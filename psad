@@ -905,7 +905,9 @@ sub check_scan() {
         ### if we are running with FW_SEARCH_ALL = Y).
         if ($pkt =~ /kernel:\s+(.*?)\s*IN=/) {
             $log_prefix = $1;
-            $ipt_prefixes{$log_prefix}++;
+            if ($log_prefix =~ /\S/) {
+                $ipt_prefixes{$log_prefix}++;
+            }
         }
 
         ### May 18 22:21:26 orthanc kernel: DROP IN=eth2 OUT=

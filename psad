@@ -852,8 +852,8 @@ sub assign_danger_level() {
                 print "assign_danger_level(): CURRENT_DANGER_LEVEL (before assignment) = "
                     . "$Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'}\n";
             }
-            ### If a scan signature packet has been detected but no other packets are detected, assign a danger
-            ### level of SIGDL.
+            ### If a scan signature packet has been detected but no other
+            ### packets are detected, assign a danger level of SIGDL.
             my $sigmatch = 0;
             my $sigproto = '';
             if (defined $Scan{$src}{$dst}{'TCP'}{'SIGMATCH'}) {

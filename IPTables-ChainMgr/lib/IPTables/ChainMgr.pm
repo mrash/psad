@@ -73,14 +73,14 @@ sub create_chain() {
 
     if (&modinternal_chain_exists($table, $chain, $iptables)) {
         ### the chain already exists
-        return 1, "[+] $chain already exists.";
+        return 1, "$table $chain chain already exists.";
     } else {
         ### create the chain
         if (&run_ipt_cmd("$iptables -t $table -N $chain") == 0) {
-            return 1, "[+] $chain chain created.";
+            return 1, "$table $chain chain created.";
         } else {
             ### could not create the chain
-            return 0, "[-] Could not create $chain chain.";
+            return 0, "Could not create $table $chain chain.";
         }
     }
 }
@@ -129,15 +129,15 @@ sub delete_chain() {
             ### of whether their were jump rules above (should probably
             ### parse for the "0 references" under the -nL <chain> output).
             if (&run_ipt_cmd("$iptables -t $table -X $del_chain") == 0) {
-                return 1, "[+] $table $del_chain chain deleted.";
+                return 1, "$table $del_chain chain deleted.";
             } else {
-                return 0, "[-] Could not delete $table $del_chain chain.";
+                return 0, "Could not delete $table $del_chain chain.";
             }
         } else {
-            return 0, "[-] Could not flush $table $del_chain chain.";
+            return 0, "Could not flush $table $del_chain chain.";
         }
     } else {
-        return 0, "[+] $table $del_chain chain does not exist";
+        return 0, "$table $del_chain chain does not exist";
     }
 }
 
@@ -186,14 +186,16 @@ sub add_ip_rule() {
     ### first check to see if this rule already exists
     if (&modinternal_find_ip_rule($normalized_src, $normalized_dst, $table,
             $chain, $target, $iptables)) {
-        return 1, '[-] Rule already exists.';
+        return 1, "$table $chain $normalized_src -> " .
+            "$normalized_dst rule already exists.";
     } else {
         ### we need to add the rule
         if (&run_ipt_cmd("$iptables -t $table -I $chain $rulenum " .
                 "-s $normalized_src -d $normalized_dst -j $target") == 0) {
-            return 1, '[+] Added rule.';
+            return 1, "Added $table $chain $normalized_src " .
+                "-> $normalized_dst";
         } else {
-            return 0, "[+] Could not add $target rule for " .
+            return 0, "Could not add $target rule for " .
                 "$normalized_src -> $normalized_dst";
         }
     }
@@ -247,13 +249,13 @@ sub delete_ip_rule() {
         ### we need to delete the rule
         if (&run_ipt_cmd("$iptables " .
             "-t $table -D $chain $rulenum") == 0) {
-            return 1, "[+] Deleted rule #$rulenum";
+            return 1, "Deleted $table $chain rule #$rulenum";
         } else {
-            return 0, "[+] Could not delete $target rule " .
+            return 0, "Could not delete $target rule " .
                 "#$rulenum for $normalized_src -> $normalized_dst.";
         }
     } else {
-        return 0, "[-] Rule does not exist in $chain chain.";
+        return 0, "Rule does not exist in $chain chain.";
     }
 }
 
@@ -315,14 +317,14 @@ sub add_jump_rule() {
     ### first check to see if the jump rule already exists
     if (&modinternal_find_ip_rule('0.0.0.0/0', '0.0.0.0/0', $table,
             $from_chain, $to_chain, $iptables)) {
-        return 1, '[-] Jump rule already exists.';
+        return 1, "$table $to_chain jump rule already exists.";
     } else {
         ### we need to add the rule
         if (&run_ipt_cmd("$iptables " .
             "-t $table -I $from_chain 1 -j $to_chain") == 0) {
-            return 1, '[+] Added rule.';
+            return 1, "Added $table $to_chain jump rule.";
         } else {
-            return 0, "[+] Could not add jump rule for $to_chain.";
+            return 0, "Could not add jump rule for $table $to_chain.";
         }
     }
 }

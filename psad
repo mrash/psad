@@ -190,6 +190,9 @@ my @ipchains_chains = qw(input);
 ### protocol info, tcp flags, etc.
 my %scan;
 
+### cache various characteristics of scan source ips.
+my %scan_attr;
+
 ### cache all scan signatures (initialized by default)
 my %sigs;
 
@@ -243,6 +246,7 @@ my $syslog_server    = 0;
 my $kill             = 0;
 my $restart          = 0;
 my $status           = 0;
+my $status_ip        = '';
 my $benchmark        = 0;
 my $b_packets        = 0;
 my $usr1             = 0;
@@ -326,6 +330,7 @@ Getopt::Long::Configure('no_ignore_case');
                                           # added via the auto blocking code.
     'Status'        => \$status,          # Display status of any currently
                                           # running psad processes.
+    'ip-status=s'   => \$status_ip,       # Display status for a specific ip.
     'Benchmark'     => \$benchmark,       # Run in benchmark mode.
     'packets=i'     => \$b_packets,       # Specify number of packets to use
                                           # in benchmark test.
@@ -368,6 +373,11 @@ if ($ver) {
     print " .. psad v$version, by Michael Rash ",
         "<mbr\@cipherdyne.com>\n";
     exit 0;
+}
+
+if ($status_ip && ! $status) {
+    die ' ** The --ip option can only be specified along with ',
+        'the --Status option.  Exiting.';
 }
 
 ### check for any old command line arguements
@@ -1904,13 +1914,22 @@ sub scan_logr() {
                         $subject = " ** psad: SCAN DETECTED from: $src";
                     }
                 }
-                &Psad::sendmail($subject, $email_alert, $config{'EMAIL_ADDRESSES'},
-                    $cmds{'mail'});
+                &Psad::sendmail($subject, $email_alert,
+                    $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
                 $scan{$src}{$dst}{'EMAIL_COUNT'}++;
 
                 ### print the number of email alerts we have sent
                 &Psad::logr("$scan{$src}{$dst}{'EMAIL_COUNT'}\n",
                     {$ecount_file => 0});
+
+                if ($config{'ENABLE_EXTERNAL_SCRIPT'} eq 'Y') {
+                    if ($config{'EXEC_EXT_SCRIPT_PER_ALERT'} eq 'Y') {
+#                        &exec_external_script($src);
+                    } else {
+#                        &exec_external_script($src) unless
+#                            defined $scan{$src}
+                    }
+                }
             }
             ### delete all current intervals so they won't show up
             ### in the next alert
@@ -2563,6 +2582,10 @@ sub restart() {
 
 ### display the status of all four psad daemons
 sub status() {
+
+    ### print the status of a specific ip address
+    &status_ip() if $status_ip;
+
     my $cmdline;
     ### only the psad daemon (normally) runs with command line arguments
     if (-e $cmdline_file) {
@@ -2681,6 +2704,66 @@ sub status() {
             print " ** psad: pid file $pidfile does not exist for ",
                 "$pidname on $hostname\n";
         }
+    }
+    exit $rv;
+}
+
+sub status_ip() {
+    my $rv = 0;
+    my @match_ip;
+    die " ** $config{'FW_DATA'} does not exist yet.  Exiting."
+        unless -e $config{'FW_DATA'};
+    die " ** No data yet in $config{'FW_DATA'}.  Exiting."
+        unless -s $config{'FW_DATA'} > 0;
+    die " ** No scans from $status_ip have been detected.\n",
+        "    See 'psad --Status' for a complete list."
+        unless -d "$config{'PSAD_DIR'}/$status_ip";
+    open FW, "< $config{'FW_DATA'}" or die " ** Could not open ",
+        "$config{'FW_DATA'}: $!";
+    while (<FW>) {
+        push @match_ip, $_ if $_ =~ /SRC=$status_ip\s/
+            || $_ =~ /DST=$status_ip\s/;
+    }
+    close FW;
+    die " ** Could not match $status_ip to packets in $config{'FW_DATA'}.  ",
+        "Exiting." unless @match_ip;
+    open D, "> $config{'PSAD_DIR'}/$status_ip/fwdata" or
+        die " ** Could not open $config{'PSAD_DIR'}/$status_ip/fwdata";
+    for my $line (@match_ip) {
+        print D $line;
+    }
+    for (my $i=$#match_ip; $i>=$#match_ip-10; $i--) {
+        print STDOUT $match_ip[$i] if defined $match_ip[$i];
+    }
+    print STDOUT "\n .. The above packet output shows up to 10 of the ",
+        "most recently\n    logged packets for $status_ip.\n";
+    print STDOUT " .. All packets logged by iptables specifically for $status_ip\n",
+        "    can be viewed here: $config{'PSAD_DIR'}/$status_ip/fwdata\n";
+    if (-e "$config{'PSAD_DIR'}/$status_ip/packet_ctr") {
+        print STDOUT " .. Packet counters:\n";
+        open F, "< $config{'PSAD_DIR'}/$status_ip/packet_ctr" or
+            die " ** Could not open $config{'PSAD_DIR'}/$status_ip/",
+                "packet_ctr: $!";
+        print STDOUT "        $_" for <F>;
+        close F;
+    }
+    if (-e "$config{'PSAD_DIR'}/$status_ip/email_count") {
+        open F, "< $config{'PSAD_DIR'}/$status_ip/email_count" or
+            die " ** Could not open $config{'PSAD_DIR'}/$status_ip/",
+                "email_count: $!";
+        my $ec = <F>;
+        close F;
+        chomp $ec;
+        print STDOUT " .. Email alerts sent: $ec\n";
+    }
+    if (-e "$config{'PSAD_DIR'}/$status_ip/danger_level") {
+        open F, "< $config{'PSAD_DIR'}/$status_ip/danger_level" or
+            die " ** Could not open $config{'PSAD_DIR'}/$status_ip/",
+                "danger_level: $!";
+        my $dl = <F>;
+        close F;
+        chomp $dl;
+        print STDOUT " .. Current danger level: $dl\n";
     }
     exit $rv;
 }
@@ -2874,7 +2957,7 @@ sub setup() {
 
         my $found_fifo = 0;
         for my $line (@slines) {
-            $found_fifo = 1 if ($line =~ /psadfifo/);
+            $found_fifo = 1 if $line =~ /psadfifo/;
         }
 
         unless ($found_fifo) {
@@ -2911,7 +2994,8 @@ sub check_config() {
         PACKET_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR
         PROC_FORWARD_FILE ENABLE_PERSISTENCE AUTO_BLOCK_IPT_FILE
         AUTO_BLOCK_IPCH_FILE AUTO_BLOCK_TCPWR_FILE PSAD_SIGS_FILE
-        PSAD_AUTO_IPS_FILE AUTO_BLOCK_TIMEOUT
+        PSAD_AUTO_IPS_FILE AUTO_BLOCK_TIMEOUT EXTERNAL_SCRIPT
+        ENABLE_EXTERNAL_SCRIPT EXEC_EXT_SCRIPT_PER_ALERT
     );
     &Psad::validate_config($config_file, \@required_vars, $config_href);
     return;

@@ -218,7 +218,7 @@ unless (`$Cmds{'grep'} psadfifo /etc/syslog.conf`) {
 }
 unless (-d "/var/log/psad") {
     &logr(" ... Creating /var/log/psad/\n", \@LOGR_FILES);
-    mkdir "/var/log/psad",400;
+    mkdir "/var/log/psad",0400;
 }
 unless (-e "/var/log/psad/fwdata") {
     &logr(" ... Creating /var/log/psad/fwdata file\n", \@LOGR_FILES);
@@ -229,7 +229,7 @@ unless (-e "/var/log/psad/fwdata") {
 }
 unless (-d $INSTALL_DIR) {
     &logr(" ... Creating $INSTALL_DIR\n", \@LOGR_FILES);
-    mkdir $INSTALL_DIR,755;
+    mkdir $INSTALL_DIR,0755;
 }
 if (-d "whois-4.5.21") {
     &logr(" ... Compiling Marco d'Itri's whois client\n", \@LOGR_FILES);
@@ -328,7 +328,7 @@ if (-e "${INSTALL_DIR}/diskmond" && (! $nopreserve)) {
 }
 unless (-d "/etc/psad") {
     &logr(" ... Creating /etc/psad/\n", \@LOGR_FILES);
-    mkdir "/etc/psad",400;
+    mkdir "/etc/psad",0400;
 }
 if (-e "/etc/psad/psad_signatures") {
     &logr(" ... Copying psad_signatures -> /etc/psad/psad_signatures\n", \@LOGR_FILES);
@@ -654,7 +654,7 @@ sub perms_ownership() {
 }
 sub create_varlogpsad() {
     unless (-d "/var/log/psad") {
-        mkdir "/var/log/psad", 400;
+        mkdir "/var/log/psad", 0400;
     }
     return;
 }

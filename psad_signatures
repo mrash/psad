@@ -115,7 +115,7 @@ alert tcp any any -> 212.146.0.34 1963 (msg:"BACKDOOR TCPDUMP/PCAP trojan traffi
 ### scan.rules
 alert tcp $EXTERNAL_NET any -> $HOME_NET 3128 (msg:"SCAN Squid Proxy attempt"; flags:S; classtype:attempted-recon; sid:618; rev:2; psad_dlevel:2)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 1080 (msg:"SCAN SOCKS Proxy attempt"; flags:S; reference:url,help.undernet.org/proxyscan/; classtype:attempted-recon; sid:615; rev:3; psad_dlevel:2)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 8080 (msg:"SCAN Proxy \(8080\) attempt"; flags:S; classtype:attempted-recon; sid:620; rev:2; psad_dlevel:2)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 8080 (msg:"SCAN Proxy (8080) attempt"; flags:S; classtype:attempted-recon; sid:620; rev:2; psad_dlevel:2)
 alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN FIN"; flags: F; reference:arachnids,27; classtype:attempted-recon; sid:621; rev:1; psad_dlevel:2)
 alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN SYN FIN";flags:SF; reference:arachnids,198; classtype:attempted-recon; sid:624; rev:1; psad_dlevel:2)
 alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN XMAS";flags:SRAFPU; reference:arachnids,144; classtype:attempted-recon; sid:625; rev:1; psad_dlevel:2)

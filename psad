@@ -72,8 +72,20 @@
 #   Mar 16 23:50:25 orthanc kernel: DENY IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:08:00 
 #   SRC=127.0.0.1 DST=127.0.0.1 LEN=60 TOS=0x00 PREC=0x00 TTL=64 ID=0 DF PROTO=TCP SPT=39935 
 #   DINDOW=32304 RES=0x00 SYN URGP=0
-#
-#
+#################################################################################################
+
+### modules used by psad
+use File::stat "stat";
+use Getopt::Long "GetOptions";
+use autouse 'Data::Dumper' => "Dumper";  ### this one is not used very much so don't load immediately
+use autouse 'Socket' => "AF_INET";       ### not used until a scan is detected so don't load until it is needed
+use Sys::Hostname "hostname";
+use POSIX "setsid";
+# use strict;
+
+### these are globals
+use vars qw(%Scan $PRINT_SCAN_HASH $USE_IPCHAINS $USE_IPTABLES $DEBUG $HOSTNAME);
+
 #==================== config ======================= ## do not remove this line (used by install.pl to preserve configs) ##
 ### Initialize config variables.  Some can be overriden with command line args
 my $PSAD_LOGFILE = "/var/log/psad/scanlog";
@@ -118,14 +130,6 @@ my $psadCmd = "/usr/local/bin/psad";
 #================== end config ==================== ## do not remove this line (used by install.pl to preserve configs) ##
 #===================== main =======================
 
-### modules used by psad
-use File::stat;
-use Getopt::Long;
-use autouse 'Data::Dumper' => "Dumper";  ### this one is not used very much so don't load immediately
-use autouse 'Socket' => "AF_INET";       ### not used until a scan is detected so don't load until it is needed
-use Sys::Hostname;
-use POSIX;
-
 ### a few more configuration variables that should not really be in the config section
 my $VERSION = "0.9.1";
 
@@ -144,7 +148,7 @@ $USE_IPTABLES = 0;
 $DEBUG = 0;
 $HOSTNAME = hostname;
 
-### initialize some default values (command line args can override some default values)
+### initialize and scope some default variables (command line args can override some default values)
 my $Scan_href;  # main psad data structure; contains ips, port ranges, tcp flags, and danger levels
 my $daemon = 0;
 my $output = 0;
@@ -160,6 +164,8 @@ my $kill = 0;
 my $restart = 0;
 my $status = 0;
 my $print_version = 0;
+my $help = 0;
+my $config = 0;
 
 ### save a copy of the command line arguments
 my @args_cp = @ARGV;
@@ -271,7 +277,8 @@ writecmdline(\@args_cp, $cmdline_file);
 ### the psad pid to $PIDFILES[1] above.
 system "$Cmds{'kmsgsd'}";
 system "$Cmds{'diskmond'}";
-system "$Cmds{'psadwatchd'}";
+system "$Cmds{'psadwatchd'}" unless ($DEBUG);	### if running in debug mode, starting psadwatchd can start unwanted
+						### copies of psad after the debugging process is killed.
 
 ### import config variables from the config file if running with --config=<config file>
 if ($config) {
@@ -402,7 +409,7 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
                         }
 		}
 		if ($enable_persistence eq "N") {
-			$currtime = time();
+			my $currtime = time();
 			if (defined $Scan{$srcip}{$dstip}{'START_TIME'}{'EPOCH_SECONDS'}) {
 				my $tmp = $currtime - $Scan{$srcip}{$dstip}{'START_TIME'}{'EPOCH_SECONDS'};
 				if (($currtime - $Scan{$srcip}{$dstip}{'START_TIME'}{'EPOCH_SECONDS'}) >= $scan_timeout) {
@@ -567,7 +574,7 @@ sub check_port() {
 }
 sub import_signatures() {
 	my $sigfile = shift;
-	my ($proto, $srcport, $dstport, $msg, $flags);
+	my ($proto, $srcport, $dstport, $msg, $flags, $dangerlevel);
 	my %Sigs;
 	my ($start, $end, $tmpport);
 	open SIGS, "< $sigfile" or die "Could not open the signatures file $sigfile: $!\n";
@@ -667,6 +674,7 @@ sub import_signatures() {
 }
 sub import_auto_ips() {
 	my $auto_ips_file = shift;
+	my %Auto_ips;
 	open AUTO, "< $auto_ips_file";
 	my @lines = <AUTO>;
 	close AUTO;
@@ -868,7 +876,7 @@ sub logr() {
 #				undef $Scan_href->{$srcip}->{$dstip}->{'CURRENT_INTERVAL'};  # get rid of the current range to make room for a new one.
 				print STDOUT "logr():  gernerating email......\n" if $DEBUG;
 		        	open EMAILALERT, "> $email_alertfile";
-				print $hndl "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
+				&markerline($hndl);
 				print $hndl "$time:     Portscan Detected by psad (pid $$) on $HOSTNAME.\n";
 				print $hndl "\n";
 				print $hndl "Source:                     $srcip\n";
@@ -881,7 +889,7 @@ sub logr() {
 				print $hndl "End time:                   $end_time\n";
 				print $hndl "Danger level:               $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} out of 5\n";
 				print $hndl "DNS info:                   $dnsstring\n" unless $dnslookups;
-				print EMAILALERT "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
+				&markerline("EMAILALERT");
                                	print EMAILALERT "$time:     Portscan Detected by psad (pid $$) on $HOSTNAME.\n";
 				print EMAILALERT "\n";
                                	print EMAILALERT "Source:                     $srcip\n";
@@ -974,16 +982,16 @@ sub logr() {
                                         print EMAILALERT "\n";
                                 }
                                 if ($USE_IPCHAINS) {
-                                        print $hndl "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
-                                        print EMAILALERT "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
+					&markerline($hndl);
+					&markerline("EMAILALERT");
                                 }
-                                print EMAILALERT "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
+				&markerline("EMAILALERT");
                                 close EMAILALERT;
                                 if ($Scan_href->{$srcip}->{$dstip}->{'ALERTED'} eq "N" && $current_danger_level >= $EMAIL_ALERT_DANGER_LEVEL) {
                                         $Scan_href = send_email_alert($Scan_href, $srcip, $dstip, $flags_mesg, $email_alertfile, $email_addresses_aref, $Cmds_href);
                                 }
                                 $Scan_href->{$srcip}->{$dstip}->{'LOGR'} = "N";
-                                print $hndl "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
+				&markerline($hndl);
 			}
 		}
 	}
@@ -1082,7 +1090,7 @@ sub get_listening_ports() {
 	my @ports = `$Cmds_href->{'netstat'} -an |$Cmds_href->{'grep'} \"LISTEN\\b\"`;
 	for my $port_tmp (@ports) {
 		my ($proto, $p_tmp) = (split /\s+/, $port_tmp)[0,3];
-		$port = (split /:/, $p_tmp)[1];
+		my $port = (split /:/, $p_tmp)[1];
 		my $key = $proto . $port;
 		$listening_ports{$key} = "";
 	}
@@ -1185,7 +1193,7 @@ sub check_commands() {
         my $Cmds_href = shift;
         CMD: foreach my $cmd (keys %$Cmds_href) {
                 unless (-e $Cmds_href->{$cmd}) {
-                        $real_location = `which $cmd 2> /dev/null`;
+                        my $real_location = `which $cmd 2> /dev/null`;
                         chomp $real_location;
                         if ($real_location) {
                                 $Cmds_href->{$cmd} = $real_location;
@@ -1320,7 +1328,12 @@ sub unique_pid() {
 			die "\n@@@@@  (psad): $pidname (pid: $pid) is already running!  Exiting.\n\n";
 		}
 	}
-}			
+}
+sub markerline() {
+        my $hndl = shift;
+	print $hndl "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
+        return;
+}
 sub usage_and_exit() {
         my $exitcode = shift;
         print <<_HELP_;

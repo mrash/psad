@@ -3541,7 +3541,9 @@ sub tcpwr_remove_block() {
         }
     }
     close T;
-    move "$config{'ETC_HOSTS_DENY'}.tmp", $config{'ETC_HOSTS_DENY'};
+    move "$config{'ETC_HOSTS_DENY'}.tmp", $config{'ETC_HOSTS_DENY'} or die
+        "[*] Could not move $config{'ETC_HOSTS_DENY'}.tmp -> ",
+        "$config{'ETC_HOSTS_DENY'}";
     return;
 }
 
@@ -3739,7 +3741,8 @@ sub rm_blocked_ip() {
             print W $line, "\n" unless $line eq $src;
         }
         close W;
-        move "${file}.tmp", $file;
+        move "${file}.tmp", $file or die "[*] Could not move ",
+            "${file}.tmp -> $file";
     }
     return;
 }
@@ -4668,7 +4671,8 @@ sub archive_data() {
                     if (-d $archive_ipdir) {
                         rmtree $archive_ipdir;
                     }
-                    move $old_ipdir, $archive_ipdir;
+                    move $old_ipdir, $archive_ipdir or die "[*] Could not ",
+                        "move $old_ipdir -> $archive_ipdir";
                 }
             }
         }
@@ -4815,7 +4819,8 @@ sub setup() {
     ### make sure the new whois path exists
     if (-x '/usr/bin/whois.psad' && ! -x $cmds{'whois'}
             && '/usr/bin/whois.psad' ne $cmds{'whois'}) {
-        move '/usr/bin/whois.psad', $cmds{'whois'};
+        move '/usr/bin/whois.psad', $cmds{'whois'} or die "[*] Could not ",
+            "move /usr/bin/whois.psad -> $cmds{'whois'}";
     }
 
     die '[*] No system logger config file could be found.'
@@ -4829,6 +4834,8 @@ sub setup() {
         if (-e $config{'ETC_SYSLOG_CONF'}) {
             unless (-e "$config{'ETC_SYSLOG_CONF'}.orig") {
                 copy $config{'ETC_SYSLOG_CONF'},
+                    "$config{'ETC_SYSLOG_CONF'}.orig" or die "[*] Could not ",
+                    "copy $config{'ETC_SYSLOG_CONF'} -> ",
                     "$config{'ETC_SYSLOG_CONF'}.orig";
             }
             open RS, "< $config{'ETC_SYSLOG_CONF'}" or
@@ -4870,6 +4877,8 @@ sub setup() {
         if (-e $config{'ETC_SYSLOGNG_CONF'}) {
             unless (-e "$config{'ETC_SYSLOGNG_CONF'}.orig") {
                 copy $config{'ETC_SYSLOGNG_CONF'},
+                    "$config{'ETC_SYSLOGNG_CONF'}.orig" or die "[*] Could not ",
+                    "copy $config{'ETC_SYSLOGNG_CONF'} -> ",
                     "$config{'ETC_SYSLOGNG_CONF'}.orig";
             }
             open RS, "< $config{'ETC_SYSLOGNG_CONF'}" or
@@ -4917,6 +4926,8 @@ sub setup() {
         if (-e $config{'ETC_METALOG_CONF'}) {
             unless (-e "$config{'ETC_METALOG_CONF'}.orig") {
                 copy $config{'ETC_METALOG_CONF'},
+                    "$config{'ETC_METALOG_CONF'}.orig" or die "[*] Could not ",
+                    "copy $config{'ETC_METALOG_CONF'} -> ",
                     "$config{'ETC_METALOG_CONF'}.orig";
             }
             open RS, "< $config{'ETC_METALOG_CONF'}" or

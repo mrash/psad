@@ -71,6 +71,7 @@ my $SNORT_DIR    = "${PSAD_CONFDIR}/snort_rules";
 
 ### system binaries ###
 my $chkconfigCmd = '/sbin/chkconfig';
+my $rcupdateCmd  = '/sbin/rc-update';
 my $gzipCmd      = '/usr/bin/gzip';
 my $psCmd        = '/bin/ps';
 my $netstatCmd   = '/bin/netstat';
@@ -144,6 +145,11 @@ if ($distro eq 'redhat') {
     $Cmds{'chkconfig'} = $chkconfigCmd;
 }
 
+### add rc-update if we are running on a gentoo distro
+if ($distro eq 'gentoo') {
+    $Cmds{'rcupdate'} = $rcupdateCmd;
+}
+
 my $init_dir = '';
 
 if (-d $INIT_DIR) {
@@ -157,9 +163,7 @@ if (-d $INIT_DIR) {
 
 ### need to make sure this exists before attempting to
 ### write anything to the install log.
-unless (-d $PSAD_DIR) {
-    mkdir $PSAD_DIR, 0500;
-}
+mkdir $PSAD_DIR, 0500 unless -d $PSAD_DIR;
 
 &check_commands();
 $Cmds{'psad'} = $psadCmd;
@@ -540,8 +544,14 @@ sub install() {
     &install_manpage('kmsgsd.8');
     &install_manpage('diskmond.8');
 
-    my $init_file = 'psad-init';
-    $init_file = 'psad-init.generic' if $distro ne 'redhat';
+    my $init_file = '';
+    if ($distro eq 'redhat') {
+        $init_file = 'psad-init';
+    } elsif ($distro eq 'gentoo') {
+        $init_file = 'psad-init.gentoo';
+    } else {
+        $init_file = 'psad-init.generic';
+    }
 
     if ($init_dir) {
         &logr(" .. Copying $init_file -> ${init_dir}/psad\n");
@@ -1047,6 +1057,7 @@ sub check_old_psad_installation() {
 }
 
 sub get_distro() {
+    return 'gentoo' if -e '/etc/gentoo-release';
     if (-e '/etc/issue') {
         ### Red Hat Linux release 6.2 (Zoot)
         open ISSUE, '< /etc/issue' or
@@ -1240,6 +1251,8 @@ sub enable_psad_at_boot() {
     if ($ans eq 'y') {
         if ($distro eq 'redhat') {
             system "$Cmds{'chkconfig'} --add psad";
+        } elsif ($distro eq 'gentoo') {
+            system "$Cmds{'rcupdate'} add psad default";
         } else {  ### it is a non-redhat distro, try to
                   ### get the runlevel from /etc/inittab
             if ($RUNLEVEL) {

@@ -83,6 +83,11 @@ $< == 0 && $> == 0 or
     die '[*] fwcheck_psad.pl: You must be root (or equivalent ',
         "UID 0 account) to execute fwcheck_psad.pl!  Exiting.\n";
 
+if ($fw_file) {
+    die "[*] iptables dump file: $fw_file does not exist."
+        unless -e $fw_file;
+}
+
 ### import psad.conf
 &Psad::buildconf(\%config, \%cmds, $config_file);
 
@@ -335,7 +340,12 @@ sub ipt_chk_chain() {
     } else {
         ### we are not looking for specific log
         ### prefixes, but we need _some_ logging rule
-        my $ipt_log = $ipt->chain_action_rules('filter', $chain, 'LOG');
+        my $ipt_log;
+        if ($fw_file) {
+            $ipt_log = $ipt->chain_action_rules('filter', $chain, 'LOG', $fw_file);
+        } else {
+            $ipt_log = $ipt->chain_action_rules('filter', $chain, 'LOG');
+        }
         return 0 unless $ipt_log;
         if (defined $ipt_log->{'all'}
                 and defined $ipt_log->{'all'}->{'0.0.0.0/0'}

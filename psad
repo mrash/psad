@@ -1210,7 +1210,7 @@ sub add_snort_sid() {
             $scan{$src}{$dst}{'alerted'} = 0
                 if ($config{'ALERT_ALL'} eq 'N');
         }
-        $scan{$src}{$dst}{$proto}{'snort_sid'}{$sid}{$chain}++;
+        $scan{$src}{$dst}{$proto}{'sid'}{$sid}{$chain}++;
     }
     return;
 }
@@ -1553,7 +1553,7 @@ sub import_configs() {
     ### the --Restart command line switch was given
     exit &restart() if $restart;
 
-    &Psad::psyslog('psad', '.. starting psad ..');
+    &Psad::psyslog('psad', '.. starting psad');
 
     ### import psad signatures (XXX: these should be taken directly
     ### from the snort signatures instead)
@@ -2542,17 +2542,17 @@ sub scan_logr_signatures() {
     open LS, ">> $log_sigs" or die " ** Could not open $log_sigs: $!";
     for my $proto qw(tcp udp icmp) {
         next unless (defined $scan{$src}{$dst}{$proto}{'curr_sig'}
-            or defined $scan{$src}{$dst}{$proto}{'snort_sid'});
+            or defined $scan{$src}{$dst}{$proto}{'sid'});
         print $email_fh "\n\n ** $proto scan signatures: **\n\n";
         print LS "\n\n ** $proto scan signatures **\n\n";
         print STDERR " .. scan_logr_signatures(): src: $src dst: $dst ",
             "proto: $proto\n" if $debug;
-        for my $sid (keys %{$scan{$src}{$dst}{$proto}{'snort_sid'}}) {
-            for my $chain (keys %{$scan{$src}{$dst}{$proto}{'snort_sid'}{$sid}}) {
+        for my $sid (keys %{$scan{$src}{$dst}{$proto}{'sid'}}) {
+            for my $chain (keys %{$scan{$src}{$dst}{$proto}{'sid'}{$sid}}) {
                 my $msg = $snort_msgs{$sid}{'msg'};
                 my $classtype = $snort_msgs{$sid}{'classtype'};
-                my $pkts = $scan{$src}{$dst}{$proto}{'snort_sid'}{$sid}{$chain};
-                my $content;
+                my $pkts = $scan{$src}{$dst}{$proto}{'sid'}{$sid}{$chain};
+                my $content = '';
                 if (defined $snort_msgs{$sid}{'content'}) {
                     $content = $snort_msgs{$sid}{'content'};
                 }
@@ -2595,55 +2595,55 @@ sub scan_logr_signatures() {
                             if (defined $local_ports{$proto}{$dp}) {
                                 if ($flags) {
                                     print $email_fh "   \"$msg\"\n",
-                                        "        chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
+                                        "        sid=$sid chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
                                         "** Your machine is listening on $proto port: $dp!\n";
                                     print LS "   \"$msg\"\n",
-                                        "        chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
+                                        "        sid=$sid chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
                                         "** Your machine is listening on $proto port: $dp!\n";
                                 } else {
                                     print $email_fh "   \"$msg\"\n",
-                                        "        chain=$chain packets=$pkts dp=$dp ",
+                                        "        sid=$sid chain=$chain packets=$pkts dp=$dp ",
                                         "** Your machine is listening on $proto port: $dp!\n";
                                     print LS "   \"$msg\"\n",
-                                        "        chain=$chain packets=$pkts dp=$dp ",
+                                        "        sid=$sid chain=$chain packets=$pkts dp=$dp ",
                                         "** Your machine is listening on $proto port: $dp!\n";
                                 }
                             } else {
                                 if ($flags) {
                                     print $email_fh "   \"$msg\"\n",
-                                        "        chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
+                                        "        sid=$sid chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
                                         "No local server on $proto/$dp\n";
                                     print LS "   \"$msg\"\n",
-                                        "        chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
+                                        "        sid=$sid chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
                                         "No local server on $proto/$dp\n";
                                 } else {
                                     print $email_fh "   \"$msg\"\n",
-                                        "        chain=$chain packets=$pkts dp=$dp No local ",
+                                        "        sid=$sid chain=$chain packets=$pkts dp=$dp No local ",
                                         "server on $proto/$dp\n";
                                     print LS "   \"$msg\"\n",
-                                        "        chain=$chain packets=$pkts dp=$dp No local ",
+                                        "        sid=$sid chain=$chain packets=$pkts dp=$dp No local ",
                                         "server on $proto/$dp\n";
                                 }
                             }
                         } else {
                             if ($flags) {
                                 print $email_fh "   \"$msg\"\n",
-                                    "       chain=$chain packets=$pkts dp=$dp flags=[$flags]\n";
+                                    "       sid=$sid chain=$chain packets=$pkts dp=$dp flags=[$flags]\n";
                                 print LS "   \"$msg\"\n",
-                                    "       chain=$chain packets=$pkts dp=$dp flags=[$flags]\n";
+                                    "       sid=$sid chain=$chain packets=$pkts dp=$dp flags=[$flags]\n";
                             } else {
                                 print $email_fh "   \"$msg\"\n",
-                                    "       chain=$chain packets=$pkts dp=$dp\n";
+                                    "       sid=$sid chain=$chain packets=$pkts dp=$dp\n";
                                 print LS "   \"$msg\"\n",
-                                    "       chain=$chain packets=$pkts dp=$dp\n";
+                                    "       sid=$sid chain=$chain packets=$pkts dp=$dp\n";
                             }
                         }
                     }
                 } else {
                     my $pkts = $scan{$src}{$dst}{'icmp'}
                         {'curr_sig'}{$sid}{$chain}{'pkts'};
-                    print $email_fh qq(   "$msg" chain=$chain packets=$pkts\n);
-                    print LS qq(   "$msg" chain=$chain packets=$pkts\n);
+                    print $email_fh qq(   "$msg" sid=$sid chain=$chain packets=$pkts\n);
+                    print LS qq(   "$msg" sid=$sid chain=$chain packets=$pkts\n);
                 }
                 ### signature logging with syslog is not yet supported
                 ### (requires a message for each matched signature).
@@ -2656,7 +2656,7 @@ sub scan_logr_signatures() {
         ### won't show up in the next alert
         delete $scan{$src}{$dst}{$proto}{'curr_sig'}
             unless $config{'SHOW_ALL_SIGNATURES'} eq 'Y';
-        delete $scan{$src}{$dst}{$proto}{'snort_sid'}
+        delete $scan{$src}{$dst}{$proto}{'sid'}
             unless $config{'SHOW_ALL_SIGNATURES'} eq 'Y';
     }
     close LS;
@@ -3314,7 +3314,7 @@ sub file_permissions() {
 sub stop_psad() {
     my $rv = 0;
 
-    &Psad::psyslog('psad', '.. shutting down psad daemons.');
+    &Psad::psyslog('psad', '.. shutting down psad daemons');
     ### must kill psadwatchd first since if not, it might try to restart
     ### any of the other three daemons.
     for my $pidname qw(psadwatchd kmsgsd psad) {

@@ -10,27 +10,31 @@ logged, at which time these messages will be written to the
 ### iptables ###
 
 Chain INPUT (policy ACCEPT)
-target     prot opt source               destination         
-ACCEPT     tcp  --  129.xx.xx.xx         64.44.21.15        tcp dpt:22 flags:0x0216/0x022 
-ACCEPT     tcp  --  208.xx.xx.xx         64.44.21.15        tcp dpt:22 flags:0x0216/0x022 
-ACCEPT     tcp  --  24.xx.xx.xx          64.44.21.15        tcp dpt:22 flags:0x0216/0x022 
-ACCEPT     tcp  --  208.xx.xx.xx         64.44.21.15        tcp dpt:22 flags:0x0216/0x022 
-ACCEPT     tcp  --  0.0.0.0/0            64.44.21.15        tcp dpt:25 flags:0x0216/0x022 
-ACCEPT     tcp  --  0.0.0.0/0            64.44.21.15        tcp dpt:80 flags:0x0216/0x022 
+target     prot opt source               destination
+ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0          state RELATED,ESTABLISHED
+ACCEPT     tcp  --  129.xx.xx.xx         64.44.21.15        tcp dpt:22 flags:0x0216/0x022
+ACCEPT     tcp  --  208.xx.xx.xx         64.44.21.15        tcp dpt:22 flags:0x0216/0x022
+ACCEPT     tcp  --  24.xx.xx.xx          64.44.21.15        tcp dpt:22 flags:0x0216/0x022
+ACCEPT     tcp  --  208.xx.xx.xx         64.44.21.15        tcp dpt:22 flags:0x0216/0x022
+ACCEPT     tcp  --  0.0.0.0/0            64.44.21.15        tcp dpt:25 flags:0x0216/0x022
+ACCEPT     tcp  --  0.0.0.0/0            64.44.21.15        tcp dpt:80 flags:0x0216/0x022
 LOG        tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0216/0x022 LOG flags 0 level 4 prefix `DENY ' 
-DROP       tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0216/0x022 
+DROP       tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0216/0x022
 LOG        tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0211/0x021 LOG flags 0 level 4 prefix `DENY ' 
-DROP       tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0211/0x021 
-ACCEPT     udp  --  209.xx.xx.xx         0.0.0.0/0          udp spt:53 
-ACCEPT     udp  --  208.xx.xx.xx         0.0.0.0/0          udp spt:53 
-DROP       udp  --  0.0.0.0/0            0.0.0.0/0          
-LOG        icmp --  0.0.0.0/0            0.0.0.0/0          limit: avg 1/sec burst 5 LOG flags 0 level 4 
+DROP       tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0211/0x021
+ACCEPT     udp  --  209.xx.xx.xx         0.0.0.0/0          udp spt:53
+ACCEPT     udp  --  208.xx.xx.xx         0.0.0.0/0          udp spt:53
+DROP       udp  --  0.0.0.0/0            0.0.0.0/0
+LOG        icmp --  0.0.0.0/0            0.0.0.0/0          limit: avg 1/sec burst 5 LOG flags 0 level 4
 
 Chain FORWARD (policy ACCEPT)
-target     prot opt source               destination         
+target     prot opt source               destination
+ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0          state RELATED,ESTABLISHED
+LOG        all  --  0.0.0.0/0            0.0.0.0/0          LOG flags 0 level 4 prefix `DROP '
+DROP       all  --  0.0.0.0/0            0.0.0.0/0
 
 Chain OUTPUT (policy ACCEPT)
-target     prot opt source               destination 
+target     prot opt source               destination
 
 
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

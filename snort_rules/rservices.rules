@@ -16,3 +16,5 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 514 (msg:"RSERVICES rsh bin"; flow:to_s
 alert tcp $EXTERNAL_NET any -> $HOME_NET 514 (msg:"RSERVICES rsh echo + +"; flow:to_server,established; content: "echo |22|+ +|22|"; reference:arachnids,388; classtype:attempted-user; sid:608;  rev:4;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 514 (msg:"RSERVICES rsh froot"; flow:to_server,established; content:"-froot|00|"; reference:arachnids,387; classtype:attempted-admin; sid:609;  rev:4;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 514 (msg:"RSERVICES rsh root"; flow:to_server,established; content: "root|00|root|00|"; reference:arachnids,391; classtype:attempted-admin; sid:610;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 512 (msg:"RSERVICES rexec username overflow attempt"; content:"|00|"; offset:9; content:"|00|"; distance:0; content:"|00|"; distance:0; classtype:attempted-admin; sid:2113; rev:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 512 (msg:"RSERVICES rexec password overflow attempt"; content:"|00|"; content:"|00|"; distance:33; content:"|00|"; distance:0; classtype:attempted-admin; sid:2114; rev:2;)

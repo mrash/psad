@@ -5,7 +5,7 @@
 # ORACLE RULES
 #----------
 #
-# These signatures detect unusual and potentually malicous oracle traffic.
+# These signatures detect unusual and potentially malicious oracle traffic.
 # These signatures are based from signatures written by Hank Leininger
 # <hlein@progressive-comp.com> for Enterasys's Dragon IDS that he released
 # publicly.
@@ -17,11 +17,11 @@
 #
 
 alert tcp $EXTERNAL_NET any -> $SQL_SERVERS $ORACLE_PORTS (msg:"ORACLE EXECUTE_SYSTEM attempt"; flow:to_server,established; content:"EXECUTE_SYSTEM"; nocase; classtype:system-call-detect; sid:1673; rev:3;)
-alert tcp $EXTERNAL_NET any -> $SQL_SERVERS $ORACLE_PORTS (msg:"ORACLE connect_data\(command=version\) attempt"; flow:to_server,established; content:"connect_data\(command=version\)"; nocase; classtype:protocol-command-decode; sid:1674; rev:3;)
+alert tcp $EXTERNAL_NET any -> $SQL_SERVERS $ORACLE_PORTS (msg:"ORACLE connect_data remote version detection attempt"; flow:to_server,established; content:"connect_data\(command=version\)"; nocase; classtype:protocol-command-decode; sid:1674; rev:4;)
 alert tcp $EXTERNAL_NET any -> $SQL_SERVERS $ORACLE_PORTS (msg:"ORACLE misparsed login response"; flow:from_server,established; content:"description=\("; nocase; content:!"connect_data=\(sid="; nocase; content:!"address=\(protocol=tcp"; nocase; classtype:suspicious-login; sid:1675; rev:3;)
 alert tcp $EXTERNAL_NET any -> $SQL_SERVERS $ORACLE_PORTS (msg:"ORACLE select union attempt"; flow:to_server,established; content:"select "; nocase; content:" union "; nocase; classtype:protocol-command-decode; sid:1676; rev:3;)
 alert tcp $EXTERNAL_NET any -> $SQL_SERVERS $ORACLE_PORTS (msg:"ORACLE select like '%' attempt"; flow:to_server,established; content:" where "; nocase; content:" like '%'"; nocase; classtype:protocol-command-decode; sid:1677; rev:3;)
-alert tcp $EXTERNAL_NET any -> $SQL_SERVERS $ORACLE_PORTS (msg:"ORACLE select like \"%\" attempt"; flow:to_server,established; content:" where "; nocase; content:" like \"%\""; nocase; classtype:protocol-command-decode; sid:1678; rev:3;)
+alert tcp $EXTERNAL_NET any -> $SQL_SERVERS $ORACLE_PORTS (msg:"ORACLE select like '%' attempt backslash escaped"; flow:to_server,established; content:" where "; nocase; content:" like \"%\""; nocase; classtype:protocol-command-decode; sid:1678; rev:4;)
 alert tcp $EXTERNAL_NET any -> $SQL_SERVERS $ORACLE_PORTS (msg:"ORACLE describe attempt";  flow:to_server,established; content:"describe "; nocase; classtype:protocol-command-decode; sid:1679; rev:3;)
 alert tcp $EXTERNAL_NET any -> $SQL_SERVERS $ORACLE_PORTS (msg:"ORACLE all_constraints access"; flow:to_server,established; content:"all_constraints"; nocase; classtype:protocol-command-decode; sid:1680; rev:3;)
 alert tcp $EXTERNAL_NET any -> $SQL_SERVERS $ORACLE_PORTS (msg:"ORACLE all_views access"; flow:to_server,established; content:"all_views"; nocase; classtype:protocol-command-decode; sid:1681; rev:3;)

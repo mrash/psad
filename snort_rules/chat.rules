@@ -21,10 +21,10 @@ alert tcp $HOME_NET any -> $EXTERNAL_NET 6666:7000 (msg:"CHAT IRC nick change"; 
 alert tcp $HOME_NET any -> $EXTERNAL_NET 6666:7000 (msg:"CHAT IRC DCC file transfer request"; flow:to_server,established; content:"PRIVMSG "; nocase; offset:0; content:" \:.DCC SEND"; nocase; classtype:misc-activity; sid:1639;  rev:3;)
 alert tcp $HOME_NET any -> $EXTERNAL_NET 6666:7000 (msg:"CHAT IRC DCC chat request"; flow:to_server,established; content:"PRIVMSG "; nocase; offset:0; content:" \:.DCC CHAT chat"; nocase; classtype:misc-activity; sid:1640;  rev:3;)
 alert tcp $HOME_NET any -> $EXTERNAL_NET 6666:7000 (msg:"CHAT IRC channel join"; flow:to_server,established; content:"JOIN \: \#"; nocase; offset:0; classtype:misc-activity; sid:1729;  rev:2;)
-alert tcp $HOME_NET any -> $EXTERNAL_NET 6666:7000 (msg:"CHAT IRC message"; flow:to_server,established; content:"PRIVMSG "; nocase; offset:0; classtype:misc-activity; sid:1463;  rev:3;)
+alert tcp $HOME_NET any <> $EXTERNAL_NET 6666:7000 (msg:"CHAT IRC message"; flow:established; content:"PRIVMSG "; nocase; classtype:misc-activity; sid:1463; rev:5;)
 alert tcp $HOME_NET any -> $EXTERNAL_NET 6666:7000 (msg:"CHAT IRC dns request"; flow:to_server,established; content:"USERHOST "; nocase; offset:0; classtype:misc-activity; sid:1789; rev:1;)
 alert tcp $EXTERNAL_NET 6666:7000 -> $HOME_NET any (msg:"CHAT IRC dns response"; flow:to_client,established; content:"\:"; offset:0; content:" 302 "; content:"=+"; classtype:misc-activity; sid:1790; rev:2;)
 
 alert tcp $HOME_NET any -> $AIM_SERVERS any (msg:"CHAT AIM login"; flow:to_server,established; content:"|2a 01|"; offset:0; depth:2; classtype:policy-violation; sid:1631; rev:4;)
 alert tcp $HOME_NET any -> $AIM_SERVERS any (msg:"CHAT AIM send message"; flow:to_server,established; content:"|2a 02|"; offset:0; depth:2; content:"|00 04 00 06|"; offset:6; depth:4; classtype:policy-violation; sid:1632; rev:4;)
-alert tcp $AIM_SERVERS any -> $HOME_NET any (msg:"CHAT AIM recieve message"; flow:to_client; content:"|2a 02|"; offset:0; depth:2; content:"|00 04 00 07|"; offset:6; depth:4; classtype:policy-violation; sid:1633; rev:3;)
+alert tcp $AIM_SERVERS any -> $HOME_NET any (msg:"CHAT AIM receive message"; flow:to_client; content:"|2a 02|"; offset:0; depth:2; content:"|00 04 00 07|"; offset:6; depth:4; classtype:policy-violation; sid:1633; rev:4;)

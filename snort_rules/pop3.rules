@@ -5,14 +5,26 @@
 # POP3 RULES
 #--------------
 
-alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 USER overflow attempt"; flow:to_server,established; content:"USER "; nocase; content:!"|0a|"; within:50; reference:bugtraq,789; reference:cve,CVE-1999-0494; reference:nessus,10311; classtype:attempted-admin; sid:1866; rev:4;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 AUTH overflow attempt"; flow:to_server,established; content:"AUTH "; nocase; content:!"|0a|"; within:50; classtype:attempted-admin; sid:1936; rev:1;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 LIST overflow attempt"; flow:to_server,established; content:"LIST "; nocase; content:!"|0a|"; within:50; reference:bugtraq,948; reference:cve,CAN-2000-0096; classtype:attempted-admin; sid:1937; rev:1;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 XTND overflow attempt"; flow:to_server,established; content:"XTND "; nocase; content:!"|0a|"; within:50; classtype:attempted-admin; sid:1938; rev:1;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 PASS overflow attempt"; flow:to_server,established; content:"PASS "; nocase; content:!"|0a|"; within:50; reference:cve,CAN-1999-1511; reference:nessus,10325; classtype:attempted-admin; sid:1634; rev:5;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 APOP overflow attempt"; flow:to_server,established; content:"APOP "; nocase; content:!"|0a|"; within:256; reference:cve,CAN-2000-0841; reference:bugtraq,1652; reference:nessus,10559; classtype:attempted-admin; sid:1635; rev:5;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 EXPLOIT x86 bsd overflow"; flow:to_server,established; content:"|5e0 e31c 0b03 b8d7 e0e8 9fa 89f9|"; classtype:attempted-admin; sid:286; rev:4;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 EXPLOIT x86 bsd overflow"; flow:to_server,established; content:"|685d 5eff d5ff d4ff f58b f590 6631|"; classtype:attempted-admin; sid:287; rev:4;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 EXPLOIT x86 linux overflow"; flow:to_server,established; content:"|d840 cd80 e8d9 ffff ff|/bin/sh"; classtype:attempted-admin; sid:288; rev:4;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 EXPLOIT x86 sco overflow"; flow:to_server,established; content:"|560e 31c0 b03b 8d7e 1289 f989 f9|"; classtype:attempted-admin; sid:289; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 DELE negative arguement attempt"; content:"DELE"; depth:4; nocase; content:"-"; distance:1; byte_test:1,>,0,0,relative,string; classtype:misc-attack; reference:bugtraq,7445; reference:bugtraq,6053; sid:2121; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 UIDL negative arguement attempt"; content:"UIDL"; depth:4; nocase; content:"-"; distance:1; byte_test:1,>,0,0,relative,string; classtype:misc-attack; reference:bugtraq,6053; sid:2122; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 USER overflow attempt"; flow:to_server,established; content:"USER"; nocase; content:!"|0a|"; within:50; reference:bugtraq,789; reference:cve,CVE-1999-0494; reference:nessus,10311; classtype:attempted-admin; sid:1866; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 CAPA overflow attempt"; flow:to_server,established; content:"CAPA"; nocase; content:!"|0a|"; within:10; classtype:attempted-admin; sid:2108; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 TOP overflow attempt"; flow:to_server,established; content:"TOP"; nocase; content:!"|0a|"; within:10; classtype:attempted-admin; sid:2109; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 STAT overflow attempt"; flow:to_server,established; content:"STAT"; nocase; content:!"|0a|"; within:10; classtype:attempted-admin; sid:2110; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 DELE overflow attempt"; flow:to_server,established; content:"DELE"; nocase; content:!"|0a|"; within:10; classtype:attempted-admin; sid:2111; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 RSET overflow attempt"; flow:to_server,established; content:"RSET"; nocase; content:!"|0a|"; within:10; classtype:attempted-admin; sid:2112; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 AUTH overflow attempt"; flow:to_server,established; content:"AUTH"; nocase; content:!"|0a|"; within:50; classtype:attempted-admin; sid:1936; rev:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 LIST overflow attempt"; flow:to_server,established; content:"LIST"; nocase; content:!"|0a|"; within:50; reference:bugtraq,948; reference:cve,CAN-2000-0096; classtype:attempted-admin; sid:1937; rev:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 XTND overflow attempt"; flow:to_server,established; content:"XTND"; nocase; content:!"|0a|"; within:50; classtype:attempted-admin; sid:1938; rev:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 PASS overflow attempt"; flow:to_server,established; content:"PASS"; nocase; content:!"|0a|"; within:50; reference:cve,CAN-1999-1511; reference:nessus,10325; classtype:attempted-admin; sid:1634; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 APOP overflow attempt"; flow:to_server,established; content:"APOP"; nocase; content:!"|0a|"; within:256; reference:cve,CAN-2000-0841; reference:bugtraq,1652; reference:nessus,10559; classtype:attempted-admin; sid:1635; rev:6;)
+
+# bsd-qpopper.c
+# overflow in the reading of a line in qpopper
+alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 EXPLOIT x86 BSD overflow"; flow:to_server,established; content:"|5e0 e31c 0b03 b8d7 e0e8 9fa 89f9|"; reference:cve,CVE-1999-0006; reference:bugtraq,133; classtype:attempted-admin; sid:286; rev:6;)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 EXPLOIT x86 BSD overflow"; flow:to_server,established; content:"|685d 5eff d5ff d4ff f58b f590 6631|"; classtype:attempted-admin; sid:287; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 EXPLOIT x86 Linux overflow"; flow:to_server,established; content:"|d840 cd80 e8d9 ffff ff|/bin/sh"; classtype:attempted-admin; sid:288; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 EXPLOIT x86 SCO overflow"; flow:to_server,established; content:"|560e 31c0 b03b 8d7e 1289 f989 f9|"; classtype:attempted-admin; sid:289; rev:5;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 EXPLOIT qpopper overflow"; flow:to_server,established; content:"|E8 D9FF FFFF|/bin/sh"; reference:bugtraq,830; reference:cve,CAN-1999-0822; classtype:attempted-admin; sid:290; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 110 (msg:"POP3 USER format string attempt"; flow:to_server,established; content:"USER"; nocase; content:"%"; distance:1; content:"%"; distance:1; reference:bugtraq,7667; reference:nessus,11742; classtype:attempted-admin; sid:2250; rev:1;)

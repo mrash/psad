@@ -27,7 +27,7 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP RMD overflow attempt"; flo
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP invalid MODE"; flow:to_server,established; content:"MODE "; nocase; content:!" B"; nocase; content:!" A"; nocase; content:!" S"; nocase; content:!" C"; nocase; classtype:protocol-command-decode; sid:1623; rev:4;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP large PWD command"; flow:to_server,established; content:"PWD"; nocase; dsize:10; classtype:protocol-command-decode; sid:1624; rev:3;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP large SYST command"; flow:to_server,established; content:"SYST"; nocase; dsize:10; classtype:protocol-command-decode; sid:1625; rev:3;)
-
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP CWD C\:\\"; flow:to_server,established; content:"CWD"; nocase; content:"C\:\\"; distance:1; reference:nessus,11677; reference:bugtraq,7674; classtype:protocol-command-decode; sid:2125; rev:3;)
 
 
 
@@ -37,8 +37,8 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP SITE ZIPCHK attempt"; flow
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP SITE NEWER attempt"; flow:to_server,established; content:"SITE "; nocase; content:" NEWER "; nocase; reference:cve,CVE-1999-0880; reference:nessus,10319; classtype:attempted-dos; sid:1864; rev:2;)
 
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP site exec"; flow:to_server,established; content:"SITE "; nocase; content:"EXEC "; distance:0; nocase; reference:bugtraq,2241; reference:arachnids,317; classtype:bad-unknown; sid:361;  rev:7;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP EXPLOIT STAT * dos attempt"; flow:to_server,established; content:"STAT "; nocase; content:"*"; reference:bugtraq,4482; classtype:attempted-dos; sid:1777; rev:1;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP EXPLOIT STAT ? dos attempt"; flow:to_server,established; content:"STAT "; nocase; content:"?"; reference:bugtraq,4482; classtype:attempted-dos; sid:1778; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP EXPLOIT STAT * dos attempt"; flow:to_server,established; content:"STAT"; nocase; content:"*"; distance:1; reference:bugtraq,4482; classtype:attempted-dos; sid:1777; rev:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP EXPLOIT STAT ? dos attempt"; flow:to_server,established; content:"STAT"; nocase; content:"?"; distance:1; reference:bugtraq,4482; classtype:attempted-dos; sid:1778; rev:2;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP tar parameters"; flow:to_server,established; content:" --use-compress-program" ; nocase; reference:bugtraq,2240; reference:arachnids,134; reference:cve,CVE-1999-0202; classtype:bad-unknown; sid:362; rev:7;)
 
 # bad directories
@@ -49,9 +49,8 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP CWD ~<CR><NEWLINE> attempt
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP CWD .... attempt"; content:"CWD "; content:" ...."; flow:to_server,established; reference:bugtraq,4884; classtype:denial-of-service; sid:1779; rev:1;)
 
 
-
 # vulnerabilities against specific implementations of ftp
-alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP serv-u directory transversal"; flow:to_server,established; content: ".%20."; nocase; reference:bugtraq,2025; reference:cve,CVE-2001-0054; classtype:bad-unknown; sid:360;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP serv-u directory transversal"; flow:to_server,established; content: ".%20."; nocase; reference:bugtraq,2052; reference:cve,CVE-2001-0054; classtype:bad-unknown; sid:360; rev:5;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP wu-ftp bad file completion attempt ["; flow:to_server,established; content:"~"; content:"["; distance:1;reference:cve,CVE-2001-0550; reference:cve,CAN-2001-0886; reference:bugtraq,3581; classtype:misc-attack; sid:1377; rev:10;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP wu-ftp bad file completion attempt {"; flow:to_server,established; content:"~"; content:"{"; distance:1; reference:cve,CVE-2001-0550; reference:cve,CAN-2001-0886; reference:bugtraq,3581; classtype:misc-attack; sid:1378; rev:10;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP format string attempt"; flow:to_server,established; content:"%p"; nocase; classtype:attempted-admin; sid:1530; rev:4;)
@@ -64,8 +63,8 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP LIST directory traversal a
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP .forward"; content: ".forward"; flow:to_server,established; reference:arachnids,319; classtype:suspicious-filename-detect; sid:334;  rev:4;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP .rhosts"; flow:to_server,established; content:".rhosts"; reference:arachnids,328; classtype:suspicious-filename-detect; sid:335;  rev:4;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP authorized_keys"; flow:to_server,established; content:"authorized_keys"; classtype:suspicious-filename-detect; sid:1927; rev:2;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP passwd retreval attempt"; flow:to_server,established; content:"RETR"; nocase; content:"passwd"; reference:arachnids,213; classtype:suspicious-filename-detect; sid:356;  rev:4;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP shadow retreval attempt"; flow:to_server,established; content:"RETR"; nocase; content:"shadow"; classtype:suspicious-filename-detect; sid:1928; rev:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP passwd retrieval attempt"; flow:to_server,established; content:"RETR"; nocase; content:"passwd"; reference:arachnids,213; classtype:suspicious-filename-detect; sid:356; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP shadow retrieval attempt"; flow:to_server,established; content:"RETR"; nocase; content:"shadow"; classtype:suspicious-filename-detect; sid:1928; rev:3;)
 
 # suspicious login attempts
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP ADMw0rm ftp login attempt"; flow:to_server,established; content:"USER w0rm|0D0A|"; reference:arachnids,01; sid:144; classtype:suspicious-login;  rev:6;)
@@ -75,3 +74,5 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP pass wh00t"; flow:to_serve
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP piss scan"; flow:to_server,established; content:"pass -cklaus"; classtype:suspicious-login; sid:357;  rev:4;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP saint scan"; flow:to_server,established; content:"pass -saint"; reference:arachnids,330; classtype:suspicious-login; sid:358;  rev:4;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP satan scan"; flow:to_server,established; content:"pass -satan"; reference:arachnids,329; classtype:suspicious-login; sid:359;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP USER format string attempt"; flow:to_server,established; content:"USER"; nocase; content:"%"; distance:1; content:"%"; distance:1; within:10; reference:bugtraq,7474; classtype:misc-attack; sid:2178; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP PASS format string attempt"; flow:to_server,established; content:"PASS"; nocase; content:"%"; distance:1;  content:"%"; distance:1; within:10; reference:bugtraq,7474; classtype:misc-attack; sid:2179; rev:1;)

@@ -23,7 +23,7 @@ alert ip 63.251.224.177 any -> $HOME_NET any (msg:"POLICY poll.gotomypc.com acce
 
 # NOTES: This signature would be better off using uricontent, and having the
 # http decoder looking at 5800 and 5802, but that is on by default
-alert tcp $EXTERNAL_NET any -> $HOME_NET 5800:5802 (msg:"POLICY vncviewer java applet download attempt"; content:"/vncviewer.jar"; reference:nessus,10758; classtype:misc-activity; sid:1846; rev:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 5800:5802 (msg:"POLICY vncviewer Java applet download attempt"; content:"/vncviewer.jar"; reference:nessus,10758; classtype:misc-activity; sid:1846; rev:3;)
 
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"POLICY FTP file_id.diz access possible warez site";  flow:to_server,established; content:"RETR"; nocase; content:"file_id.diz"; nocase; distance:1; classtype:suspicious-filename-detect; sid:1445; rev:4;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"POLICY FTP 'STOR 1MB' possible warez site"; flow:to_server,established; content:"STOR"; nocase; content:"1MB"; nocase; distance:1; classtype:misc-activity; sid:543; rev:5;)
@@ -33,3 +33,8 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"POLICY FTP 'MKD  ' possible wa
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"POLICY FTP 'MKD .' possible warez site"; flow:to_server,established; content:"MKD ."; nocase; depth: 5; classtype:misc-activity; sid:548; rev:5;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"POLICY FTP 'CWD / ' possible warez site"; flow:to_server,established; content:"CWD"; nocase; content:"/ "; distance:1; classtype: misc-activity; sid:545; rev:4;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"POLICY FTP 'MKD / ' possible warez site"; flow:to_server,established; content:"MKD"; nocase; content:"/ "; distance:1; classtype:misc-activity; sid:554; rev:6;)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 1723 (msg:"POLICY PPTP Start Control Request attempt"; flow:to_server,established,no_stream; content:"|00 01|"; offset:2; depth:2; content:"|00 01|"; offset:8; depth:2; classtype:attempted-admin; sid:2044; rev:4;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 49 (msg:"POLICY xtacacs login attempt"; content:"|80 01|"; offset:0; depth:2;  content:"|00|"; distance:4; classtype:misc-activity; sid:2040; rev:2;)
+alert udp $HOME_NET 49 -> $EXTERNAL_NET any (msg:"POLICY xtacacs accepted login response"; content:"|80 02|"; offset:0; depth:2; content:"|01|"; distance:4; classtype:misc-activity; sid:2042; rev:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 500 (msg:"POLICY IPSec PGPNet connection attempt"; content:"|00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 10 02 00 00 00 00 00 00 00 00 88 0D 00 00 5C 00 00 00 01 00 00 00 01 00 00 00 50 01 01 00 02 03 00 00 24 01 01 00 00 80 01 00 06 80 02 00 02 80 03 00 03 80 04 00 05 80 0B 00 01 00 0C 00 04 00 01 51 80 00 00 00 24 02 01 00 00 80 01 00 05 80 02 00 01 80 03 00 03 80 04 00 02 80 0B 00 01 00 0C 00 04 00 01 51 80 00 00 00 10|"; classtype:protocol-command-decode; sid:1771; rev:5;)

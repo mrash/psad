@@ -55,7 +55,7 @@ alert tcp $EXTERNAL_NET any -> $SQL_SERVERS $ORACLE_PORTS (msg:"ORACLE execute_s
 # Port based only sigs suck, this is why stream4 has flow logs
 alert tcp $EXTERNAL_NET 6000:6005 -> $HOME_NET any (msg:"X11 outbound client connection detected"; flow:established; reference:arachnids,126; classtype:misc-activity; sid:1227; rev:5;)
 
-# basicly duplicate of 330 
+# basically duplicate of 330
 alert tcp $EXTERNAL_NET any -> $HOME_NET 79 (msg:"FINGER cybercop redirection"; flow:to_server,established; content: "@localhost|0A|"; dsize:11; reference:arachnids,11; classtype:attempted-recon; sid:329;  rev:6;)
 
 # duplicate of 1478
@@ -72,9 +72,6 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP EXPLOIT partial body ove
 
 # duplicate of 1538
 alert tcp $EXTERNAL_NET any -> $HOME_NET 119 (msg:"NNTP Cassandra Overflow"; flow:to_server,established; content: "AUTHINFO USER"; nocase; dsize: >512; depth:16; reference:cve,CAN-2000-0341; reference:arachnids,274; classtype:attempted-user; sid:291;  rev:6;)
-
-# spp_conversation takes care of this now
-alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"BAD TRAFFIC Non-Standard IP protocol"; ip_proto:!1; ip_proto:!2; ip_proto:!6; ip_proto:!47; ip_proto:!50; ip_proto:!51; ip_proto:!89; classtype:non-standard-protocol; sid:1620; rev:3;)
 
 # This rule looks for the exploit for w3-msql, but very badly
 alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-CGI w3-msql solaris x86  access"; flow:to_server,established; uricontent: "/bin/shA-cA/usr/openwin"; nocase; reference:cve,CVE-1999-0276; reference:arachnids,211;classtype:attempted-recon; sid:874;  rev:4;)
@@ -103,7 +100,7 @@ alert udp $EXTERNAL_NET 2140 -> $HOME_NET 60000 (msg:"BACKDOOR DeepThroat 3.1 Se
 alert udp $EXTERNAL_NET 60000 -> $HOME_NET 2140 (msg:"BACKDOOR DeepThroat 3.1 Keylogger on Server ON"; content:"KeyLogger Is Enabled On port"; reference:arachnids,106; sid:165;  classtype:misc-activity; rev:4;)
 alert udp $EXTERNAL_NET 60000 -> $HOME_NET 2140 (msg:"BACKDOOR DeepThroat 3.1 Show Picture Client Request"; content:"22"; reference:arachnids,106; sid:166;  classtype:misc-activity; rev:4;)
 alert udp $EXTERNAL_NET 60000 -> $HOME_NET 2140 (msg:"BACKDOOR DeepThroat 3.1 Hide/Show Clock Client Request"; content:"32";  reference:arachnids,106; sid:167; classtype:misc-activity; rev:4;)
-alert udp $EXTERNAL_NET 60000 -> $HOME_NET 2140 (msg:"BACKDOOR DeepThroat 3.1 Hi de/Show Desktop Client Request"; content:"33";  reference:arachnids,106; sid:168 ;  classtype:misc-activity; rev:4;)
+alert udp $EXTERNAL_NET 60000 -> $HOME_NET 2140 (msg:"BACKDOOR DeepThroat 3.1 Hide/Show Desktop Client Request"; content:"33";  reference:arachnids,106; sid:168;  classtype:misc-activity; rev:4;)
 alert udp $EXTERNAL_NET 60000 -> $HOME_NET 2140 (msg:"BACKDOOR DeepThroat 3.1 Swap Mouse Buttons Client Request"; content:"34"; reference:arachnids,106; sid:169;  classtype:misc-activity; rev:4;)
 alert udp $EXTERNAL_NET 60000 -> $HOME_NET 2140 (msg:"BACKDOOR DeepThroat 3.1 Enable/Disable CTRL-ALT-DEL Client Request"; content:"110";  reference:arachnids,106; sid:170;  classtype:misc-activity; rev:4;)
 alert udp $EXTERNAL_NET 60000 -> $HOME_NET 2140 (msg:"BACKDOOR DeepThroat 3.1 Freeze Mouse Client Request"; content:"35";  reference:arachnids,106; sid:171;  classtype:misc-activity; rev:4;)
@@ -141,7 +138,7 @@ alert udp $EXTERNAL_NET 3150 -> $HOME_NET 60000 (msg:"BACKDOOR DeepThroat 3.1 Se
 alert udp $EXTERNAL_NET 60000 -> $HOME_NET 2140 (msg:"BACKDOOR DeepThroat 3.1 Client Sending Data to Server on Network";  reference:arachnids,106; sid:151;  classtype:misc-activity; rev:4;)
 alert udp $HOME_NET 3150 -> $EXTERNAL_NET 60000 (msg:"BACKDOOR DeepThroat 3.1 Wrong Password"; content:"Wrong Password"; reference:arachnids,106; sid:154;  classtype:misc-activity; rev:4;)
 alert udp $EXTERNAL_NET 60000 -> $HOME_NET 2140 (msg:"BACKDOOR DeepThroat 3.1 Visible Window List Client Request"; content:"37"; reference:arachnids,106; sid:156;  classtype:misc-activity; rev:4;)
-alert udp $EXTERNAL_NET 4120 -> $HOME_NET any (msg:"BACKDOOR DeepThroat access"; content: "--Ahhhhhhhhhh"; reference:arachnids,405; sid:113;  classtype:misc-act ivity; rev:4;)
+alert udp $EXTERNAL_NET 4120 -> $HOME_NET any (msg:"BACKDOOR DeepThroat access"; content: "--Ahhhhhhhhhh"; reference:arachnids,405; sid:113;  classtype:misc-activity; rev:5;)
 alert udp $EXTERNAL_NET 60000 -> $HOME_NET 2140 (msg:"BACKDOOR DeepThroat 3.1 Monitor on/off Client Request"; content:"07";  reference:arachnids,106; sid:186; classtype:misc-activity; rev:4;)
 alert udp $EXTERNAL_NET 60000 -> $HOME_NET 2140 (msg:"BACKDOOR DeepThroat 3.1 Delete File Client Request"; content:"41"; reference:arachnids,106; sid:187;  classtype:misc-activity; rev:4;)
 alert udp $EXTERNAL_NET 60000 -> $HOME_NET 2140 (msg:"BACKDOOR DeepThroat 3.1 Kill Window Client Request"; content:"38";  reference:arachnids,106; sid:188;  classtype:misc-activity; rev:4;)
@@ -183,3 +180,152 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP EXPLOIT MKD overflow"; flo
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP EXPLOIT x86 linux overflow"; flow:to_server,established; content:"|31c0 31db b017 cd80 31c0 b017 cd80|"; reference:bugtraq,113; reference:cve,CVE-1999-0368; classtype:attempted-admin; sid:350;  rev:4;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP EXPLOIT x86 linux overflow"; flow:to_server,established; content:"|31db 89d8 b017 cd80 eb2c|"; reference:bugtraq,113; reference:cve,CVE-1999-0368; classtype:attempted-admin; sid:351;  rev:4;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"FTP EXPLOIT x86 linux overflow"; flow:to_server,established; content:"|83 ec 04 5e 83 c6 70 83 c6 28 d5 e0 c0|";reference:bugtraq, 113; reference:cve, CVE-1999-0368; classtype:attempted-admin; sid:352;  rev:4;)
+
+# duplicate of 475
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Traceroute ipopts"; ipopts: rr; itype: 0; reference:arachnids,238; sid:455;  classtype:misc-activity; rev:5;)
+
+
+# not needed thanks to 1964 and 1965
+alert tcp $EXTERNAL_NET any -> $HOME_NET 32771:34000 (msg:"RPC EXPLOIT ttdbserv solaris overflow"; content: "|C0 22 3F FC A2 02 20 09 C0 2C 7F FF E2 22 3F F4|"; flow:to_server,established; dsize: >999; reference:url,www.cert.org/advisories/CA-2001-27.html; reference:bugtraq,122; reference:cve,CVE-1999-0003; reference:arachnids,242; classtype:attempted-admin; sid:570; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 32771:34000 (msg:"RPC EXPLOIT ttdbserv Solaris overflow"; flow:to_server,established; dsize: >999; content: "|00 01 86 F3 00 00 00 01 00 00 00 0F 00 00 00 01|"; reference:url,www.cert.org/advisories/CA-2001-27.html; reference:bugtraq,122; reference:cve,CVE-1999-0003; reference:arachnids,242; classtype:attempted-admin; sid:571;  rev:5;)
+
+# dup of 589
+alert udp $EXTERNAL_NET any -> $HOME_NET 111 (msg:"RPC portmap request yppasswdd"; rpc:100009,*,*; reference:bugtraq,2763; classtype:rpc-portmap-decode; sid:1296; rev:4;)
+# dup of 1275
+alert tcp $EXTERNAL_NET any -> $HOME_NET 111 (msg:"RPC portmap request yppasswdd"; rpc:100009,*,*; flow:to_server,established; reference:bugtraq,2763; classtype:rpc-portmap-decode; sid:1297;  rev:7;)
+
+# dup of 1280
+alert tcp $EXTERNAL_NET any -> $HOME_NET 111 (msg:"RPC portmap listing"; flow:to_server,established; rpc: 100000,*,*; reference:arachnids,429; classtype:rpc-portmap-decode; sid:596;  rev:5;)
+
+# dup of 1281
+alert tcp $EXTERNAL_NET any -> $HOME_NET 32771 (msg:"RPC portmap listing"; flow:to_server,established; rpc: 100000,*,*; reference:arachnids,429; classtype:rpc-portmap-decode; sid:597; rev:5;)
+
+alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"BAD TRAFFIC Non-Standard IP protocol"; ip_proto:!1; ip_proto:!2; ip_proto:!6; ip_proto:!47; ip_proto:!50; ip_proto:!51; ip_proto:!89; classtype:non-standard-protocol; sid:1620; rev:3;)
+
+# this has been replaced with sid 1905 and 1906
+alert tcp $EXTERNAL_NET any -> $HOME_NET 634:1400 (msg:"RPC AMD Overflow"; flow:to_server,established; content: "|80 00 04 2C 4C 15 75 5B 00 00 00 00 00 00 00 02|"; depth:32; reference:cve,CVE-1999-0704; reference:arachnids,217; classtype:attempted-admin; sid:573;  rev:5;)
+
+# these have been replaced by 1915, 1916, 1914, and 1913
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"RPC EXPLOIT statdx"; flow:to_server,established; content: "/bin|c74604|/sh"; reference:arachnids,442; classtype:attempted-admin; sid:600; rev:5;)
+alert udp $EXTERNAL_NET any -> $HOME_NET any (msg:"RPC EXPLOIT statdx"; content: "/bin|c74604|/sh"; reference:arachnids,442; classtype:attempted-admin; sid:1282; rev:3;)
+
+# duplicate of 1088
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-CGI webstore directory traversal"; uricontent:"/web_store.cgi?page=../.."; flow:to_server,established; reference:bugtraq,1774; reference:cve,CVE-2000-1005; classtype:web-application-attack; sid:1094; rev:8;)
+
+
+# these are obsolete
+alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP EXPLOIT overflow"; flow:to_server,established; content:"|E8 C0FF FFFF|/bin/sh"; classtype:attempted-admin; sid:293; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP EXPLOIT x86 linux overflow"; flow:to_server,established; content:"|89d8 40cd 80e8 c8ff ffff|/";reference:bugtraq,130; reference:cve,CVE-1999-0005; classtype:attempted-admin; sid:295; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP EXPLOIT x86 linux overflow"; flow:to_server,established; content:"|eb34 5e8d 1E89 5e0b 31d2 8956 07|";reference:bugtraq,130; reference:cve,CVE-1999-0005; classtype:attempted-admin; sid:296; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP EXPLOIT x86 linux overflow"; flow:to_server,established; content:"|eb35 5E80 4601 3080 4602 3080 4603 30|";reference:bugtraq,130; reference:cve,CVE-1999-0005; classtype:attempted-admin; sid:297; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP EXPLOIT x86 linux overflow"; flow:to_server,established; content:"|eb38 5e89f389d880460120804602|"; reference:bugtraq,130; reference:cve,CVE-1999-0005; classtype:attempted-admin; sid:298; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP EXPLOIT x86 linux overflow"; flow:to_server,established; content:"|eb58 5E31 db83 c308 83c3 0288 5e26|"; reference:bugtraq,130; reference:cve, CVE-1999-0005; classtype:attempted-admin; sid:299; rev:5;)
+
+# what is this rule?  we have no idea...
+alert tcp $EXTERNAL_NET any -> $HOME_NET 22 (msg:"SCAN ssh-research-scanner"; flow:to_server,established; content:"|00 00 00 60 00 00 00 00 00 00 00 00 01 00 00 00|"; classtype:attempted-recon; sid:617; rev:3;)
+
+# These have been replaced by better rules (1915,1916,1913,1914)
+alert udp $EXTERNAL_NET any -> $HOME_NET 32770: (msg:"RPC rstatd query"; content:"|00 00 00 00 00 00 00 02 00 01 86 A1|";offset:5; reference:arachnids,9;classtype:attempted-recon; sid:592; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 32770: (msg:"RPC rstatd query"; flow:to_server,established; content:"|00 00 00 00 00 00 00 02 00 01 86 A1|";offset:5; reference:arachnids,9;classtype:attempted-recon; sid:1278;  rev:4;)
+
+alert tcp $HTTP_SERVERS $HTTP_PORTS -> $EXTERNAL_NET any (msg:"ATTACK-RESPONSES id check returned nobody"; flow:from_server,established; content:"uid="; content:"(nobody)"; classtype:bad-unknown; sid:1883; rev:4;)
+alert tcp $HTTP_SERVERS $HTTP_PORTS -> $EXTERNAL_NET any (msg:"ATTACK-RESPONSES id check returned web"; flow:from_server,established; content:"uid="; content:"(web)"; classtype:bad-unknown; sid:1884; rev:4;)
+alert tcp $HTTP_SERVERS $HTTP_PORTS -> $EXTERNAL_NET any (msg:"ATTACK-RESPONSES id check returned http"; flow:from_server,established; content:"uid="; content:"(http)"; classtype:bad-unknown; sid:1885; rev:4;)
+alert tcp $HTTP_SERVERS $HTTP_PORTS -> $EXTERNAL_NET any (msg:"ATTACK-RESPONSES id check returned apache"; flow:from_server,established; content:"uid="; content:"(apache)"; classtype:bad-unknown; sid:1886; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 139 (msg:"NETBIOS SMB SMB_COM_TRANSACTION Max Data Count of 0 DOS Attempt"; flow:to_server,established; content:"|00|"; offset:0; depth:1; content:"|FF 53 4D 42 25|"; offset:4; depth:5; content:"|00 00|"; offset:45; depth:2; reference:cve,CAN-2002-0724; reference:url,www.microsoft.com/technet/security/bulletin/MS02-045.asp; reference:url,www.corest.com/common/showdoc.php?idx=262; classtype:denial-of-service; sid:2102; rev:3;)
+
+# specific example for sid:1549
+alert tcp $EXTERNAL_NET any -> $SMTP_SERVERS 25 (msg:"SMTP EXPLOIT x86 windows CSMMail overflow"; flow:to_server,established; content:"|eb53 eb20 5bfc 33c9 b182 8bf3 802b|"; reference:bugtraq,895; reference:cve,CVE-2000-0042; classtype:attempted-admin; sid:656; rev:6;)
+
+# this is properly caught by sid:527
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"DOS Land attack"; id:3868; seq: 3868; flags:S; reference:cve,CVE-1999-0016; classtype:attempted-dos; sid:269; rev:3;)
+
+# duplicate of 1546
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Cisco Web DOS attempt"; flow:to_server,established; content: "|20 2F 25 25|"; depth: 16; reference:arachnids,275; classtype:attempted-dos; sid:1138;  rev:5;)
+
+# these are obsoleted by cleaning up 663
+alert tcp $EXTERNAL_NET any -> $SMTP_SERVERS 25 (msg:"SMTP sendmail 8.4.1 exploit"; flow:to_server,established; content:"rcpt to|3a207c| sed '1,/^$/d'|7c|"; nocase;reference:arachnids,120; classtype:attempted-user; sid:666; rev:5;)
+
+# dup of 588
+alert tcp $EXTERNAL_NET any -> $HOME_NET 111 (msg:"RPC portmap tooltalk request TCP"; flow:to_server,established; content:"|00 00 00 00|"; offset:8; depth:4; content:"|00 01 86 A0|"; offset:16; depth:4; content:"|00 00 00 03|"; distance:4; within:4; byte_jump:4,4,relative,align; byte_jump:4,4,relative,align; content:"|00 01 86 F3|"; within:4; reference:cve,CAN-2001-0717; reference:cve,CVE-1999-0003; reference:cve,CVE-1999-0687; reference:cve,CAN-1999-1075; reference:url,www.cert.org/advisories/CA-2001-05.html; classtype:rpc-portmap-decode; sid:1298; rev:10;)
+# dup of 1274
+alert udp $EXTERNAL_NET any -> $HOME_NET 111 (msg:"RPC portmap tooltalk request UDP"; content:"|00 00 00 00|"; offset:4; depth:4; content:"|00 01 86 A0|"; offset:12; depth:4; content:"|00 00 00 03|"; distance:4; within:4; byte_jump:4,4,relative,align; byte_jump:4,4,relative,align; content:"|00 01 86 F3|"; within:4; reference:cve,CAN-2001-0717; reference:cve,CVE-1999-0003; reference:cve,CVE-1999-0687; reference:cve,CAN-1999-1075; reference:url,www.cert.org/advisories/CA-2001-05.html; classtype:rpc-portmap-decode; sid:1299; rev:9;)
+
+# these virus rules suck.
+alert tcp any 110 -> any any (msg:"Virus - SnowWhite Trojan Incoming"; content:"Suddlently"; sid:720;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NAVIDAD Worm"; content: "NAVIDAD.EXE"; nocase; sid:722;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible MyRomeo Worm"; content: "myromeo.exe"; nocase; sid:723;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible MyRomeo Worm"; content: "myjuliet.chm"; nocase; sid:724;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible MyRomeo Worm"; content: "ble bla"; nocase; sid:725;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible MyRomeo Worm"; content: "I Love You"; sid:726;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible MyRomeo Worm"; content: "Sorry... Hey you !"; sid:727;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible MyRomeo Worm"; content: "my picture from shake-beer"; sid:728;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible QAZ Worm"; content: "|71 61 7a 77 73 78 2e 68 73 71|"; reference:MCAFEE,98775; sid:731;  classtype:misc-activity; rev:4;)
+alert tcp any any -> any 25 (msg:"Virus - Possible QAZ Worm Calling Home"; content:"nongmin_cn"; reference:MCAFEE,98775; sid:733;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Matrix worm"; content: "Software provide by [MATRiX]"; nocase;  sid:734;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible MyRomeo Worm"; content: "Matrix has you..."; sid:735;  classtype:misc-activity; rev:4;)
+alert tcp any any -> any 25 (msg:"Virus - Successful eurocalculator execution"; flags:PA; content: "funguscrack@hotmail.com"; nocase; sid:736;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible eurocalculator.exe file"; content: "filename="; content:"eurocalculator.exe"; nocase; sid:737;  classtype:misc-activity; rev:4;)
+alert tcp any any -> any 110 (msg:"Virus - Possible Pikachu Pokemon Virus"; flags:PA; content:"Pikachu Pokemon"; reference:MCAFEE,98696; sid:738;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Triplesix Worm"; content: "filename=\"666TEST.VBS\""; nocase; reference:MCAFEE,10389; sid:739;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Tune.vbs"; content: "filename=\"tune.vbs\""; nocase; reference:MCAFEE,10497; sid:740;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NAIL Worm"; content:"|4D 61 72 6B 65 74 20 73 68 61 72 65 20 74 69 70 6F 66 66|"; reference:MCAFEE,10109; sid:741;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NAIL Worm"; content: "|6E 61 6D 65 20 3D 22 57 57 49 49 49 21|"; reference:MCAFEE,10109; sid:742;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NAIL Worm"; content:"|4E 65 77 20 44 65 76 65 6C 6F 70 6D 65 6E 74 73|"; reference:MCAFEE,10109; sid:743;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NAIL Worm"; content:"|47 6F 6F 64 20 54 69 6D 65 73|"; reference:MCAFEE,10109; sid:744;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Papa Worm"; content: "filename=\"XPASS.XLS\""; nocase; reference:MCAFEE,10145; sid:745;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Freelink Worm"; content:"|4C 49 4E 4B 53 2E 56 42 53|"; reference:MCAFEE,10225; sid:746;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Simbiosis Worm"; content: "filename=\"SETUP.EXE\""; nocase; sid:747;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible BADASS Worm"; content: "|6E 61 6D 65 20 3D 22 42 41 44 41 53 53 2E 45 58 45 22|"; reference:MCAFEE,10388; sid:748;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible ExploreZip.B Worm"; content: "|6E 61 6D 65 20 3D 22 46 69 6C 65 5F 7A 69 70 70 61 74 69 2E 65 78 65 22|"; reference:MCAFEE,10471; sid:749;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible wscript.KakWorm"; content: "filename=\"KAK.HTA\""; nocase; reference:MCAFEE,10509; sid:751;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus Possible Suppl Worm"; content: "filename=\"Suppl.doc\""; nocase; reference:MCAFEE,10361; sid:752;  classtype:misc-activity; rev:5;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - theobbq.exe"; content: "filename=\"THEOBBQ.EXE\""; nocase; reference:MCAFEE,10540; sid:753;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Word Macro - VALE"; content: "filename=\"MONEY.DOC\""; nocase; reference:MCAFEE,10502; sid:754;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible IROK Worm"; content: "filename=\"irok.exe\""; nocase; reference:MCAFEE,98552; sid:755;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Fix2001 Worm"; content: "filename=\"Fix2001.exe\""; nocase; reference:MCAFEE,10355; sid:756;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Y2K Zelu Trojan"; content: "filename=\"Y2K.EXE\""; nocase; reference:MCAFEE,10505; sid:757;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible The_Fly Trojan"; content: "filename=\"THE_FLY.CHM\""; nocase; reference:MCAFEE,10478; sid:758;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Word Macro - VALE"; content: "filename=\"DINHEIRO.DOC\""; nocase; reference:MCAFEE,10502; sid:759;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Passion Worm"; content: "filename=\"ICQ_GREETINGS.EXE\""; nocase; reference:MCAFEE,10467; sid:760;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - cooler3.exe"; content: "filename=\"COOLER3.EXE\""; nocase; reference:MCAFEE,10540; sid:761;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - party.exe"; content: "filename=\"PARTY.EXE\""; nocase; reference:MCAFEE,10540; sid:762;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - hog.exe"; content: "filename=\"HOG.EXE\""; nocase; reference:MCAFEE,10540; sid:763;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - goal1.exe"; content: "filename=\"GOAL1.EXE\""; nocase; reference:MCAFEE,10540; sid:764;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - pirate.exe"; content: "filename=\"PIRATE.EXE\""; nocase; reference:MCAFEE,10540; sid:765;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - video.exe"; content: "filename=\"VIDEO.EXE\""; nocase; reference:MCAFEE,10540; sid:766;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - baby.exe"; content: "filename=\"BABY.EXE\""; nocase; reference:MCAFEE,10540; sid:767;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - cooler1.exe"; content: "filename=\"COOLER1.EXE\""; nocase; reference:MCAFEE,10540; sid:768;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - boss.exe"; content: "filename=\"BOSS.EXE\""; nocase; reference:MCAFEE,10540; sid:769;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - g-zilla.exe"; content: "filename=\"G-ZILLA.EXE\""; nocase; reference:MCAFEE,10540; sid:770;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible ToadieE-mail Trojan"; content: "filename=\"Toadie.exe\""; nocase; reference:MCAFEE,10540; sid:771;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible PrettyPark Trojan"; content:"\\CoolProgs\\";offset:300;depth:750; reference:MCAFEE,10175; sid:772;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Happy99 Virus"; content:"X-Spanska\:Yes"; reference:MCAFEE,10144; sid:773;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible CheckThis Trojan"; content:"|6E 61 6D 65 20 3D 22 6C 69 6E 6B 73 2E 76 62 73 22|"; sid:774;  classtype:misc-activity; rev:3;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Bubbleboy Worm"; content:"BubbleBoy is back!"; reference:MCAFEE,10418; sid:775;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - copier.exe"; content: "filename=\"COPIER.EXE\""; nocase; reference:MCAFEE,10540; sid:776;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible MyPics Worm"; content: "|6E 61 6D 65 20 3D 22 70 69 63 73 34 79 6F 75 2E 65 78 65 22|"; reference:MCAFEE,10467; sid:777;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Babylonia - X-MAS.exe"; content: "|6E 61 6D 65 20 3D 22 58 2D 4D 41 53 2E 45 58 45 22|"; reference:MCAFEE,10461; sid:778;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - gadget.exe"; content: "filename=\"GADGET.EXE\""; nocase; reference:MCAFEE,10540; sid:779;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - irnglant.exe"; content: "filename=\"IRNGLANT.EXE\""; nocase; reference:MCAFEE,10540; sid:780;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - casper.exe"; content: "filename=\"CASPER.EXE\""; nocase; reference:MCAFEE,10540; sid:781;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - fborfw.exe"; content: "filename=\"FBORFW.EXE\""; nocase; reference:MCAFEE,10540; sid:782;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - saddam.exe"; content: "filename=\"SADDAM.EXE\""; nocase; reference:MCAFEE,10540; sid:783;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - bboy.exe"; content: "filename=\"BBOY.EXE\""; nocase; reference:MCAFEE,10540; sid:784;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - monica.exe"; content: "filename=\"MONICA.EXE\""; nocase; reference:MCAFEE,10540; sid:785;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - goal.exe"; content: "filename=\"GOAL.EXE\""; nocase; reference:MCAFEE,10540; sid:786;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - panther.exe"; content: "filename=\"PANTHER.EXE\""; nocase; reference:MCAFEE,10540; sid:787;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - chestburst.exe"; content: "filename=\"CHESTBURST.EXE\""; nocase; reference:MCAFEE,10540; sid:788;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Common Sense Worm"; content: "|6E 61 6D 65 20 3D 22 54 48 45 5F 46 4C 59 2E 43 48 4D 22|"; sid:790;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - cupid2.exe"; content: "filename=\"CUPID2.EXE\""; nocase; reference:MCAFEE,10540; sid:791;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Resume Worm"; content: "filename=\"RESUME1.DOC\""; nocase; reference:MCAFEE,98661; sid:792;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Resume Worm"; content: "filename=\"Explorer.doc\""; nocase; reference:MCAFEE,98661; sid:794;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Worm -  txt.vbs file"; content: "filename="; content:".txt.vbs"; nocase; sid:795;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Worm - xls.vbs file"; content: "filename="; content:".xls.vbs"; nocase; sid:796;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Worm - jpg.vbs file"; content: "filename="; content:".jpg.vbs"; nocase; sid:797;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Worm -  gif.vbs file"; content: "filename="; content:".gif.vbs"; nocase; sid:798;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Timofonica Worm"; content: "filename=\"TIMOFONICA.TXT.vbs\""; nocase; reference:MCAFEE,98674; sid:799;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Resume Worm"; content: "filename=\"NORMAL.DOT\""; nocase; reference:MCAFEE,98661; sid:800;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible Worm - doc.vbs file"; content: "filename="; content:".doc.vbs"; nocase; sid:801;  classtype:misc-activity; rev:4;)
+alert tcp any 110 -> any any (msg:"Virus - Possible NewApt.Worm - farter.exe"; content: "filename=\"FARTER.EXE\""; nocase; reference:MCAFEE,1054; sid:789;  classtype:misc-activity; rev:4;)
+alert tcp $EXTERNAL_NET any -> $SMTP_SERVERS 25 (msg:"VIRUS Klez Incoming"; flow:to_server,established; dsize:>120; content:"MIME"; content:"VGhpcyBwcm9"; classtype:misc-activity; sid:1800; rev:3;)

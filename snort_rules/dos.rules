@@ -5,7 +5,6 @@
 #----------
 
 alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"DOS Jolt attack"; fragbits: M; dsize:408; reference:cve,CAN-1999-0345; classtype:attempted-dos; sid:268; rev:2;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"DOS Land attack"; id:3868; seq: 3868; flags:S; reference:cve,CVE-1999-0016; classtype:attempted-dos; sid:269; rev:2;)
 alert udp $EXTERNAL_NET any -> $HOME_NET any (msg:"DOS Teardrop attack"; id:242; fragbits:M; reference:cve,CAN-1999-0015; reference:url,www.cert.org/advisories/CA-1997-28.html; reference:bugtraq,124; classtype:attempted-dos; sid:270; rev:2;)
 alert udp any 19 <> any 7 (msg:"DOS UDP echo+chargen bomb"; reference:cve,CAN-1999-0635; reference:cve,CVE-1999-0103; classtype:attempted-dos; sid:271; rev:3;)
 alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"DOS IGMP dos attack"; content:"|02 00|"; depth: 2; ip_proto: 2; fragbits: M+; reference:cve,CVE-1999-0918; classtype:attempted-dos; sid:272; rev:2;)
@@ -22,4 +21,4 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 135:139 (msg: "DOS Winnuke attack"; fla
 alert tcp $EXTERNAL_NET any -> $HOME_NET 3372 (msg:"DOS MSDTC attempt"; flow:to_server,established; dsize:>1023; reference:bugtraq,4006; classtype:attempted-dos; sid:1408;  rev:5;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 6004 (msg:"DOS iParty DOS attempt"; flow:to_server,established; content:"|FF FF FF FF FF FF|"; offset:0; classtype:misc-attack; reference:cve,CAN-1999-1566; sid:1605; rev:3;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 6789:6790 (msg:"DOS DB2 dos attempt"; flow:to_server,established; dsize:1; classtype:denial-of-service; sid:1641; rev:4;)
-alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS 80 (msg:"DOS cisco attempt"; flow:to_server,established; content:"|13|"; dsize:1; classtype:web-application-attack; sid:1545; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS 80 (msg:"DOS Cisco attempt"; flow:to_server,established; content:"|13|"; dsize:1; classtype:web-application-attack; sid:1545; rev:5;)

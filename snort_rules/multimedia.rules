@@ -8,8 +8,8 @@
 # Using streaming media may be a violation of corporate policies.
 
 alert tcp $HOME_NET any -> $EXTERNAL_NET 80 (msg:"MULTIMEDIA Quicktime User Agent access"; flow:to_server,established; content:"User-Agent\: Quicktime"; classtype:policy-violation; sid:1436;  rev:2;)
-alert tcp $EXTERNAL_NET 80 -> $HOME_NET any (msg:"MULTIMEDIA Windows Media audio download"; flow:from_server,established; content:"Content-type\: audio/x-ms-wma\r\n"; classtype:policy-violation; sid:1437;  rev:2;)
-alert tcp $EXTERNAL_NET 80 -> $HOME_NET any (msg:"MULTIMEDIA Windows Media Video download"; flow:from_server,established; content:"Content-type\: video/x-ms-asf\r\n"; classtype:policy-violation; sid:1438;  rev:2;)
-alert tcp $EXTERNAL_NET 80 -> $HOME_NET any (msg:"MULTIMEDIA Shoutcast playlist redirection"; flow:from_server,established; content:"Content-type\: audio/x-scpls\r\n"; classtype:policy-violation; sid:1439;  rev:2;)
-alert tcp $EXTERNAL_NET 80 -> $HOME_NET any (msg:"MULTIMEDIA Icecast playlist redirection"; flow:from_server,established; content:"Content-type\: audio/x-mpegurl\r\n"; classtype:policy-violation; sid:1440;  rev:2;)
+alert tcp $EXTERNAL_NET 80 -> $HOME_NET any (msg:"MULTIMEDIA Windows Media audio download"; flow:from_server,established; content:"Content-type\: audio/x-ms-wma"; content:"|0a|"; within:2; classtype:policy-violation; sid:1437; rev:3;)
+alert tcp $EXTERNAL_NET 80 -> $HOME_NET any (msg:"MULTIMEDIA Windows Media Video download"; flow:from_server,established; content:"Content-type\: video/x-ms-asf"; content:"|0a|"; within:2;classtype:policy-violation; sid:1438; rev:3;)
+alert tcp $EXTERNAL_NET 80 -> $HOME_NET any (msg:"MULTIMEDIA Shoutcast playlist redirection"; flow:from_server,established; content:"Content-type\: audio/x-scpls"; content:"|0a|"; within:2; classtype:policy-violation; sid:1439; rev:3;)
+alert tcp $EXTERNAL_NET 80 -> $HOME_NET any (msg:"MULTIMEDIA Icecast playlist redirection"; flow:from_server,established; content:"Content-type\: audio/x-mpegurl"; content:"|0a|"; within:2; classtype:policy-violation; sid:1440; rev:3;)
 alert tcp $HOME_NET any -> 64.245.58.0/23 any (msg:"MULTIMEDIA audio galaxy keepalive"; flow:established; content:"|45 5F 00 03 05|"; offset:0; depth:5; classtype:misc-activity; sid:1428; rev:3;)

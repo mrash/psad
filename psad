@@ -2459,8 +2459,8 @@ sub renew_auto_blocked_ips() {
         }
     }
     if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y'
-            && -e '/etc/hosts.deny') {
-        open B, '< /etc/hosts.deny' or
+            && -e $config{'ETC_HOSTS_DENY'}) {
+        open B, "< $config{'ETC_HOSTS_DENY'}" or
             die " ** Could not open $config{'AUTO_BLOCK_IPT_FILE'}: $!";
         my @lines = <B>;
         close B;
@@ -2608,8 +2608,8 @@ sub ipt_remove_block() {
 
 sub tcpwr_test_block() {
     my $ip = shift;
-    open T, "< /etc/hosts.deny" or die " ** Could not open ",
-        "/etc/hosts.deny: $!";
+    open T, "< $config{'ETC_HOSTS_DENY'}" or die " ** Could not open ",
+        "$config{'ETC_HOSTS_DENY'}: $!";
     my @lines = <T>;
     close T;
     for my $line (@lines) {
@@ -2621,8 +2621,8 @@ sub tcpwr_test_block() {
 
 sub tcpwr_block() {
     my $ip = shift;
-    open T, ">> /etc/hosts.deny" or die " ** Could not open ",
-        "/etc/hosts.deny: $!";
+    open T, ">> $config{'ETC_HOSTS_DENY'}" or die " ** Could not open ",
+        "$config{'ETC_HOSTS_DENY'}: $!";
     print T "ALL: $ip\n";
     close T;
     return;
@@ -2631,12 +2631,12 @@ sub tcpwr_block() {
 sub tcpwr_remove_block() {
     my $ip = shift;
     my $removed = 0;
-    open T, "< /etc/hosts.deny" or die " ** Could not open ",
-        "/etc/hosts.deny: $!";
+    open T, "< $config{'ETC_HOSTS_DENY'}" or die ' ** Could not open ',
+        "$config{'ETC_HOSTS_DENY'}: $!";
     my @lines = <T>;
     close T;
-    open T, "> /etc/hosts.deny.tmp" or die " ** Could not open ",
-        "/etc/hosts.deny.tmp: $!";
+    open T, "> $config{'ETC_HOSTS_DENY'}.tmp" or die ' ** Could not open ',
+        "$config{'ETC_HOSTS_DENY'}.tmp: $!";
     for my $line (@lines) {
         chomp $line;
         if ($line =~ /ALL:\s+$ip$/) {
@@ -2647,7 +2647,7 @@ sub tcpwr_remove_block() {
         }
     }
     close T;
-    move '/etc/hosts.deny.tmp', '/etc/hosts.deny';
+    move "$config{'ETC_HOSTS_DENY'}.tmp", $config{'ETC_HOSTS_DENY'};
     return $removed;
 }
 
@@ -2690,8 +2690,8 @@ sub auto_psad_response() {
                     $timeout_str, '', $config{'EMAIL_ADDRESSES'},
                     $cmds{'mail'});
                 my $found = 0;
-                open H, "< /etc/hosts.deny" or die
-                    "Could not open /etc/hosts.deny: $!";
+                open H, "< $config{'ETC_HOSTS_DENY'}" or die
+                    "Could not open $config{'ETC_HOSTS_DENY'}: $!";
                 my @lines = <H>;
                 close H;
                 for my $line (@lines) {
@@ -2699,8 +2699,8 @@ sub auto_psad_response() {
                     $found = 1 if $line =~ /ALL:\s+$src$/;
                 }
                 unless ($found) {
-                    open H, ">> /etc/hosts.deny" or die
-                        "Could not open /etc/hosts.deny: $!";
+                    open H, ">> $config{'ETC_HOSTS_DENY'}" or die
+                        "Could not open $config{'ETC_HOSTS_DENY'}: $!";
                     print H "ALL: $src\n";
                     close H;
                     ### write the ip out to the auto blocked file
@@ -3480,17 +3480,19 @@ sub setup() {
     }
 
     die ' ** No system logger config file could be found.'
-        unless (-e '/etc/syslog.conf' or -e '/etc/syslog-ng/syslog-ng.conf');
+        unless (-e $config{'ETC_SYSLOG_CONF'}
+                or -e $config{'ETC_SYSLOGNG_CONF'});
 
     ### look for psadfifo in some system logger config file
     ### (syslog, syslog-ng, etc.) and attempt to correct if not
     ### found.
-    if (-e '/etc/syslog.conf') {
-        unless (-e '/etc/syslog.conf.orig') {
-            copy '/etc/syslog.conf', '/etc/syslog.conf.orig';
+    if (-e $config{'ETC_SYSLOG_CONF'}) {
+        unless (-e "$config{'ETC_SYSLOG_CONF'}.orig") {
+            copy $config{'ETC_SYSLOG_CONF'},
+                "$config{'ETC_SYSLOG_CONF'}.orig";
         }
-        open RS, '< /etc/syslog.conf' or
-            die " ** Unable to open /etc/syslog.conf: $!";
+        open RS, "< $config{'ETC_SYSLOG_CONF'}" or
+            die " ** Unable to open $config{'ETC_SYSLOG_CONF'}: $!";
         my @lines = <RS>;
         close RS;
         my $found = 0;
@@ -3501,8 +3503,8 @@ sub setup() {
             }
         }
         unless ($found) {
-            open SYSLOG, '> /etc/syslog.conf' or
-                die " ** Unable to open /etc/syslog.conf: $!";
+            open SYSLOG, "> $config{'ETC_SYSLOG_CONF'}" or
+                die " ** Unable to open $config{'ETC_SYSLOG_CONF'}: $!";
             ### this loop removes any old location for psadfifo
             for my $line (@lines) {
                 unless ($line =~ /psadfifo/i) {
@@ -3519,13 +3521,13 @@ sub setup() {
             system "$cmds{'killall'} -HUP $cmds{'syslogd'}";
         }
     }
-    if (-e '/etc/syslog-ng/syslog-ng.conf') {
-        unless (-e '/etc/syslog-ng/syslog-ng.conf.orig') {
-            copy '/etc/syslog-ng/syslog-ng.conf',
-                '/etc/syslog-ng/syslog-ng.conf.orig';
+    if (-e $config{'ETC_SYSLOGNG_CONF'}) {
+        unless (-e "$config{'ETC_SYSLOGNG_CONF'}.orig") {
+            copy $config{'ETC_SYSLOGNG_CONF'},
+                "$config{'ETC_SYSLOGNG_CONF'}.orig";
         }
-        open RS, '< /etc/syslog-ng/syslog-ng.conf' or
-            die " ** Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
+        open RS, "< $config{'ETC_SYSLOGNG_CONF'}" or
+            die " ** Unable to open $config{'ETC_SYSLOGNG_CONF'}: $!\n";
         my @lines = <RS>;
         close RS;
 
@@ -3537,8 +3539,8 @@ sub setup() {
             }
         }
         unless ($found) {
-            open SYSLOGNG, '> /etc/syslog-ng/syslog-ng.conf' or
-                die " ** Unable to open /etc/syslog-ng/syslog-ng.conf: $!";
+            open SYSLOGNG, "> $config{'ETC_SYSLOGNG_CONF'}" or
+                die " ** Unable to open $config{'ETC_SYSLOGNG_CONF'}: $!";
             ### this loop removes any old location for psadfifo
             for my $line (@lines) {
                 unless ($line =~ /psadfifo/i) {
@@ -3891,7 +3893,8 @@ sub required_vars() {
         EXEC_EXT_SCRIPT_PER_ALERT ENABLE_DSHIELD_ALERTS
         DSHIELD_ALERT_INTERVAL DSHIELD_ALERT_EMAIL DSHIELD_USER_ID
         DSHIELD_USER_EMAIL DISK_CHECK_INTERVAL DISK_MAX_PERCENTAGE
-        DISK_MAX_RM_RETRIES
+        DISK_MAX_RM_RETRIES ETC_HOSTS_DENY ETC_SYSLOG_CONF
+        ETC_SYSLOGNG_CONF
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

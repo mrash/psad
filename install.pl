@@ -68,7 +68,6 @@ my $uninstall = 0;
 
 my %Cmds = (
 	"ps"		=> $psCmd,
-	"mknod"         => $mknodCmd,
 	"grep"		=> $grepCmd,
 	"uname"		=> $unameCmd,
 	"find"		=> $findCmd,
@@ -76,8 +75,8 @@ my %Cmds = (
 	"perl"		=> $perlCmd,
 	"ifconfig"	=> $ifconfigCmd,
 	"ipchains"      => $ipchainsCmd,
-	"iptables"	=> $iptablesCmd
-#	"psad"		=> $psadCmd
+	"iptables"	=> $iptablesCmd,
+	"psad"		=> $psadCmd
 );
 
 ### need to make sure this exists before attempting to write anything to the install log.

@@ -1271,25 +1271,109 @@ sub chk_local_port() {
 
 sub check_src_dst() {
     my ($chain, $src, $dst, $sig_href) = @_;
+
     if ($chain eq 'input') {
         if ($sig_href->{'dst'} eq 'HOME_NET') {
             if ($sig_href->{'src'} eq 'EXTERNAL_NET') {
                 return 1;
-            } else {
+            } elsif (&check_ip_in_network($src, $sig_href->{'src'})) {
+                return 1;
             }
-        } else {
+        } elsif (&check_ip_in_network($dst, $sig_href->{'dst'})) {
+            if ($sig_href->{'src'} eq 'EXTERNAL_NET') {
+                return 1;
+            } elsif (&check_ip_in_network($src, $sig_href->{'src'})) {
+                return 1;
+            }
         }
     } elsif ($chain eq 'forward') {
+        if ($sig_href->{'dst'} eq 'HOME_NET') {
+            if (&check_ip_in_network($dst, $config{'HOME_NET'})) {
+                if ($sig_href->{'src'} eq 'EXTERNAL_NET') {
+                    return 1;
+                } elsif (&check_ip_in_network($src, $sig_href->{'src'})) {
+                    return 1;
+                }
+            }
+        } elsif ($sig_href->{'dst'} eq 'EXTERNAL_NET') {
+            if (not &check_ip_in_network($dst, $config{'HOME_NET'})) {
+                if ($sig_href->{'src'} eq 'HOME_NET') {
+                    if (&check_ip_in_network($src, $config{'HOME_NET'})) {
+                        return 1;
+                    }
+                } elsif (&check_ip_in_network($src, $sig_href->{'src'})) {
+                    return 1;
+                }
+            }
+        } elsif (&check_ip_in_network($dst, $sig_href->{'dst'})) {
+            if ($sig_href->{'src'} eq 'HOME_NET') {
+                if (&check_ip_in_network($src, $config{'HOME_NET'})) {
+                    return 1;
+                }
+            } elsif (&check_ip_in_network($src, $sig_href->{'src'})) {
+                return 1;
+            }
+        }
     } elsif ($chain eq 'output') {
         if ($sig_href->{'src'} eq 'HOME_NET') {
             if ($sig_href->{'dst'} eq 'EXTERNAL_NET') {
                 return 1;
-            } else {
+            } elsif (&check_ip_in_network($dst, $sig_href->{'dst'})) {
+                return 1;
             }
-        } else {
+        } elsif (&check_ip_in_network($src, $sig_href->{'src'})) {
+            if ($sig_href->{'dst'} eq 'EXTERNAL_NET') {
+                return 1;
+            } elsif (&check_ip_in_network($dst, $sig_href->{'dst'})) {
+                return 1;
+            }
         }
     }
     ### we should have returned before this point
+    return 0;
+}
+
+sub check_ip_in_network() {
+    my ($ip, $net) = @_;
+    unless ($net =~ /$ip_re/) {
+        print STDERR " ** check_ip_in_network(): bad network \"$net\".\n",
+            if $debug;
+        return 0;
+    }
+    ### we may have several networks in a comma separated
+    ### list such as "[232.0.0.0/8,233.0.0.0/8,239.0.0.0/8]"
+    if ($net =~ /\,/) {
+        my @nets = split /\s*\,\s*/, $net;
+        for my $n (@nets) {
+            ### check if we have a cidr subnet or if it is
+            ### just a single ip address
+            if ($n =~ m|($ip_re/\d+)|) {
+                if (ipv4_in_network($1, $ip)) {
+                    print STDERR " .. check_ip_in_network(): matched ",
+                        "ip: $ip to net: $n\n" if $debug;
+                    return 1;
+                }
+            } elsif ($n =~ m|($ip_re)|) {
+                if ($ip eq $1) {
+                    print STDERR " .. check_ip_in_network(): matched ",
+                        "ip: $ip to ip: $n\n" if $debug;
+                    return 1;
+                }
+            }
+        }
+    } elsif ($net =~ m|($ip_re/\d+)|) {
+        if (ipv4_in_network($1, $ip)) {
+            print STDERR " .. check_ip_in_network(): matched ip: $ip ",
+                "to net: $net\n" if $debug;
+            return 1;
+        }
+    } elsif ($net =~ /($ip_re)/) {
+        if ($ip eq $1) {
+            print STDERR " .. check_ip_in_network(): matched ",
+                "ip: $ip to ip: $net\n" if $debug;
+            return 1;
+        }
+    }
     return 0;
 }
 
@@ -4051,7 +4135,7 @@ sub dump_conf() {
 sub required_vars() {
     my @required_vars = qw(
         EMAIL_ADDRESSES PSAD_CHECK_INTERVAL FW_DATA_FILE FW_ERROR_LOG
-        FW_MSG_SEARCH SNORT_SID_STR ENABLE_AUTO_IDS PSAD_LOG
+        FW_MSG_SEARCH HOME_NET SNORT_SID_STR ENABLE_AUTO_IDS PSAD_LOG
         IGNORE_CONNTRACK_BUG_PKTS SCAN_TIMEOUT DANGER_LEVEL1
         DANGER_LEVEL2 DANGER_LEVEL3 DANGER_LEVEL4 DANGER_LEVEL5
         PORT_RANGE_SCAN_THRESHOLD ALERT_ALL PSAD_EMAIL_LIMIT

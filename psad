@@ -39,8 +39,9 @@
 #   - Custom logging line upon auto-blocking an ip.
 #   - Customizable subject line that include the danger level.
 #   - RPM package.
+#   - Include the ability to specify a network in CIDR notation with
+#     --Status output.
 #   - Drop root privileges if not running in auto-blocking mode.
-#   - tcpwrapper auto-block multiple times bug (Albert Whale).
 #   - Extend install.pl to provide an option to dowload the latest perl
 #     modules (Date:Calc, Unix::Syslog, etc.) from CPAN.
 #   - Extend passive OS fingerprinting to make use of more types of
@@ -671,7 +672,7 @@ for (;;) {
             ### Log and send email and syslog alerts
             &scan_logr();
 
-            ### Don't manage the firewall rules if
+            ### Don't manage the firewall or tcpwrapper rules if
             ### psad is running on a syslog server
             if ($config{'ENABLE_AUTO_IDS'} eq 'Y' &&
                 ! $syslog_server) {
@@ -1777,9 +1778,7 @@ sub import_posf_sigs() {
         }
     }
     print Dumper %posf_sigs if $debug;
-
-    &Psad::psyslog('psad', '.. Imported passive OS ' .
-        'fingerprinting signatures');
+    &Psad::psyslog('psad', '.. Imported passive OS fingerprinting signatures');
     return;
 }
 
@@ -1969,10 +1968,10 @@ sub scan_logr() {
             ### unless it already exists
             mkdir "$config{'PSAD_DIR'}/${src}", 0500 unless
                 -d "$config{'PSAD_DIR'}/${src}";
-            my $email_alert  = "$config{'PSAD_DIR'}/${src}/${dst}_email_alert";
             my $ecount_file  = "$config{'PSAD_DIR'}/${src}/email_count";
-            my $whois_file   = "$config{'PSAD_DIR'}/${src}/whois";
             my $dl_file      = "$config{'PSAD_DIR'}/${src}/danger_level";
+            my $whois_file   = "$config{'PSAD_DIR'}/${src}/whois";
+            my $email_alert  = "$config{'PSAD_DIR'}/${src}/${dst}_email_alert";
             my $log_sigs     = "$config{'PSAD_DIR'}/${src}/${dst}_signatures";
             my $pkt_ctr_file = "$config{'PSAD_DIR'}/${src}/${dst}_packet_ctr";
 
@@ -1986,7 +1985,7 @@ sub scan_logr() {
             ### filename => 0 (overwrite),  filename => 1 (append)
             my %print_hsh = ($email_alert => 1);
 
-            ### set the overall packet counters for $src
+            ### get the overall packet counters for $src
             $tot_tcp  = $scan{$src}{$dst}{'TCP'}{'PKTS'}
                 if defined $scan{$src}{$dst}{'TCP'}{'PKTS'};
             $tot_udp  = $scan{$src}{$dst}{'UDP'}{'PKTS'}
@@ -2369,10 +2368,6 @@ sub renew_auto_blocked_ips() {
     }
     if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y'
             && -e $config{'AUTO_BLOCK_IPT_FILE'}) {
-
-        ### get the active iptables chains
-        &get_iptables_chains() unless $chk_ipt_chains;
-
         open B, "< $config{'AUTO_BLOCK_IPT_FILE'}" or
             die " ** Could not open $config{'AUTO_BLOCK_IPT_FILE'}: $!";
         my @lines = <B>;
@@ -2387,6 +2382,9 @@ sub renew_auto_blocked_ips() {
                         $timeout_str, '', $config{'EMAIL_ADDRESSES'},
                         $cmds{'mail'});
                 }
+                ### set the block start time here since
+                ### renew_auto_blocked_ips() is only called
+                ### at startup.
                 $auto_blocked_ips{$ip} = time();
             }
         }
@@ -2410,16 +2408,30 @@ sub renew_auto_blocked_ips() {
             }
         }
     }
-    ### XXX future
-#    if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y'
-#            && -e $config{'TCPWRAPPERS_BLOCK_METHOD'}) {
-#    }
+    if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y'
+            && -e '/etc/hosts.deny') {
+        open B, '< /etc/hosts.deny' or
+            die " ** Could not open $config{'AUTO_BLOCK_IPT_FILE'}: $!";
+        my @lines = <B>;
+        close B;
+        for my $line (@lines) {
+            if ($line =~ /($ip_re)/) {
+                my $ip = $1;
+                unless (&tcpwr_test_block($ip)) {
+                    &tcpwr_block($ip);
+                    &Psad::sendmail(" ** psad: RENEWED tcpwrappers BLOCK against $ip" .
+                        $timeout_str, '', $config{'EMAIL_ADDRESSES'},
+                        $cmds{'mail'});
+                }
+                $auto_blocked_ips{$ip} = time();
+            }
+        }
+    }
     return;
 }
 
 sub flush_auto_blocked_ips() {
     my $found_blocked = 0;
-    my $rv = 0;
     if (-e $config{'AUTO_BLOCK_IPT_FILE'}) {
         print " .. Removing iptables auto-generated block rules.\n";
         open B, "< $config{'AUTO_BLOCK_IPT_FILE'}" or
@@ -2433,9 +2445,11 @@ sub flush_auto_blocked_ips() {
                 &ipt_remove_block($ip) if &ipt_test_block($ip);
             }
         }
-        ### we have removed the iptables block rules, so remove
+        ### we have removed the iptables block rules, so truncate
         ### the cache file.
-        unlink $config{'AUTO_BLOCK_IPT_FILE'};
+        open T, "> $config{'AUTO_BLOCK_IPT_FILE'}" or
+            die " ** Could not truncate $config{'AUTO_BLOCK_IPT_FILE'}: $!";
+        close T;
         $found_blocked = 1;
     }
     if (-e $config{'AUTO_BLOCK_IPCH_FILE'}) {
@@ -2451,7 +2465,11 @@ sub flush_auto_blocked_ips() {
                 &ipch_remove_block($ip) if &ipch_test_block($ip);
             }
         }
-        unlink $config{'AUTO_BLOCK_IPCH_FILE'};
+        ### we have removed the ipchains block rules, so truncate
+        ### the cache file.
+        open T, "> $config{'AUTO_BLOCK_IPCH_FILE'}" or
+            die " ** Could not truncate $config{'AUTO_BLOCK_IPCH_FILE'}: $!";
+        close T;
         $found_blocked = 1;
     }
     if (-e $config{'AUTO_BLOCK_TCPWR_FILE'}) {
@@ -2460,14 +2478,25 @@ sub flush_auto_blocked_ips() {
             die " ** Could not open $config{'AUTO_BLOCK_TCPWR_FILE'}: $!";
         my @lines = <B>;
         close B;
-        unlink $config{'AUTO_BLOCK_TCPWR_FILE'};
+        for my $line (@lines) {
+            if ($line =~ /($ip_re)/) {
+                my $ip = $1;
+                ### remove block rules for $ip if it has been blocked
+                &tcpwr_remove_block($ip) if &tcpwr_test_block($ip);
+            }
+        }
+        ### we have removed the tcpwrapper block rules, so truncate
+        ### the cache file.
+        open T, "> $config{'AUTO_BLOCK_TCPWR_FILE'}" or
+            die " ** Could not truncate $config{'AUTO_BLOCK_TCPWR_FILE'}: $!";
+        close T;
         $found_blocked = 1;
     }
     unless ($found_blocked) {
         print " ** Currently there are no auto-generated ".
             "block rules in effect.\n";
     }
-    exit $rv;
+    exit $found_blocked;
 }
 
 sub ipt_test_block() {
@@ -2498,8 +2527,9 @@ sub ipt_block() {
     my $src = shift;
     for my $table (keys %ipt_chains) {
         for my $chain (keys %{$ipt_chains{$table}}) {
-            system "$cmds{'iptables'} -t $table -I $chain 1 " .
-                "-s $src -j DROP 2> /dev/null 1>&2";
+            system "$cmds{'iptables'} -t $table -I $chain " .
+                "$config{'IPTABLES_AUTO_RULENUM'} -s $src -j " .
+                "DROP 2> /dev/null 1>&2";
         }
     }
     ### write the ip out to the auto blocked file
@@ -2519,6 +2549,7 @@ sub ipt_remove_block() {
             my @rules = `$cmds{'iptables'} -t $table -nL $chain`;
             my $rulenum = 1;
             RULE: for my $rule (@rules) {
+                chomp $rule;
                 next RULE if $rule =~ /^\s*Chain\s/;
                 next RULE if $rule =~ /^\s*target\s/;
                 ### DROP       all  --  1.1.1.1        0.0.0.0/0
@@ -2539,10 +2570,10 @@ sub ipt_remove_block() {
     if ($rm_block) {
         &rm_blocked_ip($src, $config{'AUTO_BLOCK_IPT_FILE'});
     } else {
-        print " ** Could not locate iptables block rule for $src.\n"
+        &Psad::psyslog('psad', "** Could not locate iptables block rule for $src.")
             if $flush_fw;
     }
-    return;
+    return $rm_block;
 }
 
 sub ipch_test_block() {
@@ -2563,7 +2594,8 @@ sub ipch_test_block() {
 sub ipch_block() {
     my $src = shift;
     for my $chain (@ipchains_chains) {
-        system "$cmds{'ipchains'} -I $chain 1 -s $src " .
+        system "$cmds{'ipchains'} -I $chain " .
+            "$config{'IPCHAINS_AUTO_RULENUM'} -s $src " .
             "-j DENY 2> /dev/null 1>&2";
     }
     ### write the ip out to the auto blocked file
@@ -2595,10 +2627,55 @@ sub ipch_remove_block() {
     if ($rm_block) {
         &rm_blocked_ip($src, $config{'AUTO_BLOCK_IPCH_FILE'});
     } else {
-        print " ** Could not locate ipchains block rule for $src.\n"
+        &Psad::psyslog('psad', "** Could not locate ipchains block rule for $src.")
             if $flush_fw;
     }
+    return $rm_block;
+}
+
+sub tcpwr_test_block() {
+    my $ip = shift;
+    open T, "< /etc/hosts.deny" or die " ** Could not open ",
+        "/etc/hosts.deny: $!";
+    my @lines = <T>;
+    close T;
+    for my $line (@lines) {
+        chomp $line;
+        return 1 if $line =~ /ALL:\s+$ip$/;
+    }
+    return 0;
+}
+
+sub tcpwr_block() {
+    my $ip = shift;
+    open T, "< /etc/hosts.deny" or die " ** Could not open ",
+        "/etc/hosts.deny: $!";
+    print T "ALL: $ip\n";
+    close T;
     return;
+}
+
+sub tcpwr_remove_block() {
+    my $ip = shift;
+    my $removed = 0;
+    open T, "< /etc/hosts.deny" or die " ** Could not open ",
+        "/etc/hosts.deny: $!";
+    my @lines = <T>;
+    close T;
+    open T, "> /etc/hosts.deny.tmp" or die " ** Could not open ",
+        "/etc/hosts.deny.tmp: $!";
+    for my $line (@lines) {
+        chomp $line;
+        if ($line =~ /ALL:\s+$ip$/) {
+            $removed = 1;
+            &rm_blocked_ip($ip, $config{'AUTO_BLOCK_TCPWR_FILE'});
+        } else {
+            print T "$line\n";
+        }
+    }
+    close T;
+    move '/etc/hosts.deny.tmp', '/etc/hosts.deny';
+    return $removed;
 }
 
 sub auto_psad_response() {
@@ -2615,7 +2692,6 @@ sub auto_psad_response() {
         ### threshold for _any_ destination.
         if ($dl >= $config{'AUTO_IDS_DANGER_LEVEL'}
                 && ! defined $auto_blocked_ips{$src}) {
-
             my $timeout_str = '.';
             if ($config{'AUTO_BLOCK_TIMEOUT'} > 0) {
                 $timeout_str = " for $config{'AUTO_BLOCK_TIMEOUT'} seconds.";
@@ -2638,13 +2714,23 @@ sub auto_psad_response() {
                 &Psad::sendmail(" ** psad: tcpwrappers AUTO-BLOCK against $src" .
                     $timeout_str, '', $config{'EMAIL_ADDRESSES'},
                     $cmds{'mail'});
-                ### XXX this needs to be smarter
-                open H, ">> /etc/hosts.deny" or die
+                my $found = 0;
+                open H, "< /etc/hosts.deny" or die
                     "Could not open /etc/hosts.deny: $!";
-                print H "ALL: $src\n";
+                my @lines = <H>;
                 close H;
-                ### write the ip out to the auto blocked file
-                &write_blocked_ip($src, $config{'AUTO_BLOCK_TCPWR_FILE'});
+                for my $line (@lines) {
+                    chomp $line;
+                    $found = 1 if $line =~ /ALL:\s+$src$/;
+                }
+                unless ($found) {
+                    open H, ">> /etc/hosts.deny" or die
+                        "Could not open /etc/hosts.deny: $!";
+                    print H "ALL: $src\n";
+                    close H;
+                    ### write the ip out to the auto blocked file
+                    &write_blocked_ip($src, $config{'AUTO_BLOCK_TCPWR_FILE'});
+                }
             }
             ### keep track of when we blocked the ip
             $auto_blocked_ips{$src} = time();
@@ -2658,22 +2744,24 @@ sub timeout_auto_blocked_ips() {
         if ((time() - $auto_blocked_ips{$ip})
                 > $config{'AUTO_BLOCK_TIMEOUT'}) {
             if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
-                &Psad::sendmail(" ** psad: removed iptables block " .
-                    "against $ip (timeout expired).", '',
-                    $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
-                &ipt_remove_block($ip);
-            }
-            if ($config{'IPCHAINS_BLOCK_METHOD'} eq 'Y') {
-                &Psad::sendmail(" ** psad: removed ipchains block " .
-                    "against $ip (timeout expired)", '',
-                    $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
-                &ipch_remove_block($ip);
+                if (&ipt_remove_block($ip)) {
+                    &Psad::sendmail(" ** psad: removed iptables block " .
+                        "against $ip (timeout expired).", '',
+                        $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+                }
+            } elsif ($config{'IPCHAINS_BLOCK_METHOD'} eq 'Y') {
+                if (&ipch_remove_block($ip)) {
+                    &Psad::sendmail(" ** psad: removed ipchains block " .
+                        "against $ip (timeout expired)", '',
+                        $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+                }
             }
             if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
-#                &Psad::sendmail(" ** psad: removed tcpwrappers block " .
-#                    "against $ip (timeout expired).", '',
-#                    $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
-#                &tcpwr_remove_block($ip);
+                if (&tcpwr_remove_block($ip)) {
+                    &Psad::sendmail(" ** psad: removed tcpwrappers block " .
+                        "against $ip (timeout expired).", '',
+                        $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+                }
             }
             delete $auto_blocked_ips{$ip};
         }
@@ -2701,6 +2789,16 @@ sub get_iptables_chains() {
 sub write_blocked_ip() {
     my ($src, $file) = @_;
     if (-e $file) {
+        open F, "< $file" or die " ** Could not open open ",
+            "$file: $!";
+        my @lines = <F>;
+        close F;
+        ### see if we have already written the ip to the block
+        ### file.
+        for my $line (@lines) {
+            chomp $line;
+            return if $line eq $src;  ### already blocked $src
+        }
         open B, ">> $file" or
             die " ** Could not append to $file";
         print B "$src\n";
@@ -2760,7 +2858,6 @@ sub get_fw_type() {
     if ($line =~ /IN=.+OUT=/) {
         print STDOUT " .. get_fw_type(): firewall is iptables\n" if $debug;
         $use_iptables = 1;
-        ### ipchains log messages do not have a MAC address field
     } else {
         print STDOUT " .. get_fw_type(): firewall is ipchains\n" if $debug;
         $use_ipchains = 1;
@@ -2921,7 +3018,7 @@ sub status() {
                     chomp $line;
                     if ($line =~ /^\S+\s+$pid\s+(\S+)\s+(\S+)/) {
                         print "  %CPU: $1  %MEM: $2\n";
-                        print "     Running since: " .
+                        print "    Running since: " .
                             localtime(stat($pidfile)->mtime) . "\n";
                         next PS unless $pidname eq 'psad';
                         &status_psad_ips();  ### print individual ip info
@@ -2951,15 +3048,15 @@ sub status_psad_ips() {
         chomp $cmdline;
     }
     if ($cmdline) {
-        print "     Command line arguments: $cmdline\n";
+        print "    Command line arguments: $cmdline\n";
     } else {
-        print "     Command line arguments: [none specified]\n";
+        print "    Command line arguments: [none specified]\n";
     }
-    print "     Alert email address(es): ",
+    print "    Alert email address(es): ",
         "$config{'EMAIL_ADDRESSES'}\n";
     ### print the packet counters
     if (-e $config{'PACKET_COUNTER_FILE'}) {
-        print "\n     Global packet counters:\n";
+        print "\n    Global packet counters:\n";
         open F, "< $config{'PACKET_COUNTER_FILE'}" or
             die " ** $config{'PACKET_COUNTER_FILE'}: $!";
         print STDOUT "        $_" while (<F>);
@@ -3034,8 +3131,8 @@ sub status_psad_ips() {
         }
     }
     print STDOUT "\n";
-    printf("     %-18s%-18s%-9s%-9s%-9s%-9s\n", 'SRC', 'DST', 'TCP',
-        'UDP', 'ICMP', 'D_Level');
+    printf "    %-18s%-18s%-7s%-7s%-7s%-7s\n", 'SRC:', 'DST:', 'TCP:',
+        'UDP:', 'ICMP:', 'DL:';
     if (%scan_source_ips) {
         if ($status_sort_dl) {
             for my $dl (sort {$b <=> $a} keys %scan_source_ips) {
@@ -3044,8 +3141,8 @@ sub status_psad_ips() {
                         my $tcp  = $scan_source_ips{$dl}{$src}{$dst}{'tcp'};
                         my $udp  = $scan_source_ips{$dl}{$src}{$dst}{'udp'};
                         my $icmp = $scan_source_ips{$dl}{$src}{$dst}{'icmp'};
-                        printf("     %-18s%-18s%-9s%-9s%-9s%-9s\n",
-                            $src, $dst, $tcp, $udp, $icmp, $dl);
+                        printf "    %-18s%-18s%-7s%-7s%-7s%-7s\n",
+                            $src, $dst, $tcp, $udp, $icmp, $dl;
                     }
                 }
             }
@@ -3056,13 +3153,13 @@ sub status_psad_ips() {
                     my $tcp  = $scan_source_ips{$src}{$dst}{'tcp'};
                     my $udp  = $scan_source_ips{$src}{$dst}{'udp'};
                     my $icmp = $scan_source_ips{$src}{$dst}{'icmp'};
-                    printf("     %-18s%-18s%-9s%-9s%-9s%-9s\n",
-                        $src, $dst, $tcp, $udp, $icmp, $dl);
+                    printf "    %-18s%-18s%-7s%-7s%-7s%-7s\n",
+                        $src, $dst, $tcp, $udp, $icmp, $dl;
                 }
             }
         }
     } else {
-        print STDOUT "     [No scans detected.]\n";
+        print STDOUT "    [No scans detected]\n";
     }
     return;
 }
@@ -3084,8 +3181,8 @@ sub status_ip() {
             || $_ =~ /DST=$status_ip\s/;
     }
     close FW;
-    die " ** Could not match $status_ip to packets in $config{'FW_DATA_FILE'}.  ",
-        "Exiting." unless @match_ip;
+    die " ** Could not match $status_ip to packets in ",
+        "$config{'FW_DATA_FILE'}.  Exiting." unless @match_ip;
     open D, "> $config{'PSAD_DIR'}/$status_ip/fwdata" or
         die " ** Could not open $config{'PSAD_DIR'}/$status_ip/fwdata";
     for my $line (@match_ip) {
@@ -3096,11 +3193,12 @@ sub status_ip() {
     }
     print STDOUT "\n .. The above packet output shows up to 10 of the ",
         "most recently\n    logged packets for $status_ip.\n";
-    print STDOUT " .. All packets logged by iptables specifically for $status_ip\n",
-        "    can be viewed here: $config{'PSAD_DIR'}/$status_ip/fwdata\n";
+    print STDOUT " .. All packets logged by iptables specifically ",
+        "for $status_ip\n    can be viewed here: ",
+        "$config{'PSAD_DIR'}/$status_ip/fwdata\n";
 
-    opendir D, "$config{'PSAD_DIR'}/$status_ip" or die " ** Could not open dir: ",
-        "$config{'PSAD_DIR'}/$status_ip: $!";
+    opendir D, "$config{'PSAD_DIR'}/$status_ip" or
+        die " ** Could not open dir: $config{'PSAD_DIR'}/$status_ip: $!";
     my @ipdirfiles = readdir D;
     closedir D;
     shift @ipdirfiles; shift @ipdirfiles;

@@ -29,7 +29,7 @@
 ### default
 all : kmsgsd.c psad_funcs.c psad.h
 	/usr/bin/gcc -Wall kmsgsd.c psad_funcs.c -o kmsgsd
-#	/usr/bin/gcc -Wall psadwatchd.c psad_funcs.c -o psadwatchd
+	/usr/bin/gcc -Wall psadwatchd.c psad_funcs.c -o psadwatchd
 
 #install : kmsgsd
 #	if [ -x kmsgsd ]; then \

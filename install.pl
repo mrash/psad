@@ -70,7 +70,6 @@ my $WHOIS_PSAD   = '/usr/bin/whois.psad';
 my $chkconfigCmd = '/sbin/chkconfig';
 my $mknodCmd     = '/bin/mknod';
 my $makeCmd      = '/usr/bin/make';
-my $findCmd      = '/usr/bin/find';
 my $killallCmd   = '/usr/bin/killall';
 my $perlCmd      = '/usr/bin/perl';
 my $ipchainsCmd  = '/sbin/ipchains';
@@ -114,7 +113,6 @@ my $help         = 0;
 
 my %Cmds = (
     'mknod'    => $mknodCmd,
-    'find'     => $findCmd,
     'make'     => $makeCmd,
     'killall'  => $killallCmd,
     'perl'     => $perlCmd,
@@ -282,30 +280,37 @@ sub install() {
 
     print "\n\n";
 
-    &logr(" ... Compiling kmsgsd:\n");
-    unlink 'kmsgsd' if -e 'kmsgsd';   ### remove any previously compiled kmsgsd
+    &logr(" ... Compiling kmsgsd and psadwatchd:\n");
+    ### remove any previously compiled kmsgsd
+    unlink 'kmsgsd' if -e 'kmsgsd';
+    ### remove any previously compiled psadwatchd
+    unlink 'psadwatchd' if -e 'psadwatchd';
     system "$Cmds{'make'}";
-    if (! -e 'kmsgsd' && -e 'kmsgsd_perl') {
+    if (! -e 'kmsgsd' && -e 'kmsgsd.pl') {
         &logr(" ... @@@ Could not compile kmsgsd.c.  Installing perl kmsgsd.\n");
-        unless ((system "$Cmds{'perl'} -c kmsgsd_perl") == 0) {
-            die " ... @@@ kmsgsd_perl does not compile with \"perl -c\".  Download the" .
+        unless ((system "$Cmds{'perl'} -c kmsgsd.pl") == 0) {
+            die " ... @@@ kmsgsd.pl does not compile with \"perl -c\".  Download the" .
                 " latest sources from:\n\nhttp://www.cipherdyne.com\n";
         }
-        copy 'kmsgsd_perl', 'kmsgsd';
+        copy 'kmsgsd.pl', 'kmsgsd';
+    }
+    if (! -e 'psadwatchd' && -e 'psadwatchd.pl') {
+        &logr(" ... @@@ Could not compile psadwatchd.c.  Installing perl psadwatchd.\n");
+        unless ((system "$Cmds{'perl'} -c psadwatchd.pl") == 0) {
+            die " ... @@@ psadwatchd.pl does not compile with \"perl -c\".  Download the" .
+                " latest sources from:\n\nhttp://www.cipherdyne.com\n";
+        }
+        copy 'psadwatchd.pl', 'psadwatchd';
     }
 
     print "\n\n";
     ### make sure all of the psad (perl) daemons compile (validates
-    ### the source distribution).  kmsgsd has been re-written in
-    ### C.
+    ### the source distribution).  kmsgsd and psadwatchd have been
+    ### re-written in C.
     &logr(" ... Verifying compilation of psad (perl) daemons:\n");
     unless ((system "$Cmds{'perl'} -c psad") == 0) {
         die " ... @@@ psad does not compile with \"perl -c\".  Download the" .
             " latest sources from:\n\nhttp://www.cipherdyne.com\n";
-    }
-    unless ((system "$Cmds{'perl'} -c psadwatchd") == 0) {
-        die " ... @@@ psadwatchd does not compile with \"perl -c\".  Download " .
-            "the latest sources from:\n\nhttp://www.cipherdyne.com\n";
     }
     unless ((system "$Cmds{'perl'} -c diskmond") == 0) {
         die " ... @@@ diskmond does not compile with \"perl -c\".  Download " .

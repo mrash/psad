@@ -114,7 +114,7 @@ sub check_process() {
         unless (kill 0, $pid) {
             ### the daemon is not running so start it with $pidcmdline
             ### args (which may be empty)
-            if ($$email_count_ref > $Config{'PSADWATCHD_EMAIL_LIMIT'}) {
+            if ($$email_count_ref > $Config{'PSADWATCHD_MAX_RETRIES'}) {
                 ### this will exit the program
                 &give_up($pidname);
             }
@@ -188,7 +188,7 @@ sub check_config() {
         DISKMOND_PID_FILE KMSGSD_PID_FILE
         PSADWATCHD_PID_FILE EMAIL_ADDRESSES
         PSADWATCHD_CHECK_INTERVAL
-        PSADWATCHD_EMAIL_LIMIT
+        PSADWATCHD_MAX_RETRIES
     );
     &Psad::validate_config($CONFIG_FILE, \@required_vars, $Config_href);
     return;

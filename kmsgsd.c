@@ -38,15 +38,21 @@
 #include "psad.h"
 
 /* PROTOTYPES ***************************************************************/
-static void parse_config(char *, char *, char *, char *);
+static void parse_config(
+    char *config_file,
+    char *psadfifo_file,
+    char *fwdata_file,
+    char *fw_msg_search,
+    char *kmsgsd_pid_file
+);
 
 /* MAIN *********************************************************************/
 int main(int argc, char *argv[]) {
-    const char prog_name[] = "kmsgsd";
     char psadfifo_file[MAX_PATH_LEN+1];
     char fwdata_file[MAX_PATH_LEN+1];
     char config_file[MAX_PATH_LEN+1];
     char fw_msg_search[MAX_PATH_LEN+1];
+    char kmsgsd_pid_file[MAX_PATH_LEN+1];
     int fifo_fd, fwdata_fd;  /* file descriptors */
     char buf[MAX_LINE_BUF+1];
     int numbytes;
@@ -59,9 +65,6 @@ int main(int argc, char *argv[]) {
     printf(" ... Firewall messages will be written to both ");
     printf("STDOUT _and_ to fwdata\n\n");
 #endif
-
-    /* first make sure there isn't another kmsgsd already running */
-    check_unique_pid(KMSGSD_PID_FILE, prog_name);
 
     /* handle command line arguments */
     if (argc == 1) {
@@ -76,20 +79,19 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    /* parse the config file for the psadfifo_file, fwdata_file,
-     * and fw_msg_search variables */
 #ifdef DEBUG
     printf(" ... parsing config_file: %s\n", config_file);
 #endif
-    parse_config(config_file, psadfifo_file, fwdata_file, fw_msg_search);
+    /* parse the config file */
+    parse_config(config_file, psadfifo_file,
+        fwdata_file, fw_msg_search, kmsgsd_pid_file);
+
+    /* make sure there isn't another kmsgsd already running */
+    check_unique_pid(kmsgsd_pid_file, "kmsgsd");
 
 #ifndef DEBUG
     /* become a daemon */
-    daemonize_process(KMSGSD_PID_FILE);
-
-    /* write the daemon pid to the pid file */
-//    printf("writing pid: %d to KMSGSD_PID_FILE\n", child_pid);
-//    write_pid(KMSGSD_PID_FILE, child_pid);
+    daemonize_process(kmsgsd_pid_file);
 #endif
 
     /* start doing the real work now that the daemon is running and
@@ -144,7 +146,7 @@ int main(int argc, char *argv[]) {
 /******************** end main ********************/
 
 static void parse_config(char *config_file, char *psadfifo_file,
-    char *fwdata_file, char *fw_msg_search)
+    char *fwdata_file, char *fw_msg_search, char *kmsgsd_pid_file)
 {
     FILE *config_ptr;         /* FILE pointer to the config file */
     int linectr = 0;
@@ -173,6 +175,7 @@ static void parse_config(char *config_file, char *psadfifo_file,
             find_char_var("PSAD_FIFO ", psadfifo_file, index);
             find_char_var("FW_DATA ", fwdata_file, index);
             find_char_var("FW_MSG_SEARCH ", fw_msg_search, index);
+            find_char_var("KMSGSD_PID_FILE ", kmsgsd_pid_file, index);
         }
     }
     fclose(config_ptr);
@@ -180,6 +183,7 @@ static void parse_config(char *config_file, char *psadfifo_file,
     printf(" ... PSAD_FIFO: %s\n", psadfifo_file);
     printf(" ... FW_DATA: %s\n", fwdata_file);
     printf(" ... FW_MSG_SEARCH: %s\n", fw_msg_search);
+    printf(" ... KMSGSD_PID_FILE: %s\n", kmsgsd_pid_file);
 #endif
     return;
 }

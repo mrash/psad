@@ -45,27 +45,47 @@ short int kmsgsd_syscalls_ctr   = 0;
 short int diskmond_syscalls_ctr = 0;
 
 /* PROTOTYPES ***************************************************************/
-static void parse_config(const char *config_file);
-static void check_process(const char *pid_name, const char *pid_file,
-    const char *binary_path);
-static void incr_syscall_ctr(const char *pid_name);
+static void parse_config(
+    char *config_file,
+    char *psad_binary,
+    char *psad_pid_file,
+    char *kmsgsd_binary,
+    char *kmsgsd_pid_file,
+    char *diskmond_binary,
+    char *diskmond_pid_file,
+    char *mailCmd,
+    char *psadwatchd_pid_file,
+    unsigned int *psadwatchd_check_interval,
+    unsigned int *psadwatchd_max_retries
+);
+static void check_process(
+    const char *pid_name,
+    const char *pid_file,
+    const char *binary_path,
+    unsigned int max_retries
+);
+static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries);
 static void reset_syscall_ctr(const char *pid_name);
 static void give_up(const char *pid_name);
 
 /* MAIN *********************************************************************/
 int main(int argc, char *argv[]) {
-    const char prog_name[] = "psadwatchd";
     char config_file[MAX_PATH_LEN+1];
-    unsigned short int psadwatchd_check_interval = 1;
+    char psadCmd[MAX_PATH_LEN+1];
+    char psad_pid_file[MAX_PATH_LEN+1];
+    char kmsgsdCmd[MAX_PATH_LEN+1];
+    char kmsgsd_pid_file[MAX_PATH_LEN+1];
+    char diskmondCmd[MAX_PATH_LEN+1];
+    char diskmond_pid_file[MAX_PATH_LEN+1];
+    char mailCmd[MAX_PATH_LEN+1];
+    char psadwatchd_pid_file[MAX_PATH_LEN+1];
+    unsigned int psadwatchd_check_interval = 5;  /* default to 5 seconds */
+    unsigned int psadwatchd_max_retries = 10; /* default to 10 tries */
 
 #ifdef DEBUG
     printf(" ... Entering DEBUG mode ...\n");
     sleep(1);
-    printf(" ... parsing config_file: %s\n", config_file);
 #endif
-
-    /* first make sure there isn't another kmsgsd already running */
-    check_unique_pid(PSADWATCHD_PID_FILE, prog_name);
 
     /* handle command line arguments */
     if (argc == 1) {  /* nothing but the program name was specified on the command line */
@@ -78,17 +98,33 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    /* parse the config file for the psadfifo_file, fwdata_file,
-     * and fw_msg_search variables */
-//    parse_config(config_file, &psadwatchd_check_interval
+#ifdef DEBUG
+    printf(" ... parsing config_file: %s\n", config_file);
+#endif
+
+    /* parse the config file */
+    parse_config(
+        config_file,
+        psadCmd,
+        psad_pid_file,
+        kmsgsdCmd,
+        kmsgsd_pid_file,
+        diskmondCmd,
+        diskmond_pid_file,
+        mailCmd,
+        psadwatchd_pid_file,
+        &psadwatchd_check_interval,
+        &psadwatchd_max_retries
+    );
+
+    printf("max: %d\n", psadwatchd_max_retries);
+
+    /* first make sure there isn't another psadwatchd already running */
+    check_unique_pid(psadwatchd_pid_file, "psadwatchd");
 
 #ifndef DEBUG
     /* become a daemon */
-    daemonize_process(PSADWATCHD_PID_FILE);
-
-    /* write the daemon pid to the pid file */
-//    printf("writing pid: %d to KMSGSD_PID_FILE\n", child_pid);
-//    write_pid(KMSGSD_PID_FILE, child_pid);
+    daemonize_process(psadwatchd_pid_file);
 #endif
 
     /* start doing the real work now that the daemon is running and
@@ -100,9 +136,12 @@ int main(int argc, char *argv[]) {
 
     /* MAIN LOOP: */
     for (;;) {
-        check_process("psad", PSAD_PID_FILE, PSAD_BINARY_PATH);
-        check_process("diskmond", DISKMOND_PID_FILE, DISKMOND_BINARY_PATH);
-        check_process("kmsgsd", KMSGSD_PID_FILE, KMSGSD_BINARY_PATH);
+        check_process("psad", psad_pid_file,
+            psadCmd, psadwatchd_max_retries);
+        check_process("kmsgsd", kmsgsd_pid_file,
+            kmsgsdCmd, psadwatchd_max_retries);
+        check_process("diskmond", diskmond_pid_file,
+            diskmondCmd, psadwatchd_max_retries);
         printf("check_process\n");
         sleep(psadwatchd_check_interval);
     }
@@ -112,7 +151,11 @@ int main(int argc, char *argv[]) {
 }
 /******************** end main ********************/
 
-static void check_process(const char *pid_name, const char *pid_file, const char *binary_path)
+static void check_process(
+    const char *pid_name,
+    const char *pid_file,
+    const char *binary_path,
+    unsigned int max_retries)
 {
     FILE *pidfile_ptr;
     pid_t pid;
@@ -124,7 +167,7 @@ static void check_process(const char *pid_name, const char *pid_file, const char
 #ifdef DEBUG
     printf(" ... Could not open pid_file: %s\n", pid_file);
 #endif
-        // system(pid_path);
+        // system(binary_path);
         return;
     }
 
@@ -144,8 +187,11 @@ static void check_process(const char *pid_name, const char *pid_file, const char
     fclose(pidfile_ptr);
 
     if (kill(pid, 0) != 0) {  /* the process is not running so start it */
-        incr_syscall_ctr(pid_name);
+        incr_syscall_ctr(pid_name, max_retries);
         // system(binary_path);
+#ifdef DEBUG
+        printf(" ... Executing system(%s)\n", binary_path);
+#endif
         system("/bin/true");
     } else {
 #ifdef DEBUG
@@ -156,7 +202,7 @@ static void check_process(const char *pid_name, const char *pid_file, const char
     return;
 }
 
-static void incr_syscall_ctr(const char *pid_name)
+static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries)
 {
     if (strcmp("psad", pid_name) == 0) {
         psad_syscalls_ctr++;
@@ -164,7 +210,7 @@ static void incr_syscall_ctr(const char *pid_name)
         printf(" ... %s not running.  Trying to restart (%d tries so far).\n",
             pid_name, psad_syscalls_ctr);
 #endif
-        if (psad_syscalls_ctr >= RESTART_LIMIT)
+        if (psad_syscalls_ctr >= max_retries)
             give_up(pid_name);
     } else if (strcmp("diskmond", pid_name) == 0) {
         diskmond_syscalls_ctr++;
@@ -172,7 +218,7 @@ static void incr_syscall_ctr(const char *pid_name)
         printf(" ... %s not running.  Trying to restart (%d tries so far).\n",
             pid_name, diskmond_syscalls_ctr);
 #endif
-        if (diskmond_syscalls_ctr >= RESTART_LIMIT)
+        if (diskmond_syscalls_ctr >= max_retries)
             give_up(pid_name);
     } else if (strcmp("kmsgsd", pid_name) == 0) {
         kmsgsd_syscalls_ctr++;
@@ -180,7 +226,7 @@ static void incr_syscall_ctr(const char *pid_name)
         printf(" ... %s not running.  Trying to restart (%d tries so far).\n",
             pid_name, kmsgsd_syscalls_ctr);
 #endif
-        if (kmsgsd_syscalls_ctr >= RESTART_LIMIT)
+        if (kmsgsd_syscalls_ctr >= max_retries)
             give_up(pid_name);
     }
     return;
@@ -189,11 +235,11 @@ static void incr_syscall_ctr(const char *pid_name)
 static void reset_syscall_ctr(const char *pid_name)
 {
     if (strcmp("psad", pid_name) == 0) {
-        kmsgsd_syscalls_ctr = 0;
-    } else if (strcmp("diskmond", pid_name) == 0) {
         psad_syscalls_ctr = 0;
-    } else if (strcmp("kmsgsd", pid_name) == 0) {
+    } else if (strcmp("diskmond", pid_name) == 0) {
         diskmond_syscalls_ctr = 0;
+    } else if (strcmp("kmsgsd", pid_name) == 0) {
+        kmsgsd_syscalls_ctr = 0;
     }
     return;
 }
@@ -205,12 +251,25 @@ static void give_up(const char *pid_name)
 #endif
     exit(EXIT_FAILURE);
 }
-#if 0
-static void parse_config(char *config_file, char *psadfifo_file, char *fwdata_file, char *fw_msg_search)
+
+static void parse_config(
+    char *config_file,
+    char *psadCmd,
+    char *psad_pid_file,
+    char *kmsgsdCmd,
+    char *kmsgsd_pid_file,
+    char *diskmondCmd,
+    char *diskmond_pid_file,
+    char *mailCmd,
+    char *psadwatchd_pid_file,
+    unsigned int *psadwatchd_check_interval,
+    unsigned int *psadwatchd_max_retries)
 {
     FILE *config_ptr;         /* FILE pointer to the config file */
     int linectr = 0;
     char config_buf[MAX_LINE_BUF];
+    char char_psadwatchd_check_interval[MAX_NUM_LEN+1];
+    char char_psadwatchd_max_retries[MAX_NUM_LEN+1];
     char *index;
 
     if ((config_ptr = fopen(config_file, "r")) == NULL) {
@@ -230,12 +289,22 @@ static void parse_config(char *config_file, char *psadfifo_file, char *fwdata_fi
         /* skip comments and blank lines, etc. */
         if ((*index != '#') && (*index != '\n') && (*index != ';') && (index != NULL)) {
 
-            find_char_var("PSAD_FIFO ", psadfifo_file, index);
-            find_char_var("FW_DATA ", fwdata_file, index);
-            find_char_var("FW_MSG_SEARCH ", fw_msg_search, index);
+            find_char_var("psadCmd ", psadCmd, index);
+            find_char_var("PSAD_PID_FILE ", psad_pid_file, index);
+            find_char_var("kmsgsdCmd ", kmsgsdCmd, index);
+            find_char_var("KMSGSD_PID_FILE ", kmsgsd_pid_file, index);
+            find_char_var("diskmondCmd ", diskmondCmd, index);
+            find_char_var("DISKMOND_PID_FILE ", diskmond_pid_file, index);
+            find_char_var("mailCmd ", mailCmd, index);
+            find_char_var("PSADWATCHD_CHECK_INTERVAL ",
+                char_psadwatchd_check_interval, index);
+            find_char_var("PSADWATCHD_MAX_RETRIES ",
+                char_psadwatchd_max_retries, index);
+            find_char_var("PSADWATCHD_PID_FILE ", psadwatchd_pid_file, index);
         }
     }
+    *psadwatchd_check_interval = atoi(char_psadwatchd_check_interval);
+    *psadwatchd_max_retries    = atoi(char_psadwatchd_max_retries);
     fclose(config_ptr);
     return;
 }
-#endif

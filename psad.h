@@ -50,21 +50,9 @@
 #define MAX_LINE_BUF 1024
 #define MAX_PID_SIZE 5
 #define MAX_PATH_LEN 50
-#define RESTART_LIMIT 5
+#define MAX_NUM_LEN 5
 
 #define CONFIG_FILE "/etc/psad/psad.conf" /* default config file */
-
-#define PSAD_PID_FILE "/var/run/psad/psad.pid" /* psad pid file */
-#define PSAD_BINARY_PATH "/usr/sbin/psad"
-
-#define PSADWATCHD_PID_FILE "/var/run/psad/psadwatchd.pid" /* pid file */
-#define PSADWATCHD_BINARY_PATH "/usr/sbin/psadwatchd"
-
-#define KMSGSD_PID_FILE "/var/run/psad/kmsgsd.pid" /* kmsgsd pid file */
-#define KMSGSD_BINARY_PATH "/usr/sbin/kmsgsd"
-
-#define DISKMOND_PID_FILE "/var/run/psad/diskmond.pid" /* diskmond file */
-#define DISKMOND_BINARY_PATH "/usr/sbin/diskmond"
 
 /* PROTOTYPES *****************************************************************/
 void check_unique_pid(const char *, const char *);

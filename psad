@@ -1596,7 +1596,7 @@ sub validate_config() {
 
 sub validate_home_net() {
     open IFC, "$cmds{'ifconfig'} -a |" or die " ** Could not execute ",
-        "$cmds{'ifconfig'} -a";
+        "$cmds{'ifconfig'} -a: $!";
     my @ifconfig_out = <IFC>;
     close IFC;
     my @connected_subnets;
@@ -3171,7 +3171,7 @@ sub print_scan() {  ### this should primarily be used for debugging
 sub get_local_ips() {
     print STDERR " .. get_local_ips()\n" if $debug;
     open IFC, "$cmds{'ifconfig'} -a |" or die " ** Could not execute ",
-        "$cmds{'ifconfig'} -a";
+        "$cmds{'ifconfig'} -a: $!";
     my @ips = <IFC>;
     close IFC;
     for my $line (@ips) {
@@ -3185,7 +3185,7 @@ sub get_local_ips() {
 sub get_listening_ports() {
     %local_ports = ();
     open NETS, "$cmds{'netstat'} -an |" or die " ** Could not execute ",
-        "$cmds{'netstat'} -an";
+        "$cmds{'netstat'} -an: $!";
     my @lines = <NETS>;
     close NETS;
     for my $line (@lines) {
@@ -3356,7 +3356,7 @@ sub status() {
                 ### XXX should probably just parse /proc instead of
                 ### using ps
                 open PS, "$cmds{'ps'} auxww |" or die " ** Could not ",
-                    "execute: $cmds{'ps'} auxww";
+                    "execute: $cmds{'ps'} auxww: $!";
                 my @ps_out = <PS>;
                 close PS;
                 PS: for my $line (@ps_out) {
@@ -4072,7 +4072,7 @@ sub check_forwarding() {
             "    $config{'PROC_FORWARD_FILE'}";
     }
     open IFC, "$cmds{'ifconfig'} -a |" or die " ** Could not ",
-        "execute: $cmds{'ifconfig'} -a";
+        "execute: $cmds{'ifconfig'} -a: $!";
     my @if_out = <IFC>;
     close IFC;
     my $num_intf = 0;
@@ -4216,7 +4216,7 @@ sub print_fw_help() {
 
 sub disk_space_exceeded() {
     open DF, "$cmds{'df'} $config{'PSAD_DIR'} |" or die " ** Could not ",
-        "execute: $cmds{'df'} $config{'PSAD_DIR'}";
+        "execute: $cmds{'df'} $config{'PSAD_DIR'}: $!";
     my @df_data = <DF>;
     close DF;
     my ($prcnt) = ($df_data[$#df_data] =~ /(\d+)%/);

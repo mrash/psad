@@ -1,12 +1,20 @@
 .\"
 .TH DISKMOND 8 "November 2002" "Debian/GNU Linux"
 .SH NAME
-diskmond \- checks disk space for "fwdata".
+.B diskmond
+\- monitors disk space used by psad
 .SH SYNOPSIS
-diskmond
+.B diskmond <config_file>
 .SH DESCRIPTION
 .B diskmond
-checks every 60 seconds to make sure that the disk utilization for the partition that holds the psad "fwdata" file is not beyond a threshold that the administrator defines.
+checks every 60 seconds to make sure that the disk utilization for
+the partition that holds the psad "fwdata" file (usually located
+at /var/log/psad/fwdata) is not beyond a threshold that the
+administrator defines (the default is 95%).
+.B diskmond
+will also remove the scanlog for each ip that has scanned your
+machine; scanlog is located at /var/log/psad/<ip>/scanlog for each
+scanning ip.
 .SH SEE ALSO
 .BR psad (8),
 .BR psadwatchd (8),
@@ -14,5 +22,11 @@ checks every 60 seconds to make sure that the disk utilization for the partition
 .SH AUTHOR
 Michael B. Rash (mbr@cipherdyne.com)
 
-This manual page was written by Daniel Gubser <daniel.gubser@gutreu.ch> for the Debian GNU/Linux system (but may be used by others).
+This manual page was written by Daniel Gubser <daniel.gubser@gutreu.ch>
+for the Debian GNU/Linux system (but may be used by others).
 
+.SH DISTRIBUTION
+.B psad
+is distributed under the GNU General Public License (GPL), and the latest
+version may be downloaded from
+.B http://www.cipherdyne.com

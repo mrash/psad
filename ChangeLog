@@ -1,3 +1,15 @@
+psad-1.3.4 (09//2004):
+    - Bugfix for init script directory on Slackware systems.
+    - Bugfix for null prefix counters.
+    - Added --whois-analysis argument since whois lookups are now disabled
+      by default when running in analysis (-A) mode.
+    - Updated psad_init() to rework setup() and import orderings vs.
+      --fw-analyze and --Benchmark modes.
+    - Added bidirectional iptables auto-blocking support for all chains
+      except for the INPUT and OUTPUT chains.
+    - Better syslog message support when run in auto-blocking mode.
+    - Added iptables auto-block rules section to --Status output.
+
 psad-1.3.3 (09/09/2004):
     - Fixed __WARN__ and __DIE__ exception handlers so that they
       reference global message variables.

@@ -1,13 +1,15 @@
-psad-1.2.4 (09//2003):
+psad-1.2.4 (10//2003):
     -Added danger level to subject line in email alerts.
     -Added auto_block_ignore_ip() to prevent 0.0.0.0, 127.0.0.1,
      and local interface ips from being included in auto blocking
      routines.
-    -Made get_local_ips() called periodically since local addresses may
-     change (dhcp, etc.).
-    -Added installation code for Gentoo Linux.
+    -Made get_local_ips() called periodically since local addresses
+     may change (dhcp, etc.).
+    -Added installation code and init script for Gentoo Linux.
     -Bugfix for INIT_DIR in uninstall() routine in install.pl.
-
+    -Bugfix for auto-blocking loop after timeouts are hit.
+    -Added --status-dl [N] to display status information only for
+     those scans that reach at least [N].
 
 psad-1.2.3 (09/12/2003):
     -Added interface tracking for scans.

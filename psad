@@ -481,18 +481,9 @@ if ($ver) {
     exit 0;
 }
 
-if ($status_ip && not $status) {
-    die ' ** The --status-ip option can only be specified along with ',
-        'the --Status option.  Exiting.';
-}
-if ($status_sort_dl && not $status) {
-    die ' ** The --status-sort-dl option can only be specified along with ',
-        'the --Status option.  Exiting.';
-}
-if ($status_dl && not $status) {
-    die ' ** The --status-dl option can only be specified along with ',
-        'the --Status option.  Exiting.';
-}
+$status = 1 if ($status_ip and not $status);
+$status = 1 if ($status_sort_dl and not $status);
+$status = 1 if ($status_dl and not $status);
 if ($status_dl and $status_dl > 5) {
     die ' ** The --status-dl must be between 1 and 5.  Exiting.';
 }

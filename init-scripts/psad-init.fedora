@@ -1,0 +1,87 @@
+#!/bin/bash
+#
+#   /etc/rc.d/init.d/psad
+#
+# Starts the psad daemon
+#
+# chkconfig: 345 95 5
+# description: The Port Scan Attack Detector (psad)
+# processname: psad
+
+# Source function library.
+. /etc/init.d/functions
+
+test -x /usr/sbin/psad || exit 0
+
+RETVAL=0
+
+#
+#   See how we were called.
+#
+
+prog="psad"
+
+start() {
+	# Check if psad is already running
+	if [ ! -f /var/lock/subsys/psad ]; then
+	    echo -n $"Starting $prog: "
+	    daemon /usr/sbin/psad
+	    RETVAL=$?
+	    [ $RETVAL -eq 0 ] && touch /var/lock/subsys/psad
+	    echo
+	fi
+	return $RETVAL
+}
+
+stop() {
+	echo -n $"Stopping $prog: "
+	killproc /usr/sbin/psadwatchd
+	killproc /usr/sbin/kmsgsd
+	killproc /usr/sbin/psad
+	RETVAL=$?
+	[ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/psad
+	echo
+        return $RETVAL
+}
+
+
+restart() {
+	stop
+	start
+}	
+
+reload() {
+	restart
+}	
+
+status_psad() {
+ 	status /usr/sbin/kmsgsd
+ 	status /usr/sbin/psadwatchd
+ 	status /usr/sbin/psad
+}
+
+case "$1" in
+start)
+	start
+	;;
+stop)
+	stop
+	;;
+reload|restart)
+	restart
+	;;
+condrestart)
+	if [ -f /var/lock/subsys/psad ]; then
+	    restart
+	fi
+	;;
+status)
+	status_psad
+	;;
+*)
+	echo $"Usage: $0 {start|stop|restart|condrestart|status}"
+	exit 1
+esac
+
+exit $?
+exit $RETVAL

@@ -1,0 +1,279 @@
+                    =====================================
+                      Package "Bit::Vector" Version 6.3
+                    =====================================
+
+
+                 Copyright (c) 1995 - 2002 by Steffen Beyer.
+                             All rights reserved.
+
+
+Version history:
+----------------
+
+Version 6.3   28.09.2002
+
+ +  Added "Create_List()" and "GCD2()" in "BitVector.c".
+ +  "new()" now can optionally return a list of bit vectors.
+ +  "GCD()" now can optionally return the two integer factors
+    "x" and "y" for the linear combination of its input values
+    "a" and "b" so that gcd(a,b) = x * a + y * b.
+ +  Changed the test files "t/01________new.t" and "t/09_parameters.t"
+    as well as the documentation accordingly.
+ +  Added a new test file "t/17________gcd.t".
+ +  Further simplified the error handlers in "Vector.xs", making the
+    resulting object library file substantially smaller (about 20%!)
+    and thus faster to load.
+
+Version 6.2   15.09.2002
+
+ +  Fixed missing "\" in regular expression in "t/00____version.t".
+ +  Overhauled the error handlers in "BitVector.c" and "Vector.xs".
+ +  Added a demo "examples/test.c" to play around with the C library.
+ +  Attempted to fix all compiler warnings.
+ +  Fixed a problem in test "t/01________new.t" with Perl using
+    64 bit integers; now contains "use integer;" to avoid failure.
+ +  Synchronized "Carp::Clan" and "ToolBox.h" with "Date::Calc" 5.2.
+ +  Revealed common method aliases (Or, And, etc.) in the documentation.
+ +  Fixed GCD(), now GCD(z,0) == GCD(0,z) == z and negative values
+    are handled correctly.
+
+Version 6.1   08.10.2001
+
+ +  Fixed the problem which caused some of the tests with overloaded
+    operators to fail under Perl 5.7.1 and Perl 5.7.2.
+ +  Added the module "Carp::Clan" to the distribution.
+ +  Changed most of the error messages in Bit::Vector::Overload.
+ +  Changed the test script "t/30_overloaded.t" accordingly.
+ +  Changed "Makefile.PL" to write a "patchlevel.h" file so that
+    "Vector.xs" can automatically detect the Perl version and
+    whether to use the macro PL_na or na, GIMME_V or GIMME.
+    Tweaking the code before installing is not necessary anymore.
+ +  Changed the documentation in files README.txt and INSTALL.txt
+    accordingly.
+ +  Changed the internal names BitVector_msb and BitVector_lsb to
+    BitVector_msb_ and BitVector_lsb_ in order to make the (non-
+    ANSI C-standard-compliant!) VMS linker happy. This does NOT
+    affect the Perl interface, though.
+
+Version 6.0   08.10.2000
+
+ +  Splitted the Vector.pm module; separated XS and overloaded Perl
+    part for improved performance (reduces loading time for XS part).
+ +  Corrected the handling of numerical overflow in arithmetic methods
+    ("add()", "subtract()", "Multiply()", "from_Dec()", "new_Dec()").
+ +  Methods "add()" and "subtract()" now return the carry as well as
+    the overflow flag if called in list context (only the carry in
+    scalar context, as before).
+ +  Added two new methods "inc()" and "dec()", which return the overflow
+    flag (whereas "increment()" and "decrement()" return the carry flag).
+    The new methods also allow to copy-and-increment/decrement in addition
+    to in-place operation.
+ +  Methods "from_Dec()" and "new_Dec()" now allow you to enter large
+    positive numbers which will have the MSB set (this was forbidden
+    previously because these numbers are considered to be negative in
+    two's complement binary representation).
+
+Version 5.8   14.07.2000
+
+ +  Changed "na" to "PL_na" in Vector.xs in order to make the module
+    ready for Perl 5.6.0.
+ +  Removed the error messages which appeared at global destruction
+    time with Perl 5.6.0.
+ +  Changed the corresponding test script (t/02____destroy.t) accordingly.
+ +  Optimized the "strEQ" away from the typemap section in Vector.xs.
+ +  Fixed the misspelled word "whether" in the documentation.
+ +  Added method "Power()".
+ +  Added overloaded operator "**" (for exponentiation).
+ +  Changed method "Copy()"; the two vectors do not need to have the same
+    size anymore. The method will copy as much as will fit or fill up
+    with 0's or 1's (depending on the sign of the source) if necessary.
+ +  Changed the corresponding test script (t/09_parameters.t) accordingly.
+
+Version 5.7   19.05.1999
+
+ +  Improved method "Div_Pos()": It now uses only one instead of the
+    former two (very costly) "shift" operations in its main loop, and
+    it now depends on the (variable) length of the numbers involved rather
+    than the (constant) length of their respective bit vectors, making
+    this method tremendously faster now. The methods "to_Dec()", "Divide()"
+    and "GCD()" also profit from this change in the same way since they
+    rely crucially on the "Div_Pos()" method, internally.
+ +  Added a matrix multiplication method (for "Math::MatrixBool") named
+    "Product()" which determines paths in matrices representing graphs.
+ +  Fixed the problems with anchored error messages in the regression
+    test suite under MacPerl.
+
+Version 5.6   02.11.1998
+
+ +  Removed the leading zeros from the output of "to_Hex()".
+ +  Fixed compiler warning on line 2067 of "BitVector.c".
+
+Version 5.5   21.09.1998
+
+ +  Fixed the bug of the uninitialized return code in method "Multiply()".
+ +  Fixed the failure of tests 96-131 of test script "t/01________new.t"
+    under HP-UX 10.
+
+Version 5.4   07.09.1998
+
+ +  Fixed the bug of the uninitialized return code in method "Divide()".
+ +  Introduced an additional header "Preface" in the POD documentation to
+    avoid clobbering of the information displayed by CPAN.pm et al.
+ +  Added the new attributes to "Makefile.PL" for ActiveState's port
+    of Perl 5.005 to the Win32 platform.
+
+Version 5.3   12.05.1998
+
+ +  Changed "Norm()" to become still a bit more efficient.
+ +  Ported the "upgrade_BV52" utility to Perl ("upgrade_BV53.pl"),
+    making it faster, more flexible and easier to read and maintain.
+ +  Added "upgrade_BV42.pl".
+ +  Enhanced support for Windows NT/95.
+ +  Complete rewrite of this "CHANGES.txt" document.
+
+Version 5.2   31.03.1998
+
+ +  Changed "Norm()", "<<" and ">>" to become more efficient.
+ +  Added "new_Hex()", "new_Bin()", "new_Dec()" and "new_Enum()".
+ +  Made the exception handling in "Vector.pm" more elegant.
+
+Version 5.1   09.03.1998
+
+ +  Added systematic exception handling to "Vector.pm".
+
+Version 5.0   01.03.1998
+
+ +  "Outsourced" all example modules (now available separately).
+ +  Added: Word_Bits(), Long_Bits(), Concat(), Concat_List(), Primes(),
+    Reverse(), Interval_Reverse(), Interval_Copy(), Interval_Substitute(),
+    Lexicompare(), to_Bin(), from_Bin(), to_Dec(), from_Dec(), Bit_Copy(),
+    LSB(), MSB(), lsb(), msb(), Insert(), Delete(), add(), subtract(),
+    Negate(), Absolute(), Sign(), Multiply(), Divide(), GCD(), Block_Store(),
+    Block_Read(), Word_Size(), Word_Store(), Word_Read(), Word_List_Store(),
+    Word_List_Read(), Word_Insert(), Word_Delete(), Chunk_Store(),
+    Chunk_Read(), Chunk_List_Store(), Chunk_List_Read(), Index_List_Remove(),
+    Index_List_Store(), Index_List_Read(), Transpose().
+ +  Ported to C: "Version()", "Shadow()", "Clone()", "to_Enum()",
+    "from_Enum()".
+ +  Changed: "Compare()" (now assumes bit vectors are SIGNED).
+ +  Renamed: "to_String()" ==> "to_Hex()", "from_string()" ==> "from_Hex()",
+    "to_ASCII()" ==> "to_Enum()", "from_ASCII()" ==> "from_Enum()"
+    (aliases are still available but deprecated).
+ +  Dropped: "lexorder()", "new_from_String()".
+ +  Dropped: Module "Set::IntegerFast" (replaced by "Bit::Vector").
+ +  Definitely abandoned the possibility for subclassing because it doesn't
+    make any sense in this module (use embedding instead!).
+ +  Fixed: Module "Set::IntegerRange" version 4.2 broke with "Bit::Vector"
+    version 5.0. Issued quick fix "Set::IntRange" version 5.0. More
+    thorough implementation is under construction.
+
+Version 4.2   16.07.1997
+
+ +  Added "is_empty()" and "is_full()".
+
+Version 4.1   30.06.1997
+
+ +  Added "Move_Left()" and "Move_Right()".
+ +  Changed "<<" and ">>" to call "Move_Left()" and "Move_Right()" instead.
+ +  Added "increment()" and "decrement()".
+ +  Changed "++" and "--" to call "increment()" and "decrement()" instead.
+ +  Added "Resize()", "Interval_Scan_inc()", "Interval_Scan_dec()" and
+    "BitVector()" to "Set::IntegerRange".
+
+Version 4.0   23.04.1997
+
+ +  Complete rewrite of the "Set::IntegerFast" module.
+ +  Renamed "Set::IntegerFast" to "Bit::Vector".
+ +  United the separate C cores and XS files for sets, matrices of booleans
+    and bit shift operations in a single module.
+ +  Abandoned the individual version numbers.
+ +  Dropped the separate "Makefile.PL"s, adopted the solution using
+    a "lib" subdirectory.
+ +  Added: Flip(), Interval_Scan_inc(), Interval_Scan_dec(), rotate_left(),
+    rotate_right(), shift_left(), shift_right(), to_String(), from_string(),
+    Multiplication(), Closure(), Shadow(), Clone(), new_from_String(),
+    to_ASCII(), from_ASCII().
+ +  Added overloaded operators for: emptyness, equality, lexical comparison,
+    shift register, rotate register, string conversion, union, intersection,
+    difference, exclusive-or, complement, subset relationship, true subset
+    relationship, superset relationship, true superset relationship, norm.
+
+Version 3.2   04.02.1997
+
+ +  Added "Empty_Interval()", "Fill_Interval()", "Flip_Interval()" and
+    "Size()" to "Set::IntegerFast" and "Set::IntegerRange".
+ +  "Set::IntegerFast" and "Set::IntegerRange" both switched to version
+    number 3.0.
+ +  Improved the "Math::MatrixBool" module (new version number: 2.0) to
+    use C routines for matrix multiplication and closure and fixed some
+    bugs in these methods at the same time.
+ +  Added "new_from_string()" and "Dim()" to "Math::MatrixBool".
+ +  Fixed a severe bug in the "kleene()" method of "Math::MatrixReal"
+    (new version number: 1.1).
+
+Version 3.1   21.01.1997
+
+ +  Fixed a bug that caused the initialization routine of the module to fail
+    on 64 bit machines due to a wrong conditional expression (type "int" and
+    "size_t" do not necessarily have the same size!).
+ +  "Set::IntegerFast" switched to version number 2.2.
+
+Version 3.0   12.01.1997
+
+ +  Added "flip()" to "Set::IntegerFast" and "Set::IntegerRange".
+ +  Transformed the "kruskal" demo program to a Perl module "Graph::Kruskal".
+ +  Added new companion modules: "Math::MatrixBool", "Math::MatrixReal" and
+    "DFA::Kleene", all with separate "Makefile.PL"s.
+ +  Added introductory article about theory behind Kleene's algorithm.
+ +  Introduced independent version numbers for all modules:
+    "Set::IntegerFast" ==> version 2.1, "Set::IntegerRange" ==> version 2.0.
+ +  Added overloaded operators to "Set::IntegerRange".
+ +  Bugfix: Changed "gv_stashpv(class,0)" to "gv_stashpv(class,1)" in the
+    XS file (caused core dumps in previous versions when "new()" was called
+    with a nonexistent class name and subclassing enabled).
+
+Version 2.0   14.12.1996
+
+ +  Changed "Create()" to "new()".
+ +  Now supports "$set = new Set::IntegerFast($elements);" instead of
+    "$set = Set::IntegerFast::Create($elements);".
+ +  Changed "Destroy()" to "DESTROY()", which doesn't need to (and
+    shouldn't!) be called explicitly anymore.
+ +  Fixed the "bad free() ignored" warnings caused by "Destroy()" in
+    version 1.1 (in conjunction with Perl version 5.002) which led some
+    of the tests in "make test" to fail.
+ +  Complete rewrite of the XS part.
+ +  Changed "lexorder()" and "Compare()" to become more efficient
+    (complexity n/b instead of n/8).
+ +  Changed parameters visible externally from "word"/"unit" to "N_int"
+    in the C core.
+ +  Complete rewrite of the documentation, now in POD format.
+ +  Added a new (wrapper) module named "Set::IntegerRange".
+
+Version 1.1   08.01.1996
+
+ +  Added "Resize()".
+ +  Changed "Create()", "Empty()", "Fill()" and "Copy()" to have complexity
+    n/b rather than n/8.
+ +  Made interfaces in C core more consistent: Pointer to a set object is
+    now always the first parameter.
+ +  Added new paragraphs to the documentation.
+ +  Added "ExclusiveOr()" (for symmetric difference X = (Y + Z) \ (Y * Z)).
+
+Version 1.0   14.12.1995   First version under UNIX (with Perl module).
+
+ +  Initial release as a C library and Perl module.
+
+Version 0.9   01.11.1993   First version of C library under MS-DOS.
+
+ +  Ported the Pascal code to C because I thought sets of arbitrary sizes
+    are always useful to have.
+
+Version 0.1   ??.??.1989   First version in Turbo Pascal under CP/M.
+
+ +  I first wrote this library (on my Apple ][+) because I needed more bits
+    in a set than Turbo Pascal would support in order to calculate "first",
+    "follow" and "look-ahead" character sets for a compiler-compiler.
+
+----------------------------------------------------------------------------
+

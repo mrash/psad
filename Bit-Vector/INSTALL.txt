@@ -1,0 +1,210 @@
+                    =====================================
+                      Package "Bit::Vector" Version 6.3
+                    =====================================
+
+
+                 Copyright (c) 1995 - 2002 by Steffen Beyer.
+                             All rights reserved.
+
+
+Contents:
+---------
+
+    +   Prerequisites
+    +   Preliminary steps for use with Perl prior to version 5.002
+    +   Preliminary steps for use with ActiveState's port of Perl 5
+    +   How to install additional languages
+    +   Installation
+
+
+Prerequisites:
+--------------
+
+Perl version 5.000 or higher, and an ANSI C compiler. (!)
+                                     ^^^^^^
+If you compile under Windows, note that you will need
+exactly the same compiler your Perl itself was compiled
+with! (This is also true for Unix, but rarely a problem.)
+
+Moreover, you usually cannot build any modules under
+Windows 95/98, the Win 95/98 command shell doesn't
+grok the "&&" operator. You will need the Windows NT
+command shell ("cmd.exe") or the "4DOS" shell.
+
+Note that ActiveState provides precompiled binaries of
+this module for their Win32 port of Perl ("ActivePerl")
+on their web site at http://www.activestate.com/.
+
+
+Preliminary steps for use with Perl prior to version 5.002:
+-----------------------------------------------------------
+
+Edit the file "Makefile.PL" and change the line
+
+    'VERSION_FROM'      => 'Vector.pm',
+to
+    'VERSION'           => '6.3',
+
+Then edit the file "Vector.pm" and change the line
+
+    bootstrap Bit::Vector $VERSION;
+to
+    bootstrap Bit::Vector;
+
+Also edit the file "t/00____version.t" and change the line
+
+    use Bit::Vector 6.3;
+
+to
+
+    use Bit::Vector;
+
+Finally, edit the file "Vector.xs" and delete the line
+
+    PROTOTYPES: DISABLE
+
+
+Preliminary steps for use with ActiveState's port of Perl 5:
+------------------------------------------------------------
+
+(For the Win32 platform)
+
+Edit the file "Makefile.PL" and remove all of the "#" characters
+which currently comment out the lines involved with the setting
+of the attributes "ABSTRACT", "AUTHOR" and "CAPI".
+
+
+Installation:
+-------------
+
+=============================================================================
+ALWAYS unpack and build Perl modules OUTSIDE the Perl source and installation
+tree! (You might otherwise inadvertently corrupt your Perl installation!)
+=============================================================================
+
+Quick installation guide for experienced users:
+-----------------------------------------------
+
+    UNIX:                 Win32/Borland C++:      Win32/MS Visual C++:
+    =====                 ==================      ====================
+
+    % perl Makefile.PL    % perl Makefile.PL      % perl Makefile.PL
+    % make                % dmake                 % nmake
+    % make test           % dmake test            % nmake test
+    % make install        % dmake install         % nmake install
+
+Detailed installation guide:
+----------------------------
+
+ 1) Change directory to the directory that has been created by unpacking this
+    package ("cd Bit-Vector-6.3").
+
+ 2) Type "perl Makefile.PL" (or whatever the name and path of your Perl 5
+    binary is).
+
+    This will create a "Makefile" with the appropriate parameters for your
+    system (for instance, where the install directories are, and so on).
+
+    See "man ExtUtils::MakeMaker" or "perldoc ExtUtils::MakeMaker" for
+    other useful options to this command, like setting a different
+    installation PREFIX.
+
+ 3) Type "make".
+
+    (For installation under Windows NT/95, use "dmake" (Borland C++) or
+    "nmake" (MS Visual C++) instead!)
+
+    This will create a dynamically linkable library file that will be linked
+    to Perl later, at runtime, provided your system supports dynamic linking.
+
+    Please refer to the MakeMaker documentation for instructions on how
+    to build a new Perl with statically linked libraries (invoke "perldoc
+    ExtUtils::MakeMaker" for this), if your system does NOT support dynamic
+    linking!
+
+    Should you encounter any compiler warnings or errors (like the redefi-
+    nition of certain types already defined by your system), please contact
+    me via e-mail at <sb@engelschall.com>, sending me your compiler output
+    (both STDOUT and STDERR). Thank you!
+
+    ======================================================================
+       BEWARE that you need an ANSI C compiler in order to successfully
+       compile this package!
+    ======================================================================
+
+    Also note that problems may arise with the c89 compiler of HP, although
+    it allegedly supports ANSI C!
+
+    I recommend the GNU C compiler ("gcc"), which is freely available on
+    the Internet (see ftp://ftp.gnu.org/pub/gnu/ and mirror sites thereof).
+
+    (HP users are strongly recommended to install the GNU assembler "gas"
+    first before installing the GNU C compiler "gcc", according to GNU.)
+
+    Should you get the error messages
+
+    Vector.c: 15: Unable to find include file 'EXTERN.h'.
+    Vector.c: 16: Unable to find include file 'perl.h'.
+    Vector.c: 17: Unable to find include file 'XSUB.h'.
+
+    then edit the file "Makefile.PL" and add a line similar to the
+    following so that it points to your Perl 5 distribution tree:
+
+    'INC'       => '-I/usr/ctr/dlt/private/perl/perl5.003',
+
+    Then start over with the generation of the "Makefile" at 2).
+
+ 4) Now issue "make test" (or "dmake test" or "nmake test", respectively).
+
+    The output should look somewhat like this:
+
+    PERL_DL_NONLAZY=1 /sw/bin/perl -Iblib/arch
+    -Iblib/lib -I/sw/pkg/perl/lib/5.00503/i386-freebsd
+    -I/sw/pkg/perl/lib/5.00503 -e 'use Test::Harness
+    qw(&runtests $verbose); $verbose=0; runtests @ARGV;' t/*.t
+    t/00____version.....ok
+    t/01________new.....ok
+    t/02____destroy.....ok
+    t/03_operations.....ok
+    t/04__functions.....ok
+    t/05_____primes.....ok
+    t/06_____subset.....ok
+    t/07____compare.....ok
+    t/08_____resize.....ok
+    t/09_parameters.....ok
+    t/10__intervals.....ok
+    t/11______shift.....ok
+    t/12_____string.....ok
+    t/13__increment.....ok
+    t/14______empty.....ok
+    t/15________add.....ok
+    t/16___subtract.....ok
+    t/17________gcd.....ok
+    t/28__chunklist.....ok
+    t/30_overloaded.....ok
+    All tests successful.
+    Files=20,  Tests=67417, 22 wallclock secs
+    (13.72 cusr +  0.57 csys = 14.29 CPU)
+
+    (Note that the exact number of tests will depend on the number of bits
+     of a machine word/an unsigned long on your system!)
+
+ 5) At last, type "make install" (or "dmake install", "nmake install").
+
+ 6) Now you can run the "primes.pl" demo program from the "examples" sub-
+    directory, for instance. Start it with "perl examples/primes.pl" (or
+    whatever the name and path of your Perl 5 binary is).
+
+    It will ask you to enter a number which will serve as an upper limit for
+    the calculation of all prime numbers up to that limit, using the algorithm
+    known as "The Sieve of Erathostenes".
+
+    On my machine (SUN SPARCstation 20/61), calculating all the prime numbers
+    up to one million takes about 1 minute 30 seconds to 2 minutes (depending
+    on the load) when the algorithm is programmed in Perl. If the internal
+    method "Primes()" is used instead (implemented in C), the same machine
+    only takes about 1 second for this task.
+
+ 7) Share and enjoy!
+
+

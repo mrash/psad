@@ -1,0 +1,172 @@
+                    =====================================
+                      Package "Bit::Vector" Version 6.3
+                    =====================================
+
+
+                 Copyright (c) 1995 - 2002 by Steffen Beyer.
+                             All rights reserved.
+
+
+Credits:
+--------
+
+Many thanks to Andreas Koenig <upload@franz.ww.tu-berlin.de> for his
+efforts as upload-manager for the CPAN, his patience, and lots of good
+advice and suggestions! Thank you for doing such a tremendous (and time-
+consuming) job!!
+
+Also many thanks to David Jenkins <jenkins@sdm.de> for reviewing the
+first version of the README file and the man page.
+
+Many thanks to Jarkko Hietaniemi <Jarkko.Hietaniemi@hut.fi> for his
+suggestions while I was developing the first release of this package!
+
+Many thanks also to the people of the perl5-porters <perl5-porters@nicoh.com>
+mailing list, specifically:
+
+Andreas Koenig <andreas.koenig@mind.de>
+Tim Bunce <Tim.Bunce@ig.co.uk>
+Jarkko Hietaniemi <Jarkko.Hietaniemi@hut.fi>
+Felix Gallo <fsg@coriolan.amicus.com>
+Mark A Biggar <mab@wdl.loral.com>
+Nick Ing-Simmons <nik@tiuk.ti.com>
+John Macdonald <jmm@elegant.com>
+
+for discussing and clarifying the naming and other issues of this package!
+
+Also many thanks to David Thompson <dlt@dewey.csun.edu> for reporting a
+problem he encountered concerning the inclusion of the Perl distribution
+("Unable to find include file ...") and for suggesting a solution for this
+problem. (That's the most pleasant kind of problem report, of course! ;-) )
+
+Many thanks to Rob Johnson <rjohnson@apple.com> for an improved algorithm
+for computing binomials with always integer intermediate results (and
+numbers never getting too big)!
+
+Thanks to Banchong Harangsri <bjtong@cse.unsw.edu.au> for reporting the
+problem of the version 1.1 of this module with Perl 5.002!
+
+Special thanks to Dean Roehrich <roehrich@cray.com> for his assistance
+in trying to find the cause of and a remedy for the above problem!
+
+Many thanks to Andreas Koenig for notifying me of the alternative for the
+directory structure using the "lib" subdirectory and a way to use "confess"
+in an XSUB via "perl_eval_sv".
+
+Many special thanks to Larry Schwimmer <rosebud@cyclone.stanford.edu> for
+reporting the bug related to 64 bit machines and finding where an implicit
+assumption of 32 bit integers was hidden, and for testing the new version
+on his machine!
+
+Many thanks to Ralf S. Engelschall <rse@engelschall.com> for suggesting
+the four new methods "Size()", "Empty_Interval()", "Fill_Interval()" and
+"Flip_Interval()", implemented in version 3.0 of the "Set::IntegerFast"
+module (and also in the "Set::IntegerRange" module)!
+
+Also many thanks to Ralf Engelschall for the many good suggestions that
+went into version 4.0 of this package (concerning many different aspects)!
+
+Many thanks to Stas Bekman <sbekman@iil.intel.com> for raising the question
+of bitwise shift and rotation operations in Perl, which gave me the idea to
+implement such shift registers with arbitrary size, which in turn and with
+time gave me the idea of implementing a "Bit::Vector" base class capable of
+this along with already existing functionality (for sets and boolean matrices).
+
+Also many thanks to Jon Orwant <orwant@media.mit.edu> and Tim Bunce
+<Tim.Bunce@ig.co.uk> for their suggestions and comments concerning my
+first attempts at writing a module for bitwise shift and rotate operations
+in Perl, which eventually went into version 4.0 of this module!
+
+Many thanks to Brian S. Julin <bri@calyx.net> for sharing his ideas, his
+questions and the code of his "Bit::File" module with me, which inspired
+me to write the routines to access arbitrary chunks of bits.
+
+Many thanks to Hau-Yung Chen <hchen@oda-tech.com> for suggesting the
+string conversion routines to convert to/from binary representation
+and the possibility to concatenate bit vectors.
+
+Many thanks to Jarkko Hietaniemi <Jarkko.Hietaniemi@hut.fi> for suggesting
+the implementation of the transpose of a matrix in C for better performance.
+The transpose can be used in finding the strongly connected components of
+a graph.
+
+Many thanks go to Daniel Koch <dkoch@amcity.com> for suggesting the
+"Index_List_Store()" and "Index_List_Read()" methods!
+
+Many thanks again to Hau-Yung Chen <hchen@oda-tech.com> for suggesting
+a way for speeding up the conversion to decimal in "to_Dec()" (by dividing
+the bit vector through the largest possible power of ten that will fit into
+a machine word and then breaking down the rest using only machine words,
+which is faster than repeatedly dividing the whole bit vector by ten).
+According to my measurements, this resulted in an 8-fold speed increase.
+
+Many thanks go to Krzysztof Koczyjan <krzysztofk@rocketmail.com> for
+suggesting and extensively benchmarking a more efficient method for
+bit counting in the method "Norm()", which was adopted in version 5.2.
+
+Many thanks again to Krzysztof Koczyjan <krzysztofk@rocketmail.com> for
+an additional improvement of the method "Norm()", which was adopted in
+version 5.3.
+
+Many thanks to Bryan Bayerdorffer <bryan.bayerdorffer@analog.com> for
+notifying me of the bug in the "Divide()" method, which was immediately
+fixed in version 5.4.
+
+Many thanks to Rob W. Koeling <koeling@let.rug.nl> for reporting and to
+Paul J. Schinder <schinder@pobox.com> for reporting and helping to investigate
+the error of the failed tests 96-131 of test script "t/01________new.t" under
+HP-UX 10! This was fixed in version 5.5.
+
+Many thanks to the "CPAN testers" (http://www.connect.net/gbarr/cpan-test/)
+in general and to Jarkko Hietaniemi <jhi@iki.fi> in particular for testing
+this module and for reporting the compiler warning which occurred on line
+2067 of "BitVector.c" with the native "cc" compiler under Digital Unix,
+which has been fixed in version 5.6.
+
+Also many thanks to Matt Knecht <hex@voicenet.com> for pushing me hard
+enough ;-) to suppress those annoying leading zeros in the output from
+"to_Hex()" in version 5.6!
+
+Many thanks to Roland Titze <Roland.Titze@ks.sel.alcatel.de> and
+to Andrew Brown <alloneword@dial.pipex.com> for pointing out the
+misspelling of "whether" (was: wether) throughout my documentation,
+corrected in version 5.8.
+
+Thanks also go to Steve Tolkin <steve.tolkin@fmr.com> for suggesting that
+I should emphasize in the README.txt file that the reading of the INSTALL.txt
+file is important, especially if running Perl under Windows. :-)
+
+Many special thanks to Joshua N. Pritikin <joshua.pritikin@db.com> for
+sending in valuable patches to make this module ready for Perl 5.6.0
+and to optimize the "strEQ" away from the typemap section in Vector.xs.
+
+Lots of thanks also to Yitzchak Scott-Thoennes <sthoenna@efn.org> for
+sending in a patch to make this module ready for Perl 5.6.0 and for
+extremely useful hints (and a patch) as to why the test suite had
+failures with Perl 5.6.0 all of a sudden.
+
+Many thanks to John Peacock <jpeacock@rowman.com> for reporting a
+problem with the VMS linker which is unable to differentiate case -
+in violation of the ANSI C standard - and for sending a patch to fix
+this problem.
+
+Many thanks to Tom Oelke <toelke@mipos2.intel.com> for reporting a
+problem with test "t/01________new.t" when Perl was built to use
+64 bit integers and for suggesting two possible fixes. The second
+one (adding "use integer;" at the top of the script) was adopted
+in version 6.2.
+
+Many thanks to Clint Olsen <clint@0lsen.net> for his many interesting
+questions and suggestions, one of which led to my writing the new
+example file "examples/test.c" in version 6.2.
+
+Many thanks to Tels <tels@bloodgate.com> for his criticism of "GCD()"
+and the documentation (with respect to common method name aliases
+such as Or, And, Xor, etc.). Both weaknesses have been fixed in
+version 6.2.
+
+Many thanks to Mike Swieton <swietonm@student.gvsu.edu> (and many other
+people in the past) for sending in a patch so that ToolBox.h will compile
+with C++ compilers.
+
+

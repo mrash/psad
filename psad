@@ -287,8 +287,6 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 			}
 		} 
 		# hash initialization
-#		$Scan{$srcip} = "DEFINED";
-#		$Scan{$srcip}{$dstip} = $dstip;
 		$Scan{$srcip}{$dstip}{'LOGR'} = "Y";
 		$Scan{$srcip}{$dstip}{'ABSNUM'} = 0 unless (defined $Scan{$srcip}{$dstip});
 		if ($proto eq "TCP") {
@@ -952,10 +950,9 @@ sub check_firewall_rules() {
                         next FWPARSE if ($rule =~ /^Chain/ || $rule =~ /^target/);
                         if ($rule =~ /^(LOG)\s+(\w+)\s+\S+\s+\S+\s+(\S+)\s.+prefix\s\`(.+)\'/) {
                                 my ($target, $proto, $dst, $prefix) = ($1, $2, $3, $4);
-                                if ($target eq "LOG" && $proto =~ /all|tcp/ && $prefix =~ /drop|reject|deny/i) { # only tcp supported right now...
+                                if ($target eq "LOG" && $proto =~ /all|tcp|udp/ && $prefix =~ /drop|reject|deny/i) {
                                 # this needs work... see above _two_ rules.
                                         if (check_destination($dst, \@localips)) {
-#                                                print STDOUT "*** Your firewall setup looks good.  Unauthorized tcp packets will be logged.\n";
                                                 return 1;
                                         }
                                 }
@@ -977,15 +974,14 @@ sub check_firewall_rules() {
                         next FWPARSE if ($rule =~ /^Chain/ || $rule =~ /^target/);
                         if ($rule =~ /^(\w+)\s+(\w+)\s+(\S+)\s+\S+\s+(\S+)\s+(\*)\s+\-\>\s+(\*)/) {
                                 my ($target, $proto, $opt, $dst, $srcpt, $dstpt) = ($1, $2, $3, $4, $5, $6);
-                                if ($target =~ /drop|reject|deny/i && $proto =~ /all|tcp/ && $opt =~ /....l./) {
+                                if ($target =~ /drop|reject|deny/i && $proto =~ /all|tcp|udp/ && $opt =~ /....l./) {
                                         if (check_destination($dst, \@localips)) {
-#                                                print STDOUT "*** Your firewall setup looks good.  Unauthorized tcp packets will be dropped and logged.\n";
                                                 return 1;
                                         }
 				}		
                         } elsif ($rule =~ /^(\w+)\s+(\w+)\s+(\S+)\s+\S+\s+(\S+)\s+(n\/a)/) {
                                 my ($target, $proto, $opt, $dst, $srcpt, $dstpt) = ($1, $2, $3, $4, $5);
-                                if ($target =~ /drop|reject|deny/i && $proto =~ /all|tcp/ && $opt =~ /....l./) {
+                                if ($target =~ /drop|reject|deny/i && $proto =~ /all|tcp|udp/ && $opt =~ /....l./) {
                                         if (check_destination($dst, \@localips)) {
 						return 1;
 					}

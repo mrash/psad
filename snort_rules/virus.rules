@@ -1,32 +1,20 @@
-# (C) Copyright 2001,2002, Martin Roesch, Brian Caswell, et al.
+# (C) Copyright 2001-2004, Martin Roesch, Brian Caswell, et al.
 #    All rights reserved.
 # $Id$
 #------------
 # VIRUS RULES
 #------------
 #
-# NOTE: These rules are NOT being actively maintained.
+# We don't care about virus rules anymore.  BUT, you people won't stop asking
+# us for virus rules.  So... here ya go.
 #
+# There is now one rule that looks for any of the following attachment types:
 #
-# These rules are going away.  We don't care about virus rules anymore.
+#   ade, adp, asd, asf, asx, bat, chm, cli, cmd, com, cpp, diz, dll, dot, emf,
+#   eml, exe, hlp, hsq, hta, ini, js, jse, lnk, mda, mdb, mde, mdw, msi, msp,
+#   nws, ocx, pif, pl, pm, pot, pps, ppt, reg, rtf, scr, shs, swf, sys, vb,
+#   vbe, vbs, vcf, vxd, wmd, wmf, wms, wmz, wpd, wpm, wps, wpz, wsc, wsf, wsh,
+#   xlt, xlw
 #
 
-alert tcp any any -> any 139 (msg:"Virus - Possible QAZ Worm Infection"; flags:A; content: "|71 61 7a 77 73 78 2e 68 73 71|"; reference:MCAFEE,98775; sid:732;  classtype:misc-activity; rev:3;)
-alert tcp $SMTP_SERVERS any -> $EXTERNAL_NET 25 (msg:"VIRUS OUTBOUND .pif file attachment"; flow:to_server,established; content:"Content-Disposition|3a|"; content:"filename=|22|"; distance:0; within:30; content:".pif|22|"; distance:0; within:30; nocase; classtype:suspicious-filename-detect; sid:721; rev:4;)
-alert tcp $SMTP_SERVERS any -> $EXTERNAL_NET 25 (msg:"VIRUS OUTBOUND .shs file attachment"; flow:to_server,established; content:"Content-Disposition|3a|"; content:"filename=|22|"; distance:0; within:30; content:".shs|22|"; distance:0; within:30; nocase; classtype:suspicious-filename-detect; sid:730; rev:4;)
-alert tcp $SMTP_SERVERS any -> $EXTERNAL_NET 25 (msg:"VIRUS OUTBOUND .exe file attachment"; flow:to_server,established; content:"Content-Disposition|3a|"; content:"filename=|22|"; distance:0; within:30; content:".exe|22|"; distance:0; within:30; nocase; classtype:suspicious-filename-detect; sid:2160; rev:1;)
-alert tcp $SMTP_SERVERS any -> $EXTERNAL_NET 25 (msg:"VIRUS OUTBOUND .doc file attachment"; flow:to_server,established; content:"Content-Disposition|3a|"; content:"filename=|22|"; distance:0; within:30; content:".doc|22|"; distance:0; within:30; nocase; classtype:suspicious-filename-detect; sid:2161; rev:1;)
-alert tcp $SMTP_SERVERS any -> $EXTERNAL_NET 25 (msg:"VIRUS OUTBOUND .vbs file attachment"; flow:to_server,established; content:"Content-Disposition|3a|"; content:"filename=|22|"; distance:0; within:30; content:".vbs|22|"; distance:0; within:30; nocase; classtype:suspicious-filename-detect; sid:793; rev:4;)
-alert tcp $SMTP_SERVERS any -> $EXTERNAL_NET 25 (msg:"VIRUS OUTBOUND .hta file attachment"; flow:to_server,established; content:"Content-Disposition|3a|"; content:"filename=|22|"; distance:0; within:30; content:".hta|22|"; distance:0; within:30; nocase; classtype:suspicious-filename-detect; sid:2162; rev:1;)
-alert tcp $SMTP_SERVERS any -> $EXTERNAL_NET 25 (msg:"VIRUS OUTBOUND .chm file attachment"; flow:to_server,established; content:"Content-Disposition|3a|"; content:"filename=|22|"; distance:0; within:30; content:".chm|22|"; distance:0; within:30; nocase; classtype:suspicious-filename-detect; sid:2163; rev:1;)
-alert tcp $SMTP_SERVERS any -> $EXTERNAL_NET 25 (msg:"VIRUS OUTBOUND .reg file attachment"; flow:to_server,established; content:"Content-Disposition|3a|"; content:"filename=|22|"; distance:0; within:30; content:".reg|22|"; distance:0; within:30; nocase; classtype:suspicious-filename-detect; sid:2164; rev:1;)
-alert tcp $SMTP_SERVERS any -> $EXTERNAL_NET 25 (msg:"VIRUS OUTBOUND .ini file attachment"; flow:to_server,established; content:"Content-Disposition|3a|"; content:"filename=|22|"; distance:0; within:30; content:".ini|22|"; distance:0; within:30; nocase; classtype:suspicious-filename-detect; sid:2165; rev:1;)
-alert tcp $SMTP_SERVERS any -> $EXTERNAL_NET 25 (msg:"VIRUS OUTBOUND .bat file attachment"; flow:to_server,established; content:"Content-Disposition|3a|"; content:"filename=|22|"; distance:0; within:30; content:".bat|22|"; distance:0; within:30; nocase; classtype:suspicious-filename-detect; sid:2166; rev:1;)
-alert tcp $SMTP_SERVERS any -> $EXTERNAL_NET 25 (msg:"VIRUS OUTBOUND .diz file attachment"; flow:to_server,established; content:"Content-Disposition|3a|"; content:"filename=|22|"; distance:0; within:30; content:".diz|22|"; distance:0; within:30; nocase; classtype:suspicious-filename-detect; sid:2167; rev:1;)
-alert tcp $SMTP_SERVERS any -> $EXTERNAL_NET 25 (msg:"VIRUS OUTBOUND .cpp file attachment"; flow:to_server,established; content:"Content-Disposition|3a|"; content:"filename=|22|"; distance:0; within:30; content:".cpp|22|"; distance:0; within:30; nocase; classtype:suspicious-filename-detect; sid:2168; rev:1;)
-alert tcp $SMTP_SERVERS any -> $EXTERNAL_NET 25 (msg:"VIRUS OUTBOUND .dll file attachment"; flow:to_server,established; content:"Content-Disposition|3a|"; content:"filename=|22|"; distance:0; within:30; content:".dll|22|"; distance:0; within:30; nocase; classtype:suspicious-filename-detect; sid:2169; rev:1;)
-alert tcp $SMTP_SERVERS any -> $EXTERNAL_NET 25 (msg:"VIRUS OUTBOUND .vxd file attachment"; flow:to_server,established; content:"Content-Disposition|3a|"; content:"filename=|22|"; distance:0; within:30; content:".vxd|22|"; distance:0; within:30; nocase; classtype:suspicious-filename-detect; sid:2170; rev:1;)
-alert tcp $SMTP_SERVERS any -> $EXTERNAL_NET 25 (msg:"VIRUS OUTBOUND .sys file attachment"; flow:to_server,established; content:"Content-Disposition|3a|"; content:"filename=|22|"; distance:0; within:30; content:".sys|22|"; distance:0; within:30; nocase; classtype:suspicious-filename-detect; sid:2171; rev:1;)
-alert tcp $SMTP_SERVERS any -> $EXTERNAL_NET 25 (msg:"VIRUS OUTBOUND .com file attachment"; flow:to_server,established; content:"Content-Disposition|3a|"; content:"filename=|22|"; distance:0; within:30; content:".com|22|"; distance:0; within:30; nocase; classtype:suspicious-filename-detect; sid:2172; rev:1;)
-alert tcp $SMTP_SERVERS any -> $EXTERNAL_NET 25 (msg:"VIRUS OUTBOUND .scr file attachment"; flow:to_server,established; content:"Content-Disposition|3a|"; content:"filename=|22|"; distance:0; within:30; content:".scr|22|"; distance:0; within:30; nocase; classtype:suspicious-filename-detect; sid:729; rev:4;)
-alert tcp $SMTP_SERVERS any -> $EXTERNAL_NET 25 (msg:"VIRUS OUTBOUND .hsq file attachment"; flow:to_server,established; content:"Content-Disposition|3a|"; content:"filename=|22|"; distance:0; within:30; content:".hsq|22|"; distance:0; within:30; nocase; classtype:suspicious-filename-detect; sid:2173; rev:1;)
+alert tcp $HOME_NET any -> $EXTERNAL_NET 25 (msg:"VIRUS OUTBOUND bad file attachment"; flow:to_server,established; content:"Content-Disposition|3A|"; nocase; pcre:"/filename\s*=\s*.*?\.(?=[abcdehijlmnoprsvwx])(a(d[ep]|s[dfx])|c([ho]m|li|md|pp)|d(iz|ll|ot)|e(m[fl]|xe)|h(lp|sq|ta)|jse?|m(d[abew]|s[ip])|p(p[st]|if|[lm]|ot)|r(eg|tf)|s(cr|[hy]s|wf)|v(b[es]?|cf|xd)|w(m[dfsz]|p[dmsz]|s[cfh])|xl[tw]|bat|ini|lnk|nws|ocx)[\x27\x22\n\r\s]/iR"; classtype:suspicious-filename-detect; sid:721; rev:8;)

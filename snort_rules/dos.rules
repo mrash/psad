@@ -1,24 +1,28 @@
-# (C) Copyright 2001, Martin Roesch, Brian Caswell, et al.  All rights reserved.
+# (C) Copyright 2001-2004, Martin Roesch, Brian Caswell, et al.
+# All rights reserved.
 # $Id$
 #----------
 # DOS RULES
 #----------
 
-alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"DOS Jolt attack"; fragbits: M; dsize:408; reference:cve,CAN-1999-0345; classtype:attempted-dos; sid:268; rev:2;)
-alert udp $EXTERNAL_NET any -> $HOME_NET any (msg:"DOS Teardrop attack"; id:242; fragbits:M; reference:cve,CAN-1999-0015; reference:url,www.cert.org/advisories/CA-1997-28.html; reference:bugtraq,124; classtype:attempted-dos; sid:270; rev:2;)
-alert udp any 19 <> any 7 (msg:"DOS UDP echo+chargen bomb"; reference:cve,CAN-1999-0635; reference:cve,CVE-1999-0103; classtype:attempted-dos; sid:271; rev:3;)
-alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"DOS IGMP dos attack"; content:"|02 00|"; depth: 2; ip_proto: 2; fragbits: M+; reference:cve,CVE-1999-0918; classtype:attempted-dos; sid:272; rev:2;)
-alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"DOS IGMP dos attack"; content:"|00 00|"; depth:2; ip_proto:2; fragbits:M+; reference:cve,CVE-1999-0918; classtype:attempted-dos; sid:273; rev:2;)
-alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"DOS ath"; content:"+++ath"; nocase; itype: 8; reference:cve,CAN-1999-1228; reference:arachnids,264; classtype:attempted-dos; sid:274; rev:2;)
-alert tcp $EXTERNAL_NET any <> $HOME_NET any (msg:"DOS NAPTHA"; flags:S; seq: 6060842; id: 413; reference:cve,CAN-2000-1039; reference:url,www.microsoft.com/technet/security/bulletin/MS00-091.asp; reference:url,www.cert.org/advisories/CA-2000-21.html; reference:url,razor.bindview.com/publish/advisories/adv_NAPTHA.html; reference:bugtraq,2022; classtype:attempted-dos; sid:275; rev:4;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 7070 (msg:"DOS Real Audio Server"; flow:to_server,established; content: "|fff4 fffd 06|"; reference:bugtraq,1288; reference:cve,CVE-2000-0474; reference:arachnids,411; classtype:attempted-dos; sid:276; rev:2;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 7070 (msg:"DOS Real Server template.html"; flow:to_server,established; content:"/viewsource/template.html?"; nocase; reference:cve,CVE-2000-0474; reference:bugtraq,1288; classtype:attempted-dos; sid:277; rev:3;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 8080 (msg:"DOS Real Server template.html"; flow:to_server,established; content:"/viewsource/template.html?"; nocase; reference:cve,CVE-2000-0474; reference:bugtraq,1288; classtype:attempted-dos; sid:278; rev:3;)
-alert udp $EXTERNAL_NET any -> $HOME_NET 161 (msg:"DOS Bay/Nortel Nautica Marlin"; dsize:0; reference:bugtraq,1009; reference:cve,CVE-2000-0221; classtype:attempted-dos; sid:279; rev:2;)
-alert udp $EXTERNAL_NET any -> $HOME_NET 9 (msg:"DOS Ascend Route"; content: "|4e 41 4d 45 4e 41 4d 45|"; offset: 25; depth: 50; reference:bugtraq,714; reference:cve,CVE-1999-0060; reference:arachnids,262; classtype:attempted-dos; sid:281; rev:2;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 617 (msg:"DOS arkiea backup"; flow:to_server,established; dsize:>1445; reference:bugtraq,662; reference:cve,CVE-1999-0788; reference:arachnids,261; classtype:attempted-dos; sid:282; rev:4;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 135:139 (msg: "DOS Winnuke attack"; flags: U+; reference: bugtraq,2010; reference:cve,CVE-1999-0153; classtype: attempted-dos; sid:1257; rev:4;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 3372 (msg:"DOS MSDTC attempt"; flow:to_server,established; dsize:>1023; reference:bugtraq,4006; classtype:attempted-dos; sid:1408;  rev:5;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 6004 (msg:"DOS iParty DOS attempt"; flow:to_server,established; content:"|FF FF FF FF FF FF|"; offset:0; classtype:misc-attack; reference:cve,CAN-1999-1566; sid:1605; rev:3;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 6789:6790 (msg:"DOS DB2 dos attempt"; flow:to_server,established; dsize:1; classtype:denial-of-service; sid:1641; rev:4;)
-alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS 80 (msg:"DOS Cisco attempt"; flow:to_server,established; content:"|13|"; dsize:1; classtype:web-application-attack; sid:1545; rev:5;)
+alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"DOS Jolt attack"; dsize:408; fragbits:M; reference:cve,1999-0345; classtype:attempted-dos; sid:268; rev:4;)
+alert udp $EXTERNAL_NET any -> $HOME_NET any (msg:"DOS Teardrop attack"; fragbits:M; id:242; reference:bugtraq,124; reference:cve,1999-0015; reference:nessus,10279; reference:url,www.cert.org/advisories/CA-1997-28.html; classtype:attempted-dos; sid:270; rev:6;)
+alert udp any 19 <> any 7 (msg:"DOS UDP echo+chargen bomb"; reference:cve,1999-0103; reference:cve,1999-0635; classtype:attempted-dos; sid:271; rev:4;)
+alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"DOS IGMP dos attack"; fragbits:M+; ip_proto:2; content:"|02 00|"; depth:2; reference:bugtraq,514; reference:cve,1999-0918; classtype:attempted-dos; sid:272; rev:7;)
+alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"DOS IGMP dos attack"; fragbits:M+; ip_proto:2; content:"|00 00|"; depth:2; reference:bugtraq,514; reference:cve,1999-0918; classtype:attempted-dos; sid:273; rev:7;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"DOS ath"; itype:8; content:"+++ath"; nocase; reference:arachnids,264; reference:cve,1999-1228; classtype:attempted-dos; sid:274; rev:5;)
+alert tcp $EXTERNAL_NET any <> $HOME_NET any (msg:"DOS NAPTHA"; flow:stateless; flags:S; id:413; seq:6060842; reference:bugtraq,2022; reference:cve,2000-1039; reference:url,razor.bindview.com/publish/advisories/adv_NAPTHA.html; reference:url,www.cert.org/advisories/CA-2000-21.html; reference:url,www.microsoft.com/technet/security/bulletin/MS00-091.mspx; classtype:attempted-dos; sid:275; rev:11;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 7070 (msg:"DOS Real Audio Server"; flow:to_server,established; content:"|FF F4 FF FD 06|"; reference:arachnids,411; reference:bugtraq,1288; reference:cve,2000-0474; classtype:attempted-dos; sid:276; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 7070 (msg:"DOS Real Server template.html"; flow:to_server,established; content:"/viewsource/template.html?"; nocase; reference:bugtraq,1288; reference:cve,2000-0474; classtype:attempted-dos; sid:277; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 8080 (msg:"DOS Real Server template.html"; flow:to_server,established; content:"/viewsource/template.html?"; nocase; reference:bugtraq,1288; reference:cve,2000-0474; classtype:attempted-dos; sid:278; rev:5;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 161 (msg:"DOS Bay/Nortel Nautica Marlin"; dsize:0; reference:bugtraq,1009; reference:cve,2000-0221; classtype:attempted-dos; sid:279; rev:3;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 9 (msg:"DOS Ascend Route"; content:"NAMENAME"; depth:50; offset:25; reference:arachnids,262; reference:bugtraq,714; reference:cve,1999-0060; classtype:attempted-dos; sid:281; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 617 (msg:"DOS arkiea backup"; flow:to_server,established; dsize:>1445; reference:arachnids,261; reference:bugtraq,662; reference:cve,1999-0788; classtype:attempted-dos; sid:282; rev:8;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 135:139 (msg:"DOS Winnuke attack"; flow:stateless; flags:U+; reference:bugtraq,2010; reference:cve,1999-0153; classtype:attempted-dos; sid:1257; rev:9;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 3372 (msg:"DOS MSDTC attempt"; flow:to_server,established; dsize:>1023; reference:bugtraq,4006; reference:cve,2002-0224; reference:nessus,10939; classtype:attempted-dos; sid:1408; rev:10;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 6004 (msg:"DOS iParty DOS attempt"; flow:to_server,established; content:"|FF FF FF FF FF FF|"; offset:0; reference:bugtraq,6844; reference:cve,1999-1566; classtype:misc-attack; sid:1605; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 6789:6790 (msg:"DOS DB2 dos attempt"; flow:to_server,established; dsize:1; reference:bugtraq,3010; reference:cve,2001-1143; reference:nessus,10871; classtype:denial-of-service; sid:1641; rev:9;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS 80 (msg:"DOS Cisco attempt"; flow:to_server,established; dsize:1; content:"|13|"; classtype:web-application-attack; sid:1545; rev:8;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 500 (msg:"DOS ISAKMP invalid identification payload attempt"; content:"|05|"; depth:1; offset:16; byte_test:2,>,4,30; byte_test:2,<,8,30; reference:bugtraq,10004; reference:cve,2004-0184; classtype:attempted-dos; sid:2486; rev:5;)
+alert tcp $EXTERNAL_NET any <> $HOME_NET 179 (msg:"DOS BGP spoofed connection reset attempt"; flow:established; flags:RSF*; threshold:type both,track by_dst,count 10,seconds 10; reference:bugtraq,10183; reference:cve,2004-0230; reference:url,www.uniras.gov.uk/vuls/2004/236929/index.htm; classtype:attempted-dos; sid:2523; rev:7;)
+

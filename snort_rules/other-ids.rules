@@ -1,4 +1,4 @@
-# (C) Copyright 2001,2002, Martin Roesch, Brian Caswell, et al.
+# (C) Copyright 2001-2004, Martin Roesch, Brian Caswell, et al.
 #    All rights reserved.
 # $Id$
 # ---------------
@@ -15,8 +15,8 @@
 #
 
 
-alert tcp $HOME_NET 902 -> $EXTERNAL_NET any (msg:"OTHER-IDS ISS RealSecure 6 event collector connection attempt"; flow:from_server,established; content:"6ISS ECNRA Built-In Provider, Strong Encryption"; nocase; offset:30; depth:70; classtype:successful-recon-limited; sid:1760; rev:2;)
-alert tcp $HOME_NET 2998 -> $EXTERNAL_NET any (msg:"OTHER-IDS ISS RealSecure 6 daemon connection attempt"; flow:from_server,established; content:"6ISS ECNRA Built-In Provider, Strong Encryption"; nocase; offset:30; depth:70; classtype:successful-recon-limited; sid:1761; rev:2;)
+alert tcp $HOME_NET 902 -> $EXTERNAL_NET any (msg:"OTHER-IDS ISS RealSecure 6 event collector connection attempt"; flow:from_server,established; content:"6ISS ECNRA Built-In Provider, Strong Encryption"; depth:70; offset:30; nocase; classtype:successful-recon-limited; sid:1760; rev:3;)
+alert tcp $HOME_NET 2998 -> $EXTERNAL_NET any (msg:"OTHER-IDS ISS RealSecure 6 daemon connection attempt"; flow:from_server,established; content:"6ISS ECNRA Built-In Provider, Strong Encryption"; depth:70; offset:30; nocase; classtype:successful-recon-limited; sid:1761; rev:3;)
 
 # To limit false positives, limit to the default port of 975
-alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"OTHER-IDS SecureNetPro traffic"; content: "|00 67 00 01 00 03|"; offset:0; depth:6; flow:established; classtype:bad-unknown; sid:1629; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"OTHER-IDS SecureNetPro traffic"; flow:established; content:"|00|g|00 01 00 03|"; depth:6; classtype:bad-unknown; sid:1629; rev:6;)

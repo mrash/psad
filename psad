@@ -225,9 +225,9 @@ my $timezone;
 my $year;
 
 ### %auto_ips holds all ip addresses that should automatically
-### be assigned a danger level (or ignored).  (Only initialized
-### if the "-a <auto ips file>" is specified on the command line).
+### be assigned a danger level (or ignored).
 my %auto_ips = ();
+my %assigned_auto_dl = ();
 
 ### cache the source ips that we have automatically blocked
 ### (if ENABLE_AUTO_IDS == 'Y')
@@ -447,7 +447,8 @@ $< == 0 && $> == 0 or
         "UID 0 account) to execute psad!  Exiting.\n";
 
 ### Import all psad configuration and signatures files
-### (psad.conf, psad_posf, psad_signatures, and psad_auto_ips).
+### (psad.conf, psad_posf, psad_signatures, psad_icmp_types,
+### and psad_auto_ips).
 &import_configs();
 
 ### check to make sure another psad process is not already running.
@@ -937,7 +938,7 @@ sub check_scan() {
         unless (defined $scan_dl{$src}) {
             $scan_dl{$src} = 0;
             $scan{$src}{$dst}{'alerted'} = 0
-                if ($config{'ALERT_ALL'} eq 'N');
+                if $config{'ALERT_ALL'} eq 'N';
         }
 
         if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
@@ -2083,10 +2084,48 @@ sub import_auto_ips() {
         $i++;
         next if ($line =~ /^\s*#/);
         next unless ($line =~ /\S/);
-        if ($line =~ m|^\s*($ip_re)\s+([0-5]);|) {
-            $auto_ips{'ip'}{$1} = $2;
-        } elsif ($line =~ m|^\s*($ip_re/\d+)\s+([0-5]);|) {
-            $auto_ips{'net'}{$1} = $2;
+        if ($line =~ m|^\s*($ip_re)\s+([0-5])|) {
+            my $ip = $1;
+            my $dl = $2;
+            my $all_proto = 1;
+            ### check for optional protocol (any combination of tcp, udp
+            ### or icmp is allowed)
+            if ($line =~ m|tcp|i) {
+                $auto_ips{'ip'}{$ip}{'tcp'} = $dl;
+                $all_proto = 0;
+            }
+            if ($line =~ m|udp|i) {
+                $auto_ips{'ip'}{$ip}{'udp'} = $dl;
+                $all_proto = 0;
+            }
+            if ($line =~ m|icmp|i) {
+                $auto_ips{'ip'}{$ip}{'icmp'} = $dl;
+                $all_proto = 0;
+            }
+            if ($all_proto) {
+                $auto_ips{'ip'}{$ip}{'allprto'} = $dl;
+            }
+        } elsif ($line =~ m|^\s*($ip_re/\d+)\s+([0-5])|) {
+            my $net = $1;
+            my $dl  = $2;
+            my $all_proto = 1;
+            ### check for optional protocol (any combination of tcp, udp
+            ### or icmp is allowed)
+            if ($line =~ m|tcp|i) {
+                $auto_ips{'net'}{$net}{'tcp'} = $dl;
+                $all_proto = 0;
+            }
+            if ($line =~ m|udp|i) {
+                $auto_ips{'net'}{$net}{'udp'} = $dl;
+                $all_proto = 0;
+            }
+            if ($line =~ m|icmp|i) {
+                $auto_ips{'net'}{$net}{'icmp'} = $dl;
+                $all_proto = 0;
+            }
+            if ($all_proto) {
+                $auto_ips{'net'}{$net}{'allprto'} = $dl;
+            }
         } else {
             my $subject = " ** psad import warning: " .
                 "$config{'PSAD_AUTO_IPS_FILE'} error on line: $i";
@@ -2191,32 +2230,12 @@ sub check_range() {
 sub assign_danger_level() {
     my $current_scan_href = shift;
 
+    ### assign auto danger level
+    &assign_auto_danger_level($current_scan_href) if %auto_ips;
+
     SRC: for my $src (keys %$current_scan_href) {
         print STDERR " .. assign_danger_level(): source ip: $src\n"
             if $debug;
-        if (%auto_ips) {
-            if (defined $auto_ips{'ip'}{$src}) {
-                $scan_dl{$src} = $auto_ips{'ip'}{$src};
-                for my $dst (keys %{$scan{$src}}) {
-                    $scan{$src}{$dst}{'alerted'} = 0
-                        if ($config{'ALERT_ALL'} eq 'N');
-                }
-                ### ignore $src if the auto danger level is zero
-                next SRC if $auto_ips{'ip'}{$src} == 0;
-            } else {
-                for my $net (keys %{$auto_ips{'net'}}) {
-                    if (ipv4_in_network($net, $src)) {
-                        $scan_dl{$src} = $auto_ips{'net'}{$net};
-                        for my $dst (keys %{$scan{$src}}) {
-                            $scan{$src}{$dst}{'alerted'} = 0
-                                if ($config{'ALERT_ALL'} eq 'N');
-                        }
-                        ### ignore $src if the auto danger level is zero
-                        next SRC if $auto_ips{'net'}{$net} == 0;
-                    }
-                }
-            }
-        }
         DST: for my $dst (keys %{$current_scan_href->{$src}}) {
             my $absnum = $scan{$src}{$dst}{'absnum'};
             my $range;
@@ -2225,6 +2244,7 @@ sub assign_danger_level() {
 
             ### calculate the range over _both_ tcp and udp
             for my $proto qw(tcp udp) {
+                next unless defined $scan{$src}{$dst}{$proto};
                 next unless defined $scan{$src}{$dst}{$proto}{'abs_sp'};
                 if ($s_port > $scan{$src}{$dst}{$proto}{'abs_sp'}) {
                     $s_port = $scan{$src}{$dst}{$proto}{'abs_sp'};
@@ -2283,12 +2303,67 @@ sub assign_danger_level() {
     return;
 }
 
+sub assign_auto_danger_level() {
+    my $current_scan_href = shift;
+    ### note that we only _increase_ danger levels (or ignore ips
+    ### altogether) here; we never ### decrease them.
+    SRC: for my $src (keys %$current_scan_href) {
+        if (defined $auto_ips{'ip'}{$src}) {
+            for my $proto qw(allprto tcp udp icmp) {
+                if (defined $auto_ips{'ip'}{$src}{$proto}) {
+                    ### ignore $src if the auto danger level is zero
+                    next SRC if $auto_ips{'ip'}{$src}{$proto} == 0;
+                    if ($scan_dl{$src} < $auto_ips{'ip'}{$src}{$proto}) {
+                        $scan_dl{$src} = $auto_ips{'ip'}{$src}{$proto};
+                        $assigned_auto_dl{$src} = '';
+                        ### the danger level has increased so set the
+                        ### alerted flag to zero for all destinations
+                        &set_alerted_zero($scan{$src});
+                    }
+                }
+            }
+        } else {
+            for my $net (keys %{$auto_ips{'net'}}) {
+                next unless ipv4_in_network($net, $src);
+                for my $proto qw(allprto tcp udp icmp) {
+                    if (defined $auto_ips{'net'}{$src}{$proto}) {
+                        ### ignore $src if the auto danger level is zero
+                        next SRC if $auto_ips{'net'}{$src}{$proto} == 0;
+                        if ($scan_dl{$src} < $auto_ips{'net'}{$src}{$proto}) {
+                            $scan_dl{$src} = $auto_ips{'net'}{$src}{$proto};
+                            $assigned_auto_dl{$src} = '';
+                            &set_alerted_zero($scan{$src});
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return;
+}
+
+sub set_alerted_zero() {
+    my $scan_href = shift;
+    for my $dst (keys %$scan_href) {
+        $scan_href->{$dst}->{'alerted'} = 0;
+    }
+    return;
+}
+
+sub check_scan_proto() {
+    my ($proto, $scan_href) = @_;
+    for my $dst (keys %$scan_href) {
+        return 1 if defined $scan_href->{$dst}->{$proto};
+    }
+    return 0;
+}
+
 sub write_global_packet_counters() {
     open P, "> $config{'PACKET_COUNTER_FILE'}" or
         die " ** Could not open $config{'PACKET_COUNTER_FILE'}: $!";
-    print P "tcp:  $tcp_ctr\n";
-    print P "udp:  $udp_ctr\n";
-    print P "icmp: $icmp_ctr\n";
+    print P "tcp:  $tcp_ctr\n",
+        "udp:  $udp_ctr\n",
+        "icmp: $icmp_ctr\n";
     close P;
     return;
 }
@@ -2521,11 +2596,17 @@ sub scan_logr() {
             }
 
             print $fh "=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=",
-                "-=-=-=-=\n";
-            print $fh " ** psad: Suspicious traffic detected against ",
+                "-=-=-=-=\n",
+                " ** psad: Suspicious traffic detected against ",
                 "$dst\n\n\n";
-            printf $fh "%${log_len}s%s", 'Danger level: ',
-                "[$scan_dl{$src}] (out of 5)\n\n";
+            if (defined $assigned_auto_dl{$src}) {
+                printf $fh "%${log_len}s%s", 'Danger level: ',
+                    "[$scan_dl{$src} auto-assigned] (out of 5)\n\n";
+                delete $assigned_auto_dl{$src};
+            } else {
+                printf $fh "%${log_len}s%s", 'Danger level: ',
+                    "[$scan_dl{$src}] (out of 5)\n\n";
+            }
             if ($tcp_f) {
                 printf $fh "%${log_len}s%s", 'Scanned tcp ports: ',
                     "[$tcp_newrange: $tcp_newpkts packets]\n";
@@ -2568,18 +2649,15 @@ sub scan_logr() {
                 printf $fh "%${log_len}s%s", 'icmp packets: ',
                     "[$icmp_newpkts]\n";
             }
-            print $fh "\n";
-            printf $fh "%${log_len}s%s", 'Source: ', "$src\n";
+            printf $fh "\n%${log_len}s%s", 'Source: ', "$src\n";
             printf $fh "%${log_len}s%s", 'DNS: ', "$src_dns_str\n"
                 unless $no_rdns;
             if (!$no_posf and defined $posf{$src}{'guess'}) {
                 printf $fh "%${log_len}s%s", 'OS guess: ',
                     "$posf{$src}{'guess'}\n";
             }
-            print $fh "\n";
-            printf $fh "%${log_len}s%s", 'Destination: ', "$dst\n";
-            printf $fh "%${log_len}s%s", 'DNS: ', "$dst_dns_str\n";
-            print $fh "\n";
+            printf $fh "\n%${log_len}s%s", 'Destination: ', "$dst\n",
+                "%${log_len}s%s", 'DNS: ', "$dst_dns_str\n\n";
 
             if (defined $current_scan_href->{$src}->{$dst}->{'syslog_host'}) {
                 my $syslog_hosts = '';
@@ -2597,12 +2675,11 @@ sub scan_logr() {
             print $fh "\n";
             unless ($analyze_msgs) {
                 printf $fh "%${log_len}s%s\n", 'Current interval: ',
-                    "$s_time (start)";
-                printf $fh "%${log_len}s%s\n", '', "$time (end)";
-                print $fh "\n";
+                    "$s_time (start)",
+                    "%${log_len}s%s\n", '', "$time (end)\n";
             }
             ### print the overall stats since the scan began
-            printf $fh "%${log_len}s%s\n", 'Overall stats since: ',
+            printf $fh "%${log_len}s%s\n\n", 'Overall stats since: ',
                 $abs_s_time;
             if ($tcp_absrange) {
                 printf $fh "%${log_len}s%s\n", 'Complete tcp range: ',
@@ -2612,8 +2689,7 @@ sub scan_logr() {
                 printf $fh "%${log_len}s%s\n", 'Complete udp range: ',
                     "[$udp_absrange]";
             }
-            print $fh "\n";
-            printf $fh "   %-9s%-13s%-7s%-7s%-7s\n", 'chain:', 'interface:',
+            printf $fh "\n   %-9s%-13s%-7s%-7s%-7s\n", 'chain:', 'interface:',
                 'tcp:', 'udp:', 'icmp:';
             for my $chain (keys %{$scan{$src}{$dst}{'chain'}}) {
                 for my $intf (keys %{$scan{$src}{$dst}{'chain'}{$chain}}) {
@@ -3890,7 +3966,6 @@ sub status_ip() {
 }
 
 sub import_old_scans() {
-    &Psad::psyslog('psad', '.. importing scan data from previous run');
     opendir D, $config{'PSAD_DIR'} or
         die " ** Could not open dir: $config{'PSAD_DIR'}: $!";
     my @files = readdir D;
@@ -3974,6 +4049,7 @@ sub import_old_scans() {
                 $scan{$src}{$dst}{'s_time'} = $s_time;
             }
         }
+        $import_ctr++;
     }
     ### increment global packet counters
     if (-e $config{'PACKET_COUNTER_FILE'}) {
@@ -3995,6 +4071,10 @@ sub import_old_scans() {
     open FD, "> $config{'FW_DATA_FILE'}" or die ' ** Could not open ',
         "$config{'FW_DATA_FILE'}: $!";
     close FD;
+    if ($import_ctr) {
+        &Psad::psyslog('psad',
+            ".. imported $import_ctr scanning IPs from previous run");
+    }
     return;
 }
 
@@ -4471,7 +4551,7 @@ sub check_forwarding() {
         print STDERR " .. forwarding value: $forwarding\n" if $debug;
         return 0 if $forwarding == 0;
     } else {
-        die " ** Make sure the path to the ip forwarding file correct.\n",
+        die " ** Make sure the path to the IP forwarding file correct.\n",
             "    The PROC_FORWARD_FILE in $config_file points to\n",
             "    $config{'PROC_FORWARD_FILE'}";
     }

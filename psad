@@ -65,7 +65,7 @@
 # Sample icmp packet rejected by iptables
 # Nov 27 15:45:51 orthanc kernel: DENY IN=eth1 OUT= MAC=00:a0:cc:e2:1f:f2:00:20:78:10:70:e7:08:00
 # SRC=192.168.10.20 DST=192.168.10.1 LEN=84 TOS=0x00 PREC=0x00 TTL=64 ID=0 DF PROTO=ICMP TYPE=8 
-# CODE=0 ID=61055 SEQ=256  
+# CODE=0 ID=61055 SEQ=256
 #
 # There may be a bug in iptables, since occasionally log entries are generated 
 # by a long port scan like this (note there is no 'DPT' field): 
@@ -107,7 +107,7 @@ my $CHECK_INTERVAL = 15;  ### (seconds)
 my $PORT_RANGE_SCAN_THRESHOLD = 1;
 my $ENABLE_PERSISTENCE = "Y";	# if "Y", means that scans will never timeout
 my $SCAN_TIMEOUT = 3600;	# this is used only if $ENABLE_PERSISTENCE = "N";
-my $SHOW_ALL_SIGNATURES = "N";	# if "Y", means that all tcp signatures will be shown since the scan started instead of just the current ones.
+my $SHOW_ALL_SIGNATURES = "N";	# if "Y", means that all signatures will be shown since the scan started instead of just the current ones.
 my %DANGER_LEVELS;
 $DANGER_LEVELS{'1'} = 5;  ### number of packets 
 $DANGER_LEVELS{'2'} = 50;
@@ -116,6 +116,7 @@ $DANGER_LEVELS{'4'} = 5000;
 $DANGER_LEVELS{'5'} = 10000;
 my $ENABLE_EMAIL_ALERTS = "Y";
 my $EMAIL_ALERT_DANGER_LEVEL = 1;  # Send email alert if danger level >= to this value
+my $EMAIL_LIMIT = 1000;   ### send no more than this number of emails for a single scanning source ip
 my @EMAIL_ADDRESSES = qw(root@localhost);  # supports multiple email addresses
 my $ALERT_ALL = "Y";	# if "Y", send email for all new bad packets instead of just when a danger level increases
 my $ENABLE_AUTO_IDS = "N"; 	# if "Y", enable automated IDS response (auto manages firewall rulesets). 
@@ -276,7 +277,7 @@ my $local_ips_href = &get_local_ips(\%Cmds);
 
 ### disable whois lookups if for some reason the whois client that is 
 ### bundled with psad can't be found
-$whoislookups = 1 if ($Cmds{'whois'} !~ /psad/); 
+$whoislookups = 1 if ($Cmds{'whois'} !~ /psad/);
 
 ### if psad is running on a syslog server, don't check the firewall 
 ### rules since they may not be local.
@@ -378,12 +379,12 @@ for (;;) {
 		my @process_lines = `$Cmds{'tail'} -$grabnum $FW_DATA`;
 		print "MAIN: calling check_scan()\n" if $DEBUG;
 		$Scan_href = &check_scan(\@process_lines, $Sigs_href, $signatures, $netstat_lookup, $local_ips_href, $errors, 
-									$ERROR_LOG, $ENABLE_PERSISTENCE, $SCAN_TIMEOUT, \%Cmds);
+									$ERROR_LOG, $ENABLE_PERSISTENCE, $SHOW_ALL_SIGNATURES, $SCAN_TIMEOUT, \%Cmds);
 		print "MAIN: calling assign_danger_level()\n" if $DEBUG;
 		$Scan_href = &assign_danger_level($Scan_href, $Auto_ips_href, $PORT_RANGE_SCAN_THRESHOLD, $ALERT_ALL, \%DANGER_LEVELS);
 		print "MAIN: calling scan_logr()\n" if $DEBUG;
 		$Scan_href = &scan_logr($Scan_href, $PSAD_LOGFILE, $output, $dnslookups, $whoislookups, $WHOIS_TIMEOUT, $ENABLE_EMAIL_ALERTS,
-					$EMAIL_ALERT_DANGER_LEVEL, $EMAIL_ALERTFILE, \@EMAIL_ADDRESSES, $SHOW_ALL_SIGNATURES, \%Cmds);
+					$EMAIL_ALERT_DANGER_LEVEL, $EMAIL_ALERTFILE, $EMAIL_LIMIT, \@EMAIL_ADDRESSES, $SHOW_ALL_SIGNATURES, \%Cmds);
 		if ($ENABLE_AUTO_IDS eq "Y" && ! $Syslog_server) {  # don't manage the firewall rules if psad is running on a syslog server.
 			$Scan_href = &auto_psad_response($Scan_href, $AUTO_IDS_DANGER_LEVEL, \%Cmds, \@EMAIL_ADDRESSES);
 		}
@@ -398,10 +399,10 @@ exit 0;
 sub check_scan() {  # keeps track of scanning ip's, increments packet counters, keep track of tcp flags for each
 		    # scan (iptables only)
 	my ($process_lines_aref, $sigs_href, $signatures, $netstat_lookup, $local_ips_href, $errors, 
-							$error_log, $enable_persistence, $scan_timeout, $Cmds_href) = @_;
+			$error_log, $enable_persistence, $show_all_signatures, $scan_timeout, $Cmds_href) = @_;
 	my @bad_packets;
 	my $local_listening_ports_href;
-	my ($srcip, $dstip, $proto, $srcport, $dstport, $flags);
+	my ($srcip, $dstip, $len, $ttl, $proto, $srcport, $dstport, $flags, $type, $code, $id, $seq);
 	# if necessary, check which firewall (ipchains vs. iptables)
 	&check_fw($process_lines_aref->[0]) unless ($USE_IPCHAINS || $USE_IPTABLES);
 	unless ($netstat_lookup) {
@@ -411,9 +412,9 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 		chomp $l;
 		if ($USE_IPTABLES) {
 			# sometimes the log entry is messed up by iptables so we write it to the error log
-			if ($l =~ /SRC\=(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\sDST\=(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s.+?PROTO\=(\w{3,4})\sSPT\=(\d+)\sDPT\=(\d+)/) {
-				($srcip, $dstip, $proto, $srcport, $dstport) = ($1,$2,$3,$4,$5);
-				if ($proto ne "TCP" && $proto ne "UDP") {  # psad does not yet support any protocols other than tcp and udp....
+			if ($l =~ /SRC\=(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\sDST\=(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\sLEN\=(\d+)\s.+?TTL\=(\d+)\s.+?PROTO\=(\w{3,4})\sSPT\=(\d+)\sDPT\=(\d+)/) {
+				($srcip, $dstip, $len, $ttl, $proto, $srcport, $dstport) = ($1,$2,$3,$4,$5,$6,$7,$8);
+				if ($proto ne "TCP" && $proto ne "UDP") {  ### it was some weird non-tcp/udp packet that has source and destination ports
 					push @bad_packets, $l;
 					next READPKT;
 				}
@@ -421,20 +422,23 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 					if ($l =~ /RES\S+\s(.*?)URGP/ || $l =~ /RES(\s)URGP/) {
 						$flags = $1;
 						chop $flags;
-						$flags = "NULL" if ($flags eq ""); 
+						$flags = "NULL" if ($flags eq "");
 						# per page 595 of the Camel book, "if /blah1|blah2/" can be slower than "if /blah1/ || /blah2/
-					        unless (($flags =~ /SYN/ || $flags =~ /FIN/ || $flags =~ /URG/ || $flags =~ /PSH/ || $flags =~ /ACK/ 
-							  		 || $flags =~ /RST/ || $flags =~ /NULL/) && ($flags !~ /LEN/ || $flags !~ /TOS/
+						unless (($flags =~ /SYN/ || $flags =~ /FIN/ || $flags =~ /URG/ || $flags =~ /PSH/ || $flags =~ /ACK/ 
+									 || $flags =~ /RST/ || $flags =~ /NULL/) && ($flags !~ /LEN/ || $flags !~ /TOS/
 									 || $flags !~ /PREC/ || $flags !~ /PROTO/ || $flags !~ /WINDOW/ ||
 									    $flags !~ /RES/)) {
-                                			push @bad_packets, $l;
-                                			next READPKT;
-                        			}
+							push @bad_packets, $l;
+							next READPKT;
+						}
 					} else {
 						push @bad_packets, $l;
 						next READPKT;
 					}
-				}	
+				} # else it is UDP, but there are no more fields we need to defined since we already have the ports, etc.
+			} elsif ($l =~ /SRC\=(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\sDST\=(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\sLEN\=(\d+)\s.+?TTL\=(\d+)\s.+?PROTO\=ICMP\sTYPE\=(\d+)\sCODE\=(\d+)\sID\=(\d+)\sSEQ\=(\d+)/) {
+				($srcip, $dstip, $len, $ttl, $type, $code, $id, $seq) = ($1,$2,$3,$4,$5,$6,$7,$8);
+				$proto = "ICMP";
 			} else {
 				push @bad_packets, $l;
 				next READPKT;
@@ -446,8 +450,8 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 				$flags = "NONE";
 			} else {
 				push @bad_packets, $l;
-                                next READPKT;
-                        }
+				next READPKT;
+			}
 		}
 		if ($enable_persistence eq "N") {
 			my $currtime = time();
@@ -460,12 +464,12 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 		} 
 		# hash initialization
 		$Scan{$srcip}{$dstip}{'LOGR'} = "Y";
-		if ($proto eq "TCP") {
-			$Scan{$srcip}{$dstip}{$proto}{'FLAGS'}{$flags} = 0 unless (defined $Scan{$srcip}{$dstip}{$proto}{'FLAGS'}{$flags});
-		}
+#		if ($proto eq "TCP") {
+#			$Scan{$srcip}{$dstip}{$proto}{'FLAGS'}{$flags} = 0 unless (defined $Scan{$srcip}{$dstip}{$proto}{'FLAGS'}{$flags});
+#		}
 		$Scan{$srcip}{$dstip}{'AUTO'} = "N" unless (defined $Scan{$srcip}{$dstip}{'AUTO'});
 		$Scan{$srcip}{$dstip}{'CURRENT_DANGER_LEVEL'} = 0 unless (defined $Scan{$srcip}{$dstip}{'CURRENT_DANGER_LEVEL'});
-		unless (defined $Scan{$srcip}{$dstip}{'START_PORT'}) {  # this is the absolute starting port since the first packet was detected
+		unless (defined $Scan{$srcip}{$dstip}{'START_PORT'} || $proto eq "ICMP") {  # this is the absolute starting port since the first packet was detected
 			$Scan{$srcip}{$dstip}{'START_PORT'} = 65535; # make sure the initial start port is not too low
 			$Scan{$srcip}{$dstip}{'END_PORT'} = 0; # make sure the initial end port is not too high
 		}
@@ -473,27 +477,40 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 		my @time = split / /, scalar localtime;   # Get the current time as a nice ASCII string.
 		pop @time; shift @time;    # Get rid of the day and the year to make the time consistent with syslog
 		my $time = join ' ', @time;
-		unless (defined $Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'}) {  # this is the current starting port since $CHECK_INTERVAL
+		unless (defined $Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}) {  ### initialize values for the current interval
 			$Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'START_TIME'} = $time;
-                       	$Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'} = 65535; # make sure the initial start port is not too low
-                       	$Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'} = 0; # make sure the initial end port is not too high
+			$Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'PACKETS'} = 0;
+			unless ($proto eq "ICMP") {
+				### make sure the initial start port is not too low
+				$Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'} = 65535;
+				### make sure the initial end port is not too high
+				$Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'} = 0;
+			}
+			if ($proto eq "TCP") {
+				$Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'FLAGS'}{$flags} = 0;
+			}
 		}
 		unless (defined $Scan{$srcip}{$dstip}{'START_TIME'}{'READABLE'}) {
 			$Scan{$srcip}{$dstip}{'START_TIME'}{'READABLE'} = $time;
 			$Scan{$srcip}{$dstip}{'START_TIME'}{'EPOCH_SECONDS'} = $epoch_seconds if ($enable_persistence eq "N");
 		}
+		$Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'PACKETS'}++;
 		$Scan{$srcip}{$dstip}{'END_TIME'} = $time;
 		$Scan{$srcip}{$dstip}{'END_TIME'}{'EPOCH_SECONDS'} = $epoch_seconds if ($enable_persistence eq "N");
-		# increment hash values
+		### increment hash values
+		### if $Scan{$srcip}{$dstip}{'ABSNUM'} is not yet defined, incrementing it here will make it equal to 1 anyway
 		$Scan{$srcip}{$dstip}{'ABSNUM'}++;  # if $Scan{$srcip}{$dstip}{'ABSNUM'} is not yet defined, incrementing it here will make it equal to 1 anyway
 		if ($proto eq "TCP") {
-			$Scan{$srcip}{$dstip}{'TCP'}{'FLAGS'}{$flags}++;
+			$Scan{$srcip}{$dstip}{'TCP'}{'CURRENT_INTERVAL'}{'FLAGS'}{$flags}++;
 		}
 		# see if this port lies outside our current range
-		($Scan{$srcip}{$dstip}{'START_PORT'}, $Scan{$srcip}{$dstip}{'END_PORT'}) = 
-			&check_range($dstport, $Scan{$srcip}{$dstip}{'START_PORT'}, $Scan{$srcip}{$dstip}{'END_PORT'});
-		($Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'}, $Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'}) =
-                        &check_range($dstport, $Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'}, $Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'});
+		unless ($proto eq "ICMP") {
+			($Scan{$srcip}{$dstip}{'START_PORT'}, $Scan{$srcip}{$dstip}{'END_PORT'}) =
+				&check_range($dstport, $Scan{$srcip}{$dstip}{'START_PORT'}, $Scan{$srcip}{$dstip}{'END_PORT'});
+			($Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'}, $Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'}) =
+				&check_range($dstport, $Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'},
+								$Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'});
+		} 
 		if ($DEBUG) {
 			print "check_scan():\n";
 			print "     srcip: $srcip, dstip: $dstip\n";
@@ -505,14 +522,18 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 			print "     flags: $flags\n" if ($proto eq "TCP");
 			print "     Scan{srcip}{dstip}{'AUTO'} $Scan{$srcip}{$dstip}{'AUTO'}\n";
 			print "     Scan{srcip}{dstip}{'CURRENT_DANGER_LEVEL'} = $Scan{$srcip}{$dstip}{'CURRENT_DANGER_LEVEL'}\n";
-			print "     Scan{srcip}{dstip}{'START_PORT'} = $Scan{$srcip}{$dstip}{'START_PORT'}\n";
-			print "     Scan{srcip}{dstip}{'END_PORT'} = $Scan{$srcip}{$dstip}{'END_PORT'}\n";
+			print "     Scan{srcip}{dstip}{'START_PORT'} = $Scan{$srcip}{$dstip}{'START_PORT'}\n" unless ($proto eq "ICMP");
+			print "     Scan{srcip}{dstip}{'END_PORT'} = $Scan{$srcip}{$dstip}{'END_PORT'}\n" unless ($proto eq "ICMP");
 			print "     Scan{srcip}{dstip}{'START_TIME'}{'READABLE'} = $Scan{$srcip}{$dstip}{'START_TIME'}{'READABLE'}\n";
 			print "     Scan{srcip}{dstip}{'START_TIME'}{'EPOCH_SECONDS'} = $Scan{$srcip}{$dstip}{'START_TIME'}{'EPOCH_SECONDS'}\n" if ($enable_persistence eq "N");
 			print "     Scan{srcip}{dstip}{'END_TIME'} = $Scan{$srcip}{$dstip}{'END_TIME'}\n";
 			print "     Scan{srcip}{dstip}{'END_TIME'}{'EPOCH_SECONDS'} = $Scan{$srcip}{$dstip}{'END_TIME'}{'EPOCH_SECONDS'}\n" if ($enable_persistence eq "N");
-			print "     Scan{srcip}{dstip}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'} = $Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'}\n";
-			print "     Scan{srcip}{dstip}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'} = $Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'}\n";
+			unless ($proto eq "ICMP") {
+				print "     Scan{srcip}{dstip}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'} = "
+					. "$Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'}\n";
+				print "     Scan{srcip}{dstip}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'} = "
+					. "$Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'}\n";
+			}
 		}
 		if ($signatures && $USE_IPTABLES) {  # might try to use ipchains also, but then cannot use tcp flags except for -y -l rules
 			for my $msg (keys %{$sigs_href->{$proto}}) {   # need to iterate through all signatures since a packet may match several
@@ -520,30 +541,42 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 				my $srcport_criteria = 0;
 				my $rv = 0;
 				if ($proto eq "TCP") {
-					if (&check_port($sigs_href, $msg, $dstport, "DSTPORT", $proto)
-						&& &check_port($sigs_href, $msg, $srcport, "SRCPORT", $proto)
-							&& &check_flags($sigs_href, $msg, $flags, $proto)) {     # tripped a tcp signature
+					if (&check_port($sigs_href, $msg, $srcport, $dstport, $proto)
+						&& &check_misc_fields($sigs_href, $msg, $proto, $len, $ttl)
+							&& &check_tcp_flags($sigs_href, $msg, $flags, $proto)) {   ### tripped a tcp signature
 						$Scan{$srcip}{$dstip}{'TCP'}{'SIGMATCH'}{'SIGDL'} = $sigs_href->{'TCP'}->{$msg}->{'DANGERLEVEL'};
 						$rv = 1;
 					}
 				} elsif ($proto eq "UDP") {
-                                        if (&check_port($sigs_href, $msg, $dstport, "DSTPORT", $proto)
-                                                && &check_port($sigs_href, $msg, $srcport, "SRCPORT", $proto)) {     # tripped a udp signature
+					if (&check_port($sigs_href, $msg, $srcport, $dstport, $proto)
+						&& &check_misc_fields($sigs_href, $msg, $proto, $len, $ttl)) {   ### tripped a udp signature
 						$Scan{$srcip}{$dstip}{'UDP'}{'SIGMATCH'}{'SIGDL'} = $sigs_href->{'UDP'}->{$msg}->{'DANGERLEVEL'};
 						$rv = 1;
 					}
+				} elsif ($proto eq "ICMP") {
+					if (&check_icmp_sigs($sigs_href, $msg, $ttl, $type, $code, $id, $seq)) {
+						$Scan{$srcip}{$dstip}{'ICMP'}{'SIGMATCH'}{'SIGDL'} = $sigs_href->{'ICMP'}->{$msg}->{'DANGERLEVEL'};
+						$rv = 1;
+					}
 				}
-				if ($rv) {
-					print "     SIGMATCH on dstport: $dstport\n" if $DEBUG;
+				if ($rv) {   ### we matched a signature
+					if ($DEBUG) {
+						unless ($proto eq "ICMP") {
+							print "     SIGMATCH on dstport: $dstport\n";
+						} else {
+							print "     ICMP SIGMATCH\n";
+						}
+					}
 					my $listening_port = "";
-					unless ($netstat_lookup) {
+					unless ($netstat_lookup || $proto eq "ICMP") {
 						my $lprot;
 						$lprot = "tcp" if ($proto eq "TCP");
 						$lprot = "udp" if ($proto eq "UDP");
 						my $dstip_is_local = 0;
-						# check to see if the scan destination ip is directed at the firewall.  If yes, then check to see if
-						# a server is listening on the DSTPORT by parsing netstat output.  If not, psad would have to connect
-						# to the deestination port on the remote machine, but it should not do this so it is not implemented.
+						### check to see if the scan destination ip is directed at the firewall.  If yes,
+						### then check to see if a server is listening on the DSTPORT by parsing netstat
+						### output.  If not, psad would have to connect to the deestination port on the
+						### remote machine, but it should not do this so it is not implemented.
 						$dstip_is_local = 1 if defined $local_ips_href->{$dstip};
 						if ($dstip_is_local) {
 							my $key = $lprot . $dstport;
@@ -557,20 +590,26 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 					### including sp almost always changes the hash key: 	\
 					### my $alert_string = "$msg  sp=$srcport, dp=$dstport, flags=$flags.  $listening_port";
 					my $alert_string;
-					$alert_string = "$msg  dp=$dstport, flags=$flags. $listening_port";
+					if ($proto eq "TCP") {
+						$alert_string = "$msg  dp=$dstport, flags=$flags. $listening_port";
+					} elsif ($proto eq "UDP") {
+						$alert_string = "$msg  dp=$dstport. $listening_port";
+					} else {
+						$alert_string = "$msg";
+					}
 					if (defined $Scan{$srcip}{$dstip}{$proto}{'SIGMATCH'}{$alert_string}) {
 						$Scan{$srcip}{$dstip}{$proto}{'SIGMATCH'}{$alert_string}++;
 					} else {
 						$Scan{$srcip}{$dstip}{$proto}{'SIGMATCH'}{$alert_string} = 1;
 					}
-					unless (defined $Scan{$srcip}{$dstip}{$proto}{'CURRENT_SIGMATCH_START_TIME'}) {
-						$Scan{$srcip}{$dstip}{$proto}{'CURRENT_SIGMATCH_START_TIME'} = $time;
+#					unless (defined $Scan{$srcip}{$dstip}{'CURRENT_SIGMATCH'}{'START_TIME'}) {
+					unless (defined $Scan{$srcip}{$dstip}{'CURRENT_SIGMATCH'}) {
+#						$Scan{$srcip}{$dstip}{'CURRENT_SIGMATCH'}{'START_TIME'} = $time;
+						$Scan{$srcip}{$dstip}{$proto}{'CURRENT_SIGMATCH'}{$alert_string} = 0;
+						$Scan{$srcip}{$dstip}{$proto}{'CURRENT_SIGMATCH'}{'PACKETS'} = 0;
 					}
-					if (defined $Scan{$srcip}{$dstip}{$proto}{'CURRENT_SIGMATCH'}{$alert_string}) {
-                               	                $Scan{$srcip}{$dstip}{$proto}{'CURRENT_SIGMATCH'}{$alert_string}++;
-                                       	} else {
-                                               	$Scan{$srcip}{$dstip}{$proto}{'CURRENT_SIGMATCH'}{$alert_string} = 1;
-                                       	}
+					$Scan{$srcip}{$dstip}{$proto}{'CURRENT_SIGMATCH'}{$alert_string}++;
+					$Scan{$srcip}{$dstip}{$proto}{'CURRENT_SIGMATCH'}{'PACKETS'}++;
 				}
 			} 
 		}
@@ -578,10 +617,10 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 	&collect_errors(\@bad_packets, $error_log) unless $errors;
 	return \%Scan;
 }
-# check_flags will eventually need to include all possible permutations of the six 
+# check_tcp_flags will eventually need to include all possible permutations of the six 
 # tcp flags so that any signature can be written, but for now this should be most 
 # of the important ones.
-sub check_flags() {
+sub check_tcp_flags() {
 	my ($sigs_href, $msg, $flags_to_check, $proto) = @_;
 	return 0 if ($proto ne "TCP");
 	my $msgflags = $sigs_href->{$proto}->{$msg}->{'FLAGS'};
@@ -596,24 +635,77 @@ sub check_flags() {
 	return 0;
 }
 sub check_port() {
-	my ($sigs_href, $msg, $port_to_check, $portdirection, $proto) = @_;
-	print "check_port(): msg: $msg, start: port_to_check: $port_to_check\n" if $DEBUG;
-        if (defined $sigs_href->{$proto}->{$msg}->{$portdirection} && $sigs_href->{$proto}->{$msg}->{$portdirection} eq "any") {
-        	return 1;
-        } elsif (defined $sigs_href->{$proto}->{$msg}->{$portdirection} && $port_to_check == $sigs_href->{$proto}->{$msg}->{$portdirection}) {
-        	return 1;
-        } elsif (defined $sigs_href->{$proto}->{$msg}->{$portdirection}->{'START'}) {
-        	my $start = $sigs_href->{$proto}->{$msg}->{$portdirection}->{'START'};
-        	my $end = $sigs_href->{$proto}->{$msg}->{$portdirection}->{'END'};
-        	return 1 if ($port_to_check >= $start && $port_to_check <= $end);
-        } elsif (defined $sigs_href->{$proto}->{$msg}->{$portdirection}->{'NOT'}) {
-        	return 1 if ($port_to_check != $sigs_href->{$proto}->{$msg}->{$portdirection}->{'NOT'});
-        } elsif (defined $sigs_href->{$proto}->{$msg}->{$portdirection}->{'NEGSTART'}) {
-        	my $start = $sigs_href->{$proto}->{$msg}->{$portdirection}->{'NEGSTART'};
-        	my $end = $sigs_href->{$proto}->{$msg}->{$portdirection}->{'NEGEND'};
-        	return 1 if ($port_to_check < $start || $port_to_check > $end);
-       }
-	return 0;
+	my ($sigs_href, $msg, $srcport, $dstport, $proto) = @_;
+	print "check_port(): msg: $msg, srcport: $srcport, dstport: $dstport\n" if $DEBUG;
+	### check dst port first
+	if (defined $sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'START'}) {
+		my $start = $sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'START'};
+		my $end = $sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'END'};
+		return 0 if ($dstport < $start || $dstport > $end);
+	}
+	if (defined $sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'NOT'}) {
+		return 0 if ($dstport == $sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'NOT'});
+	}
+	if (defined $sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'NEGSTART'}) {
+		my $start = $sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'NEGSTART'};
+		my $end = $sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'NEGEND'};
+		return 0 if ($dstport > $start || $dstport < $end);
+	}
+	if (defined $sigs_href->{$proto}->{$msg}->{'DSTPORT'}) {
+		unless ($sigs_href->{$proto}->{$msg}->{'DSTPORT'} eq "any") {
+			return 0 if ($dstport != $sigs_href->{$proto}->{$msg}->{'DSTPORT'});
+		}
+	}
+	### check src port
+	if (defined $sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'START'}) {
+		my $start = $sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'START'};
+		my $end = $sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'END'};
+		return 0 if ($dstport < $start || $dstport > $end);
+	}
+	if (defined $sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'NOT'}) {
+		return 0 if ($dstport == $sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'NOT'});
+	}
+	if (defined $sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'NEGSTART'}) {
+		my $start = $sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'NEGSTART'};
+		my $end = $sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'NEGEND'};
+		return 0 if ($dstport > $start || $dstport < $end);
+	}
+	if (defined $sigs_href->{$proto}->{$msg}->{'SRCPORT'}) {
+		unless ($sigs_href->{$proto}->{$msg}->{'SRCPORT'} eq "any") {
+			return 0 if ($dstport != $sigs_href->{$proto}->{$msg}->{'SRCPORT'});
+		}
+	}
+	return 1;   ### if we made it to here, then we matched both the src and dst port criteria
+}
+sub check_icmp_sigs() {
+	my ($sigs_href, $msg, $ttl, $type, $code, $icmp_id, $icmp_seq) = @_;
+	### check icmp type first
+	if (defined $sigs_href->{'ICMP'}->{$msg}->{'TYPE'}) {
+		return 0 if ($sigs_href->{'ICMP'}->{$msg}->{'TYPE'} != $type);
+	}
+	if (defined $sigs_href->{'ICMP'}->{$msg}->{'TTL'}) {
+		return 0 if ($sigs_href->{'ICMP'}->{$msg}->{'TTL'} != $ttl);
+	}
+	if (defined $sigs_href->{'ICMP'}->{$msg}->{'CODE'}) {
+		return 0 if ($sigs_href->{'ICMP'}->{$msg}->{'CODE'} != $code);
+	}
+	if (defined $sigs_href->{'ICMP'}->{$msg}->{'ID'}) {
+		return 0 if ($sigs_href->{'ICMP'}->{$msg}->{'ICMP_ID'} != $icmp_id);
+	}
+	if (defined $sigs_href->{'ICMP'}->{$msg}->{'SEQ'}) {
+		return 0 if ($sigs_href->{'ICMP'}->{$msg}->{'ICMP_SEQ'} != $icmp_seq);
+	}
+	return 1; ### if we got to this point, then we matched the signature
+}
+sub check_misc_fields() {
+	my ($sigs_href, $msg, $proto, $len, $ttl) = @_;
+	if (defined $sigs_href->{$proto}->{$msg}->{'LEN'}) {
+		return 0 if ($sigs_href->{$proto}->{$msg}->{'LEN'} != $len);
+	}
+	if (defined $sigs_href->{$proto}->{$msg}->{'TTL'}) {
+		return 0 if ($sigs_href->{$proto}->{$msg}->{'TTL'} != $ttl);
+	}
+	return 1;
 }
 sub import_signatures() {
 	my $sigfile = shift;
@@ -623,97 +715,104 @@ sub import_signatures() {
 	open SIGS, "< $sigfile" or die "Could not open the signatures file $sigfile: $!\n";
 	my @sigs = <SIGS>;
 	close SIGS;
-	for my $s (@sigs) {
-		chomp $s;
-		next if ($s =~ /^#/);
-		if ($s =~ /^tcp/) {
-			if ($s =~ /^(\w{3,4})\s+(\S+)\s+\-\>\s+(\S+)\s+msg:(\".*?\")\;\s+flags:\s?(\w+)\;.*?dlevel:\s?(\d{1})\;/) {
-				($proto, $srcport, $dstport, $msg, $flags, $dangerlevel) = ($1,$2,$3,$4,$5,$6);
-				$Sigs{'TCP'}{$msg}{'FLAGS'} = $flags;
-				$Sigs{'TCP'}{$msg}{'DANGERLEVEL'} = $dangerlevel;
-				if ($srcport =~ /\:/ && $srcport !~ /\!/) {
-					($start, $end) = split /:/, $srcport;
-					$start = 1 if ($start eq '');
-					$end = 65535 if ($end eq '');
-					$Sigs{'TCP'}{$msg}{'SRCPORT'}{'START'} = $start;
-					$Sigs{'TCP'}{$msg}{'SRCPORT'}{'END'} = $end;
-				} elsif ($srcport =~ /\!/ && $srcport !~ /\:/) {
-					$tmpport = (split /\!/, $srcport)[1];
-					$Sigs{'TCP'}{$msg}{'SRCPORT'}{'NOT'} = $tmpport;
-				} elsif ($srcport =~ /\:/ && $srcport =~ /\!/) {
-					($start, $end) = split /:/, $srcport;
-               	        	        $start = 1 if ($start !~ /\d/);
-					$end = 65535 if ($end !~ /\d/);
-					$Sigs{'TCP'}{$msg}{'SRCPORT'}{'NEGSTART'} = $start;
-       		                       	$Sigs{'TCP'}{$msg}{'SRCPORT'}{'NEGEND'} = $end;
-				} else {
-					$Sigs{'TCP'}{$msg}{'SRCPORT'} = $srcport;
-				}
-				if ($dstport =~ /\:/ && $dstport !~ /\!/) {
-       	                       		($start, $end) = split /:/, $dstport;
-        	                       	$start = 1 if ($start eq '');
-        		                $end = 65535 if ($end eq '');
-       	                	        $Sigs{'TCP'}{$msg}{'DSTPORT'}{'START'} = $start;
-               	       	        	$Sigs{'TCP'}{$msg}{'DSTPORT'}{'END'} = $end;
-                        	} elsif ($dstport =~ /\!/ && $dstport !~ /\:/) {
-       	                       		$tmpport = (split /\!/, $dstport)[1];
-               	               		$Sigs{'TCP'}{$msg}{'DSTPORT'}{'NOT'} = $tmpport;
-	        	        } elsif ($dstport =~ /\:/ && $dstport =~ /\!/) {
-       		        	        ($start, $end) = split /:/, $dstport;
-               	                	$start = 1 if ($start !~ /\d/);
-                        	        $end = 65535 if ($end !~ /\d/);
-       	                       		$Sigs{'TCP'}{$msg}{'DSTPORT'}{'NEGSTART'} = $start;
-               	               		$Sigs{'TCP'}{$msg}{'DSTPORT'}{'NEGEND'} = $end;
-				} else {
-                              			$Sigs{'TCP'}{$msg}{'DSTPORT'} = $dstport;
-                       		}
-			}
-		} elsif ($s =~ /^udp/) {
-			# udp any -> 31337 msg:"Back Orifice";
-			if ($s =~ /^(\w{3,4})\s+(\S+)\s+\-\>\s+(\S+)\s+msg:(\".*?\")\;.*?dlevel:\s?(\d{1})\;/) {
-				($proto, $srcport, $dstport, $msg, $dangerlevel) = ($1,$2,$3,$4,$5);	
-				$Sigs{'UDP'}{$msg}{'DANGERLEVEL'} = $dangerlevel;
-                                if ($srcport =~ /\:/ && $srcport !~ /\!/) {
-                                        ($start, $end) = split /:/, $srcport;
-                                        $start = 1 if ($start eq '');
-                                        $end = 65535 if ($end eq '');
-                                        $Sigs{'UDP'}{$msg}{'SRCPORT'}{'START'} = $start;
-                                        $Sigs{'UDP'}{$msg}{'SRCPORT'}{'END'} = $end;
-                                } elsif ($srcport =~ /\!/ && $srcport !~ /\:/) {
-                                        $tmpport = (split /\!/, $srcport)[1];
-                                        $Sigs{'UDP'}{$msg}{'SRCPORT'}{'NOT'} = $tmpport;
-                                } elsif ($srcport =~ /\:/ && $srcport =~ /\!/) {
-                                        ($start, $end) = split /:/, $srcport;
-                                        $start = 1 if ($start !~ /\d/);
-                                        $end = 65535 if ($end !~ /\d/);
-                                        $Sigs{'UDP'}{$msg}{'SRCPORT'}{'NEGSTART'} = $start;
-                                        $Sigs{'UDP'}{$msg}{'SRCPORT'}{'NEGEND'} = $end;
-                                } else {
-                                        $Sigs{'UDP'}{$msg}{'SRCPORT'} = $srcport;
-                                }
-                                if ($dstport =~ /\:/ && $dstport !~ /\!/) {
-                                        ($start, $end) = split /:/, $dstport;
-                                        $start = 1 if ($start eq '');
-                                        $end = 65535 if ($end eq '');
-                                        $Sigs{'UDP'}{$msg}{'DSTPORT'}{'START'} = $start;
-                                        $Sigs{'UDP'}{$msg}{'DSTPORT'}{'END'} = $end;
-                                } elsif ($dstport =~ /\!/ && $dstport !~ /\:/) {
-                                        $tmpport = (split /\!/, $dstport)[1];
-                                        $Sigs{'UDP'}{$msg}{'DSTPORT'}{'NOT'} = $tmpport;
-                                } elsif ($dstport =~ /\:/ && $dstport =~ /\!/) {
-                                        ($start, $end) = split /:/, $dstport;
-                                        $start = 1 if ($start !~ /\d/);
-                                        $end = 65535 if ($end !~ /\d/);
-                                        $Sigs{'UDP'}{$msg}{'DSTPORT'}{'NEGSTART'} = $start;
-                                        $Sigs{'UDP'}{$msg}{'DSTPORT'}{'NEGEND'} = $end;
-                                } else {
-                                        $Sigs{'UDP'}{$msg}{'DSTPORT'} = $dstport;
-                                }
-                        }
-		}
+	for my $sig (@sigs) {
+		chomp $sig;
+		next if ($sig =~ /^#/);
+		&get_signature_fields(\%Sigs, $sig);
 	}
 	print STDOUT Dumper %Sigs if $DEBUG;
-	return \%Sigs;	
+	return \%Sigs;
+}
+sub get_signature_fields() {
+	my ($Sigs_href, $sig) = @_;
+	my ($len, $ttl, $proto, $srcport, $dstport, $flags, $type, $code, $id, $seq);
+	if ($sig =~ /^tcp/) {
+		$proto = "TCP";
+	} elsif ($sig =~ /^udp/) {
+		$proto = "UDP";
+	} elsif ($sig =~ /^icmp/) {
+		$proto = "ICMP";
+	} else {
+		return;
+	}
+	my @fields = split /\;/, $sig;
+	for my $f (@fields) {  ### get the msg first
+		if ($f =~ /msg\:\s*?(\".*?\")/) {
+			$msg = $1;
+		}
+	}
+	if ($msg) {
+		if (defined $Sigs_href->{$proto}->{$msg}) {
+			$msg .= " ";   ### make sure we have a unique signature by apending whitespace if necessary
+		}
+		if ($proto ne "ICMP") {   ### it is either tcp or udp
+			&get_signature_ports($Sigs_href, $sig, $proto, $msg);
+		}
+		for my $f (@fields) {
+			if ($f =~ /flags\:\s*?(\w+)/i) {
+				$Sigs_href->{$proto}->{$msg}->{'FLAGS'} = $1;
+			} elsif ($f =~ /ttl\:\s*(\d+)/i) {
+				$Sigs_href->{$proto}->{$msg}->{'TTL'} = $1;
+			} elsif ($f =~ /itype\:\s*?(\d+)/i) {
+				$Sigs_href->{$proto}->{$msg}->{'TYPE'} = $1;
+			} elsif ($f =~ /icode\:\s*?(\d+)/i) {
+				$Sigs_href->{$proto}->{$msg}->{'CODE'} = $1;
+			} elsif ($f =~ /icmp_seq\:\s*?(\d+)/i) {
+				$Sigs_href->{$proto}->{$msg}->{'ICMP_SEQ'} = $1;
+			} elsif ($f =~ /icmp_id\:\s*?(\d+)/i) {
+				$Sigs_href->{$proto}->{$msg}->{'ICMP_ID'} = $1;
+			} elsif ($f =~ /dlevel\:\s*?(\d{1})/i) {
+				$Sigs_href->{$proto}->{$msg}->{'DANGERLEVEL'} = $1;
+			}
+		}
+	}
+	return;
+}
+sub get_signature_ports() {
+	my ($Sigs_href, $sig, $proto, $msg) = @_;
+	my ($srcport, $dstport);
+	if ($sig =~ /^\w{3,4}\s+(\S+)\s+\-\>\s+(\S+)\s/) {
+		($srcport, $dstport) = ($1, $2);
+	} else {
+		return;
+	} 
+	if ($srcport =~ /\:/ && $srcport !~ /\!/) {
+		($start, $end) = split /:/, $srcport;
+		$start = 1 if ($start eq '');
+		$end = 65535 if ($end eq '');
+		$Sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'START'} = $start;
+		$Sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'END'} = $end;
+	} elsif ($srcport =~ /\!/ && $srcport !~ /\:/) {
+		$tmpport = (split /\!/, $srcport)[1];
+		$Sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'NOT'} = $tmpport;
+	} elsif ($srcport =~ /\:/ && $srcport =~ /\!/) {
+		($start, $end) = split /:/, $srcport;
+		$start = 1 if ($start !~ /\d/);
+		$end = 65535 if ($end !~ /\d/);
+		$Sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'NEGSTART'} = $start;
+		$Sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'NEGEND'} = $end;
+	} else {
+		$Sigs_href->{$proto}->{$msg}->{'SRCPORT'} = $srcport;
+	}
+	if ($dstport =~ /\:/ && $dstport !~ /\!/) {
+		($start, $end) = split /:/, $dstport;
+		$start = 1 if ($start eq '');
+		$end = 65535 if ($end eq '');
+		$Sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'START'} = $start;
+		$Sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'END'} = $end;
+	} elsif ($dstport =~ /\!/ && $dstport !~ /\:/) {
+		$tmpport = (split /\!/, $dstport)[1];
+		$Sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'NOT'} = $tmpport;
+	} elsif ($dstport =~ /\:/ && $dstport =~ /\!/) {
+		($start, $end) = split /:/, $dstport;
+		$start = 1 if ($start !~ /\d/);
+		$end = 65535 if ($end !~ /\d/);
+		$Sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'NEGSTART'} = $start;
+		$Sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'NEGEND'} = $end;
+	} else {
+		$Sigs_href->{$proto}->{$msg}->{'DSTPORT'} = $dstport;
+	}
+	return;
 }
 sub import_auto_ips() {
 	my $auto_ips_file = shift;
@@ -749,71 +848,94 @@ sub assign_danger_level() {
 	$Scan_href = &automatic_ip_danger_assignment($Scan_href, $Auto_ips_href) if ($Auto_ips_href); 
 	for my $srcip (keys %$Scan_href) {
 		print "assign_danger_level(): source ip: $srcip\n" if $DEBUG;
-		for my $dstip (keys %{$Scan_href->{$srcip}}) {
+		DST: for my $dstip (keys %{$Scan_href->{$srcip}}) {
 			my $absnum = $Scan_href->{$srcip}->{$dstip}->{'ABSNUM'};
-			my $range = $Scan_href->{$srcip}->{$dstip}->{'END_PORT'} - $Scan_href->{$srcip}->{$dstip}->{'START_PORT'};
+			my $range;
+			if (defined $Scan_href->{$srcip}->{$dstip}->{'START_PORT'}) {
+				$range = $Scan_href->{$srcip}->{$dstip}->{'END_PORT'} - $Scan_href->{$srcip}->{$dstip}->{'START_PORT'};
+			} else {
+				$range = $absnum;
+			}
 			if ($DEBUG) {
 				print "assign_danger_level(): destination ip: $dstip\n";
 				print "assign_danger_level(): ABSNUM: $Scan_href->{$srcip}->{$dstip}->{'ABSNUM'}\n";
-				print "assign_danger_level(): START_PORT: $Scan_href->{$srcip}->{$dstip}->{'START_PORT'}, END_PORT: $Scan_href->{$srcip}->{$dstip}->{'END_PORT'}\n";
-				print "assign_danger_level(): CURRENT_DANGER_LEVEL (before assignment) = $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'}\n";
+				if (defined $Scan_href->{$srcip}->{$dstip}->{'START_PORT'}) {
+					print "assign_danger_level(): START_PORT: $Scan_href->{$srcip}->{$dstip}->{'START_PORT'}, "
+						. "END_PORT: $Scan_href->{$srcip}->{$dstip}->{'END_PORT'}\n";
+				}
+				print "assign_danger_level(): CURRENT_DANGER_LEVEL (before assignment) = "
+					. "$Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'}\n";
 			}
 			# If a scan signature packet has been detected but no other packets are detected, assign a danger
-			# level of 1.  (This should really look at the danger level field for each signature to assign a real
-			# danger level that is based on the type of signature... see the TODO)
+			# level of SIGDL.
 			my $sigmatch = 0;
 			my $sigproto = "";
 			if (defined $Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'SIGMATCH'}) {
 				$sigmatch = 1;
 				$sigproto = "TCP";
-				print "assign_danger_level(): sigmatch = $sigmatch (definitely 1 here)\n" if $DEBUG;
+				print "assign_danger_level(): sigmatch = $sigmatch\n" if $DEBUG;
 			}
-                        if (defined $Scan_href->{$srcip}->{$dstip}->{'UDP'}->{'SIGMATCH'}) {
-                                $sigmatch = 1;
+			if (defined $Scan_href->{$srcip}->{$dstip}->{'UDP'}->{'SIGMATCH'}) {
+				$sigmatch = 1;
 				$sigproto = "UDP";
-                                print "assign_danger_level(): sigmatch = $sigmatch (definitely 1 here)\n" if $DEBUG;
-                        }
-			if ($sigmatch && $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} < $Scan_href->{$srcip}->{$dstip}->{$sigproto}->{'SIGMATCH'}->{'SIGDL'}) {
-#				$Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} = 1;
-				$Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} = $Scan_href->{$srcip}->{$dstip}->{$sigproto}->{'SIGMATCH'}->{'SIGDL'};
-				print "assign_danger_level(): danger level: $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'}\n" if $DEBUG;
+				print "assign_danger_level(): sigmatch = $sigmatch\n" if $DEBUG;
 			}
-			# if $port_range_scan_threshold is >= 1, then psad will not assign a danger level to repeated packets to the same tcp port
-			if ($absnum >= $danger_levels_href->{'1'} && $absnum < $danger_levels_href->{'2'} && $range >= $port_range_scan_threshold) {
-				if ($Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} < 1 && $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} != -1) {
+			if (defined $Scan_href->{$srcip}->{$dstip}->{'ICMP'}->{'SIGMATCH'}) {
+				$sigmatch = 1;
+				$sigproto = "ICMP";
+				print "assign_danger_level(): sigmatch = $sigmatch\n" if $DEBUG;
+			}
+			if ($sigmatch && $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} <
+							$Scan_href->{$srcip}->{$dstip}->{$sigproto}->{'SIGMATCH'}->{'SIGDL'}) {
+				$Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} =
+								$Scan_href->{$srcip}->{$dstip}->{$sigproto}->{'SIGMATCH'}->{'SIGDL'};
+				$Scan_href->{$srcip}->{$dstip}->{'ALERTED'} = "N";
+				print "assign_danger_level(): danger level: "
+					. "$Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'}\n" if $DEBUG;
+			}
+			### if $port_range_scan_threshold is >= 1, then psad will not assign a
+			### danger level to repeated packets to the same port
+			if ($absnum < $danger_levels_href->{'1'}) {
+				### we don't have enough packets to even reach danger level 1 yet.
+				next DST;
+			} elsif ($absnum < $danger_levels_href->{'2'} && $range >= $port_range_scan_threshold) {
+				if ($Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} < 1
+						&& $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} != -1) {
 					$Scan_href->{$srcip}->{$dstip}->{'ALERTED'} = "N";
 					$Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} = 1;
 				}
-			}
-			if ($absnum >= $danger_levels_href->{'2'} && $absnum < $danger_levels_href->{'3'} && $range >= $port_range_scan_threshold) {
-				if ($Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} < 2 && $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} != -1) {
+			} elsif ($absnum < $danger_levels_href->{'3'} && $range >= $port_range_scan_threshold) {
+				if ($Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} < 2
+						&& $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} != -1) {
 					$Scan_href->{$srcip}->{$dstip}->{'ALERTED'} = "N";
 					$Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} = 2;
 				}
-			}
-			if ($absnum >= $danger_levels_href->{'3'} && $absnum < $danger_levels_href->{'4'} && $range >= $port_range_scan_threshold) {
-				if ($Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} < 3 && $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} != -1) {
+			} elsif ($absnum < $danger_levels_href->{'4'} && $range >= $port_range_scan_threshold) {
+				if ($Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} < 3
+						&& $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} != -1) {
 					$Scan_href->{$srcip}->{$dstip}->{'ALERTED'} = "N";
 					$Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} = 3;
 				}
-			}
-			if ($absnum >= $danger_levels_href->{'4'} && $absnum < $danger_levels_href->{'5'} && $range >= $port_range_scan_threshold) {
-				if ($Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} < 4 && $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} != -1) {
+			} elsif ($absnum < $danger_levels_href->{'5'} && $range >= $port_range_scan_threshold) {
+				if ($Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} < 4
+						&& $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} != -1) {
 					$Scan_href->{$srcip}->{$dstip}->{'ALERTED'} = "N";
 					$Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} = 4;
 				}
-			}
-			if ($absnum >= $danger_levels_href->{'5'} && $range >= $port_range_scan_threshold) {
-				if ($Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} < 5 && $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} != -1) {
+			} elsif ($range >= $port_range_scan_threshold) {
+				if ($Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} < 5
+						&& $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} != -1) {
 					$Scan_href->{$srcip}->{$dstip}->{'ALERTED'} = "N";
 					$Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} = 5;
 				}
 			}
-			# we will always send an alert email for any new "bad" packet if $alert_all eq "Y".  Else email sent only if the scan increments its D.L.
-			if ($alert_all eq "Y") {  
+			### we will always send an alert email for any new "bad" packet if $alert_all eq "Y"...
+			### Else email sent only if the scan increments its D.L.
+			if ($alert_all eq "Y") {
 				$Scan_href->{$srcip}->{$dstip}->{'ALERTED'} = "N";
 			}
-			print "assign_danger_level(): CURRENT_DANGER_LEVEL (after assignment) = $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'}\n" if $DEBUG;
+			print "assign_danger_level(): CURRENT_DANGER_LEVEL (after assignment) = "
+				. "$Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'}\n" if $DEBUG;
 		}
 	}
 	return $Scan_href;
@@ -842,109 +964,162 @@ sub collect_errors() {
 	close ERRORS;
 }
 sub scan_logr() {
-	my ($Scan_href, $logfile, $output, $dnslookups, $whoislookups, $whois_timeout, $enable_email_alerts, $email_alert_danger_level,
-					$email_alertfile, $email_addresses_aref, $show_all_signatures, $Cmds_href) = @_;
-	my $flags_mesg;
+	my ($Scan_href, $logfile, $output, $dnslookups, $whoislookups, $whois_timeout,
+		$enable_email_alerts, $email_alert_danger_level, $email_alertfile, 
+				$email_limit, $email_addresses_aref, $show_all_signatures, $Cmds_href) = @_;
+	my $flags_msg;
 	my $hndl;
 	my $range;
-	my ($tcp_newrange, $udp_newrange, $tcp_new_start_range, $tcp_new_end_range, $udp_new_start_range, $udp_new_end_range);
-	my ($tcp_new_start_time, $udp_new_start_time);
+	my ($tcp_newrange, $udp_newrange, $tcp_new_start_range, $tcp_new_end_range);
+	my ($udp_new_start_range, $udp_new_end_range);
+	my ($tcp_new_start_time, $udp_new_start_time, $icmp_new_start_time);
 	my $dnsstring = "";
 	my $whois_info_aref;
-       	if ($output || $DEBUG) {
-                $hndl = "STDOUT";
-       	} else {
+	if ($output || $DEBUG) {
+		$hndl = "STDOUT";
+	} else {
 		$hndl = "LOG"; 
 		open $hndl, ">> $logfile";
-       	}
+	}
 	for my $srcip (keys %$Scan_href) {
 		print "scan_logr(): source ip: $srcip\n" if $DEBUG;
-		for my $dstip (keys %{$Scan_href->{$srcip}}) {
+		DST: for my $dstip (keys %{$Scan_href->{$srcip}}) {
+			unless (defined $Scan_href->{$srcip}->{$dstip}->{'EMAIL_LIMIT'}) {
+				$Scan_href->{$srcip}->{$dstip}->{'EMAIL_LIMIT'} = 0;
+			} elsif ($Scan_href->{$srcip}->{$dstip}->{'EMAIL_LIMIT'} > $email_limit) {
+				unless (defined $Scan_href->{$srcip}->{$dstip}->{'EMAIL_STOPPED'}) {
+					&email_limit_reached($email_addresses_aref, $srcip, $Cmds_href);
+					$Scan_href->{$srcip}->{$dstip}->{'EMAIL_STOPPED'} = 1;
+				}
+				next DST;
+			}
 			print "scan_logr(): dst ip: $dstip\n" if $DEBUG;
-			my ($tcp, $udp) = (0,0);
+			my ($tcp, $udp, $icmp) = (0,0,0);
 			my $current_danger_level = $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'};
 			if ($current_danger_level >= 1 && $Scan_href->{$srcip}->{$dstip}->{'LOGR'} eq "Y") {
-				my $abs_start_range = $Scan_href->{$srcip}->{$dstip}->{'START_PORT'};
-				my $abs_end_range = $Scan_href->{$srcip}->{$dstip}->{'END_PORT'};
-
+				my ($abs_start_range, $abs_end_range);
+				my ($tcp_new_start_range, $tcp_new_end_range, $tcp_new_start_time, $tcp_new_num_pkts);
+				my ($udp_new_start_range, $udp_new_end_range, $udp_new_start_time, $udp_new_num_pkts);
+				my ($icmp_new_start_time, $icmp_new_num_pkts);
 				if (defined $Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'CURRENT_INTERVAL'}) {
 					$tcp = 1;
-				 	$tcp_new_start_range = $Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'CURRENT_INTERVAL'}->{'START_PORT'};
-				 	$tcp_new_end_range = $Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'CURRENT_INTERVAL'}->{'END_PORT'};
-				 	$tcp_new_start_time = $Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'CURRENT_INTERVAL'}->{'START_TIME'};
+					$tcp_new_start_range = $Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'CURRENT_INTERVAL'}->{'START_PORT'};
+					$tcp_new_end_range = $Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'CURRENT_INTERVAL'}->{'END_PORT'};
+					$tcp_new_start_time = $Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'CURRENT_INTERVAL'}->{'START_TIME'};
+					$tcp_new_num_pkts = $Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'CURRENT_INTERVAL'}->{'PACKETS'};
 				}
-                                if (defined $Scan_href->{$srcip}->{$dstip}->{'UDP'}->{'CURRENT_INTERVAL'}) {
+				if (defined $Scan_href->{$srcip}->{$dstip}->{'UDP'}->{'CURRENT_INTERVAL'}) {
 					$udp = 1;
-                                        $udp_new_start_range = $Scan_href->{$srcip}->{$dstip}->{'UDP'}->{'CURRENT_INTERVAL'}->{'START_PORT'};
-                                        $udp_new_end_range = $Scan_href->{$srcip}->{$dstip}->{'UDP'}->{'CURRENT_INTERVAL'}->{'END_PORT'};
-                                        $udp_new_start_time = $Scan_href->{$srcip}->{$dstip}->{'UDP'}->{'CURRENT_INTERVAL'}->{'START_TIME'};
-                                }
-
+					$udp_new_start_range = $Scan_href->{$srcip}->{$dstip}->{'UDP'}->{'CURRENT_INTERVAL'}->{'START_PORT'};
+					$udp_new_end_range = $Scan_href->{$srcip}->{$dstip}->{'UDP'}->{'CURRENT_INTERVAL'}->{'END_PORT'};
+					$udp_new_start_time = $Scan_href->{$srcip}->{$dstip}->{'UDP'}->{'CURRENT_INTERVAL'}->{'START_TIME'};
+					$udp_new_num_pkts = $Scan_href->{$srcip}->{$dstip}->{'UDP'}->{'CURRENT_INTERVAL'}->{'PACKETS'};
+				}
+				if (defined $Scan_href->{$srcip}->{$dstip}->{'ICMP'}->{'CURRENT_INTERVAL'}) {
+					$icmp = 1;
+					$icmp_new_start_time = $Scan_href->{$srcip}->{$dstip}->{'ICMP'}->{'CURRENT_INTERVAL'}->{'START_TIME'};
+					$icmp_num_packets = $Scan_href->{$srcip}->{$dstip}->{'ICMP'}->{'CURRENT_INTERVAL'}->{'PACKETS'};
+				}
 				my $start_time = $Scan_href->{$srcip}->{$dstip}->{'START_TIME'}->{'READABLE'};
 				my $end_time = $Scan_href->{$srcip}->{$dstip}->{'END_TIME'};
-                        	my @time = split / /, scalar localtime;   ### Get the current time as a nice ASCII string.
-                        	pop @time; shift @time;    ### Get rid of the day and the year to make the time consistent with syslog
-                        	my $time = join ' ', @time;
-                        	unless ($dnslookups) {
-                                	my $ipaddr = gethostbyname($srcip);
-                                	my $rdns = gethostbyaddr($ipaddr, AF_INET);
-                                	$rdns = "No reverse dns info available" unless $rdns;
-                                	$dnsstring = "$srcip -> $rdns";
-                        	} 
+				my @time = split /\s/, scalar localtime;   ### Get the current time as a nice ASCII string.
+				pop @time; shift @time;    ### Get rid of the day and the year to make the time consistent with syslog
+				my $time = join ' ', @time;
+				unless ($dnslookups) {
+					my $ipaddr = gethostbyname($srcip);
+					my $rdns = gethostbyaddr($ipaddr, "AF_INET");
+					$rdns = "No reverse dns info available" unless $rdns;
+					$dnsstring = "$srcip -> $rdns";
+				}
 				unless ($whoislookups) {
 					$whois_info_aref = &get_whois_data($whois_timeout, $srcip, $Cmds_href);
 				}
-				if ($abs_start_range == $abs_end_range) {
-					$range = $abs_start_range;
-				} else {
-					$range = "$abs_start_range-$abs_end_range";
+				if ($tcp || $udp) {
+					$abs_start_range = $Scan_href->{$srcip}->{$dstip}->{'START_PORT'};
+					$abs_end_range = $Scan_href->{$srcip}->{$dstip}->{'END_PORT'};
+					if ($abs_start_range == $abs_end_range) {
+						$range = $abs_start_range;
+					} else {
+						$range = "$abs_start_range-$abs_end_range";
+					}
 				}
+				my @tcp_flags;
+				my $flags_msg;
 				if ($tcp) {
 					if ($tcp_new_start_range == $tcp_new_end_range) {
-                                		$tcp_newrange = $tcp_new_start_range;
-                        		} else {
-                                		$tcp_newrange = "$tcp_new_start_range-$tcp_new_end_range";
-                        		}
+						$tcp_newrange = $tcp_new_start_range;
+					} else {
+						$tcp_newrange = "$tcp_new_start_range-$tcp_new_end_range";
+					}
+					for my $flags (keys %{$Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'CURRENT_INTERVAL'}->{'FLAGS'}}) {
+						my $nmapOpts = 0;
+						$nmapOpts = "-sT or -sS" if ($flags eq "SYN");
+						$nmapOpts = "-sF" if ($flags eq "FIN");
+						$nmapOpts = "-sX" if ($flags eq "URG PSH FIN");
+						$nmapOpts = "-O" if ($flags eq "URG PSH SYN FIN");
+						if ($nmapOpts) {
+							$nmapOpts = "  Nmap: [$nmapOpts]";
+						}
+						my $num_pkts = $Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'CURRENT_INTERVAL'}->{'FLAGS'}->{$flags};
+						$flags_msg = "TCP flags:                   [$flags: $num_pkts packets]${nmapOpts}\n";
+						push @tcp_flags, $flags_msg;
+					}
+					### need to undef the current interval so it won't show up in the next alert
 					undef $Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'CURRENT_INTERVAL'};
 				}
 				if ($udp) {
-                                	if ($udp_new_start_range == $udp_new_end_range) {
-                                        	$udp_newrange = $udp_new_start_range;
-                                	} else {
-                                        	$udp_newrange = "$udp_new_start_range-$udp_new_end_range";
-                                	}
+					if ($udp_new_start_range == $udp_new_end_range) {
+						$udp_newrange = $udp_new_start_range;
+					} else {
+						$udp_newrange = "$udp_new_start_range-$udp_new_end_range";
+					}
+					### need to undef the current interval so it won't show up in the next alert
 					undef $Scan_href->{$srcip}->{$dstip}->{'UDP'}->{'CURRENT_INTERVAL'};
 				}
-#				undef $Scan_href->{$srcip}->{$dstip}->{'CURRENT_INTERVAL'};  # get rid of the current range to make room for a new one.
-				print STDOUT "scan_logr():  gernerating email......\n" if $DEBUG;
-		        	open EMAILALERT, "> $email_alertfile";
+				if ($icmp) {
+					undef $Scan_href->{$srcip}->{$dstip}->{'ICMP'}->{'CURRENT_INTERVAL'};
+				}
+				print STDOUT "scan_logr():  generating email......\n" if $DEBUG;
+				open EMAILALERT, "> $email_alertfile";
 				&markerline($hndl);
 				### could use logr() here, but perhaps the subroutine call is slower?
 				print $hndl "$time:     Portscan Detected by psad (pid $$) on $HOSTNAME.\n";
 				print $hndl "\n";
 				print $hndl "Source:                     $srcip\n";
 				print $hndl "Destination:                $dstip\n";
-				print $hndl "Newly scanned TCP ports:    [$tcp_newrange]  (since: $tcp_new_start_time)\n" if ($tcp);
-				print $hndl "Newly scanned UDP ports:    [$udp_newrange]  (since: $udp_new_start_time)\n" if ($udp);
-				print $hndl "Complete port range:        [$range]  (since: $start_time) TCP and/or UDP\n";
-				print $hndl "Total number of packets:    $Scan_href->{$srcip}->{$dstip}->{'ABSNUM'}\n";
-				print $hndl "Start time:                 $start_time\n";
-				print $hndl "End time:                   $end_time\n";
-				print $hndl "Danger level:               $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} out of 5\n";
-				print $hndl "DNS info:                   $dnsstring\n" unless $dnslookups;
+				print $hndl "Newly scanned TCP ports:    [$tcp_newrange]  (since: $tcp_new_start_time)\n" if $tcp;
+				print $hndl "Newly Blocked TCP packets:  [$tcp_new_num_pkts] (since: $tcp_new_start_time)\n" if $tcp;
+				if (@tcp_flags) {
+					print $hndl $_ for (@tcp_flags);
+				}
+				print $hndl "Newly scanned UDP ports:     [$udp_newrange]  (since: $udp_new_start_time)\n" if $udp;
+				print $hndl "Newly Blocked UDP packets:   [$udp_new_num_pkts] (since: $udp_new_start_time)\n" if $udp;
+				print $hndl "Newly Blocked ICMP packets:  [$icmp_num_packets] (since: $icmp_new_start_time)\n" if $icmp;
+				print $hndl "Complete port range:         [$range]  (since: $start_time) TCP and/or UDP\n" unless $icmp;
+				print $hndl "Total blocked packets:       $Scan_href->{$srcip}->{$dstip}->{'ABSNUM'}\n";
+				print $hndl "Start time:                  $start_time\n";
+				print $hndl "End time:                    $end_time\n";
+				print $hndl "Danger level:                $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} out of 5\n";
+				print $hndl "DNS info:                    $dnsstring\n" unless $dnslookups;
 				&markerline("EMAILALERT");
-                               	print EMAILALERT "$time:     Portscan Detected by psad (pid $$) on $HOSTNAME.\n";
+				print EMAILALERT "$time:     Portscan Detected by psad (pid $$) on $HOSTNAME.\n";
 				print EMAILALERT "\n";
-                               	print EMAILALERT "Source:                     $srcip\n";
-                               	print EMAILALERT "Destination:                $dstip\n";
-                                print EMAILALERT "Newly scanned TCP ports:    [$tcp_newrange]  (since: $tcp_new_start_time)\n" if ($tcp);
-                                print EMAILALERT "Newly scanned UDP ports:    [$udp_newrange]  (since: $udp_new_start_time)\n" if ($udp);
-                               	print EMAILALERT "Complete port range:        [$range]  (since: $start_time) TCP and/or UDP\n";
-                               	print EMAILALERT "Total number of packets:    $Scan_href->{$srcip}->{$dstip}->{'ABSNUM'}\n";
-                               	print EMAILALERT "Start time:                 $start_time\n";
-                               	print EMAILALERT "End time:                   $end_time\n";
-                               	print EMAILALERT "Danger level:               $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} out of 5\n";
-                               	print EMAILALERT "DNS info:                   $dnsstring\n" unless $dnslookups;
+				print EMAILALERT "Source:                      $srcip\n";
+				print EMAILALERT "Destination:                 $dstip\n";
+				print EMAILALERT "Newly scanned TCP ports:     [$tcp_newrange]  (since: $tcp_new_start_time)\n" if $tcp;
+				print EMAILALERT "Newly Blocked TCP packets:   [$tcp_new_num_pkts] (since: $tcp_new_start_time)\n" if $tcp;
+				if (@tcp_flags) {
+					print EMAILALERT $_ for (@tcp_flags);
+				}
+				print EMAILALERT "Newly scanned UDP ports:     [$udp_newrange]  (since: $udp_new_start_time)\n" if $udp;
+				print EMAILALERT "Newly Blocked UDP packets    [$udp_new_num_pkts] (since: $udp_new_start_time)\n" if $udp;
+				print EMAILALERT "Newly Blocked ICMP packets:  [$icmp_num_packets] (since: $icmp_new_start_time)\n" if $icmp;
+				print EMAILALERT "Complete port range:         [$range]  (since: $start_time) TCP and/or UDP\n" unless $icmp;
+				print EMAILALERT "Total blocked packets:       $Scan_href->{$srcip}->{$dstip}->{'ABSNUM'}\n";
+				print EMAILALERT "Start time:                  $start_time\n";
+				print EMAILALERT "End time:                    $end_time\n";
+				print EMAILALERT "Danger level:                $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} out of 5\n";
+				print EMAILALERT "DNS info:                    $dnsstring\n" unless $dnslookups;
 
 				### write a syslog message
 #				openlog("psad", "ndelay", "daemon");
@@ -963,93 +1138,79 @@ sub scan_logr() {
 				if ($DEBUG) {
 					print STDOUT "scan_logr(): printing email..................\n";
 					print STDOUT "     $time: Portscan Detected by psad (pid $$) on $HOSTNAME.\n";
-                                       	print STDOUT "     Source:                   $srcip\n";
-                                       	print STDOUT "     Destination:              $dstip\n";
-					print STDOUT "     Newly scanned TCP ports:  [$tcp_newrange]  (since: $tcp_new_start_time)\n" if ($tcp);
-					print STDOUT "     Newly scanned UDP ports:  [$udp_newrange]  (since: $udp_new_start_time)\n" if ($udp);
-                                       	print STDOUT "     Complete port range:      [$range]  (since: $start_time) TCP and/or UDP\n";
-                                       	print STDOUT "     Total number of packets:  $Scan_href->{$srcip}->{$dstip}->{'ABSNUM'}\n";
-                                       	print STDOUT "     Start time:               $start_time\n";
-                                       	print STDOUT "     End time:                 $end_time\n";
-                                       	print STDOUT "     Danger level:             $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} out of 5\n";
-                                       	print STDOUT "     DNS info:                 $dnsstring\n" unless $dnslookups;
+					print STDOUT "     Source:                   $srcip\n";
+					print STDOUT "     Destination:              $dstip\n";
+					print STDOUT "     Newly scanned TCP ports:  [$tcp_newrange]  (since: $tcp_new_start_time)\n" if $tcp;
+					print STDOUT "     Blocked TCP packets       [$tcp_new_num_pkts] (since: $tcp_new_start_time)\n" if $tcp;
+					if (@tcp_flags) {
+						print STDOUT $_ for (@tcp_flags);
+					}
+					print STDOUT "     Newly scanned UDP ports:  [$udp_newrange]  (since: $udp_new_start_time)\n" if $udp;
+					print STDOUT "     Blocked UDP packets       [$udp_new_num_pkts] (since: $udp_new_start_time)\n" if $udp;
+					print STDOUT "     Blocked ICMP packets:     [$icmp_num_packets] (since: $icmp_new_start_time)\n" if $icmp;
+					print STDOUT "     Complete port range:      [$range]  (since: $start_time) TCP and/or UDP\n" unless $icmp;
+					print STDOUT "     Total number of packets:  $Scan_href->{$srcip}->{$dstip}->{'ABSNUM'}\n";
+					print STDOUT "     Start time:               $start_time\n";
+					print STDOUT "     End time:                 $end_time\n";
+					print STDOUT "     Danger level:             $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} out of 5\n";
+					print STDOUT "     DNS info:                 $dnsstring\n" unless $dnslookups;
 				}
 				if ($USE_IPTABLES) {
-					my $i = 0;
-					SIGS: for my $p ($tcp, $udp) {
-						my $proto;
-						next SIGS unless $p;
-						if ($p && $i == 0) {
-							$proto = "TCP";
-						} elsif ($p && $i == 1) {
-							$proto = "UDP";
-						}
-						if ($proto eq "TCP") {  # print tcp flags
-							for my $flags (keys %{$Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'FLAGS'}}) {
-								my $nmapOpts = 0;
-								$nmapOpts = "-sT or -sS" if ($flags eq "SYN");
-								$nmapOpts = "-sF" if ($flags eq "FIN");
-								$nmapOpts = "-sX" if ($flags eq "URG PSH FIN"); 
-								$nmapOpts = "-O" if ($flags eq "URG PSH SYN FIN");
-								if ($nmapOpts) {
-									$flags_mesg = "TCP flags:                  [$flags: $Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'FLAGS'}->{$flags} packets]  Nmap: [$nmapOpts]";
-									print $hndl "$flags_mesg\n";
-									print EMAILALERT "$flags_mesg\n";
-								} else {
-									$flags_mesg = "TCP flags:                  [$flags: $Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'FLAGS'}->{$flags} packets]";
-									print $hndl "$flags_mesg\n";
-									print EMAILALERT "$flags_mesg\n";
-								}
-							}
-						}
-						if (defined $Scan_href->{$srcip}->{$dstip}->{$proto}->{'CURRENT_SIGMATCH_START_TIME'}) {
+					SIGS: for my $proto ("TCP", "UDP", "ICMP") {
+						if (defined $Scan_href->{$srcip}->{$dstip}->{$proto}->{'CURRENT_SIGMATCH'}) {
+							my $sig_start_time = $tcp_new_start_time;
 							print $hndl "\n";
 							print EMAILALERT "\n";
-							print $hndl "=-=-= $proto alert signatures found since [$Scan_href->{$srcip}->{$dstip}->{$proto}->{'CURRENT_SIGMATCH_START_TIME'}]\n";
-							print EMAILALERT "=-=-= $proto alert signatures found since [$Scan_href->{$srcip}->{$dstip}->{$proto}->{'CURRENT_SIGMATCH_START_TIME'}]\n";
+							print $hndl "=-=-= $proto alert signatures found since [$sig_start_time]\n";
+							print EMAILALERT "=-=-= $proto alert signatures found since [$sig_start_time]\n";
 							for my $sigmatch (keys %{$Scan_href->{$srcip}->{$dstip}->{$proto}->{'CURRENT_SIGMATCH'}}) {
-                                        	        	print $hndl "$sigmatch  Packets=$Scan_href->{$srcip}->{$dstip}->{$proto}->{'CURRENT_SIGMATCH'}->{$sigmatch}\n";
-                                                		print EMAILALERT "$sigmatch  Packets=$Scan_href->{$srcip}->{$dstip}->{$proto}->{'CURRENT_SIGMATCH'}->{$sigmatch}\n";
-	                                        	}
-							undef $Scan_href->{$srcip}->{$dstip}->{$proto}->{'CURRENT_SIGMATCH_START_TIME'};
+								next if ($sigmatch eq "PACKETS" || $sigmatch eq "START_TIME");
+								my $sig_num_packets = $Scan_href->{$srcip}->{$dstip}->{$proto}->{'CURRENT_SIGMATCH'}->{$sigmatch};
+								print $hndl "$sigmatch  Packets=$sig_num_packets\n";
+								print EMAILALERT "$sigmatch  Packets=$sig_num_packets\n";
+							}
+							### need to undef the current interval so it won't show up in the next alert
 							undef $Scan_href->{$srcip}->{$dstip}->{$proto}->{'CURRENT_SIGMATCH'};
 						}
 						if (defined $Scan_href->{$srcip}->{$dstip}->{$proto}->{'SIGMATCH'} && $show_all_signatures eq "Y") {
 							print $hndl "\n";
-                                        		print EMAILALERT "\n";
+							print EMAILALERT "\n";
 							print $hndl "=-=-= ALL $proto alert signatures found since [$start_time]\n";
-        	                                	print EMAILALERT "=-=-= ALL $proto alert signatures found since [$start_time]\n";
+							print EMAILALERT "=-=-= ALL $proto alert signatures found since [$start_time]\n";
 							for my $sigmatch (keys %{$Scan_href->{$srcip}->{$dstip}->{$proto}->{'SIGMATCH'}}) {
-								print $hndl "$sigmatch  Packets=$Scan_href->{$srcip}->{$dstip}->{$proto}->{'SIGMATCH'}->{$sigmatch}\n";
-								print EMAILALERT "$sigmatch  Packets=$Scan_href->{$srcip}->{$dstip}->{$proto}->{'SIGMATCH'}->{$sigmatch}\n";
+								my $sig_num_packets = $Scan_href->{$srcip}->{$dstip}->{$proto}->{'SIGMATCH'}->{$sigmatch};
+								print $hndl "$sigmatch  Packets=$sig_num_packets\n";
+								print EMAILALERT "$sigmatch  Packets=$sig_num_packets\n";
 							}
 						}
-						$i++;
 					}
 				} else {
-					$flags_mesg = 0;
+					$flags_msg = 0;
 				}
-                                unless ($whoislookups) {
-                                        print $hndl "\n\n";
-                                        print $hndl "   =-=-=-=-=-=-= Whois Information: =-=-=-=-=-=-=\n";
-                                        print EMAILALERT "\n\n";
-                                        print EMAILALERT "   =-=-=-=-=-=-= Whois Information =-=-=-=-=-=-=\n";
-                                        print $hndl $_ for (@$whois_info_aref);
-                                        print EMAILALERT $_ for (@$whois_info_aref);
-                                        print $hndl "\n";
-                                        print EMAILALERT "\n";
-                                }
-                                if ($USE_IPCHAINS) {
+				unless ($whoislookups) {
+					print $hndl "\n\n";
+					print $hndl "   =-=-=-=-=-=-= Whois Information: =-=-=-=-=-=-=\n";
+					print EMAILALERT "\n\n";
+					print EMAILALERT "   =-=-=-=-=-=-= Whois Information =-=-=-=-=-=-=\n";
+					print $hndl $_ for (@$whois_info_aref);
+					print EMAILALERT $_ for (@$whois_info_aref);
+					print $hndl "\n";
+					print EMAILALERT "\n";
+				}
+				if ($USE_IPCHAINS) {
 					&markerline($hndl);
 					&markerline("EMAILALERT");
-                                }
+				}
 				&markerline("EMAILALERT");
-                                close EMAILALERT;
-                                if ($Scan_href->{$srcip}->{$dstip}->{'ALERTED'} eq "N" && $current_danger_level >= $EMAIL_ALERT_DANGER_LEVEL) {
-                                        $Scan_href = &send_email_alert($Scan_href, $srcip, $dstip, $flags_mesg, $email_alertfile, $email_addresses_aref, $Cmds_href);
-                                }
-                                $Scan_href->{$srcip}->{$dstip}->{'LOGR'} = "N";
+				close EMAILALERT;
+				if ($Scan_href->{$srcip}->{$dstip}->{'ALERTED'} eq "N" && $current_danger_level
+											>= $EMAIL_ALERT_DANGER_LEVEL) {
+					$Scan_href = &send_email_alert($Scan_href, $srcip, $dstip, $flags_msg,
+								$email_alertfile, $email_addresses_aref, $Cmds_href);
+				}
 				&markerline($hndl);
+				$Scan_href->{$srcip}->{$dstip}->{'LOGR'} = "N";
+				$Scan_href->{$srcip}->{$dstip}->{'EMAIL_LIMIT'}++;
 			}
 		}
 	}
@@ -1057,58 +1218,65 @@ sub scan_logr() {
 	return $Scan_href;
 }
 sub auto_psad_response(){
-        my ($Scan_href, $auto_psad_level, $Cmds_href, $email_addresses_aref) = @_;
+	my ($Scan_href, $auto_psad_level, $Cmds_href, $email_addresses_aref) = @_;
 	SOURCEIP: for my $srcip (keys %$Scan_href) {
 		for my $dstip (keys %{$Scan_href->{$srcip}}) {
 			my $current_danger_level = $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'};
 			### We only want to block the IP once.  Currently this will block all traffic from the host to _all_ destinations
 			### that are protected by the firewall if the ip trips the $auto_psad_level threshold for _any_ destination. 
-        		if ($current_danger_level >= $auto_psad_level && !(defined $Scan_href->{$srcip}->{$dstip}->{'BLOCKED'})) {
-                		if ($USE_IPCHAINS) {
-                        		my @chains = &get_input_chains($Cmds_href->{'ipchains'});
-                        		for my $inchain (@chains) {
-                                		`$Cmds_href->{'ipchains'} -I $inchain 1 -s $srcip -l -j DENY`;
-                        		}
+			if ($current_danger_level >= $auto_psad_level && !(defined $Scan_href->{$srcip}->{$dstip}->{'BLOCKED'})) {
+				if ($USE_IPCHAINS) {
+					my @chains = &get_input_chains($Cmds_href->{'ipchains'});
+					for my $inchain (@chains) {
+						`$Cmds_href->{'ipchains'} -I $inchain 1 -s $srcip -l -j DENY`;
+					}
 					for my $dst (keys %{$Scan_href->{$srcip}}) {
 						$Scan_href->{$srcip}->{$dst}->{'BLOCKED'} = "Y";
 					}
-                			for my $email_address (@$email_addresses_aref) {
-                        			system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $srcip has been BLOCKED on $HOSTNAME\" < /dev/null";
-                			}
-					next SOURCEIP; 
-                		} elsif ($USE_IPTABLES) {
-                        		my @chains = &get_input_chains($Cmds_href->{'iptables'});
-                        		for my $inchain (@chains) {
-                                		`$Cmds_href->{'iptables'} -I $inchain 1 -s $srcip -j DROP`;
-                        		}
+					for my $email_address (@$email_addresses_aref) {
+						system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $srcip has been BLOCKED on $HOSTNAME\" < /dev/null";
+					}
+					next SOURCEIP;
+				} elsif ($USE_IPTABLES) {
+					my @chains = &get_input_chains($Cmds_href->{'iptables'});
+					for my $inchain (@chains) {
+						`$Cmds_href->{'iptables'} -I $inchain 1 -s $srcip -j DROP`;
+					}
 					for my $dst (keys %{$Scan_href->{$srcip}}) {
-                                                $Scan_href->{$srcip}->{$dst}->{'BLOCKED'} = "Y";
-                                        }
-                                        for my $email_address (@$email_addresses_aref) {
-                                                system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $srcip has been BLOCKED on $HOSTNAME\" < /dev/null";
-                                        }
-                                        next SOURCEIP;
-                		}
+						$Scan_href->{$srcip}->{$dst}->{'BLOCKED'} = "Y";
+					}
+					for my $email_address (@$email_addresses_aref) {
+						system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $srcip has been BLOCKED on $HOSTNAME\" < /dev/null";
+					}
+					next SOURCEIP;
+				}
 			}
 		}
-        }
+	}
 	return $Scan_href;
+}
+sub email_limit_reached() {
+	my ($email_addresses_aref, $srcip, $Cmds_href) = @_;
+	for my $email_address (@$email_addresses_aref) {
+		system "$Cmds_href->{'mail'} $email_address -s \"psad: Email message limit for $srcip has been reached!!!\" < /dev/null";
+	}
+	return;
 }
 sub get_input_chains() {
 	my $fwCmd = shift;
-        my @rules;
-        my @chains;
-        @rules = `$fwCmd -L`;
-        for my $r (@rules) {
-                next unless ($r =~ /Chain/);
-                my ($cname) = ($r =~ /Chain\s(\w+)/);
-                next unless ($cname =~ /in/i);  # we don't have an input chain
-                push @chains, $cname;
-        }
-        return @chains;
+	my @rules;
+	my @chains;
+	@rules = `$fwCmd -L`;
+	for my $r (@rules) {
+		next unless ($r =~ /Chain/);
+		my ($cname) = ($r =~ /Chain\s(\w+)/);
+		next unless ($cname =~ /in/i);  # we don't have an input chain
+		push @chains, $cname;
+	}
+	return @chains;
 }
 sub send_email_alert() {
-        my ($Scan_href, $srcip, $dstip, $flags_mesg, $email_alertfile, $email_addresses_aref, $Cmds_href) = @_;
+	my ($Scan_href, $srcip, $dstip, $flags_msg, $email_alertfile, $email_addresses_aref, $Cmds_href) = @_;
 	for my $email_address (@$email_addresses_aref) {
 		print "send_email_alert(): sending scan alert email to: $email_address\n" if $DEBUG;
 		system("$Cmds_href->{'mail'} $email_address -s \"psad WARNING: $HOSTNAME has been scanned!\" < $email_alertfile");
@@ -1134,8 +1302,8 @@ sub check_fw() {
 }
 sub get_local_ips() {
 	my $Cmds_href = shift;
-        my %localips;
-        my @ips = `$Cmds_href->{'ifconfig'} -a |$Cmds_href->{'grep'} inet`;
+	my %localips;
+	my @ips = `$Cmds_href->{'ifconfig'} -a |$Cmds_href->{'grep'} inet`;
 	for my $iptmp (@ips) {
 		my $ip = (split /:/, (split /\s+/, $iptmp)[2])[1];
 		$localips{$ip} = "";
@@ -1222,18 +1390,18 @@ sub kill_psad() {
 }
 sub restart_psad() {
 	my ($pidfiles_aref, $cmdline_file, $Cmds_href) = @_;
-        my $cmdline;
-        if (-e $cmdline_file) {
-                open CMD, "< $cmdline_file";
-                $cmdline = <CMD>;
-                close CMD;
-                chomp $cmdline;
-        } else {
-                die "@@@@@  psad:  No other psad process is currently running on $HOSTNAME!\n";
-        }
-        &kill_psad($pidfiles_aref);
-        print " ----  Restarting the psad daemons on $HOSTNAME.  ----\n";
-        system "$Cmds_href->{'psad'} $cmdline";
+	my $cmdline;
+	if (-e $cmdline_file) {
+		open CMD, "< $cmdline_file";
+		$cmdline = <CMD>;
+		close CMD;
+		chomp $cmdline;
+	} else {
+		die "@@@@@  psad:  No other psad process is currently running on $HOSTNAME!\n";
+	}
+	&kill_psad($pidfiles_aref);
+	print " ----  Restarting the psad daemons on $HOSTNAME.  ----\n";
+	system "$Cmds_href->{'psad'} $cmdline";
 	return;
 }
 sub psad_status() {

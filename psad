@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -w 
 #
 # Description: Port Scan Attack Detector (psad)
 # - uses ipchains/iptables logs.  Uses input from /var/log/psad/fwdata 
@@ -76,7 +76,8 @@ use autouse 'Data::Dumper' => "Dumper";  ### this one is not used very much so d
 use autouse 'Socket';       ### not used until a scan is detected so don't load until it is needed
 use Sys::Hostname "hostname";
 # use Sys::Syslog qw(openlog syslog closelog);   ### this does not seem to play nice with perl-5.005_03
-use POSIX "setsid";
+# use POSIX qw(:signal_h :errno_h :sys_wait_h setsid);
+use POSIX;
 # use strict;
 ### psad does not yet support 'strict refs' since several hashes have $hsh{key} = "someval" and $hsh{key1}{key2} = "anotherval"... should probably fix this.
 # no strict "refs";
@@ -256,9 +257,6 @@ my $local_ips_href = &get_local_ips(\%Cmds);
 ### disable whois lookups if for some reason the whois client that is bundled with psad can't be found
 $whoislookups = 1 if ($Cmds{'whois'} !~ /psad/); 
 
-### install signal handler for debugging %Scan with Data::Dumper
-$SIG{USR1} = \&print_scan;
-
 ### if psad is running on a syslog server, don't check the firewall rules since they may not be local.
 unless ($fwcheck || $Syslog_server) {
 	unlink "/var/log/psad/fw_check.txt";
@@ -314,6 +312,10 @@ if ($auto_ips) {  # support automatic ip danger level increases/decreases.
 } else {
 	$Auto_ips_href = 0;
 }
+
+### install signal handlers for debugging %Scan with Data::Dumper, and for reaping zombie whois processes
+$SIG{'USR1'} = \&print_scan;
+$SIG{'CHLD'} = \&REAPER;
 
 ### initialize fwdata_start_lines
 my $fwdata_start_lines = (split /\s+/, `$Cmds{'wc'} -l $FW_DATA`)[1];
@@ -1123,6 +1125,7 @@ sub get_listening_ports() {
 sub get_whois_data() {
 	my ($whois_timeout, $ip, $Cmds_href) = @_;
 	my @whois_data;
+	$whois_timeout = 1;
 	eval {
 		local $SIG{'ALRM'} = sub {die "alarm\n"};
 		alarm $whois_timeout;
@@ -1137,6 +1140,19 @@ sub get_whois_data() {
 	} else {
 		return \@whois_data;
 	}
+}
+sub REAPER {
+	my $pid;
+	$pid = waitpid(-1, &WNOHANG);
+#	if ($pid == -1) {
+		### ignore
+#	} elsif (WIFEXITED($?)) {
+#		print "@@@@@  Process $pid exited.\n";
+#	} else {
+#		print "@@@@@  False alarm on $pid.\n";
+#	}
+	$SIG{'CHLD'} = \&REAPER;
+	return;
 }
 sub check_permissions() {
 	my @files = @_;
@@ -1226,8 +1242,13 @@ sub psad_usr1() {
 		if (kill 0, $pid) {  ### make sure psad is actually running
 			if (kill USR1, $pid) {
 				$rv = 1;
+				open U, "< /var/log/psad/scan_hash.${pid}" 
+				or print "@@@@@  Sent psad pid $pid a USR1 signal, but could not open\n" . 
+					 "\"/var/log/psad/scan_hash.${pid}\n\"" and return $rv;
+				print while(<U>);
+				close U;
 			} else {
-				print "@@@@@  Counld not send psad the USR1 signal on $HOSTNAME\n";
+				print "@@@@@  Could not send psad the USR1 signal on $HOSTNAME\n";
 			}
 		} else {
 			print " ----  psad is not currently running on $HOSTNAME  ----\n";
@@ -1249,7 +1270,7 @@ Version: $VERSION
 By Michael B. Rash (mbr\@cipherdyne.com, http://www.cipherdyne.com)
 
 USAGE: psad [-D] [-d] [-o] [-e] [-L] [-f] [-r] [-w] [-l] [-i <interval>] [-h]
-       [-V] [-K] [-R] [-S] [-c <config file>] [-s <signature file>] 
+       [-V] [-K] [-R] [-U] [-S] [-c <config file>] [-s <signature file>] 
        [-a <auto ips file>]
 
 OPTIONS:
@@ -1281,6 +1302,8 @@ OPTIONS:
 	-R   --Restart			- restart all running psad processes.
 	-S   --Status			- displays the status of any
 					  currently running psad processes.
+	-U   --USR1			- send a running psad process a USR1
+					  signal.
 	-V   --Version			- print the psad version and exit.
         -h   --help                     - prints this help message.
 

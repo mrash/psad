@@ -2996,7 +2996,7 @@ sub scan_logr() {
                 "icmp=$icmp_newpkts dangerlevel: $curr_dl");
 
             unless ($no_whois) {
-                print $fh  "\n[*] Whois Information:\n";
+                print $fh  "\n[+] Whois Information:\n";
                 for my $line (@$whois_info_aref) {
                     print $fh $line;
                 }
@@ -3058,8 +3058,8 @@ sub scan_logr_signatures() {
             or defined $scan{$src}{$dst}{$proto}{'sid'}
             or defined $scan{$src}{$dst}{$proto}{'invalid_type'}
             or defined $scan{$src}{$dst}{$proto}{'invalid_code'});
-        print $email_fh "\n\n[*] $proto scan signatures:\n\n";
-        print LS "\n\n[*] $proto scan signatures\n\n";
+        print $email_fh "\n\n[+] $proto scan signatures:\n\n";
+        print LS "\n\n[+] $proto scan signatures\n\n";
         print STDERR "[+] scan_logr_signatures(): src: $src dst: $dst ",
             "proto: $proto\n" if $debug;
         for my $sid (keys %{$scan{$src}{$dst}{$proto}{'sid'}}) {
@@ -3350,7 +3350,7 @@ sub flush_auto_blocked_ips() {
         $found_blocked = 1;
     }
     unless ($found_blocked) {
-        print "[*] Currently there are no auto-generated ".
+        print "[-] Currently there are no auto-generated ".
             "block rules in effect.\n";
     }
     exit $found_blocked;
@@ -3757,11 +3757,11 @@ sub print_scan() {  ### this should primarily be used for debugging
     my $scanfile = "$config{'PRINT_SCAN_HASH'}.$$";
     open PSCAN, "> $scanfile" or warn '[-] Could not open ',
         "$scanfile: $!" and return;
-    print PSCAN "[*] Passive OS fingerprinting hash:\n";
+    print PSCAN "[+] Passive OS fingerprinting hash:\n";
     print PSCAN Dumper \%posf;
-    print PSCAN "[*] Scan danger level hash:\n";
+    print PSCAN "[+] Scan danger level hash:\n";
     print PSCAN Dumper %scan_dl;
-    print PSCAN "[*] Main scan hash:\n";
+    print PSCAN "[+] Main scan hash:\n";
     print PSCAN Dumper \%scan;
     close PSCAN;
     chmod 0600, $scanfile;
@@ -3873,19 +3873,6 @@ sub REAPER {
     return;
 }
 
-sub file_permissions() {
-    my $file = shift;
-    if (-e $file) {
-        chmod 0600, $file;
-    } else {
-        open T, "> $file" or die '[*] Could not open ',
-            "$file: $!";
-        close T;
-        chmod 0600, $file;
-    }
-    return;
-}
-
 sub stop_psad() {
     my $rv = 0;
 
@@ -3908,12 +3895,12 @@ sub stop_psad() {
                     $rv = 1;
                 }
             } else {
-                print "[*] psad: $pidname is not running on ",
+                print "[-] psad: $pidname is not running on ",
                     "$config{'HOSTNAME'}\n";
                 $rv = 1;
             }
         } else {
-            print "[*] psad: pid file $pidfile does not exist for ",
+            print "[-] psad: pid file $pidfile does not exist for ",
                 "$pidname on $config{'HOSTNAME'}\n";
             $rv = 1;
         }
@@ -4024,11 +4011,11 @@ sub status() {
                 print "\n";
                 $rv = 1;
             } else {
-                print "[*] psad: $pidname is not running on ",
+                print "[-] psad: $pidname is not running on ",
                     "$config{'HOSTNAME'}\n";
             }
         } else {
-            print "[*] psad: pid file $pidfile does not exist for ",
+            print "[-] psad: pid file $pidfile does not exist for ",
                 "$pidname on $config{'HOSTNAME'}\n";
         }
     }
@@ -4595,7 +4582,7 @@ sub usr1() {
                     "$config{'HOSTNAME'}\n";
             }
         } else {
-            print "[*] psad is not running on $config{'HOSTNAME'}\n";
+            print "[-] psad is not running on $config{'HOSTNAME'}\n";
         }
     }
     return $rv;
@@ -4623,7 +4610,7 @@ sub hup() {
                 $rv = 1;
             }
         } else {
-            print "[*] $pidname daemon not running.\n";
+            print "[-] $pidname daemon not running.\n";
             $rv = 1;
         }
     }
@@ -4715,7 +4702,7 @@ sub archive_data() {
 
 sub check_old_cmdargs() {
     if ($oldarg_snort_sids) {
-        print "[*] The --snort-sids capability is enabled by\n",
+        print "[-] The --snort-sids capability is enabled by\n",
             "default (see the --no-snort-sids option).\n";
         &usage(1);
     }
@@ -4781,6 +4768,9 @@ sub handle_cmdline() {
 }
 
 sub setup() {
+
+    ### set umask to -rw-------
+    umask 0077;
 
     ### turn off buffering
     $| = 1;
@@ -4976,8 +4966,14 @@ sub setup() {
     }
 
     ### make sure the permissions on these files is 0600
-    &file_permissions($config{'FW_DATA_FILE'});
-    &file_permissions($config{'FW_ERROR_LOG'});
+    for my $file ($config{'FW_DATA_FILE'}, $config{'FW_ERROR_LOG'}) {
+        unless (-e $config{'FW_DATA_FILE'}) {
+            open F, "> $config{'FW_DATA_FILE'}" or die "[*] Could not open ",
+                "$config{'FW_DATA_FILE'}: $!";
+            close F;
+        }
+        chmod 0600, $config{'FW_DATA_FILE'};
+    }
 
     ### set the /var/log/messages file as the default file to
     ### analyze if we are in --Analyze mode.

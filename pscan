@@ -1,41 +1,56 @@
 #!/usr/bin/perl -w
-
-# pscan: perl scan, lightweight port scanner.  Simply tries to
-# open a socket to each of the ports in the range specified on
-# the command line.  You do not need to be root to execute this
-# script.  This script is only meant to assist in troubleshooting
-# psad if another more worthy port scanner has not already been
-# installed.  If you want a real port scanner, then download
-# nmap.
+#
+#####################################################################
+#
+# File: pscan; perl scan, lightweight port scanner.
+#
+# Purpose: Simply tries to open a socket to each of the ports in the
+#          range specified on the command line.  You do not need to
+#          be root to execute this script.  This script is only meant
+#          to assist in troubleshooting psad if another more worthy
+#          port scanner has not already been installed.  If you want
+#          a real port scanner, then download nmap.  :)
 #
 # TODO:
-#   - use alarms to avoid hanging on closed ports
-#   - use the libnet module generate packets?
+#   - use alarms to avoid hanging on filtered ports
+#   - use the libnet module to generate packets?
 #   - multithread?
+#
+#####################################################################
+#
+# $Id$
+#
 
 use Socket;
 use Getopt::Long;
 use strict;
 
-usage_and_exit(1) unless (GetOptions (
+my $help = 0;
+my $ipaddress;
+my $start_port;
+my $end_port;
+
+&usage_and_exit(1) unless (GetOptions (
     'help'        => \$help,
     'ipaddress=s' => \$ipaddress,
     'startport=s' => \$start_port,
     'endport=s'   => \$end_port
 ));
-usage_and_exit(0) if ($help);
+&usage_and_exit(0) if ($help);
 
 if ($ipaddress && $start_port && $end_port) {
     my @closed_ports;
     my @open_ports;
 
-    my $ipaddr = inet_aton $ipaddress or die "Could not get ip address for host: $ipaddress\n";
+    my $ipaddr = inet_aton $ipaddress or die "Could not get ip " .
+        "address for host: $ipaddress\n";
     my $protocol = getprotobyname 'tcp';
     my $timeout = 5;
     print "Scanning: $ipaddress\n";
     my $i = $start_port;
     while ($i <= $end_port) {
-        socket SCAN, PF_INET, SOCK_STREAM, $protocol or die "Could not open socket: $!\n";
+        socket SCAN, PF_INET, SOCK_STREAM, $protocol
+            or die "Could not open socket: $!\n";
         my $test = connect SCAN, sockaddr_in($i, $ipaddr);
         if (! $test) {
             push @closed_ports, $i;
@@ -52,11 +67,12 @@ if ($ipaddress && $start_port && $end_port) {
     if ($#closed_ports == ($end_port - $start_port)) {
         print "All $#closed_ports ports are closed\n";
     } else {
-        print "The remaining $#closed_ports ports are closed\n" if ($#closed_ports > 0); 
+        print "The remaining $#closed_ports ports are closed\n"
+            if ($#closed_ports > 0);
     }
     exit 0;
 } else {
-    usage_and_exit(1);
+    &usage_and_exit(1);
 }
 
 sub usage_and_exit() {

@@ -496,6 +496,16 @@ contained in the HOME_NET variable should be directly connected to the
 machine that is running psad.
 .TP
 
+.BR IMPORT_OLD_SCANS
+Preserve scan data across restarts of
+.B psad
+or even across reboots of the machine.  This is accomplished by importing
+the data contained in the filesystem cache psad writes to during normal
+operation back into memory as psad is started.  The filesystem cache data
+in contained within the directory
+.B /var/log/psad.
+.TP
+
 .BR FW_SEARCH_ALL
 Defines the search mode
 .B psad
@@ -528,7 +538,6 @@ and
 so it lives in the file
 .B /etc/psad/fw_search.conf.
 .TP
-
 
 .BR ENABLE_PERSISTENCE
 If "Y", psad will keep all scans in memory and not let them timeout.
@@ -661,6 +670,10 @@ level assignments are enabled by default without having to specify any
 command line arguments (best for most situations):
 
 .B # psad
+
+Same as above, but this time we use the init script to start psad:
+
+.B # /etc/init.d/psad start
 
 Use psad as a forensics tool to analyze an old iptables logfile (psad defaults
 to analyzing the

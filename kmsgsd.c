@@ -150,15 +150,16 @@ int main(int argc, char *argv[]) {
             /* clear the signal flag */
             received_sighup = 0;
 
+            /* re-parse the config file after receiving HUP signal */
+            parse_config(config_file, psadfifo_file,
+                fwdata_file, fw_msg_search, snort_sid_str, kmsgsd_pid_file);
+
             /* close file descriptors and re-open them after
              * re-reading config file */
             close(fifo_fd);
             close(fwdata_fd);
 
-            /* re-parse the config file after receiving HUP signal */
-            parse_config(config_file, psadfifo_file,
-                fwdata_file, fw_msg_search, snort_sid_str, kmsgsd_pid_file);
-
+            /* re-open psadfifo and fwdata files */
             if ((fifo_fd = open(psadfifo_file, O_RDONLY)) < 0) {
                 perror(" ** Could not open psadfifo");
                 exit(EXIT_FAILURE);  /* could not open psadfifo named pipe */

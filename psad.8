@@ -100,6 +100,12 @@ can be made to psad_auto_ips (installed by default in /etc/psad)
 and psad will import them without having to restart the psad process.
 .TP
 
+.BR \-F ", " \-\^\-Flush
+Remove any auto-generated firewall block rules if psad was configured
+to automatically respond to scans (see the ENABLE_AUTO_IDS variable
+in psad.conf).
+.TP
+
 .BR \-S ", " \-\^\-Status
 Display the status of any psad processes that may or not be running.
 The status output contains a listing of the number of packets that

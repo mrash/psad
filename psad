@@ -332,8 +332,8 @@ if ($Config{'ENABLE_AUTO_IDS'}) {
     &check_auto_blocked();
 }
 
-### archive old firewall data
-&archive_fwdata();
+### archive old firewall and scan data
+&archive_data();
 
 ### Install signal handlers for debugging %Scan with Data::Dumper,
 ### and for reaping zombie whois processes
@@ -1827,9 +1827,38 @@ sub psad_usr1() {
     exit $rv;
 }
 
-sub archive_fwdata() {
+sub archive_data() {
+    chdir $Config{'PSAD_DIR'} or die " ... @@@ Could not chdir " .
+        "$Config{'PSAD_DIR'}: $!";
+    unless (-d $Config{'SCAN_DATA_ARCHIVE_DIR'}) {
+        mkdir $Config{'SCAN_DATA_ARCHIVE_DIR'} or die " ... @@@ Could not " .
+            "create dir: $Config{'SCAN_DATA_ARCHIVE_DIR'}: $!";
+    }
+
+    ### archive all of the old ip address directories since
+    ### we are restarting psad (should add a way to import
+    ### these directories back into memory)
+    opendir D, $Config{'PSAD_DIR'} or die " ... @@@ Could not open dir: " .
+        "$Config{'PSAD_DIR'}: $!";
+    my @files = readdir D;
+    closedir D;
+    shift @files; shift @files;
+
+    for my $file (@files) {
+        if ($file =~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/ && -d $file) {
+            ### $file is an old scaning ip from a previous psad execution
+            my $old_ipdir     = $file;
+            my $archive_ipdir = "$Config{'SCAN_DATA_ARCHIVE_DIR'}/$old_ipdir";
+            if (-d $archive_ipdir) {
+                rmtree $archive_ipdir;
+            }
+            move $old_ipdir, $archive_ipdir;
+        }
+    }
+
+    ### archive the fwdata file
     my $fwdata    = $Config{'FW_DATA'};
-    my $fwarchive = $Config{'FW_DATA_ARCHIVE'};
+    my $fwarchive = "$Config{'SCAN_DATA_ARCHIVE_DIR'}/fwdata_archive";
     ### first see how big the archive file is and zero out if
     ### it is larger than about 10,000 lines
     if (-e $fwarchive) {
@@ -1901,7 +1930,7 @@ sub check_config() {
         IPTABLES_BLOCK_METHOD IPCHAINS_BLOCK_METHOD
         TCPWRAPPERS_BLOCK_METHOD EMAIL_ALERT_DANGER_LEVEL
         PSAD_FIFO WHOIS_THRESHOLD WHOIS_TIMEOUT
-        PACKET_COUNTER_FILE
+        PACKET_COUNTER_FILE  SCAN_DATA_ARCHIVE_DIR
     );
     &Psad::validate_config($CONFIG_FILE, \@required_vars, $Config_href);
     return;

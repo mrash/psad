@@ -93,3 +93,8 @@ Ugo Viti                Discovered bug in auto-blocking code where the
                         adding the FORWARD chain to the auto blocking
                         code.  Found bug for email alert being reached
                         prematurely.
+
+Leif Westlye            Discovered a bug where psad would not allow
+                        commands to be different than the <cmd>Cmd name.
+                        The bugfix allows someone to specify
+                        "/usr/bin/mailto" for the mailCmd for example.

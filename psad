@@ -281,6 +281,7 @@ my $status_ip        = '';
 my $benchmark        = 0;
 my $b_packets        = 0;
 my $usr1             = 0;
+my $hup              = 0;
 my $usr1_flag        = 0;
 my $hup_flag         = 0;
 my $ver              = 0;
@@ -372,6 +373,8 @@ Getopt::Long::Configure('no_ignore_case');
                                               # in benchmark test.
     'USR1'              => \$usr1,            # Send an existing psad process a
                                               # USR1 signal (useful for debugging).
+    'HUP'               => \$hup,             # Send psad processes a HUP signal
+                                              # to re-import config.
     'no-whois'          => \$no_whois,        # Do not issue whois lookups against
     'no-passiveos'      => \$no_posf,         # Do not attempt to passively
                                               # fingerprint the remote OS.
@@ -524,12 +527,6 @@ $SIG{'CHLD'}     = \&REAPER;
 $SIG{'USR1'}     = \&usr1_sig;
 $SIG{'HUP'}      = \&hup_sig;
 
-### Get the mtimes of the signatures and auto ips files.
-#my $sigs_mtime     = stat($config{'PSAD_SIGS_FILE'})->mtime;
-#my $posf_mtime     = stat($config{'PSAD_POSF_FILE'})->mtime;
-#my $auto_ips_mtime = stat($config{'PSAD_AUTO_IPS_FILE'})->mtime;
-#my $config_mtime   = stat($config_file)->mtime;
-
 ### zero out the packet counter file (the counters
 ### are all zero at this point anyway).
 &write_global_packet_counters();
@@ -562,18 +559,22 @@ for (;;) {
     if ($hup_flag) {
         $hup_flag = 0;  ### clear the HUP flag
         ### send email saying we re-imported config and signatures files
-        &Psad::sendmail(" ** psad: re-read config files on $hostname", '',
-            $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+        &Psad::sendmail(" ** psad: re-read config files on $hostname",
+            '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
 
         ### Re-import all used config files (psad.conf, psad_auto_ips,
         ### psad_posf, psad_signatures) if we received a HUP signal.
-        &import_config();
+        &import_configs();
+
+        close FWDATA;
+        open FWDATA, $config{'FW_DATA_FILE'} or die ' ** Could not open ',
+            "$config{'FW_DATA_FILE'}: $!" unless $benchmark;
     }
 
     ### See if we need to print out the %scan datastructure
     ### (we received a USR1 signal)
     if ($usr1_flag) {
-        $usr1_flag = 0;
+        $usr1_flag = 0;  ### clear the USR1 flag
         &print_scan();
     }
 
@@ -1239,6 +1240,9 @@ sub import_configs() {
 
     ### The --USR1 command line switch was given.
     exit &usr1() if $usr1;
+
+    ### The --HUP command line switch was given.
+    exit &hup() if $hup;
 
     ### the --Status command line switch was given
     exit &status() if $status;
@@ -2974,6 +2978,28 @@ sub usr1_sig() {
     return;
 }
 
+sub hup() {
+    my $rv = 0;
+    for my $pidfile (@pidfiles) {
+        open PID, "< $pidfile" or die " ** Could not open $pidfile: $!";
+        my $pid = <PID>;
+        close PID;
+        chomp $pid;
+        if (kill 0, $pid) {
+            if (kill 'HUP', $pid) {
+                print " .. HUP sent to pid $pid for $pidfile.\n";
+            } else {
+                print " ** Could not send $pidfile a HUP signal.\n";
+                $rv = 1;
+            }
+        } else {
+            print " ** Daemon not running for pid file: $pidfile\n";
+            $rv = 1;
+        }
+    }
+    return $rv;
+}
+
 sub hup_sig() {
     $hup_flag = 1;
     return;
@@ -3497,6 +3523,8 @@ Options:
     -U   --USR1                   - Send a running psad process a USR1
                                     signal (generates a dump of psad
                                     data structures on STDOUT).
+    -H   --HUP                    - Send all psad daemons a HUP signal
+                                    to have them re-import configs.
     -V   --Version                - Print the psad version and exit.
 
     --no-signatures               - Disable signature processing.

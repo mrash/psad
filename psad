@@ -203,6 +203,18 @@ print "psad version $VERSION, by Michael B. Rash (mbr\@cipherdyne.com)\n" and ex
 ### everthing after this point must be executed as root.
 $< == 0 && $> == 0 or die "\n@@@@@  (psad): You must be root (or equivalent UID 0 account) to execute psad!  Exiting.\n\n";
 
+### the --Kill command line switch was given
+if ($kill) {
+        kill_psad(\@PIDFILES);
+        exit 0;
+}
+
+### the --Status command line switch was given
+if ($status) {
+        psad_status(\@PIDFILES);
+        exit 0;
+}
+
 my %Cmds = (
         "ipchains"      => $ipchainsCmd,
         "iptables"      => $iptablesCmd,
@@ -223,21 +235,9 @@ my %Cmds = (
 ### check to make sure the commands specified in the config section are in the right place, and attempt to correct automatically if not.
 %Cmds = check_commands(\%Cmds);
 
-### the --Kill command line switch was given
-if ($kill) {
-	kill_psad(\@PIDFILES);
-	exit 0;
-}
-
 ### the --Restart command line switch was given
 if ($restart) {
 	restart_psad(\@PIDFILES, $cmdline_file, \%Cmds);
-	exit 0;
-}
-
-### the --Status command line switch was given
-if ($status) {
-	psad_status(\@PIDFILES);
 	exit 0;
 }
 

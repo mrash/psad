@@ -31,13 +31,13 @@ my $psadCmd = "${INSTALL_DIR}/psad";
 #============ end config ============
 
 ### set the default execution
-$SUB_TAB = "        ";
+$SUB_TAB = "       ";
 my $fwcheck = 0;
 my $execute_psad = 0;
 my $nopreserve = 0;
 my $uninstall = 0;
 
-usage_and_exit(1) unless (GetOptions (
+&usage_and_exit(1) unless (GetOptions (
 	'no_preserve'		=> \$nopreserve,	# don't preserve existing configs
         'firewall_check'	=> \$fwcheck,           # do not check firewall rules
 	'exec_psad'		=> \$execute_psad,
@@ -45,7 +45,7 @@ usage_and_exit(1) unless (GetOptions (
 	'verbose'		=> \$verbose,
         'help'          	=> \$help               # display help
 ));
-usage_and_exit(0) if ($help);
+&usage_and_exit(0) if ($help);
 
 my %Cmds = (
 	"ps"		=> $psCmd,
@@ -61,11 +61,11 @@ my %Cmds = (
 	"psad"		=> $psadCmd
 );
 
-%Cmds = check_commands(\%Cmds);
+%Cmds = &check_commands(\%Cmds);
 
 $< == 0 && $> == 0 or die "You need to be root (or equivalent UID 0 account) to install/uninstall psad!\n";
 
-check_old_psad_installation();  ### check for a pre-0.9.2 installation of psad.
+&check_old_psad_installation();  ### check for a pre-0.9.2 installation of psad.
 
 ### make sure we know where the syslog init script is.
 unless (-e $SYSLOG_INIT) {
@@ -164,7 +164,7 @@ unless (-e "/var/log/psad/fwdata") {
 	open F, ">> /var/log/psad/fwdata";
 	close F;
 	chmod 0600, "/var/log/psad/fwdata";
-	perms_ownership("/var/log/psad/fwdata", 0600);
+	&perms_ownership("/var/log/psad/fwdata", 0600);
 }
 unless (-e $INSTALL_DIR) {
 	print " ----  Creating $INSTALL_DIR  ----\n";
@@ -176,62 +176,62 @@ unless (-e "/usr/bin/whois.psad") {
 		if (! system("$Cmds{'make'} -C whois-4.5.6")) {  # remember unix return value...
 			print " ----  Copying whois binary to /usr/bin/whois.psad  ----\n";
 			copy("whois-4.5.6/whois", "/usr/bin/whois.psad");
-			perms_ownership("/usr/bin/whois.psad", 0755);
+			&perms_ownership("/usr/bin/whois.psad", 0755);
 		}
 	}
 } else {
-	perms_ownership("/usr/bin/whois.psad", 0755);  # make absolutely certain we can execute whois.psad
+	&perms_ownership("/usr/bin/whois.psad", 0755);  # make absolutely certain we can execute whois.psad
 }
 if ( -e "${INSTALL_DIR}/psad" && (! $nopreserve)) {  # need to grab the old config
 	print " ----  Copying psad -> ${INSTALL_DIR}/psad  ----\n";
 	print "       Preserving old config within ${INSTALL_DIR}/psad\n";
-	preserve_config("psad", "${INSTALL_DIR}/psad", \%Cmds);
+	&preserve_config("psad", "${INSTALL_DIR}/psad", \%Cmds);
 	### we don't need to run with -w for production code, and they are daemons so nothing would see warnings anyway if there are any.
-	rm_perl_options("${INSTALL_DIR}/psad", \%Cmds);
-	perms_ownership("${INSTALL_DIR}/psad", 0500)
+	&rm_perl_options("${INSTALL_DIR}/psad", \%Cmds);
+	&perms_ownership("${INSTALL_DIR}/psad", 0500)
 } else {
 	print " ----  Copying psad -> ${INSTALL_DIR}/  ----\n";
 	copy("psad", "${INSTALL_DIR}/psad");
-	rm_perl_options("${INSTALL_DIR}/psad", \%Cmds);
-	perms_ownership("${INSTALL_DIR}/psad", 0500);
-	change_email("${INSTALL_DIR}/psad");
+	&rm_perl_options("${INSTALL_DIR}/psad", \%Cmds);
+	&perms_ownership("${INSTALL_DIR}/psad", 0500);
+	&change_email("${INSTALL_DIR}/psad");
 }
 if ( -e "${INSTALL_DIR}/psadwatchd" && (! $nopreserve)) {  # need to grab the old config
         print " ----  Copying psadwatchd -> ${INSTALL_DIR}/psadwatchd  ----\n";
         print "       Preserving old config within ${INSTALL_DIR}/psadwatchd\n";
-        preserve_config("psadwatchd", "${INSTALL_DIR}/psadwatchd", \%Cmds);
-	rm_perl_options("${INSTALL_DIR}/psadwatchd", \%Cmds);
-        perms_ownership("${INSTALL_DIR}/psadwatchd", 0500);
+        &preserve_config("psadwatchd", "${INSTALL_DIR}/psadwatchd", \%Cmds);
+	&rm_perl_options("${INSTALL_DIR}/psadwatchd", \%Cmds);
+        &perms_ownership("${INSTALL_DIR}/psadwatchd", 0500);
 } else {
         print " ----  Copying psadwatchd -> ${INSTALL_DIR}/  ----\n";
 	copy("psadwatchd", "${INSTALL_DIR}/psadwatchd");
-	rm_perl_options("${INSTALL_DIR}/psadwatchd", \%Cmds);
-        perms_ownership("${INSTALL_DIR}/psadwatchd", 0500);
-	change_email("${INSTALL_DIR}/psadwatchd");
+	&rm_perl_options("${INSTALL_DIR}/psadwatchd", \%Cmds);
+        &perms_ownership("${INSTALL_DIR}/psadwatchd", 0500);
+	&change_email("${INSTALL_DIR}/psadwatchd");
 }
 if (-e "${INSTALL_DIR}/kmsgsd" && (! $nopreserve)) { 
 	print " ----  Copying kmsgsd -> ${INSTALL_DIR}/kmsgsd\n";
 	print "       Preserving old config within ${INSTALL_DIR}/kmsgsd  ----\n";
-	preserve_config("kmsgsd", "${INSTALL_DIR}/kmsgsd", \%Cmds);
-	rm_perl_options("${INSTALL_DIR}/kmsgsd", \%Cmds);
-	perms_ownership("${INSTALL_DIR}/kmsgsd", 0500);
+	&preserve_config("kmsgsd", "${INSTALL_DIR}/kmsgsd", \%Cmds);
+	&rm_perl_options("${INSTALL_DIR}/kmsgsd", \%Cmds);
+	&perms_ownership("${INSTALL_DIR}/kmsgsd", 0500);
 } else {
 	print " ----  Copying kmsgsd -> ${INSTALL_DIR}/kmsgsd  ----\n";
 	copy("kmsgsd", "${INSTALL_DIR}/kmsgsd");
-	rm_perl_options("${INSTALL_DIR}/kmsgsd", \%Cmds);
-	perms_ownership("${INSTALL_DIR}/kmsgsd", 0500);
+	&rm_perl_options("${INSTALL_DIR}/kmsgsd", \%Cmds);
+	&perms_ownership("${INSTALL_DIR}/kmsgsd", 0500);
 }
 if (-e "${INSTALL_DIR}/diskmond" && (! $nopreserve)) {
 	print " ----  Copying diskmond -> ${INSTALL_DIR}/diskmond  ----\n";
 	print "       Preserving old config within ${INSTALL_DIR}/diskmond\n";
-        preserve_config("diskmond", "${INSTALL_DIR}/diskmond", \%Cmds);
-	rm_perl_options("${INSTALL_DIR}/diskmond", \%Cmds);
-        perms_ownership("${INSTALL_DIR}/diskmond", 0500);
+        &preserve_config("diskmond", "${INSTALL_DIR}/diskmond", \%Cmds);
+	&rm_perl_options("${INSTALL_DIR}/diskmond", \%Cmds);
+        &perms_ownership("${INSTALL_DIR}/diskmond", 0500);
 } else {
 	print " ----  Copying diskmond -> ${INSTALL_DIR}/diskmond  ----\n";
 	copy("diskmond", "${INSTALL_DIR}/diskmond");
-	rm_perl_options("${INSTALL_DIR}/diskmond", \%Cmds);
-	perms_ownership("${INSTALL_DIR}/diskmond", 0500);
+	&rm_perl_options("${INSTALL_DIR}/diskmond", \%Cmds);
+	&perms_ownership("${INSTALL_DIR}/diskmond", 0500);
 }
 unless (-e "/etc/psad") {
         print " ----  Creating /etc/psad/  ----\n";
@@ -242,40 +242,40 @@ if (-e "/etc/psad/psad_signatures") {
 	print "       Preserving old signatures file as /etc/psad/psad_signatures.old\n";
 	move("/etc/psad/psad_signatures", "/etc/psad/psad_signatures.old");
 	copy("psad_signatures", "/etc/psad/psad_signatures");
-	perms_ownership("/etc/psad/psad_signatures", 0600);
+	&perms_ownership("/etc/psad/psad_signatures", 0600);
 } else {
 	print " ----  Copying psad_signatures -> /etc/psad/psad_signatures  ----\n";
 	copy("psad_signatures", "/etc/psad/psad_signatures");
-	perms_ownership("/etc/psad/psad_signatures", 0600);
+	&perms_ownership("/etc/psad/psad_signatures", 0600);
 }
 if (-e "/etc/psad/psad_auto_ips") {
 	print " ----  Copying psad_auto_ips -> /etc/psad/psad_auto_ips  ----\n";
 	print "       Preserving old auto_ips file as /etc/psad/psad_auto_ips.old\n";
 	move("/etc/psad/psad_auto_ips", "/etc/psad/psad_auto_ips.old");
 	copy("psad_auto_ips", "/etc/psad/psad_auto_ips");
-	perms_ownership("/etc/psad/psad_auto_ips", 0600);
+	&perms_ownership("/etc/psad/psad_auto_ips", 0600);
 } else {
 	print " ----  Copying psad_auto_ips -> /etc/psad/psad_auto_ips  ----\n";
 	copy("psad_auto_ips", "/etc/psad/psad_auto_ips");
-	perms_ownership("/etc/psad/psad_auto_ips", 0600);
+	&perms_ownership("/etc/psad/psad_auto_ips", 0600);
 }
 if (-e "/etc/psad/psad.conf") {
 	print " ----  Copying psad.conf -> /etc/psad/psad.conf  ----\n";
 	print "       Preserving old psad.conf file as /etc/psad/psad.conf\n";
 	move("/etc/psad/psad.conf", "/etc/psad/psad.conf.old");
 	copy("psad.conf", "/etc/psad/psad.conf");
-	perms_ownership("/etc/psad/psad.conf", 0600);
+	&perms_ownership("/etc/psad/psad.conf", 0600);
 } else {
 	print " ----  Copying psad.conf -> /etc/psad/psad.conf  ----\n";
 	copy("psad.conf", "/etc/psad/psad.conf");
-	perms_ownership("/etc/psad/psad.conf", 0600);
+	&perms_ownership("/etc/psad/psad.conf", 0600);
 }
 print " ----  Installing psad(8) man page  ----\n";
 if (-e "/etc/man.config") {
 	# prefer to install psad.8 in /usr/local/man/man8 if this directory is configured in /etc/man.config
 	if (open MPATH, "< /etc/man.config" and grep /MANPATH\s+\/usr\/local\/man/, <MPATH> and close MPATH) {
 		copy("psad.8", "/usr/local/man/man8/psad.8");
-		perms_ownership("/usr/local/man/man8/psad.8", 0644);
+		&perms_ownership("/usr/local/man/man8/psad.8", 0644);
 	} else {
 		my $mpath;
 		open MPATH, "< /etc/man.config";
@@ -291,25 +291,25 @@ if (-e "/etc/man.config") {
 		if ($mpath) {
 			my $path = $mpath . "/man8/psad.8";
 			copy("psad.8", $path);
-			perms_ownership($path, 0644);
+			&perms_ownership($path, 0644);
 		} else {
 			copy("psad.8", "/usr/man/man8/psad.8");
-			perms_ownership("/usr/man/man8/psad.8", 0644);
+			&perms_ownership("/usr/man/man8/psad.8", 0644);
 		}
 	}
 } else {
 	copy("psad.8", "/usr/man/man8/psad.8");
-	perms_ownership("/usr/man/man8/psad.8", 0644);
+	&perms_ownership("/usr/man/man8/psad.8", 0644);
 }
 
-my $distro = get_distro();
-my $kernel = get_kernel(\%Cmds);
+my $distro = &get_distro();
+my $kernel = &get_kernel(\%Cmds);
 
 if ($distro eq "redhat61" || $distro eq "redhat62" || $distro eq "redhat70" || $distro eq "redhat71") {
 	if (-e $INIT_DIR) {
 		print " ----  Copying psad-init -> ${INIT_DIR}/psad  ----\n";
 		copy("psad-init", "${INIT_DIR}/psad");
-		perms_ownership("${INIT_DIR}/psad", 0744);
+		&perms_ownership("${INIT_DIR}/psad", 0744);
 		# remove signature checking from psad process if we are not running an iptables-enabled kernel
 #		system "$Cmds{'perl'} -p -i -e 's|\\-s\\s/etc/psad/psad_signatures||' ${INIT_DIR}/psad" if ($kernel !~ /^2.3/ && $kernel !~ /^2.4/);
 	} else {
@@ -318,7 +318,7 @@ if ($distro eq "redhat61" || $distro eq "redhat62" || $distro eq "redhat70" || $
 }
 # need to put checks in here for redhat vs. other systems.
 unless($fwcheck) {
-	if(check_firewall_rules(\%Cmds)) {
+	if(&check_firewall_rules(\%Cmds)) {
 		my $running;
 		my $pid;
 		if (-e "/var/log/psad/pid.psad") {
@@ -428,10 +428,15 @@ sub change_email() {
 		}
 		push @email_addresses, '$ans';
 		$ans = "";
-		while ($ans ne "n") {
+		E: while ($ans ne "n") {
 			print " ----  Would you like to enter an additional email address (y/n)?  ";
 			$ans = <STDIN>;
 			chomp $ans;
+			if ($ans eq "n") {
+				last E;
+			} elsif ($ans ne "y") {
+				next E;
+			}
 			while ($ans !~ /\S+?\@\S+?\.\S+?/) {
 				print " ----  Enter an email address:  ";
 				$ans = <STDIN>;

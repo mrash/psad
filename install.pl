@@ -1046,7 +1046,7 @@ sub put_email() {
     open F, "> $file";
     for my $line (@lines) {
         if ($line =~ /EMAIL_ADDRESSES\s+/) {
-            print F "EMAIL_ADDRESSES            $emailstr;\n";
+            printf F "%-28s%s;\n", 'EMAIL_ADDRESSES', $emailstr;
         } else {
             print F $line;
         }
@@ -1079,8 +1079,8 @@ sub put_string() {
     close RF;
     open F, "> $file";
     for my $line (@lines) {
-        if ($line =~ /^\s*$key\s*.*;/) {
-            print F "$key                    $value;\n";
+        if ($line =~ /^\s*$key\s+.*;/) {
+            printf F "%-28s%s;\n", $key, $value;
         } else {
             print F $line;
         }

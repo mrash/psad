@@ -8,7 +8,7 @@
 #          scans.  Data is provided by kmsgsd which reads firewall
 #          messages out of the /var/log/psad/psadfifo named pipe
 #          (syslog is reconfigured to write kern.info messages there
-#          which include firewall messages).  For mone information
+#          which include firewall messages).  For more information
 #          read the psad man page.
 #
 # Author: Michael B. Rash (mbr@cipherdyne.com)
@@ -190,28 +190,28 @@ my ($found_new_packets, $daemon, $output, $errors, $dnslookups, $whoislookups,
 ### save a copy of the command line arguments
 my @args_cp = @ARGV;
 
-Getopt::Long::Configure("no_ignore_case");  # make Getopts case sensitive
+Getopt::Long::Configure("no_ignore_case");  ### make Getopts case sensitive
 
 &usage_and_exit(1) unless (GetOptions (
-    'help'           => \$help,           # display help
-    'auto_ips=s'     => \$auto_ips_file,  # enable automatic ip danger level assignment
-    'output'         => \$output,         # write scanlog messages to STDOUT
-    'Daemon'         => \$daemon,         # do not run as a daemon
-    'debug'          => \$DEBUG,          # run in debug mode
-    'interval=s'     => \$CHECK_INTERVAL, # set $CHECK_INTERVAL from the command line
-    'firewallcheck'  => \$fwcheck,        # do not check firewall rules
-    'config=s'       => \$config,         # specify configuration file
-    'reversedns'     => \$dnslookups,     # do not issue dns lookups against scanning ip address
-    'signatures=s'   => \$sigs_file,      # scan signatures
-    'localport'      => \$netstat_lookup, # do not check to see if the firewall is listening on localport that has been scanned
-    'errors'         => \$errors,         # do not write malformed packet messages to error log
-    'Logging_server' => \$Syslog_server,  # we are running psad on a syslog logging server
-    'Kill'           => \$kill,           # kill all running psad processes (psadwatchd, psad, kmsgsd, diskmond)
-    'Restart'        => \$restart,        # restart psad with all options of the currently running psad process
-    'Status'         => \$status,         # display status of any currently running psad processes
-    'USR1'           => \$usr1,           # send an existing psad process a USR1 signal (useful for debugging)
-    'Version'        => \$print_version,  # print the psad version and exit
-    'whois'          => \$whoislookups    # do not issue whois lookups against the scanning ip
+    'help'           => \$help,           ### display help
+    'auto_ips=s'     => \$auto_ips_file,  ### enable automatic ip danger level assignment
+    'output'         => \$output,         ### write scanlog messages to STDOUT
+    'Daemon'         => \$daemon,         ### do not run as a daemon
+    'debug'          => \$DEBUG,          ### run in debug mode
+    'interval=s'     => \$CHECK_INTERVAL, ### set $CHECK_INTERVAL from the command line
+    'firewallcheck'  => \$fwcheck,        ### do not check firewall rules
+    'config=s'       => \$config,         ### specify configuration file
+    'reversedns'     => \$dnslookups,     ### do not issue dns lookups against scanning ip address
+    'signatures=s'   => \$sigs_file,      ### scan signatures
+    'localport'      => \$netstat_lookup, ### do not check to see if the firewall is listening on localport that has been scanned
+    'errors'         => \$errors,         ### do not write malformed packet messages to error log
+    'Logging_server' => \$Syslog_server,  ### we are running psad on a syslog logging server
+    'Kill'           => \$kill,           ### kill all running psad processes (psadwatchd, psad, kmsgsd, diskmond)
+    'Restart'        => \$restart,        ### restart psad with all options of the currently running psad process
+    'Status'         => \$status,         ### display status of any currently running psad processes
+    'USR1'           => \$usr1,           ### send an existing psad process a USR1 signal (useful for debugging)
+    'Version'        => \$print_version,  ### print the psad version and exit
+    'whois'          => \$whoislookups    ### do not issue whois lookups against the scanning ip
 ));
 &usage_and_exit(0) if ($help);
 
@@ -473,13 +473,13 @@ sub check_scan() {
         $Scan_href->{$src}->{$dst}->{'LOGR'} = "Y";
         $Scan_href->{$src}->{$dst}->{'AUTO'} = "N" unless (defined $Scan_href->{$src}->{$dst}->{'AUTO'});
         $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} = 0 unless (defined $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'});
-        unless (defined $Scan_href->{$src}->{$dst}->{'START_PORT'} || $proto eq "ICMP") {  # this is the absolute starting port since the first packet was detected
-            $Scan_href->{$src}->{$dst}->{'START_PORT'} = 65535; # make sure the initial start port is not too low
-            $Scan_href->{$src}->{$dst}->{'END_PORT'} = 0; # make sure the initial end port is not too high
+        unless (defined $Scan_href->{$src}->{$dst}->{'START_PORT'} || $proto eq "ICMP") { ### this is the absolute starting port since the first packet was detected
+            $Scan_href->{$src}->{$dst}->{'START_PORT'} = 65535; ### make sure the initial start port is not too low
+            $Scan_href->{$src}->{$dst}->{'END_PORT'} = 0; ### make sure the initial end port is not too high
         }
         my $epoch_seconds = time() if ($ENABLE_PERSISTENCE eq "N");
-        my @time = split /\s+/, scalar localtime;   # Get the current time as a nice ASCII string.
-        pop @time; shift @time;    # Get rid of the day and the year to make the time consistent with syslog
+        my @time = split /\s+/, scalar localtime; ### Get the current time as a nice ASCII string.
+        pop @time; shift @time; ### Get rid of the day and the year to make the time consistent with syslog
         my $time = join ' ', @time;
         unless (defined $Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_INTERVAL'}) {  ### initialize values for the current interval
             $Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_INTERVAL'}->{'START_TIME'} = $time;
@@ -507,7 +507,7 @@ sub check_scan() {
         }
         ### increment hash values
         ### if $Scan{$src}{$dst}{'ABSNUM'} is not yet defined, incrementing it here will make it equal to 1 anyway
-        $Scan_href->{$src}->{$dst}->{'ABSNUM'}++;  # if $Scan{$src}{$dst}{'ABSNUM'} is not yet defined, incrementing it here will make it equal to 1 anyway
+        $Scan_href->{$src}->{$dst}->{'ABSNUM'}++;
         if ($proto eq "TCP") {
             $Scan_href->{$src}->{$dst}->{'TCP'}->{'CURRENT_INTERVAL'}->{'FLAGS'}->{$flags}++;
         }
@@ -540,8 +540,8 @@ sub check_scan() {
                     . "$Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_INTERVAL'}->{'END_PORT'}\n";
             }
         }
-        if ($signatures && $USE_IPTABLES) {  # might try to use ipchains also, but then cannot use tcp flags except for -y -l rules
-            for my $msg (keys %{$sigs_href->{$proto}}) {   # need to iterate through all signatures since a packet may match several
+        if ($signatures && $USE_IPTABLES) { ### might try to use ipchains also, but then cannot use tcp flags except for -y -l rules
+            for my $msg (keys %{$sigs_href->{$proto}}) { ### need to iterate through all signatures since a packet may match several
                 my $dstport_criteria = 0;
                 my $srcport_criteria = 0;
                 my $rv = 0;
@@ -554,7 +554,7 @@ sub check_scan() {
                     }
                 } elsif ($proto eq "UDP") {
                     if (&check_port($sigs_href, $msg, $srcport, $dstport, $proto)
-                        && &check_misc_fields($sigs_href, $msg, $proto, $len, $ttl)) {   ### tripped a udp signature
+                        && &check_misc_fields($sigs_href, $msg, $proto, $len, $ttl)) { ### tripped a udp signature
                         $Scan_href->{$src}->{$dst}->{'UDP'}->{'SIGMATCH'}->{'SIGDL'} = $sigs_href->{'UDP'}->{$msg}->{'DANGERLEVEL'};
                         $rv = 1;
                     }
@@ -564,7 +564,7 @@ sub check_scan() {
                         $rv = 1;
                     }
                 }
-                if ($rv) {   ### we matched a signature
+                if ($rv) {   ### we matched some signature
                     if ($DEBUG) {
                         unless ($proto eq "ICMP") {
                             print "     SIGMATCH on dstport: $dstport\n";
@@ -590,7 +590,7 @@ sub check_scan() {
                             } else {
                                 $listening_port = "There is no server listening on $lprot port $dstport";
                             }
-                        } # else $listening_port is already ""
+                        } ### else $listening_port is already ""
                     }
                     ### including sp almost always changes the hash key:
                     ### my $alert_string = "$msg  sp=$srcport, dp=$dstport, flags=$flags.  $listening_port";
@@ -737,7 +737,7 @@ sub import_signatures() {
     close SIGS;
     for my $sig (@sigs) {
         chomp $sig;
-        next if ($sig =~ /^#/);
+        next if ($sig =~ /^\s*#/);
         &get_signature_fields($Sigs_href, $sig);
     }
     print STDOUT Dumper %Sigs if $DEBUG;
@@ -886,8 +886,8 @@ sub assign_danger_level() {
                 print "assign_danger_level(): CURRENT_DANGER_LEVEL (before assignment) = "
                     . "$Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'}\n";
             }
-            # If a scan signature packet has been detected but no other packets are detected, assign a danger
-            # level of SIGDL.
+            ### If a scan signature packet has been detected but no other packets are detected, assign a danger
+            ### level of SIGDL.
             my $sigmatch = 0;
             my $sigproto = "";
             if (defined $Scan_href->{$src}->{$dst}->{'TCP'}->{'SIGMATCH'}) {
@@ -1042,7 +1042,7 @@ sub scan_logr() {
                         $dnsstring = $src;
                     } else {
                         my $ipaddr = gethostbyname($src);
-                        # my $rdns = gethostbyaddr($ipaddr, AF_INET);
+                        ### my $rdns = gethostbyaddr($ipaddr, AF_INET);
                         my $rdns = gethostbyaddr($ipaddr, 2);
                         $rdns = "No reverse dns info available" unless $rdns;
                         $dnsstring = "$src -> $rdns";
@@ -1332,7 +1332,7 @@ sub get_input_chains() {
     for my $r (@rules) {
         next unless ($r =~ /Chain/);
         my ($cname) = ($r =~ /Chain\s(\w+)/);
-        next unless ($cname =~ /in/i);  # we don't have an input chain
+        next unless ($cname =~ /in/i); ### we don't have an input chain
         push @chains, $cname;
     }
     return \@chains;
@@ -1436,7 +1436,7 @@ sub kill_psad() {
     ### must kill psadwatchd first since if not, it might try to restart any of the other three daemons; 
     ### (it's the first element of $pidfiles_aref)
     for my $pidfile (@$pidfiles_aref) {
-        # my $pidname = (split /\./, $pidfile)[1];
+        ### my $pidname = (split /\./, $pidfile)[1];
         my $pidname = (split /\./, (split /\//, $pidfile)[$#_])[0];
         if (-e $pidfile) {
             open PIDFILE, "< $pidfile";

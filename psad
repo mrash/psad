@@ -169,12 +169,6 @@ my $flush_fw = 0;
 ### IPT_AUTO_CHAIN variable
 my @ipt_block_config = ();
 
-### Cache the default table->chain relationships used
-### by the auto blocking code for iptables firewalls.
-### The nat and mangle PREROUTING chains will be added
-### by get_iptables_chains() if they are active.
-my %ipt_chains = ();
-
 ### configuration hash
 my %config = ();
 
@@ -2002,12 +1996,7 @@ sub psad_init() {
     ### build iptable block config hash out of IPT_AUTO_CHAIN keywords
     ### (we don't check ENABLE_AUTO_IDS here since someone may have turned
     ### it off but still want to run --Status checks or use --Flush).
-    &build_ipt_block_config();
-
-    ### note that we don't have a check for ENABLE_AUTO_IDS here
-    ### since someone may turn this off but still want to be able
-    ### to flush old firewall rules with --Flush
-    &get_iptables_chains() unless $syslog_server;
+    &build_ipt_block_config() unless $syslog_server;
 
     ### The --Kill command line switch was given.
     exit &stop_psad() if $kill;
@@ -4165,58 +4154,6 @@ sub build_ipt_block_config() {
             print STDERR "[-] build_ipt_block_config(): $msg\n" if $debug;
         }
         $ctr++;
-    }
-    return;
-}
-
-sub get_iptables_chains() {
-
-    print STDERR "[+] get_iptables_chains()\n" if $debug;
-    my $nat_rv    = 1;
-    my $mangle_rv = 1;
-    my $filter_input_rv   = 1;
-    my $filter_forward_rv = 1;
-
-    my %iptables_testing = (
-        'filter' => {
-            'INPUT'   => '',
-            'OUTPUT'  => '',
-            'FORWARD' => ''
-        },
-        'nat' => {
-            'PREROUTING' => ''
-        },
-        'mangle' => {
-            'PREROUTING' => ''
-        }
-    );
-
-    for my $table (keys %iptables_testing) {
-        for my $chain (keys %{$iptables_testing{$table}}) {
-            my $rv = 1;
-            eval {
-                $rv = (system "$cmds{'iptables'} -nL -t $table " .
-                    "> /dev/null 2>&1") >> 8;
-            };
-            if ($rv == 0) {
-                eval {
-                    $rv = (system "$cmds{'iptables'} -t $table -I " .
-                        "$chain 1 -s 127.0.0.2 -j DROP > /dev/null " .
-                        "2>&1") >> 8;
-                };
-                if ($rv == 0) {
-                    eval {
-                        $rv = (system "$cmds{'iptables'} -t $table -D " .
-                            "$chain 1 > /dev/null 2>&1") >> 8;
-                    };
-                }
-                if ($rv == 0) {
-                    $ipt_chains{$table}{$chain} = '';
-                }
-            }
-            print STDERR "[+] get_iptables_chains(): $table $chain rv: $rv\n"
-                if $debug;
-        }
     }
     return;
 }

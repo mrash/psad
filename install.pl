@@ -254,14 +254,14 @@ sub install() {
         &logr(" ... Creating $USRSBIN_DIR\n");
         mkdir $USRSBIN_DIR,0755;
     }
-    if (-d 'whois-4.5.31') {
+    if (-d 'whois-4.6.2') {
         &logr(" ... Compiling Marco d'Itri's whois client\n");
-        system "$Cmds{'make'} -C whois-4.5.31";
-        if (-e 'whois-4.5.31/whois') {
+        system "$Cmds{'make'} -C whois-4.6.2";
+        if (-e 'whois-4.6.2/whois') {
             &logr(" ... Copying whois binary to $WHOIS_PSAD\n");
-            copy "whois-4.5.31/whois", $WHOIS_PSAD;
+            copy "whois-4.6.2/whois", $WHOIS_PSAD;
         } else {
-            die " ... @@@ Could not compile whois-4.5.31";
+            die " ... @@@ Could not compile whois-4.6.2";
         }
     }
     &perms_ownership($WHOIS_PSAD, 0755);

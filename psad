@@ -681,7 +681,7 @@ sub check_scan() {
 
     ### If necessary, check which firewall (ipchains vs. iptables)
     unless ($use_ipchains || $use_iptables) {
-        &check_fw($fw_pkts_aref->[0]);
+        &get_fw_type($fw_pkts_aref->[0]);
     }
     unless ($no_netstat) {
         if ($netstat_lkup_ctr == 10) {
@@ -2355,12 +2355,11 @@ sub print_scan() {  ### this should primarily be used for debugging
     return;
 }
 
-sub check_fw() {
+sub get_fw_type() {
     my $line = shift;
     ### ipchains log messages do not have a MAC address field
-    if ($line !~ /MAC=/) {
+    if ($line !~ /IN=.*OUT=/) {
         $use_ipchains = 1;
-        ### check
     } else {
         $use_iptables = 1;
     }
@@ -2570,6 +2569,7 @@ sub status() {
                                             "${src_ipdir}/danger_level: $!";
                                     $dl = <F>;
                                     close F;
+                                    chomp $dl;
                                 }
                                 if (-e "${src_ipdir}/packet_ctr") {
                                     open F, "< ${src_ipdir}/packet_ctr" or

@@ -322,6 +322,8 @@ my $snort_rules_dir  = '';
 my $srules_type      = '';
 my $psad_logfile     = '';
 my $cmdline_file     = '';
+my $messages_file    = '';
+my $analyze_msgs     = 0;
 my $syslog_server    = 0;
 my $kill             = 0;
 my $restart          = 0;
@@ -398,6 +400,12 @@ Getopt::Long::Configure('no_ignore_case');
                                               # rules.
     'auto-ips=s'        => \$autoips_file,    # Path to psad auto ips file for
                                               # auto-setting ip danger level.
+    'Analyze-msgs'      => \$analyze_msgs,    # Analysis mode for old iptables
+                                              # messages in the psad fwdata file
+                                              # (or messages file; see --messages).
+    'messages-file'     => \$messages_file,   # Specify the path to file containing
+                                              # old iptables messages (fwdata by
+                                              # default).
     'debug'             => \$debug,           # Run in debug mode.
     'Dump-conf'         => \$dump_conf,       # Dump config and exit.
     'interval=i'        => \$chk_interval,    # Set $chk_interval from the
@@ -474,25 +482,8 @@ if ($ver) {
     exit 0;
 }
 
-$status = 1 if ($status_ip and not $status);
-$status = 1 if ($status_sort_dl and not $status);
-$status = 1 if ($status_dl and not $status);
-
-if ($status_dl and $status_dl > 5) {
-    die ' ** The --status-dl must be between 1 and 5.  Exiting.';
-}
-
-if ($no_kmsgsd and not $debug) {
-    die ' ** The --no-kmsgsd option can only be used with ',
-        '--debug.  Exiting.';
-}
-
 ### check for any old command line arguments
 &check_old_cmdargs();
-
-### make sure to go into firewall analysis mode if a ruleset
-### file was specified on the command line.
-$fw_analyze = 1 if $fw_file;
 
 ### Everthing after this point must be executed as root.
 $< == 0 && $> == 0 or
@@ -782,6 +773,9 @@ sub check_scan() {
     my %current_scan = ();
     my @err_pkts = ();
 
+    my $pkt_ctr = 0;
+    my $scale_print_factor = int($#$fw_packets_aref/10)
+        + (100 - int($#$fw_packets_aref/10));  ### round to nearest 100
     PKT: for my $pkt (@$fw_packets_aref) {
         my $src = '';
         my $dst = '';
@@ -804,6 +798,13 @@ sub check_scan() {
         my $syslog_host = '';
 
         print STDERR $pkt, "\n" if $debug;
+
+        if ($analyze_msgs) {
+            $pkt_ctr++;
+            if ($pkt_ctr % $scale_print_factor == 0) {
+                print "    Processed $pkt_ctr packets.\n";
+            }
+        }
 
         ### get the in/out interface and iptables chain
         if ($pkt =~ /IN=(\S+)\s+OUT=\s/) {
@@ -886,7 +887,8 @@ sub check_scan() {
                 push @err_pkts, $pkt;
                 next PKT;
             }
-            if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
+            if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
+                    and not $analyze_msgs) {
                 my $dflags = $flags;
                 $dflags =~ s/\s/,/g;
                 $dshield_str = "$src\t$sp\t$dst\t$dp\t$proto\t$dflags";
@@ -910,7 +912,8 @@ sub check_scan() {
             ($src, $dst, $len, $tos, $ttl, $id, $sp, $dp) =
                 ($1,$2,$3,$4,$5,$6,$7,$8);
             $proto = 'udp';
-            if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
+            if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
+                    and not $analyze_msgs) {
                 $dshield_str = "$src\t$sp\t$dst\t$dp\t$proto";
             }
             ### make sure we have a "reasonable" packet (note that nmap
@@ -934,7 +937,8 @@ sub check_scan() {
                 next PKT;
             }
             $icmp_ctr++;
-            if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
+            if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
+                    and not $analyze_msgs) {
                 $dshield_str = "$src\t$type\t$dst\t$code\t$proto";
             }
         } else {
@@ -960,7 +964,8 @@ sub check_scan() {
         }
 
         if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
-                and not $benchmark) {
+                and not $benchmark
+                and not $analyze_msgs) {
             if ($pkt =~ /^\s*(\w+)\s+(\d+)\s+(\S+)/) {
                 my $month   = Decode_Month($1);
                 my $day     = sprintf("%.2d", $2);
@@ -989,7 +994,17 @@ sub check_scan() {
 
         ### record the absolute starting time of the scan
         unless (defined $scan{$src}{$dst}{'s_time'}) {
-            $scan{$src}{$dst}{'s_time'} = time();
+            if ($analyze_msgs) {
+                if ($pkt =~ /^(.*?)\s+\S+\s+kernel:/) {
+                    $scan{$src}{$dst}{'s_time'} = $1;
+                } else {
+                    die " ** Could not extract time from packet: $pkt\n",
+                        " ** Please send a bug report to: ",
+                        "mbr\@cipherdyne.org\n";
+                }
+            } else {
+                $scan{$src}{$dst}{'s_time'} = time();
+            }
         }
 
         ### increment hash values
@@ -1053,11 +1068,10 @@ sub check_scan() {
             }
         }
 
-        if ($sid and ! $no_snort_sids) {
+        if ($sid and not $no_snort_sids) {
             ### found a snort sid in the packet log message
             &add_snort_sid($src, $dst, $chain, $proto, $sid);
         } else {
-
             ### attempt to match any tcp/udp/icmp signatures in the
             ### main signatures hash
             &match_sigs($src, $dst, $chain, $sp, $dp, $proto,
@@ -1073,15 +1087,26 @@ sub check_scan() {
     }
 
     ### Assign a danger level to the scan
+    print " .. Assigning danger levels.\n" if $analyze_msgs;
     &assign_danger_level(\%current_scan);
 
     ### Log and send email and syslog alerts
+    if ($analyze_msgs) {
+        print " .. Writing $config{'PSAD_DIR'}/<ip> directories, sending\n",
+            "    email alerts";
+        if ($no_whois) {
+            print ".\n";
+        } else {
+            print ", and issuing whois lookups (may take several seconds).\n";
+        }
+    }
     &scan_logr(\%current_scan);
 
     ### Don't manage the firewall or tcpwrapper rules if
     ### psad is running on a syslog server
-    if ($config{'ENABLE_AUTO_IDS'} eq 'Y' and
-            not $syslog_server) {
+    if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
+            and not $syslog_server
+            and not $analyze_msgs) {
         &auto_psad_response(\%current_scan);
     }
     return;
@@ -1589,6 +1614,9 @@ sub import_configs() {
     ### the local system.
     &validate_home_net();
 
+    ### enter iptables analysis mode.
+    &analysis_mode() if $analyze_msgs;
+
     return;
 }
 
@@ -1611,6 +1639,15 @@ sub validate_config() {
             'both IPTABLES_BLOCK_METHOD and TCPWRAPPERS_BLOCK_METHOD are ' .
             'set to N.');
     }
+    if ($status_dl and $status_dl > 5) {
+        die ' ** The --status-dl must be between 1 and 5.  Exiting.';
+    }
+
+    if ($no_kmsgsd and not $debug) {
+        die ' ** The --no-kmsgsd option can only be used with ',
+            '--debug.  Exiting.';
+    }
+
     return;
 }
 
@@ -2389,10 +2426,15 @@ sub scan_logr() {
 
             ### get the absolute starting time for the scan and the
             ### current time
-            my $abs_s_time = scalar localtime $scan{$src}{$dst}{'s_time'};
-            my $s_time;
-            if (time() - $config{'PSAD_CHECK_INTERVAL'} <
-                $scan{$src}{$dst}{'s_time'}) {
+            my $abs_s_time = '';
+            if ($analyze_msgs) {
+                $abs_s_time = $scan{$src}{$dst}{'s_time'};
+            } else {
+                $abs_s_time = scalar localtime $scan{$src}{$dst}{'s_time'};
+            }
+            my $s_time = '';
+            if (not $analyze_msgs and time() - $config{'PSAD_CHECK_INTERVAL'} <
+                    $scan{$src}{$dst}{'s_time'}) {
                 $s_time = $abs_s_time;
             } else {
                 $s_time = scalar localtime((time()
@@ -2487,10 +2529,12 @@ sub scan_logr() {
                 }
             }
             print $fh "\n";
-            printf $fh "%${log_len}s%s\n", 'Current interval: ',
-                "$s_time (start)";
-            printf $fh "%${log_len}s%s\n", '', "$time (end)";
-            print $fh "\n";
+            unless ($analyze_msgs) {
+                printf $fh "%${log_len}s%s\n", 'Current interval: ',
+                    "$s_time (start)";
+                printf $fh "%${log_len}s%s\n", '', "$time (end)";
+                print $fh "\n";
+            }
             ### print the overall stats since the scan began
             printf $fh "%${log_len}s%s\n", 'Overall stats since: ',
                 $abs_s_time;
@@ -3406,6 +3450,37 @@ sub restart() {
     return 0;
 }
 
+sub analysis_mode() {
+
+    ### setup to put all <ip> files in the ANALYSIS_DIR
+    $config{'PSAD_DIR'} = $config{'ANALYSIS_DIR'};
+
+    unless (-d $config{'PSAD_DIR'}) {
+        mkdir $config{'PSAD_DIR'} or die " ** Could not mkdir ",
+            $config{'PSAD_DIR'};
+    }
+    print " .. Entering analysis mode.  Parsing $messages_file\n";
+    open MSGS, "< $messages_file" or die " ** Could not open ",
+        "$messages_file: $!";
+    my @lines = <MSGS>;
+    close MSGS;
+    my @ipt_msgs;
+    for my $line (@lines) {
+        if ($line =~ /IN.*OUT/ and
+                ($line =~ /$config{'FW_MSG_SEARCH'}/ or
+                 $line =~ /$config{'SNORT_SID_STR'}/)) {
+            push @ipt_msgs, $line;
+        }
+    }
+    print " .. Found $#ipt_msgs iptables messages out of ",
+        "$#lines total lines.\n";
+    &check_scan(\@ipt_msgs);
+    print " .. Displaying status output.\n";
+    &status_psad_daemon();
+    print "\n.. Finished --Analyze cycle.\n";
+    exit 0;
+}
+
 ### display the status of all four psad daemons
 sub status() {
 
@@ -3455,27 +3530,22 @@ sub status() {
 
 sub status_psad_daemon() {
     my $cmdline;
-    ### only the psad daemon (normally) runs with command line arguments
-    if (-e $cmdline_file) {
-        open CMD, "< $cmdline_file" or die ' ** Could not open ',
-            "$cmdline_file: $!";
-        $cmdline = <CMD>;
-        chomp $cmdline;
-    }
-    if ($cmdline) {
-        print "    Command line arguments: $cmdline\n";
-    } else {
-        print "    Command line arguments: [none specified]\n";
-    }
-    print "    Alert email address(es): ",
-        "$config{'EMAIL_ADDRESSES'}\n";
-    ### print the packet counters
-    if (-e $config{'PACKET_COUNTER_FILE'}) {
-        print "\n    Global packet counters:\n";
-        open F, "< $config{'PACKET_COUNTER_FILE'}" or
-            die " ** $config{'PACKET_COUNTER_FILE'}: $!";
-        print STDOUT "        $_" while (<F>);
-        close F;
+    if (not $analyze_msgs) {
+        ### only the psad daemon (normally) runs
+        ### with command line arguments
+        if (-e $cmdline_file) {
+            open CMD, "< $cmdline_file" or die ' ** Could not open ',
+                "$cmdline_file: $!";
+            $cmdline = <CMD>;
+            chomp $cmdline;
+        }
+        if ($cmdline) {
+            print "    Command line arguments: $cmdline\n";
+        } else {
+            print "    Command line arguments: [none specified]\n";
+        }
+        print "    Alert email address(es): ",
+            "$config{'EMAIL_ADDRESSES'}\n";
     }
     ### sort and print the scan source ips
     my %scan_srcs;
@@ -3624,6 +3694,14 @@ sub status_psad_daemon() {
         }
     } else {
         print STDOUT "    [No scans detected]\n";
+    }
+    ### print the global packet counters
+    if (not $analyze_msgs and -e $config{'PACKET_COUNTER_FILE'}) {
+        print "\n    Global packet counters:\n";
+        open F, "< $config{'PACKET_COUNTER_FILE'}" or
+            die " ** $config{'PACKET_COUNTER_FILE'}: $!";
+        print STDOUT "        $_" while (<F>);
+        close F;
     }
     return;
 }
@@ -3892,6 +3970,20 @@ sub handle_cmdline() {
     ### The --auto-ips switch was given
     $config{'PSAD_AUTO_IPS_FILE'} = $autoips_file if $autoips_file;
 
+    ### make sure to go into status display mode if the following
+    ### args were given.
+    $status = 1 if ($status_ip and not $status);
+    $status = 1 if ($status_sort_dl and not $status);
+    $status = 1 if ($status_dl and not $status);
+
+    ### make sure to go into firewall analysis mode if a ruleset
+    ### file was specified on the command line.
+    $fw_analyze = 1 if $fw_file;
+
+    ### make sure to go into message analysis mode if --messages-file
+    ### argument was given.
+    $analyze_msgs = 1 if $messages_file;
+
     return;
 }
 
@@ -4068,6 +4160,12 @@ sub setup() {
     ### make sure the permissions on these files is 0600
     &file_permissions($config{'FW_DATA_FILE'});
     &file_permissions($config{'FW_ERROR_LOG'});
+
+    ### set the fwdata file as the default file to analyze if we are in
+    ### --Analyze mode.
+    $messages_file = $config{'FW_DATA_FILE'}
+        if ($analyze_msgs and not $messages_file);
+
     return;
 }
 
@@ -4427,7 +4525,7 @@ sub required_vars() {
         DSHIELD_ALERT_INTERVAL DSHIELD_ALERT_EMAIL DSHIELD_USER_ID
         DSHIELD_USER_EMAIL DISK_CHECK_INTERVAL DISK_MAX_PERCENTAGE
         DISK_MAX_RM_RETRIES ETC_HOSTS_DENY ETC_SYSLOG_CONF
-        ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL
+        ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL ANALYSIS_DIR
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

@@ -1,7 +1,7 @@
 .\" Process this file with
 .\" groff -man -Tascii foo.1
 .\"
-.TH PSAD 8 "Oct, 2003" Linux
+.TH PSAD 8 "Dec, 2003" Linux
 .SH NAME
 .B psad
 \- The Port Scan Attack Detector
@@ -11,10 +11,12 @@
 .B ] [-c
 .I config-file
 .B ] [-l]
-.B ] [-h] [-B] [-F] [-S] [-K] [-R] [-U] [-H] [-V] [-p] [-D] [-d] [--signatures
+.B ] [-h] [-B] [-A] [-F] [-S] [-K] [-R] [-U] [-H] [-V] [-p] [-D] [-d] [--signatures
 .I sig-file
 .B ] [--interval
 .I interval
+.B ] [-m
+.I messages-file
 .B ] [--snort-type
 .I type
 .B ] [--snort-rdir
@@ -105,6 +107,18 @@ option) without having to restart the psad process.  Psad also detects
 many udp and icmp signatures that were originally included within snort.
 .TP
 
+.BR \-A ", " \-\^\-Analyze-msgs
+Run psad in after-the-fact analysis mode.  This will generate email alerts
+just as a normal running psad process would have for all logged scans.  By
+default the psad data file
+.B /var/log/psad/fwdata
+is parsed for old scans, but any file can be specified through the use
+of the --messages-file command line option.  For example it might be useful
+to point psad at your
+.B /var/log/messages
+file.
+.TP
+
 .BI \-\^\-snort-type "  type"
 Restrict the type of snort sids to
 .I type.
@@ -167,6 +181,13 @@ level of at least
 Sort status output by danger level.  The default output is sorted
 by ip address to show scans that may be associated with the same
 network in an easily readable format.
+.TP
+
+.BI \-m "\fR,\fP " \-\^\-messages-file "  file"
+This option is used to specify the file that will be parsed in analysis
+mode (see the --Analyze-msgs option).  The default path is the psad
+data file
+.B /var/log/psad/fwdata.
 .TP
 
 .BR \-K ", " \-\^\-Kill

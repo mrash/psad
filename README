@@ -199,34 +199,43 @@ USAGE:
           argument disables this feature.
 
 
-Usage: psad [-n] [-d] [-o] [-e] [-f] [-r] [-w] [-S] [-l] [-i <interval>] [-h]
-        [-c <config file>] [-s <signature file>] [-a <auto ips file>]
+USAGE: psad [-D] [-d] [-o] [-e] [-L] [-f] [-r] [-w] [-l] [-i <interval>] [-h]
+       [-V] [-K] [-R] [-U] [-S] [-c <config file>] [-s <signature file>]
+       [-a <auto ips file>]
 
-        -D   --Daemon                   - do not run as a daemon.
-        -e   --errors                   - do not write errors to the error
-                      log.
-        -d   --debug                    - run psad in debugging mode.
-        -w   --whois                    - disable whois lookups.
-        -i   --interval                 - configure the check interval from
-                                          the command line to override the 15
-                                          second default.
-        -f   --firewallcheck            - disable firewall rules verification.
-        -o   --output                   - print all messages to STDOUT (this
-                                          does not include bad packet messages
-                                          that are printed to the error log).
-        -c   --config <config file>     - use config file instead of the
-                                          values contained within the psad
-                                          script.
-        -r   --reversedns               - disable name resolution against
-                                          scanning ips.
-        -s   --signatures <sig file>    - import scan signatures.
-        -a   --auto_ips <ips file>      - import auto ips file for automatic
-                                          ip danger level increases/decreases.
-        -L   --Logging_server           - psad is being run on a syslog
-                                          server.
-        -l   --local_port_lookup        - disable local port lookups for scan
-                                          signatures.
-        -h   --help                     - prints this help message.
+OPTIONS:
+      -D   --Daemon                   - do not run as a daemon.
+      -e   --errors                   - do not write errors to the error
+                                        log.
+      -d   --debug                    - run psad in debugging mode.
+      -w   --whois                    - disable whois lookups.
+      -i   --interval                 - configure the check interval from
+                                        the command line to override the 15
+                                        second default.
+      -f   --firewallcheck            - disable firewall rules verification.
+      -o   --output                   - print all messages to STDOUT (this
+                                        does not include bad packet messages
+                                        that are printed to the error log).
+      -c   --config <config file>     - use config file instead of the
+                                        values contained within the psad
+                                        script.
+      -L   --Logging_server           - psad is being run on a syslog
+                                        logging server.
+      -r   --reversedns               - disable name resolution against
+                                        scanning ips.
+      -s   --signatures <sig file>    - import scan signatures.
+      -a   --auto_ips <ips file>      - import auto ips file for automatic
+                                        ip danger level increases/decreses.
+      -l   --local_port_lookup        - disable local port lookups for scan
+                                        signatures.
+      -K   --Kill                     - kill all running psad processes.
+      -R   --Restart                  - restart all running psad processes.
+      -S   --Status                   - displays the status of any
+                                        currently running psad processes.
+      -U   --USR1                     - send a running psad process a USR1
+                                        signal.
+      -V   --Version                  - print the psad version and exit.
+      -h   --help                     - prints this help message.
 
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 INSTALLATION:
@@ -240,8 +249,10 @@ PLATFORMS:
 2.2.18, 2.4.0, and 2.4.17, although it should work on any Linux system that
 has a properly configured firewall.  The only program that depends on the
 RedHat architecture is psad-init, which specifically depends on
-/etc/rc.d/init.d/functions.  psad-init is mostly included as a nicety; it can
-be run from the command line like any other program.
+/etc/rc.d/init.d/functions.  For non-RedHat systems a more generic init
+script is included called "psad-init.generic".  The psad init scripts are
+mostly included as a nicety; psad can be run from the command line like any
+other program.
 
 Ipfilter support on *BSD boxes is coming soon.
 

@@ -669,7 +669,7 @@ exit 0;
 ### Keeps track of scanning ip's, increments packet counters,
 ### keep track of tcp flags for each scan (iptables only)
 sub check_scan() {
-    my ($fw_lines_aref, $signatures) = @_;
+    my ($fw_pkts_aref, $signatures) = @_;
     my @bad_packets;
     my $flags;
     my $src;
@@ -687,7 +687,7 @@ sub check_scan() {
 
     ### If necessary, check which firewall (ipchains vs. iptables)
     unless ($use_ipchains || $use_iptables) {
-        &check_fw($fw_lines_aref->[0]);
+        &check_fw($fw_pkts_aref->[0]);
     }
     unless ($no_netstat) {
         if ($netstat_lkup_ctr == 10) {
@@ -699,23 +699,29 @@ sub check_scan() {
             $netstat_lkup_ctr++;
         }
     }
-    PKT: for my $line (@$fw_lines_aref) {
-        chomp $line;
+    PKT: for my $pkt (@$fw_pkts_aref) {
+        chomp $pkt;
+        my $found_sid = 0;
         if ($use_iptables) {
-            if ($line =~ /SRC=(\S+)\s+DST=(\S+)\s+
-                          LEN=(\d+).*TTL=(\d+).*PROTO=(\S+)\s+
-                          SPT=(\d+)\s+DPT=(\d+)/x) {
+            if ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+
+                         LEN=(\d+).*TTL=(\d+).*PROTO=(\S+)\s+
+                         SPT=(\d+)\s+DPT=(\d+)/x) {
                 ($src, $dst, $len, $ttl, $proto, $srcport, $dstport) =
                     ($1,$2,$3,$4,$5,$6,$7,$8);
+                if ($snort_sids) {
+                    if ($pkt =~ /($config{'SNORT_SID_STR'}\d+)\s+SRC/) {
+                        $found_sid = $1;
+                    }
+                }
                 if ($proto ne 'TCP' && $proto ne 'UDP') {
                     ### it was some weird non-tcp/udp packet
                     ### with source and destination ports
-                    push @bad_packets, $line;
+                    push @bad_packets, $pkt;
                     next PKT;
                 }
                 if ($proto eq 'TCP') {
                     $flags = 'NULL';  ### default to NULL
-                    if ($line =~ /RES=\S+\s+(.*)\s+URGP=/) {
+                    if ($pkt =~ /RES=\S+\s+(.*)\s+URGP=/) {
                         $flags = $1;
                     }
 
@@ -740,7 +746,7 @@ sub check_scan() {
                             $flags =~ /SYN/ ||
                             $flags =~ /FIN/ ||
                             $flags eq 'NULL') {
-                        push @bad_packets, $line;
+                        push @bad_packets, $pkt;
                         next PKT;
                     }
                     $tcp_ctr++;
@@ -750,7 +756,7 @@ sub check_scan() {
                     $udp_ctr++;
                 }
                 $matched_packet = 1;
-            } elsif ($line =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+).*
+            } elsif ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+).*
                                TTL=(\d+).*PROTO=ICMP\s+TYPE=(\d+)\s+
                                CODE=(\d+)\s+ID=(\d+)\s+SEQ=(\d+)/x) {
                 ($src, $dst, $len, $ttl, $type, $code, $id, $seq) =
@@ -761,12 +767,12 @@ sub check_scan() {
             } else {
                 ### Sometimes the iptables log entry gets messed up due to
                 ### buffering issues so we write it to the error log.
-                push @bad_packets, $line;
+                push @bad_packets, $pkt;
                 next PKT;
             }
         } elsif ($use_ipchains) {
             ### could implement source port checking here
-            if ($line =~ /PROTO\=(\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):
+            if ($pkt =~ /PROTO\=(\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):
                           (\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)/x) {
                 ($proto, $src, $srcport, $dst, $dstport) = ($1,$2,$3,$4,$5);
                 ### should implement protocol mapping
@@ -784,7 +790,7 @@ sub check_scan() {
                 $flags = 'NONE';
                 $matched_packet = 1;
             } else {
-                push @bad_packets, $line;
+                push @bad_packets, $pkt;
                 next PKT;
             }
         }
@@ -871,16 +877,19 @@ sub check_scan() {
         ### also, but then cannot use tcp flags except for -y -l rules
         next PKT unless ($signatures && $use_iptables);
 
-        ### attempt to match any tcp/udp/icmp signatures in the
-        ### %sigs_fast hash
-        &match_fastsigs($src, $dst, $srcport, $dstport, $proto,
-            $flags, $len, $ttl);
+        if ($snort_sids && $found_sid) {
+            ### found a snort sid in the packet log message
+        } else {
+            ### attempt to match any tcp/udp/icmp signatures in the
+            ### %sigs_fast hash
+            &match_fastsigs($src, $dst, $srcport, $dstport, $proto,
+                $flags, $len, $ttl);
 
-        ### attempt to match any tcp/udp/icmp signatures in the
-        ### main signatures hash
-        &match_sigs($src, $dst, $srcport, $dstport, $proto,
-            $flags, $len, $ttl, $type, $code, $id, $seq);
-
+            ### attempt to match any tcp/udp/icmp signatures in the
+            ### main signatures hash
+            &match_sigs($src, $dst, $srcport, $dstport, $proto,
+                $flags, $len, $ttl, $type, $code, $id, $seq);
+        }
     }
     &collect_errors(\@bad_packets) unless $no_errors;
     return $matched_packet;
@@ -902,7 +911,7 @@ sub match_fastsigs() {
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
 #                $scan{$src}{$dst}{$proto}{'CURR_SIG'}{$sig_id}{'PKTS'}++;
-                &cache_dst_port($src, $dst, 'TCP', $dstport, $flags, $sig_id)
+                &chk_local_port($src, $dst, 'TCP', $dstport, $flags, $sig_id)
                     unless $no_netstat;
             }
         }
@@ -917,7 +926,7 @@ sub match_fastsigs() {
                         = $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
-                &cache_dst_port($src, $dst, 'TCP', $dstport, $flags, $sig_id)
+                &chk_local_port($src, $dst, 'TCP', $dstport, $flags, $sig_id)
                     unless $no_netstat;
             }
         }
@@ -932,7 +941,7 @@ sub match_fastsigs() {
                         = $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
-                &cache_dst_port($src, $dst, 'TCP', $dstport, $flags, $sig_id)
+                &chk_local_port($src, $dst, 'TCP', $dstport, $flags, $sig_id)
                     unless $no_netstat;
             }
         }
@@ -947,7 +956,7 @@ sub match_fastsigs() {
                         = $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
-                &cache_dst_port($src, $dst, 'TCP', $dstport, $flags, $sig_id)
+                &chk_local_port($src, $dst, 'TCP', $dstport, $flags, $sig_id)
                     unless $no_netstat;
             }
         }
@@ -960,7 +969,7 @@ sub match_fastsigs() {
                         $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
-                &cache_dst_port($src, $dst, 'UDP', $dstport, '', $sig_id)
+                &chk_local_port($src, $dst, 'UDP', $dstport, '', $sig_id)
                     unless $no_netstat;
             }
         }
@@ -1018,13 +1027,13 @@ sub match_sigs() {
             }
         }
         if ($matched_sig && !$no_netstat && $proto ne 'ICMP') {
-            &cache_dst_port($src, $dst, $proto, $dstport, $flags, $sig_id);
+            &chk_local_port($src, $dst, $proto, $dstport, $flags, $sig_id);
         }
     }
     return;
 }
 
-sub cache_dst_port() {
+sub chk_local_port() {
     my ($src, $dst, $proto, $dstport, $flags, $sig_id) = @_;
     ### check to see if the scan destination ip is directed
     ### at the firewall.  If yes, then check to see if a

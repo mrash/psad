@@ -1017,7 +1017,7 @@ sub check_scan() {
 sub match_fastsigs() {
     my ($src, $dst, $sp, $dp, $proto,
         $flags, $len, $ttl) = @_;
-    print "match_fastsigs() call\n";
+    print "match_fastsigs() call\n" if $debug;
     if ($proto eq 'tcp') {
         if (defined $sigs_fast{'tcp'}{$dp}{$sp}{$flags}) {
             for my $sig_id (keys
@@ -1089,7 +1089,7 @@ sub match_fastsigs() {
 sub match_sigs() {
     my ($src, $dst, $sp, $dp, $proto,
         $flags, $len, $ttl, $type, $code, $id, $seq) = @_;
-    print "match_sigs() call\n";
+    print "match_sigs() call\n" if $debug;
     for my $sig_id (keys %{$sigs{$proto}}) {
         ### need to iterate through all signatures
         ### since a packet may match several

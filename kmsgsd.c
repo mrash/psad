@@ -79,8 +79,8 @@ int main(int argc, char *argv[]) {
 #endif
 
 #ifdef DEBUG
-    fprintf(stderr, " .. Entering DEBUG mode ..\n");
-    fprintf(stderr, " .. Firewall messages will be written to both ");
+    fprintf(stderr, "[+] Entering DEBUG mode\n");
+    fprintf(stderr, "[+] Firewall messages will be written to both ");
     fprintf(stderr, "STDOUT _and_ to fwdata.\n\n");
 #endif
 
@@ -98,14 +98,14 @@ int main(int argc, char *argv[]) {
                 strlcpy(fw_search_file, optarg, MAX_PATH_LEN);
                 break;
             default:
-                printf(" .. Usage:  kmsgsd [-c <config file>] ");
+                printf("[+] Usage:  kmsgsd [-c <config file>] ");
                 printf("[-k <fw_search file>]\n");
                 exit(EXIT_FAILURE);
         }
     }
 
 #ifdef DEBUG
-    fprintf(stderr, " .. parsing config_file: %s\n", config_file);
+    fprintf(stderr, "[+] parsing config_file: %s\n", config_file);
 #endif
     /* parse config file (kmsgsd.conf) */
     parse_config(config_file, psadfifo_file,
@@ -223,7 +223,7 @@ int main(int argc, char *argv[]) {
             fwlinectr++;
             if (fwlinectr % 50 == 0)
                 fprintf(stderr,
-                    " .. Processed %d firewall lines.\n", fwlinectr);
+                    "[+] Processed %d firewall lines.\n", fwlinectr);
             matched_ipt_log_msg = 0;
         } else {
             puts(buf);
@@ -286,10 +286,10 @@ static void parse_config(char *config_file, char *psadfifo_file,
     }
     fclose(config_ptr);
 #ifdef DEBUG
-    fprintf(stderr, " .. PSAD_FIFO: %s\n", psadfifo_file);
-    fprintf(stderr, " .. FW_DATA_FILE: %s\n", fwdata_file);
-    fprintf(stderr, " .. SNORT_SID_STR: %s\n", snort_sid_str);
-    fprintf(stderr, " .. KMSGSD_PID_FILE: %s\n", kmsgsd_pid_file);
+    fprintf(stderr, "[+] PSAD_FIFO: %s\n", psadfifo_file);
+    fprintf(stderr, "[+] FW_DATA_FILE: %s\n", fwdata_file);
+    fprintf(stderr, "[+] SNORT_SID_STR: %s\n", snort_sid_str);
+    fprintf(stderr, "[+] KMSGSD_PID_FILE: %s\n", kmsgsd_pid_file);
 #endif
     return;
 }

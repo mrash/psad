@@ -4567,7 +4567,15 @@ sub status_psad_daemon() {
                     shift @ipdirfiles; shift @ipdirfiles;
                     FILE: for my $file (@ipdirfiles) {
                         my $dst;
-                        if ($file =~ /os_guess/ and -e "${src_ipdir}/os_guess") {
+                        if ($file =~ /p0f_guess/ and -e "${src_ipdir}/p0f_guess") {
+                            open F, "< ${src_ipdir}/p0f_guess" or die "[*] Could not ",
+                                "open ${src_ipdir}/p0f_guess: $!";
+                            my $os = <F>;
+                            close F;
+                            chomp $os;
+                            $scan_os{$src_ipdir} = $os;
+                            next FILE;
+                        } elsif ($file =~ /os_guess/ and -e "${src_ipdir}/os_guess") {
                             open F, "< ${src_ipdir}/os_guess" or die "[*] Could not ",
                                 "open ${src_ipdir}/os_guess: $!";
                             my $os = <F>;

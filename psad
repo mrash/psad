@@ -150,15 +150,24 @@ my $hostname = hostname;
 my $debug = 0;
 
 ### we don't yet know which type of firewall we are
-### running on; this will be calculated by check_scan().
+### running on; this will be calculated by check_scan()
 ### when the first dropped packet hits the firewall and
 ### we can examine the logging format.
 my $use_ipchains = 0;
 my $use_iptables = 0;
 
-### firewall flags (only used if $config{'ENABLE_AUTO_IDS'} eq 'Y')
-my $iptables_have_mangle;
-my $iptables_have_nat;
+my $checked_iptables_flags = 0;
+my $flush_fw_rules         = 0;
+
+### Cache the default table->chain relationships used
+### by the auto blocking code for iptables firewalls.
+### The nat and mangle PREROUTING chains will be added
+### by iptables_flags().
+my %iptables_chains;
+
+### define the input chains for ipchains firewalls (this
+### is very simplistic).
+my @ipchains_chains = qw(input);
 
 ### main psad data structure; contains ips, port ranges,
 ### protocol info, tcp flags, etc.
@@ -236,6 +245,8 @@ Getopt::Long::Configure('no_ignore_case');
                                           # diskmond).
     'Restart'        => \$restart,        # Restart psad with all options of
                                           # the currently running psad process.
+    'Flush'          => \$flush_fw_rules, # Flush any rules that psad added
+                                          # via the auto blocking code.
     'Status'         => \$status,         # Display status of any currently
                                           # running psad processes.
     'USR1'           => \$usr1,           # Send an existing psad process a
@@ -309,8 +320,16 @@ if ($kill) {
     exit 0;
 }
 
+### The --Flush command line switch was given.
+if ($flush_fw_rules) {
+    &rm_auto_blocked_rules();
+    exit 0;
+}
+
 ### The --USR1 command line switch was given.
-&psad_usr1() if $usr1;
+if ($usr1) {
+    exit &usr1();
+}
 
 ### The -i <check interval> command line argument was given
 if ($check_interval) {
@@ -410,7 +429,7 @@ if ($config_file eq '/etc/psad/psad.conf') {
 ### a previous run.  This feature is most useful for preserving
 ### automatically blocked ips after a reboot.
 if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
-    &check_auto_blocked();
+    &reinstate_auto_blocked();
 }
 
 ### archive old firewall and scan data
@@ -1497,7 +1516,7 @@ sub scan_logr() {
     return;
 }
 
-sub check_auto_blocked() {
+sub reinstate_auto_blocked() {
     if (-e $auto_blocked_file) {
         open B, "< $auto_blocked_file" or
             warn " ... @@@ Could not open $auto_blocked_file\n" and return;
@@ -1518,29 +1537,29 @@ sub check_auto_blocked() {
             }
         }
         if ($use_iptables) {
-            my $inchains_aref = &get_fw_chains($cmds{'iptables'});
-            for my $inchain (@$inchains_aref) {
-                my @rules = `$cmds{'iptables'} -nL $inchain`;
-                for my $blockip (@block_ips) {
-                    my $blocked = 0;
-                    RULE: for my $rule (@rules) {
-                        ### DROP       all  --  1.1.1.1        0.0.0.0/0
-                        if ($rule =~ /^DROP\s+all.*?$blockip\s+0\.0\.0\.0\/0/) {
-                            ### all traffic from $blockip is being blocked
-                            $blocked = 1;
-                            last RULE;
+            &iptables_flags unless $checked_iptables_flags;
+            for my $table (keys %iptables_chains) {
+                for my $chain (keys %{$iptables_chains{$table}}) {
+                    my @rules = `$cmds{'iptables'} -t $table -nL $chain`;
+                    for my $blockip (@block_ips) {
+                        my $blocked = 0;
+                        RULE: for my $rule (@rules) {
+                            ### DROP       all  --  1.1.1.1        0.0.0.0/0
+                            if ($rule =~ /^DROP\s+all.*?$blockip\s+0\.0\.0\.0\/0/) {
+                                ### all traffic from $blockip is being blocked
+                                $blocked = 1;
+                                last RULE;
+                            }
                         }
-                    }
-                    unless ($blocked) {
-                        system "$cmds{'iptables'} -I $inchain 1 -s $blockip " .
-                               "-j DROP 2> /dev/null 1>&2";
+                        unless ($blocked) {
+                            &iptables_block($table, $chain, $blockip);
+                        }
                     }
                 }
             }
         } elsif ($use_ipchains) {
-            my $inchains_aref = &get_fw_chains($cmds{'ipchains'});
-            for my $inchain (@$inchains_aref) {
-                my @rules = `$cmds{'ipchains'} -nL $inchain`;
+            for my $chain (@ipchains_chains) {
+                my @rules = `$cmds{'ipchains'} -nL $chain`;
                 for my $blockip (@block_ips) {
                     my $blocked = 0;
                     RULE: for my $rule (@rules) {
@@ -1552,8 +1571,7 @@ sub check_auto_blocked() {
                         }
                     }
                     unless ($blocked) {
-                        system "$cmds{'ipchains'} -I $inchain 1 -s $blockip " .
-                            "-j DENY 2> /dev/null 1>&2";
+                        &ipchains_block($chain, $blockip);
                     }
                 }
             }
@@ -1562,8 +1580,8 @@ sub check_auto_blocked() {
     return;
 }
 
-sub auto_psad_response(){
-    if ($use_iptables && ! defined $iptables_have_nat) {
+sub auto_psad_response() {
+    if ($use_iptables && ! $checked_iptables_flags) {
         ### determine whether or not the NAT or mangle code has
         ### been compiled into iptables
         &iptables_flags();
@@ -1577,14 +1595,12 @@ sub auto_psad_response(){
             ### threshold for _any_ destination.
             if ($current_danger_level
                 >= $config{'AUTO_IDS_DANGER_LEVEL'}
-                && !(defined $scan{$src}{$dst}{'BLOCKED'})) {
+                && ! defined $scan{$src}{$dst}{'BLOCKED'}) {
                 if ($use_ipchains) {
-                    my $chains_aref = &get_fw_chains($cmds{'ipchains'});
                     my $blocked_str = '';
                     if ($config{'IPCHAINS_BLOCK_METHOD'} eq 'Y') {
-                        for my $inchain (@$chains_aref) {
-                            system "$cmds{'ipchains'} -I $inchain 1 -s $src " .
-                                "-j DENY 2> /dev/null 1>&2";
+                        for my $chain (@ipchains_chains) {
+                            &ipchains_block($chain, $src);
                         }
                         $blocked_str = 'via ipchains';
                     } elsif ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
@@ -1609,27 +1625,12 @@ sub auto_psad_response(){
                     &write_blocked_ip($src);
                     next SOURCE;
                 } elsif ($use_iptables) {
-                    my $chains_aref = &get_fw_chains($cmds{'iptables'});
                     my $blocked_str = '';
                     if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
-                        if ($iptables_have_nat) {  ### prefer the nat table
-                            ### block the offending ip in the PREROUTING
-                            ### chain in the nat table
-                            system "$cmds{'iptables'} -t nat -I PREROUTING 1 " .
-                                "-p tcp -s $src -j DROP 2> /dev/null 1>&2";
-                        } elsif ($iptables_have_mangle) {
-                            ### block the offending ip in the PREROUTING
-                            ### chain in the mangle table
-                            system "$cmds{'iptables'} -t mangle -I PREROUTING 1 " .
-                                "-p tcp -s $src -j DROP 2> /dev/null 1>&2";
-                        }
-                        ### block the offending ip in the FORWARD chain
-                        ### in the normal filter table
-                        system "$cmds{'iptables'} -I FORWARD 1 -s $src " .
-                            "-j DROP 2> /dev/null 1>&2";
-                        for my $inchain (@$chains_aref) {
-                            system "$cmds{'iptables'} -I $inchain 1 -s $src " .
-                                "-j DROP 2> /dev/null 1>&2";
+                        for my $table (keys %iptables_chains) {
+                            for my $chain (keys %{$iptables_chains{$table}}) {
+                                &iptables_block($table, $chain, $src);
+                            }
                         }
                         $blocked_str = 'via iptables';
                     } elsif ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
@@ -1661,18 +1662,33 @@ sub auto_psad_response(){
 }
 
 sub iptables_flags() {
-    my $nat_rv    = (system "$cmds{'iptables'} -nL -t nat") >> 8;
-    my $mangle_rv = (system "$cmds{'iptables'} -nL -t mangle") >> 8;
+    $checked_iptables_flags = 1;
+    $iptables_chains{'filter'}{'INPUT'}   = '';
+    $iptables_chains{'filter'}{'FORWARD'} = '';
+    my $nat_rv    = (system "$cmds{'iptables'} -nL -t nat " .
+        "> /dev/null 2>&1") >> 8;
+    my $mangle_rv = (system "$cmds{'iptables'} -nL -t mangle " .
+        "> /dev/null 2>&1") >> 8;
     if ($nat_rv == 0) {
-        $iptables_have_nat = 1;
-    } else {
-        $iptables_have_nat = 0;
+        $iptables_chains{'nat'}{'PREROUTING'} = '';
     }
     if ($mangle_rv == 0) {
-        $iptables_have_mangle = 1;
-    } else {
-        $iptables_have_mangle = 0;
+        $iptables_chains{'mangle'}{'PREROUTING'} = '';
     }
+    return;
+}
+
+sub iptables_block() {
+    my ($table, $chain, $src) = @_;
+    system "$cmds{'iptables'} -t $table -I $chain 1 " .
+        "-s $src -j DROP 2> /dev/null 1>&2";
+    return;
+}
+
+sub ipchains_block() {
+    my ($chain, $src) = @_;
+    system "$cmds{'ipchains'} -I $chain 1 -s $src " .
+        "-j DENY 2> /dev/null 1>&2";
     return;
 }
 
@@ -1700,20 +1716,6 @@ sub email_limit_reached() {
         "$hostname ($dst)!!!";
     &Psad::sendmail($subject, '', $emails_aref, $cmds{'mail'});
     return;
-}
-
-sub get_fw_chains() {
-    my $fwCmd = shift;
-    my @rules;
-    my @chains;
-    @rules = `$fwCmd -nL`;
-    for my $rule (@rules) {
-        next unless ($rule =~ /Chain/);
-        my ($cname) = ($rule =~ /Chain\s(\w+)/);
-        next unless ($cname =~ /in/i); ### we don't have an input chain
-        push @chains, $cname;
-    }
-    return \@chains;
 }
 
 sub print_scan() {  ### this should primarily be used for debugging
@@ -1976,7 +1978,7 @@ sub status_psad() {
     exit $rv;
 }
 
-sub psad_usr1() {
+sub usr1() {
     my $rv = 0;
     my $psad_pidfile = $pidfiles[1];
     if (-e $psad_pidfile) {
@@ -2005,7 +2007,7 @@ sub psad_usr1() {
             print " ... psad is not currently running on $hostname\n";
         }
     }
-    exit $rv;
+    return $rv;
 }
 
 sub archive_data() {

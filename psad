@@ -355,8 +355,8 @@ if ($ENABLE_AUTO_IDS eq "Y") {
 
 ### Install signal handlers for debugging %Scan with Data::Dumper,
 ### and for reaping zombie whois processes
-#$SIG{'__WARN__'} = \&Psad::warn_handler;
-#$SIG{'__DIE__'}  = \&Psad::die_handler;
+$SIG{'__WARN__'} = \&Psad::warn_handler;
+$SIG{'__DIE__'}  = \&Psad::die_handler;
 $SIG{'CHLD'}     = \&REAPER;
 $SIG{'USR1'}     = \&print_scan;
 

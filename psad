@@ -160,6 +160,9 @@ use strict;
 ### set current the psad version number
 my $version = '1.1.1';
 
+### regex to match an ip address
+my $ip_re = '(?:\d{1,3}\.){3}\d{1,3}';
+
 ### establish some default paths
 my $config_dir   = '/etc/psad';
 my $config_file  = "${config_dir}/psad.conf";
@@ -406,10 +409,7 @@ my @pidfiles = (
 );
 
 ### The --Kill command line switch was given.
-if ($kill) {
-    &kill_psad();
-    exit 0;
-}
+exit &kill_psad() if $kill;
 
 ### The --Flush command line switch was given.
 if ($flush_fw) {
@@ -425,9 +425,7 @@ if ($flush_fw) {
 }
 
 ### The --USR1 command line switch was given.
-if ($usr1) {
-    exit &usr1();
-}
+exit &usr1() if $usr1;
 
 ### The -i <check interval> command line argument was given
 if ($chk_interval) {
@@ -577,7 +575,8 @@ if ($benchmark) {
 ### Get an open filehandle for the main firewall data file $FW_DATA.
 ### All firewall drop/deny/reject log messages are written to $FW_DATA
 ### by kmsgsd.
-open FWDATA, $config{'FW_DATA'} unless $benchmark;
+open FWDATA, $config{'FW_DATA'} or die ' ** Could not open ',
+    "$config{'FW_DATA'}: $!" unless $benchmark;
 
 ###=========================================================###
 ######                    MAIN LOOP                      ######
@@ -775,8 +774,7 @@ sub check_scan() {
             }
         } elsif ($use_ipchains) {
             ### could implement source port checking here
-            if ($pkt =~ /PROTO\=(\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):
-                          (\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)/x) {
+            if ($pkt =~ /PROTO\=(\d+)\s($ip_re):(\d+)\s($ip_re):(\d+)/) {
                 ($proto, $src, $srcport, $dst, $dstport) = ($1,$2,$3,$4,$5);
                 ### should implement protocol mapping
                 ### with /etc/protocols here
@@ -1197,7 +1195,7 @@ sub check_import_config() {
         ### kill kmsgsd since it does not have the capability of
         ### checking for a modified config file
         open K, "< $config{'KMSGSD_PID_FILE'}" or warn
-            " ** Could not open $config{'KMSGSD_PID_FILE'}";
+            " ** Could not open $config{'KMSGSD_PID_FILE'}" and return;
         my $pid = <K>;
         close K;
         chomp $pid;
@@ -1237,6 +1235,11 @@ sub import_snort_rules() {
             my $sid;
             my $classtype;
             my $content;
+
+            ### can't handle multiple content fields
+            next RULE if ($line =~ /content:.*content:/);
+            next RULE if ($line =~ /content-list:/);
+
             $msg = $1 if $line =~ /msg:\s*\"(.*?)\"\s*;/;
             $sid = $1 if $line =~ /[\s;]sid:\s*(\d+)\s*;/;
             $classtype = $1 if $line =~ /[\s;]classtype:\s*(.*?)\s*;/;
@@ -1456,7 +1459,8 @@ sub is_range() {
 
 sub import_auto_ips() {
     %auto_ips = ();  ### undef so we don't leave old ips in %auto_ips
-    open A, "< $autoips_file";
+    open A, "< $autoips_file" or die ' ** Could not open ',
+        "$autoips_file: $!";
     my @lines = <A>;
     close A;
     my $i = 1;
@@ -1464,10 +1468,9 @@ sub import_auto_ips() {
         $i++;
         next if ($line =~ /^\s*#/);
         next unless ($line =~ /\S/);
-        if ($line =~ /^\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+([0-5])/) {
+        if ($line =~ /^\s*($ip_re)\s+([0-5])/) {
             $auto_ips{'ip'}{$1} = $2;
-        } elsif ($line =~ m|^\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d+)
-                            \s+([0-5])|x) {
+        } elsif ($line =~ m|^\s*($ip_re/\d+)\s+([0-5])|) {
             $auto_ips{'net'}{$1} = $2;
         } else {
             my $subject = " ** psad import warning: $autoips_file " .
@@ -1600,7 +1603,8 @@ sub write_packet_counters() {
 
 sub collect_errors() {
     my ($bad_packets_aref) = @_;
-    open ERR, ">> $config{'ERROR_LOG'}";
+    open ERR, ">> $config{'ERROR_LOG'}" or die ' ** Could not open ',
+        "$config{'ERROR_LOG'}: $!";
     for my $line (@$bad_packets_aref) {
         print ERR "$line\n";
     }
@@ -1740,7 +1744,7 @@ sub scan_logr() {
 
             ### get reverse dns info
             unless ($no_rdns) {
-                if ($src =~ /^(?:\d{1,3}\.){3}\d{1,3}$/) {
+                if ($src =~ /^$ip_re$/) {
                     my $ipaddr = gethostbyname $src;
                     ### my $rdns = gethostbyaddr($ipaddr, AF_INET);
                     if ($rdns = gethostbyaddr $ipaddr, 2) {
@@ -2026,7 +2030,7 @@ sub old_auto_blocked_ips() {
             } elsif ($line =~ /IPCHAINS/) {
                 $use_ipchains = 1;
             }
-            if ($line =~ /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/) {
+            if ($line =~ /^($ip_re)/) {
                 push @block_ips, $1;
             }
         }
@@ -2252,7 +2256,8 @@ sub email_limit_reached() {
 sub print_scan() {  ### this should primarily be used for debugging
     $usr1_flag = 0;  ### clear the flag
     my $scanfile = $config{'PRINT_SCAN_HASH'} . ".$$";
-    open PSCAN, "> $scanfile";
+    open PSCAN, "> $scanfile" or warn ' ** Could not open ',
+        "$scanfile: $!" and return;
     print PSCAN Dumper \%scan;
     close PSCAN;
     chmod 0600, $scanfile;
@@ -2274,7 +2279,7 @@ sub get_local_ips() {
     my @ips = `$cmds{'ifconfig'} -a`;
     my %local_ips;
     for my $line (@ips) {
-        if ($line =~ /inet\s+addr:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s/) {
+        if ($line =~ /inet\s+addr:($ip_re)\s/) {
             $local_ips{$1} = '';
         }
     }
@@ -2344,7 +2349,8 @@ sub check_permissions() {
         if (-e $file) {
             chmod 0600, $file;
         } else {
-            open T, "> $file";
+            open T, "> $file" or die ' ** Could not open ',
+                "$file: $!";
             close T;
             chmod 0600, $file;
         }
@@ -2353,13 +2359,15 @@ sub check_permissions() {
 }
 
 sub kill_psad() {
+    my $rv = 0;
     ### must kill psadwatchd first since if not, it might try to restart
     ### any of the other three daemons (its pid file is listed first in
     ### @pidfiles)
     for my $pidfile (@pidfiles) {
         my ($pidname) = ($pidfile =~ m|.*/(\w+)\.pid|);
         if (-e $pidfile) {
-            open PIDFILE, "< $pidfile";
+            open PIDFILE, "< $pidfile" or die ' ** Could not open ',
+                "$pidfile: $!";
             my $pid = <PIDFILE>;
             close PIDFILE;
             chomp $pid;
@@ -2368,22 +2376,26 @@ sub kill_psad() {
                 unless (kill 15, $pid) {
                     kill 9, $pid or print " ** psad: Could not kill ",
                         "$pidname, pid: $pid $!\n";
+                    $rv = 1;
                 }
             } else {
                 print " ** psad: $pidname is not running on $hostname.\n";
+                $rv = 1;
             }
         } else {
             print " ** psad: pid file $pidfile does not exist for ",
                 "$pidname on $hostname\n";
+            $rv = 1;
         }
     }
-    return;
+    return $rv;
 }
 
 sub restart() {
     my $cmdline;
     if (-e $cmdline_file) {
-        open CMD, "< $cmdline_file";
+        open CMD, "< $cmdline_file" or die ' ** Could not open ',
+            "$cmdline_file: $!";
         $cmdline = <CMD>;
         close CMD;
         chomp $cmdline;
@@ -2402,7 +2414,8 @@ sub status() {
     my $cmdline;
     ### only the psad daemon (normally) runs with command line arguments
     if (-e $cmdline_file) {
-        open CMD, "< $cmdline_file";
+        open CMD, "< $cmdline_file" or die ' ** Could not open ',
+            "$cmdline_file: $!";
         $cmdline = <CMD>;
         chomp $cmdline;
     }
@@ -2413,7 +2426,8 @@ sub status() {
             $config{'DISKMOND_PID_FILE'}) {
         my ($pidname) = ($pidfile =~ /(\w+)\.pid$/);
         if (-e $pidfile) {
-            open PIDFILE, "< $pidfile";
+            open PIDFILE, "< $pidfile" or die ' ** Could not open ',
+                "$pidfile: $!";
             my $pid = <PIDFILE>;
             close PIDFILE;
             chomp $pid;
@@ -2450,8 +2464,7 @@ sub status() {
                             closedir D;
                             shift @files; shift @files;
                             for my $file (@files) {
-                                if ($file =~ /(?:\d{1,3}\.){3}\d{1,3}/
-                                    && -d $file) {
+                                if ($file =~ /$ip_re/ && -d $file) {
                                     ### $file is a current scan source ip
                                     my $src_ipdir = $file;
                                     if (-e "${src_ipdir}/danger_level") {
@@ -2559,7 +2572,7 @@ sub archive_data() {
     shift @files; shift @files;
 
     for my $file (@files) {
-        if ($file =~ /(?:\d{1,3}\.){3}\d{1,3}/ && -d $file) {
+        if ($file =~ /$ip_re/ && -d $file) {
             ### $file is an old scaning ip from a previous psad execution
             my $old_ipdir     = $file;
             my $archive_ipdir = "$config{'SCAN_DATA_ARCHIVE_DIR'}/$old_ipdir";
@@ -2576,7 +2589,8 @@ sub archive_data() {
     ### first see how big the archive file is and zero out if
     ### it is larger than about 10,000 lines
     if (-e $fwarchive && (-s $fwarchive) > 2367766) {  ### about 10,000 lines
-        open F, "> $fwarchive";
+        open F, "> $fwarchive" or die ' ** Could not open ',
+            "$fwarchive: $!";
         close F;
     }
     unless (-e $fwdata) {
@@ -2589,7 +2603,8 @@ sub archive_data() {
     print AR $_ for @fwlines;
     close AR;
     ### zero out $FW_DATA
-    open F, "> $fwdata";
+    open F, "> $fwdata" or die ' ** Could not open ',
+        "$fwdata: $!";
     close F;
     return;
 }
@@ -2631,15 +2646,22 @@ sub setup() {
         mkdir $config{'PSAD_ERROR_DIR'}, 0500;
     }
     unless (-e $config{'FW_DATA'}) {
-        open F, "> $config{'FW_DATA'}";
+        open F, "> $config{'FW_DATA'}" or die ' ** Could not open ',
+            "$config{'FW_DATA'}: $!";
         close F;
     }
     unless (-e $config{'ERROR_LOG'}) {
-        open E, "> $config{'ERROR_LOG'}";
+        open E, "> $config{'ERROR_LOG'}" or die ' ** Could not open ',
+            "$config{'ERROR_LOG'}: $!";
         close E;
     }
     unless (-e $config{'PSAD_FIFO'}) {
         system "$cmds{'mknod'} -m 600 $config{'PSAD_FIFO'} p";
+    }
+    ### make sure the new whois path exists
+    if (-x '/usr/bin/whois.psad' && ! -x $cmds{'whois'}
+        && '/usr/bin/whois.psad' ne $cmds{'whois'}) {
+        move '/usr/bin/whois.psad', $cmds{'whois'};
     }
     unless (-e '/etc/syslog.conf.orig') {
         copy('/etc/syslog.conf', '/etc/syslog.conf.orig');

@@ -6,7 +6,7 @@
 #
 # version 0.8.9
 # Copyright (C) 1999-2001 Michael B. Rash (mbr@cipherdyne.com)
-# Thanks to Manuel Caphina for greatly assisting in the original version.
+#
 # Credits:
 #	Manual Caphina--  Greatly assisting in the original version.
 #	Tim Schaller--    Identifying and submitting a patch for a particularly
@@ -372,7 +372,7 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 						if (`$Cmds_href->{'netstat'} -an |$Cmds_href->{'grep'} \"$lprot\" | $Cmds_href->{'grep'} \"LISTEN\\b\" |$Cmds_href->{'grep'} \"\\:$dstport\\b\"`) {
 							$listening_port = "YOUR MACHINE IS LISTENING ON ($lprot) PORT: $dstport";
 						} else {
-							$listening_port = "There is no server listening on $lport port $dstport";
+							$listening_port = "There is no server listening on $lprot port $dstport";
 						}
 					}
 # including sp almost always changes the hash key: 	my $alert_string = "$msg  sp=$srcport, dp=$dstport, flags=$flags.  $listening_port";
@@ -933,7 +933,6 @@ sub check_fw() {
 sub check_firewall_rules() {
 	my $Cmds_href = shift;
         my @localips;
-	my $proto;
         my $kernel = (split /\s/, `$Cmds_href->{'uname'} -a`)[2];
         my @localips_tmp = `$Cmds_href->{'ifconfig'} -a |$Cmds_href->{'grep'} inet`;
         push @localips, (split /:/, (split /\s+/, $_)[2])[1] foreach (@localips_tmp);
@@ -952,7 +951,7 @@ sub check_firewall_rules() {
                 FWPARSE: foreach my $rule (@rules) {
                         next FWPARSE if ($rule =~ /^Chain/ || $rule =~ /^target/);
                         if ($rule =~ /^(LOG)\s+(\w+)\s+\S+\s+\S+\s+(\S+)\s.+prefix\s\`(.+)\'/) {
-                                ($target, $proto, $dst, $prefix) = ($1, $2, $3, $4);
+                                my ($target, $proto, $dst, $prefix) = ($1, $2, $3, $4);
                                 if ($target eq "LOG" && $proto =~ /all|tcp/ && $prefix =~ /drop|reject|deny/i) { # only tcp supported right now...
                                 # this needs work... see above _two_ rules.
                                         if (check_destination($dst, \@localips)) {

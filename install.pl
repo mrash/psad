@@ -471,8 +471,8 @@ sub install() {
         unlink "${PSAD_CONFDIR}/diskmond.conf";
     }
 
-    ### deal with auto_dl, signatures, icmp_types, and posf files
-    for my $file qw(signatures icmp_types posf auto_dl) {
+    ### install auto_dl, signatures, icmp_types, posf, and pf.os files
+    for my $file qw(signatures icmp_types posf auto_dl pf.os) {
         if (-e "${PSAD_CONFDIR}/$file") {
             unless (&query_preserve_sigs_autodl("${PSAD_CONFDIR}/$file")) {
                 ### keep the installed file intact (the user must have
@@ -633,9 +633,9 @@ sub install() {
         &logr("\n[+] Psad has been installed.\n");
     }
     if ($init_dir) {
-        &logr("\n[+] To start psad, run \"${init_dir}/psad start.\"\n");
+        &logr("\n[+] To start psad, run \"${init_dir}/psad start\"\n");
     } else {
-        &logr("\n[+] To start psad, run ${USRSBIN_DIR}/psad.\"\n");
+        &logr("\n[+] To start psad, run ${USRSBIN_DIR}/psad\"\n");
     }
     return;
 }
@@ -1558,7 +1558,7 @@ sub query_email() {
 }
 
 sub query_syslog() {
-    &logr("[+] psad supports the syslogd, syslog-ng, and metalog logging " .
+    &logr("\n[+] psad supports the syslogd, syslog-ng, and metalog logging " .
         "daemons.\n\n");
     my $ans = '';
     while ($ans ne 'syslogd' and $ans ne 'syslog-ng' and $ans ne 'metalog') {

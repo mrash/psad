@@ -135,7 +135,9 @@ int main(int argc, char *argv[]) {
      * the config file has been processed */
 
     if (chdir(psad_dir) < 0) {
-        printf(" ... @@@ Could not chdir() into: %s\n", psad_dir);
+#ifdef DEBUG
+    printf(" ... @@@ Could not chdir() into: %s\n", psad_dir);
+#endif
         exit(EXIT_FAILURE);
     }
 
@@ -144,11 +146,7 @@ int main(int argc, char *argv[]) {
         if (!statfs(psad_dir, &statfsbuf)) {
             current_prct = (float) statfsbuf.f_bfree / statfsbuf.f_blocks * 100;
             if (current_prct > max_disk_percentage) {
-                printf("current_prct: %f\n", current_prct);
-                printf("calling rm_data()\n");
                 rm_data(fwdata_file, psad_dir, archive_dir);
-            } else {
-                printf("current_prct: %f\n", current_prct);
             }
         }
 
@@ -250,6 +248,13 @@ void rm_data(char *fwdata_file, char *psad_dir, char *archive_dir) {
     rm_scanlog(psad_dir);
     rm_scanlog(archive_dir);
 
+    if (chdir(psad_dir) < 0) {
+#ifdef DEBUG
+    printf(" ... @@@ Could not chdir() into: %s\n", psad_dir);
+#endif
+        exit(EXIT_FAILURE);
+    }
+
     /* truncate the fwdata_file after truncating the scanlog
      * files since changing the number of lines in fwdata will
      * cause psad to write to files in the ip directories */
@@ -284,7 +289,6 @@ void rm_scanlog(char *dir) {
         }
         while ((direntp = readdir(dir_ptr)) != NULL) {
             if (check_ip_dir(direntp->d_name)) {
-                printf("ip: %s\n", direntp->d_name);
                 strcpy(path_tmp, direntp->d_name);
                 strcat(path_tmp, "/scanlog");
                 /* zero out the file */

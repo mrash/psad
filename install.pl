@@ -716,7 +716,8 @@ sub query_email() {
 	}
 	my @ftmp = split /\//, $file;
 	my $filename = $ftmp[$#ftmp];
-	print " ----  $filename alerts will be sent to: $email_address\n";
+	print " ----  $filename alerts will be sent to:\n\n";
+	print "       $email_address\n\n";
 	my $ans = "";
 	while ($ans ne "y" && $ans ne "n") {
 		print "       Would you like alerts sent to a different address (y/n)?  ";

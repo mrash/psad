@@ -3739,8 +3739,12 @@ sub flush_auto_blocked_ips() {
 
             my ($rv, $status_msg) = $ipt->delete_chain($table,
                 $from_chain, $to_chain);
-            print $status_msg, "\n";
-            $flushed_chain = 1 if $rv;
+            if ($rv) {
+                print "[+] $status_msg\n";
+                $flushed_chain = 1;
+            } else {
+                print "[-] $status_msg\n";
+            }
         }
         unless ($flushed_chain) {
             print "[-] Could not flush any IPT_AUTO_CHAIN chains.\n";
@@ -3815,9 +3819,8 @@ sub ipt_block() {
         my ($rv, $status_msg) = $ipt->create_chain($table, $to_chain);
 
         unless ($rv) {
-            my $msg = "could not create $table $to_chain chain for $ip";
-            &Psad::psyslog('psad', $msg);
-            print STDERR "[-] ipt_block(): $msg\n" if $debug;
+            &Psad::psyslog('psad', $status_msg);
+            print STDERR "[-] ipt_block(): $status_msg\n" if $debug;
             next;
         }
 
@@ -3826,16 +3829,14 @@ sub ipt_block() {
             $from_chain, $to_chain);
 
         unless ($rv) {
-            my $msg = "could not create jump rule to " .
-                "$to_chain from $from_chain";
-            &Psad::psyslog('psad', $msg);
-            print STDERR "[-] ipt_block(): $msg\n" if $debug;
+            &Psad::psyslog('psad', $status_msg);
+            print STDERR "[-] ipt_block(): $status_msg\n" if $debug;
             next;
         }
 
         my $src = '';
         my $dst = '';
-        if ($direction eq 'src') {
+        if ($direction eq 'src' or $direction eq 'both') {
             $src = $ip;
             $dst = '0.0.0.0/0';
         } elsif ($direction eq 'dst') {
@@ -3861,10 +3862,8 @@ sub ipt_block() {
                         $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
                     $block_success = 1;
                 } else {
-                    my $msg = "could not add iptables block to " .
-                        "$to_chain for $ip";
-                    &Psad::psyslog('psad', $msg);
-                    print STDERR "[-] ipt_block(): $msg\n" if $debug;
+                    &Psad::psyslog('psad', $status_msg);
+                    print STDERR "[-] ipt_block(): $status_msg\n" if $debug;
                 }
             }
         } else {
@@ -3881,6 +3880,7 @@ sub ipt_block() {
                 ($rv, $status_msg) = $ipt->add_ip_rule($src2, $dst2,
                     $config{'IPTABLES_AUTO_RULENUM'}, $table,
                     $to_chain, $target);
+                $block_success = 1 if $rv;
             }
         }
     }
@@ -3888,7 +3888,7 @@ sub ipt_block() {
         ### write the ip out to the auto blocked file
         print STDERR "[+] ipt_block(): added block for $ip\n"
             if $debug;
-        &write_blocked_ip($ip, $config{'AUTO_BLOCK_IPT_FILE'});
+        &cache_file_write_blocked_ip($ip, $config{'AUTO_BLOCK_IPT_FILE'});
     } else {
         &Psad::psyslog('psad', "could not add iptables " .
             "block rule for: $ip");
@@ -3940,6 +3940,7 @@ sub ipt_remove_block() {
             my $dst2 = $src;
             my ($rv, $status_msg) = $ipt->delete_ip_rule($src, $dst,
                 $table, $to_chain, $target);
+            $rm_block = 1 if $rv;
         }
     }
 
@@ -4062,7 +4063,8 @@ sub auto_psad_response() {
                     print H "ALL: $src\n";
                     close H;
                     ### write the ip out to the auto blocked file
-                    &write_blocked_ip($src, $config{'AUTO_BLOCK_TCPWR_FILE'});
+                    &cache_file_write_blocked_ip($src,
+                        $config{'AUTO_BLOCK_TCPWR_FILE'});
                 }
             }
             print STDERR "[+] setting blocked = 1 for $src\n" if $debug;
@@ -4158,9 +4160,9 @@ sub build_ipt_block_config() {
     return;
 }
 
-sub write_blocked_ip() {
+sub cache_file_write_blocked_ip() {
     my ($src, $file) = @_;
-    print STDERR "[+] write_blocked_ip($src, $file)\n" if $debug;
+    print STDERR "[+] cache_file_write_blocked_ip($src, $file)\n" if $debug;
     if (-e $file) {
         open F, "< $file" or die "[*] Could not open open ",
             "$file: $!";

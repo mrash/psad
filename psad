@@ -1116,7 +1116,7 @@ sub scan_logr() {
                         if (defined $Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_SIGMATCH'}) {
                             my $sig_start_time = $tcp_new_start_time;
                             &Psad::logr("\n", \@print_array);
-                            &Psad::logr("=-=-= $proto alert signatures found since [$sig_start_time]\n", \@print_array);
+                            &Psad::logr("---- $proto alert signatures found since [$sig_start_time]\n", \@print_array);
                             for my $sigmatch (keys %{$Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_SIGMATCH'}}) {
                                 next if ($sigmatch eq "PACKETS" || $sigmatch eq "START_TIME");
                                 my $sig_num_packets = $Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_SIGMATCH'}->{$sigmatch};
@@ -1132,7 +1132,7 @@ sub scan_logr() {
                         }
                         if (defined $Scan_href->{$src}->{$dst}->{$proto}->{'SIGMATCH'} && $SHOW_ALL_SIGNATURES eq "Y") {
                             &Psad::logr("\n", \@print_array);
-                            &Psad::logr("=-=-= ALL $proto alert signatures found since [$start_time]\n", \@print_array);
+                            &Psad::logr("---- ALL $proto alert signatures found since [$start_time]\n", \@print_array);
                             for my $sigmatch (keys %{$Scan_href->{$src}->{$dst}->{$proto}->{'SIGMATCH'}}) {
                                 my $sig_num_packets = $Scan_href->{$src}->{$dst}->{$proto}->{'SIGMATCH'}->{$sigmatch};
                                 &Psad::logr("$sigmatch  Packets=$sig_num_packets\n", \@print_array);
@@ -1156,7 +1156,7 @@ sub scan_logr() {
                 closelog();
                 unless ($whoislookups) {
                     &Psad::logr("\n\n", \@print_array);
-                    &Psad::logr("=-=-=-=-=-=-= Whois Information: =-=-=-=-=-=-=\n", [$PSAD_LOGFILE, $EMAIL_ALERTFILE]);
+                    &Psad::logr("---- Whois Information: ----\n", [$PSAD_LOGFILE, $EMAIL_ALERTFILE]);
                     for my $w (@$whois_info_aref) {
                         &Psad::logr($w, \@print_array);
                     }

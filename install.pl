@@ -140,7 +140,7 @@ my %Cmds = (
 my $distro = &get_distro();
 
 ### add chkconfig only if we are runing on a redhat distro
-if ($distro =~ /red.*hat/i) {
+if ($distro eq 'redhat') {
     $Cmds{'chkconfig'} = $chkconfigCmd;
 }
 
@@ -343,7 +343,6 @@ sub install() {
     system "$Cmds{'make'} install";
     chdir '..';
 
-
     &logr(" .. Installing snort-2.0 signatures in $SNORT_DIR\n");
     unless (-d $SNORT_DIR) {
         mkdir $SNORT_DIR, 0500 or die " ** Could not create $SNORT_DIR: $!";
@@ -530,30 +529,25 @@ sub install() {
     &install_manpage('kmsgsd.8');
     &install_manpage('diskmond.8');
 
-    if ($distro =~ /red\s*hat/i) {
-        if (-d $INIT_DIR) {
-            &logr(" .. Copying psad-init -> ${INIT_DIR}/psad\n");
-            copy 'psad-init', "${INIT_DIR}/psad";
-            &perms_ownership("${INIT_DIR}/psad", 0744);
-            &enable_psad_at_boot($distro);
-        } else {
-            &logr(" **  The init script directory, \"${INIT_DIR}\" " .
-                "does not exist!.\n");
-            &logr("Edit the \$INIT_DIR variable in the config section to " .
-                "point to where the init scripts are.\n");
-        }
-    } else {  ### psad is being installed on a non-redhat distribution
-        if (-d $INIT_DIR) {
-            &logr(" .. Copying psad-init.generic -> ${INIT_DIR}/psad\n");
-            copy 'psad-init.generic', "${INIT_DIR}/psad";
-            &perms_ownership("${INIT_DIR}/psad", 0744);
-            &enable_psad_at_boot($distro);
-        } else {
-            &logr(" **  The init script directory, \"${INIT_DIR}\" does " .
-                "not exist!.  Edit the \$INIT_DIR variable in the config " .
-                "section.\n");
-        }
+    my $init_dir = '';
+    my $init_file = 'psad-init';
+    $init_file = 'psad-init.generic' if $distro ne 'redhat';
+
+    if (-d $INIT_DIR) {
+        $init_dir = $INIT_DIR;
+    } elsif (-d '/etc/init.d') {
+        $init_dir = '/etc/init.d';
     }
+    if ($init_dir) {
+        &logr(" .. Copying $init_file -> ${init_dir}/psad\n");
+        copy $init_file, "${init_dir}/psad";
+        &perms_ownership("${init_dir}/psad", 0744);
+        &enable_psad_at_boot($distro);
+    } else {
+        &logr(" ** Cannot find the init script directory, edit " .
+            "the \$INIT_DIR variable.\n");
+    }
+
     my $running;
     my $pid;
     if (-e "${RUNDIR}/psad.pid") {
@@ -576,7 +570,11 @@ sub install() {
         &logr(" .. An older version of psad is already running.  To ".
             "start the new version, run \"${USRSBIN_DIR}/psad --Restart\"\n");
     } else {
-        &logr("\n .. To execute psad, run \"${INIT_DIR}/psad start\"\n");
+        if ($init_dir) {
+            &logr("\n .. To execute psad, run \"${init_dir}/psad start.\"\n");
+        } else {
+            &logr("\n .. To execute psad, run ${USRSBIN_DIR}/psad.\"\n");
+        }
     }
     return;
 }
@@ -1049,17 +1047,16 @@ sub check_old_psad_installation() {
 sub get_distro() {
     if (-e '/etc/issue') {
         ### Red Hat Linux release 6.2 (Zoot)
-        open ISSUE, '< /etc/issue';
-        while(<ISSUE>) {
-            my $line = $_;
-            chomp $line;
-            return 'redhat' if ($line =~ /Red\s*Hat/i);
-        }
+        open ISSUE, '< /etc/issue' or
+            die " ** Could not open /etc/issue: $!";
+        my @lines = <ISSUE>;
         close ISSUE;
-        return 'NA';
-    } else {
-        return 'NA';
+        for my $line (@lines) {
+            chomp $line;
+            return 'redhat' if $line =~ /red\s*hat/i;
+        }
     }
+    return 'NA';
 }
 
 sub perms_ownership() {
@@ -1239,7 +1236,7 @@ sub enable_psad_at_boot() {
         chomp $ans;
     }
     if ($ans eq 'y') {
-        if ($distro =~ /redhat/) {
+        if ($distro eq 'redhat') {
             system "$Cmds{'chkconfig'} --add psad";
         } else {  ### it is a non-redhat distro, try to
                   ### get the runlevel from /etc/inittab

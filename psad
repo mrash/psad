@@ -256,6 +256,7 @@ $SIG{USR1} = \&print_scan;
 
 ### if psad is running on a syslog server, don't check the firewall rules since they may not be local.
 unless ($fwcheck || $Syslog_server) {
+	unlink "/var/log/psad/fw_check.txt";
 	&check_firewall_rules(\@EMAIL_ADDRESSES, ["/var/log/psad/fw_check.txt"], \%Cmds);
 }
 

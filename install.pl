@@ -1,8 +1,36 @@
 #!/usr/bin/perl -w
-
+#
+# $Id$
+#
+# File: install.pl
+#
+# Purpose:  install.pl is the installation script for psad.  It is safe
+#           to execute install.pl even if psad has already been installed
+#           on a system since install.pl will preserve the existing
+#           config section within the new script.
+#
+# Credits:  (see the CREDITS file)
+#
+# Version: 0.9.6
+#
+# Copyright (C) 1999-2002 Michael B. Rash (mbr@cipherdyne.com)
+#
+# License (GNU Public License):
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
+#    USA
+#
 # TODO: 
 #   - make install.pl preserve psad_signatures and psad_auto_ips
 #     with "diff" and "patch" from the old to the new.
+#########################################################################
 
 use File::Path; # used for the 'rmtree' function for removing directories
 use File::Copy; # used for copying/moving files
@@ -211,7 +239,7 @@ unless (`$Cmds{'grep'} psadfifo /etc/syslog.conf`) {
     &logr(" ... Modifying /etc/syslog.conf\n", \@LOGR_FILES);
     copy("/etc/syslog.conf", "/etc/syslog.conf.orig") unless (-e "/etc/syslog.conf.orig");
     open SYSLOG, ">> /etc/syslog.conf" or die "@@@@@  Unable to open /etc/syslog.conf: $!\n";
-    print SYSLOG "kern.info  |/var/log/psadfifo\n\n";  #reinstate kernel logging to our named pipe
+    print SYSLOG "kern.info		|/var/log/psadfifo\n\n";  #reinstate kernel logging to our named pipe
     close SYSLOG;
     print " ... Restarting syslog.\n";
     system("$SYSLOG_INIT restart");

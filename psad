@@ -3858,14 +3858,13 @@ sub renew_auto_blocked_ips() {
 
                 ### block the IP address (note that checks are built into
                 ### this function)
-                if (&ipt_block($ip, 'renew')) {
+                &ipt_block($ip, 'renew');
 
-                    ### set the auto-block start time here since
-                    ### renew_auto_blocked_ips() is only called
-                    ### at startup.
-                    $auto_blocked_ips{$ip}{'time'}    = time();
-                    $auto_blocked_ips{$ip}{'blocked'} = 1;
-                }
+                ### set the auto-block start time here since
+                ### renew_auto_blocked_ips() is only called
+                ### at startup.
+                $auto_blocked_ips{$ip}{'time'}    = time();
+                $auto_blocked_ips{$ip}{'blocked'} = 1;
             }
         }
     }

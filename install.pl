@@ -144,6 +144,17 @@ if ($distro eq 'redhat') {
     $Cmds{'chkconfig'} = $chkconfigCmd;
 }
 
+my $init_dir = '';
+
+if (-d $INIT_DIR) {
+    $init_dir = $INIT_DIR;
+} elsif (-d '/etc/init.d') {
+    $init_dir = '/etc/init.d';
+} else {
+    &logr(" ** Cannot find the init script directory, edit " .
+    "the \$INIT_DIR variable.\n");
+}
+
 ### need to make sure this exists before attempting to
 ### write anything to the install log.
 unless (-d $PSAD_DIR) {
@@ -529,23 +540,14 @@ sub install() {
     &install_manpage('kmsgsd.8');
     &install_manpage('diskmond.8');
 
-    my $init_dir = '';
     my $init_file = 'psad-init';
     $init_file = 'psad-init.generic' if $distro ne 'redhat';
 
-    if (-d $INIT_DIR) {
-        $init_dir = $INIT_DIR;
-    } elsif (-d '/etc/init.d') {
-        $init_dir = '/etc/init.d';
-    }
     if ($init_dir) {
         &logr(" .. Copying $init_file -> ${init_dir}/psad\n");
         copy $init_file, "${init_dir}/psad";
         &perms_ownership("${init_dir}/psad", 0744);
         &enable_psad_at_boot($distro);
-    } else {
-        &logr(" ** Cannot find the init script directory, edit " .
-            "the \$INIT_DIR variable.\n");
     }
 
     my $running;
@@ -603,8 +605,8 @@ sub uninstall() {
             chomp $pid;
             if (kill 0, $pid) {
                 print " .. Stopping psad daemons!\n";
-                if (-e "${INIT_DIR}/psad") {  ### prefer this for old versions
-                    system "${INIT_DIR}/psad stop";
+                if (-e "${init_dir}/psad") {  ### prefer this for old versions
+                    system "${init_dir}/psad stop";
                 } else {
                     system "${USRSBIN_DIR}/psad --Kill";
                 }
@@ -623,9 +625,9 @@ sub uninstall() {
         unlink "${USRSBIN_DIR}/diskmond"   or
             warn " **  Could not remove ${USRSBIN_DIR}/diskmond!!!\n";
     }
-    if (-e "${INIT_DIR}/psad") {
-        print " .. Removing ${INIT_DIR}/psad\n";
-        unlink "${INIT_DIR}/psad";
+    if (-e "${init_dir}/psad") {
+        print " .. Removing ${init_dir}/psad\n";
+        unlink "${init_dir}/psad";
     }
     if (-e "${PERL_INSTALL_DIR}/Psad.pm") {
         print " ----  Removing ${PERL_INSTALL_DIR}/Psad.pm  ----\n";

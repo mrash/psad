@@ -251,7 +251,7 @@ sub install() {
     }
     system "$Cmds{'perl'} Makefile.PL";
     system "$Cmds{'make'}";
-    system "$Cmds{'make'} test";
+#    system "$Cmds{'make'} test";
     system "$Cmds{'make'} install";
     chdir '..';
 
@@ -713,17 +713,19 @@ sub archive() {
     my $file = shift;
     my ($filename) = ($file =~ m|.*/(.*)|);
     my $targetbase = "${CONF_ARCHIVE}/${filename}.old";
-    my $target = $targetbase;
-    if (-e $targetbase) {
-        my $i = 2;
-        $target = $targetbase . $i;
-        while (-e $target) {
-            $i++;
-            $target = $targetbase . $i;
+    for (my $i = 4; $i > 1; $i--) {  ### keep five copies of the old config files
+        my $oldfile = $targetbase . $i;
+        my $newfile = $targetbase . ($i+1);
+        if (-e $oldfile) {
+            move $oldfile, $newfile;
         }
     }
-    &logr(" ... Archiving $file -> $target\n");
-    copy($file, $target);   ### move $file into the archive directory
+    if (-e $targetbase) {
+        my $newfile = $targetbase . "2";
+        move $targetbase, $newfile;
+    }
+    &logr(" ... Archiving $file -> $targetbase\n");
+    copy($file, $targetbase);   ### move $file into the archive directory
     return;
 }
 sub enable_psad_at_boot() {

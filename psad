@@ -2180,13 +2180,13 @@ sub check_config() {
     my @required_vars = qw(
         EMAIL_ADDRESSES  PSAD_CHECK_INTERVAL
         FW_DATA ERROR_LOG  FW_MSG_SEARCH ENABLE_AUTO_IDS
-        ENABLE_PERSISTENCE   SCAN_TIMEOUT DANGER_LEVEL1
-        DANGER_LEVEL2 DANGER_LEVEL3 DANGER_LEVEL4 DANGER_LEVEL5
-        PORT_RANGE_SCAN_THRESHOLD   ALERT_ALL  PSAD_EMAIL_LIMIT
-        IPTABLES_BLOCK_METHOD IPCHAINS_BLOCK_METHOD
-        TCPWRAPPERS_BLOCK_METHOD EMAIL_ALERT_DANGER_LEVEL
-        PSAD_FIFO WHOIS_THRESHOLD WHOIS_TIMEOUT
-        PACKET_COUNTER_FILE  SCAN_DATA_ARCHIVE_DIR
+        SCAN_TIMEOUT DANGER_LEVEL1 DANGER_LEVEL2 DANGER_LEVEL3
+        DANGER_LEVEL4 DANGER_LEVEL5 PORT_RANGE_SCAN_THRESHOLD
+        ALERT_ALL PSAD_EMAIL_LIMIT IPTABLES_BLOCK_METHOD
+        IPCHAINS_BLOCK_METHOD TCPWRAPPERS_BLOCK_METHOD
+        EMAIL_ALERT_DANGER_LEVEL PSAD_FIFO WHOIS_THRESHOLD
+        WHOIS_TIMEOUT PACKET_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR
+        ENABLE_PERSISTENCE
     );
     &Psad::validate_config($config_file, \@required_vars, $config_href);
     return;
@@ -2201,7 +2201,7 @@ Version: $version
 By Michael B. Rash (mbr\@cipherdyne.com, http://www.cipherdyne.com)
 
 USAGE: psad [-s <signature file>] [-a <auto ips file>] [-c <config file>] [-o]
-       [-L] [-i <interval>] [-h] [-S] [-K] [-R] [-U] [-V] [--no_fwcheck]
+       [-L] [-i <interval>] [-h] [-F] [-S] [-K] [-R] [-U] [-V] [--no_fwcheck]
        [--no_daemon] [--no_rdns] [--no_whois] [--no_netstat] [--no_errors]
 
 OPTIONS:
@@ -2220,6 +2220,8 @@ OPTIONS:
                                         that are printed to the error log).
       -L   --Logging_server           - psad is being run on a syslog
                                         logging server.
+      -F   --Flush                    - remove any auto-generated firewall
+                                        block rules.
       -K   --Kill                     - kill all running psad processes.
       -R   --Restart                  - restart all running psad processes.
       -S   --Status                   - displays the status of any

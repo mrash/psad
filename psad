@@ -492,6 +492,10 @@ if ($benchmark) {
     $test_pktend = 'WINDOW=16384 RES=0x00 SYN URGP=0';
 }
 
+### print the startup message
+print STDOUT " -**- psad started; email alerts will be sent to:\n",
+    "      $config{'EMAIL_ADDRESSES'}\n";
+
 ### daemonize psad unless running with --no_daemon or --debug
 unless ($no_daemon || $debug || $benchmark) {
     my $pid = fork();
@@ -509,7 +513,7 @@ unless ($no_daemon || $debug || $benchmark) {
 ### psad _requires_ that kmsgsd is running to receive any data, so let's
 ### start it here for good measure (as of 0.9.2 it makes use of the pid
 ### files and unique_pid(), so we don't have to worry about starting a
-### duplicate copy).  While we're at it, start psadwatchd and diskmond too
+### duplicate copy).  While we're at it, start psadwatchd and diskmond too.
 ### Note that this is the best place to start the other daemons since we
 ### just wrote the psad pid to PSAD_PID_FILE above.
 if ($config_file eq '/etc/psad/psad.conf') {
@@ -2440,7 +2444,7 @@ sub status() {
                             }
                             ### print the packet counters
                             if (-e $config{'PACKET_COUNTER_FILE'}) {
-                                print "     Packets Counters:\n";
+                                print "     Packet Counters:\n";
                                 open F, "< $config{'PACKET_COUNTER_FILE'}" or
                                     die " ** $config{'PACKET_COUNTER_FILE'}: $!";
                                 print STDOUT "        $_" while (<F>);

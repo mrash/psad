@@ -509,7 +509,7 @@ sub logr() {
 				print EMAILALERT "\n";
                                 print EMAILALERT "Source:                   $ip\n";
                                 print EMAILALERT "Destination:              $dstip\n";
-                                print EMAILALERT "Complete port range:       [$range]  (since:  $start_time)\n";
+                                print EMAILALERT "Complete port range:      [$range]  (since:  $start_time)\n";
 				print EMAILALERT "Newly scanned ports:      [$newrange]  (since:  $new_start_time)\n";
                                 print EMAILALERT "Number of packets:        $Scan_href->{$ip}->{'ABSNUM'}\n";
                                 print EMAILALERT "Start time:               $start_time\n";

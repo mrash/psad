@@ -24,7 +24,7 @@ my $execute_psad = 0;
 my $nopreserve = 0;
 
 usage_and_exit(1) unless (GetOptions (
-	'nopreserve'		=> \$nopreserve,	# don't preserve existing configs
+	'no_preserve'		=> \$nopreserve,	# don't preserve existing configs
         'firewall_check'	=> \$fwcheck,           # do not check firewall rules
 	'exec_psad'		=> \$execute_psad,
         'help'          	=> \$help,              # display help
@@ -396,11 +396,11 @@ sub usage_and_exit() {
         my $exitcode = shift;
         print <<_HELP_;
 
-Usage: psad [-f] [-h]
+Usage: psad [-f] [-n] [-e] [-h]
 	
-	-nopreserve		- disable preservation of old configs.
+	-no_preserve		- disable preservation of old configs.
 	-exec_psad		- execute psad after installing.
-        -firewallcheck          - disable firewall rules verification.
+        -firewall_check          - disable firewall rules verification.
         -h                      - prints this help message.
 
 _HELP_

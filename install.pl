@@ -1,5 +1,11 @@
 #!/usr/bin/perl -w
 
+# TODO:  - clean up preserve_config() to take variable type changes into
+#          account.  Recall the 'if (defined $hash{one}{two})' test will 
+#	   automatically define $hash{one} if it did not exist before the
+#	   test.
+#	 - clean up check_firewall_rules() to support tcp and/or udp 
+
 #============== config ===============
 my $SYSLOG_INIT = "/etc/rc.d/init.d/syslog";
 
@@ -329,7 +335,6 @@ sub check_firewall_rules() {
 	my $Cmds_href = shift;
 	my @localips;
 	my $kernel = get_kernel($Cmds_href);
-#	my $kernel = (split /\s/, `$Cmds_href->{'uname'} -a`)[2];
         my $iptables = 1 if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/);
         my $ipchains = 1 if ($kernel =~ /^2.2/); # and also 2.0.x ?
 	my @localips_tmp = `$Cmds_href->{'ifconfig'} -a |$Cmds_href->{'grep'} inet`;
@@ -344,19 +349,45 @@ sub check_firewall_rules() {
 # DROP       tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0216/0x022
 		my @rules = `$Cmds_href->{'iptables'} -nL`;
 		my $drop_rule = 0;
+		my $drop_tcp = 0;
+		my $drop_udp = 0;
 		FWPARSE: foreach my $rule (@rules) {
 			next FWPARSE if ($rule =~ /^Chain/ || $rule =~ /^target/);
 			if ($rule =~ /^(LOG)\s+(\w+)\s+\S+\s+\S+\s+(\S+)\s.+prefix\s\`(.+)\'/) {
 				($target, $proto, $dst, $prefix) = ($1, $2, $3, $4);
-				if ($target eq "LOG" && $proto =~ /all|tcp/ && $prefix =~ /drop|reject|deny/i) { # only tcp supported right now...
+				if ($target eq "LOG" && $proto =~ /all/ && $prefix =~ /drop|reject|deny/i) {
 				# this needs work... see above _two_ rules.
 					if (check_destination($dst, \@localips)) {
-						print STDOUT "=-=-=  Your firewall setup looks good.  Unauthorized tcp packets will be logged.\n";
+						print STDOUT "=-=-=  Your firewall setup looks good.  Unauthorized tcp and/or udp packets will be logged.\n";
 						return 1;
 					}
+				} elsif ($target eq "LOG" && $proto =~ /tcp/ && $prefix =~ /drop|reject|deny/i) {
+					$drop_tcp = 1 if (check_destination($dst, \@localips));
+				} elsif ($target eq "LOG" && $proto =~ /udp/ && $prefix =~ /drop|reject|deny/i) {
+					$drop_udp = 1 if (check_destination($dst, \@localips));
 				}
 			}
 		}
+		if ($drop_tcp && $drop_udp) {
+			print STDOUT "=-=-=  Your firewall setup looks good.  Unauthorized tcp and/or udp packets will be logged.\n";
+			return 1;
+		} elsif ($drop_tcp) {
+			print STDOUT "=-=-=  Your firewall will log unauthorized tcp packets, but not all udp packets.\n";
+			print STDOUT "=-=-=  Hence psad will be able to detect tcp scans, but not udp ones.\n";
+			print STDOUT "=-=-=  Suggestion: After making sure you accept any udp traffic that you need to (such as udp/53\n";
+			print STDOUT "=-=-=  for nameservice) add a rule to log and drop all other udp traffic with the following two commands:\n";
+			print STDOUT "=-=-=     # /usr/local/bin/iptables -A INPUT -p udp -j LOG --log-prefix \"DENY \"\n";
+			print STDOUT "=-=-=     # /usr/local/bin/iptables -A INPUT -p udp -j DROP\n";
+			return 1;
+		} elsif ($drop_tcp) {
+                        print STDOUT "=-=-=  Your firewall will log unauthorized udp packets, but not all tcp packets.\n";
+                        print STDOUT "=-=-=  Hence psad will be able to detect udp scans, but not tcp ones.\n";
+                        print STDOUT "=-=-=  Suggestion: After making sure you accept any tcp traffic that you need to (such as tcp/80\n";  
+                        print STDOUT "=-=-=  etc.) add a rule to log and drop all other tcp traffic with the following two commands:\n";
+                        print STDOUT "=-=-=     # /usr/local/bin/iptables -A INPUT -p tcp -j LOG --log-prefix \"DENY \"\n";
+                        print STDOUT "=-=-=     # /usr/local/bin/iptables -A INPUT -p tcp -j DROP\n";
+			return 1;
+                }
 		print STDOUT "=-=-=  Your firewall does not include rules that will log dropped/rejected packets.\n";
 		print STDOUT "    You need to include a default rule that logs packets that have not been accepted\n";
 		print STDOUT "    by previous rules, and this rule should have a logging prefix of \"drop\", \"deny\"\n";
@@ -385,9 +416,7 @@ sub check_firewall_rules() {
 			chomp $rule;
                         next FWPARSE if ($rule =~ /^Chain/ || $rule =~ /^target/);
 			if ($rule =~ /^(\w+)\s+(\w+)\s+(\S+)\s+\S+\s+(\S+)\s+(\*)\s+\-\>\s+(\*)/) {
-#			if ($rule =~ /^(\w+)\s+(\w+)\s+(\S+)\s+\S+\s+(\S+)/) {
 				my ($target, $proto, $opt, $dst, $srcpt, $dstpt) = ($1, $2, $3, $4, $5, $6);
-#				my ($target, $proto, $opt, $dst, $srcpt, $dstpt) = ($1, $2, $3, $4);
                         	if ($target =~ /drop|reject|deny/i && $proto =~ /all|tcp/ && $opt =~ /....l./) {
 					if (check_destination($dst, \@localips)) {
 						print STDOUT "=-=-=  Your firewall setup looks good.  Unauthorized tcp packets will be dropped and logged.\n"; 

@@ -56,7 +56,7 @@ tcp any -> any msg:"IDS027 - SCAN-FIN"; flags: F;
 
 # IIS scans ha, ha, we are not vulnerable, but don't you want to know when someone is trying these?
 tcp 1024: -> 1031:1035 msg:"IIS - Possible Attempt at NT INETINFO.EXE 100% CPU Utilization"; flags:S; 
-tcp 1024: -> 1029 msg:"IIS - Possible Attempt at NT DNS.EXE 100% CPU Utilization"; flags:S; 
-tcp 1024: -> 1091 msg:"IIS - Possible Attempt at NT DNS.EXE 100% CPU Utilization"; flags:S; 
+tcp 1024: -> 1029 msg:"IIS - Possible Attempt at NT DNS.EXE 100% CPU Utilization (port 1029)"; flags:S; 
+tcp 1024: -> 1091 msg:"IIS - Possible Attempt at NT DNS.EXE 100% CPU Utilization (port 1091)"; flags:S; 
 tcp 1024: -> 1043 msg:"IIS - Possible Attempt at NT WINS.EXE 100% CPU Utilization"; flags:S; 
 tcp 1024: -> 1038 msg:"IIS - Possible Attempt at NT TCPSVCS.EXE 100% CPU Utilization"; flags:S; 

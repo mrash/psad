@@ -142,7 +142,6 @@ my $config_dir        = '/etc/psad';
 my $config_file       = "${config_dir}/psad.conf";
 my $sigs_file         = "${config_dir}/psad_signatures";
 my $autoips_file      = "${config_dir}/psad_auto_ips";
-my $auto_blocked_file = "${config_dir}/psad_auto_blocked_ips";
 
 ### get the hostname of the machine
 my $hostname = hostname;
@@ -154,6 +153,10 @@ my $debug = 0;
 ### running on; this will be calculated by check_scan().
 my $use_ipchains = 0;
 my $use_iptables = 0;
+
+### firewall flags (only used if $config{'ENABLE_AUTO_IDS'} eq 'Y')
+my $iptables_have_mangle;
+my $iptables_have_nat;
 
 ### main psad data structure; contains ips, port ranges,
 ### protocol info, tcp flags, etc.
@@ -170,10 +173,6 @@ my %auto_ips;
 
 ### cache the addresses we have executed whois lookups for
 my %whois_cache;
-
-### firewall flags (only used if $config{'ENABLE_AUTO_IDS'} eq 'Y')
-my $iptables_have_mangle;
-my $iptables_have_nat;
 
 ### packet counters
 my $tcp_ctr  = 0;
@@ -217,7 +216,7 @@ my $daemon;
 my @args_cp = @ARGV;
 
 ### make Getopts case sensitive
-Getopt::Long::Configure("no_ignore_case");
+Getopt::Long::Configure('no_ignore_case');
 
 &usage_and_exit(1) unless (GetOptions (
     'signatures=s'   => \$sigs_file,      # Path to psad signatures file.
@@ -265,7 +264,8 @@ Getopt::Long::Configure("no_ignore_case");
 
 ### Print the version number and exit if -V given on the command line.
 if ($print_version) {
-    print " .. psad version $version, by Michael B. Rash (mbr\@cipherdyne.com)\n";
+    print " .. psad version $version, by Michael B. Rash " .
+        "(mbr\@cipherdyne.com)\n";
     exit 0;
 }
 
@@ -289,6 +289,9 @@ my $emails_aref = $config{'EMAIL_ADDRESSES'};
 
 ### store the psad command line.
 my $cmdline_file = $config{'PSAD_CMDLINE_FILE'};
+
+### define the path to the auto_blocked_ips file
+my $auto_blocked_file = "$config{'PSAD_DIR'}/auto_blocked_ips";
 
 ### pid file array
 my @pidfiles = (
@@ -323,8 +326,8 @@ my $PSADCMD = $cmds{'psad'};
 ### the --Status command line switch was given
 &status_psad() if $status;
 
-### make sure $PSAD_DIR, $FW_DATA, and /var/lib/psad/psadfifo, etc. actually
-### exist
+### make sure $PSAD_DIR, $FW_DATA, and /var/lib/psad/psadfifo, etc.
+### actually exist
 &setup_psad();
 
 ### the --Restart command line switch was given
@@ -1495,7 +1498,7 @@ sub scan_logr() {
 sub check_auto_blocked() {
     if (-e $auto_blocked_file) {
         open B, "< $auto_blocked_file" or
-            warn " @@@ Could not open $auto_blocked_file\n" and return;
+            warn " ... @@@ Could not open $auto_blocked_file\n" and return;
         my @blines = <B>;
         close B;
         my $use_ipchains;
@@ -1548,7 +1551,7 @@ sub check_auto_blocked() {
                     }
                     unless ($blocked) {
                         system "$cmds{'ipchains'} -I $inchain 1 -s $blockip " .
-                               "-j DENY 2> /dev/null 1>&2";
+                            "-j DENY 2> /dev/null 1>&2";
                     }
                 }
             }
@@ -1560,7 +1563,7 @@ sub check_auto_blocked() {
 sub auto_psad_response(){
     if ($use_iptables && ! defined $iptables_have_nat) {
         ### determine whether or not the NAT or mangle code has
-        ### compiled into iptables
+        ### been compiled into iptables
         &iptables_flags();
     }
     SOURCE: for my $src (keys %scan) {

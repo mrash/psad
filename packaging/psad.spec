@@ -1,5 +1,5 @@
 %define name psad
-%define version 1.4.0
+%define version 1.4.1
 %define release 1
 %define psadlibdir /usr/lib/psad
 %define psadlogdir /var/log/psad
@@ -150,7 +150,7 @@ install -m 444 Net-IPv4Addr/blib/lib/auto/Net/IPv4Addr/autosplit.ix $RPM_BUILD_R
 install -m 444 Net-IPv4Addr/blib/lib/Net/IPv4Addr.pm $RPM_BUILD_ROOT%psadlibdir/Net/IPv4Addr.pm
 install -m 444 IPTables-Parse/blib/lib/IPTables/Parse.pm $RPM_BUILD_ROOT%psadlibdir/IPTables/Parse.pm
 install -m 444 IPTables-ChainMgr/blib/lib/IPTables/ChainMgr.pm $RPM_BUILD_ROOT%psadlibdir/IPTables/ChainMgr.pm
-install -m 444 Psad/Psad.pm $RPM_BUILD_ROOT%psadlibdir/Psad.pm
+install -m 444 Psad/blib/lib/Psad.pm $RPM_BUILD_ROOT%psadlibdir/Psad.pm
 
 ### install snort rules files
 cp -r snort_rules $RPM_BUILD_ROOT%_sysconfdir/%name

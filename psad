@@ -1003,17 +1003,9 @@ sub assign_danger_level() {
                 for my $dst (keys %{$Scan{$src}}) {
                     $Scan{$src}{$dst}{'CURR_DL'} = $Auto_ips{$src};
                     $Scan{$src}{$dst}{'ALERTED'} = 0;
-                    open T, ">> /tmp/psad.test";
-                    print T "assigned $src dl $Auto_ips{$src}\n";
-                    close T;
                 }
                 ### ignore $src if the auto danger level is zero
-                if ($Auto_ips{$src} == 0) {
-                    open T, ">> /tmp/psad.test";
-                    print T "ignore $src\n";
-                    close T;
-                    return if $Auto_ips{$src} == 0;
-                }
+                return if $Auto_ips{$src} == 0;
             }
         }
         DST: for my $dst (keys %{$Scan{$src}}) {

@@ -4,7 +4,7 @@
 #
 # Purpose: psad makes use of ipchains/iptables logs to detect port
 #          scans.  Data is provided by kmsgsd which reads firewall
-#          messages out of the /var/log/psad/psadfifo named pipe
+#          messages out of the /var/lib/psad/psadfifo named pipe
 #          (syslog is reconfigured to write kern.info messages there
 #          which include firewall messages).  For more information
 #          read the psad man page.
@@ -79,10 +79,10 @@
 #   SRC=127.0.0.1 DST=127.0.0.1 LEN=60 TOS=0x00 PREC=0x00 TTL=64 ID=0 DF PROTO=TCP SPT=39935
 #   DINDOW=32304 RES=0x00 SYN URGP=0
 #
+#################################################################################################
 #
 # $Id$
 #
-#################################################################################################
 
 ### modules used by psad
 use Psad;
@@ -108,11 +108,6 @@ my $USE_IPTABLES      = 0;
 my $DEBUG             = 0;
 my $HOSTNAME          = hostname; ### Calculate hostname of the machine on which psad is running.
 my $VERSION           = '0.9.9';
-my $CMDLINE_FILE      = '/var/run/psad.cmd';  ### File used to store the psad command line.
-my @PIDFILES          = qw(/var/run/psadwatchd.pid
-                           /var/run/psad.pid
-                           /var/run/kmsgsd.pid
-                           /var/run/diskmond.pid);
 ### ======================== end config =============================
 
 ### ========================== main =================================
@@ -171,15 +166,6 @@ print "psad version $VERSION, by Michael B. Rash (mbr\@cipherdyne.com)\n" and ex
 $< == 0 && $> == 0 or die "\n@@@@@  psad: You must be root (or equivalent UID" .
                           " 0 account) to execute psad!  Exiting.\n\n";
 
-### The --Kill command line switch was given.
-if ($kill) {
-    &kill_psad();
-    exit 0;
-}
-
-### The --USR1 command line switch was given.
-&psad_usr1() if $usr1;
-
 ### read in configuration file
 my ($Config_href, $Cmds_href) = &Psad::buildconf($CONFIG_FILE);
 
@@ -189,6 +175,20 @@ my ($Config_href, $Cmds_href) = &Psad::buildconf($CONFIG_FILE);
 my %Config = %$Config_href;
 my %Cmds   = %$Cmds_href;
 my $Emailaddrs_aref = $Config{'EMAIL_ADDRESSES'};
+my $CMDLINE_FILE    = $Config{'PSAD_CMDLINE_FILE'}; ### File used to store the psad command line.
+
+### pid file array
+my @PIDFILES = ($Config{'PSADWATCHD_PID_FILE'}, $Config{'PSAD_PID_FILE'},
+                    $Config{'KMSGSD_PID_FILE'}, $Config{'DISKMOND_PID_FILE'});
+
+### The --Kill command line switch was given.
+if ($kill) {
+    &kill_psad();
+    exit 0;
+}
+
+### The --USR1 command line switch was given.
+&psad_usr1() if $usr1;
 
 ### The -i <check interval> command line argument was given
 if ($check_interval) {
@@ -206,7 +206,8 @@ my $PSADCMD = $Cmds{'psad'};
 ### the --Status command line switch was given
 &psad_status() if $status;
 
-### make sure $PSAD_DIR, $FW_DATA, and /var/log/psadfifo, etc. actually exist
+### make sure $PSAD_DIR, $FW_DATA, and /var/lib/psad/psadfifo, etc. actually
+### exist
 &psad_setup();
 
 ### the --Restart command line switch was given
@@ -216,7 +217,7 @@ if ($restart) {
 }
 
 ### check to make sure another psad process is not already running.
-&Psad::unique_pid($PIDFILES[1]);
+&Psad::unique_pid($Config{'PSAD_PID_FILE'});
 
 ### make sure the permissions on these files is 0600
 &check_permissions($Config{'PSAD_LOGFILE'}, $Config{'FW_DATA'}, $Config{'ERROR_LOG'}, $Config{'EMAIL_ALERTFILE'});
@@ -245,7 +246,7 @@ unless ($daemon || $DEBUG) {
 }
 
 ### write the current pid associated with psad to the psad pid file
-&Psad::writepid($PIDFILES[1]);
+&Psad::writepid($Config{'PSAD_PID_FILE'});
 
 ### write the command line args used to start psad to $cmdline_file
 &Psad::writecmdline(\@args_cp, $CMDLINE_FILE);
@@ -255,7 +256,7 @@ unless ($daemon || $DEBUG) {
 ### files and unique_pid(), so we don't have to worry about starting a
 ### duplicate copy).  While we're at it, start psadwatchd and diskmond too
 ### Note that this is the best place to start the other daemons since we
-### just wrote the psad pid to $PIDFILES[1] above.
+### just wrote the psad pid to PSAD_PID_FILE above.
 if ($CONFIG_FILE eq '/etc/psad/psad.conf') {
     system "$Cmds{'kmsgsd'}";
     system "$Cmds{'diskmond'}";
@@ -702,7 +703,7 @@ sub check_import_config() {
 
         ### restart kmsgsd since it does not have the capability of
         ### checking for a modified config file
-        open K, "< $PIDFILES[2]" or warn " @@@ Could not open $PIDFILES[2]";
+        open K, "< $Config{'KMSGSD_PID_FILE'}" or warn " @@@ Could not open $Config{'KMSGSD_PID_FILE'}";
         my $pid = <K>;
         close K;
         if (kill 0, $pid) {
@@ -1440,8 +1441,9 @@ sub check_permissions() {
     return;
 }
 sub kill_psad() {
-    ### must kill psadwatchd first since if not, it might try to restart any of the other three daemons;
-    ### (it's the first element of $pidfiles_aref)
+    ### must kill psadwatchd first since if not, it might try to restart
+    ### any of the other three daemons (its pid file is listed first in
+    ### @PIDFILES)
     for my $pidfile (@PIDFILES) {
         my ($pidname) = ($pidfile =~ m|.*/(\w+)\.pid|);
         if (-e $pidfile) {
@@ -1451,12 +1453,12 @@ sub kill_psad() {
             chomp $pid;
             if (kill 0, $pid) {
                 print " ... Killing $pidname, pid: $pid\n";
-                kill 15, $pid or print "@@@@@  psad: Could not kill $pidname, pid: $pid\n";
+                kill 15, $pid or print " ... @@@  psad: Could not kill $pidname, pid: $pid\n";
             } else {
-                print "@@@@@  psad: $pidname is not running on $HOSTNAME.\n";
+                print " ... @@@  psad: $pidname is not running on $HOSTNAME.\n";
             }
         } else {
-            print "@@@@@  psad: pid file $pidfile does not exist for $pidname on $HOSTNAME\n";
+            print " ... @@@  psad: pid file $pidfile does not exist for $pidname on $HOSTNAME\n";
         }
     }
     return;

@@ -41,7 +41,7 @@
 #define KMSGSD_CONF "/etc/psad/kmsgsd.conf"
 
 /* globals */
-static sig_atomic_t received_sighup = 0;
+static volatile sig_atomic_t received_sighup = 0;
 
 /* prototypes */
 static void parse_config(
@@ -127,25 +127,11 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);  /* could not open fwdata file */
     }
 
-    /* MAIN LOOP:
+    /* MAIN LOOP;
      * Read data from the pipe indefinitely (we opened it _without_
      * O_NONBLOCK) and write it to the fwdata file if it is a firewall message
      */
     while ((numbytes = read(fifo_fd, buf, MAX_LINE_BUF)) >= 0) {
-        if (((strstr(buf, "OUT") != NULL && strstr(buf, "IN") != NULL)
-            && (strstr(buf, fw_msg_search) != NULL || strstr(buf, snort_sid_str)))
-            || (strstr(buf, "Packet log") != NULL)) {
-
-            if (write(fwdata_fd, buf, numbytes) < 0)
-                exit(EXIT_FAILURE);  /* could not write to the fwdata file */
-#ifdef DEBUG
-            buf[numbytes] = '\0';
-            puts(buf);
-            fwlinectr++;
-            if (fwlinectr % 50 == 0)
-                printf(" .. Processed %d firewall lines.\n", fwlinectr);
-#endif
-        }
         if (received_sighup) {
             /* clear the signal flag */
             received_sighup = 0;
@@ -170,6 +156,25 @@ int main(int argc, char *argv[]) {
                 perror(" ** Could not open the fwdata_file");
                 exit(EXIT_FAILURE);  /* could not open fwdata file */
             }
+            slogr("psad(kmsgsd)",
+                    "Received HUP signal, re-imported kmsgsd.conf");
+        }
+
+        /* see if we matched a firewall message write it to the
+         * fwdata file */
+        if (((strstr(buf, "OUT") != NULL && strstr(buf, "IN") != NULL)
+            && (strstr(buf, fw_msg_search) != NULL || strstr(buf, snort_sid_str)))
+            || (strstr(buf, "Packet log") != NULL)) {
+
+            if (write(fwdata_fd, buf, numbytes) < 0)
+                exit(EXIT_FAILURE);  /* could not write to the fwdata file */
+#ifdef DEBUG
+            buf[numbytes] = '\0';
+            puts(buf);
+            fwlinectr++;
+            if (fwlinectr % 50 == 0)
+                printf(" .. Processed %d firewall lines.\n", fwlinectr);
+#endif
         }
     }
 

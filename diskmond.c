@@ -48,7 +48,7 @@ const char hostname[] = HOSTNAME;
 char mail_addrs[MAX_GEN_LEN];
 char shCmd[MAX_GEN_LEN];
 char mailCmd[MAX_GEN_LEN];
-static sig_atomic_t received_sighup = 0;
+static volatile sig_atomic_t received_sighup = 0;
 
 /* prototypes */
 static void parse_config(
@@ -141,7 +141,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    /* MAIN LOOP: */
+    /* MAIN LOOP */
     for (;;) {
         if (!statfs(psad_dir, &statfsbuf)) {
             current_prct =
@@ -150,6 +150,9 @@ int main(int argc, char *argv[]) {
                 rm_data(fwdata_file, psad_dir, archive_dir);
             }
         }
+
+        /* sleep and then see if we received any signals */
+        sleep(diskmond_check_interval);
 
         if (received_sighup) {
 
@@ -173,9 +176,9 @@ int main(int argc, char *argv[]) {
                 &diskmond_check_interval,
                 &diskmond_max_retries
             );
+            slogr("psad(diskmond)",
+                    "Received HUP signal, re-imported diskmond.conf");
         }
-
-        sleep(diskmond_check_interval);
     }
 
     /* this statement doesn't get executed, but for completeness... */

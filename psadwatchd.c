@@ -49,7 +49,7 @@ const char hostname[] = HOSTNAME;
 char mail_addrs[MAX_GEN_LEN];
 char shCmd[MAX_GEN_LEN];
 char mailCmd[MAX_GEN_LEN];
-static sig_atomic_t received_sighup = 0;
+static volatile sig_atomic_t received_sighup = 0;
 
 /* prototypes */
 static void parse_config(
@@ -149,8 +149,9 @@ int main(int argc, char *argv[]) {
     /* start doing the real work now that the daemon is running and
      * the config file has been processed */
 
-    /* MAIN LOOP: */
+    /* MAIN LOOP */
     for (;;) {
+        /* restart processes as necessary */
         check_process("psad", psad_pid_file, psad_cmdline_file,
             psadCmd, psadwatchd_max_retries);
         check_process("kmsgsd", kmsgsd_pid_file, NULL,
@@ -158,6 +159,10 @@ int main(int argc, char *argv[]) {
         check_process("diskmond", diskmond_pid_file, NULL,
             diskmondCmd, psadwatchd_max_retries);
 
+        /* sleep and then check to see if we received any signals */
+        sleep(psadwatchd_check_interval);
+
+        /* check for sighup */
         if (received_sighup) {
             received_sighup = 0;
 #ifdef DEBUG
@@ -181,8 +186,9 @@ int main(int argc, char *argv[]) {
                 &psadwatchd_check_interval,
                 &psadwatchd_max_retries
             );
+            slogr("psad(psadwatchd)",
+                    "Received HUP signal, re-imported psadwatchd.conf");
         }
-        sleep(psadwatchd_check_interval);
     }
 
     /* this statement doesn't get executed, but for completeness... */

@@ -30,6 +30,7 @@ require Exporter;
 @EXPORT = qw(
     buildconf
     defined_vars
+    pidrunning
     writepid
     writecmdline
     unique_pid
@@ -119,20 +120,24 @@ sub check_commands() {
     return;
 }
 
+sub pidrunning() {
+    my $pidfile = shift || croak '[*] Must supply a pid file.';
+    return 0 unless -e $pidfile;
+    open PIDFILE, "< $pidfile" or croak "[*] Could not open $pidfile: $!";
+    my $pid = <PIDFILE>;
+    close PIDFILE;
+    chomp $pid;
+    if (kill 0, $pid) {  ### pid is running
+        return $pid;
+    }
+    return 0;
+}
+
 ### make sure pid is unique
 sub unique_pid() {
     my $pidfile = shift;
-    if (-e $pidfile) {
-        my $caller = $0;
-        open PIDFILE, "< $pidfile";
-        my $pid = <PIDFILE>;
-        close PIDFILE;
-        chomp $pid;
-        if (kill 0, $pid) {  # psad is already running
-            croak "[*] $caller (pid: $pid) is already " .
-                  "running!  Exiting.\n";
-        }
-    }
+    croak "[*] $0 process is already running! Exiting.\n"
+        if &pidrunning($pidfile);
     return;
 }
 
@@ -200,7 +205,7 @@ __END__
 
 =head1 NAME
 
-Psad.pm - Perl extension for the psad (Port Scan Attack Detector) daemons
+Psad - Perl extension for psad (the Port Scan Attack Detector) daemons
 
 =head1 SYNOPSIS
 

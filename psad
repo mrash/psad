@@ -835,11 +835,11 @@ sub check_scan() {
 
         ### increment hash values
         $scan{$src}{$dst}{'ABSNUM'}++;
-        $scan{$src}{$dst}{$proto}{'CURR_INT'}{'PKTS'}++;
+        $scan{$src}{$dst}{$proto}{'C_INT'}{'PKTS'}++;
         $scan{$src}{$dst}{$proto}{'PKTS'}++;
 
         ### keep track of tcp flags
-        $scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'FLAGS'}{$flags}++
+        $scan{$src}{$dst}{'TCP'}{'C_INT'}{'FLAGS'}{$flags}++
             if $proto eq 'TCP';
 
         ### initialize the start and end port for the scanned port range
@@ -855,11 +855,11 @@ sub check_scan() {
 
         ### initialize values for the current interval
         unless ($proto eq 'ICMP' ||
-                defined $scan{$src}{$dst}{$proto}{'CURR_INT'}{'SP'}) {
+                defined $scan{$src}{$dst}{$proto}{'C_INT'}{'SP'}) {
             ### make sure the initial start port is not too low
-            $scan{$src}{$dst}{$proto}{'CURR_INT'}{'SP'} = 65535;
+            $scan{$src}{$dst}{$proto}{'C_INT'}{'SP'} = 65535;
             ### make sure the initial end port is not too high
-            $scan{$src}{$dst}{$proto}{'CURR_INT'}{'EP'} = 0;
+            $scan{$src}{$dst}{$proto}{'C_INT'}{'EP'} = 0;
         }
 
         ### see if the destination port lies outside our current range
@@ -869,11 +869,11 @@ sub check_scan() {
                 $scan{$src}{$dst}{$proto}{'ABS_EP'}) = &check_range($dstport,
                     $scan{$src}{$dst}{$proto}{'ABS_SP'},
                     $scan{$src}{$dst}{$proto}{'ABS_EP'});
-            ($scan{$src}{$dst}{$proto}{'CURR_INT'}{'SP'},
-                $scan{$src}{$dst}{$proto}{'CURR_INT'}{'EP'}) =
+            ($scan{$src}{$dst}{$proto}{'C_INT'}{'SP'},
+                $scan{$src}{$dst}{$proto}{'C_INT'}{'EP'}) =
                 &check_range($dstport,
-                    $scan{$src}{$dst}{$proto}{'CURR_INT'}{'SP'},
-                    $scan{$src}{$dst}{$proto}{'CURR_INT'}{'EP'});
+                    $scan{$src}{$dst}{$proto}{'C_INT'}{'SP'},
+                    $scan{$src}{$dst}{$proto}{'C_INT'}{'EP'});
         }
         if ($debug) {
             print STDOUT "check_scan(): src: $src, dst: $dst\n";
@@ -1703,19 +1703,19 @@ sub scan_logr() {
                     $tcp_absrange = "$tcp_s_port-$tcp_e_port";
                 }
             }
-            if (defined $scan{$src}{$dst}{'TCP'}{'CURR_INT'}) {
+            if (defined $scan{$src}{$dst}{'TCP'}{'C_INT'}) {
                 $tcp_f = 1;
                 my $tcp_s_port
-                    = $scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'SP'};
+                    = $scan{$src}{$dst}{'TCP'}{'C_INT'}{'SP'};
                 my $tcp_e_port
-                    = $scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'EP'};
+                    = $scan{$src}{$dst}{'TCP'}{'C_INT'}{'EP'};
                 if ($tcp_s_port == $tcp_e_port) {
                     $tcp_newrange = $tcp_s_port;
                 } else {
                     $tcp_newrange = "$tcp_s_port-$tcp_e_port";
                 }
                 $tcp_newpkts = $scan{$src}{$dst}{'TCP'}
-                    {'CURR_INT'}{'PKTS'};
+                    {'C_INT'}{'PKTS'};
             }
             if (defined $scan{$src}{$dst}{'UDP'}{'ABS_SP'}) {
                 my $udp_s_port
@@ -1728,24 +1728,24 @@ sub scan_logr() {
                     $udp_absrange = "$udp_s_port-$udp_e_port";
                 }
             }
-            if (defined $scan{$src}{$dst}{'UDP'}{'CURR_INT'}) {
+            if (defined $scan{$src}{$dst}{'UDP'}{'C_INT'}) {
                 $udp_f = 1;
                 my $udp_s_port
-                    = $scan{$src}{$dst}{'UDP'}{'CURR_INT'}{'SP'};
+                    = $scan{$src}{$dst}{'UDP'}{'C_INT'}{'SP'};
                 my $udp_e_port
-                    = $scan{$src}{$dst}{'UDP'}{'CURR_INT'}{'EP'};
+                    = $scan{$src}{$dst}{'UDP'}{'C_INT'}{'EP'};
                 if ($udp_s_port == $udp_e_port) {
                     $udp_newrange = $udp_s_port;
                 } else {
                     $udp_newrange = "$udp_s_port-$udp_e_port";
                 }
                 $udp_newpkts = $scan{$src}{$dst}{'UDP'}
-                    {'CURR_INT'}{'PKTS'};
+                    {'C_INT'}{'PKTS'};
             }
-            if (defined $scan{$src}{$dst}{'ICMP'}{'CURR_INT'}) {
+            if (defined $scan{$src}{$dst}{'ICMP'}{'C_INT'}) {
                 $icmp_f = 1;
                 $icmp_newpkts = $scan{$src}{$dst}{'ICMP'}
-                    {'CURR_INT'}{'PKTS'};
+                    {'C_INT'}{'PKTS'};
             }
 
             ### get reverse dns info
@@ -1807,11 +1807,11 @@ sub scan_logr() {
                     "[$tcp_newrange: $tcp_newpkts packets]\n"), \%print_hsh);
                 my $prefix = 'TCP flags: ';
                 for my $flags (keys
-                        %{$scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'FLAGS'}}) {
+                        %{$scan{$src}{$dst}{'TCP'}{'C_INT'}{'FLAGS'}}) {
                     my $nmap_opts;
                     $syslog_flags .= "$flags ";
                     my $n_pkts = $scan{$src}{$dst}{'TCP'}
-                        {'CURR_INT'}{'FLAGS'}{$flags};
+                        {'C_INT'}{'FLAGS'}{$flags};
                     if ($flags eq 'SYN') {
                         $nmap_opts = '-sT or -sS';
                     } elsif ($flags eq 'FIN') {
@@ -1920,9 +1920,9 @@ sub scan_logr() {
             }
             ### delete all current intervals so they won't show up
             ### in the next alert
-            delete $scan{$src}{$dst}{'TCP'}{'CURR_INT'};
-            delete $scan{$src}{$dst}{'UDP'}{'CURR_INT'};
-            delete $scan{$src}{$dst}{'ICMP'}{'CURR_INT'};
+            delete $scan{$src}{$dst}{'TCP'}{'C_INT'};
+            delete $scan{$src}{$dst}{'UDP'}{'C_INT'};
+            delete $scan{$src}{$dst}{'ICMP'}{'C_INT'};
 
             ### we have sent an alert for $dst
             $scan{$src}{$dst}{'ALERTED'} = 1;
@@ -2909,6 +2909,11 @@ sub setup() {
     }
     unless (-d $config{'PSAD_ERROR_DIR'}) {
         mkdir $config{'PSAD_ERROR_DIR'}, 0500;
+    }
+    if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
+        unless (-d $config{'DSHIELD_DIR'}) {
+            mkdir $config{'DSHIELD_DIR'}, 0500;
+        }
     }
     unless (-e $config{'FW_DATA'}) {
         open F, "> $config{'FW_DATA'}" or die ' ** Could not open ',

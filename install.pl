@@ -12,19 +12,35 @@ my $ipchainsCmd = "/sbin/ipchains";
 my $iptablesCmd = "/usr/local/bin/iptables";
 #============ end config ============
 
-my $uid = (split /\s+/, `$idCmd`)[0];
+my %Cmds = (
+	"touch"		=> $touchCmd,
+	"mknod"         => $mknodCmd,
+	"grep"		=> $grepCmd,
+	"cp"		=> $cpCmd,
+	"id"		=> $idCmd,
+	"uname"		=> $unameCmd,
+	"ifconfig"	=> $ifconfigCmd,
+	"ipchains"      => $ipchainsCmd,
+	"iptables"	=> $iptablesCmd
+);
+
+%Cmds = check_commands(\%Cmds);
+
+my $uid = (split /\s+/, `$Cmds{'id'}`)[0];
 ($uid) = ($uid =~ /^uid\=(\d+)/);
 die "You need to be root (or equivalent UID 0 account) to install psad!\n" if $uid;
 unless (-e "/var/log/psadfifo") {
 	print "*** Creating named pipe /var/log/psadfifo\n";
 	# create the named pipe
-	`$mknodCmd -m 600 /var/log/psadfifo p`;	# die does not seem to work right here.
+	`$Cmds{'mknod'} -m 600 /var/log/psadfifo p`;	# die does not seem to work right here.
 }
-unless (`$grepCmd psadfifo /etc/syslog.conf`) {
+unless (`$Cmds{'grep'} psadfifo /etc/syslog.conf`) {
 	print "*** Modifying /etc/syslog.conf\n";
 	open SYSLOG, ">> /etc/syslog.conf";
 	print SYSLOG "kern.info  |/var/log/psadfifo\n\n";  #reinstate kernel logging to our named pipe
 	close SYSLOG;
+	print "*** Restarting syslog\n";
+	system("/etc/rc.d/init.d/syslog restart");      # restart syslog
 }
 unless (-e "/var/log/psad") {
 	print "*** Creating /var/log/psad/\n";
@@ -32,25 +48,23 @@ unless (-e "/var/log/psad") {
 }
 unless (-e "/var/log/psad/fwdata") {
 	print "*** Creating /var/log/psad/fwdata file\n";
-	`$touchCmd /var/log/psad/fwdata`;
+	`$Cmds{'touch'} /var/log/psad/fwdata`;
 }
 unless (-e "/etc/psad") {
 	print "*** Creating /etc/psad/\n";
 	mkdir "/etc/psad",400;
 }
 print "*** Copying psad,kmsgsd,diskmond -> /usr/local/bin/\n";
-`$cpCmd psad /usr/local/bin/psad`;
-`$cpCmd kmsgsd /usr/local/bin/kmsgsd`;
-`$cpCmd diskmond /usr/local/bin/diskmond`;
+`$Cmds{'cp'} psad /usr/local/bin/psad`;
+`$Cmds{'cp'} kmsgsd /usr/local/bin/kmsgsd`;
+`$Cmds{'cp'} diskmond /usr/local/bin/diskmond`;
 print "*** Copying psad-init -> /etc/rc.d/init.d/psad-init\n";
-`$cpCmd psad-init /etc/rc.d/init.d/psad-init`;
+`$Cmds{'cp'} psad-init /etc/rc.d/init.d/psad-init`;
 print "*** Copying psad.conf,psad_signatures -> /etc/psad/\n";
-`$cpCmd psad.conf /etc/psad/psad.conf`;
-`$cpCmd psad_signatures /etc/psad/psad_signatures`;
-print "*** Restarting syslog\n";
-system("/etc/rc.d/init.d/syslog restart");	# restart syslog
+`$Cmds{'cp'} psad.conf /etc/psad/psad.conf`;
+`$Cmds{'cp'} psad_signatures /etc/psad/psad_signatures`;
 
-if(check_firewall_rules($unameCmd, $ipchainsCmd, $iptablesCmd, $ifconfigCmd, $grepCmd)) {
+if(check_firewall_rules(\%Cmds)) {
 	print "*** To execute psad, run \"/etc/rc.d/init.d/psad-init start\"\n";
 } else {
 	print "*** After setting up your firewall per the above note, execute \"/etc/rc.d/init.d/psad-init start\" to start psad\n";
@@ -58,13 +72,13 @@ if(check_firewall_rules($unameCmd, $ipchainsCmd, $iptablesCmd, $ifconfigCmd, $gr
 exit 0;
 #==================== end mail =====================
 sub check_firewall_rules() {
-	my ($unameCmd, $ipchainsCmd, $iptablesCmd, $ifconfigCmd, $grepCmd) = @_;
+	my $Cmds_href = shift;
 	my @localips;
-	my $kernel = (split /\s/, `$unameCmd -a`)[2];
-	my @localips_tmp = `$ifconfigCmd -a |$grepCmd inet`;
+	my $kernel = (split /\s/, `$Cmds_href->{'uname'} -a`)[2];
+        my $iptables = 1 if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/);
+        my $ipchains = 1 if ($kernel =~ /^2.2/); # and also 2.0.x ?
+	my @localips_tmp = `$Cmds_href->{'ifconfig'} -a |$Cmds_href->{'grep'} inet`;
  	push @localips, (split /:/, (split /\s+/, $_)[2])[1] foreach (@localips_tmp);
-	my $iptables = 1 if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/);
-	my $ipchains = 1 if ($kernel =~ /^2.2/); # and also 2.0.x ?
 	if ($iptables) {
 # target     prot opt source               destination
 # LOG        tcp  --  anywhere             anywhere           tcp flags:SYN,RST,ACK/SYN LOG level warning prefix `DENY '
@@ -73,8 +87,7 @@ sub check_firewall_rules() {
 # ACCEPT     tcp  --  0.0.0.0/0            64.44.21.15        tcp dpt:80 flags:0x0216/0x022
 # LOG        tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0216/0x022 LOG flags 0 level 4 prefix `DENY '
 # DROP       tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0216/0x022
-
-		my @rules = `$iptablesCmd -nL`;
+		my @rules = `$Cmds_href->{'iptables'} -nL`;
 		my $drop_rule = 0;
 		FWPARSE: foreach my $rule (@rules) {
 			next FWPARSE if ($rule =~ /^Chain/ || $rule =~ /^target/);
@@ -99,7 +112,7 @@ sub check_firewall_rules() {
 #target     prot opt     source                destination           ports
 #ACCEPT     tcp  ------  0.0.0.0/0            0.0.0.0/0             * ->   22
 #DENY       tcp  ----l-  0.0.0.0/0            0.0.0.0/0             * ->   *
-		my @rules = `$ipchainsCmd -nL`;
+		my @rules = `$Cmds_href->{'ipchains'} -nL`;
 		FWPARSE: foreach my $rule (@rules) {
 			chomp $rule;
                         next FWPARSE if ($rule =~ /^Chain/ || $rule =~ /^target/);
@@ -127,4 +140,30 @@ sub check_destination() {
 		return 1 if ($dst =~ /^$oct/);
 	}
 	return 0;
+}
+sub check_commands() {
+	my $Cmds_href = shift;
+	foreach my $cmd (keys %$Cmds_href) {
+		unless (-e $Cmds_href->{$cmd}) {
+			$real_location = `which $cmd 2> /dev/null`;
+			chomp $real_location;
+			if ($real_location) {
+				print "*** $cmd is not located at $Cmds_href->{$cmd}.  Using $real_location\n";
+				$Cmds_href->{$cmd} = $real_location;
+			} else {
+				if ($cmd ne "ipchains" && $cmd ne "iptables") {
+					die "Could not find $cmd anywhere!!!  Please edit the config section to include the path to $cmd.\n";
+				} elsif (defined $Cmds_href->{'uname'}) {
+        				my $kernel = (split /\s+/, `$Cmds_href->{'uname'} -a`)[2];
+        				if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/) {
+						die "*** You appear to be running kernel $kernel so you should be running iptables but iptables is not\nlocated at $Cmds_href->{'iptables'}.  Please edit the config section to include the path to iptables.\n";	
+					}      
+  					if ($kernel =~ /^2.2/) { # and also 2.0.x ?
+						die "*** You appear to be running kernel $kernel so you should be running ipchains but ipchains is not\nlocated at $Cmds_href->{'ipchains'}.  Please edit the config section to include the path to ipchains.\n";
+					}
+				}
+			}
+		}
+	}
+	return %$Cmds_href;
 }

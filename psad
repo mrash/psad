@@ -46,8 +46,6 @@
 #   - Make use of other logging options available in iptables to detect
 #     more tcp signatures.  (E.g. --log-tcp-options, --log-ip-options,
 #     --log-tcp-sequence, etc.) for better signature recognition.
-#   - Make use of string matching support to look for application level
-#     signatures.  See http://www.stearns.org/snort2iptables
 #   - Include a verbose message in the body of certain emails that as
 #     of psad-1.0.0-pre2 only contain a subject line.
 #   - Allow ipchains to use tcp signatures that only require a syn packet
@@ -83,7 +81,7 @@
 #   The default file locations can be changed by manually specifying the
 #   locations to these files with the --signatures and --auto_ips options.
 #   The signature matching and the auto_ips danger level assignments can
-#   be disabled by using the --no_signatures and --no_auto_ips options
+#   be disabled by using the --no-signatures and --no-auto-ips options
 #   respectively.  In addition the psad adheres to the following
 #   defaults:
 #       -write errors to error log            = yes
@@ -320,7 +318,7 @@ Getopt::Long::Configure('no_ignore_case');
                                          # USR1 signal (useful for debugging).
     'no-whois'      => \$no_whois,       # Do not issue whois lookups against
     'no-signatures' => \$no_signatures,  # Disable signature processing.
-    'no-auto_ips'   => \$no_auto_ips,    # Disable auto danger level
+    'no-auto-ips'   => \$no_auto_ips,    # Disable auto danger level
                                          # assignment.
     'no-daemon'     => \$no_daemon,      # Do not run as a daemon.
     'no-fwcheck'    => \$no_fwcheck,     # Do not check firewall rules.
@@ -2867,6 +2865,8 @@ Options:
                                     data structures on STDOUT).
     -V   --Version                - Print the psad version and exit.
 
+    --no-signatures               - Disable signature processing.
+    --no-auto-ips                 - Disable auto danger level assignment.
     --no-daemon                   - Do not run as a daemon.
     --no-errors                   - Do not write errors to the error
                                     log.

@@ -350,6 +350,9 @@ sub install() {
     &put_string("${PSAD_CONFDIR}/psad.conf", 'PSAD_DIR', $PSAD_DIR);
     &put_string("${PSAD_CONFDIR}/psad.conf", 'PSAD_FIFO', $PSAD_FIFO);
 
+    ### remove old man page
+    unlink '/usr/local/man/man8/psad.8' if (-e '/usr/local/man/man8/psad.8');
+
     ### default location to put the psad man page, but check with
     ### /etc/man.config
     my $mpath = '/usr/share/man/man8';

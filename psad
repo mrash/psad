@@ -363,6 +363,7 @@ for (;;) {
 	print "MAIN: number of lines in $FW_DATA: $fwdata_end_lines\n" if $DEBUG;
 	$fwdata_start_lines = $fwdata_end_lines; # reset fwdata_start_lines to where we just left off so that we don't miss any packets
 }
+exit 0;
 
 #==================================== end main =========================================
 sub check_scan() {  # keeps track of scanning ip's, increments packet counters, keep track of tcp flags for each
@@ -373,9 +374,9 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 	my $local_listening_ports_href;
 	my ($srcip, $dstip, $proto, $srcport, $dstport, $flags);
 	# if necessary check which firewall (ipchains vs. iptables)
-	check_fw($process_lines_aref->[0]) unless ($USE_IPCHAINS || $USE_IPTABLES);
+	&check_fw($process_lines_aref->[0]) unless ($USE_IPCHAINS || $USE_IPTABLES);
 	unless ($netstat_lookup) {
-		$local_listening_ports_href = get_listening_ports($Cmds_href);
+		$local_listening_ports_href = &get_listening_ports($Cmds_href);
 	}
 	READPKT: foreach my $l (@$process_lines_aref) {
 		chomp $l;
@@ -461,9 +462,9 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 		}
 		# see if this port lies outside our current range
 		($Scan{$srcip}{$dstip}{'START_PORT'}, $Scan{$srcip}{$dstip}{'END_PORT'}) = 
-			check_range($dstport, $Scan{$srcip}{$dstip}{'START_PORT'}, $Scan{$srcip}{$dstip}{'END_PORT'});
+			&check_range($dstport, $Scan{$srcip}{$dstip}{'START_PORT'}, $Scan{$srcip}{$dstip}{'END_PORT'});
 		($Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'}, $Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'}) =
-                        check_range($dstport, $Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'}, $Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'});
+                        &check_range($dstport, $Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'}, $Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'});
 		if ($DEBUG) {
 			print "check_scan():\n";
 			print "     srcip: $srcip, dstip: $dstip\n";
@@ -490,15 +491,15 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 				my $srcport_criteria = 0;
 				my $rv = 0;
 				if ($proto eq "TCP") {
-					if (check_port($sigs_href, $msg, $dstport, "DSTPORT", $proto)
-						&& check_port($sigs_href, $msg, $srcport, "SRCPORT", $proto)
-							&& check_flags($sigs_href, $msg, $flags, $proto)) {     # tripped a tcp signature
+					if (&check_port($sigs_href, $msg, $dstport, "DSTPORT", $proto)
+						&& &check_port($sigs_href, $msg, $srcport, "SRCPORT", $proto)
+							&& &check_flags($sigs_href, $msg, $flags, $proto)) {     # tripped a tcp signature
 						$Scan{$srcip}{$dstip}{'TCP'}{'SIGMATCH'}{'SIGDL'} = $sigs_href->{'TCP'}->{$msg}->{'DANGERLEVEL'};
 						$rv = 1;
 					}
 				} elsif ($proto eq "UDP") {
-                                        if (check_port($sigs_href, $msg, $dstport, "DSTPORT", $proto)
-                                                && check_port($sigs_href, $msg, $srcport, "SRCPORT", $proto)) {     # tripped a udp signature
+                                        if (&check_port($sigs_href, $msg, $dstport, "DSTPORT", $proto)
+                                                && &check_port($sigs_href, $msg, $srcport, "SRCPORT", $proto)) {     # tripped a udp signature
 						$Scan{$srcip}{$dstip}{'UDP'}{'SIGMATCH'}{'SIGDL'} = $sigs_href->{'UDP'}->{$msg}->{'DANGERLEVEL'};
 						$rv = 1;
 					}
@@ -544,7 +545,7 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 			} 
 		}
 	}
-	collect_errors(\@bad_packets, $error_log) unless $errors;
+	&collect_errors(\@bad_packets, $error_log) unless $errors;
 	return \%Scan;
 }
 # check_flags will eventually need to include all possible permutations of the six 
@@ -715,7 +716,7 @@ sub check_range() {
 }
 sub assign_danger_level() {
 	my ($Scan_href, $Auto_ips_href, $port_range_scan_threshold, $alert_all, $danger_levels_href) = @_;
-	$Scan_href = automatic_ip_danger_assignment($Scan_href, $Auto_ips_href) if ($Auto_ips_href); 
+	$Scan_href = &automatic_ip_danger_assignment($Scan_href, $Auto_ips_href) if ($Auto_ips_href); 
 	foreach my $srcip (keys %$Scan_href) {
 		print "assign_danger_level(): source ip: $srcip\n" if $DEBUG;
 		foreach my $dstip (keys %{$Scan_href->{$srcip}}) {
@@ -861,7 +862,7 @@ sub scan_logr() {
                                 	$dnsstring = "$srcip -> $rdns";
                         	} 
 				unless ($whoislookups) {
-					$whois_info_aref = get_whois_data($whois_timeout, $srcip, $Cmds_href);
+					$whois_info_aref = &get_whois_data($whois_timeout, $srcip, $Cmds_href);
 				}
 				if ($abs_start_range == $abs_end_range) {
 					$range = $abs_start_range;
@@ -1015,7 +1016,7 @@ sub scan_logr() {
 				&markerline("EMAILALERT");
                                 close EMAILALERT;
                                 if ($Scan_href->{$srcip}->{$dstip}->{'ALERTED'} eq "N" && $current_danger_level >= $EMAIL_ALERT_DANGER_LEVEL) {
-                                        $Scan_href = send_email_alert($Scan_href, $srcip, $dstip, $flags_mesg, $email_alertfile, $email_addresses_aref, $Cmds_href);
+                                        $Scan_href = &send_email_alert($Scan_href, $srcip, $dstip, $flags_mesg, $email_alertfile, $email_addresses_aref, $Cmds_href);
                                 }
                                 $Scan_href->{$srcip}->{$dstip}->{'LOGR'} = "N";
 				&markerline($hndl);
@@ -1034,7 +1035,7 @@ sub auto_psad_response(){
 			### that are protected by the firewall if the ip trips the $auto_psad_level threshold for _any_ destination. 
         		if ($current_danger_level >= $auto_psad_level && !(defined $Scan_href->{$srcip}->{$dstip}->{'BLOCKED'})) {
                 		if ($USE_IPCHAINS) {
-                        		my @chains = get_input_chains($Cmds_href->{'ipchains'});
+                        		my @chains = &get_input_chains($Cmds_href->{'ipchains'});
                         		foreach my $inchain (@chains) {
                                 		`$Cmds_href->{'ipchains'} -I $inchain 1 -s $srcip -l -j DENY`;
                         		}
@@ -1046,7 +1047,7 @@ sub auto_psad_response(){
                 			}
 					next SOURCEIP; 
                 		} elsif ($USE_IPTABLES) {
-                        		my @chains = get_input_chains($Cmds_href->{'iptables'});
+                        		my @chains = &get_input_chains($Cmds_href->{'iptables'});
                         		foreach my $inchain (@chains) {
                                 		`$Cmds_href->{'iptables'} -I $inchain 1 -s $srcip -j DROP`;
                         		}

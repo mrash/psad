@@ -1513,7 +1513,7 @@ sub check_auto_blocked() {
             }
         }
         if ($use_iptables) {
-            my $inchains_aref = &get_input_chains($cmds{'iptables'});
+            my $inchains_aref = &get_fw_chains($cmds{'iptables'});
             for my $inchain (@$inchains_aref) {
                 my @rules = `$cmds{'iptables'} -nL $inchain`;
                 for my $blockip (@block_ips) {
@@ -1533,7 +1533,7 @@ sub check_auto_blocked() {
                 }
             }
         } elsif ($use_ipchains) {
-            my $inchains_aref = &get_input_chains($cmds{'ipchains'});
+            my $inchains_aref = &get_fw_chains($cmds{'ipchains'});
             for my $inchain (@$inchains_aref) {
                 my @rules = `$cmds{'ipchains'} -nL $inchain`;
                 for my $blockip (@block_ips) {
@@ -1574,7 +1574,7 @@ sub auto_psad_response(){
                 >= $config{'AUTO_IDS_DANGER_LEVEL'}
                 && !(defined $scan{$src}{$dst}{'BLOCKED'})) {
                 if ($use_ipchains) {
-                    my $chains_aref = &get_input_chains($cmds{'ipchains'});
+                    my $chains_aref = &get_fw_chains($cmds{'ipchains'});
                     my $blocked_str = '';
                     if ($config{'IPCHAINS_BLOCK_METHOD'} eq 'Y') {
                         for my $inchain (@$chains_aref) {
@@ -1604,7 +1604,7 @@ sub auto_psad_response(){
                     &write_blocked_ip($src);
                     next SOURCE;
                 } elsif ($use_iptables) {
-                    my $chains_aref = &get_input_chains($cmds{'iptables'});
+                    my $chains_aref = &get_fw_chains($cmds{'iptables'});
                     my $blocked_str = '';
                     if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
                         if ($iptables_have_nat) {  ### prefer the nat table
@@ -1697,14 +1697,14 @@ sub email_limit_reached() {
     return;
 }
 
-sub get_input_chains() {
+sub get_fw_chains() {
     my $fwCmd = shift;
     my @rules;
     my @chains;
     @rules = `$fwCmd -nL`;
-    for my $r (@rules) {
-        next unless ($r =~ /Chain/);
-        my ($cname) = ($r =~ /Chain\s(\w+)/);
+    for my $rule (@rules) {
+        next unless ($rule =~ /Chain/);
+        my ($cname) = ($rule =~ /Chain\s(\w+)/);
         next unless ($cname =~ /in/i); ### we don't have an input chain
         push @chains, $cname;
     }

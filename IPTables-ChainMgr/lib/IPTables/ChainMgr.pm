@@ -27,7 +27,7 @@ use strict;
 use warnings;
 use vars qw($VERSION);
 
-$VERSION = '0.1';
+$VERSION = '0.2';
 
 sub new() {
     my $class = shift;
@@ -52,9 +52,8 @@ sub chain_exists() {
 
     if ($self->run_ipt_cmd("$iptables -t $table -n -L $chain") == 0) {
         return 1;
-    } else {
-        return 0;
     }
+    return 0;
 }
 
 sub create_chain() {
@@ -85,9 +84,8 @@ sub flush_chain() {
 
     if ($self->run_ipt_cmd("$iptables -t $table -F $chain") == 0) {
         return 1;
-    } else {
-        return 0;
     }
+    return 0;
 }
 
 sub delete_chain() {
@@ -106,7 +104,7 @@ sub delete_chain() {
             ### find and delete jump rules to this chain (we can't delete
             ### the chain until there are no references to it)
             my $rulenum = $self->find_ip_rule('0.0.0.0/0',
-                '0.0.0.0/0', $table, $jump_from_chain, $del_chain, $iptables);
+                '0.0.0.0/0', $table, $jump_from_chain, $del_chain, {});
             if ($rulenum) {
                 $self->run_ipt_cmd("$iptables -t $table " .
                     "-D $jump_from_chain $rulenum");
@@ -139,6 +137,8 @@ sub add_ip_rule() {
     my $chain   = shift || croak '[-] Must specify a chain.';
     my $target  = shift ||
         croak '[-] Must specify a Netfilter target, e.g. "DROP"';
+    ### optionally add port numbers and protocols, etc.
+    my $extended_href = shift || {};
     my $iptables = $self->{'_iptables'};
 
     ### regex to match an IP address
@@ -174,18 +174,63 @@ sub add_ip_rule() {
 
     ### first check to see if this rule already exists
     if ($self->find_ip_rule($normalized_src, $normalized_dst, $table,
-            $chain, $target, $iptables)) {
-        return 1, "Table: $table, chain: $chain, $normalized_src -> " .
-            "$normalized_dst rule already exists.";
+            $chain, $target, $extended_href)) {
+        my $msg = '';
+        if ($extended_href) {
+            $msg = "Table: $table, chain: $chain, $normalized_src -> " .
+                "$normalized_dst ";
+            for my $key qw(protocol s_port d_port) {
+                $msg .= "$key $extended_href->{$key} "
+                    if defined $extended_href->{$key};
+            }
+            $msg .= 'rule already exists.';
+        } else {
+            $msg = "Table: $table, chain: $chain, $normalized_src -> " .
+                "$normalized_dst rule already exists.";
+        }
+        return 1, $msg;
     } else {
         ### we need to add the rule
-        if ($self->run_ipt_cmd("$iptables -t $table -I $chain $rulenum " .
-                "-s $normalized_src -d $normalized_dst -j $target") == 0) {
-            return 1, "Table: $table, chain: $chain, added $normalized_src " .
-                "-> $normalized_dst";
-        } else {
-            return 0, "Table: $table, chain: $chain, could not add $target " .
+        my $ipt_cmd = '';
+        my $msg     = '';
+        my $err_msg = '';
+        if ($extended_href) {
+            $ipt_cmd = "$iptables -t $table -I $chain $rulenum ";
+            $ipt_cmd .= "-p $extended_href->{'protocol'} "
+                if defined $extended_href->{'protocol'};
+            $ipt_cmd .= "-s $normalized_src ";
+            $ipt_cmd .= "--sport $extended_href->{'s_port'} "
+                if defined $extended_href->{'s_port'};
+            $ipt_cmd .= "-d $normalized_dst ";
+            $ipt_cmd .= "--dport $extended_href->{'d_port'} "
+                if defined $extended_href->{'d_port'};
+            $ipt_cmd .= "-j $target";
+            $msg = "Table: $table, chain: $chain, added $normalized_src " .
+                "-> $normalized_dst ";
+            for my $key qw(protocol s_port d_port) {
+                $msg .= "$key $extended_href->{$key} "
+                    if defined $extended_href->{$key};
+            }
+            $msg =~ s/\s*$//;
+            $err_msg = "Table: $table, chain: $chain, could not add $target " .
                 "rule for $normalized_src -> $normalized_dst";
+            for my $key qw(protocol s_port d_port) {
+                $err_msg .= "$key $extended_href->{$key} "
+                    if defined $extended_href->{$key};
+            }
+            $err_msg =~ s/\s*$//;
+        } else {
+            $ipt_cmd = "$iptables -t $table -I $chain $rulenum " .
+                "-s $normalized_src -d $normalized_dst -j $target";
+            $msg = "Table: $table, chain: $chain, added $normalized_src " .
+                "-> $normalized_dst";
+            $err_msg = "Table: $table, chain: $chain, could not add $target " .
+                "rule for $normalized_src -> $normalized_dst";
+        }
+        if ($self->run_ipt_cmd($ipt_cmd) == 0) {
+            return 1, $msg;
+        } else {
+            return 0, $err_msg;
         }
     }
 }
@@ -198,6 +243,8 @@ sub delete_ip_rule() {
     my $chain  = shift || croak '[-] Must specify a chain.';
     my $target = shift ||
         croak '[-] Must specify a Netfilter target, e.g. "DROP"';
+    ### optionally add port numbers and protocols, etc.
+    my $extended_href = shift || {};
     my $iptables = $self->{'_iptables'};
 
     ### regex to match an IP address
@@ -233,20 +280,36 @@ sub delete_ip_rule() {
 
     ### first check to see if this rule already exists
     my $rulenum = $self->find_ip_rule($normalized_src,
-        $normalized_dst, $table, $chain, $target, $iptables);
+        $normalized_dst, $table, $chain, $target, $extended_href);
     if ($rulenum) {
         ### we need to delete the rule
         if ($self->run_ipt_cmd("$iptables " .
             "-t $table -D $chain $rulenum") == 0) {
             return 1, "Table: $table, chain: $chain, deleted rule #$rulenum";
         } else {
+            my $extended_msg = '.';
+            if ($extended_href) {
+                for my $key qw(protocol s_port d_port) {
+                    $extended_msg .= "$key: $extended_href->{$key} "
+                        if defined $extended_href->{$key};
+                }
+            }
+            $extended_msg =~ s/\s*$//;
             return 0, "Table: $table, chain: $chain, could not delete " .
                 "$target rule #$rulenum for $normalized_src -> " .
-                "$normalized_dst.";
+                "$normalized_dst $extended_msg";
         }
     } else {
+        my $extended_msg = '';
+        if ($extended_href) {
+            for my $key qw(protocol s_port d_port) {
+                $extended_msg .= "$key: $extended_href->{$key} "
+                    if defined $extended_href->{$key};
+            }
+        }
+        $extended_msg =~ s/\s*$//;
         return 0, "Table: $table, chain: $chain, rule $normalized_src -> " .
-            "$normalized_dst does not exist.";
+            "$normalized_dst $extended_msg does not exist.";
     }
 }
 
@@ -258,6 +321,8 @@ sub find_ip_rule() {
     my $chain = shift || croak '[*] Must specify Netfilter chain.';
     my $target = shift ||
         croak '[*] Must specify Netfilter target (this may be a chain).';
+    ### optionally add port numbers and protocols, etc.
+    my $extended_href = shift || {};
     my $iptables = $self->{'_iptables'};
 
     ### first make sure the chain actually exists
@@ -273,18 +338,36 @@ sub find_ip_rule() {
     my $rulenum = 1;
     for my $rule_href (@$chain_aref) {
         if ($rule_href->{'target'} eq $target
-                and $rule_href->{'protocol'} eq 'all'
                 and $rule_href->{'src'} eq $src
                 and $rule_href->{'dst'} eq $dst) {
-            if ($target eq 'LOG' or $target eq 'ULOG') {
-                ### built-in LOG and ULOG target rules always
-                ### have extended information
-                return $rulenum;
-            } elsif (not $rule_href->{'extended'}) {
-                ### don't want any additional criteria (such as
-                ### port numbers) in the rule. Note that we are
-                ### also not checking interfaces
-                return $rulenum;
+            if ($extended_href) {
+                my $found = 1;
+                for my $key qw(
+                    protocol
+                    s_port
+                    d_port
+                ) {
+                    if (defined $extended_href->{$key}) {
+                        unless ($extended_href->{$key}
+                                eq $rule_href->{$key}) {
+                            $found = 0
+                        }
+                    }
+                }
+                return $rulenum if $found;
+            } else {
+                if ($rule_href->{'protocol'} eq 'all') {
+                    if ($target eq 'LOG' or $target eq 'ULOG') {
+                        ### built-in LOG and ULOG target rules always
+                        ### have extended information
+                        return $rulenum;
+                    } elsif (not $rule_href->{'extended'}) {
+                        ### don't want any additional criteria (such as
+                        ### port numbers) in the rule. Note that we are
+                        ### also not checking interfaces
+                        return $rulenum;
+                    }
+                }
             }
         }
         $rulenum++;
@@ -301,7 +384,7 @@ sub add_jump_rule() {
 
     ### first check to see if the jump rule already exists
     if ($self->find_ip_rule('0.0.0.0/0', '0.0.0.0/0', $table,
-            $from_chain, $to_chain, $iptables)) {
+            $from_chain, $to_chain, {})) {
         return 1, "Table: $table, chain: $to_chain, jump rule already exists.";
     } else {
         ### we need to add the rule
@@ -342,9 +425,8 @@ sub run_ipt_cmd_output() {
     };
     if ($rv == 0) {
         return 1, \@output;
-    } else {
-        return 0, \@output;
     }
+    return 0, \@output;
 }
 
 1;

@@ -688,8 +688,8 @@ sub check_scan() {
                     }
 
                     if ($config{'IGNORE_CONNTRACK_BUG_PKTS'} eq 'Y' &&
-                        $dstport > 1024 && ($flags =~ /ACK/ ||
-                        $flags =~ /RST/)) {
+#                        $dstport > 1024 && ($flags =~ /ACK/ ||
+                        ($flags =~ /ACK/ || $flags =~ /RST/)) {
                         ### XXX ignore TCP packets that have the ACK or RST
                         ### bits set ### since _usually_ we see these packets
                         ### as a result of the iptables connection tracking

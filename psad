@@ -23,6 +23,7 @@
 # TODO: 
 #	- make line counts of fwdata file take high-rate scans into
 #	  account.
+#	- include time within scan logic.
 #	- signal handler for configuration updating. 
 #	- "ignore ips" file so that psad will ignore scans originating
 #	  from any ip contained within this file.
@@ -94,6 +95,7 @@ my $errors = 0;
 my $dnslookups = 0;
 my $signatures = 0;
 my $netstat_lookup = 0;
+my $fwcheck = 0;
 my $dnsstring;
 
 use Getopt::Long;
@@ -121,19 +123,22 @@ my %Cmds = (
 $SIG{USR1} = \&print_scan;  # install signal handler for debugging the %Scan hash with Data::Dumper
 
 usage_and_exit(1) unless (GetOptions (
-        'help'          => \$help,
-	'output'	=> \$output,
-	'daemon'	=> \$daemon,
-	'config=s'	=> \$config,
-	'namelookups'	=> \$dnslookups,
-	'signatures=s'	=> \$signatures,
-	'localport'	=> \$netstat_lookup,
-	'errors'	=> \$errors
+        'help'          => \$help,		# display help
+	'output'	=> \$output,		# write scanlog messages to STDOUT
+	'daemon'	=> \$daemon,		# do not run as a daemon
+	'firewallcheck'	=> \$fwcheck,		# do not check firewall rules
+	'config=s'	=> \$config,		# specify configuration file
+	'namelookups'	=> \$dnslookups,	# dns lookup against scanning ip address
+	'signatures=s'	=> \$signatures,	# scan signatures
+	'localport'	=> \$netstat_lookup,	# listening on localport that has been scanned?
+	'errors'	=> \$errors		# do not write malformed packet messages to error log
 ));
 usage_and_exit(0) if ($help);
 
-unless (check_firewall_rules(\%Cmds)) {
-        die "*** After setting up your firewall per the above note, execute \"/etc/rc.d/init.d/psad-init start\" to start psad\n";
+unless ($fwcheck) {
+	unless (check_firewall_rules(\%Cmds)) {
+        	die "*** After setting up your firewall per the above note, execute \"/etc/rc.d/init.d/psad-init start\" to start psad\n";
+	}
 }
 
 fork and exit unless ($daemon);
@@ -679,6 +684,7 @@ Usage: psad [-d] [-o] [-e] [-c <config file>] [-h]
 
         -daemon			- do not run as a daemon.
 	-error			- do not write errors to the error log.
+	-firewallcheck		- disable firewall rules verification.
 	-output			- print all messages to STDOUT (this 
 				  does not include bad packet messages
 				  that are printed to the error log).

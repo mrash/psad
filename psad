@@ -3452,13 +3452,20 @@ sub restart() {
 
 sub analysis_mode() {
 
+    if (-d $config{'ANALYSIS_DIR'}) {
+        print " .. Removing old $config{'ANALYSIS_DIR'}\n";
+        rmtree $config{'ANALYSIS_DIR'} or die " ** Could not ",
+            "remove $config{'ANALYSIS_DIR'}\n";
+    }
+
+    mkdir $config{'ANALYSIS_DIR'} or die " ** Could not mkdir ",
+        $config{'ANALYSIS_DIR'};
+
     ### setup to put all <ip> files in the ANALYSIS_DIR
+    ### (by setting PSAD_DIR to ANALYSIS_DIR subroutines
+    ### work more easily).
     $config{'PSAD_DIR'} = $config{'ANALYSIS_DIR'};
 
-    unless (-d $config{'PSAD_DIR'}) {
-        mkdir $config{'PSAD_DIR'} or die " ** Could not mkdir ",
-            $config{'PSAD_DIR'};
-    }
     print " .. Entering analysis mode.  Parsing $messages_file\n";
     open MSGS, "< $messages_file" or die " ** Could not open ",
         "$messages_file: $!";

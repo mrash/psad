@@ -41,6 +41,12 @@ Ryan Bebeau             Suggested fix for AF_INET protocol error.
 Cliff Rayman            Helped track down a nasty bug in which psad would
                         parse iptables messages that included a dns name
                         instead of just an ip address for the src and dst.
-                        Performed lots of excellent testing and troubleshooting.
+                        Performed lots of excellent testing and
+                        troubleshooting.
 
 Henry Jobst             Bugfix in install.pl for chomp error.
+
+Ray Curtis              Found bug in kmsgsd for undefined $service lines.
+                        Comprehensive testing to help remove bugs
+                        including a difficult one in which psad gets
+                        periodically restarted.

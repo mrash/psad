@@ -302,10 +302,15 @@ sub install() {
     }
 
     &logr(" ... Compiling kmsgsd and psadwatchd:\n");
+
     ### remove any previously compiled kmsgsd
     unlink 'kmsgsd' if -e 'kmsgsd';
+
     ### remove any previously compiled psadwatchd
     unlink 'psadwatchd' if -e 'psadwatchd';
+
+    ### remove any previously compiled diskmond
+    unlink 'diskmond' if -e 'diskmond';
 
     ### compile the C psad daemons
     system $Cmds{'make'};
@@ -326,18 +331,22 @@ sub install() {
         copy 'psadwatchd.pl', 'psadwatchd';
     }
 
+    if (! -e 'diskmond' && -e 'diskmond.pl') {
+        &logr(" ... @@@ Could not compile diskmond.c.  Installing perl diskmond.\n");
+        unless ((system "$Cmds{'perl'} -c diskmond.pl") == 0) {
+            die " ... @@@ diskmond.pl does not compile with \"perl -c\".  Download the" .
+                " latest sources from:\n\nhttp://www.cipherdyne.com\n";
+        }
+        copy 'diskmond.pl', 'diskmond';
+    }
+
     print "\n\n";
-    ### make sure all of the psad (perl) daemons compile (validates
-    ### the source distribution).  kmsgsd and psadwatchd have been
-    ### re-written in C.
+    ### make sure the psad (perl) daemon compiles.  The other three
+    ### daemons have all been re-written in C.
     &logr(" ... Verifying compilation of psad (perl) daemons:\n");
     unless ((system "$Cmds{'perl'} -c psad") == 0) {
         die " ... @@@ psad does not compile with \"perl -c\".  Download the" .
             " latest sources from:\n\nhttp://www.cipherdyne.com\n";
-    }
-    unless ((system "$Cmds{'perl'} -c diskmond") == 0) {
-        die " ... @@@ diskmond does not compile with \"perl -c\".  Download " .
-            "the latest sources from:\n\nhttp://www.cipherdyne.com\n";
     }
     print "\n";
     print "\n";

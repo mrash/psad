@@ -31,7 +31,6 @@
 #	  should be done in a way that allows some scan data to persist.
 #	- Put source and destination ip addresses back into psad_signatures.
 #	- Ipfilter support on *BSD platforms.
-#	- Icmp support.
 #	- Re-write significant components (kmsgsd, diskmond, psadwatchd) in C.
 #	- Possibly add a daemon to take into account ACK PSH, ACK FIN, RST etc.
 #	  packets that the client may generate after the ip_conntrack module
@@ -50,7 +49,6 @@
 #	  with Bastille Linux.
 #	- (psad-init) make sure the init script will work on different Linux
 #	  distros.
-#	- Threshold-based rate limiting for email messages.
 #	- perldoc
 #
 # Sample packet (rejected by ipchains)
@@ -726,6 +724,7 @@ sub import_signatures() {
 sub get_signature_fields() {
 	my ($Sigs_href, $sig) = @_;
 	my ($len, $ttl, $proto, $srcport, $dstport, $flags, $type, $code, $id, $seq);
+	my $msg;
 	if ($sig =~ /^tcp/) {
 		$proto = "TCP";
 	} elsif ($sig =~ /^udp/) {
@@ -771,6 +770,7 @@ sub get_signature_fields() {
 sub get_signature_ports() {
 	my ($Sigs_href, $sig, $proto, $msg) = @_;
 	my ($srcport, $dstport);
+	my ($start, $end, $tmpport);
 	if ($sig =~ /^\w{3,4}\s+(\S+)\s+\-\>\s+(\S+)\s/) {
 		($srcport, $dstport) = ($1, $2);
 	} else {
@@ -1018,7 +1018,7 @@ sub scan_logr() {
 				if (defined $Scan_href->{$srcip}->{$dstip}->{'ICMP'}->{'CURRENT_INTERVAL'}) {
 					$icmp = 1;
 					$icmp_new_start_time = $Scan_href->{$srcip}->{$dstip}->{'ICMP'}->{'CURRENT_INTERVAL'}->{'START_TIME'};
-					$icmp_num_packets = $Scan_href->{$srcip}->{$dstip}->{'ICMP'}->{'CURRENT_INTERVAL'}->{'PACKETS'};
+					$icmp_new_num_pkts = $Scan_href->{$srcip}->{$dstip}->{'ICMP'}->{'CURRENT_INTERVAL'}->{'PACKETS'};
 				}
 				my $start_time = $Scan_href->{$srcip}->{$dstip}->{'START_TIME'}->{'READABLE'};
 				my $end_time = $Scan_href->{$srcip}->{$dstip}->{'END_TIME'};
@@ -1052,7 +1052,7 @@ sub scan_logr() {
 						$tcp_newrange = "$tcp_new_start_range-$tcp_new_end_range";
 					}
 					for my $flags (keys %{$Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'CURRENT_INTERVAL'}->{'FLAGS'}}) {
-						my $nmapOpts = 0;
+						my $nmapOpts = "";
 						$nmapOpts = "-sT or -sS" if ($flags eq "SYN");
 						$nmapOpts = "-sF" if ($flags eq "FIN");
 						$nmapOpts = "-sX" if ($flags eq "URG PSH FIN");
@@ -1094,7 +1094,7 @@ sub scan_logr() {
 				}
 				print $hndl "Newly scanned UDP ports:     [$udp_newrange]  (since: $udp_new_start_time)\n" if $udp;
 				print $hndl "Newly Blocked UDP packets:   [$udp_new_num_pkts] (since: $udp_new_start_time)\n" if $udp;
-				print $hndl "Newly Blocked ICMP packets:  [$icmp_num_packets] (since: $icmp_new_start_time)\n" if $icmp;
+				print $hndl "Newly Blocked ICMP packets:  [$icmp_new_num_pkts] (since: $icmp_new_start_time)\n" if $icmp;
 				print $hndl "Complete port range:         [$range]  (since: $start_time) TCP and/or UDP\n" unless $icmp;
 				print $hndl "Total blocked packets:       $Scan_href->{$srcip}->{$dstip}->{'ABSNUM'}\n";
 				print $hndl "Start time:                  $start_time\n";
@@ -1113,7 +1113,7 @@ sub scan_logr() {
 				}
 				print EMAILALERT "Newly scanned UDP ports:     [$udp_newrange]  (since: $udp_new_start_time)\n" if $udp;
 				print EMAILALERT "Newly Blocked UDP packets    [$udp_new_num_pkts] (since: $udp_new_start_time)\n" if $udp;
-				print EMAILALERT "Newly Blocked ICMP packets:  [$icmp_num_packets] (since: $icmp_new_start_time)\n" if $icmp;
+				print EMAILALERT "Newly Blocked ICMP packets:  [$icmp_new_num_pkts] (since: $icmp_new_start_time)\n" if $icmp;
 				print EMAILALERT "Complete port range:         [$range]  (since: $start_time) TCP and/or UDP\n" unless $icmp;
 				print EMAILALERT "Total blocked packets:       $Scan_href->{$srcip}->{$dstip}->{'ABSNUM'}\n";
 				print EMAILALERT "Start time:                  $start_time\n";
@@ -1147,7 +1147,7 @@ sub scan_logr() {
 					}
 					print STDOUT "     Newly scanned UDP ports:  [$udp_newrange]  (since: $udp_new_start_time)\n" if $udp;
 					print STDOUT "     Blocked UDP packets       [$udp_new_num_pkts] (since: $udp_new_start_time)\n" if $udp;
-					print STDOUT "     Blocked ICMP packets:     [$icmp_num_packets] (since: $icmp_new_start_time)\n" if $icmp;
+					print STDOUT "     Blocked ICMP packets:     [$icmp_new_num_pkts] (since: $icmp_new_start_time)\n" if $icmp;
 					print STDOUT "     Complete port range:      [$range]  (since: $start_time) TCP and/or UDP\n" unless $icmp;
 					print STDOUT "     Total number of packets:  $Scan_href->{$srcip}->{$dstip}->{'ABSNUM'}\n";
 					print STDOUT "     Start time:               $start_time\n";

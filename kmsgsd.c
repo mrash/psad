@@ -10,13 +10,13 @@
 *            print any firewall related dop/reject/deny messages to
 *            the psad data file "/var/log/psad/fwdata".
 *
-*  Author: Michael B. Rash (mbr@cipherdyne.com)
+*  Author: Michael Rash (mbr@cipherdyne.com)
 *
 *  Credits:  (see the CREDITS file)
 *
 *  Version: 1.0
 *
-*  Copyright (C) 1999-2001 Michael B. Rash (mbr@cipherdyne.com)
+*  Copyright (C) 1999-2001 Michael Rash (mbr@cipherdyne.com)
 *
 *  License (GNU Public License):
 *
@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
      * O_NONBLOCK) and write it to the fwdata file if it is a firewall message
      */
     while ((numbytes = read(fifo_fd, buf, MAX_LINE_BUF)) >= 0) {
-        if (((strstr(buf, "MAC") != NULL && strstr(buf, "IN") != NULL)
+        if (((strstr(buf, "OUT") != NULL && strstr(buf, "IN") != NULL)
             && (strstr(buf, fw_msg_search) != NULL || strstr(buf, snort_sid_str)))
             || (strstr(buf, "Packet log") != NULL)) {
 

@@ -11,13 +11,13 @@
 #           print any firewall related dop/reject/deny messages to
 #           the psad data file "/var/log/psad/fwdata".
 #
-# Author: Michael B. Rash (mbr@cipherdyne.com)
+# Author: Michael Rash (mbr@cipherdyne.com)
 #
 # Credits:  (see the CREDITS file)
 #
 # Version: 1.0
 #
-# Copyright (C) 1999-2001 Michael B. Rash (mbr@cipherdyne.com)
+# Copyright (C) 1999-2001 Michael Rash (mbr@cipherdyne.com)
 #
 # License (GNU Public License):
 #
@@ -45,6 +45,9 @@ use strict;
 ### establish the default path to the config file (can be
 ### over-ridden with the -c <file> command line option.
 my $CONFIG_FILE = '/etc/psad/psad.conf';
+
+### syslog config file
+my $syslog = '/etc/syslog.conf';
 
 ### handle command line arguments
 die " ** Specify the path to the psad.conf file with " .
@@ -95,7 +98,7 @@ for (;;) {
     open FIFO, "< $PSAD_FIFO" or die "Can't open file : $!\n";
     my $service = <FIFO>;  ### don't chomp for better performance
     if (defined $service
-        && ($service =~ /Packet\slog/ || $service =~ /IN.+?OUT.+?MAC/)
+        && ($service =~ /Packet\slog/ || $service =~ /IN.+?OUT/)
         && ($service =~ /$FW_MSG_SEARCH/ || $service =~ /$SNORT_SID_STR/) {
         ### log to the fwdata file
         my $old_fh = select LOG;
@@ -117,7 +120,6 @@ close FIFO;
 exit 0;
 #==================== end main =====================
 sub check_facility() {
-    my $syslog = '/etc/syslog.conf';
     open SYS, "< $syslog";
     while(<SYS>) {
         next if (/^#/);

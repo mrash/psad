@@ -133,7 +133,7 @@ my %Cmds = (
     'make'     => $makeCmd,
     'killall'  => $killallCmd,
     'perl'     => $perlCmd,
-    'ipchains' => $ipchainsCmd,
+#    'ipchains' => $ipchainsCmd,
     'iptables' => $iptablesCmd,
 );
 
@@ -590,9 +590,9 @@ sub install() {
         &logr(" .. To execute psad, run \"${INIT_DIR}/psad start\"\n");
     }
     if ($query_rv) {
-        &logr("\n .. Psad has been installed (with your original config)!\n");
+        &logr("\n .. Psad has been installed (with your original config).\n");
     } else {
-        &logr("\n .. Psad has been installed!\n");
+        &logr("\n .. Psad has been installed.\n");
     }
     return;
 }
@@ -1273,7 +1273,6 @@ sub check_commands() {
                 }
             }
             unless ($found) {
-                next CMD if ($cmd eq 'ipchains' || $cmd eq 'iptables');
                 die "\n **  ($caller): Could not find $cmd anywhere!!!  " .
                     "Please edit the config section to include the path to " .
                     "$cmd.\n";

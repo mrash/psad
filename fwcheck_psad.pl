@@ -80,7 +80,7 @@ $fw_search_all = 0 if $no_fw_search_all;
 
 ### Everthing after this point must be executed as root.
 $< == 0 && $> == 0 or
-    die ' ** fwcheck_psad.pl: You must be root (or equivalent ',
+    die '[*] fwcheck_psad.pl: You must be root (or equivalent ',
         "UID 0 account) to execute fwcheck_psad.pl!  Exiting.\n";
 
 ### import psad.conf
@@ -93,7 +93,7 @@ $< == 0 && $> == 0 or
 ### import FW_MSG_SEARCH strings
 &import_fw_search();
 
-open FWCHECK, "> $config{'FW_CHECK_FILE'}" or die " ** Could not ",
+open FWCHECK, "> $config{'FW_CHECK_FILE'}" or die "[*] Could not ",
     "open $config{'FW_CHECK_FILE'}: $!";
 
 unless ($fw_search_all) {
@@ -142,14 +142,14 @@ sub fw_check() {
 "\n .. NOTE: IPTables::Parse does not yet parse user defined chains and so\n",
 "    it is possible your firewall config is compatible with psad anyway.\n";
 
-        &Psad::sendmail(" ** psad: firewall setup warning on " .
+        &Psad::sendmail("[-] psad: firewall setup warning on " .
             "$config{'HOSTNAME'}!", $config{'FW_CHECK_FILE'},
             $config{'EMAIL_ADDRESSES'},
             $cmds{'mail'}
         );
         if ($fw_analyze) {
-            print scalar localtime(), " ** Errors found in firewall config.\n";
-            print scalar localtime(), " ** Results in ",
+            print scalar localtime(), "[-] Errors found in firewall config.\n";
+            print scalar localtime(), "[-] Results in ",
                 "$config{'FW_CHECK_FILE'}\n";
             print scalar localtime(), "    emailed to ",
                 "$config{'EMAIL_ADDRESSES'}\n";
@@ -173,7 +173,7 @@ sub fw_check() {
 sub print_fw_help() {
     my $chain = shift;
     print FWCHECK
-" ** The $chain chain in the iptables ruleset on $config{'HOSTNAME'} does not\n",
+"[-] The $chain chain in the iptables ruleset on $config{'HOSTNAME'} does not\n",
 "    appear to include default rules that will log and drop unwanted packets.\n",
 "    You need to include two default rules; one that logs packets that have\n",
 "    not been accepted by previous rules ";
@@ -199,7 +199,7 @@ sub print_fw_help() {
     }
         print FWCHECK
 "              iptables -A $chain -j DROP\n\n",
-" ** Psad will not detect in the iptables $chain chain scans without an\n",
+"[-] Psad will not detect in the iptables $chain chain scans without an\n",
 "    iptables ruleset that includes rules similar to the two rules above.\n\n";
     return;
 }
@@ -214,17 +214,17 @@ sub check_forwarding() {
     my $forwarding;
     if (-e $config{'PROC_FORWARD_FILE'}) {
         open F, "< $config{'PROC_FORWARD_FILE'}"
-            or die " ** Could not open $config{'PROC_FORWARD_FILE'}: $!";
+            or die "[*] Could not open $config{'PROC_FORWARD_FILE'}: $!";
         $forwarding = <F>;
         close F;
         chomp $forwarding;
         return 0 if $forwarding == 0;
     } else {
-        die " ** Make sure the path to the IP forwarding file correct.\n",
+        die "[*] Make sure the path to the IP forwarding file correct.\n",
             "    The PROC_FORWARD_FILE in $config_file points to\n",
             "    $config{'PROC_FORWARD_FILE'}";
     }
-    open IFC, "$cmds{'ifconfig'} -a |" or die " ** Could not ",
+    open IFC, "$cmds{'ifconfig'} -a |" or die "[*] Could not ",
         "execute: $cmds{'ifconfig'} -a: $!";
     my @if_out = <IFC>;
     close IFC;
@@ -284,7 +284,7 @@ sub ipt_chk_chain() {
                         $str2 = "$proto scans";
                     }
                     print FWCHECK
-" ** The $chain chain in the iptables ruleset on $config{'HOSTNAME'} does not\n",
+"[-] The $chain chain in the iptables ruleset on $config{'HOSTNAME'} does not\n",
 "    appear to include a default LOG rule $str1.  psad will not be able to\n",
 "    detect $str2 without such a rule.\n\n";
 
@@ -298,12 +298,12 @@ sub ipt_chk_chain() {
                     }
                     unless ($found) {
                         if ($proto eq 'all') {
-                            $str1 = " ** The $chain chain in the iptables ruleset " .
+                            $str1 = "[-] The $chain chain in the iptables ruleset " .
                             "on $config{'HOSTNAME'} includes a default\n    LOG rule for " .
                             "all protocols,";
                             $str2 = 'scans';
                         } else {
-                            $str1 = " ** The $chain chain in the iptables ruleset " .
+                            $str1 = "[-] The $chain chain in the iptables ruleset " .
                             "on $config{'HOSTNAME'} inclues a default\n    LOG rule for " .
                             "the $proto protocol,";
                             $str2 = "$proto scans";
@@ -324,7 +324,7 @@ sub ipt_chk_chain() {
                         $str1 = "for the $proto protocol";
                     }
                     print FWCHECK
-" ** The $chain chain in the iptables ruleset on $config{'HOSTNAME'} does not\n",
+"[-] The $chain chain in the iptables ruleset on $config{'HOSTNAME'} does not\n",
 "    appear to include a default DROP rule $str1.\n\n";
                     $rv = 0;
                 }
@@ -346,13 +346,13 @@ sub ipt_chk_chain() {
             return 1;
         } elsif (defined $ipt_log->{'all'}) {
             print FWCHECK
-" ** Indeterminate firewall logging config for chain $chain on $config{'HOSTNAME'}.\n",
+"[-] Indeterminate firewall logging config for chain $chain on $config{'HOSTNAME'}.\n",
 "    There are logging rules however, so at least psad will be able to analyze\n",
 "    packets logged through these rules.\n\n";
             return 1;
         } else {
             print FWCHECK
-" ** Your firewall config no $config{'HOSTNAME'} does not include any logging\n",
+"[-] Your firewall config no $config{'HOSTNAME'} does not include any logging\n",
 "    rules at all in the $chain chain.\n\n";
             return 0;
         }
@@ -361,7 +361,7 @@ sub ipt_chk_chain() {
 }
 
 sub import_fw_search() {
-    open F, "< $fw_search_file" or die " ** Could not open fw search ",
+    open F, "< $fw_search_file" or die "[*] Could not open fw search ",
         "string file $fw_search_file: $!";
     my @lines = <F>;
     close F;

@@ -2,15 +2,21 @@ Installation notes:
 
 QUICK AND EASY INSTALLATION INSTRUCTIONS:
 
-Just run the psad installation script "install.pl":
+Just run the psad installation script "install.pl" from the psad
+sources directory:
+
 
 # ./install.pl
+
 
 Done.  Enough said.  :)  This will result in a functional installation
 of psad on your system.  It is safe to run the install.pl script even
 if you already have psad installed on your system.  The configuration
-can (optionally) be preserved from the previous installation.
+can (optionally) be preserved from the previous installation (you will
+be prompted for this if an existing psad installation is detected on
+your system).
 
+=======================================================================
 
 For more information, read on:
 
@@ -79,12 +85,11 @@ install.pl with the --uninstall option.
 
 USAGE:
 
-Usage: install.pl [-n] [-u] [-v] [-h]
+Usage: install.pl [-n] [-u] [-h]
 
         -n  --no-preserve            - disable preservation of old configs.
         -u  --uninstall              - completely remove psad from the
                                        system.
-        -v  --verbose                - verbose mode.
         -h  --help                   - prints this help message.
 
 

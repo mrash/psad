@@ -78,23 +78,6 @@ void check_unique_pid(const char *pid_file, const char *prog_name)
     return; /* for completness */
 }
 
-int check_import_config(time_t *config_mtime, char *config_file)
-{
-    struct stat statbuf_tmp;
-
-    if (stat(config_file, &statbuf_tmp)) {
-        printf(" ** Could not get mtime for config file: %s\n",
-            config_file);
-        exit(EXIT_FAILURE);
-    }
-
-    if (*config_mtime != statbuf_tmp.st_mtime) {
-        *config_mtime = statbuf_tmp.st_mtime;
-        return 1;
-    }
-    return 0;
-}
-
 void write_pid(const char *pid_file, const pid_t pid)
 {
     FILE *pidfile_ptr;

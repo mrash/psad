@@ -4753,9 +4753,7 @@ sub remove_old_scans() {
     shift @files; shift @files;
     chdir $config{'PSAD_DIR'} or die $!;
     SRCIP: for my $src (@files) {
-print "src: $src\n";
         next SRCIP unless ($src =~ /$ip_re/ and -d $src);
-print "rm: $src\n";
         rmtree $src or die
             "[*] Could not remove $config{'PSAD_DIR'}/$src: $!";
     }

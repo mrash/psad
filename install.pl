@@ -85,6 +85,8 @@ my $iptablesCmd  = '/sbin/iptables';
 my $psadCmd      = "${USRSBIN_DIR}/psad";
 #============ end config ============
 
+my $preserved_config = 0;
+
 ### get the hostname of the system
 my $HOSTNAME = hostname;
 
@@ -486,9 +488,13 @@ sub install() {
     }
     if (-e "${PSAD_CONFDIR}/psad.conf") {
         &archive("${PSAD_CONFDIR}/psad.conf") unless $nopreserve;
-        &logr(" .. Copying psad.conf -> ${PSAD_CONFDIR}/psad.conf\n");
-        copy 'psad.conf', "${PSAD_CONFDIR}/psad.conf";
-        &perms_ownership("${PSAD_CONFDIR}/psad.conf", 0600);
+        if (&query_preserve_config()) {
+            &preserve_config();
+        } else {
+            &logr(" .. Copying psad.conf -> ${PSAD_CONFDIR}/psad.conf\n");
+            copy 'psad.conf', "${PSAD_CONFDIR}/psad.conf";
+            &perms_ownership("${PSAD_CONFDIR}/psad.conf", 0600);
+        }
     } else {
         &logr(" .. Copying psad.conf -> ${PSAD_CONFDIR}/psad.conf\n");
         copy 'psad.conf', "${PSAD_CONFDIR}/psad.conf";
@@ -502,20 +508,22 @@ sub install() {
         &test_syslog_config();
     }
 
-    my $email_str = &query_email();
-    if ($email_str) {
-        &put_email("${PSAD_CONFDIR}/psad.conf", $email_str);
-    }
-    ### Give the admin the opportunity to add to the strings that are normally
-    ### checked in iptables messages.  This is useful since the admin may have
-    ### configured the firewall to use a logging prefix of "Audit" or something
-    ### else other than the normal "DROP", "DENY", or "REJECT" strings.
-    my $custom_fw_search_str = &get_fw_search_string();
-    if ($custom_fw_search_str) {
-        &logr(" .. Setting \$FW_MSG_SEARCH to \"$custom_fw_search_str\" " .
-            "in ${PSAD_CONFDIR}/psad.conf\n");
-        &put_custom_fw_search_str("${PSAD_CONFDIR}/psad.conf",
-            $custom_fw_search_str);
+    unless ($preserved_config) {  ### we preserved the existing config
+        my $email_str = &query_email();
+        if ($email_str) {
+            &put_email("${PSAD_CONFDIR}/psad.conf", $email_str);
+        }
+        ### Give the admin the opportunity to add to the strings that are normally
+        ### checked in iptables messages.  This is useful since the admin may have
+        ### configured the firewall to use a logging prefix of "Audit" or something
+        ### else other than the normal "DROP", "DENY", or "REJECT" strings.
+        my $custom_fw_search_str = &get_fw_search_string();
+        if ($custom_fw_search_str) {
+            &logr(" .. Setting \$FW_MSG_SEARCH to \"$custom_fw_search_str\" " .
+                "in ${PSAD_CONFDIR}/psad.conf\n");
+            &put_custom_fw_search_str("${PSAD_CONFDIR}/psad.conf",
+                $custom_fw_search_str);
+        }
     }
     ### make sure the PSAD_DIR and PSAD_FIFO variables are correctly defined
     ### in the config file.
@@ -568,7 +576,11 @@ sub install() {
     } else {
         &logr(" .. To execute psad, run \"${INIT_DIR}/psad start\"\n");
     }
-    &logr("\n .. Psad has been installed!\n");
+    if ($preserved_config) {
+        &logr("\n .. Psad has been installed (with your original config)!\n");
+    } else {
+        &logr("\n .. Psad has been installed!\n");
+    }
     return;
 }
 
@@ -710,6 +722,59 @@ sub append_fifo_syslog_ng() {
         print SYSLOGNG "log { source(src); filter(f_kerninfo); destination(psadpipe); };\n";
         close SYSLOGNG;
     }
+    return;
+}
+
+sub query_preserve_config() {
+    my $ans = '';
+    while ($ans ne 'y' && $ans ne 'n') {
+        &logr(" .. Would you like to preserve the config from the " .
+            "existing psad installation ([y]/n)?  ");
+        $ans = <STDIN>;
+        return 1 if $ans eq "\n";
+        chomp $ans;
+    }
+    if ($ans eq 'y') {
+        return 1;
+    }
+    return 0;
+}
+
+sub preserve_config() {
+    open C, "< psad.conf" or die " ** Could not open psad.conf: $!";
+    my @new_lines = <C>;
+    close C;
+
+    open CO, "< ${PSAD_CONFDIR}/psad.conf" or die " ** Could not open ",
+        "${PSAD_CONFDIR}/psad.conf: $!";
+    my @orig_lines = <CO>;
+    close CO;
+
+    &logr(" .. Preserving existing config: /etc/psad/psad.conf\n");
+    ### write to a tmp file and then move so any running psad daemon will
+    ### re-import a full config file
+    open CONF, "> ${PSAD_CONFDIR}/psad.conf.new" or die " ** Could not open ",
+        "${PSAD_CONFDIR}/psad.conf.new: $!";
+    for my $orig_line (@new_lines) {
+        if ($orig_line =~ /^\s*(\w+)/) {
+            my $var = $1;
+            my $found = 0;
+            for my $new_line (@new_lines) {
+                if ($new_line =~ /^\s*$var\s/) {
+                    print CONF $new_line;
+                    $found = 1;
+                }
+            }
+            unless ($found) {
+                print CONF $orig_line;
+            }
+        } else {
+            print CONF $orig_line;
+        }
+    }
+    close CONF;
+    move "${PSAD_DIR}/psad.conf.new", "${PSAD_DIR}/psad/psad.conf";
+    $preserved_config = 1;
     return;
 }
 
@@ -1043,8 +1108,6 @@ sub query_email() {
             $correct = 0 unless @emails;
         }
         return $emailstr;
-    } else {
-        return '';
     }
     return '';
 }

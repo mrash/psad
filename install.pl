@@ -69,6 +69,7 @@ my $WHOIS_PSAD   = '/usr/bin/whois.psad';
 
 ### system binaries ###
 my $chkconfigCmd = '/sbin/chkconfig';
+my $psCmd        = '/bin/ps';
 my $netstatCmd   = '/bin/netstat';
 my $ifconfigCmd  = '/sbin/ifconfig';
 my $mknodCmd     = '/bin/mknod';
@@ -80,9 +81,11 @@ my $iptablesCmd  = '/sbin/iptables';
 my $psadCmd      = "${USRSBIN_DIR}/psad";
 #============ end config ============
 
-open INSTALL, "> $INSTALL_LOG" or
-    die " ... @@@ Could not open $INSTALL_LOG: $!";
-close INSTALL;
+if (-e $INSTALL_LOG) {
+    open INSTALL, "> $INSTALL_LOG" or
+        die " ... @@@ Could not open $INSTALL_LOG: $!";
+    close INSTALL;
+}
 
 ### get the hostname of the system
 my $HOSTNAME = hostname;
@@ -119,14 +122,15 @@ my $help         = 0;
 &usage(0) if ($help);
 
 my %Cmds = (
-    'mknod'     => $mknodCmd,
-    'netstat'   => $netstatCmd,
-    'ifconfig'  => $ifconfigCmd,
-    'make'      => $makeCmd,
-    'killall'   => $killallCmd,
-    'perl'      => $perlCmd,
-    'ipchains'  => $ipchainsCmd,
-    'iptables'  => $iptablesCmd,
+    'ps'       => $psCmd,
+    'mknod'    => $mknodCmd,
+    'netstat'  => $netstatCmd,
+    'ifconfig' => $ifconfigCmd,
+    'make'     => $makeCmd,
+    'killall'  => $killallCmd,
+    'perl'     => $perlCmd,
+    'ipchains' => $ipchainsCmd,
+    'iptables' => $iptablesCmd,
 );
 
 my $distro = &get_distro();
@@ -1142,7 +1146,7 @@ sub usage() {
         my $exitcode = shift;
         print <<_HELP_;
 
-Usage: install.pl [-f] [-n] [-u] [-v] [-h]
+Usage: install.pl [-n] [-u] [-v] [-h]
 
     -n  --no_preserve   - disable preservation of old configs.
     -u  --uninstall     - uninstall psad.

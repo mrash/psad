@@ -17,7 +17,7 @@
 #
 # Copyright (C) 1999-2002 Michael B. Rash (mbr@cipherdyne.com)
 #
-# GPL License:
+# License (GNU Public License):
 #
 #    This program is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -85,10 +85,9 @@ use Getopt::Long "GetOptions";
 use Data::Dumper;
 use Socket;
 use Sys::Hostname "hostname";
+use Unix::Syslog qw(:subs :macros);
 use POSIX;
 use strict;
-
-# use Sys::Syslog qw(openlog syslog closelog);   ### this does not seem to play nice with perl-5.005_03
 
 #==================== config ======================= ## do not remove this line (used by install.pl to preserve configs) ##
 ### Initialize config variables.  Some can be overriden with command line args
@@ -151,9 +150,9 @@ my $VERSION = "0.9.6";
 
 ### pid files
 my @PIDFILES = qw(/var/run/psadwatchd.pid
-                    /var/run/psad.pid
-                    /var/run/kmsgsd.pid
-                    /var/run/diskmond.pid);
+                  /var/run/psad.pid
+                  /var/run/kmsgsd.pid
+                  /var/run/diskmond.pid);
 
 ### File used to store the psad command line.
 my $cmdline_file = "/var/run/psad.cmd";
@@ -407,6 +406,7 @@ sub check_scan() {
     my @bad_packets;
     my $local_listening_ports_href;
     my ($src, $dst, $len, $ttl, $proto, $srcport, $dstport, $flags, $type, $code, $id, $seq);
+    my $matched_packet = 0;
     ### If necessary, check which firewall (ipchains vs. iptables)
     unless ($USE_IPCHAINS || $USE_IPTABLES) {
         &check_fw($process_lines_aref->[0]);
@@ -414,7 +414,6 @@ sub check_scan() {
     unless ($netstat_lookup) {
         $local_listening_ports_href = &get_listening_ports($Cmds_href);
     }
-    my $matched_packet = 0;
     READPKT: for my $l (@$process_lines_aref) {
         chomp $l;
         if ($USE_IPTABLES) {
@@ -708,9 +707,7 @@ sub check_misc_fields() {
 }
 sub import_signatures() {
     my $sigfile = shift;
-    my ($proto, $srcport, $dstport, $msg, $flags, $dangerlevel);
     my %Sigs;
-    my ($start, $end, $tmpport);
     open SIGS, "< $sigfile" or die "Could not open the signatures file $sigfile: $!";
     my @sigs = <SIGS>;
     close SIGS;
@@ -724,8 +721,7 @@ sub import_signatures() {
 }
 sub get_signature_fields() {
     my ($Sigs_href, $sig) = @_;
-    my ($len, $ttl, $proto, $srcport, $dstport, $flags, $type, $code, $id, $seq);
-    my $msg;
+    my ($proto, $msg);
     if ($sig =~ /^tcp/) {
         $proto = "TCP";
     } elsif ($sig =~ /^udp/) {
@@ -965,13 +961,10 @@ sub collect_errors() {
     close ERRORS;
 }
 sub scan_logr() {
-    my ($Scan_href, $output, $dnslookups, $whoislookups,
-                        $email_addresses_aref, $Cmds_href) = @_;
-    my $flags_msg;
+    my ($Scan_href, $output, $dnslookups,
+                    $whoislookups, $email_addresses_aref, $Cmds_href) = @_;
     my $range;
-    my ($tcp_newrange, $udp_newrange, $tcp_new_start_range, $tcp_new_end_range);
-    my ($udp_new_start_range, $udp_new_end_range);
-    my ($tcp_new_start_time, $udp_new_start_time, $icmp_new_start_time);
+    my ($tcp_newrange, $udp_newrange);
     my $dnsstring = "";
     my $whois_info_aref;
     $PSAD_LOGFILE = *STDOUT if ($output || $DEBUG);
@@ -1034,7 +1027,6 @@ sub scan_logr() {
                     }
                 }
                 unless ($whoislookups) {
-#                    $whois_info_aref = &get_whois_data($whois_datafile, $whois_timeout, $src, $Cmds_href);
                     $whois_info_aref = &get_whois_data($src, $Cmds_href);
                 }
                 if ($tcp || $udp) {
@@ -1047,13 +1039,15 @@ sub scan_logr() {
                     }
                 }
                 my @tcp_flags;
-                my $flags_msg;
+                my $syslog_print_flags = "";
                 if ($tcp) {
                     if ($tcp_new_start_range == $tcp_new_end_range) {
                         $tcp_newrange = $tcp_new_start_range;
                     } else {
                         $tcp_newrange = "$tcp_new_start_range-$tcp_new_end_range";
                     }
+                    $syslog_print_flags = "flags=[";
+                    my %individual_flags_tmp;
                     for my $flags (keys %{$Scan_href->{$src}->{$dst}->{'TCP'}->{'CURRENT_INTERVAL'}->{'FLAGS'}}) {
                         my $nmapOpts = "";
                         $nmapOpts = "-sT or -sS" if ($flags eq "SYN");
@@ -1064,9 +1058,17 @@ sub scan_logr() {
                             $nmapOpts = "  Nmap: [$nmapOpts]";
                         }
                         my $num_pkts = $Scan_href->{$src}->{$dst}->{'TCP'}->{'CURRENT_INTERVAL'}->{'FLAGS'}->{$flags};
-                        $flags_msg = "TCP flags:                   [$flags: $num_pkts packets]${nmapOpts}\n";
-                        push @tcp_flags, $flags_msg;
+                        push @tcp_flags, "TCP flags:                   [$flags: $num_pkts packets]${nmapOpts}\n";
+                        my @flags_tmp = split /\s+/, $flags;
+                        for my $f (@flags_tmp) {
+                            $individual_flags_tmp{$f} = "";
+                        }
                     }
+                    for my $f (keys %individual_flags_tmp) {
+                        $syslog_print_flags .= "$f ";
+                    }
+                    $syslog_print_flags =~ s/\s+$//;
+                    $syslog_print_flags .= "]";
                     ### need to delete the current interval so it won't show up in the next alert
                     delete $Scan_href->{$src}->{$dst}->{'TCP'}->{'CURRENT_INTERVAL'};
                 }
@@ -1106,20 +1108,7 @@ sub scan_logr() {
                 &Psad::logr("Danger level:                $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} out of 5\n", \@print_array);
                 &Psad::logr("DNS info:                    $dnsstring\n", \@print_array) unless $dnslookups;
 
-                ### write a syslog message
-#               openlog("psad", "ndelay", "daemon");
-#               my $syslog_print_range = "";
-#               if ($tcp) {
-#                   $syslog_print_range .= "TCP ports: [$tcp_newrange] ";
-#               }
-#               if ($udp) {
-#                   $syslog_print_range .= "UCP ports: [$udp_newrange] ";
-#               }
-#               my $syslog_num_pkts = $Scan_href->{$src}->{$dst}->{'ABSNUM'};
-#               my $syslog_danger_level = $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'};
-#
-#               syslog("warning", "Port scan detected: src: $src, dst: $dst, $syslog_print_range, pkts: $syslog_num_pkts, dangerlevel: $syslog_danger_level");
-#               closelog();
+#                my $syslog_print_sig_title = "";
                 if ($USE_IPTABLES) {
                     SIGS: for my $proto ("TCP", "UDP", "ICMP") {
                         if (defined $Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_SIGMATCH'}) {
@@ -1130,6 +1119,11 @@ sub scan_logr() {
                                 next if ($sigmatch eq "PACKETS" || $sigmatch eq "START_TIME");
                                 my $sig_num_packets = $Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_SIGMATCH'}->{$sigmatch};
                                 &Psad::logr("$sigmatch  Packets=$sig_num_packets\n", \@print_array);
+                                ### signature logging with syslog is not yet supported
+                                ### (requires a message for each matched signature).
+#                                if ($sigmatch =~ /^(\".*\")/) {
+#                                    $syslog_print_sig_title = "signature=$1";
+#                                }
                             }
                             ### need to delete the current interval so it won't show up in the next alert
                             delete $Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_SIGMATCH'};
@@ -1143,9 +1137,21 @@ sub scan_logr() {
                             }
                         }
                     }
-                } else {
-                    $flags_msg = 0;
                 }
+                ### write a message to syslog
+                openlog("psad", LOG_DAEMON, LOG_LOCAL7);
+                my $syslog_print_range = "";
+                if ($tcp) {
+                    $syslog_print_range .= "tcp=[$tcp_newrange] $syslog_print_flags";
+                }
+                if ($udp) {
+                    $syslog_print_range .= "udp=[$udp_newrange] ";
+                }
+                my $syslog_num_pkts = $Scan_href->{$src}->{$dst}->{'ABSNUM'};
+                my $syslog_danger_level = $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'};
+
+                syslog(LOG_INFO, "port scan detected: $src -> $dst $syslog_print_range pkts=$syslog_num_pkts dangerlevel: $syslog_danger_level");
+                closelog();
                 unless ($whoislookups) {
                     &Psad::logr("\n\n", \@print_array);
                     &Psad::logr("=-=-=-=-=-=-= Whois Information: =-=-=-=-=-=-=\n", [$PSAD_LOGFILE, $EMAIL_ALERTFILE]);
@@ -1157,8 +1163,7 @@ sub scan_logr() {
                 &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=-=-=-=-=-=-=\n", \@print_array);
                 if ($Scan_href->{$src}->{$dst}->{'ALERTED'} eq "N"
                                         && $current_danger_level >= $EMAIL_ALERT_DANGER_LEVEL) {
-                    &send_email_alert($Scan_href, $src, $dst, $flags_msg,
-                                                    $email_addresses_aref, $Cmds_href);
+                    &send_email_alert($Scan_href, $src, $dst, $email_addresses_aref, $Cmds_href);
                 }
                 $Scan_href->{$src}->{$dst}->{'LOGR'} = "N";
                 $Scan_href->{$src}->{$dst}->{'EMAIL_LIMIT'}++;
@@ -1226,7 +1231,7 @@ sub get_input_chains() {
     return @chains;
 }
 sub send_email_alert() {
-    my ($Scan_href, $src, $dst, $flags_msg, $email_addresses_aref, $Cmds_href) = @_;
+    my ($Scan_href, $src, $dst, $email_addresses_aref, $Cmds_href) = @_;
     for my $email_address (@$email_addresses_aref) {
         print "send_email_alert(): sending scan alert email to: $email_address\n" if $DEBUG;
         system "$Cmds_href->{'mail'} $email_address -s \"psad WARNING: $HOSTNAME ($dst) has been scanned!\" < $EMAIL_ALERTFILE > /dev/null 2>&1";
@@ -1380,10 +1385,7 @@ sub psad_status() {
     }
     my $rv = 0;   ### assume psad is not running and test...
     for my $pidfile (@$pidfiles_aref) {
-#       my $pidname = (split /\./, (split /\//, $pidfile)[$#_])[0];
-        my @p_tmp = split /\//, $pidfile;
-        my $pname_tmp = $p_tmp[$#p_tmp];
-        my $pidname = (split /\./, $pname_tmp)[0];
+        my ($pidname) = ($pidfile =~ /(\w+)\.pid$/);
         if (-e $pidfile) {
             my $pid_mtime = stat($pidfile)->mtime;
             ### ($sec, $min, $hr, $day_of_month, $mon, $year, $wday, $yday, $isdst) = localtime($mtime);

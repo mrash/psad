@@ -116,7 +116,7 @@ install -m 500 {psad,kmsgsd,psadwatchd} $RPM_BUILD_ROOT%_sbindir/
 install -m 755 whois/whois $RPM_BUILD_ROOT/usr/bin/whois_psad
 install -m 755 psad-init.redhat $RPM_BUILD_ROOT/etc/rc.d/init.d/psad
 install -m 644 {psad.conf,kmsgsd.conf,psadwatchd.conf} $RPM_BUILD_ROOT%_sysconfdir/%name/
-install -m 644 {psad_signatures,psad_auto_ips,psad_posf} $RPM_BUILD_ROOT%_sysconfdir/%name/
+install -m 644 {psad_signatures,psad_icmp_types,psad_auto_ips,psad_posf} $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 *.8 $RPM_BUILD_ROOT%{_mandir}/man8/
 
 ### install perl modules used by psad

@@ -393,16 +393,13 @@ sub install() {
     }
     print "\n\n";
 
-    &logr(" .. Compiling kmsgsd, psadwatchd, and diskmond:\n");
+    &logr(" .. Compiling kmsgsd, and psadwatchd:\n");
 
     ### remove any previously compiled kmsgsd
     unlink 'kmsgsd' if -e 'kmsgsd';
 
     ### remove any previously compiled psadwatchd
     unlink 'psadwatchd' if -e 'psadwatchd';
-
-    ### remove any previously compiled diskmond
-    unlink 'diskmond' if -e 'diskmond';
 
     ### compile the C psad daemons
     system $Cmds{'make'};
@@ -424,17 +421,6 @@ sub install() {
                 "from:\n\nhttp://www.cipherdyne.org\n";
         }
         copy 'psadwatchd.pl', 'psadwatchd';
-    }
-
-    if (! -e 'diskmond' && -e 'diskmond.pl') {
-        &logr(" ** Could not compile diskmond.c.  Installing " .
-            "perl diskmond.\n");
-        unless (((system "$Cmds{'perl'} -c diskmond.pl")>>8) == 0) {
-            die " ** diskmond.pl does not compile with \"perl -c\".  ",
-                "Download the latest sources " .
-                "from:\n\nhttp://www.cipherdyne.org\n";
-        }
-        copy 'diskmond.pl', 'diskmond';
     }
 
     print "\n\n";
@@ -463,11 +449,6 @@ sub install() {
     copy 'kmsgsd', "${USRSBIN_DIR}/kmsgsd";
     &perms_ownership("${USRSBIN_DIR}/kmsgsd", 0500);
 
-    &logr(" .. Copying diskmond -> ${USRSBIN_DIR}/diskmond\n");
-    unlink "${USRSBIN_DIR}/diskmond" if -e "${USRSBIN_DIR}/diskmond";
-    copy 'diskmond', "${USRSBIN_DIR}/diskmond";
-    &perms_ownership("${USRSBIN_DIR}/diskmond", 0500);
-
     unless (-d $PSAD_CONFDIR) {
         &logr(" .. Creating $PSAD_CONFDIR\n");
         mkdir $PSAD_CONFDIR,0500;
@@ -481,7 +462,7 @@ sub install() {
         $preserve_rv = &query_preserve_config();
     }
 
-    for my $file qw(psad.conf psadwatchd.conf kmsgsd.conf diskmond.conf) {
+    for my $file qw(psad.conf psadwatchd.conf kmsgsd.conf) {
         if (-e "${PSAD_CONFDIR}/$file") {
             &archive("${PSAD_CONFDIR}/$file") unless $noarchive;
             if ($preserve_rv) {
@@ -526,7 +507,7 @@ sub install() {
     unless ($preserve_rv) {  ### we preserved the existing config
         my $email_str = &query_email();
         if ($email_str) {
-            for my $file qw(psad.conf psadwatchd.conf kmsgsd.conf diskmond.conf) {
+            for my $file qw(psad.conf psadwatchd.conf kmsgsd.conf) {
                 &put_email("${PSAD_CONFDIR}/$file", $email_str);
             }
         }
@@ -546,8 +527,7 @@ sub install() {
     }
     for my $file ("${PSAD_CONFDIR}/psad.conf",
             "${PSAD_CONFDIR}/kmsgsd.conf",
-            "${PSAD_CONFDIR}/psadwatchd.conf",
-            "${PSAD_CONFDIR}/diskmond.conf") {
+            "${PSAD_CONFDIR}/psadwatchd.conf") {
         &logr(" .. Setting hostname to \"$HOSTNAME\" in $file\n");
         &set_hostname($file);
     }
@@ -555,13 +535,11 @@ sub install() {
     ### make sure the PSAD_DIR and PSAD_FIFO variables are correctly defined
     ### in the config file.
     &put_string("${PSAD_CONFDIR}/psad.conf", 'PSAD_DIR', $PSAD_DIR);
-    &put_string("${PSAD_CONFDIR}/diskmond.conf", 'PSAD_DIR', $PSAD_DIR);
     &put_string("${PSAD_CONFDIR}/kmsgsd.conf", 'PSAD_FIFO', $PSAD_FIFO);
 
     &install_manpage('psad.8');
     &install_manpage('psadwatchd.8');
     &install_manpage('kmsgsd.8');
-    &install_manpage('diskmond.8');
 
     my $init_file = '';
     if ($distro eq 'redhat') {
@@ -644,15 +622,13 @@ sub uninstall() {
     }
     if (-e "${USRSBIN_DIR}/psad") {
         print wrap('', $SUB_TAB, " .. Removing psad daemons: ${USRSBIN_DIR}/" .
-            "(psad, psadwatchd, kmsgsd, diskmond)\n");
-        unlink "${USRSBIN_DIR}/psad"       or
+            "(psad, psadwatchd, kmsgsd)\n");
+        unlink "${USRSBIN_DIR}/psad" or
             warn " **  Could not remove ${USRSBIN_DIR}/psad!!!\n";
         unlink "${USRSBIN_DIR}/psadwatchd" or
             warn " **  Could not remove ${USRSBIN_DIR}/psadwatchd!!!\n";
-        unlink "${USRSBIN_DIR}/kmsgsd"     or
+        unlink "${USRSBIN_DIR}/kmsgsd" or
             warn " **  Could not remove ${USRSBIN_DIR}/kmsgsd!!!\n";
-        unlink "${USRSBIN_DIR}/diskmond"   or
-            warn " **  Could not remove ${USRSBIN_DIR}/diskmond!!!\n";
     }
     if (-e "${init_dir}/psad") {
         print " .. Removing ${init_dir}/psad\n";
@@ -1044,9 +1020,6 @@ sub check_old_psad_installation() {
     }
     if (-e "${old_install_dir}/psadwatchd") {
         move "${old_install_dir}/psadwatchd", "${USRSBIN_DIR}/psadwatchd";
-    }
-    if (-e "${old_install_dir}/diskmond") {
-        move "${old_install_dir}/diskmond", "${USRSBIN_DIR}/diskmond";
     }
     if (-e "${old_install_dir}/kmsgsd") {
         move "${old_install_dir}/kmsgsd", "${USRSBIN_DIR}/kmsgsd";

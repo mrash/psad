@@ -305,6 +305,7 @@ my $log_len          = 23;  ### used in scan_logr()
 my $fw_analyze       = 0;
 my $fw_file          = '';
 my $rm_data_ctr      = 0;
+my $analysis_emails  = 0;
 my $netstat_lkup_ctr = 0;
 my $local_ips_lkup_ctr = 0;
 
@@ -326,7 +327,6 @@ my $no_kmsgsd     = 0;
 ### old command line options
 my $oldarg_snort_sids;
 my $oldarg_autoips;
-my $oldarg_errs;
 my $oldarg_nerrs;
 my $oldarg_nerrs2;
 my $oldarg_rdns;
@@ -364,6 +364,7 @@ Getopt::Long::Configure('no_ignore_case');
     'Analyze-msgs'      => \$analyze_msgs,    # Analysis mode for old iptables
                                               # messages in the psad fwdata file
                                               # (or messages file; see --messages).
+    'email-analysis'    => \$analysis_emails, # Send analysis mode emails.
     'messages-file=s'   => \$messages_file,   # Specify the path to file containing
                                               # old iptables messages (fwdata by
                                               # default).
@@ -429,7 +430,6 @@ Getopt::Long::Configure('no_ignore_case');
     'no_fw_check'       => \$oldarg_nfwchk,  # old command line arg
     'snort-sids'        => \$oldarg_snort_sids, # old command line arg
     'reversedns'        => \$oldarg_rdns,    # old command line arg
-    'errors'            => \$oldarg_errs,    # old command line arg
     'no_errors'         => \$oldarg_nerrs,   # old command line arg
     'no-errors'         => \$oldarg_nerrs2,  # old command line arg
     'whois'             => \$oldarg_whois,   # old command line arg
@@ -1087,12 +1087,12 @@ sub check_scan() {
 
     ### Log and send email and syslog alerts
     if ($analyze_msgs) {
-        print " .. Writing $config{'PSAD_DIR'}/<ip> directories, sending\n",
-            "    email alerts";
-        if ($no_whois) {
-            print ".\n";
-        } else {
-            print ", and issuing whois lookups (may take several seconds).\n";
+        print " .. Writing $config{'PSAD_DIR'}/<ip> directories.\n";
+        if ($analysis_emails) {
+            print " .. Generating email alerts.\n";
+            unless ($no_whois) {
+                print " .. Issuing whois lookups (may take several seconds).\n";
+            }
         }
     }
     &scan_logr(\%current_scan);
@@ -2763,34 +2763,43 @@ sub scan_logr() {
                 "icmp=$icmp_newpkts dangerlevel: $curr_dl");
 
             unless ($no_whois) {
-                print $fh  "\n ** Whois Information: **\n";
-                for my $line (@$whois_info_aref) {
-                    print $fh $line;
+                unless ($analyze_msgs and not $analysis_emails) {
+                    print $fh  "\n ** Whois Information: **\n";
+                    for my $line (@$whois_info_aref) {
+                        print $fh $line;
+                    }
+                    print $fh "\n";
                 }
-                print $fh "\n";
             }
             print $fh "=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=",
                 "-=-=-=-=\n";
             close $fh unless $no_daemon;
             if ($curr_dl >= $config{'EMAIL_ALERT_DANGER_LEVEL'}
                     and not $no_daemon) {
-                my $subject = " ** psad: [DL$curr_dl] SCAN from: $src_subj";
-                &Psad::psyslog('psad', ".. sending email alert to: " .
-                    "$config{'EMAIL_ADDRESSES'}\n");
-                &Psad::sendmail($subject, $email_file,
-                    $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
-                $scan{$src}{$dst}{'email_ctr'}++;
-
-                ### print the number of email alerts we have sent
-                &Psad::logr("$scan{$src}{$dst}{'email_ctr'}\n",
-                    {$ecount_file => 0});
-
-                if ($config{'ENABLE_EXT_SCRIPT_EXEC'} eq 'Y') {
-                    if ($config{'EXEC_EXT_SCRIPT_PER_ALERT'} eq 'Y') {
-                        &exec_external_script($src);
+                unless ($analyze_msgs and not $analysis_emails) {
+                    my $subject;
+                    if ($analyze_msgs) {
+                        $subject = " ** psad (analysis mode): [DL$curr_dl] SCAN from: $src_subj";
                     } else {
-                        &exec_external_script($src) unless
-                            defined $scan_ext_exec{$src};
+                        $subject = " ** psad: [DL$curr_dl] SCAN from: $src_subj";
+                    }
+                    &Psad::psyslog('psad', ".. sending email alert to: " .
+                        "$config{'EMAIL_ADDRESSES'}\n");
+                    &Psad::sendmail($subject, $email_file,
+                        $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+                    $scan{$src}{$dst}{'email_ctr'}++;
+
+                    ### print the number of email alerts we have sent
+                    &Psad::logr("$scan{$src}{$dst}{'email_ctr'}\n",
+                        {$ecount_file => 0});
+
+                    if ($config{'ENABLE_EXT_SCRIPT_EXEC'} eq 'Y') {
+                        if ($config{'EXEC_EXT_SCRIPT_PER_ALERT'} eq 'Y') {
+                            &exec_external_script($src);
+                        } else {
+                            &exec_external_script($src) unless
+                                defined $scan_ext_exec{$src};
+                        }
                     }
                 }
             }
@@ -3676,19 +3685,19 @@ sub restart() {
 
 sub analysis_mode() {
 
-    if (-d $config{'ANALYSIS_DIR'}) {
-        print " .. Removing old $config{'ANALYSIS_DIR'}\n";
-        rmtree $config{'ANALYSIS_DIR'} or die " ** Could not ",
-            "remove $config{'ANALYSIS_DIR'}\n";
+    if (-d $config{'ANALYSIS_MODE_DIR'}) {
+        print " .. Removing old $config{'ANALYSIS_MODE_DIR'}\n";
+        rmtree $config{'ANALYSIS_MODE_DIR'} or die " ** Could not ",
+            "remove $config{'ANALYSIS_MODE_DIR'}\n";
     }
 
-    mkdir $config{'ANALYSIS_DIR'} or die " ** Could not mkdir ",
-        $config{'ANALYSIS_DIR'};
+    mkdir $config{'ANALYSIS_MODE_DIR'} or die " ** Could not mkdir ",
+        $config{'ANALYSIS_MODE_DIR'};
 
-    ### setup to put all <ip> files in the ANALYSIS_DIR
-    ### (by setting PSAD_DIR to ANALYSIS_DIR subroutines
+    ### setup to put all <ip> files in the ANALYSIS_MODE_DIR
+    ### (by setting PSAD_DIR to ANALYSIS_MODE_DIR subroutines
     ### work more easily).
-    $config{'PSAD_DIR'} = $config{'ANALYSIS_DIR'};
+    $config{'PSAD_DIR'} = $config{'ANALYSIS_MODE_DIR'};
 
     print " .. Entering analysis mode.  Parsing $messages_file\n";
     open MSGS, "< $messages_file" or die " ** Could not open ",
@@ -4350,7 +4359,6 @@ sub check_old_cmdargs() {
     }
     &print_old_arg('auto_ips', 'auto-ips') if $oldarg_autoips;
     &print_old_arg('Logging_server', 'log-server') if $oldarg_logserv;
-    &print_old_arg('errors', 'no-ipt-errors') if $oldarg_errs;
     &print_old_arg('no_errors', 'no-ipt-errors') if $oldarg_nerrs;
     &print_old_arg('no-errors', 'no-ipt-errors') if $oldarg_nerrs2;
     &print_old_arg('reversedns', 'no-rdns') if $oldarg_rdns;
@@ -4370,6 +4378,12 @@ sub print_old_arg() {
 }
 
 sub handle_cmdline() {
+
+    if ($analysis_emails and not $analyze_msgs) {
+        print " ** Can only specify --email-analysis flag ",
+            "when run in --Analyze mode.";
+        &usage(1);
+    }
 
     ### The -i switch was given
     $config{'PSAD_CHECK_INTERVAL'} = $chk_interval if $chk_interval;
@@ -4521,12 +4535,12 @@ sub setup() {
                     print SYSLOGNG $line;
                 }
             }
-            print SYSLOGNG "\n";
-            print SYSLOGNG 'destination psadpipe { pipe(',
-                "\"$config{'PSAD_FIFO'}\"); };\n";
-            print SYSLOGNG "filter f_kerninfo { facility(kern) ",
-                "and level(info); };\n";
-            print SYSLOGNG 'log { source(src); ',
+            print SYSLOGNG "\n",
+                'destination psadpipe { pipe(',
+                "\"$config{'PSAD_FIFO'}\"); };\n",
+                "filter f_kerninfo { facility(kern) ",
+                "and level(info); };\n",
+                'log { source(src); ',
                 "filter(f_kerninfo); destination(psadpipe); };\n";
             close SYSLOGNG;
             &Psad::psyslog('psad', '.. reconfiguring syslog-ng to write ' .
@@ -4556,10 +4570,10 @@ sub setup() {
             open METALOG, "> $config{'ETC_METALOG_CONF'}" or
                 die " ** Unable to open $config{'ETC_METALOG_CONF'}: $!";
 
-            print METALOG "\n";
-            print METALOG "\nPSAD :\n",
-                "  facility = \"kern\"\n";
-            print METALOG '  command  = ',
+            print METALOG "\n",
+                "\nPSAD :\n",
+                "  facility = \"kern\"\n",
+                '  command  = ',
                 "\"/usr/sbin/psadpipe.sh\"\n";
             close METALOG;
             &Psad::psyslog('psad', '.. reconfiguring metalog to write ' .
@@ -4567,8 +4581,8 @@ sub setup() {
 
             open PIPESCRIPT, '> /usr/sbin/psadpipe.sh' or
                 die " ** Unable to open /usr/sbin/psadpipe.sh: $!";
-            print PIPESCRIPT "#!/bin/sh\n\n";
-            print PIPESCRIPT "echo \"\$3\" >> $config{'PSAD_FIFO'}\n";
+            print PIPESCRIPT "#!/bin/sh\n\n",
+                "echo \"\$3\" >> $config{'PSAD_FIFO'}\n";
             close PIPESCRIPT;
             chmod 0700, '/usr/sbin/psadpipe.sh';
             &Psad::psyslog('psad', '.. generated /usr/sbin/psadpipe.sh ' .
@@ -4957,7 +4971,7 @@ sub required_vars() {
         DSHIELD_ALERT_INTERVAL DSHIELD_ALERT_EMAIL DSHIELD_USER_ID
         DSHIELD_USER_EMAIL DISK_CHECK_INTERVAL DISK_MAX_PERCENTAGE
         DISK_MAX_RM_RETRIES ETC_HOSTS_DENY ETC_SYSLOG_CONF
-        ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL ANALYSIS_DIR
+        ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL ANALYSIS_MODE_DIR
         IMPORT_OLD_SCANS PSAD_ICMP_TYPES_FILE SHOW_ALL_SIGNATURES
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
@@ -4993,12 +5007,14 @@ Options:
     --interval                    - Configure the check interval from
                                     the command line to override the 15
                                     second default.
-    -A   --Analyze-msgs           - Analyze iptables logfile and exit.
     -a   --auto-ips <ips file>    - Import auto IPs file for automatic
                                     IP danger level increases/decreses.
     -c   --config <config file>   - Use <config file> instead of the
                                     normal config file located at
                                     $config_file.
+    -A   --Analyze-msgs           - Analyze iptables logfile and exit.
+    -e   --email-analysis         - Send emails for scans detected in
+                                    analysis mode.
     -m   --messages-file <file>   - Specify the path to the iptables
                                     logfile (use in conjunction with
                                     --Analyze-msgs).

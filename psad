@@ -254,7 +254,7 @@ my $fw_analyze       = 0;
 my $no_signatures = 0;
 my $no_auto_ips   = 0;
 my $no_daemon     = 0;
-my $no_errors     = 0;
+my $no_ipt_errors = 0;
 my $no_rdns       = 0;
 my $no_whois      = 0;
 my $no_netstat    = 0;
@@ -884,7 +884,7 @@ sub check_scan() {
                 $flags, $len, $ttl, $type, $code, $id, $seq);
         }
     }
-    &collect_errors(\@bad_packets) unless $no_errors;
+    &collect_errors(\@bad_packets) unless $no_ipt_errors;
     return $matched_packet;
 }
 

@@ -1966,26 +1966,30 @@ sub status() {
                             closedir D;
                             shift @files; shift @files;
                             for my $file (@files) {
-                                if ($file =~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/ && -d $file) {
+                                if ($file =~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/
+                                    && -d $file) {
                                     ### $file is a current scan source ip
                                     my $src_ipdir = $file;
                                     if (-e "${src_ipdir}/danger_level") {
-                                        open F, "< ${src_ipdir}/danger_level" or die;
+                                        open F, "< ${src_ipdir}/danger_level" or
+                                            die " ... @@@ Could not open " .
+                                                "${src_ipdir}/danger_level\n";
                                         my $dl = <F>;
                                         close F;
                                         chomp $dl;
-                                        $scan_source_ips{$src_ipdir} = $dl;
+                                        $scan_source_ips{$dl}{$src_ipdir} = '';
                                     } else {
-                                        $scan_source_ips{$src_ipdir} = '[N/A]';
+                                        $scan_source_ips{0}{$src_ipdir} = '';
                                     }
                                 }
                             }
-#                            print STDOUT "     scan source ip addresses and danger levels:\n";
-                            print STDOUT "     IP:           Danger Level:\n";
+                            print STDOUT "     Danger_Level:   IP:\n";
                             if (%scan_source_ips) {
-                                for my $src (keys %scan_source_ips) {
-                                    print STDOUT "   " . sprintf("%16s", $src) .
-                                                 "    $scan_source_ips{$src}\n";
+                                for my $dl (sort {$b <=> $a} keys %scan_source_ips) {
+                                    for my $src (keys %{$scan_source_ips{$dl}}) {
+                                        print STDOUT "                  $dl   " .
+                                            sprintf("%16s", $src) . "\n";
+                                    }
                                 }
                             } else {
                                 print STDOUT "     [No scans detected.]\n";

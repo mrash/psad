@@ -163,7 +163,7 @@ Getopt::Long::Configure("no_ignore_case");  ### make Getopts case sensitive
 print "psad version $VERSION, by Michael B. Rash (mbr\@cipherdyne.com)\n" and exit 0 if $print_version;
 
 ### Everthing after this point must be executed as root.
-$< == 0 && $> == 0 or die "\n@@@@@  psad: You must be root (or equivalent UID" .
+$< == 0 && $> == 0 or die "\n ... @@@  psad: You must be root (or equivalent UID" .
                           " 0 account) to execute psad!  Exiting.\n\n";
 
 ### read in configuration file
@@ -241,8 +241,8 @@ unless ($fwcheck || $Syslog_server) {
 unless ($daemon || $DEBUG) {
     my $pid = fork;
     exit if $pid;
-    die "@@@@@  $0: Couldn't fork: $!" unless defined($pid);
-    POSIX::setsid() or die "@@@@@  $0: Can't start a new session: $!";
+    die " ... @@@  $0: Couldn't fork: $!" unless defined($pid);
+    POSIX::setsid() or die " ... @@@  $0: Can't start a new session: $!";
 }
 
 ### write the current pid associated with psad to the psad pid file
@@ -1422,7 +1422,7 @@ sub REAPER {
     my $pid;
     $pid = waitpid(-1, WNOHANG);
 #   if (WIFEXITED($?)) {
-#       print STDERR "@@@@@  Process $pid exited.\n";
+#       print STDERR " .. @@@  Process $pid exited.\n";
 #   }
     $SIG{'CHLD'} = \&REAPER;
     return;
@@ -1471,7 +1471,7 @@ sub restart_psad() {
         close CMD;
         chomp $cmdline;
     } else {
-        die "@@@@@  psad:  No other psad process is currently running on $HOSTNAME!";
+        die " ... @@@  psad:  No other psad process is currently running on $HOSTNAME!";
     }
     &kill_psad();
     print " ... Restarting the psad daemons on $HOSTNAME\n";
@@ -1535,7 +1535,7 @@ sub psad_status() {
                 printf "%-16s %s", " ... $pidname ", "is not currently running on $HOSTNAME\n";
             }
         } else {
-            print "@@@@@  psad: pid file $pidfile does not exist for $pidname on $HOSTNAME\n";
+            print " ... @@@  psad: pid file $pidfile does not exist for $pidname on $HOSTNAME\n";
         }
     }
     exit $rv;
@@ -1544,7 +1544,7 @@ sub psad_usr1() {
     my $rv = 0;
     my $psad_pidfile = $PIDFILES[1];
     if (-e $psad_pidfile) {
-        open PIDFILE, "< $psad_pidfile" or die "@@@@@  Could not open $psad_pidfile: $!";
+        open PIDFILE, "< $psad_pidfile" or die " ... @@@  Could not open $psad_pidfile: $!";
         my $pid = <PIDFILE>;
         close PIDFILE;
         chomp $pid;
@@ -1553,12 +1553,12 @@ sub psad_usr1() {
                 $rv = 1;
                 sleep 1;  ### sleep to give time for the USR1 signal to be delivered and for the file to be created.
                 open U, "< /var/log/psad/scan_hash.${pid}" 
-                or print "@@@@@  Sent psad pid $pid a USR1 signal, but could not open\n" . 
+                or print " ... @@@  Sent psad pid $pid a USR1 signal, but could not open\n" . 
                      "\"/var/log/psad/scan_hash.${pid}\n\"" and return $rv;
                 print while(<U>);
                 close U;
             } else {
-                print "@@@@@  Could not send psad the USR1 signal on $HOSTNAME\n";
+                print " ... @@@  Could not send psad the USR1 signal on $HOSTNAME\n";
             }
         } else {
             print " ... psad is not currently running on $HOSTNAME\n";
@@ -1572,7 +1572,7 @@ sub archive_fwdata() {
     ### first see how big the archive file is and zero out if
     ### it is larger than about 10,000 lines
     if (-e $fwarchive) {
-        my $size = -s $fwarchive) {
+        my $size = -s $fwarchive;
         if ($size > 2367766) {  ### about 10,000 lines
             open F, "> $fwarchive";
             close F;
@@ -1612,10 +1612,10 @@ sub psad_setup() {
         system "$Cmds{'mknod'} -m 600 $Config{'PSAD_FIFO'} p";
     }
     copy('/etc/syslog.conf', '/etc/syslog.conf.orig') unless (-e '/etc/syslog.conf.orig');
-    open RS, '< /etc/syslog.conf' or die "@@@@@  Unable to open /etc/syslog.conf: $!";
+    open RS, '< /etc/syslog.conf' or die " ... @@@  Unable to open /etc/syslog.conf: $!";
     my @slines = <RS>;
     close RS;
-    open SYSLOG, '> /etc/syslog.conf' or die "@@@@@  Unable to open /etc/syslog.conf: $!";
+    open SYSLOG, '> /etc/syslog.conf' or die " ... @@@  Unable to open /etc/syslog.conf: $!";
     for my $l (@slines) {
         chomp $l;
         unless ($l =~ /psadfifo/) {

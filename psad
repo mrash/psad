@@ -239,7 +239,8 @@ my $year;
 ### %auto_dl holds all ip addresses that should automatically
 ### be assigned a danger level (or ignored).
 my %auto_dl = ();
-my %auto_assigned_dl = ();
+my %auto_assigned_dl     = ();
+my %auto_assigned_dl_msg = ();
 
 ### cache the source ips that we have automatically blocked
 ### (if ENABLE_AUTO_IDS == 'Y')
@@ -1032,6 +1033,7 @@ sub check_scan() {
         unless ($no_auto_dl) {
             if (not defined $auto_assigned_dl{$src} and
                     &assign_auto_danger_level($src, $proto) == 2) {
+                &Psad::psyslog('psad', "auto-assigned $src to danger level 0");
                 next PKT;
             }
         }
@@ -2296,8 +2298,8 @@ sub import_auto_dl() {
         my $net_ctr = 0;
         $ip_ctr++ for keys %{$auto_dl{'ip'}};
         $net_ctr++ for keys %{$auto_dl{'net'}};
-        &Psad::psyslog('psad',
-            "imported auto_dl, got $ip_ctr IPs and $net_ctr networks");
+        &Psad::psyslog('psad', "imported auto_dl, got $ip_ctr " .
+            "IP addresses and $net_ctr networks");
     }
     return;
 }
@@ -2502,25 +2504,29 @@ sub assign_auto_danger_level() {
             if ($scan_dl{$src} < $auto_dl{'ip'}{$src}{'allproto'}) {
                 $scan_dl{$src} = $auto_dl{'ip'}{$src}{'allproto'};
                 $auto_assigned_dl{$src} = '';
-                &Psad::psyslog('psad',
-                    " auto-assigned danger level: $scan_dl{$src} for IP: $src");
+                $auto_assigned_dl_msg{$src} = '';
+                &Psad::psyslog('psad', "auto-assigned danger level: " .
+                    "$scan_dl{$src} for IP: $src");
                 return 1;
             }
             if ($auto_dl{'ip'}{$src}{'allproto'} == 0) {
                 $auto_assigned_dl{$src} = '';
+                $auto_assigned_dl_msg{$src} = '';
                 return 2;
             }
         } elsif (defined $auto_dl{'ip'}{$src}{$scan_proto}) {
             if ($scan_dl{$src} < $auto_dl{'ip'}{$src}{$scan_proto}) {
                 $scan_dl{$src} = $auto_dl{'ip'}{$src}{$scan_proto};
                 $auto_assigned_dl{$src} = '';
-                &Psad::psyslog('psad',
-                    " auto-assigned danger level: $scan_dl{$src} for IP: $src");
+                $auto_assigned_dl_msg{$src} = '';
+                &Psad::psyslog('psad', "auto-assigned danger level: " .
+                    "$scan_dl{$src} for IP: $src");
                 return 1;
             }
             if ($auto_dl{'ip'}{$src}{$scan_proto} == 0) {
                 return 2;
                 $auto_assigned_dl{$src} = '';
+                $auto_assigned_dl_msg{$src} = '';
             }
         }
     } elsif (defined $auto_dl{'net'}) {
@@ -2530,24 +2536,28 @@ sub assign_auto_danger_level() {
                 if ($scan_dl{$src} < $auto_dl{'net'}{$net}{'allproto'}) {
                     $scan_dl{$src} = $auto_dl{'net'}{$net}{'allproto'};
                     $auto_assigned_dl{$src} = '';
-                    &Psad::psyslog('psad', " auto-assigned danger level: " .
+                    $auto_assigned_dl_msg{$src} = '';
+                    &Psad::psyslog('psad', "auto-assigned danger level: " .
                         "$scan_dl{$src} for IP: $src");
                     return 1;
                 }
                 if ($auto_dl{'net'}{$src}{'allproto'} == 0) {
                     $auto_assigned_dl{$src} = '';
+                    $auto_assigned_dl_msg{$src} = '';
                     return 2;
                 }
             } elsif (defined $auto_dl{'net'}{$net}{$scan_proto}) {
                 if ($scan_dl{$src} < $auto_dl{'net'}{$net}{$scan_proto}) {
                     $scan_dl{$src} = $auto_dl{'net'}{$net}{$scan_proto};
                     $auto_assigned_dl{$src} = '';
-                    &Psad::psyslog('psad', " auto-assigned danger level: " .
+                    $auto_assigned_dl_msg{$src} = '';
+                    &Psad::psyslog('psad', "auto-assigned danger level: " .
                         "$scan_dl{$src} for IP: $src");
                     return 1;
                 }
                 if ($auto_dl{'net'}{$src}{$scan_proto} == 0) {
                     $auto_assigned_dl{$src} = '';
+                    $auto_assigned_dl_msg{$src} = '';
                     return 2;
                 }
             }
@@ -2841,17 +2851,16 @@ sub scan_logr() {
                 "$dst\n\n\n";
 
             printf $fh "%${log_len}s%s", 'Danger level: ',
-                "[$scan_dl{$src}] (out of 5) ";
+                "[$scan_dl{$src}] (out of 5)";
 
             if (defined $scan{$src}{$dst}{'multiproto'}) {
-                print $fh 'Multi-Protocol';
+                print $fh ' Multi-Protocol';
+            }
+            if (defined $auto_assigned_dl_msg{$src}) {
+                printf $fh ' Auto-assigned';
+                delete $auto_assigned_dl_msg{$src};
             }
             print $fh "\n\n";
-
-            if (defined $auto_assigned_dl{$src}) {
-                printf $fh "%${log_len}s%s\n", ' ', 'Auto-assigned';
-                delete $auto_assigned_dl{$src};
-            }
 
             if ($tcp_f) {
                 printf $fh "%${log_len}s%s\n", 'Scanned tcp ports: ',
@@ -4539,7 +4548,7 @@ sub import_old_scans() {
     close FD;
     if ($import_ctr) {
         &Psad::psyslog('psad',
-            "imported $import_ctr scanning IPs from previous psad run");
+            "imported $import_ctr scanning IP addresses from previous psad run");
     }
     return;
 }
@@ -5214,7 +5223,7 @@ Options:
     --no-whois                    - Disable whois lookups.
     --no-fwcheck                  - Disable firewall rules verification.
     --no-rdns                     - Disable name resolution against
-                                    scanning IPs.
+                                    scanning IP addresses.
     --no-kmsgsd                   - Disable startup of kmsgsd (useful
                                     for debugging with an existing file
                                     of iptables messages).

@@ -32,11 +32,11 @@
 *  $Id$
 */
 
-#define DEBUG 1
-
 /* INCLUDES *****************************************************************/
 #include "psad.h"
 #include <sys/vfs.h> /* statfs() */
+#include <dirent.h>
+#include <ctype.h>   /* isdigit() */
 
 /* GLOBALS ******************************************************************/
 short int email_ctr = 0;
@@ -59,7 +59,9 @@ static void parse_config(
     unsigned int *diskmond_max_retries
 );
 
-void rm_data(char *fwdata_file);
+void rm_data(char *fwdata_file, char *psad_dir, char *archive_dir);
+void rm_scanlog(char *dir);
+int check_ip_dir(char *file);
 
 /* MAIN *********************************************************************/
 int main(int argc, char *argv[]) {
@@ -124,11 +126,6 @@ int main(int argc, char *argv[]) {
     /* first make sure there isn't another diskmond already running */
     check_unique_pid(diskmond_pid_file, "diskmond");
 
-    if (chdir(psad_dir)) {
-        printf(" ... @@@ Could not chdir() into: %s\n", psad_dir);
-        exit(EXIT_FAILURE);
-    }
-
 #ifndef DEBUG
     /* become a daemon */
     daemonize_process(diskmond_pid_file);
@@ -137,17 +134,19 @@ int main(int argc, char *argv[]) {
     /* start doing the real work now that the daemon is running and
      * the config file has been processed */
 
-#ifdef DEBUG
-    printf("\n");
-#endif
+    if (chdir(psad_dir) < 0) {
+        printf(" ... @@@ Could not chdir() into: %s\n", psad_dir);
+        exit(EXIT_FAILURE);
+    }
 
     /* MAIN LOOP: */
     for (;;) {
         if (!statfs(psad_dir, &statfsbuf)) {
             current_prct = (float) statfsbuf.f_bfree / statfsbuf.f_blocks * 100;
             if (current_prct > max_disk_percentage) {
-                printf("calling rmstuff()\n");
-                rm_data(fwdata_file);
+                printf("current_prct: %f\n", current_prct);
+                printf("calling rm_data()\n");
+                rm_data(fwdata_file, psad_dir, archive_dir);
             } else {
                 printf("current_prct: %f\n", current_prct);
             }
@@ -242,7 +241,77 @@ static void parse_config(
     return;
 }
 
-void rm_data(char *fwdata_file) {
-    printf("removing: %s\n", fwdata_file);
+void rm_data(char *fwdata_file, char *psad_dir, char *archive_dir) {
+    char path_tmp[MAX_PATH_LEN+1];
+    int fd;  /* file descriptor */
+
+    /* remove the ip/scanlog files in psad_dir and archive_dir
+     * since they take up the most space */
+    rm_scanlog(psad_dir);
+    rm_scanlog(archive_dir);
+
+    /* truncate the fwdata_file after truncating the scanlog
+     * files since changing the number of lines in fwdata will
+     * cause psad to write to files in the ip directories */
+    if ((fd = open(fwdata_file, O_TRUNC)) >= 0)
+        close(fd);
+
+    strcpy(path_tmp, archive_dir);
+    strcat(path_tmp, "/fwdata_archive");
+
+    if ((fd = open(path_tmp, O_TRUNC)) >= 0)
+        close(fd);
+
     return;
+}
+
+void rm_scanlog(char *dir) {
+    DIR *dir_ptr;
+    struct dirent *direntp;
+    char path_tmp[MAX_PATH_LEN+1];
+    int fd;
+
+    if ((dir_ptr = opendir(dir)) == NULL) {
+        /* could not open dir */
+        return;
+    } else {
+        if (chdir(dir) < 0) {
+#ifdef DEBUG
+    printf(" ... @@@ Could not chdir(%s)\n", dir);
+#endif
+            closedir(dir_ptr);
+            return;
+        }
+        while ((direntp = readdir(dir_ptr)) != NULL) {
+            if (check_ip_dir(direntp->d_name)) {
+                printf("ip: %s\n", direntp->d_name);
+                strcpy(path_tmp, direntp->d_name);
+                strcat(path_tmp, "/scanlog");
+                /* zero out the file */
+                if ((fd = open(path_tmp, O_TRUNC)) >= 0)
+                    close(fd);
+            }
+        }
+        closedir(dir_ptr);
+    }
+    return;
+}
+
+int check_ip_dir(char *file) {
+    int pctr = 0;
+    char *index;
+    if (isdigit(file[0])) {
+        index = file;
+        while (*index != '\0') {
+            if (*index == '.') {
+                pctr++;
+            }
+            index++;
+        }
+        /* ex: 10.10.10.10 */
+        if (pctr == 3) {
+            return 1;
+        }
+    }
+    return 0;
 }

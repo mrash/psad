@@ -428,15 +428,17 @@ EMAIL_ALERT_DANGER_LEVEL is set to 1 by default.
 has the capability of dynamically blocking all traffic from an ip that
 has reached a (configurable) danger level through modification of tcpwrapper,
 ipchains, or iptables rulesets.
-.B NOTE:
+.B IMPORTANT:
 This feature is disabled by default since it is possible for an attacker
 to spoof packets from a well known (web)site in an effort to make it
 look as though the site is scanning your machine, and then psad will
 consequently block all access to it.  Also, psad works by parsing firewall
 messages for packets the firewall has already dropped, so the "scans" are
-unsuccessful anyway.  However, if an ip is scanning you it might be wise
-to not allow the ip to connect to servers that you do allow access to, and
-this is the reason the auto blocking capability was included in psad.
+unsuccessful anyway.  However, some administrators prefer to take this risk
+anyway reasoning that they can always review which sites are being blocked
+and manually remove the block if necessary (see the
+.B --Flush
+option).  Your mileage will vary.
 .TP
 
 .BR AUTO_IDS_DANGER_LEVEL
@@ -453,7 +455,7 @@ command line arguments:
 
 .B # psad
 
-Enabled psad to look for snort sid's in the iptables log messages:
+Enable psad to look for snort sid's in iptables log messages:
 
 .B # psad --snort-sids
 

@@ -543,7 +543,7 @@ sub install() {
 
     my $init_file = '';
     if ($distro eq 'redhat') {
-        $init_file = 'psad-init';
+        $init_file = 'psad-init.redhat';
     } elsif ($distro eq 'gentoo') {
         $init_file = 'psad-init.gentoo';
     } else {

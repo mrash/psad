@@ -74,15 +74,16 @@
 #   - perldoc
 #
 # Default Command Line Arguments:  As of the 1.0.0-pre3 release, psad by
-#   by default will have the --signatures and --auto_ips options set even
+#   by default will have the --signatures and --auto-ips options set even
 #   if these options are not specified on the command line, and psad
 #   will use the default locations for the signatures and auto_ips files.
 #   The default file locations can be changed by manually specifying the
-#   locations to these files with the --signatures and --auto_ips options.
+#   locations to these files with the --signatures and --auto-ips options.
 #   The signature matching and the auto_ips danger level assignments can
 #   be disabled by using the --no-signatures and --no-auto-ips options
-#   respectively.  In addition the psad adheres to the following
+#   respectively.  In addition, psad adheres to the following
 #   defaults:
+#       -passive OS fingerprinting            = yes
 #       -write errors to error log            = yes
 #       -daemon mode                          = yes
 #       -reverse dns lookups                  = yes
@@ -91,11 +92,12 @@
 #       -parse netstat output for local ports = yes
 #
 # Coding Style:  All configuration variables from psad.conf are stored in
-#   the $config hash ref by keys that are in capital letters.  This is
+#   the %config hash by keys that are in capital letters.  This is
 #   the only place in the code where capital letters will be used in
 #   variables names.  There are several variables with file-scope, and
 #   these variables are clearly commented near the top of each of the
-#   psad daemons.
+#   psad daemons.  Generally lines are limited to 80 characters for easy
+#   reading.
 #
 # Sample packets:
 #
@@ -180,6 +182,12 @@ my %ipt_chains;
 ### is very simplistic).
 my @ipchains_chains = qw(input);
 
+### configuration hash
+my %config;
+
+### commands hash
+my %cmds;
+
 ### main psad data structure; contains ips, port ranges,
 ### protocol info, tcp flags, etc.
 my %scan;
@@ -230,6 +238,10 @@ my %whois_cache;
 ### updated by get_listening_ports()).
 my %local_ports;
 
+### cache the ip addresses associated with each interface on the
+### local machine.
+my %local_ips;
+
 ### regex to match an ip address
 my $ip_re = '(?:\d{1,3}\.){3}\d{1,3}';
 
@@ -247,6 +259,9 @@ my $tcp_ctr  = 0;
 my $udp_ctr  = 0;
 my $icmp_ctr = 0;
 
+### pid file array
+my @pidfiles;
+
 ### initialize and scope some default variables (command
 ### line args can override some default values)
 my $sigs_file        = '';
@@ -255,6 +270,7 @@ my $autoips_file     = '';
 my $snort_rules_dir  = '';
 my $srules_type      = '';
 my $psad_logfile     = '';
+my $cmdline_file     = '';
 my $snort_sids       = 0;
 my $output           = 0;
 my $syslog_server    = 0;
@@ -266,6 +282,7 @@ my $benchmark        = 0;
 my $b_packets        = 0;
 my $usr1             = 0;
 my $usr1_flag        = 0;
+my $hup_flag         = 0;
 my $ver              = 0;
 my $help             = 0;
 my $dump_conf        = 0;
@@ -406,85 +423,18 @@ if ($status_ip && ! $status) {
 
 ### Everthing after this point must be executed as root.
 $< == 0 && $> == 0 or
-    die " ** psad: You must be root (or equivalent ",
+    die ' ** psad: You must be root (or equivalent ',
         "UID 0 account) to execute psad!  Exiting.\n";
 
-### read in configuration file
-my ($config_href, $cmds_href) = &Psad::buildconf($config_file);
-
-### make sure the configuration is complete
-&check_config();
-
-my %config = %$config_href;
-my %cmds   = %$cmds_href;
-
-### release the memory in config_href and cmds_href
-%$config_href = ();
-%$cmds_href   = ();
-
-### dump configuration to STDOUT
-&dump_conf() if $dump_conf;
-
-### store the psad command line.
-my $cmdline_file = $config{'PSAD_CMDLINE_FILE'};
-
-### pid file array
-my @pidfiles = (
-    $config{'PSADWATCHD_PID_FILE'},
-    $config{'PSAD_PID_FILE'},
-    $config{'KMSGSD_PID_FILE'},
-    $config{'DISKMOND_PID_FILE'}
-);
-
-### The --Kill command line switch was given.
-exit &stop_psad() if $kill;
-
-### The --Flush command line switch was given.
-exit &flush_auto_blocked_ips() if $flush_fw;
-
-### The --USR1 command line switch was given.
-exit &usr1() if $usr1;
-
-### The -i switch was given
-$config{'PSAD_CHECK_INTERVAL'} = $chk_interval if $chk_interval;
-
-### The --snort-rdir switch was given
-$config{'SNORT_RULES_DIR'} = $snort_rules_dir if $snort_rules_dir;
-
-### The --signatures switch was given
-$config{'PSAD_SIGS_FILE'} = $sigs_file if $sigs_file;
-
-### The --passive-os-file switch was given
-$config{'PSAD_POSD_FILE'} = $posf_file if $posf_file;
-
-### The --auto-ips switch was given
-$config{'PSAD_AUTO_IPS_FILE'} = $autoips_file if $autoips_file;
-
-### check to make sure the commands specified in the config section
-### are in the right place, and attempt to correct automatically if not.
-&Psad::check_commands(\%cmds);
-
-### the --Status command line switch was given
-&status() if $status;
-
-### make sure PSAD_DIR, FW_DATA_FILE, and /var/lib/psad/psadfifo, etc.
-### actually exist
-&setup();
-
-### the --Restart command line switch was given
-exit &restart if $restart;
+### Import all psad configuration and signatures files
+### (psad.conf, psad_posf, psad_signatures, and psad_auto_ips).
+&import_configs();
 
 ### check to make sure another psad process is not already running.
 &Psad::unique_pid($config{'PSAD_PID_FILE'});
 
-### make sure the permissions on these files is 0600
-&check_permissions(
-    $config{'FW_DATA_FILE'},
-    $config{'FW_ERROR_LOG'},
-);
-
 ### get the ip addresses that are local to this machine
-my $local_ips_href = &get_local_ips();
+&get_local_ips();
 
 ### disable whois lookups if for some reason the whois client that is
 ### bundled with psad can't be found
@@ -501,10 +451,6 @@ unless ($no_whois) {
 ### rules since they may not be local.
 &fw_check() unless $no_fwcheck || $syslog_server;
 
-### parse snort rules if we enable psad to match on iptables log
-### messages that include snort SID's
-&import_snort_rules() if $snort_sids;
-
 ### initialize benchmarking test packets if we are running
 ### in benchmark mode
 if ($benchmark) {
@@ -514,9 +460,6 @@ if ($benchmark) {
         'TTL=110 ID=13383 DF PROTO=TCP SPT=1389 DPT=';
     $test_pktend = 'WINDOW=16384 RES=0x00 SYN URGP=0';
 }
-
-### make sure the psad logfile is where we think it is.
-$psad_logfile = $config{'PSAD_LOG'} unless $psad_logfile;
 
 ### print the startup message
 print STDOUT " .. psad started; email alerts will be sent to:\n",
@@ -578,13 +521,14 @@ if ($config_file eq '/etc/psad/psad.conf') {
 $SIG{'__WARN__'} = \&Psad::warn_handler;
 $SIG{'__DIE__'}  = \&Psad::die_handler;
 $SIG{'CHLD'}     = \&REAPER;
-$SIG{'USR1'}     = \&process_usr1;
+$SIG{'USR1'}     = \&usr1_sig;
+$SIG{'HUP'}      = \&hup_sig;
 
 ### Get the mtimes of the signatures and auto ips files.
-my $sigs_mtime     = stat($config{'PSAD_SIGS_FILE'})->mtime;
-my $posf_mtime     = stat($config{'PSAD_POSF_FILE'})->mtime;
-my $auto_ips_mtime = stat($config{'PSAD_AUTO_IPS_FILE'})->mtime;
-my $config_mtime   = stat($config_file)->mtime;
+#my $sigs_mtime     = stat($config{'PSAD_SIGS_FILE'})->mtime;
+#my $posf_mtime     = stat($config{'PSAD_POSF_FILE'})->mtime;
+#my $auto_ips_mtime = stat($config{'PSAD_AUTO_IPS_FILE'})->mtime;
+#my $config_mtime   = stat($config_file)->mtime;
 
 ### zero out the packet counter file (the counters
 ### are all zero at this point anyway).
@@ -615,21 +559,23 @@ open FWDATA, $config{'FW_DATA_FILE'} or die ' ** Could not open ',
 ###=========================================================###
 for (;;) {
 
-    ### See if we need to import any changed config variables
-    &check_import_config(\$config_mtime);
+    if ($hup_flag) {
+        $hup_flag = 0;  ### clear the HUP flag
+        ### send email saying we re-imported config and signatures files
+        &Psad::sendmail(" ** psad: re-read config files on $hostname", '',
+            $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
 
-    ### See if we need to import any new signatures
-    &check_import(\$sigs_mtime, $config{'PSAD_SIGS_FILE'}, 1);
-
-    ### See if we need to import any new posf signatures
-    &check_import(\$posf_mtime, $config{'PSAD_POSF_FILE'}, 2);
-
-    ### See if we need to re-import the psad_auto_ips file
-    &check_import(\$auto_ips_mtime, $config{'PSAD_AUTO_IPS_FILE'}, 0);
+        ### Re-import all used config files (psad.conf, psad_auto_ips,
+        ### psad_posf, psad_signatures) if we received a HUP signal.
+        &import_config();
+    }
 
     ### See if we need to print out the %scan datastructure
     ### (we received a USR1 signal)
-    &print_scan() if $usr1_flag;
+    if ($usr1_flag) {
+        $usr1_flag = 0;
+        &print_scan();
+    }
 
     ### Get any new packets have been written to
     ### FW_DATA_FILE by kmsgsd for psad analysis.
@@ -1158,7 +1104,7 @@ sub chk_local_port() {
     ### to the destination port on the remote machine, but
     ### of course it should not do this so it is not
     ### implemented. :)
-    if (defined $local_ips_href->{$dst}) {
+    if (defined $local_ips{$dst}) {
         if (defined $local_ports{$proto}{$dp}) {
             $scan{$src}{$dst}{$proto}{'CURR_SIG'}
             {$sig_id}{'LISTEN'}{$dp}{'PKTS'}++;
@@ -1248,7 +1194,7 @@ sub check_icmp_sigs() {
     if (defined $sigs{'ICMP'}{$sig_id}{'seq'}) {
         return 0 if ($sigs{'ICMP'}{$sig_id}{'icmp_seq'} != $icmp_seq);
     }
-    return 1; ### if we got to this point, then we matched the signature
+    return 1;  ### if we got to this point, then we matched the signature
 }
 
 sub check_misc_fields() {
@@ -1262,56 +1208,65 @@ sub check_misc_fields() {
     return 1;
 }
 
-sub check_import() {
-    my ($mtime_ref, $file, $type) = @_;
-    my $mtime_tmp = stat($file)->mtime;
-    if ($mtime_tmp != $$mtime_ref) {  ### the file was modified, so import
-        if ($type == 0) {  ### import signatures
-            &import_auto_ips();
-        } elsif ($type == 1) {
-            &import_signatures();
-        } else {
-            &import_posf_sigs();
-        }
-        my $subject = " ** psad: re-read $file on $hostname";
-        &Psad::sendmail($subject, '',
-            $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
-        $$mtime_ref = $mtime_tmp;
-    }
-    return;
-}
+sub import_configs() {
 
-sub check_import_config() {
-    my $mtime_ref = shift;
-    my $mtime_tmp = stat($config_file)->mtime;
-    if ($mtime_tmp != $$mtime_ref) {  ### the file was modified, so import
+    ### import psad.conf
+    &Psad::buildconf(\%config, \%cmds, $config_file);
 
-        ($config_href, $cmds_href) = &Psad::buildconf($config_file);
+    ### make sure all necessary configuration variables
+    ### are defined (some validation is also done in setup()).
+    &required_vars();
 
-        ### make sure the configuration is complete
-        &check_config();
+    ### check to make sure the commands specified in the config section
+    ### are in the right place, and attempt to correct automatically if not.
+    &Psad::check_commands(\%cmds);
 
-        %config = %$config_href;
-        %cmds   = %$cmds_href;
-        my $subject = " ** psad: re-read $config_file on $hostname";
-        &Psad::sendmail($subject, '',
-            $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
-        $$mtime_ref = $mtime_tmp;
+    ### set some config variables based on command line input
+    &handle_cmdline();
 
-        ### kill kmsgsd since it does not have the capability of
-        ### checking for a modified config file
-        open K, "< $config{'KMSGSD_PID_FILE'}" or warn
-            " ** Could not open $config{'KMSGSD_PID_FILE'}" and return;
-        my $pid = <K>;
-        close K;
-        chomp $pid;
-        if (kill 0, $pid) {
-            kill 15, $pid;
-            ### NOTE: we are not restarting kmsgsd here since we
-            ###       don't want to create a race condition between
-            ###       psad and psadwatchd both starting kmsgsd
-        }
-    }
+    ### make sure PSAD_DIR, FW_DATA_FILE, and /var/lib/psad/psadfifo, etc.
+    ### actually exist and validate some other variable values as well.
+    &setup();
+
+    ### dump configuration to STDOUT
+    exit &dump_conf() if $dump_conf;
+
+    ### The --Kill command line switch was given.
+    exit &stop_psad() if $kill;
+
+    ### The --Flush command line switch was given.
+    exit &flush_auto_blocked_ips() if $flush_fw;
+
+    ### The --USR1 command line switch was given.
+    exit &usr1() if $usr1;
+
+    ### the --Status command line switch was given
+    exit &status() if $status;
+
+    ### the --Restart command line switch was given
+    exit &restart() if $restart;
+
+    ### import psad signatures (XXX: these should be taken directly
+    ### from the snort signatures instead)
+    &import_signatures() unless $no_signatures;
+
+    ### import passive OS fingerprinting signatures
+    &import_posf_sigs() unless $no_posf;
+
+    ### import psad_auto_ips file for automatic ip/network danger
+    ### level assignment
+    &import_auto_ips() unless $no_auto_ips;
+
+    ### parse snort rules if we enable psad to match on iptables log
+    ### messages that include snort SID's
+    &import_snort_rules() if $snort_sids;
+
+    ### make sure the permissions on these files is 0600
+    &check_permissions(
+        $config{'FW_DATA_FILE'},
+        $config{'FW_ERROR_LOG'},
+    );
+
     return;
 }
 
@@ -1636,13 +1591,13 @@ sub import_posf_sigs() {
         }
         unless (defined $posf_sigs{$os}{'ttl'}) {
             &Psad::logr_nowrap(localtime() . " ** $posf_file: missing " .
-                "TTL for os: $os\n", \%$psad_logfile);
+                "TTL for os: $os\n", $psad_logfile);
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'id'}) {
             &Psad::logr_nowrap(localtime() . " ** $posf_file: missing " .
-                "ID for os: $os\n", \%$psad_logfile);
+                "ID for os: $os\n", $psad_logfile);
             delete $posf_sigs{$os};
             next OS;
         } else {
@@ -2629,8 +2584,7 @@ sub email_limit_reached() {
 }
 
 sub print_scan() {  ### this should primarily be used for debugging
-    $usr1_flag = 0;  ### clear the flag
-    my $scanfile = $config{'PRINT_SCAN_HASH'} . ".$$";
+    my $scanfile = "$config{'PRINT_SCAN_HASH'}.$$";
     open PSCAN, "> $scanfile" or warn ' ** Could not open ',
         "$scanfile: $!" and return;
     print PSCAN " ** Passive OS fingerprinting hash:\n";
@@ -2656,13 +2610,12 @@ sub get_fw_type() {
 
 sub get_local_ips() {
     my @ips = `$cmds{'ifconfig'} -a`;
-    my %local_ips;
     for my $line (@ips) {
         if ($line =~ /inet\s+addr:($ip_re)\s/) {
             $local_ips{$1} = '';
         }
     }
-    return \%local_ips;
+    return;
 }
 
 sub get_listening_ports() {
@@ -2913,7 +2866,7 @@ sub status() {
                 "$pidname on $hostname\n";
         }
     }
-    exit $rv;
+    return $rv;
 }
 
 sub status_ip() {
@@ -2989,7 +2942,7 @@ sub usr1() {
             if (kill 'USR1', $pid) {
                 $rv = 1;
                 print " .. USR1 signal sent to pid: $pid\n";
-                for (my $try=0; $try<=$config{'PSAD_CHECK_INTERVAL'}; $try++) {
+                for (my $try=0; $try<=20; $try++) {  ### limit attempts to 20
                     sleep 1;
                     print " .. Checking for file: ",
                         "$config{'PSAD_DIR'}/scan_hash.${pid}\n";
@@ -3016,8 +2969,13 @@ sub usr1() {
     return $rv;
 }
 
-sub process_usr1() {
+sub usr1_sig() {
     $usr1_flag = 1;
+    return;
+}
+
+sub hup_sig() {
+    $hup_flag = 1;
     return;
 }
 
@@ -3102,10 +3060,44 @@ sub print_old_arg() {
     return;
 }
 
+sub handle_cmdline() {
+
+    ### make sure the psad logfile is where we think it is.
+    $psad_logfile = $config{'PSAD_LOG'} unless $psad_logfile;
+
+    ### The -i switch was given
+    $config{'PSAD_CHECK_INTERVAL'} = $chk_interval if $chk_interval;
+
+    ### The --snort-rdir switch was given
+    $config{'SNORT_RULES_DIR'} = $snort_rules_dir if $snort_rules_dir;
+
+    ### The --signatures switch was given
+    $config{'PSAD_SIGS_FILE'} = $sigs_file if $sigs_file;
+
+    ### The --passive-os-file switch was given
+    $config{'PSAD_POSD_FILE'} = $posf_file if $posf_file;
+
+    ### The --auto-ips switch was given
+    $config{'PSAD_AUTO_IPS_FILE'} = $autoips_file if $autoips_file;
+
+    return;
+}
+
 sub setup() {
 
     ### turn off buffering
     $| = 1;
+
+    ### store the psad command line.
+    $cmdline_file = $config{'PSAD_CMDLINE_FILE'};
+
+    ### pid file array
+    @pidfiles = (
+        $config{'PSADWATCHD_PID_FILE'},
+        $config{'PSAD_PID_FILE'},
+        $config{'KMSGSD_PID_FILE'},
+        $config{'DISKMOND_PID_FILE'}
+    );
 
     unless (-d $config{'PSAD_DIR'}) {
         mkdir $config{'PSAD_DIR'}, 0500;
@@ -3139,41 +3131,51 @@ sub setup() {
     unless (-e '/etc/syslog.conf.orig') {
         copy('/etc/syslog.conf', '/etc/syslog.conf.orig');
     }
-    open RS, '< /etc/syslog.conf' or
-        die " ** Unable to open /etc/syslog.conf: $!";
-    my @slines = <RS>;
-    close RS;
-    my $found = 0;
-    for my $line (@slines) {
-        $found = 1 if $line =~ m/|\s*$config{'PSAD_FIFO'}/;
-    }
-    unless ($found) {
-        open SYSLOG, '> /etc/syslog.conf' or
+    ### look for psadfifo in some system logger config file
+    ### (syslog, syslog-ng, etc.).
+    my $found_logger = 0;
+    if (-e '/etc/syslog.conf') {
+        open RS, '< /etc/syslog.conf' or
             die " ** Unable to open /etc/syslog.conf: $!";
-        for my $line (@slines) {
-            unless ($line =~ /psadfifo/) {
-                print SYSLOG $line;
+        my @lines = <RS>;
+        close RS;
+        my $found = 0;
+        for my $line (@lines) {
+            if ($line =~ m/|\s*$config{'PSAD_FIFO'}/) {
+                $found = 1;
+                $found_logger = 1;
             }
         }
-        ### reinstate kernel logging to our named pipe
-        print SYSLOG '### Send kern.info messages to psadfifo for ',
-            "analysis by kmsgsd\n";
-        print SYSLOG "kern.info\t\t|$config{'PSAD_FIFO'}\n";
-        close SYSLOG;
-        system "$cmds{'killall'} -HUP $cmds{'syslogd'}";
+        unless ($found) {
+            open SYSLOG, '> /etc/syslog.conf' or
+                die " ** Unable to open /etc/syslog.conf: $!";
+            for my $line (@lines) {
+                unless ($line =~ /psadfifo/) {
+                    print SYSLOG $line;
+                }
+            }
+            ### reinstate kernel logging to our named pipe
+            print SYSLOG '### Send kern.info messages to psadfifo for ',
+                "analysis by kmsgsd\n";
+            print SYSLOG "kern.info\t\t|$config{'PSAD_FIFO'}\n";
+            close SYSLOG;
+            system "$cmds{'killall'} -HUP $cmds{'syslogd'}";
+        }
     }
     if (-e '/etc/syslog-ng/syslog-ng.conf') {
         open RS, '< /etc/syslog-ng/syslog-ng.conf' or
             die " ** Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
-        my @slines = <RS>;
+        my @lines = <RS>;
         close RS;
 
-        my $found_fifo = 0;
-        for my $line (@slines) {
-            $found_fifo = 1 if $line =~ /psadfifo/;
+        my $found = 0;
+        for my $line (@lines) {
+            if ($line =~ m/|\s*$config{'PSAD_FIFO'}/) {
+                $found = 1;
+                $found_logger = 1;
+            }
         }
-
-        unless ($found_fifo) {
+        unless ($found) {
             open SYSLOGNG, '>> /etc/syslog-ng/syslog-ng.conf' or
                 die " ** Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
             print SYSLOGNG "\n";
@@ -3187,6 +3189,10 @@ sub setup() {
             system "$cmds{'killall'} -HUP syslog-ng";
         }
     }
+    unless ($found_logger) {
+        die " ** Could not find $config{'PSAD_FIFO'} in any system logger ",
+            "config file.  Exiting.";
+    }
     die ' ** PORT_RANGE_SCAN_THRESHOLD must be less than 65535.',
         '  Exiting.' unless $config{'PORT_RANGE_SCAN_THRESHOLD'} < 65535;
     die ' ** PORT_RANGE_SCAN_THRESHOLD must be greater than 0.',
@@ -3194,10 +3200,10 @@ sub setup() {
     return;
 }
 
-sub check_config() {
+sub required_vars() {
     my @required_vars = qw(
         EMAIL_ADDRESSES PSAD_CHECK_INTERVAL FW_DATA_FILE FW_ERROR_LOG
-        FW_MSG_SEARCH SNORT_SID_STR ENABLE_AUTO_IDS
+        FW_MSG_SEARCH SNORT_SID_STR ENABLE_AUTO_IDS PSAD_LOG
         IGNORE_CONNTRACK_BUG_PKTS SCAN_TIMEOUT DANGER_LEVEL1
         DANGER_LEVEL2 DANGER_LEVEL3 DANGER_LEVEL4 DANGER_LEVEL5
         PORT_RANGE_SCAN_THRESHOLD ALERT_ALL PSAD_EMAIL_LIMIT
@@ -3211,7 +3217,7 @@ sub check_config() {
         ENABLE_EXT_SCRIPT_EXEC EXEC_EXT_SCRIPT_PER_ALERT
         ENABLE_DSHIELD_ALERTS DSHIELD_DIR
     );
-    &Psad::defined_vars($config_file, \@required_vars, $config_href);
+    &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;
 }
 
@@ -3427,10 +3433,10 @@ sub ipt_chk_chain() {
 }
 
 sub dump_conf() {
-    for my $var (keys %config) {
+    for my $var (sort keys %config) {
         printf("%-30s %s\n", " .. $var", $config{$var});
     }
-    exit 0;
+    return 0;
 }
 
 sub usage() {

@@ -52,18 +52,18 @@
 #define MAX_PATH_LEN 50
 #define RESTART_LIMIT 5
 
-#define CONFIG_FILE "/etc/psad/psad.conf"             /* default config file */
+#define CONFIG_FILE "/etc/psad/psad.conf" /* default config file */
 
-#define PSAD_PID_FILE "/var/run/psad.pid"             /* psad pid file */
+#define PSAD_PID_FILE "/var/run/psad/psad.pid" /* psad pid file */
 #define PSAD_BINARY_PATH "/usr/sbin/psad"
 
-#define PSADWATCHD_PID_FILE "/var/run/psadwatchd.pid" /* psadwatchd pid file */
+#define PSADWATCHD_PID_FILE "/var/run/psad/psadwatchd.pid" /* pid file */
 #define PSADWATCHD_BINARY_PATH "/usr/sbin/psadwatchd"
 
-#define KMSGSD_PID_FILE "/var/run/kmsgsd.pid"         /* kmsgsd pid file */
+#define KMSGSD_PID_FILE "/var/run/psad/kmsgsd.pid" /* kmsgsd pid file */
 #define KMSGSD_BINARY_PATH "/usr/sbin/kmsgsd"
 
-#define DISKMOND_PID_FILE "/var/run/diskmond.pid"     /* diskmond file */
+#define DISKMOND_PID_FILE "/var/run/psad/diskmond.pid" /* diskmond file */
 #define DISKMOND_BINARY_PATH "/usr/sbin/diskmond"
 
 /* PROTOTYPES *****************************************************************/

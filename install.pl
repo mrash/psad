@@ -370,11 +370,11 @@ sub install() {
     ### checked in iptables messages.  This is useful since the admin may have
     ### configured the firewall to use a logging prefix of "Audit" or something
     ### else other than the normal "DROP", "DENY", or "REJECT" strings.
-    my $append_fw_search_str = &get_fw_search_string();
-    if ($append_fw_search_str) {
-        &logr(" ... Appending \"$append_fw_search_str\" to " .
-            "\$FW_MSG_SEARCH in ${PSAD_CONFDIR}/psad.conf\n");
-        &put_fw_search_str("${PSAD_CONFDIR}/psad.conf", $append_fw_search_str);
+    my $custom_fw_search_str = &get_fw_search_string();
+    if ($custom_fw_search_str) {
+        &logr(" ... Setting \$FW_MSG_SEARCH to \"$custom_fw_search_str\"" .
+            "in ${PSAD_CONFDIR}/psad.conf\n");
+        &put_custom_fw_search_str("${PSAD_CONFDIR}/psad.conf", $custom_fw_search_str);
     }
     ### make sure the PSAD_DIR and PSAD_FIFO variables are correctly defined
     ### in the config file.
@@ -749,17 +749,15 @@ sub put_email() {
     close F;
     return;
 }
-sub put_fw_search_str() {
-    my ($file, $append_fw_search) = @_;
+sub put_custom_fw_search_str() {
+    my ($file, $custom_fw_search) = @_;
     open RF, "< $file";
     my @lines = <RF>;
     close RF;
     open F, "> $file";
     for my $line (@lines) {
-        if ($line =~ /^\s*FW_MSG_SEARCH\s*(.*);/) {
-            my $fw_string = $1;
-            $fw_string .= "|$append_fw_search";
-            print F "FW_MSG_SEARCH              $fw_string;\n";
+        if ($line =~ /^\s*FW_MSG_SEARCH\s/) {
+            print F "FW_MSG_SEARCH              $custom_fw_search;\n";
         } else {
             print F $line;
         }

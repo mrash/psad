@@ -58,8 +58,6 @@ int main(int argc, char *argv[]) {
     printf(" ... Entering DEBUG mode ...\n");
     printf(" ... Firewall messages will be written to both ");
     printf("STDOUT _and_ to fwdata\n\n");
-    sleep(1);
-    printf(" ... parsing config_file: %s\n", config_file);
 #endif
 
     /* first make sure there isn't another kmsgsd already running */
@@ -80,6 +78,9 @@ int main(int argc, char *argv[]) {
 
     /* parse the config file for the psadfifo_file, fwdata_file,
      * and fw_msg_search variables */
+#ifdef DEBUG
+    printf(" ... parsing config_file: %s\n", config_file);
+#endif
     parse_config(config_file, psadfifo_file, fwdata_file, fw_msg_search);
 
 #ifndef DEBUG
@@ -175,5 +176,10 @@ static void parse_config(char *config_file, char *psadfifo_file,
         }
     }
     fclose(config_ptr);
+#ifdef DEBUG
+    printf(" ... PSAD_FIFO: %s\n", psadfifo_file);
+    printf(" ... FW_DATA: %s\n", fwdata_file);
+    printf(" ... FW_MSG_SEARCH: %s\n", fw_msg_search);
+#endif
     return;
 }

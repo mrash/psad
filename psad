@@ -2352,7 +2352,7 @@ sub scan_logr() {
             unless ($no_whois) {
                 $whois_info_aref = &get_whois_info($src, $whois_file);
             }
-            print STDERR " .. scan_logr():  generating email.....\n"
+            print STDERR " .. scan_logr(): generating email.....\n"
                 if $debug;
 
             ### get the absolute starting time for the scan and the

@@ -2541,7 +2541,7 @@ sub assign_auto_danger_level() {
                         "$scan_dl{$src} for IP: $src");
                     return 1;
                 }
-                if ($auto_dl{'net'}{$src}{'allproto'} == 0) {
+                if ($auto_dl{'net'}{$net}{'allproto'} == 0) {
                     $auto_assigned_dl{$src} = '';
                     $auto_assigned_dl_msg{$src} = '';
                     return 2;
@@ -2555,7 +2555,7 @@ sub assign_auto_danger_level() {
                         "$scan_dl{$src} for IP: $src");
                     return 1;
                 }
-                if ($auto_dl{'net'}{$src}{$scan_proto} == 0) {
+                if ($auto_dl{'net'}{$net}{$scan_proto} == 0) {
                     $auto_assigned_dl{$src} = '';
                     $auto_assigned_dl_msg{$src} = '';
                     return 2;

@@ -221,47 +221,47 @@ my $flush_fw       = 0;
 ### by the auto blocking code for iptables firewalls.
 ### The nat and mangle PREROUTING chains will be added
 ### by get_iptables_chains() if they are active.
-my %ipt_chains;
+my %ipt_chains = ();
 
 ### configuration hash
-my %config;
+my %config = ();
 
 ### commands hash
-my %cmds;
+my %cmds = ();
 
 ### main psad data structure; contains ips, port ranges,
 ### protocol info, tcp flags, etc.
-my %scan;
+my %scan = ();
 
 ### cache scan danger levels
-my %scan_dl;
+my %scan_dl = ();
 
 ### cache executions of external script (only used if
 ### ENABLE_EXT_SCRIPT_EXEC is set to 'Y');
-my %scan_ext_exec;
+my %scan_ext_exec = ();
 
 ### cache passive os fingerprinting information
-my %posf;
+my %posf = ();
 
 ### cache passive os fingerprinting signature information
-my %posf_sigs;
+my %posf_sigs = ();
 
 ### cache all scan signatures (initialized by default)
-my %sigs;
+my %sigs = ();
 
 ### Cache snort rule messages if --snort-sids switch was
 ### given.  This is only useful if iptables includes rule
 ### that log things like "SID123".  "fwsnort"
 ### (http://www.cipherdyne.org/fwsnort/) will automatically
 ### build such a ruleset from snort signatures.
-my %snort_msgs;
+my %snort_msgs = ();
 
 ### cache signature info that can be check quickly against
 ### single hash keys
-my %sigs_fast;
+my %sigs_fast = ();
 
 ### cache signature messages, danger levels, etc.
-my %sigs_attr;
+my %sigs_attr = ();
 
 ### data array used for dshield.org logs
 my @dshield_data;
@@ -279,28 +279,28 @@ my $year;
 ### %auto_ips holds all ip addresses that should automatically
 ### be assigned a danger level (or ignored).  (Only initialized
 ### if the "-a <auto ips file>" is specified on the command line).
-my %auto_ips;
+my %auto_ips = ();
 
 ### cache the source ips that we have automatically blocked
 ### (if ENABLE_AUTO_IDS == 'Y')
-my %auto_blocked_ips;
+my %auto_blocked_ips = ();
 
 ### cache the addresses we have executed whois lookups for
-my %whois_cache;
+my %whois_cache = ();
 
 ### cache ports the local machine is listening on (periodically
 ### updated by get_listening_ports()).
-my %local_ports;
+my %local_ports = ();
 
 ### cache the ip addresses associated with each interface on the
 ### local machine.
-my %local_ips;
+my %local_ips = ();
 
 ### regex to match an ip address
 my $ip_re = '(?:\d{1,3}\.){3}\d{1,3}';
 
 ### psad logging hash
-my %log_hsh;
+my %log_hsh = ();
 
 ### ttl values are decremented depending on the number of hops
 ### the packet has taken before it hits the firewall.  We will
@@ -2698,6 +2698,10 @@ sub ipt_test_block() {
 
 sub ipt_block() {
     my $src = shift;
+
+    ### get the active iptables chains
+    &get_iptables_chains() unless $chk_ipt_chains;
+
     for my $table (keys %ipt_chains) {
         for my $chain (keys %{$ipt_chains{$table}}) {
             print " .. ipt_block(): table: $table, chain: $chain\n"
@@ -2816,7 +2820,7 @@ sub auto_psad_response() {
         ### protected by the firewall if the ip trips the $auto_psad_level
         ### threshold for _any_ destination.
         if ($dl >= $config{'AUTO_IDS_DANGER_LEVEL'}
-                && not $auto_blocked_ips{$src}) {
+                and not $auto_blocked_ips{$src}) {
             my $timeout_str = '.';
             if ($config{'AUTO_BLOCK_TIMEOUT'} > 0) {
                 $timeout_str = " for $config{'AUTO_BLOCK_TIMEOUT'} seconds.";

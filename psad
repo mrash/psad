@@ -38,8 +38,6 @@
 #   - Add a density calculation for a range of scanned ports, and also
 #     add a "verbose" mode that will display which of the scanned ports
 #     actually resolve to something in the IANA spec.
-#   - Send psad alerts to network abuse alerting services such as
-#     abuse.net and dshield.org.
 #   - Packet grapher mode with annotated scan alerts.
 #   - Database support?
 #   - Get rid of the psad_signatures file in favor of just parsing the
@@ -57,6 +55,8 @@
 #     should be done in a way that allows some scan data to persist.
 #   - Put source and destination ips/networks back into psad_signatures.
 #   - Ipfilter support on *BSD platforms.
+#   - Take into account syslog message summarization; i.e. "last message
+#     repeated n times".
 #   - Possibly add a daemon to take into account ACK PSH, ACK FIN, RST etc.
 #     packets that the client may generate after the ip_conntrack module
 #     is reloaded.  Without anticipating such packets psad will interpret
@@ -142,6 +142,7 @@ use Net::IPv4Addr 'ipv4_in_network';
 use File::stat 'stat';
 use File::Copy;
 use File::Path;
+use Date::Calc qw(Timezone This_Year Decode_Month);
 use Getopt::Long 'GetOptions';
 use Socket;
 use Sys::Hostname 'hostname';
@@ -188,6 +189,9 @@ my %config;
 ### commands hash
 my %cmds;
 
+### array for packets logged by the firewall
+my @fw_packets;
+
 ### main psad data structure; contains ips, port ranges,
 ### protocol info, tcp flags, etc.
 my %scan;
@@ -221,6 +225,19 @@ my %sigs_fast;
 
 ### cache signature messages, danger levels, etc.
 my %sigs_attr;
+
+### data array used for dshield.org logs
+my @dshield_data;
+
+### track the last time we sent an alert to dshield.org
+my $last_dshield_alert;
+
+### get the current timezone for dshield (this is calculated
+### and re-calculated since the timezone may change).
+my $timezone;
+
+### get the current year for dshield
+my $year;
 
 ### %auto_ips holds all ip addresses that should automatically
 ### be assigned a danger level (or ignored).  (Only initialized
@@ -544,6 +561,10 @@ if ($benchmark) {
     }
 }
 
+if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
+    $last_dshield_alert = time() unless $last_dshield_alert;
+}
+
 ### Get an open filehandle for the main firewall data file FW_DATA_FILE.
 ### All firewall drop/deny/reject log messages are written to FW_DATA_FILE
 ### by kmsgsd.
@@ -579,9 +600,11 @@ for (;;) {
         &print_scan();
     }
 
+    ### clear the firewall data array
+    @fw_packets = ();
+
     ### Get any new packets have been written to
     ### FW_DATA_FILE by kmsgsd for psad analysis.
-    my @fw_packets;
     if ($benchmark) {
         $b_time = time();
         print localtime() . " .. Creating packet array.\n";
@@ -597,7 +620,7 @@ for (;;) {
     if (@fw_packets) {
         print localtime() . " .. check_scan()\n" if $benchmark;
 
-        if (&check_scan(\@fw_packets)) {
+        if (&check_scan()) {
             print localtime() . " .. assign_danger_level()\n"
                 if $benchmark;
             ### Assign a danger level to the scan
@@ -622,6 +645,11 @@ for (;;) {
     if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
             && $config{'AUTO_BLOCK_TIMEOUT'} > 0) {
         &timeout_auto_blocked_ips();
+    }
+
+    ### send logs to dshield in dshield format
+    if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
+        &dshield_email_log();
     }
 
     ### Print the number of new packets we saw in FW_DATA_FILE if we are
@@ -651,9 +679,10 @@ exit 0;
 #=================== BEGIN SUBROUTINES ========================
 
 ### Keeps track of scanning ip's, increments packet counters,
-### keep track of tcp flags for each scan (iptables only)
+### keep track of tcp flags for each scan (iptables only),
+### test for snort sid values in iptables packets (if fwsnort
+### is being used).
 sub check_scan() {
-    my $fw_pkts_aref = shift;
     my @bad_packets;
     my $flags;
     my $src;
@@ -673,7 +702,7 @@ sub check_scan() {
 
     ### If necessary, check which firewall (ipchains vs. iptables)
     unless ($use_ipchains || $use_iptables) {
-        &get_fw_type($fw_pkts_aref->[0]);
+        &get_fw_type($fw_packets[0]);
     }
     unless ($no_netstat) {
         if ($netstat_lkup_ctr == 10) {
@@ -685,7 +714,12 @@ sub check_scan() {
             $netstat_lkup_ctr++;
         }
     }
-    PKT: for my $pkt (@$fw_pkts_aref) {
+    if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
+        ### calculate the timezone offset
+        $timezone = sprintf("%.2d", Timezone())[3]) . ':00';
+        $year     = This_Year();
+    }
+    PKT: for my $pkt (@fw_packets) {
         chomp $pkt;
         my $sid = 0;
         if ($use_iptables) {
@@ -694,15 +728,10 @@ sub check_scan() {
                     $sid = $1;
                 }
             }
-#            if ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+
-#                         LEN=(\d+).*TTL=(\d+).*PROTO=(\S+)\s+
-#                         SPT=(\d+)\s+DPT=(\d+)/x) {
-#                ($src, $dst, $len, $ttl, $proto, $sp, $dp) =
-#                    ($1,$2,$3,$4,$5,$6,$7,$8);
-        ### May 18 22:21:26 orthanc kernel: DROP IN=eth2 OUT=
-        ### MAC=00:60:1d:23:d0:01:00:60:1d:23:d3:0e:08:00 SRC=192.168.20.25
-        ### DST=192.168.20.1 LEN=60 TOS=0x10 PREC=0x00 TTL=64 ID=47300 DF
-        ### PROTO=TCP SPT=34111 DPT=6345 WINDOW=5840 RES=0x00 SYN URGP=0 
+            ### May 18 22:21:26 orthanc kernel: DROP IN=eth2 OUT=
+            ### MAC=00:60:1d:23:d0:01:00:60:1d:23:d3:0e:08:00 SRC=192.168.20.25
+            ### DST=192.168.20.1 LEN=60 TOS=0x10 PREC=0x00 TTL=64 ID=47300 DF
+            ### PROTO=TCP SPT=34111 DPT=6345 WINDOW=5840 RES=0x00 SYN URGP=0
             if ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+)\s+TOS=(\S+)
                         \s.*\sTTL=(\d+)\s+ID=(\d+)\s.*\sPROTO=(\S+)\s+
                         SPT=(\d+)\s+DPT=(\d+)\s+WINDOW=(\d+)/x) {
@@ -746,12 +775,33 @@ sub check_scan() {
                         next PKT;
                     }
                     $tcp_ctr++;
+                    if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
+                        my $dflags = $flags;
+                        $dflags =~ s/\s/,/g;
+                        if ($pkt =~ /^\s*(\w+)\s+(\d+)\s+(\S+)/) {
+                            my $month   = Decode_Month($1);
+                            my $day     = sprintf("%.2d", $2);
+                            my $time_24 = $3;
+                            push @dshield_data, "$year-$month-$day $time_24 " .
+                                "$timezone\t$config{'DSHIELD_USER_ID'}\t1" .
+                                "\t$src\t$sp\t$dst\t$dp\t$proto\t$dflags\n";
+                        }
+                    }
                 } else {
                     ### it is UDP, but there are no more fields we need to
                     ### define since we already have the ports, etc.
                     $udp_ctr++;
+                    if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
+                        if ($pkt =~ /^\s*(\w+)\s+(\d+)\s+(\S+)/) {
+                            my $month   = Decode_Month($1);
+                            my $day     = sprintf("%.2d", $2);
+                            my $time_24 = $3;
+                            push @dshield_data, "$year-$month-$day $time_24 " .
+                                "$timezone\t$config{'DSHIELD_USER_ID'}\t1" .
+                                "\t$src\t$sp\t$dst\t$dp\t$proto\n";
+                        }
+                    }
                 }
-                $matched_packet = 1;
             } elsif ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+).*
                               TTL=(\d+).*PROTO=ICMP\s+TYPE=(\d+)\s+
                               CODE=(\d+)\s+ID=(\d+)\s+SEQ=(\d+)/x) {
@@ -759,7 +809,16 @@ sub check_scan() {
                     ($1,$2,$3,$4,$5,$6,$7,$8);
                 $proto = 'ICMP';
                 $icmp_ctr++;
-                $matched_packet = 1;
+                if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
+                    if ($pkt =~ /^\s*(\w+)\s+(\d+)\s+(\S+)/) {
+                        my $month   = Decode_Month($1);
+                        my $day     = sprintf("%.2d", $2);
+                        my $time_24 = $3;
+                        push @dshield_data, "$year-$month-$day $time_24 " .
+                            "$timezone\t$config{'DSHIELD_USER_ID'}\t1" .
+                            "\t$src\t$type\t$dst\t$code\t$proto\n";
+                    }
+                }
             } else {
                 ### Sometimes the iptables log entry gets messed up due to
                 ### buffering issues so we write it to the error log.
@@ -783,7 +842,6 @@ sub check_scan() {
                     $udp_ctr++;
                 }
                 $flags = 'NONE';
-                $matched_packet = 1;
             } else {
                 push @bad_packets, $pkt;
                 next PKT;
@@ -802,6 +860,7 @@ sub check_scan() {
 
         ### scan hash initialization; if we made it here then we matched
         ### packets that the firewall logged (and maybe dropped).
+        $matched_packet = 1;
 
         ### initialize the danger level to 0 if it is not already defined
         unless (defined $scan_dl{$src}) {
@@ -1093,6 +1152,48 @@ sub add_snort_sid() {
     return;
 }
 
+sub dshield_email_log() {
+    ### dshield alert interval is in hours.  Check to see if there are more
+    ### than 10,000 lines of log data (and if the last alert was sent more than
+    ### two hours later than the previous alert), and if yes send the alert
+    ### email.
+    if (@dshield_data && ((time() - $last_dshield_alert)
+            >= 3600*$config{'DSHIELD_ALERT_INTERVAL'})
+            || (($#dshield_data > 10000)
+            && ((time() - $last_dshield_alert) >= 2*3600))) {
+#    if (@dshield_data) {
+        my $subject = "FORMAT DSHIELD USERID $config{'DSHIELD_USER_ID'} " .
+            "TZ $timezone psad Version 1.2";
+        if ($config{'DSHIELD_USER_EMAIL'} eq 'NONE') {
+            open MAIL, qq(| $cmds{'mail'} -s "$subject" ) .
+                $config{'DSHIELD_ALERT_EMAIL'} or die ' ** Could not send ',
+                'dshield alert email.';
+            print MAIL for @dshield_data;
+            close MAIL;
+        } else {
+            open MAIL, "| $cmds{'sendmail'} -oi -t" or die ' ** Could not ',
+                'send dshield alert email.';
+            print MAIL "From: $config{'DSHIELD_USER_EMAIL'}\n";
+            print MAIL "To: $config{'DSHIELD_ALERT_EMAIL'}\n";
+            print MAIL "Subject: $subject\n";
+            print MAIL for @dshield_data;
+            print STDOUT "sendmail: $_" for @dshield_data;
+            close MAIL;
+        }
+
+        &Psad::psyslog('psad',
+            "sent $#dshield_data lines of log data to dshield.org");
+
+        ### store the current time
+        $last_dshield_alert = time();
+
+        ### clear the dshield data array so we don't re-send
+        ### any data.
+        @dshield_data = ();
+    }
+    return;
+}
+
 sub chk_local_port() {
     my ($src, $dst, $proto, $dp, $flags, $sig_id) = @_;
     ### check to see if the scan destination ip is directed
@@ -1212,8 +1313,11 @@ sub import_configs() {
     &Psad::buildconf(\%config, \%cmds, $config_file);
 
     ### make sure all necessary configuration variables
-    ### are defined (some validation is also done in setup()).
+    ### are defined
     &required_vars();
+
+    ### make sure the values in the config file make sense
+    &validate_config();
 
     ### check to make sure the commands specified in the config section
     ### are in the right place, and attempt to correct automatically if not.
@@ -1223,7 +1327,7 @@ sub import_configs() {
     &handle_cmdline();
 
     ### make sure PSAD_DIR, FW_DATA_FILE, and /var/lib/psad/psadfifo, etc.
-    ### actually exist and validate some other variable values as well.
+    ### actually exist
     &setup();
 
     ### dump configuration to STDOUT
@@ -1263,6 +1367,27 @@ sub import_configs() {
     &import_snort_rules() if $snort_sids;
 
     return;
+}
+
+sub validate_config() {
+    die ' ** PORT_RANGE_SCAN_THRESHOLD must be between 1 and 65535 '
+        unless (&is_digit($config{'PORT_RANGE_SCAN_THRESHOLD'})
+            && 0 < $config{'PORT_RANGE_SCAN_THRESHOLD'}
+            && $config{'PORT_RANGE_SCAN_THRESHOLD'} < 65535);
+
+    die qq( ** Invalid EMAIL_ADDRESSES value: "$config{'EMAIL_ADDRESSES'}")
+        unless $config{'EMAIL_ADDRESSES'} =~ /\S+\@\S+/;
+    die ' ** DSHIELD_ALERT_INTERVAL must be between 1 and 24 '
+        unless (&is_digit($config{'DSHIELD_ALERT_INTERVAL'})
+            && 0 < $config{'DSHIELD_ALERT_INTERVAL'}
+            && $config{'DSHIELD_ALERT_INTERVAL'} < 24);
+    return;
+}
+
+sub is_digit() {
+    my $str = shift;
+    return 1 if $str =~ m|^\d+$|;
+    return 0;
 }
 
 sub import_snort_rules() {
@@ -3116,11 +3241,6 @@ sub setup() {
     unless (-d $config{'PSAD_ERROR_DIR'}) {
         mkdir $config{'PSAD_ERROR_DIR'}, 0500;
     }
-    if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
-        unless (-d $config{'DSHIELD_DIR'}) {
-            mkdir $config{'DSHIELD_DIR'}, 0500;
-        }
-    }
     unless (-e $config{'FW_DATA_FILE'}) {
         open F, "> $config{'FW_DATA_FILE'}" or die ' ** Could not open ',
             "$config{'FW_DATA_FILE'}: $!";
@@ -3204,35 +3324,9 @@ sub setup() {
         die " ** Could not find $config{'PSAD_FIFO'} in any system logger ",
             "config file.  Exiting.";
     }
-    die ' ** PORT_RANGE_SCAN_THRESHOLD must be less than 65535.',
-        '  Exiting.' unless $config{'PORT_RANGE_SCAN_THRESHOLD'} < 65535;
-    die ' ** PORT_RANGE_SCAN_THRESHOLD must be greater than 0.',
-        '  Exiting.' unless $config{'PORT_RANGE_SCAN_THRESHOLD'} > 0;
-
     ### make sure the permissions on these files is 0600
     &file_permissions($config{'FW_DATA_FILE'});
     &file_permissions($config{'FW_ERROR_LOG'});
-    return;
-}
-
-sub required_vars() {
-    my @required_vars = qw(
-        EMAIL_ADDRESSES PSAD_CHECK_INTERVAL FW_DATA_FILE FW_ERROR_LOG
-        FW_MSG_SEARCH SNORT_SID_STR ENABLE_AUTO_IDS PSAD_LOG
-        IGNORE_CONNTRACK_BUG_PKTS SCAN_TIMEOUT DANGER_LEVEL1
-        DANGER_LEVEL2 DANGER_LEVEL3 DANGER_LEVEL4 DANGER_LEVEL5
-        PORT_RANGE_SCAN_THRESHOLD ALERT_ALL PSAD_EMAIL_LIMIT
-        IPTABLES_BLOCK_METHOD IPCHAINS_BLOCK_METHOD
-        TCPWRAPPERS_BLOCK_METHOD EMAIL_ALERT_DANGER_LEVEL
-        PSAD_FIFO WHOIS_THRESHOLD WHOIS_TIMEOUT SNORT_RULES_DIR
-        PACKET_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR
-        PROC_FORWARD_FILE ENABLE_PERSISTENCE AUTO_BLOCK_IPT_FILE
-        AUTO_BLOCK_IPCH_FILE AUTO_BLOCK_TCPWR_FILE PSAD_SIGS_FILE
-        PSAD_AUTO_IPS_FILE AUTO_BLOCK_TIMEOUT EXTERNAL_SCRIPT
-        ENABLE_EXT_SCRIPT_EXEC EXEC_EXT_SCRIPT_PER_ALERT
-        ENABLE_DSHIELD_ALERTS DSHIELD_DIR
-    );
-    &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;
 }
 
@@ -3452,6 +3546,28 @@ sub dump_conf() {
         printf("%-30s %s\n", " .. $var", $config{$var});
     }
     return 0;
+}
+
+sub required_vars() {
+    my @required_vars = qw(
+        EMAIL_ADDRESSES PSAD_CHECK_INTERVAL FW_DATA_FILE FW_ERROR_LOG
+        FW_MSG_SEARCH SNORT_SID_STR ENABLE_AUTO_IDS PSAD_LOG
+        IGNORE_CONNTRACK_BUG_PKTS SCAN_TIMEOUT DANGER_LEVEL1
+        DANGER_LEVEL2 DANGER_LEVEL3 DANGER_LEVEL4 DANGER_LEVEL5
+        PORT_RANGE_SCAN_THRESHOLD ALERT_ALL PSAD_EMAIL_LIMIT
+        IPTABLES_BLOCK_METHOD IPCHAINS_BLOCK_METHOD
+        TCPWRAPPERS_BLOCK_METHOD EMAIL_ALERT_DANGER_LEVEL
+        PSAD_FIFO WHOIS_THRESHOLD WHOIS_TIMEOUT SNORT_RULES_DIR
+        PACKET_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR
+        PROC_FORWARD_FILE ENABLE_PERSISTENCE AUTO_BLOCK_IPT_FILE
+        AUTO_BLOCK_IPCH_FILE AUTO_BLOCK_TCPWR_FILE PSAD_SIGS_FILE
+        PSAD_AUTO_IPS_FILE AUTO_BLOCK_TIMEOUT EXTERNAL_SCRIPT
+        ENABLE_EXT_SCRIPT_EXEC EXEC_EXT_SCRIPT_PER_ALERT
+        ENABLE_DSHIELD_ALERTS DSHIELD_ALERT_INTERVAL
+        DSHIELD_ALERT_EMAIL DSHIELD_USER_ID DSHIELD_USER_EMAIL
+    );
+    &Psad::defined_vars(\%config, $config_file, \@required_vars);
+    return;
 }
 
 sub usage() {

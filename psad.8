@@ -10,14 +10,22 @@
 .I auto-ips-file
 .B ] [-c
 .I config-file
-.B ] [-l] [-i
-.I interval
+.B ] [-l]
 .B ] [-h] [-B] [-F] [-S] [-K] [-R] [-U] [-V] [-f] [-o] [-p] [-D] [-d] [--signatures
 .I sig-file
+.B ] [--interval
+.I interval
 .B ] [--snort-sids] [--snort-type
 .I type
-.B ] [--snort-rdir] [--no-fwcheck] [--no-daemon] [--no-rdns]
+.B ] [--snort-rdir
+.I rules-directory
+.B ] [--passive-os-sigs
+.I posf-file
+.B ] [--ip-status
+.I ip
+.B ] [--no-fwcheck] [--no-daemon] [--no-rdns]
 .B [--no-whois] [--no-netstat] [--no-ipt-errors]
+.B [--no-passive-os]
 .SH DESCRIPTION
 .B psad
 makes use of ipchains/iptables log messages to detect, alert, and
@@ -45,7 +53,10 @@ the administrator to define what constitutes a port scan or other suspect
 traffic.  Email alerts sent by psad contain the scanning ip, number of
 packets sent to each port, any tcp, udp, or icmp signatures that have been
 matched (e.g. "NMAP XMAS scan"), the scanned port range, the current danger
-level (from 1 to 5), reverse dns info, and whois information.
+level (from 1 to 5), reverse dns info, and whois information.  To top it
+off psad makes use of packet length, ttl, tos, ip id, and tcp window size,
+to passively fingerprint remote operating systems from which scans are
+launched.
 
 .B psad
 consists of four daemons: psad, kmsgsd, psadwatchd, and diskmond.
@@ -125,6 +136,11 @@ The default is
 .B /etc/psad/snort_rules.
 .TP
 
+.BI \-\^\-passive-os-sigs "  passive-os-sigs-file"
+Manually specify the passive operating system fingerprinting signatures.
+.B /etc/psad/psad_posf.
+.TP
+
 .BI \-a "\fR,\fP " \-\^\-auto-ips "  auto-ips-file"
 Occasionally certain ip addresses are repeat offenders and
 should automatically be given a higher danger level than
@@ -182,7 +198,7 @@ Analyze the local firewall ruleset, send any alerts if errors are
 discovered, and then exit.
 .TP
 
-.BI \-i "\fR,\fP " \-\^\-interval "  seconds"
+.BI \-\^\-interval "  seconds"
 Specify the interval (in seconds) that psad should use to
 check whether or not packets have been denied by the
 firewall.  Psad will use the default of 15 seconds unless a
@@ -261,6 +277,13 @@ Passing the --no-fwcheck or --log-server options will
 disable this check.
 .TP
 
+.BR \-\^\-no-passive-os
+By default psad will attempt to passively (i.e. without sending
+any packets) fingerprint the remote operating system from which
+a scan originates.  Passing the --no-passive-os option will
+disable this feature.
+.TP
+
 .BR \-\^\-no-rdns
 Psad normally attempts to find the name associated with a
 scanning ip address, but this feature can be disabled with
@@ -299,6 +322,14 @@ firewall.  The syntax is "<ip address> <danger level>" where
 <danger level> is an integer from 0 to 5, with 0 meaning to ignore
 all traffic from <ip address>, and 5 is to assign the highest danger
 level to <ip address>.
+.RE
+
+.B /etc/psad/psad_posf
+.RS
+Contains a listing of all passive operating system fingerprinting
+signatures.  These signatures include packet lengths, ttl, tos,
+ip id, and tcp window size values that are specific to various
+operating systems.
 .RE
 
 .B /etc/psad/psad.conf

@@ -45,7 +45,7 @@ short int psad_syscalls_ctr     = 0;
 short int kmsgsd_syscalls_ctr   = 0;
 short int diskmond_syscalls_ctr = 0;
 const char mail_redr[] = " < /dev/null > /dev/null 2>&1";
-const char hostname[] = HOSTNAME;
+char hostname[MAX_GEN_LEN];
 char mail_addrs[MAX_GEN_LEN];
 char shCmd[MAX_GEN_LEN];
 char mailCmd[MAX_GEN_LEN];
@@ -54,6 +54,7 @@ static volatile sig_atomic_t received_sighup = 0;
 /* prototypes */
 static void parse_config(
     char *config_file,
+    char *hostname,
     char *psad_binary,
     char *psad_pid_file,
     char *psad_cmdline_file,
@@ -120,6 +121,7 @@ int main(int argc, char *argv[]) {
     /* parse the config file */
     parse_config(
         config_file,
+        hostname,
         psadCmd,
         psad_pid_file,
         psad_cmdline_file,
@@ -172,6 +174,7 @@ int main(int argc, char *argv[]) {
              * HUP signal */
             parse_config(
                 config_file,
+                hostname,
                 psadCmd,
                 psad_pid_file,
                 psad_cmdline_file,
@@ -426,6 +429,7 @@ static void exec_binary(const char *binary, const char *cmdlinefile)
 
 static void parse_config(
     char *config_file,
+    char *hostname,
     char *psadCmd,
     char *psad_pid_file,
     char *psad_cmdline_file,
@@ -467,6 +471,7 @@ static void parse_config(
                 (*index != ';') && (index != NULL)) {
 
             find_char_var("psadCmd ", psadCmd, index);
+            find_char_var("HOSTNAME ", hostname, index);
             find_char_var("PSAD_PID_FILE ", psad_pid_file, index);
             find_char_var("PSAD_CMDLINE_FILE ", psad_cmdline_file, index);
             find_char_var("kmsgsdCmd ", kmsgsdCmd, index);

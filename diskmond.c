@@ -44,7 +44,7 @@
 /* globals */
 short int email_ctr = 0;
 const char mail_redr[] = " < /dev/null > /dev/null 2>&1";
-const char hostname[] = HOSTNAME;
+char hostname[MAX_GEN_LEN];
 char mail_addrs[MAX_GEN_LEN];
 char shCmd[MAX_GEN_LEN];
 char mailCmd[MAX_GEN_LEN];
@@ -53,6 +53,7 @@ static volatile sig_atomic_t received_sighup = 0;
 /* prototypes */
 static void parse_config(
     char *config_file,
+    char *hostname,
     char *psad_dir,
     char *fwdata_file,
     char *archive_dir,
@@ -108,6 +109,7 @@ int main(int argc, char *argv[]) {
     /* parse the config file */
     parse_config(
         config_file,
+        hostname,
         psad_dir,
         fwdata_file,
         archive_dir,
@@ -165,6 +167,7 @@ int main(int argc, char *argv[]) {
              * HUP signal */
             parse_config(
                 config_file,
+                hostname,
                 psad_dir,
                 fwdata_file,
                 archive_dir,
@@ -188,6 +191,7 @@ int main(int argc, char *argv[]) {
 
 static void parse_config(
     char *config_file,
+    char *hostname,
     char *psad_dir,
     char *fwdata_file,
     char *archive_dir,
@@ -227,6 +231,7 @@ static void parse_config(
                 && (*index != ';') && (index != NULL)) {
 
             find_char_var("PSAD_DIR", psad_dir, index);
+            find_char_var("HOSTNAME ", hostname, index);
             find_char_var("FW_DATA_FILE", fwdata_file, index);
             find_char_var("SCAN_DATA_ARCHIVE_DIR", archive_dir, index);
             find_char_var("shCmd ", shCmd, index);

@@ -1334,7 +1334,7 @@ sub kill_psad() {
             close PIDFILE;
             chomp $pid;
             if (kill 0, $pid) {
-                print " ----  Killing $pidname, pid: $pid  ----\n";
+                print " ... Killing $pidname, pid: $pid\n";
                 kill 15, $pid or print "@@@@@  psad: Could not kill $pidname, pid: $pid\n";
             } else {
                 print "@@@@@  psad: $pidname is not running on $HOSTNAME.\n";
@@ -1357,7 +1357,7 @@ sub restart_psad() {
         die "@@@@@  psad:  No other psad process is currently running on $HOSTNAME!\n";
     }
     &kill_psad($pidfiles_aref);
-    print " ----  Restarting the psad daemons on $HOSTNAME.  ----\n";
+    print " ... Restarting the psad daemons on $HOSTNAME\n";
     system "$Cmds_href->{'psad'} $cmdline";
     return;
 }
@@ -1377,25 +1377,35 @@ sub psad_status() {
         my $pname_tmp = $p_tmp[$#p_tmp];
         my $pidname = (split /\./, $pname_tmp)[0];
         if (-e $pidfile) {
+            my $pid_mtime = stat($pidfile)->mtime;
+            ### ($sec, $min, $hr, $day_of_month, $mon, $year, $wday, $yday, $isdst) = localtime($mtime);
+            my @timevars = localtime($pid_mtime);
+            $timevars[4] += 1;
+            if ($timevars[4] =~ /^\d$/) {
+                $timevars[4] = "0" . $timevars[4];
+            }
+            $timevars[5] += 1900;
             open PIDFILE, "< $pidfile";
             my $pid = <PIDFILE>;
             close PIDFILE;
             chomp $pid;
             if (kill 0, $pid) {
-                print " ----  $pidname is running on $HOSTNAME as pid: $pid\n";
+                print " ... $pidname is running on $HOSTNAME as pid: $pid\n";
                 my @grep_output = `$Cmds_href->{'ps'} -auxww |$Cmds_href->{'grep'} $pid`;
                 GP: for my $g (@grep_output) {
                     if ($g =~ /^\S+\s+$pid\s+(\S+)\s+(\S+)/) {
-                        print "       %CPU: $1  %MEM: $2\n";
+                        print "     %CPU: $1  %MEM: $2\n";
                         if ($pidname eq "psad" && $cmdline) {
-                            print "       CMDL ARGS: $cmdline\n";
+                            print "     Command line arguments: $cmdline\n";
                         }
                         last GP;
                     }
                 }
+                print "     Running since: $timevars[2]:$timevars[1]:$timevars[0] $timevars[4]/$timevars[3]/$timevars[5]\n";
+                print "\n";
                 $rv = 1;
             } else {
-                print " ----  $pidname is not currently running on $HOSTNAME  ----\n";
+                print " ... $pidname is not currently running on $HOSTNAME\n";
             }
         } else {
             print "@@@@@  psad: pid file $pidfile does not exist for $pidname on $HOSTNAME\n";
@@ -1425,7 +1435,7 @@ sub psad_usr1() {
                 print "@@@@@  Could not send psad the USR1 signal on $HOSTNAME\n";
             }
         } else {
-            print " ----  psad is not currently running on $HOSTNAME  ----\n";
+            print " ... psad is not currently running on $HOSTNAME\n";
         }
     }
     return $rv;

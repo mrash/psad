@@ -11,7 +11,7 @@
 #
 # Credits:  (see the CREDITS file)
 #
-# Version: 1.0.0-pre1
+# Version: 1.0.0-pre2
 #
 # Copyright (C) 1999-2002 Michael B. Rash (mbr@cipherdyne.com)
 #
@@ -223,11 +223,11 @@ sub install() {
         &logr(" ... Creating $SBIN_DIR\n");
         mkdir $SBIN_DIR,0755;
     }
-    if (-d 'whois-4.5.29') {
+    if (-d 'whois-4.5.31') {
         &logr(" ... Compiling Marco d'Itri's whois client\n");
-        if (! system("$Cmds{'make'} -C whois-4.5.29")) {  # remember unix return value...
+        if (! system("$Cmds{'make'} -C whois-4.5.31")) {  # remember unix return value...
             &logr(" ... Copying whois binary to $WHOIS_PSAD\n");
-            copy("whois-4.5.29/whois", $WHOIS_PSAD);
+            copy("whois-4.5.31/whois", $WHOIS_PSAD);
         }
     }
     &perms_ownership($WHOIS_PSAD, 0755);

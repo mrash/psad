@@ -215,9 +215,8 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 							$listening_port = "There is no server listening on port $dstport";
 						}
 					}
-					my $alert_string = "$msg.  sp=$srcport, dp=$dstport, flags=$flags.  $listening_port";
+					my $alert_string = "$msg  sp=$srcport, dp=$dstport, flags=$flags.  $listening_port";
 					$Scan{$srcip}{'SIGMATCH'}{$alert_string} = "";
-#					print "Caught: $msg.  sp=$srcport, dp=$dstport, flags=$flags.  $listening_port\n";
 				}
 			} 
 		}

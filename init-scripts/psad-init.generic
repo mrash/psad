@@ -19,7 +19,7 @@ restart() {
 case "$1" in
 start)
     if grep -q psadfifo /etc/syslog.conf; then
-        echo -n "Starting the psad daemons. "
+        echo -n "Starting psad: "
         ### psad enables signature matching and auto
         ### danger level assignment by default, so
         ### command line args are not necessary here.

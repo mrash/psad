@@ -137,14 +137,14 @@ my %Auto_ips;
 ### cache the addresses we have executed whois lookups for
 my %whois_cache;
 
-### packet counters
-my $tcp_ctr           = 0;
-my $udp_ctr           = 0;
-my $icmp_ctr          = 0;
-
 ### firewall flags (only used if $Config{'ENABLE_AUTO_IDS'} eq 'Y')
+my $iptables_have_mangle;
+my $iptables_have_nat;
 
-
+### packet counters
+my $tcp_ctr  = 0;
+my $udp_ctr  = 0;
+my $icmp_ctr = 0;
 
 ### initialize and scope some default variables (command
 ### line args can override some default values)
@@ -1475,6 +1475,11 @@ sub check_auto_blocked() {
 }
 
 sub auto_psad_response(){
+    if ($USE_IPTABLES && ! defined $iptables_have_nat) {
+        ### determine whether or not the NAT or mangle code has
+        ### compiled into iptables
+        &iptables_flags();
+    }
     SOURCE: for my $src (keys %Scan) {
         for my $dst (keys %{$Scan{$src}}) {
             my $current_danger_level = $Scan{$src}{$dst}{'CURR_DL'};
@@ -1519,9 +1524,22 @@ sub auto_psad_response(){
                     my $chains_aref = &get_input_chains($Cmds{'iptables'});
                     my $blocked_str = '';
                     if ($Config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
-                        for my $inchain (@$chains_aref) {
+                        if ($iptables_have_nat) {  ### prefer the nat table
+                            ### block the offending ip in the PREROUTING
+                            ### chain in the nat table
                             system "$Cmds{'iptables'} -t nat -I PREROUTING 1 " .
-                                "-p tcp -s $src -j DROP";
+                                "-p tcp -s $src -j DROP 2> /dev/null 1>&2";
+                        } elsif ($iptables_have_mangle) {
+                            ### block the offending ip in the PREROUTING
+                            ### chain in the mangle table
+                            system "$Cmds{'iptables'} -t mangle -I PREROUTING 1 " .
+                                "-p tcp -s $src -j DROP 2> /dev/null 1>&2";
+                        }
+                        ### block the offending ip in the FORWARD chain
+                        ### in the normal filter table
+                        system "$Cmds{'iptables'} -I FORWARD 1 -s $src " .
+                            "-j DROP 2> /dev/null 1>&2";
+                        for my $inchain (@$chains_aref) {
                             system "$Cmds{'iptables'} -I $inchain 1 -s $src " .
                                 "-j DROP 2> /dev/null 1>&2";
                         }
@@ -1550,6 +1568,22 @@ sub auto_psad_response(){
                 }
             }
         }
+    }
+    return;
+}
+
+sub iptables_flags() {
+    my $nat_rv    = (system "$Cmds{'iptables'} -nL -t nat") >> 8;
+    my $mangle_rv = (system "$Cmds{'iptables'} -nL -t mangle") >> 8;
+    if ($nat_rv == 0) {
+        $iptables_have_nat = 1;
+    } else {
+        $iptables_have_nat = 0;
+    }
+    if ($mangle_rv == 0) {
+        $iptables_have_mangle = 1;
+    } else {
+        $iptables_have_mangle = 0;
     }
     return;
 }
@@ -1609,6 +1643,7 @@ sub check_fw() {
     ### ipchains log messages do not have a MAC address field
     if ($line !~ /MAC=/) {
         $USE_IPCHAINS = 1;
+        ### check
     } else {
         $USE_IPTABLES = 1;
     }

@@ -2850,9 +2850,7 @@ sub scan_logr() {
             }
 
             print $fh "=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=",
-                "-=-=-=-=\n",
-                "[*] psad: Suspicious traffic detected against ",
-                "$dst\n\n\n";
+                "-=-=-=-=\n\n\n";
 
             printf $fh "%${log_len}s%s", 'Danger level: ',
                 "[$scan_dl{$src}] (out of 5)";

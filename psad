@@ -363,7 +363,7 @@ Getopt::Long::Configure('no_ignore_case');
 ### Print the version number and exit if -V given on the command line.
 if ($ver) {
     print " .. psad v$version, by Michael Rash ",
-        "(mbr\@cipherdyne.com)\n";
+        "<mbr\@cipherdyne.com>\n";
     exit 0;
 }
 
@@ -809,7 +809,7 @@ sub check_scan() {
         }
 
         ### scan hash initialization; if we made it here then we matched
-        ### packets that the firewall dropped.
+        ### packets that the firewall logged (and maybe dropped).
 
         ### initialize the danger level to 0 if it is not already defined
         unless (defined $scan{$src}{$dst}{'DL'}) {
@@ -828,9 +828,18 @@ sub check_scan() {
             $scan{$src}{$dst}{'S_TIME'} = time();
         }
 
+        ### increment hash values
+        $scan{$src}{$dst}{'ABSNUM'}++;
+        $scan{$src}{$dst}{$proto}{'CURR_INT'}{'PKTS'}++;
+        $scan{$src}{$dst}{$proto}{'PKTS'}++;
+
+        ### keep track of tcp flags
+        $scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'FLAGS'}{$flags}++
+            if $proto eq 'TCP';
+
         ### initialize the start and end port for the scanned port range
-        unless (defined $scan{$src}{$dst}{$proto}{'ABS_SP'}
-            || $proto eq 'ICMP') {
+        unless ($proto eq 'ICMP' ||
+            defined $scan{$src}{$dst}{$proto}{'ABS_SP'}) {
             ### This is the absolute starting port since the
             ### first packet was detected.  Make sure the initial
             ### start port is not too low
@@ -840,25 +849,13 @@ sub check_scan() {
         }
 
         ### initialize values for the current interval
-        unless (defined $scan{$src}{$dst}{$proto}{'CURR_INT'}) {
-            unless ($proto eq 'ICMP') {
-                ### make sure the initial start port is not too low
-                $scan{$src}{$dst}{$proto}{'CURR_INT'}{'SP'}
-                    = 65535;
-                ### make sure the initial end port is not too high
-                $scan{$src}{$dst}{$proto}{'CURR_INT'}{'EP'}
-                    = 0;
-            }
+        unless ($proto eq 'ICMP' ||
+            defined $scan{$src}{$dst}{$proto}{'CURR_INT'}{'SP'}) {
+            ### make sure the initial start port is not too low
+            $scan{$src}{$dst}{$proto}{'CURR_INT'}{'SP'} = 65535;
+            ### make sure the initial end port is not too high
+            $scan{$src}{$dst}{$proto}{'CURR_INT'}{'EP'} = 0;
         }
-
-        ### increment hash values
-        $scan{$src}{$dst}{'ABSNUM'}++;
-        $scan{$src}{$dst}{$proto}{'CURR_INT'}{'PKTS'}++;
-        $scan{$src}{$dst}{$proto}{'PKTS'}++;
-
-        ### keep track of tcp flags
-        $scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'FLAGS'}{$flags}++
-            if $proto eq 'TCP';
 
         ### see if the destination port lies outside our current range
         ### and change if needed
@@ -1542,12 +1539,10 @@ sub assign_danger_level() {
                 print "assign_danger_level(): ABSNUM: ",
                     "$scan{$src}{$dst}{'ABSNUM'}\n";
                 for my $proto qw(TCP UDP) {
-                    next unless defined $scan{$src}{$dst}{$proto};
-                    if (defined $scan{$src}{$dst}{$proto}{'ABS_SP'}) {
-                        print "assign_danger_level(): ABS_SP: ",
-                            "$scan{$src}{$dst}{$proto}{'ABS_SP'}, ABS_EP: ",
-                            "$scan{$src}{$dst}{$proto}{'ABS_EP'}\n";
-                    }
+                    next unless defined $scan{$src}{$dst}{$proto}{'ABS_SP'};
+                    print "assign_danger_level(): ABS_SP: ",
+                        "$scan{$src}{$dst}{$proto}{'ABS_SP'}, ABS_EP: ",
+                        "$scan{$src}{$dst}{$proto}{'ABS_EP'}\n";
                 }
                 print 'assign_danger_level(): DL (before assignment) = ',
                     "$scan{$src}{$dst}{'DL'}\n";

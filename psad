@@ -302,6 +302,7 @@ my $status           = 0;
 my $status_ip        = '';
 my $status_sort_dl   = 0;
 my $status_dl        = 0;
+my $fw_auto_list     = 0;
 my $benchmark        = 0;
 my $b_packets        = 0;
 my $usr1             = 0;
@@ -413,6 +414,8 @@ Getopt::Long::Configure('no_ignore_case');
     'fw-file=s'         => \$fw_file,         # Analyze ruleset contained within
                                               # $fw_file instead of a running
                                               # policy.
+    'fw-auto-list'      => \$fw_auto_list,    # Display Netfilter chains used by
+                                              # psad in auto blocking code.
     'log-server'        => \$syslog_server,   # We are running psad on a syslog
                                               # logging server.
     'Kill'              => \$kill,            # Kill all running psad processes.
@@ -2018,6 +2021,9 @@ sub psad_init() {
 
     ### the --Restart command line switch was given
     exit &restart() if $restart;
+
+    ### list any existing Netfilter IPT_AUTO_CHAIN chains
+    exit &ipt_list_auto_chains() if $fw_auto_list;
 
     ### import psad signatures (note that these signatures have been
     ### adapted from the Snort IDS and contain several keywords that
@@ -3964,6 +3970,29 @@ sub ipt_remove_block() {
             if $debug;
     }
     return;
+}
+
+sub ipt_list_auto_chains() {
+
+    my $ipt = new IPTables::ChainMgr(
+        'iptables' => $cmds{'iptables'}
+    ) or die '[*] Could not acquire IPTables::ChainMgr object.';
+
+    print "[+] Listing chains from IPT_AUTO_CHAIN keywords...\n";
+    for my $block_hr (@ipt_block_config) {
+        my $table      = $block_hr->{'table'};
+        my $to_chain   = $block_hr->{'to_chain'};
+
+        my ($rv, $output_aref) =
+            $ipt->run_ipt_cmd_output("$cmds{'iptables'} -t " .
+                "$table -n -L $to_chain -v");
+
+        if ($rv and $output_aref) {
+            print for @$output_aref;
+        }
+        print "\n";
+    }
+    return 0;
 }
 
 sub tcpwr_test_block() {

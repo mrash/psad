@@ -87,7 +87,7 @@ start)
 		daemon /usr/local/bin/kmsgsd
 		echo
 		echo -n "Starting the psad daemon: "
-		daemon /usr/local/bin/psad -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips 
+		daemon /usr/local/bin/psad -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips
 		echo
                 echo -n "Starting the psadwatchd monitoring daemon: "
                 daemon /usr/local/bin/psadwatchd

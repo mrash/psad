@@ -249,20 +249,33 @@ system "make test";
 system "make install";
 chdir "..";
 
+print "\n\n";
+# my $append_fw_search_str = "";
+
+### give the admin the opportunity to add to the strings that are normally
+### checked in iptables messages.  This is useful since the admin may have
+### configured the firewall to use a logging prefix of "Audit" or something
+### else other than the normal "DROP", "DENY", or "REJECT" strings.
+# $append_fw_search_str = &get_fw_search_string();
+
 if ( -e "${INSTALL_DIR}/psad" && (! $nopreserve)) {  # need to grab the old config
 	&logr(" ----  Copying psad -> ${INSTALL_DIR}/psad  ----\n", \@LOGR_FILES);
 	&logr("       Preserving old config within ${INSTALL_DIR}/psad\n", \@LOGR_FILES);
 	&preserve_config("psad", "${INSTALL_DIR}/psad", \%Cmds);
 	### we don't need to run with -w for production code, and they are daemons so nothing would see warnings anyway if there are any.
-        if (&default_email("${INSTALL_DIR}/psad")) {
+        if (&query_email("${INSTALL_DIR}/psad")) {
                 &put_email("${INSTALL_DIR}/psad");
         }
+#	if ($append_fw_search_str) {
+		### the second input is the variable name that will be altered
+#		&put_fw_search_str("${INSTALL_DIR}/psad", "IPTABLES_MSG_SEARCH");
+#	}
 	&rm_perl_options("${INSTALL_DIR}/psad", \%Cmds);
 	&perms_ownership("${INSTALL_DIR}/psad", 0500)
 } else {
 	&logr(" ----  Copying psad -> ${INSTALL_DIR}/  ----\n", \@LOGR_FILES);
 	copy("psad", "${INSTALL_DIR}/psad");
-        if (&default_email("${INSTALL_DIR}/psad")) {
+        if (&query_email("${INSTALL_DIR}/psad")) {
                 &put_email("${INSTALL_DIR}/psad");
         }
 	&rm_perl_options("${INSTALL_DIR}/psad", \%Cmds);
@@ -272,7 +285,7 @@ if ( -e "${INSTALL_DIR}/psadwatchd" && (! $nopreserve)) {  # need to grab the ol
         &logr(" ----  Copying psadwatchd -> ${INSTALL_DIR}/psadwatchd  ----\n", \@LOGR_FILES);
         &logr("       Preserving old config within ${INSTALL_DIR}/psadwatchd\n", \@LOGR_FILES);
         &preserve_config("psadwatchd", "${INSTALL_DIR}/psadwatchd", \%Cmds);
-        if (&default_email("${INSTALL_DIR}/psadwatchd")) {
+        if (&query_email("${INSTALL_DIR}/psadwatchd")) {
                 &put_email("${INSTALL_DIR}/psadwatchd");
         }
 	&rm_perl_options("${INSTALL_DIR}/psadwatchd", \%Cmds);
@@ -280,7 +293,7 @@ if ( -e "${INSTALL_DIR}/psadwatchd" && (! $nopreserve)) {  # need to grab the ol
 } else {
         &logr(" ----  Copying psadwatchd -> ${INSTALL_DIR}/  ----\n", \@LOGR_FILES);
 	copy("psadwatchd", "${INSTALL_DIR}/psadwatchd");
-	if (&default_email("${INSTALL_DIR}/psadwatchd")) {
+	if (&query_email("${INSTALL_DIR}/psadwatchd")) {
 		&put_email("${INSTALL_DIR}/psadwatchd");
 	}
 	&rm_perl_options("${INSTALL_DIR}/psadwatchd", \%Cmds);
@@ -295,6 +308,10 @@ if (-e "${INSTALL_DIR}/kmsgsd" && (! $nopreserve)) {
 } else {
 	&logr(" ----  Copying kmsgsd -> ${INSTALL_DIR}/kmsgsd  ----\n", \@LOGR_FILES);
 	copy("kmsgsd", "${INSTALL_DIR}/kmsgsd");
+#        if ($append_fw_search_str) {
+                ### the second input is the variable name that will be altered
+#                &put_fw_search_str("${INSTALL_DIR}/psad", "IPTABLES_MSG_SEARCH");
+#        }
 	&rm_perl_options("${INSTALL_DIR}/kmsgsd", \%Cmds);
 	&perms_ownership("${INSTALL_DIR}/kmsgsd", 0500);
 }
@@ -521,7 +538,7 @@ sub preserve_config() {
 		if ($p =~ /(\S+)\s+=\s+(.*?)\;/) {
 			my ($varname, $value) = ($1, $2);
 			my $type;
-			($varname, $type) = assign_var_type($varname);
+			($varname, $type) = &assign_var_type($varname);
 			$prodvars{$type}{$varname}{'VALUE'} = $value;
 			$prodvars{$type}{$varname}{'LINE'} = $p;
 			$prodvars{$type}{$varname}{'FOUND'} = "N";
@@ -544,10 +561,14 @@ sub preserve_config() {
 		print TMP "$l\n" unless $start;   # print the "======= config =======" line
 		if ($start && $print) {
 			PDEF: foreach my $defc (@defconfig) {
+				if ($defc =~ /^\s*#/) {   ### found a comment
+					print TMP "$defc\n";
+					next PDEF;
+				}
 				if ($defc =~ /(\S+)\s+=\s+(.*?)\;/) {  # found a variable
 					my ($varname, $value) = ($1, $2);
 					my $type;
-					($varname, $type) = assign_var_type($varname);
+					($varname, $type) = &assign_var_type($varname);
 					if ($varname eq "EMAIL_ADDRESSES" && defined $prodvars{'STRING'}{'EMAIL_ADDRESS'}{'VALUE'}) {  # old email format in production psad
 						if ($prodvars{'STRING'}{'EMAIL_ADDRESS'}{'VALUE'} =~ /\"(\S+).\@(\S+)\"/) {
 							my $mailbox = $1;
@@ -649,7 +670,30 @@ sub rm_perl_options() {
 	close F;
 	return;
 }
-sub default_email() {
+sub get_fw_search_string() {
+	print " ----  By default, psad checks the firewall configuration on the underlying\n";
+	print "       machine to see if packets will be logged and dropped that have not\n";
+	print "       explicitly allowed through.  With an iptables firewall, psad looks for\n";
+	print "       the strings \"DENY\", \"DROP\", or \"REJECT\". However, if your\n";
+	print "       particular iptables firewall configuration logs blocked packets with the\n";
+	print "       string \"Audit\" for example, psad can be configured to look for this\n";
+	print "       string.  (Note that ipchains firewalls are unaffected by this.)\n\n";
+	my $ans = "";
+	while ($ans ne "y" && $ans ne "n") {
+		print "       Would you like to add a string that will be used to analyze firewall\n";
+		print "       log messages (y/n)?\n";	
+		$ans = <STDIN>;
+		chomp $ans;
+	}
+	my $fw_string = "";
+	if ($ans eq "y") {
+		print "       Enter a string (i.e. \"Audit\"):  ";
+		$fw_string = <STDIN>;
+		chomp $fw_string;
+	}
+	return $fw_string;
+}	
+sub query_email() {
 	my $file = shift;
 	open F, "< $file";
 	my @lines = <F>;
@@ -657,7 +701,8 @@ sub default_email() {
 	my $email_address;
 	for my $l (@lines) {
 		chomp $l;
-		if ($l =~ /my\s*\@EMAIL_ADDRESSES\s*=\s*qw\(\s*(\S+)/) {
+#		if ($l =~ /my\s*\@EMAIL_ADDRESSES\s*=\s*qw\(\s*(\S+)/) {
+		if ($l =~ /my\s*\@EMAIL_ADDRESSES\s*=\s*qw\s*\((.+)\)/) {
 			$email_address = $1;
 			last;
 		}
@@ -665,7 +710,16 @@ sub default_email() {
 	unless ($email_address) {
 		return 0;
 	}
-	if ($email_address =~ /root\@localhost/) {
+	my @ftmp = split /\//, $file;
+	my $filename = $ftmp[$#ftmp];
+	print " ----  $filename alerts will be sent to: $email_address\n";
+	my $ans = "";
+	while ($ans ne "y" && $ans ne "n") {
+		print "       Would you like alerts sent to a different address (y/n)?  ";
+		$ans = <STDIN>;
+		chomp $ans;
+	}
+	if ($ans eq "y") {
 		return 1;
 	}
 	return 0;
@@ -678,8 +732,10 @@ sub put_email() {
 	my @lines = <TMP>;
 	close TMP;
 	unlink $tmp;
+        my @ftmp = split /\//, $file;
+        my $filename = $ftmp[$#ftmp];
 	print "\n";
-	print " ----  To which email address(es) would you like $file alerts to be sent?\n";
+	print " ----  To which email address(es) would you like $filename alerts to be sent?\n";
 	print " ----  You can enter as many email addresses as you like separated by spaces.\n";
 	my $emailstr = "";
 	my $correct = 0;

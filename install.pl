@@ -140,7 +140,7 @@ $Cmds{'psad'} = $psadCmd;
 
 ### check to make sure we are running as root
 $< == 0 && $> == 0 or die "You need to be root (or equivalent UID 0" .
-                          " account) to install/uninstall psad!\n";
+    " account) to install/uninstall psad!\n";
 
 &check_old_psad_installation();  ### check for a pre-0.9.2 installation of psad.
 
@@ -217,7 +217,7 @@ sub install() {
     ### reinstate kernel logging to our named pipe
     print SYSLOG "kern.info		|$PSAD_FIFO\n";
     close SYSLOG;
-    print " ... Restarting syslog.\n";
+    &logr(" ... Restarting syslog.\n");
     system "$Cmds{'killall'} -HUP syslogd";
 
     unless (-d $PSAD_DIR) {
@@ -282,9 +282,23 @@ sub install() {
 
     print "\n\n";
 
-    ### make sure all of the psad daemons compile (validates
-    ### the source distribution)
-    print " ... Verifying compilation of psad daemons:\n";
+    &logr(" ... Compiling kmsgsd:\n");
+    unlink 'kmsgsd' if -e 'kmsgsd';   ### remove any previously compiled kmsgsd
+    system "$Cmds{'make'}";
+    if (! -e 'kmsgsd' && -e 'kmsgsd_perl') {
+        &logr(" ... @@@ Could not compile kmsgsd.c.  Installing perl kmsgsd.\n");
+        unless ((system "$Cmds{'perl'} -c kmsgsd_perl") == 0) {
+            die " ... @@@ kmsgsd_perl does not compile with \"perl -c\".  Download the" .
+                " latest sources from:\n\nhttp://www.cipherdyne.com\n";
+        }
+        copy 'kmsgsd_perl', 'kmsgsd';
+    }
+
+    print "\n\n";
+    ### make sure all of the psad (perl) daemons compile (validates
+    ### the source distribution).  kmsgsd has been re-written in
+    ### C.
+    &logr(" ... Verifying compilation of psad (perl) daemons:\n");
     unless ((system "$Cmds{'perl'} -c psad") == 0) {
         die " ... @@@ psad does not compile with \"perl -c\".  Download the" .
             " latest sources from:\n\nhttp://www.cipherdyne.com\n";
@@ -293,31 +307,28 @@ sub install() {
         die " ... @@@ psadwatchd does not compile with \"perl -c\".  Download " .
             "the latest sources from:\n\nhttp://www.cipherdyne.com\n";
     }
-    unless ((system "$Cmds{'perl'} -c kmsgsd") == 0) {
-        die " ... @@@ kmsgsd does not compile with \"perl -c\".  Download the" .
-            " latest sources from:\n\nhttp://www.cipherdyne.com\n";
-    }
     unless ((system "$Cmds{'perl'} -c diskmond") == 0) {
         die " ... @@@ diskmond does not compile with \"perl -c\".  Download " .
             "the latest sources from:\n\nhttp://www.cipherdyne.com\n";
     }
     print "\n";
+    print "\n";
 
     ### put the psad daemons in place
     &logr(" ... Copying psad -> ${SBIN_DIR}/psad\n");
-    copy('psad', "${SBIN_DIR}/psad");
+    copy 'psad', "${SBIN_DIR}/psad";
     &perms_ownership("${SBIN_DIR}/psad", 0500);
 
     &logr(" ... Copying psadwatchd -> ${SBIN_DIR}/psadwatchd\n");
-    copy('psadwatchd', "${SBIN_DIR}/psadwatchd");
+    copy 'psadwatchd', "${SBIN_DIR}/psadwatchd";
     &perms_ownership("${SBIN_DIR}/psadwatchd", 0500);
 
     &logr(" ... Copying kmsgsd -> ${SBIN_DIR}/kmsgsd\n");
-    copy('kmsgsd', "${SBIN_DIR}/kmsgsd");
+    copy 'kmsgsd', "${SBIN_DIR}/kmsgsd";
     &perms_ownership("${SBIN_DIR}/kmsgsd", 0500);
 
     &logr(" ... Copying diskmond -> ${SBIN_DIR}/diskmond\n");
-    copy('diskmond', "${SBIN_DIR}/diskmond");
+    copy 'diskmond', "${SBIN_DIR}/diskmond";
     &perms_ownership("${SBIN_DIR}/diskmond", 0500);
 
     unless (-d $PSAD_CONFDIR) {
@@ -372,7 +383,7 @@ sub install() {
     ### else other than the normal "DROP", "DENY", or "REJECT" strings.
     my $custom_fw_search_str = &get_fw_search_string();
     if ($custom_fw_search_str) {
-        &logr(" ... Setting \$FW_MSG_SEARCH to \"$custom_fw_search_str\"" .
+        &logr(" ... Setting \$FW_MSG_SEARCH to \"$custom_fw_search_str\" " .
             "in ${PSAD_CONFDIR}/psad.conf\n");
         &put_custom_fw_search_str("${PSAD_CONFDIR}/psad.conf", $custom_fw_search_str);
     }
@@ -467,27 +478,13 @@ sub install() {
     } else {
         $running = 0;
     }
-    if ($distro =~ /redhat/) {
-        if ($running) {
-            &logr(" ... An older version of psad is already running.  To ".
-                "execute, run \"${INIT_DIR}/psad restart\"\n");
-        } else {
-            &logr(" ... To execute psad, run \"${INIT_DIR}/psad start\"\n");
-        }
+    if ($running) {
+        &logr(" ... An older version of psad is already running.  To ".
+            "start the new version, run \"${SBIN_DIR}/psad --Restart\"\n");
     } else {
-        if ($running) {
-            &logr(" ... An older version of psad is already running.  kill " .
-                "pid $pid, and then execute:\n");
-            &logr("${SBIN_DIR}/psad -s ${PSAD_CONFDIR}/psad_signatures -a " .
-                "${PSAD_CONFDIR}/psad_auto_ips\n");
-        } else {
-            &logr("To start psad, execute: ${SBIN_DIR}/psad -s " .
-                "${PSAD_CONFDIR}/psad_signatures -a ${PSAD_CONFDIR}/" .
-                "psad_auto_ips\n");
-        }
+        &logr(" ... To execute psad, run \"${INIT_DIR}/psad start\"\n");
     }
     &logr("\n ... Psad has been installed!\n");
-
     return;
 }
 
@@ -649,6 +646,7 @@ sub perms_ownership() {
     return;
 }
 sub get_fw_search_string() {
+    print "\n";
     print " ... psad checks the firewall configuration on the underlying machine\n"
         . "     to see if packets will be logged and dropped that have not\n"
         . "     explicitly allowed through.  By default psad looks for the\n"
@@ -670,7 +668,7 @@ sub get_fw_search_string() {
     print "\n";
     my $fw_string = '';
     if ($ans eq 'y') {
-        print "     Enter a string (i.e. \"Audit\"):  ";
+        &logr("     Enter a string (i.e. \"Audit\"):  ");
         $fw_string = <STDIN>;
         chomp $fw_string;
     }
@@ -692,11 +690,11 @@ sub query_email() {
     unless ($email_addresses) {
         return '';
     }
-    print " ... psad alerts will be sent to:\n\n";
-    print "       $email_addresses\n\n";
+    &logr(" ... psad alerts will be sent to:\n\n");
+    &logr("       $email_addresses\n\n");
     my $ans = '';
     while ($ans ne 'y' && $ans ne 'n') {
-        print " ... Would you like alerts sent to a different address ([y]/n)?  ";
+        &logr(" ... Would you like alerts sent to a different address ([y]/n)?  ");
         $ans = <STDIN>;
         if ($ans eq "\n") {  ### allow the default of "y" to take over
                              ### when just "Enter" is pressed.
@@ -707,10 +705,10 @@ sub query_email() {
     print "\n";
     if ($ans eq 'y') {
         print "\n";
-        print " ... To which email address(es) would you like " .
-            "psad alerts to be sent?\n";
-        print " ... You can enter as many email addresses as you like " .
-            "separated by spaces.\n";
+        &logr(" ... To which email address(es) would you like " .
+            "psad alerts to be sent?\n");
+        &logr(" ... You can enter as many email addresses as you like " .
+            "separated by spaces.\n");
         my $emailstr = '';
         my $correct = 0;
         while (! $correct) {
@@ -804,7 +802,7 @@ sub enable_psad_at_boot() {
     my $distro = shift;
     my $ans = '';
     while ($ans ne 'y' && $ans ne 'n') {
-        print " ... Enable psad at boot time ([y]/n)?  ";
+        &logr(" ... Enable psad at boot time ([y]/n)?  ");
         $ans = <STDIN>;
         if ($ans eq "\n") {  ### allow the default of "y" to take over
             $ans = 'y';
@@ -834,9 +832,9 @@ sub enable_psad_at_boot() {
                     }
                 }
                 unless ($RUNLEVEL) {
-                    print " ... @@@  Could not determine the runlevel.  Set " .
+                    &logr(" ... @@@  Could not determine the runlevel.  Set " .
                         "the runlevel\nmanually in the config section of " .
-                        "install.pl\n";
+                        "install.pl\n");
                     return;
                 }
                 ### the link already exists, so don't re-create it
@@ -845,9 +843,9 @@ sub enable_psad_at_boot() {
                         "/etc/rc.d/rc${RUNLEVEL}.d/S99psad";
                 }
             } else {
-                print " ... @@@  /etc/inittab does not exist!  Set the " .
+                &logr(" ... @@@  /etc/inittab does not exist!  Set the " .
                     "runlevel\nmanually in the config section of " .
-                    "install.pl.\n";
+                    "install.pl.\n");
                 return;
             }
         }

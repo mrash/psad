@@ -12,6 +12,16 @@ my $ipchainsCmd = "/sbin/ipchains";
 my $iptablesCmd = "/usr/local/bin/iptables";
 #============ end config ============
 
+use Getopt::Long;
+
+my $fwcheck = 0;
+
+usage_and_exit(1) unless (GetOptions (
+        'help'          => \$help,              # display help
+        'firewallcheck' => \$fwcheck,           # do not check firewall rules
+));
+usage_and_exit(0) if ($help);
+
 my %Cmds = (
 	"touch"		=> $touchCmd,
 	"mknod"         => $mknodCmd,
@@ -70,10 +80,12 @@ chmod 0600, "/etc/psad/psad.conf";
 `$Cmds{'cp'} psad_signatures /etc/psad/psad_signatures`;
 chmod 0600, "/etc/psad/psad_signatures";
 
-if(check_firewall_rules(\%Cmds)) {
-	print "*** To execute psad, run \"/etc/rc.d/init.d/psad-init start\"\n";
-} else {
-	print "*** After setting up your firewall per the above note, execute \"/etc/rc.d/init.d/psad-init start\" to start psad\n";
+unless($fwcheck) {
+	if(check_firewall_rules(\%Cmds)) {
+		print "*** To execute psad, run \"/etc/rc.d/init.d/psad-init start\"\n";
+	} else {
+		print "*** After setting up your firewall per the above note, execute \"/etc/rc.d/init.d/psad-init start\" to start psad\n";
+	}
 }
 exit 0;
 #==================== end mail =====================
@@ -181,3 +193,16 @@ sub check_commands() {
 	}
 	return %$Cmds_href;
 }
+sub usage_and_exit() {
+        my $exitcode = shift;
+        print <<_HELP_;
+
+Usage: psad [-f] [-h]
+
+        -firewallcheck          - disable firewall rules verification.
+        -h                      - prints this help message.
+
+_HELP_
+        exit $exitcode;
+}
+

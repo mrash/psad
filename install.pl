@@ -267,7 +267,7 @@ sub install() {
 
     chdir 'Unix-Syslog-0.100';
     unless (-e 'Makefile.PL' && -e 'Syslog.pm') {
-        die " ... @@@  Your source kit appears to be incomplete!  Syslog.pm " .
+        die " ... @@@  Your source directory appears to be incomplete!  Syslog.pm " .
             "is missing.\n       Download the latest sources from " .
             "http://www.cipherdyne.com\n";
     }
@@ -297,7 +297,7 @@ sub install() {
         }
         close PH;
     } else {
-        die " ... @@@  Your source kit appears to be incomplete!  psad.h " .
+        die " ... @@@  Your source directory appears to be incomplete!  psad.h " .
             "is missing.\n       Download the latest sources from " .
             "http://www.cipherdyne.com\n";
     }
@@ -307,6 +307,8 @@ sub install() {
     unlink 'kmsgsd' if -e 'kmsgsd';
     ### remove any previously compiled psadwatchd
     unlink 'psadwatchd' if -e 'psadwatchd';
+
+    ### compile the C psad daemons
     system $Cmds{'make'};
     if (! -e 'kmsgsd' && -e 'kmsgsd.pl') {
         &logr(" ... @@@ Could not compile kmsgsd.c.  Installing perl kmsgsd.\n");

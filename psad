@@ -412,25 +412,13 @@ my @pidfiles = (
 exit &kill_psad() if $kill;
 
 ### The --Flush command line switch was given.
-if ($flush_fw) {
-    if (-e $auto_blocked_file) {
-        print " .. Removing auto-generated block rules.\n";
-        &old_auto_blocked_ips();
-        unlink $auto_blocked_file;
-    } else {
-        print " ** Currently there are no auto-generated ".
-            "block rules in effect.\n";
-    }
-    exit 0;
-}
+exit &flush_auto_blocked_ips() if $flush_fw;
 
 ### The --USR1 command line switch was given.
 exit &usr1() if $usr1;
 
 ### The -i <check interval> command line argument was given
-if ($chk_interval) {
-    $config{'PSAD_CHECK_INTERVAL'} = $chk_interval;
-}
+$config{'PSAD_CHECK_INTERVAL'} = $chk_interval if $chk_interval;
 
 ### check to make sure the commands specified in the config section
 ### are in the right place, and attempt to correct automatically if not.
@@ -534,10 +522,9 @@ if ($config_file eq '/etc/psad/psad.conf') {
 
 ### Check to see if psad automatically blocked some ips from
 ### a previous run.  This feature is most useful for preserving
-### automatically blocked ips after a reboot.
-if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
-    &old_auto_blocked_ips();
-}
+### automatically blocked ips after a reboot or after
+### restarting psad.
+&renew_blocked_ips() if $config{'ENABLE_AUTO_IDS'} eq 'Y';
 
 ### archive old firewall and scan data
 &archive_data() unless $benchmark;
@@ -1886,6 +1873,7 @@ sub scan_logr() {
                 "tcp=$tcp_newpkts udp=$udp_newpkts icmp=$icmp_newpkts " .
                 "dangerlevel: $curr_dlevel";
             closelog();
+            &Psad::logr();
             unless ($no_whois) {
                 &Psad::logr("\n\n", \%print_hsh);
                 &Psad::logr("---- Whois Information: ----\n", \%print_hsh);
@@ -2030,101 +2018,156 @@ sub scan_logr_signatures() {
     return;
 }
 
-sub old_auto_blocked_ips() {
-    if (-e $auto_blocked_file) {
-        open B, "< $auto_blocked_file" or
-            warn " ** Could not open $auto_blocked_file\n" and return;
-        my @blines = <B>;
+sub flush_auto_blocked_ips() {
+    my $found_blocked = 0;
+    my $rv = 0;
+    if (-e $config{'AUTO_BLOCKED_IPTABLES'}) {
+        print " .. Removing iptables auto-generated block rules.\n";
+        open B, "< $config{'AUTO_BLOCKED_IPTABLES'}" or
+            die " ** Could not open $config{'AUTO_BLOCKED_IPTABLES'}: $!";
+        my @lines = <B>;
         close B;
-        my $use_ipchains;
-        my $use_iptables;
-        my @block_ips;
-        for my $line (@blines) {
-            chomp $line;
-            if ($line =~ /IPTABLES/) {
-                $use_iptables = 1;
-            } elsif ($line =~ /IPCHAINS/) {
-                $use_ipchains = 1;
-            }
-            if ($line =~ /^($ip_re)/) {
-                push @block_ips, $1;
+        my @blocked_ips;
+        for my $line (@lines) {
+            push @blocked_ips, $1 if $line =~ /($ip_re)/;
+        }
+        for my $ip (@blocked_ips) {
+            if (&ipt_test_blocked($ip)) {  ### see if the ip has been blocked
+                &ipt_remove_block($ip);  ### remove all block rules for $ip
             }
         }
-        if ($use_iptables) {
-            &iptables_flags() unless $chk_ipt_chains;
-            for my $blockip (@block_ips) {
-                if ($flush_fw) {
-                    print " .. Removing rules for: $blockip\n";
-                }
-                for my $table (keys %ipt_chains) {
-                    for my $chain (keys %{$ipt_chains{$table}}) {
-                        ### The rule numbers can change for each ip
-                        my @rules = `$cmds{'iptables'} -t $table -nL $chain`;
-                        my $blocked = 0;
-                        my $rulenum = 1;
-                        RULE: for my $rule (@rules) {
-                            next RULE if ($rule =~ /^Chain\s/);
-                            next RULE if ($rule =~ /^target\s/);
-                            chomp $rule;
-                            ### DROP       all  --  1.1.1.1        0.0.0.0/0
-                            if ($rule =~ /^DROP\s+all.*?$blockip\s+0\.0\.0\.0\/0/) {
-                                ### all traffic from $blockip is being blocked
-                                $blocked = 1;
-                                if ($flush_fw) {
-                                    print "     Deleting rule $table $chain: $rule\n";
-                                    system "$cmds{'iptables'} -t $table -D $chain $rulenum";
-                                } else {
-                                    last RULE;
-                                }
-                            }
-                            $rulenum++;
-                        }
-                        unless ($blocked || $flush_fw) {
-                            &iptables_block($table, $chain, $blockip);
-                        }
-                        if ($flush_fw && ! $blocked) {
-                            print " .. Could not locate any $table $chain ",
-                                "auto-generated rules for $blockip\n";
-                        }
-                    }
-                }
+        ### we have removed the iptables block rules, so remove
+        ### the cache file.
+        unlink $config{'AUTO_BLOCKED_IPTABLES'};
+        $found_blocked = 1;
+    }
+    if (-e $config{'AUTO_BLOCKED_IPCHAINS'}) {
+        print " .. Removing ipchains auto-generated block rules.\n";
+        open B, "< $config{'AUTO_BLOCKED_IPCHAINS'}" or
+            die " ** Could not open $config{'AUTO_BLOCKED_IPCHAINS'}: $!";
+        my @lines = <B>;
+        close B;
+        my @blocked_ips;
+        for my $line (@lines) {
+            push @blocked_ips, $1 if $line =~ /($ip_re)/;
+        }
+        for my $ip (@blocked_ips) {
+            if (&ipch_test_blocked($ip)) {  ### see if the ip has been blocked
+                &ipch_remove_block($ip);  ### remove all block rules for $ip
             }
-        } elsif ($use_ipchains) {
-            for my $chain (@ipchains_chains) {
-                for my $blockip (@block_ips) {
-                    ### The rule numbers can change for each ip
-                    my @rules = `$cmds{'ipchains'} -nL $chain`;
-                    my $blocked = 0;
-                    my $rulenum = 1;
-                    if ($flush_fw) {
-                        print " .. Removing rules for: $blockip\n";
-                    }
-                    RULE: for my $rule (@rules) {
-                        chomp $rule;
-                        ### DENY   udp  ------  0.0.0.0/0   0.0.0.0/0   * -> *
-                        if ($rule =~ /^DENY\s+all.*?$blockip.*0\.0\.0\.0\/0
-                                \s+\*\s+\-\>\s+\*/x) {
-                            ### all traffic from $blockip is being blocked
-                            $blocked = 1;
-                            if ($flush_fw) {
-                                print "     Deleting rule: $rule\n";
-                                system "$cmds{'ipchains'} -D $chain $rulenum";
-                            } else {
-                                last RULE;
-                            }
-                        }
-                        $rulenum++;
-                    }
-                    unless ($blocked || $flush_fw) {
-                        &ipchains_block($chain, $blockip);
-                    }
-                    if ($flush_fw && ! $blocked) {
-                        print " .. Could not locate any auto-generated ",
-                            "rules for: $blockip\n";
-                    }
+        }
+        unlink $config{'AUTO_BLOCKED_IPCHAINS'};
+        $found_blocked = 1;
+    }
+    if (-e $config{'AUTO_BLOCKED_TCPWR'}) {
+        print " .. Removing tcpwrapper auto-generated block rules.\n";
+        open B, "< $config{'AUTO_BLOCKED_TCPWR'}" or
+            die " ** Could not open $config{'AUTO_BLOCKED_TCPWR'}: $!";
+        my @lines = <B>;
+        close B;
+        unlink $config{'AUTO_BLOCKED_TCPWR'};
+        $found_blocked = 1;
+    }
+    unless ($found_blocked) {
+        print " ** Currently there are no auto-generated ".
+            "block rules in effect.\n";
+    }
+    exit $rv;
+}
+
+sub ipt_test_blocked() {
+    my $ip = shift;
+
+    ### get the active iptables chains
+    &get_iptables_chains() unless $chk_ipt_chains;
+
+    for my $table (keys %ipt_chains) {
+        for my $chain (keys %{$ipt_chains{$table}}) {
+            my @rules = `$cmds{'iptables'} -t $table -nL $chain`;
+            RULE: for my $rule (@rules) {
+                chomp $rule;
+                next RULE if $rule =~ /^\s*Chain\s/;
+                next RULE if $rule =~ /^\s*target\s/;
+                ### DROP       all  --  1.1.1.1        0.0.0.0/0
+                if ($rule =~ /^DROP\s+all.*?$ip\s+0\.0\.0\.0\/0/) {
+                    return 1;
                 }
             }
         }
+    }
+    ### did not find the ip
+    return 0;
+}
+
+sub ipt_remove_block() {
+    my $ip = shift;
+
+    ### get the active iptables chains
+    &get_iptables_chains() unless $chk_ipt_chains;
+
+    my $rm_block = 0;
+    for my $table (keys %ipt_chains) {
+        for my $chain (keys %{$ipt_chains{$table}}) {
+            my @rules = `$cmds{'iptables'} -t $table -nL $chain`;
+            my $rulenum = 1;
+            RULE: for my $rule (@rules) {
+                next RULE if $rule =~ /^\s*Chain\s/;
+                next RULE if $rule =~ /^\s*target\s/;
+                ### DROP       all  --  1.1.1.1        0.0.0.0/0
+                if ($rule =~ /^DROP\s+all.*?$ip\s+0\.0\.0\.0\/0/) {
+                    print " .. Deleting rule $rulenum for $ip, $table ",
+                        "table $chain chain:\n";
+                    print "        $rule\n";
+                    system "$cmds{'iptables'} -t $table -D $chain $rulenum";
+                    $rm_block = 1;
+                    last RULE;  ### there should only be one auto-blocked rule
+                }
+                $rulenum++;
+            }
+        }
+    }
+    unless ($rm_block) {
+        print " ** Could not locate iptables block rule for $ip.\n";
+    }
+    return;
+}
+
+sub ipch_test_blocked() {
+    my $ip = shift;
+    for my $chain (@ipchains_chains) {
+        my @rules = `$cmds{'ipchains'} -nL $chain`;
+        RULE: for my $rule (@rules) {
+            chomp $rule;
+            ### DENY   udp  ------  0.0.0.0/0   0.0.0.0/0   * -> *
+            if ($rule =~ /^DENY\s+all.*?$ip.*0\.0\.0\.0\/0\s+\*\s+\-\>\s+\*/) {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+sub ipch_remove_block() {
+    my $ip = shift;
+    my $rm_block = 0;
+    for my $chain (@ipchains_chains) {
+        my @rules = `$cmds{'ipchains'} -nL $chain`;
+        my $rulenum = 1;
+        RULE: for my $rule (@rules) {
+            chomp $rule;
+            ### DENY   udp  ------  0.0.0.0/0   0.0.0.0/0   * -> *
+            if ($rule =~ /^DENY\s+all.*?$ip.*0\.0\.0\.0\/0\s+\*\s+\-\>\s+\*/) {
+                print " .. Deleting rule $rulenum for $ip, $chain chain:\n";
+                print "        $rule\n";
+                system "$cmds{'ipchains'} -D $chain $rulenum";
+                $rm_block = 1;
+                last RULE;
+            }
+            $rulenum++;
+        }
+    }
+    unless ($rm_block) {
+        print " ** Could not locate ipchains block rule for $ip.\n";
     }
     return;
 }
@@ -2212,7 +2255,7 @@ sub auto_psad_response() {
     return;
 }
 
-sub iptables_flags() {
+sub get_iptables_chains() {
     $chk_ipt_chains = 1;
     $ipt_chains{'filter'}{'INPUT'}   = '';
     $ipt_chains{'filter'}{'FORWARD'} = '';
@@ -2755,10 +2798,10 @@ sub setup() {
             system "$cmds{'killall'} -HUP syslog-ng";
         }
     }
-    die " ** PORT_RANGE_SCAN_THRESHOLD must be less than 65535.",
-        "  Exiting." unless $config{'PORT_RANGE_SCAN_THRESHOLD'} < 65535;
-    die " ** PORT_RANGE_SCAN_THRESHOLD must be greater than 0.",
-        "  Exiting." unless $config{'PORT_RANGE_SCAN_THRESHOLD'} > 0;
+    die ' ** PORT_RANGE_SCAN_THRESHOLD must be less than 65535.',
+        '  Exiting.' unless $config{'PORT_RANGE_SCAN_THRESHOLD'} < 65535;
+    die ' ** PORT_RANGE_SCAN_THRESHOLD must be greater than 0.',
+        '  Exiting.' unless $config{'PORT_RANGE_SCAN_THRESHOLD'} > 0;
     return;
 }
 
@@ -2773,7 +2816,8 @@ sub check_config() {
         TCPWRAPPERS_BLOCK_METHOD EMAIL_ALERT_DANGER_LEVEL
         PSAD_FIFO WHOIS_THRESHOLD WHOIS_TIMEOUT
         PACKET_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR
-        PROC_FORWARD_FILE ENABLE_PERSISTENCE
+        PROC_FORWARD_FILE ENABLE_PERSISTENCE AUTO_BLOCKED_IPTABLES
+        AUTO_BLOCKED_IPCHAINS AUTO_BLOCKED_TCPWR
     );
     &Psad::validate_config($config_file, \@required_vars, $config_href);
     return;

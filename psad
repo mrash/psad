@@ -190,6 +190,13 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 			$Scan{$srcip}{'SCAN_RANGE'}{'START_PORT'} = 65535; # make sure the initial start port is not too low
 			$Scan{$srcip}{'SCAN_RANGE'}{'END_PORT'} = 0; # make sure the initial end port is not too high
 		}
+		my @time = split / /, scalar localtime;   ### Get the current time as a nice ASCII string.
+		pop @time; shift @time;    ### Get rid of the day and the year to make the time consistent with syslog
+		my $time = join ' ', @time;
+		unless (defined $Scan{$srcip}{'START_TIME'}) {
+			$Scan{$srcip}{'START_TIME'} = $time;
+		}
+		$Scan{$srcip}{'END_TIME'} = $time;
 		# increment hash values
 		$Scan{$srcip}{'ABSNUM'}++;
 		$Scan{$srcip}{'FLAGS'}{$flags}++;

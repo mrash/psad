@@ -66,8 +66,13 @@ static void parse_config(
     unsigned int *diskmond_max_retries
 );
 
-void rm_data(char *fwdata_file, char *psad_dir, char *archive_dir);
-void rm_scanlog(char *dir);
+void rm_data(
+    unsigned short int max_disk_percentage,
+    char *fwdata_file,
+    char *psad_dir,
+    char *archive_dir
+);
+void rm_siglog(char *dir);
 int check_ip_dir(char *file);
 static void sighup_handler(int sig);
 
@@ -149,7 +154,9 @@ int main(int argc, char *argv[]) {
             current_prct =
                 (float) 100 - (float) statfsbuf.f_bfree / statfsbuf.f_blocks * 100;
             if (current_prct > max_disk_percentage) {
-                rm_data(fwdata_file, psad_dir, archive_dir);
+                /* get rid of as much data as possible from the psad_dir
+                 * directory. */
+                rm_data(max_disk_percentage, fwdata_file, psad_dir, archive_dir);
             }
         }
 
@@ -254,15 +261,18 @@ static void parse_config(
     return;
 }
 
-void rm_data(char *fwdata_file, char *psad_dir, char *archive_dir) {
+void rm_data(unsigned short int max_disk_percentage, char *fwdata_file,
+        char *psad_dir, char *archive_dir) {
     char mail_str[MAX_MSG_LEN] = "";
     char path_tmp[MAX_PATH_LEN];
     int fd;
 
-    /* remove the ip/scanlog files in psad_dir and archive_dir
-     * since they take up the most space */
-    rm_scanlog(psad_dir);
-    rm_scanlog(archive_dir);
+    /* remove the ip/<ip>_signatures files in psad_dir and archive_dir
+     * since they take up the most space.  Note: rm_siglog() will be
+     * removed after psad starts just writing the signature number and
+     * corresponding packet counts to the <ip>_signatures file. */
+    rm_siglog(psad_dir);
+    rm_siglog(archive_dir);
 
     if (chdir(psad_dir) < 0) {
 #ifdef DEBUG
@@ -271,7 +281,7 @@ void rm_data(char *fwdata_file, char *psad_dir, char *archive_dir) {
         exit(EXIT_FAILURE);
     }
 
-    /* truncate the fwdata_file after truncating the scanlog
+    /* truncate the fwdata_file after truncating the <ip>_signatures
      * files since changing the number of lines in fwdata will
      * cause psad to write to files in the ip directories */
     if ((fd = open(fwdata_file, O_TRUNC)) >= 0)
@@ -283,9 +293,21 @@ void rm_data(char *fwdata_file, char *psad_dir, char *archive_dir) {
     if ((fd = open(path_tmp, O_TRUNC)) >= 0)
         close(fd);
 
-#ifdef DEBUG
-    printf(" .. sending mail:  %s\n", mail_str);
-#endif
+    strlcat(mail_str,
+            " -s \" ** psad diskmond: ", MAX_MSG_LEN);
+    strlcat(mail_str, psad_dir, MAX_MSG_LEN);
+    strlcat(mail_str, "Disk utilization > ", MAX_MSG_LEN);
+    mail_str[strlen(mail_str)] = max_disk_percentage;
+    mail_str[strlen(mail_str)+1] = '\0';
+    strlcat(mail_str, "% on ", MAX_MSG_LEN);
+    strlcat(mail_str, hostname, MAX_MSG_LEN);
+    strlcat(mail_str, "\" ", MAX_MSG_LEN);
+    strlcat(mail_str, mail_addrs, MAX_MSG_LEN);
+    strlcat(mail_str, mail_redr, MAX_MSG_LEN);
+    mail_str[0] = '\0';
+
+    /* send alert email */
+    send_alert_email(shCmd, mailCmd, mail_str);
 
     strlcat(mail_str,
             " -s \" ** psad diskmond: Removing data in ", MAX_MSG_LEN);
@@ -296,12 +318,16 @@ void rm_data(char *fwdata_file, char *psad_dir, char *archive_dir) {
     strlcat(mail_str, mail_addrs, MAX_MSG_LEN);
     strlcat(mail_str, mail_redr, MAX_MSG_LEN);
 
+#ifdef DEBUG
+    printf(" .. sending mail:  %s\n", mail_str);
+#endif
+
     /* send alert email */
     send_alert_email(shCmd, mailCmd, mail_str);
     return;
 }
 
-void rm_scanlog(char *dir) {
+void rm_siglog(char *dir) {
     DIR *dir_ptr;
     struct dirent *direntp;
     char path_tmp[MAX_PATH_LEN];
@@ -321,8 +347,13 @@ void rm_scanlog(char *dir) {
         while ((direntp = readdir(dir_ptr)) != NULL) {
             if (check_ip_dir(direntp->d_name)) {
                 strlcpy(path_tmp, direntp->d_name, MAX_PATH_LEN);
-                strlcat(path_tmp, "/scanlog", MAX_PATH_LEN);
+                strlcat(path_tmp, "/", MAX_PATH_LEN);
+                strlcat(path_tmp, direntp->d_name, MAX_PATH_LEN);
+                strlcat(path_tmp, "_signatures", MAX_PATH_LEN);
                 /* zero out the file */
+#ifdef DEBUG
+    printf(" ** Truncating %s file\n", path_tmp);
+#endif
                 if ((fd = open(path_tmp, O_TRUNC)) >= 0)
                     close(fd);
             }

@@ -108,7 +108,7 @@ my %required_perl_modules = (
         'force-lib-install' => 1,
     },
     'Psad' => {
-        'version' => '1.3.3',
+        'version' => '1.4.0',
         'force-lib-install' => 1,
     }
 );
@@ -226,7 +226,7 @@ exit 0;
 
 sub install() {
     ### make sure install.pl is being called from the source directory
-    unless (-e 'psad' && -e 'Psad/Psad.pm') {
+    unless (-e 'psad' && -e 'Psad/lib/Psad.pm') {
         die "[*] install.pl can only be executed from the directory\n",
             "    that contains the psad sources!  Exiting.";
     }

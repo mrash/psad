@@ -609,11 +609,10 @@ sub check_scan() {
             $scan{$src}{$dst}{'E_PORT'} = 0;
         }
         my $epoch_seconds = time() if ($config{'ENABLE_PERSISTENCE'} eq 'N');
-        ### Get the current time as a nice ASCII string.
-        my @time = split /\s+/, scalar localtime;
-        pop @time; shift @time; ### Get rid of the day and the year to make
-                                ### the time consistent with syslog
-        my $time = join ' ', @time;
+        ### get rid of the day and the year to make the time
+        ### consistent with syslog
+        my ($time) = ((scalar localtime()) =~ /^\S+\s+(.*)\s+\d+/);
+
         ### initialize values for the current interval
         unless (defined $scan{$src}{$dst}{$proto}{'CURR_INT'}) {
             $scan{$src}{$dst}{$proto}{'CURR_INT'}{'S_TIME'} = $time;
@@ -790,7 +789,9 @@ sub check_port() {
     ### check dst port first
     if (defined $sigs{$proto}{$msg}{'DSTPORT'}{'UNIQUE_OR_ANY'}) {
         unless ($sigs{$proto}{$msg}{'DSTPORT'}{'UNIQUE_OR_ANY'} eq 'any') {
-            return 0 if ($dstport != $sigs{$proto}{$msg}{'DSTPORT'}{'UNIQUE_OR_ANY'});
+            if ($dstport != $sigs{$proto}{$msg}{'DSTPORT'}{'UNIQUE_OR_ANY'}) {
+                return 0;
+            }
         }
     }
     if (defined $sigs{$proto}{$msg}{'DSTPORT'}{'START'}) {
@@ -809,7 +810,9 @@ sub check_port() {
     ### check src port
     if (defined $sigs{$proto}{$msg}{'SRCPORT'}{'UNIQUE_OR_ANY'}) {
         unless ($sigs{$proto}{$msg}{'SRCPORT'}{'UNIQUE_OR_ANY'} eq 'any') {
-            return 0 if ($dstport != $sigs{$proto}{$msg}{'SRCPORT'}{'UNIQUE_OR_ANY'});
+            if ($dstport != $sigs{$proto}{$msg}{'SRCPORT'}{'UNIQUE_OR_ANY'}) {
+                return 0;
+            }
         }
     }
     if (defined $sigs{$proto}{$msg}{'SRCPORT'}{'START'}) {
@@ -1187,10 +1190,10 @@ sub scan_logr() {
     for my $src (keys %scan) {
         print STDOUT "scan_logr(): source ip: $src\n" if $debug;
         DST: for my $dst (keys %{$scan{$src}}) {
-            unless (defined $scan{$src}{$dst}{'EMAIL_LIMIT'}) {
-                $scan{$src}{$dst}{'EMAIL_LIMIT'} = 0;
+            unless (defined $scan{$src}{$dst}{'EMAIL_COUNT'}) {
+                $scan{$src}{$dst}{'EMAIL_COUNT'} = 0;
             } elsif ($config{'PSAD_EMAIL_LIMIT'} > 0
-                && $scan{$src}{$dst}{'EMAIL_LIMIT'}
+                && $scan{$src}{$dst}{'EMAIL_COUNT'}
                 > $config{'PSAD_EMAIL_LIMIT'}) {
                 ### ignore PSAD_EMAIL_LIMIT if it is zero
                 unless (defined $scan{$src}{$dst}{'EMAIL_STOPPED'}) {
@@ -1212,6 +1215,7 @@ sub scan_logr() {
                     -d "$config{'PSAD_DIR'}/${src}";
                 my $scanlog     = "$config{'PSAD_DIR'}/${src}/scanlog";
                 my $email_alert = "$config{'PSAD_DIR'}/${src}/email_alert";
+                my $ecount_file = "$config{'PSAD_DIR'}/${src}/email_count";
                 my $whois_file  = "$config{'PSAD_DIR'}/${src}/whois";
                 my $dl_file     = "$config{'PSAD_DIR'}/${src}/danger_level";
                 my $sigs_file   = "$config{'PSAD_DIR'}/${src}/signatures";
@@ -1242,7 +1246,7 @@ sub scan_logr() {
                 my $udp_new_num_pkts;
                 my $icmp_new_start_time;
                 my $icmp_new_num_pkts;
-                my $rdns;
+                my $rdns = '';
                 if (defined $scan{$src}{$dst}{'TCP'}{'CURR_INT'}) {
                     $tcp = 1;
                     $tcp_new_start_range = $scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'S_PORT'};
@@ -1273,8 +1277,11 @@ sub scan_logr() {
                         my $ipaddr = gethostbyname($src);
                         ### my $rdns = gethostbyaddr($ipaddr, AF_INET);
                         $rdns = gethostbyaddr($ipaddr, 2);
-                        $rdns = 'No reverse dns info available' unless $rdns;
-                        $dnsstring = "$src -> $rdns";
+                        if ($rdns) {
+                            $dnsstring = "$src -> $rdns";
+                        } else {
+                            $dnsstring = "$src -> No reverse dns info available";
+                        }
                     } else {
                         ### $ipaddr was already reported as
                         ### a host name by iptables
@@ -1438,7 +1445,7 @@ sub scan_logr() {
                 ### write a message to syslog
                 openlog 'psad', LOG_DAEMON, LOG_LOCAL7;
                 syslog LOG_INFO, "psad: scan detected: $src -> $dst $syslog_print_range " .
-                        "pkts=$syslog_num_pkts dangerlevel: $syslog_danger_level";
+                    "pkts=$syslog_num_pkts dangerlevel: $syslog_danger_level";
                 closelog();
                 unless ($no_whois) {
                     &Psad::logr("\n\n", \%print_hsh);
@@ -1453,16 +1460,20 @@ sub scan_logr() {
                 if ($scan{$src}{$dst}{'ALERTED'} == 0
                     && $current_danger_level >= $config{'EMAIL_ALERT_DANGER_LEVEL'}) {
                     my $subject;
-                    if ($rdns eq 'No reverse dns info available') {
-                        $subject = "psad: SCAN DETECTED from: $src";
-                    } else {
+                    if ($rdns) {
                         $subject = "psad: SCAN DETECTED from: $rdns";
+                    } else {
+                        $subject = "psad: SCAN DETECTED from: $src";
                     }
                     &Psad::sendmail($subject, $email_alert, $emails_aref, $cmds{'mail'});
                     $scan{$src}{$dst}{'ALERTED'} = 1;
+                    $scan{$src}{$dst}{'EMAIL_COUNT'}++;
+
+                    ### print the number of email alerts we have sent
+                    &Psad::logr("$scan{$src}{$dst}{'EMAIL_COUNT'}\n",
+                        {$ecount_file => 0});
                 }
                 $scan{$src}{$dst}{'LOGR'} = 0;
-                $scan{$src}{$dst}{'EMAIL_LIMIT'}++;
             }
         }
     }
@@ -1890,8 +1901,7 @@ sub status_psad() {
                             }
                             ### print the packet counters
                             if (-e $config{'PACKET_COUNTER_FILE'}) {
-                                print "     Packets Counters (packets blocked by " .
-                                    "the firewall and processed by psad):\n";
+                                print "     Packets Counters:\n"
                                 open F, "< $config{'PACKET_COUNTER_FILE'}" or
                                     die " ... $config{'PACKET_COUNTER_FILE'}: $!";
                                 print STDOUT "        $_" while (<F>);

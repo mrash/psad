@@ -89,7 +89,7 @@ my $psCmd = "/bin/ps";
 my $netstatCmd = "/bin/netstat";
 my $unameCmd = "/bin/uname";
 my $hostnameCmd = "/bin/hostname";
-# my $whoisCmd = "/home/mbr/psad/whois";
+my $whoisCmd = "/usr/local/bin/whois.psad";
 #================== end config ====================
 #===================== main =======================
 
@@ -101,7 +101,7 @@ my $daemon = 0;
 my $output = 0;
 my $errors = 0;
 my $dnslookups = 0;
-my $whoislookups = 1;
+my $whoislookups = 0;
 my $signatures = 0;
 my $auto_ips = 0;
 my $netstat_lookup = 0;
@@ -126,11 +126,13 @@ my %Cmds = (
 	"ps"		=> $psCmd,
 	"netstat"	=> $netstatCmd,
 	"uname"		=> $unameCmd,
-	"hostname"	=> $hostnameCmd
-#	"whois"		=> $whoisCmd
+	"hostname"	=> $hostnameCmd,
+	"whois"		=> $whoisCmd
 );
 
 %Cmds = check_commands(\%Cmds);
+
+$whoislookups = 1 if ($Cmds{'whois'} !~ /psad/);  # don't use the normal whois binary.
 
 $SIG{USR1} = \&print_scan;  # install signal handler for debugging the %Scan hash with Data::Dumper
 
@@ -144,8 +146,8 @@ usage_and_exit(1) unless (GetOptions (
 	'namelookups'	=> \$dnslookups,	# dns lookup against scanning ip address
 	'signatures=s'	=> \$signatures,	# scan signatures
 	'localport'	=> \$netstat_lookup,	# listening on localport that has been scanned?
-	'errors'	=> \$errors		# do not write malformed packet messages to error log
-#	'whois'		=> \$whoislookups
+	'errors'	=> \$errors,		# do not write malformed packet messages to error log
+	'whois'		=> \$whoislookups
 ));
 usage_and_exit(0) if ($help);
 
@@ -555,7 +557,6 @@ sub logr() {
                                 $dnsstring = "$ip -> $rdns";
                         } 
 			unless ($whoislookups) {
-				print "executing $Cmds_href->{'whois'} $ip\n";
 				@whois_info = `$Cmds_href->{'whois'} $ip`;
 			}
 			if ($abs_start_range == $abs_end_range) {

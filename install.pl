@@ -360,28 +360,6 @@ sub install() {
     }
     print "\n\n";
 
-    &logr(" .. Setting hostname to \"$HOSTNAME\" in psad.h\n");
-    if (-e 'psad.h') {
-        open P, "< psad.h";
-        my @lines = <P>;
-        close P;
-        ### replace the "#define HOSTNAME HOSTNAME" line with $HOSTNAME
-        open PH, "> psad.h";
-        for my $line (@lines) {
-            chomp $line;
-            if ($line =~ /^#define\s+HOSTNAME\s+\"HOSTNAME\"/) {
-                print PH "#define HOSTNAME \"$HOSTNAME\"\n";
-            } else {
-                print PH $line . "\n";
-            }
-        }
-        close PH;
-    } else {
-        die " ** Your source directory appears to be incomplete!  psad.h " .
-            "is missing.\n    Download the latest sources from " .
-            "http://www.cipherdyne.org\n";
-    }
-
     &logr(" .. Compiling kmsgsd, psadwatchd, and diskmond:\n");
 
     ### remove any previously compiled kmsgsd
@@ -434,8 +412,7 @@ sub install() {
         die " ** psad does not compile with \"perl -c\".  Download the" .
             " latest sources from:\n\nhttp://www.cipherdyne.org\n";
     }
-    print "\n";
-    print "\n";
+    print "\n\n";
 
     ### put the psad daemons in place
     &logr(" .. Copying psad -> ${USRSBIN_DIR}/psad\n");
@@ -513,28 +490,35 @@ sub install() {
         &test_syslog_config();
     }
 
-    my $email_str = '';
     unless ($preserve_rv) {  ### we preserved the existing config
-        $email_str = &query_email();
-    }
-    if ($email_str) {
-        for my $file qw(psad.conf psadwatchd.conf kmsgsd.conf diskmond.conf) {
-            &put_email("${PSAD_CONFDIR}/$file", $email_str);
+        my $email_str = &query_email();
+        if ($email_str) {
+            for my $file qw(psad.conf psadwatchd.conf kmsgsd.conf diskmond.conf) {
+                &put_email("${PSAD_CONFDIR}/$file", $email_str);
+            }
+        }
+        ### Give the admin the opportunity to add to the strings that are normally
+        ### checked in iptables messages.  This is useful since the admin may have
+        ### configured the firewall to use a logging prefix of "Audit" or something
+        ### else other than the normal "DROP", "DENY", or "REJECT" strings.
+        my $custom_fw_search_str = &get_fw_search_string();
+        if ($custom_fw_search_str) {
+            for my $file qw(psad.conf kmsgsd.conf) {
+                &logr(qq{ .. Setting \$FW_MSG_SEARCH to "$custom_fw_search_str" } .
+                    "in ${PSAD_CONFDIR}/$file\n");
+                &put_custom_fw_search_str("${PSAD_CONFDIR}/$file",
+                    $custom_fw_search_str);
+            }
         }
     }
-    ### Give the admin the opportunity to add to the strings that are normally
-    ### checked in iptables messages.  This is useful since the admin may have
-    ### configured the firewall to use a logging prefix of "Audit" or something
-    ### else other than the normal "DROP", "DENY", or "REJECT" strings.
-    my $custom_fw_search_str = &get_fw_search_string();
-    if ($custom_fw_search_str) {
-        for my $file qw(psad.conf kmsgsd.conf) {
-            &logr(qq{ .. Setting \$FW_MSG_SEARCH to "$custom_fw_search_str" } .
-                "in ${PSAD_CONFDIR}/$file\n");
-            &put_custom_fw_search_str("${PSAD_CONFDIR}/$file",
-                $custom_fw_search_str);
-        }
+    for my $file ("${PSAD_CONFDIR}/psad.conf",
+            "${PSAD_CONFDIR}/kmsgsd.conf",
+            "${PSAD_CONFDIR}/psadwatchd.conf",
+            "${PSAD_CONFDIR}/diskmond.conf") {
+        &logr(" .. Setting hostname to \"$HOSTNAME\" in $file\n");
+        &set_hostname($file);
     }
+
     ### make sure the PSAD_DIR and PSAD_FIFO variables are correctly defined
     ### in the config file.
     &put_string("${PSAD_CONFDIR}/psad.conf", 'PSAD_DIR', $PSAD_DIR);
@@ -546,7 +530,7 @@ sub install() {
     &install_manpage('kmsgsd.8');
     &install_manpage('diskmond.8');
 
-    if ($distro =~ /redhat/i) {
+    if ($distro =~ /red\s*hat/i) {
         if (-d $INIT_DIR) {
             &logr(" .. Copying psad-init -> ${INIT_DIR}/psad\n");
             copy 'psad-init', "${INIT_DIR}/psad";
@@ -705,6 +689,31 @@ sub uninstall() {
     print "\n";
     print " .. Psad has been uninstalled!\n";
 
+    return;
+}
+
+sub set_hostname() {
+    my $file = shift;
+    if (-e $file) {
+        open P, "< $file" or die " ** Could not open $file: $!";
+        my @lines = <P>;
+        close P;
+        ### replace the "HOSTNAME           CHANGE_ME" line
+        open PH, "> $file";
+        for my $line (@lines) {
+            chomp $line;
+            if ($line =~ /^\s*HOSTNAME(\s+)CHANGE.?ME/) {
+                print PH "HOSTNAME${1}$HOSTNAME;\n";
+            } else {
+                print PH "$line\n";
+            }
+        }
+        close PH;
+    } else {
+        die " ** Your source directory appears to be incomplete!  $file " .
+            "is missing.\n    Download the latest sources from " .
+            "http://www.cipherdyne.org\n";
+    }
     return;
 }
 
@@ -1072,9 +1081,9 @@ sub get_fw_search_string() {
         "    can be configured here to look for this string.\n\n";
     my $ans = '';
     while ($ans ne 'y' && $ans ne 'n') {
-        print "     Would you like to add a new string that will be used to analyze\n",
-            "     firewall log messages?  (Is it usually safe to say \"n\" here).\n",
-            "     (y/[n])?  ";
+        print "    Would you like to add a new string that will be used to analyze\n",
+            "    firewall log messages?  (Is it usually safe to say \"n\" here).\n",
+            "    (y/[n])?  ";
         $ans = <STDIN>;
         if ($ans eq "\n") {  ### allow the default answer to take over
             $ans = 'n';

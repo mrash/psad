@@ -1,10 +1,12 @@
-psad-1.3.3 (09//2003):
+psad-1.3.3 (09/09/2004):
     - Fixed __WARN__ and __DIE__ exception handlers so that they
       reference global message variables.
     - Fixed auto danger level assignments.  Network auto assignments as
       well as per-protocol assignments work now.
     - Added SYSLOG_DAEMON variable to define which syslog daemon is running
       on the underlying system instead of just guessing.
+    - Added the ability to ignore both ranges and specific ports/protocols
+      with a new variable IGNORE_PORTS in psad.conf.
     - Bugfix to make sure email addresses are separated by spaces when
       Psad::sendmail() is called.
     - Bugfix for ipt_prefix counters not being parsed correct at import
@@ -27,7 +29,7 @@ psad-1.3.3 (09//2003):
     - Permissions fixes with umask() setting in /var/log/psad, permissions
       fixes for files in /etc/psad at install time.
 
-psad-1.3.2 (06/25/2003):
+psad-1.3.2 (06/25/2004):
     - Removed FW_MSG_SEARCH from psad.conf, and created a new config
       file "fw_search.conf" that both psad and kmsgsd use to get the
       FW_MSG_SEARCH definition(s).

@@ -43,8 +43,8 @@ short int kmsgsd_syscalls_ctr   = 0;
 short int diskmond_syscalls_ctr = 0;
 const char mail_redr[] = " < /dev/null > /dev/null 2>&1";
 const char hostname[] = HOSTNAME;
-char mail_addrs[MAX_GEN_LEN+1];
-char mailCmd[MAX_GEN_LEN+1];
+char mail_addrs[MAX_GEN_LEN];
+char mailCmd[MAX_GEN_LEN];
 
 /* PROTOTYPES ***************************************************************/
 static void parse_config(
@@ -73,18 +73,19 @@ static void give_up(const char *pid_name);
 
 /* MAIN *********************************************************************/
 int main(int argc, char *argv[]) {
-    char config_file[MAX_PATH_LEN+1];
-    char psadCmd[MAX_PATH_LEN+1];
-    char psad_pid_file[MAX_PATH_LEN+1];
-    char kmsgsdCmd[MAX_PATH_LEN+1];
-    char kmsgsd_pid_file[MAX_PATH_LEN+1];
-    char diskmondCmd[MAX_PATH_LEN+1];
-    char diskmond_pid_file[MAX_PATH_LEN+1];
-    char psadwatchd_pid_file[MAX_PATH_LEN+1];
+    char config_file[MAX_PATH_LEN];
+    char psadCmd[MAX_PATH_LEN];
+    char psad_pid_file[MAX_PATH_LEN];
+    char kmsgsdCmd[MAX_PATH_LEN];
+    char kmsgsd_pid_file[MAX_PATH_LEN];
+    char diskmondCmd[MAX_PATH_LEN];
+    char diskmond_pid_file[MAX_PATH_LEN];
+    char psadwatchd_pid_file[MAX_PATH_LEN];
     unsigned int psadwatchd_check_interval = 5;  /* default to 5 seconds */
     unsigned int psadwatchd_max_retries = 10; /* default to 10 tries */
     time_t config_mtime;
     struct stat statbuf;
+    int len;
 
 #ifdef DEBUG
     printf(" .. Entering DEBUG mode ..n");
@@ -94,10 +95,18 @@ int main(int argc, char *argv[]) {
     /* handle command line arguments */
     if (argc == 1) {  /* nothing but the program name was
                          specified on the command line */
-        strcpy(config_file, CONFIG_FILE);
+        len = strlen(CONFIG_FILE);
+        if (len > MAX_PATH_LEN)
+            len = MAX_PATH_LEN;
+        memcpy(config_file, CONFIG_FILE, len);
+        config_file[len] = '\0';
     } else if (argc == 2) {  /* the path to the config file was
                                 supplied on the command line */
-        strcpy(config_file, argv[1]);
+        len = strlen(argv[1]);
+        if (len > MAX_PATH_LEN)
+            len = MAX_PATH_LEN;
+        memcpy(config_file, argv[1], len);
+        config_file[len] = '\0';
     } else {
         printf(" .. You may only specify the path to a single config file:  ");
         printf("Usage:  psadwatchd <configfile>\n");
@@ -192,8 +201,8 @@ static void check_process(
 {
     FILE *pidfile_ptr;
     pid_t pid;
-    char mail_str[MAX_MSG_LEN+1] = "";
-    char pid_line[MAX_PID_SIZE+1];
+    char mail_str[MAX_MSG_LEN] = "";
+    char pid_line[MAX_PID_SIZE];
 
     if ((pidfile_ptr = fopen(pid_file, "r")) == NULL) {
         /* the pid file must not exist (or we can't read it), so
@@ -201,14 +210,14 @@ static void check_process(
 #ifdef DEBUG
     printf(" .. Could not open pid_file: %s\n", pid_file);
 #endif
-        strcat(mail_str, mailCmd);
-        strcat(mail_str, " -s \" ** psadwatchd: Restarting ");
-        strcat(mail_str, pid_name);
-        strcat(mail_str, " on ");
-        strcat(mail_str, hostname);
-        strcat(mail_str, "\" ");
-        strcat(mail_str, mail_addrs);
-        strcat(mail_str, mail_redr);
+        strlcat(mail_str, mailCmd, MAX_MSG_LEN);
+        strlcat(mail_str, " -s \" ** psadwatchd: Restarting ", MAX_MSG_LEN);
+        strlcat(mail_str, pid_name, MAX_MSG_LEN);
+        strlcat(mail_str, " on ", MAX_MSG_LEN);
+        strlcat(mail_str, hostname, MAX_MSG_LEN);
+        strlcat(mail_str, "\" ", MAX_MSG_LEN);
+        strlcat(mail_str, mail_addrs, MAX_MSG_LEN);
+        strlcat(mail_str, mail_redr, MAX_MSG_LEN);
 
 #ifdef DEBUG
     printf("sending mail:  %s\n", mail_str);
@@ -226,7 +235,7 @@ static void check_process(
 
     /* read the first line of the pid_file, which will contain the
      * process id of any running pid_name process. */
-    if (fgets(pid_line, MAX_PID_SIZE+1, pidfile_ptr) == NULL) {
+    if (fgets(pid_line, MAX_PID_SIZE, pidfile_ptr) == NULL) {
 #ifdef DEBUG
     printf(" .. Could not read the pid_file: %s\n", pid_file);
 #endif
@@ -243,14 +252,14 @@ static void check_process(
 #ifdef DEBUG
         printf(" .. Executing system(%s)\n", binary_path);
 #endif
-        strcat(mail_str, mailCmd);
-        strcat(mail_str, " -s \" ** psadwatchd: Restarting ");
-        strcat(mail_str, pid_name);
-        strcat(mail_str, " on ");
-        strcat(mail_str, hostname);
-        strcat(mail_str, "\" ");
-        strcat(mail_str, mail_addrs);
-        strcat(mail_str, mail_redr);
+        strlcat(mail_str, mailCmd, MAX_MSG_LEN);
+        strlcat(mail_str, " -s \" ** psadwatchd: Restarting ", MAX_MSG_LEN);
+        strlcat(mail_str, pid_name, MAX_MSG_LEN);
+        strlcat(mail_str, " on ", MAX_MSG_LEN);
+        strlcat(mail_str, hostname, MAX_MSG_LEN);
+        strlcat(mail_str, "\" ", MAX_MSG_LEN);
+        strlcat(mail_str, mail_addrs, MAX_MSG_LEN);
+        strlcat(mail_str, mail_redr, MAX_MSG_LEN);
 
 #ifdef DEBUG
     printf("sending mail:  %s\n", mail_str);
@@ -316,18 +325,18 @@ static void reset_syscall_ctr(const char *pid_name)
 
 static void give_up(const char *pid_name)
 {
-    char mail_str[MAX_MSG_LEN+1] = "";
+    char mail_str[MAX_MSG_LEN] = "";
 #ifdef DEBUG
     printf(" ** Could not restart %s process.  Exiting.\n", pid_name);
 #endif
-    strcat(mail_str, mailCmd);
-    strcat(mail_str, " -s \"** psadwatchd: Could not restart ");
-    strcat(mail_str, pid_name);
-    strcat(mail_str, " on ");
-    strcat(mail_str, hostname);
-    strcat(mail_str, ".  Exiting.\" ");
-    strcat(mail_str, mail_addrs);
-    strcat(mail_str, mail_redr);
+    strlcat(mail_str, mailCmd, MAX_MSG_LEN);
+    strlcat(mail_str, " -s \"** psadwatchd: Could not restart ", MAX_MSG_LEN);
+    strlcat(mail_str, pid_name, MAX_MSG_LEN);
+    strlcat(mail_str, " on ", MAX_MSG_LEN);
+    strlcat(mail_str, hostname, MAX_MSG_LEN);
+    strlcat(mail_str, ".  Exiting.\" ", MAX_MSG_LEN);
+    strlcat(mail_str, mail_addrs, MAX_MSG_LEN);
+    strlcat(mail_str, mail_redr, MAX_MSG_LEN);
 
     /* Send the email */
     system(mail_str);
@@ -351,8 +360,8 @@ static void parse_config(
     FILE *config_ptr;         /* FILE pointer to the config file */
     int linectr = 0;
     char config_buf[MAX_LINE_BUF];
-    char char_psadwatchd_check_interval[MAX_NUM_LEN+1];
-    char char_psadwatchd_max_retries[MAX_NUM_LEN+1];
+    char char_psadwatchd_check_interval[MAX_NUM_LEN];
+    char char_psadwatchd_max_retries[MAX_NUM_LEN];
     char *index;
 
     if ((config_ptr = fopen(config_file, "r")) == NULL) {

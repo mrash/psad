@@ -42,8 +42,8 @@
 short int email_ctr = 0;
 const char mail_redr[] = " < /dev/null > /dev/null 2>&1";
 const char hostname[] = HOSTNAME;
-char mail_addrs[MAX_GEN_LEN+1];
-char mailCmd[MAX_GEN_LEN+1];
+char mail_addrs[MAX_GEN_LEN];
+char mailCmd[MAX_GEN_LEN];
 
 /* PROTOTYPES ***************************************************************/
 static void parse_config(
@@ -65,11 +65,11 @@ int check_ip_dir(char *file);
 
 /* MAIN *********************************************************************/
 int main(int argc, char *argv[]) {
-    char config_file[MAX_PATH_LEN+1];
-    char psad_dir[MAX_PATH_LEN+1];
-    char fwdata_file[MAX_PATH_LEN+1];
-    char archive_dir[MAX_PATH_LEN+1];
-    char diskmond_pid_file[MAX_PATH_LEN+1];
+    char config_file[MAX_PATH_LEN];
+    char psad_dir[MAX_PATH_LEN];
+    char fwdata_file[MAX_PATH_LEN];
+    char archive_dir[MAX_PATH_LEN];
+    char diskmond_pid_file[MAX_PATH_LEN];
     float current_prct = 0;
     unsigned short int max_disk_percentage = 95; /* default to 95% utilization */
     unsigned int diskmond_check_interval   = 5;  /* default to 5 seconds */
@@ -86,10 +86,10 @@ int main(int argc, char *argv[]) {
     /* handle command line arguments */
     if (argc == 1) {  /* nothing but the program name was
                          specified on the command line */
-        strcpy(config_file, CONFIG_FILE);
+        strlcpy(config_file, CONFIG_FILE, MAX_PATH_LEN);
     } else if (argc == 2) {  /* the path to the config file was
                                 supplied on the command line */
-        strcpy(config_file, argv[1]);
+        strlcpy(config_file, argv[1], MAX_PATH_LEN);
     } else {
         printf(" .. You may only specify the path to a single config file:  ");
         printf("Usage:  diskmond <configfile>\n");
@@ -193,9 +193,9 @@ static void parse_config(
     FILE *config_ptr;         /* FILE pointer to the config file */
     int linectr = 0;
     char config_buf[MAX_LINE_BUF];
-    char char_max_disk_percentage[MAX_NUM_LEN+1];
-    char char_diskmond_check_interval[MAX_NUM_LEN+1];
-    char char_diskmond_max_retries[MAX_NUM_LEN+1];
+    char char_max_disk_percentage[MAX_NUM_LEN];
+    char char_diskmond_check_interval[MAX_NUM_LEN];
+    char char_diskmond_max_retries[MAX_NUM_LEN];
     char *index;
 
     if ((config_ptr = fopen(config_file, "r")) == NULL) {
@@ -240,8 +240,8 @@ static void parse_config(
 }
 
 void rm_data(char *fwdata_file, char *psad_dir, char *archive_dir) {
-    char path_tmp[MAX_PATH_LEN+1];
-    int fd;  /* file descriptor */
+    char path_tmp[MAX_PATH_LEN];
+    int fd;
 
     /* remove the ip/scanlog files in psad_dir and archive_dir
      * since they take up the most space */
@@ -261,8 +261,8 @@ void rm_data(char *fwdata_file, char *psad_dir, char *archive_dir) {
     if ((fd = open(fwdata_file, O_TRUNC)) >= 0)
         close(fd);
 
-    strcpy(path_tmp, archive_dir);
-    strcat(path_tmp, "/fwdata_archive");
+    strlcpy(path_tmp, archive_dir, MAX_PATH_LEN);
+    strlcat(path_tmp, "/fwdata_archive", MAX_PATH_LEN);
 
     if ((fd = open(path_tmp, O_TRUNC)) >= 0)
         close(fd);
@@ -273,7 +273,7 @@ void rm_data(char *fwdata_file, char *psad_dir, char *archive_dir) {
 void rm_scanlog(char *dir) {
     DIR *dir_ptr;
     struct dirent *direntp;
-    char path_tmp[MAX_PATH_LEN+1];
+    char path_tmp[MAX_PATH_LEN];
     int fd;
 
     if ((dir_ptr = opendir(dir)) == NULL) {
@@ -289,8 +289,8 @@ void rm_scanlog(char *dir) {
         }
         while ((direntp = readdir(dir_ptr)) != NULL) {
             if (check_ip_dir(direntp->d_name)) {
-                strcpy(path_tmp, direntp->d_name);
-                strcat(path_tmp, "/scanlog");
+                strlcpy(path_tmp, direntp->d_name, MAX_PATH_LEN);
+                strlcat(path_tmp, "/scanlog", MAX_PATH_LEN);
                 /* zero out the file */
                 if ((fd = open(path_tmp, O_TRUNC)) >= 0)
                     close(fd);

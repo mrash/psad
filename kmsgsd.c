@@ -49,14 +49,14 @@ static void parse_config(
 
 /* MAIN *********************************************************************/
 int main(int argc, char *argv[]) {
-    char psadfifo_file[MAX_PATH_LEN+1];
-    char fwdata_file[MAX_PATH_LEN+1];
-    char config_file[MAX_PATH_LEN+1];
-    char fw_msg_search[MAX_PATH_LEN+1];
-    char snort_sid_str[MAX_PATH_LEN+1];
-    char kmsgsd_pid_file[MAX_PATH_LEN+1];
+    char psadfifo_file[MAX_PATH_LEN];
+    char fwdata_file[MAX_PATH_LEN];
+    char config_file[MAX_PATH_LEN];
+    char fw_msg_search[MAX_PATH_LEN];
+    char snort_sid_str[MAX_PATH_LEN];
+    char kmsgsd_pid_file[MAX_PATH_LEN];
     int fifo_fd, fwdata_fd;  /* file descriptors */
-    char buf[MAX_LINE_BUF+1];
+    char buf[MAX_LINE_BUF];
     int numbytes;
 #ifdef DEBUG
     int fwlinectr = 0;
@@ -71,10 +71,10 @@ int main(int argc, char *argv[]) {
     /* handle command line arguments */
     if (argc == 1) {
         /* nothing but the program name was specified on the command line */
-        strcpy(config_file, CONFIG_FILE);
+        strlcpy(config_file, CONFIG_FILE, MAX_PATH_LEN);
     } else if (argc == 2) {
         /* the path to the config file was supplied on the command line */
-        strcpy(config_file, argv[1]);
+        strlcpy(config_file, argv[1], MAX_PATH_LEN);
     } else {
         printf(" .. You may only specify the path to a single config file:  ");
         printf("Usage:  kmsgsd <configfile>\n");

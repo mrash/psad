@@ -485,7 +485,7 @@ unless ($no_whois) {
 ### if psad is running on a syslog server, don't check the firewall
 ### rules since they may not be local.
 unless ($no_fwcheck or $syslog_server or $benchmark) {
-    my $opts = "-c $config_file --fw-file $fw_search_file";
+    my $opts = "-c $config_file --fw-search $fw_search_file";
     $opts .= " --fw-analyze" if $fw_analyze;
     $opts .= " --fw-file $fw_file" if $fw_file;
     system "$cmds{'fwcheck_psad'} $opts";

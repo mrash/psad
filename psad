@@ -1083,46 +1083,46 @@ sub chk_local_port() {
 sub check_port_range() {
     my ($sig_id, $srcport, $dstport, $proto) = @_;
     ### check dst port first
-    if (defined $sigs{$proto}{$sig_id}{'dstport'}{'uniq_or_any'}) {
-        unless ($sigs{$proto}{$sig_id}{'dstport'}{'uniq_or_any'} eq 'any') {
-            if ($dstport != $sigs{$proto}{$sig_id}{'dstport'}{'uniq_or_any'}) {
+    if (defined $sigs{$proto}{$sig_id}{'dp'}{'uniq_or_any'}) {
+        unless ($sigs{$proto}{$sig_id}{'dp'}{'uniq_or_any'} eq 'any') {
+            if ($dstport != $sigs{$proto}{$sig_id}{'dp'}{'uniq_or_any'}) {
                 return 0;
             }
         }
     }
-    if (defined $sigs{$proto}{$sig_id}{'dstport'}{'start'}) {
-        my $start = $sigs{$proto}{$sig_id}{'dstport'}{'start'};
-        my $end = $sigs{$proto}{$sig_id}{'dstport'}{'end'};
+    if (defined $sigs{$proto}{$sig_id}{'dp'}{'start'}) {
+        my $start = $sigs{$proto}{$sig_id}{'dp'}{'start'};
+        my $end = $sigs{$proto}{$sig_id}{'dp'}{'end'};
         return 0 if ($dstport < $start || $dstport > $end);
     }
-    if (defined $sigs{$proto}{$sig_id}{'dstport'}{'not'}) {
-        return 0 if ($dstport == $sigs{$proto}{$sig_id}{'dstport'}{'not'});
+    if (defined $sigs{$proto}{$sig_id}{'dp'}{'not'}) {
+        return 0 if ($dstport == $sigs{$proto}{$sig_id}{'dp'}{'not'});
     }
-    if (defined $sigs{$proto}{$sig_id}{'dstport'}{'negstart'}) {
-        my $start = $sigs{$proto}{$sig_id}{'dstport'}{'negstart'};
-        my $end = $sigs{$proto}{$sig_id}{'dstport'}{'negend'};
+    if (defined $sigs{$proto}{$sig_id}{'dp'}{'negstart'}) {
+        my $start = $sigs{$proto}{$sig_id}{'dp'}{'negstart'};
+        my $end = $sigs{$proto}{$sig_id}{'dp'}{'negend'};
         return 0 if ($dstport > $start || $dstport < $end);
     }
 
     ### check src port
-    if (defined $sigs{$proto}{$sig_id}{'srcport'}{'uniq_or_any'}) {
-        unless ($sigs{$proto}{$sig_id}{'srcport'}{'uniq_or_any'} eq 'any') {
-            if ($dstport != $sigs{$proto}{$sig_id}{'srcport'}{'uniq_or_any'}) {
+    if (defined $sigs{$proto}{$sig_id}{'sp'}{'uniq_or_any'}) {
+        unless ($sigs{$proto}{$sig_id}{'sp'}{'uniq_or_any'} eq 'any') {
+            if ($dstport != $sigs{$proto}{$sig_id}{'sp'}{'uniq_or_any'}) {
                 return 0;
             }
         }
     }
-    if (defined $sigs{$proto}{$sig_id}{'srcport'}{'start'}) {
-        my $start = $sigs{$proto}{$sig_id}{'srcport'}{'start'};
-        my $end = $sigs{$proto}{$sig_id}{'srcport'}{'end'};
+    if (defined $sigs{$proto}{$sig_id}{'sp'}{'start'}) {
+        my $start = $sigs{$proto}{$sig_id}{'sp'}{'start'};
+        my $end = $sigs{$proto}{$sig_id}{'sp'}{'end'};
         return 0 if ($srcport < $start || $srcport > $end);
     }
-    if (defined $sigs{$proto}{$sig_id}{'srcport'}{'not'}) {
-        return 0 if ($srcport == $sigs{$proto}{$sig_id}{'srcport'}{'not'});
+    if (defined $sigs{$proto}{$sig_id}{'sp'}{'not'}) {
+        return 0 if ($srcport == $sigs{$proto}{$sig_id}{'sp'}{'not'});
     }
-    if (defined $sigs{$proto}{$sig_id}{'srcport'}{'negstart'}) {
-        my $start = $sigs{$proto}{$sig_id}{'srcport'}{'negstart'};
-        my $end   = $sigs{$proto}{$sig_id}{'srcport'}{'negend'};
+    if (defined $sigs{$proto}{$sig_id}{'sp'}{'negstart'}) {
+        my $start = $sigs{$proto}{$sig_id}{'sp'}{'negstart'};
+        my $end   = $sigs{$proto}{$sig_id}{'sp'}{'negend'};
         return 0 if ($srcport > $start || $srcport < $end);
     }
     return 1;   ### if we made it to here, then we matched both
@@ -1374,19 +1374,19 @@ sub build_tcp_udp_sigs() {
             my ($start, $end) = split /:/, $src_port;
             $start = 1 unless $start;
             $end = 65535 unless $end;
-            $sigs{$proto}{$sig_id}{'srcport'}{'start'} = $start;
-            $sigs{$proto}{$sig_id}{'srcport'}{'end'}   = $end;
+            $sigs{$proto}{$sig_id}{'sp'}{'start'} = $start;
+            $sigs{$proto}{$sig_id}{'sp'}{'end'}   = $end;
         } elsif ($src_port =~ /!/ && $src_port !~ /:/) {
             $src_port =~ s/!//;
-            $sigs{$proto}{$sig_id}{'srcport'}{'not'} = $src_port;
+            $sigs{$proto}{$sig_id}{'sp'}{'not'} = $src_port;
         } elsif ($src_port =~ /:/ && $src_port =~ /!/) {
             my ($start, $end) = split /:/, $src_port;
             $start = 1 unless $start;
             $end = 65535 unless $end;
-            $sigs{$proto}{$sig_id}{'srcport'}{'negstart'} = $start;
-            $sigs{$proto}{$sig_id}{'srcport'}{'negend'}   = $end;
+            $sigs{$proto}{$sig_id}{'sp'}{'negstart'} = $start;
+            $sigs{$proto}{$sig_id}{'sp'}{'negend'}   = $end;
         } else {
-            $sigs{$proto}{$sig_id}{'srcport'}{'uniq_or_any'}
+            $sigs{$proto}{$sig_id}{'sp'}{'uniq_or_any'}
                 = $src_port;
         }
 
@@ -1395,19 +1395,19 @@ sub build_tcp_udp_sigs() {
             my ($start, $end) = split /:/, $dst_port;
             $start = 1 unless $start;
             $end = 65535 unless $end;
-            $sigs{$proto}{$sig_id}{'dstport'}{'start'} = $start;
-            $sigs{$proto}{$sig_id}{'dstport'}{'end'}   = $end;
+            $sigs{$proto}{$sig_id}{'dp'}{'start'} = $start;
+            $sigs{$proto}{$sig_id}{'dp'}{'end'}   = $end;
         } elsif ($dst_port =~ /!/ && $dst_port !~ /:/) {
             $dst_port =~ s/!//;
-            $sigs{$proto}{$sig_id}{'dstport'}{'not'} = $dst_port;
+            $sigs{$proto}{$sig_id}{'dp'}{'not'} = $dst_port;
         } elsif ($dst_port =~ /:/ && $dst_port =~ /!/) {
             my ($start, $end) = split /:/, $dst_port;
             $start = 1 unless $start;
             $end = 65535 unless $end;
-            $sigs{$proto}{$sig_id}{'dstport'}{'negstart'} = $start;
-            $sigs{$proto}{$sig_id}{'dstport'}{'negend'}   = $end;
+            $sigs{$proto}{$sig_id}{'dp'}{'negstart'} = $start;
+            $sigs{$proto}{$sig_id}{'dp'}{'negend'}   = $end;
         } else {
-            $sigs{$proto}{$sig_id}{'dstport'}{'uniq_or_any'}
+            $sigs{$proto}{$sig_id}{'dp'}{'uniq_or_any'}
                 = $dst_port;
         }
     } else {

@@ -104,7 +104,7 @@ my %required_perl_modules = (
         'force-lib-install' => 1,
     },
     'IPTables::ChainMgr' => {
-        'version' => '0.1',
+        'version' => '0.2',
         'force-lib-install' => 1,
     },
     'Psad' => {

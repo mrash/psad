@@ -62,8 +62,6 @@
 #     actually resolve to something in the IANA spec.
 #   - Packet grapher mode with annotated scan alerts.
 #   - Mysql database support?
-#   - Get rid of the psad_signatures file in favor of just parsing the
-#     snort rules files directly.
 #   - Make use of other logging options available in iptables to detect
 #     more tcp signatures.  (E.g. --log-tcp-options, --log-ip-options,
 #     --log-tcp-sequence, etc.) for better signature recognition.
@@ -132,8 +130,8 @@
 #   curr_sig  - Current signature.
 #   abs_sp    - Absolute starting port.
 #   abs_ep    - Absolute ending port.
-#   sp        - Starting port.
-#   ep        - Ending port.
+#   strtp     - Starting port.
+#   endp      - Ending port.
 #
 # Sample iptables log messages:
 #
@@ -191,7 +189,7 @@
 use lib '/usr/lib/psad';
 use Psad;
 use IPTables::Parse;
-use Net::IPv4Addr 'ipv4_in_network';
+use Net::IPv4Addr qw(ipv4_network ipv4_in_network);
 use File::Copy;
 use File::Path;
 use Date::Calc qw(Timezone This_Year Decode_Month);
@@ -981,11 +979,11 @@ sub check_scan() {
 
         unless ($proto eq 'icmp') {
             ### initialize the start and end port for the scanned port range
-            if (not defined $current_scan{$src}{$dst}{$proto}{'sp'}) {
+            if (not defined $current_scan{$src}{$dst}{$proto}{'strtp'}) {
                 ### make sure the initial start port is not too low
-                $current_scan{$src}{$dst}{$proto}{'sp'} = 65535;
+                $current_scan{$src}{$dst}{$proto}{'strtp'} = 65535;
                 ### make sure the initial end port is not too high
-                $current_scan{$src}{$dst}{$proto}{'ep'} = 0;
+                $current_scan{$src}{$dst}{$proto}{'endp'} = 0;
             }
             if (not defined $scan{$src}{$dst}{$proto}{'abs_sp'}) {
                 ### This is the absolute starting port since the
@@ -998,11 +996,11 @@ sub check_scan() {
 
             ### see if the destination port lies outside our current range
             ### and change if needed
-            ($current_scan{$src}{$dst}{$proto}{'sp'},
-                    $current_scan{$src}{$dst}{$proto}{'ep'}) =
+            ($current_scan{$src}{$dst}{$proto}{'strtp'},
+                    $current_scan{$src}{$dst}{$proto}{'endp'}) =
                 &check_range($dp,
-                    $current_scan{$src}{$dst}{$proto}{'sp'},
-                    $current_scan{$src}{$dst}{$proto}{'ep'});
+                    $current_scan{$src}{$dst}{$proto}{'strtp'},
+                    $current_scan{$src}{$dst}{$proto}{'endp'});
             ($scan{$src}{$dst}{$proto}{'abs_sp'},
                     $scan{$src}{$dst}{$proto}{'abs_ep'}) =
                 &check_range($dp,
@@ -1234,37 +1232,6 @@ sub dshield_email_log() {
         ### clear the dshield data array so we don't re-send
         ### any old data.
         @dshield_data = ();
-    }
-    return;
-}
-
-sub chk_local_port() {
-    my ($src, $dst, $proto, $dp, $flags, $sid) = @_;
-    ### check to see if the scan destination ip is directed
-    ### at the firewall.  If yes, then check to see if a
-    ### server is listening on the DSTPORT by parsing
-    ### netstat output.  If not, psad would have to connect
-    ### to the destination port on the remote machine, but
-    ### of course it should not do this so it is not
-    ### implemented. :)
-    if (defined $local_ips{$dst}) {
-        if (defined $local_ports{$proto}{$dp}) {
-            $scan{$src}{$dst}{$proto}{'curr_sig'}
-            {$sid}{'listen'}{$dp}{'pkts'}++;
-            if ($flags) {
-                $scan{$src}{$dst}{$proto}{'curr_sig'}
-                {$sid}{'listen'}{$dp}{'flags'}
-                    = $flags;
-            }
-        } else {
-            $scan{$src}{$dst}{$proto}{'curr_sig'}
-            {$sid}{'no_listen'}{$dp}{'pkts'}++;
-            if ($flags) {
-                $scan{$src}{$dst}{$proto}{'curr_sig'}
-                {$sid}{'no_listen'}{$dp}{'flags'}
-                    = $flags;
-            }
-        }
     }
     return;
 }
@@ -1586,7 +1553,7 @@ sub validate_home_net() {
         }
         unless ($found) {
             &Psad::psyslog('psad', " .. HOME_NET definition in psad.conf " .
-                "contains $home_net which does not appear to be directed " .
+                "contains $home_net which does not appear to be directly " .
                 "connected to the local system.");
         }
     }
@@ -2204,12 +2171,12 @@ sub scan_logr() {
                     $tcp_absrange = "$tcp_s_port-$tcp_e_port";
                 }
             }
-            if (defined $current_scan_href->{$src}->{$dst}->{'tcp'}->{'sp'}) {
+            if (defined $current_scan_href->{$src}->{$dst}->{'tcp'}->{'strtp'}) {
                 $tcp_f = 1;
                 my $tcp_s_port
-                    = $current_scan_href->{$src}->{$dst}->{'tcp'}->{'sp'};
+                    = $current_scan_href->{$src}->{$dst}->{'tcp'}->{'strtp'};
                 my $tcp_e_port
-                    = $current_scan_href->{$src}->{$dst}->{'tcp'}->{'ep'};
+                    = $current_scan_href->{$src}->{$dst}->{'tcp'}->{'endp'};
                 if ($tcp_s_port == $tcp_e_port) {
                     $tcp_newrange = $tcp_s_port;
                 } else {
@@ -2229,12 +2196,12 @@ sub scan_logr() {
                     $udp_absrange = "$udp_s_port-$udp_e_port";
                 }
             }
-            if (defined $current_scan_href->{$src}->{$dst}->{'udp'}->{'sp'}) {
+            if (defined $current_scan_href->{$src}->{$dst}->{'udp'}->{'strtp'}) {
                 $udp_f = 1;
                 my $udp_s_port
-                    = $current_scan_href->{$src}->{$dst}->{'udp'}->{'sp'};
+                    = $current_scan_href->{$src}->{$dst}->{'udp'}->{'strtp'};
                 my $udp_e_port
-                    = $current_scan_href->{$src}->{$dst}->{'udp'}->{'ep'};
+                    = $current_scan_href->{$src}->{$dst}->{'udp'}->{'endp'};
                 if ($udp_s_port == $udp_e_port) {
                     $udp_newrange = $udp_s_port;
                 } else {

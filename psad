@@ -523,8 +523,8 @@ if ($config_file eq '/etc/psad/psad.conf') {
 $SIG{'__WARN__'} = \&Psad::warn_handler;
 $SIG{'__DIE__'}  = \&Psad::die_handler;
 $SIG{'CHLD'}     = \&REAPER;
-$SIG{'USR1'}     = \&usr1_sig;
-$SIG{'HUP'}      = \&hup_sig;
+$SIG{'USR1'}     = \&usr1_handler;
+$SIG{'HUP'}      = \&hup_handler;
 
 ### zero out the packet counter file (the counters
 ### are all zero at this point anyway).
@@ -581,27 +581,23 @@ for (;;) {
 
     ### Get any new packets have been written to
     ### FW_DATA_FILE by kmsgsd for psad analysis.
-    my @new_packets;
+    my @fw_packets;
     if ($benchmark) {
         $b_time = time();
         print localtime() . " .. Creating packet array.\n";
         my $dp = 1000;
         for (my $i=0; $i <= $b_packets; $i++) {
             ### avert "." operator
-            push @new_packets, "$test_pkt DPT=$dp $test_pktend";
+            push @fw_packets, "$test_pkt DPT=$dp $test_pktend";
             $dp++ if $dp < 50000;
         }
     } else {
-        @new_packets = <FWDATA>;
+        @fw_packets = <FWDATA>;
     }
-    if (@new_packets) {
+    if (@fw_packets) {
         print localtime() . " .. check_scan()\n" if $benchmark;
 
-        my $found_potential_scan = &check_scan(
-            \@new_packets,
-            $config{'PSAD_SIGS_FILE'},
-        );
-        if ($found_potential_scan) {
+        if (&check_scan(\@fw_packets)) {
             print localtime() . " .. assign_danger_level()\n"
                 if $benchmark;
             ### Assign a danger level to the scan
@@ -631,7 +627,7 @@ for (;;) {
     ### Print the number of new packets we saw in FW_DATA_FILE if we are
     ### running in debug mode
     if ($debug) {
-        print "MAIN: number of new packets: $#new_packets\n";
+        print "MAIN: number of new packets: $#fw_packets\n";
     }
 
     if ($benchmark) {
@@ -657,7 +653,7 @@ exit 0;
 ### Keeps track of scanning ip's, increments packet counters,
 ### keep track of tcp flags for each scan (iptables only)
 sub check_scan() {
-    my ($fw_pkts_aref, $signatures) = @_;
+    my $fw_pkts_aref = shift;
     my @bad_packets;
     my $flags;
     my $src;
@@ -883,7 +879,7 @@ sub check_scan() {
 
         ### might try to match signatures against ipchains messages
         ### also, but then cannot use tcp flags except for -y -l rules
-        next PKT unless ($signatures && $use_iptables);
+        next PKT unless $use_iptables;
 
         if ($snort_sids && $sid) {
             ### found a snort sid in the packet log message
@@ -2920,7 +2916,7 @@ sub status_ip() {
     exit $rv;
 }
 
-sub usr1() {
+sub usr1_handler() {
     my $rv = 0;
     my $psad_pidfile = $pidfiles{'psad'};
     if (-e $psad_pidfile) {
@@ -2989,7 +2985,7 @@ sub hup() {
     return $rv;
 }
 
-sub hup_sig() {
+sub hup_handler() {
     $hup_flag = 1;
     return;
 }

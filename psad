@@ -216,7 +216,7 @@ my $daemon;
 my @args_cp = @ARGV;
 
 ### make Getopts case sensitive
-Getopt::Long::configure("no_ignore_case");
+Getopt::Long::Configure("no_ignore_case");
 
 &usage_and_exit(1) unless (GetOptions (
     'signatures=s'   => \$sigs_file,      # Path to psad signatures file.

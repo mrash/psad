@@ -89,6 +89,7 @@ use Socket;
 use Sys::Hostname "hostname";
 use Unix::Syslog qw(:subs :macros);
 use POSIX;
+use IO::Handle;
 use strict;
 
 #==================== config ======================= ## do not remove this line (used by install.pl to preserve configs) ##
@@ -96,6 +97,7 @@ use strict;
 my $PSAD_DIR                  = "/var/log/psad";
 my $PSAD_LOGFILE              = "${PSAD_DIR}/scanlog";
 my $FW_DATA                   = "${PSAD_DIR}/fwdata";
+my $FW_DATA_ARCHIVE           = "${PSAD_DIR}/fwdata_archive";
 my $ERROR_LOG                 = "${PSAD_DIR}/fwerrorlog";
 my $EMAIL_ALERTFILE           = "${PSAD_DIR}/email_alert";
 my $PRINT_SCAN_HASH           = "${PSAD_DIR}/scan_hash";
@@ -131,12 +133,11 @@ my $ipchainsCmd   = "/sbin/ipchains";
 my $iptablesCmd   = "/sbin/iptables";
 my $mknodCmd      = "/bin/mknod";
 my $psCmd         = "/bin/ps";
-my $wcCmd         = "/usr/bin/wc";
-my $tailCmd       = "/usr/bin/tail";
 my $mailCmd       = "/bin/mail";
 my $ifconfigCmd   = "/sbin/ifconfig";
 my $grepCmd       = "/bin/grep";
-my $sysloginitCmd = "/etc/rc.d/init.d/syslog";
+my $syslogdCmd    = "/sbin/syslogd";
+my $killallCmd    = "/usr/bin/killall";
 my $netstatCmd    = "/bin/netstat";
 my $unameCmd      = "/bin/uname";
 my $whoisCmd      = "/usr/bin/whois.psad";
@@ -172,9 +173,18 @@ my $AUTO_BLOCKED_FILE = "/etc/psad/psad_auto_blocked_ips";
 ### main psad data structure; contains ips, port ranges, tcp flags, and danger levels
 my %Scan;
 
+### %Sigs holds all scan signatures (only initialized if "-s <sig file>"
+### is specified on the command line).
+my %Sigs;
+
+### %Auto_ips holds all ip addresses that should automatically
+### be assigned a danger level (or ignored).  (Only initialized
+### if the "-a <auto ips file>" is specified on the command line).
+my %Auto_ips;
+
 ### initialize and scope some default variables (command line args can override some default values)
 my ($found_new_packets, $daemon, $output, $errors, $dnslookups, $whoislookups,
-    $signatures, $auto_ips, $netstat_lookup, $fwcheck, $Syslog_server, $kill,
+    $sigs_file, $auto_ips_file, $netstat_lookup, $fwcheck, $Syslog_server, $kill,
     $restart, $status, $usr1, $print_version, $help, $config) = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0);
 
 ### save a copy of the command line arguments
@@ -184,7 +194,7 @@ Getopt::Long::Configure("no_ignore_case");  # make Getopts case sensitive
 
 &usage_and_exit(1) unless (GetOptions (
     'help'           => \$help,           # display help
-    'auto_ips=s'     => \$auto_ips,       # enable automatic ip danger level assignment
+    'auto_ips=s'     => \$auto_ips_file,  # enable automatic ip danger level assignment
     'output'         => \$output,         # write scanlog messages to STDOUT
     'Daemon'         => \$daemon,         # do not run as a daemon
     'debug'          => \$DEBUG,          # run in debug mode
@@ -192,7 +202,7 @@ Getopt::Long::Configure("no_ignore_case");  # make Getopts case sensitive
     'firewallcheck'  => \$fwcheck,        # do not check firewall rules
     'config=s'       => \$config,         # specify configuration file
     'reversedns'     => \$dnslookups,     # do not issue dns lookups against scanning ip address
-    'signatures=s'   => \$signatures,     # scan signatures
+    'signatures=s'   => \$sigs_file,      # scan signatures
     'localport'      => \$netstat_lookup, # do not check to see if the firewall is listening on localport that has been scanned
     'errors'         => \$errors,         # do not write malformed packet messages to error log
     'Logging_server' => \$Syslog_server,  # we are running psad on a syslog logging server
@@ -225,23 +235,22 @@ if ($usr1) {
 
 ### Define our %Cmds hash, which will be used throughout psad.
 my %Cmds = (
-    "ipchains"      => $ipchainsCmd,
-    "iptables"      => $iptablesCmd,
-    "mknod"         => $mknodCmd,
-    "wc"            => $wcCmd,
-    "ps"            => $psCmd,
-    "tail"          => $tailCmd,
-    "mail"          => $mailCmd,
-    "ifconfig"      => $ifconfigCmd,
-    "grep"          => $grepCmd,
-    "syslog_init"   => $sysloginitCmd,
-    "netstat"       => $netstatCmd,
-    "uname"         => $unameCmd,
-    "whois"         => $whoisCmd,
-    "psadwatchd"    => $psadwatchdCmd,
-    "kmsgsd"        => $kmsgsdCmd,
-    "diskmond"      => $diskmondCmd,
-    "psad"          => $psadCmd
+    "ipchains"   => $ipchainsCmd,
+    "iptables"   => $iptablesCmd,
+    "mknod"      => $mknodCmd,
+    "ps"         => $psCmd,
+    "mail"       => $mailCmd,
+    "ifconfig"   => $ifconfigCmd,
+    "grep"       => $grepCmd,
+    "syslogd"    => $syslogdCmd,
+    "killall"    => $killallCmd,
+    "netstat"    => $netstatCmd,
+    "uname"      => $unameCmd,
+    "whois"      => $whoisCmd,
+    "psadwatchd" => $psadwatchdCmd,
+    "kmsgsd"     => $kmsgsdCmd,
+    "diskmond"   => $diskmondCmd,
+    "psad"       => $psadCmd
 );
 
 ### check to make sure the commands specified in the config section 
@@ -330,13 +339,9 @@ if ($config) {
     close CONF;
 }
 
-my $Sigs_href = &import_signatures($signatures) if $signatures;
-my $Auto_ips_href;
-if ($auto_ips) {  ### support automatic ip danger level increases/decreases.
-    $Auto_ips_href = &import_auto_ips($auto_ips);
-} else {
-    $Auto_ips_href = 0;
-}
+### import the scan signatures and auto ips file
+&import_signatures($sigs_file, \%Sigs) if $sigs_file;
+&import_auto_ips($auto_ips_file, \%Auto_ips) if $auto_ips_file;
 
 ### Check to see if psad automatically blocked some ips from
 ### a previous run.  This feature is most useful for preserving
@@ -345,72 +350,59 @@ if ($ENABLE_AUTO_IDS eq "Y") {
     &check_auto_blocked(\%Cmds);
 }
 
+### archive old firewall data
+&archive_fwdata();
+
 ### Install signal handlers for debugging %Scan with Data::Dumper,
 ### and for reaping zombie whois processes
-#$SIG{'SEGV'} = \&print_scan_and_exit;
-$SIG{'__WARN__'} = \&Psad::warn_handler;
-$SIG{'__DIE__'} = \&Psad::die_handler;
-$SIG{'CHLD'} = \&REAPER;
-$SIG{'USR1'} = \&print_scan;
+#$SIG{'__WARN__'} = \&Psad::warn_handler;
+#$SIG{'__DIE__'}  = \&Psad::die_handler;
+$SIG{'CHLD'}     = \&REAPER;
+$SIG{'USR1'}     = \&print_scan;
 
-### initialize fwdata_start_lines
-my $fwdata_start_lines = (split /\s+/, `$Cmds{'wc'} -l $FW_DATA`)[1];
+### Get an open filehandle for the main firewall data file $FW_DATA.
+### All firewall drop/deny/reject log messages are written to $FW_DATA
+### by kmsgsd.
+open FWDATA, $FW_DATA;
 
-#=================================== main loop ======================================
+### Get the mtimes of the signatures and auto ips files.
+my $sigs_mtime     = stat($sigs_file)->mtime if $sigs_file;
+my $auto_ips_mtime = stat($auto_ips_file)->mtime if $auto_ips_file;
+#================== #### main loop #### ======================
 for (;;) {
-    my $auto_ips_mtime_start = stat($auto_ips)->mtime if $auto_ips;
-    my $sigs_mtime_start = stat($signatures)->mtime if $signatures;
-    sleep $CHECK_INTERVAL;
-    my $fwdata_end_lines = (split /\s+/, `$Cmds{'wc'} -l $FW_DATA`)[1];
-    ### scan $signatures for any signature updates
-    if ($signatures) {
-        my $sigs_mtime_end = stat($signatures)->mtime;
-        ### the signatures were updated... import the new signatures.
-        if ($sigs_mtime_start != $sigs_mtime_end) {
-            $Sigs_href = &import_signatures($signatures);
-            for my $email_address (@EMAIL_ADDRESSES) {
-                system "$Cmds{'mail'} $email_address -s \"psad: re-read $signatures file on $HOSTNAME\" < /dev/null > /dev/null 2>&1";
-            }
-        }
+    if ($sigs_file) {
+        &check_import(\$sigs_mtime, $sigs_file, \%Scan, 1);
     }
-    ### scan $auto_ips for any ips that should automatically have a certain danger threshold set.
-    if ($auto_ips) {
-        my $auto_ips_mtime_end = stat($auto_ips)->mtime;
-        if ($auto_ips_mtime_start != $auto_ips_mtime_end) {  ### auto_ips file was updated... import ip/danger level pairs.
-            $Auto_ips_href = &import_auto_ips($auto_ips);
-            ### need to set $Scan_href->{$src}->{$dst}->{'AUTO'} = "N" since $Auto_ips_href was updated.
-            &reset_auto_tags(\%Scan);
-            for my $email_address (@EMAIL_ADDRESSES) {
-                system "$Cmds{'mail'} $email_address -s \"psad: re-read $auto_ips file on $HOSTNAME\" < /dev/null > /dev/null 2>&1";
-            }
-        }
+    if ($auto_ips_file) {
+        &check_import(\$auto_ips_mtime, $auto_ips_file, \%Scan, 0);
     }
-    ### New packets have been written to $FW_DATA by kmsgsd for psad analysis.
-    if ($fwdata_end_lines - $fwdata_start_lines > 0) {
-        my $grabnum = $fwdata_end_lines - $fwdata_start_lines;
-        my @process_lines = `$Cmds{'tail'} -$grabnum $FW_DATA`;
-        $found_new_packets = &check_scan(\%Scan, \@process_lines, $Sigs_href, $signatures,
-                                                 $netstat_lookup, $local_ips_href, $errors, \%Cmds);
-        if ($found_new_packets) {
+
+    ### Get any new packets have been written to $FW_DATA by kmsgsd for psad analysis.
+    my @new_packets = <FWDATA>;
+
+    if (@new_packets) {
+        my $found_potential_scan = &check_scan(\%Scan, \@new_packets, \%Sigs, $sigs_file,
+                                            $netstat_lookup, $local_ips_href, $errors, \%Cmds);
+        if ($found_potential_scan) {
             ### Assign a danger level to the scan.
-            &assign_danger_level(\%Scan, $Auto_ips_href, \%DANGER_LEVELS);
+            &assign_danger_level(\%Scan, \%Auto_ips);
             ### Log and send an email alert about the scan.
-            &scan_logr(\%Scan, $output, $dnslookups, $whoislookups, \@EMAIL_ADDRESSES, \%Cmds);
+            &scan_logr(\%Scan, $output, $dnslookups, $whoislookups, \%Cmds);
             ### Don't manage the firewall rules if psad is running on a syslog server.
             if ($ENABLE_AUTO_IDS eq "Y" && ! $Syslog_server) {
-                &auto_psad_response(\%Scan, \%Cmds, \@EMAIL_ADDRESSES);
+                &auto_psad_response(\%Scan, \%Cmds);
             }
         }
     }
     if ($DEBUG) {
-        print "MAIN: number of lines in $FW_DATA: $fwdata_end_lines\n";
+        print "MAIN: number of new packets: $#new_packets\n";
     }
-    ### reset fwdata_start_lines to where we just left off so that we don't miss any packets
-    $fwdata_start_lines = $fwdata_end_lines;
+    sleep $CHECK_INTERVAL;
+    FWDATA->clearerr();
 }
 exit 0;
+#================== #### end main #### ======================
 
-#==================================== end main =========================================
 ### Keeps track of scanning ip's, increments packet counters,
 ### keep track of tcp flags for each scan (iptables only)
 sub check_scan() {
@@ -622,7 +614,7 @@ sub check_scan() {
                     $Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_SIGMATCH'}->{$alert_string}++;
                     $Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_SIGMATCH'}->{'PACKETS'}++;
                 }
-            } 
+            }
         }
     }
     &collect_errors(\@bad_packets) unless $errors;
@@ -718,19 +710,38 @@ sub check_misc_fields() {
     }
     return 1;
 }
+sub check_import() {
+    my ($mtime_ref, $file, $Scan_href, $sigs) = @_;
+    my $mtime_tmp = stat($file)->mtime;
+    if ($mtime_tmp != $$mtime_ref) {  ### the file was modified, so import
+        if ($sigs) {  ### import signatures
+            &import_signatures($file);
+        } else {
+            &import_auto_ips($file);
+            ### need to set $Scan_href->{$src}->{$dst}->{'AUTO'} = "N" foreach
+            ### src and dst since $Auto_ips_href was updated.
+            &reset_auto_tags($Scan_href);
+        }
+        for my $email_address (@EMAIL_ADDRESSES) {
+            system "$Cmds{'mail'} $email_address -s \"psad: re-read $sigs_file" .
+                            " file on $HOSTNAME\" < /dev/null > /dev/null 2>&1";
+        }
+        $$mtime_ref = $mtime_tmp;
+    }
+    return;
+}
 sub import_signatures() {
-    my $sigfile = shift;
-    my %Sigs;
+    my ($sigfile, $Sigs_href) = @_;
     open SIGS, "< $sigfile" or die "Could not open the signatures file $sigfile: $!";
     my @sigs = <SIGS>;
     close SIGS;
     for my $sig (@sigs) {
         chomp $sig;
         next if ($sig =~ /^#/);
-        &get_signature_fields(\%Sigs, $sig);
+        &get_signature_fields($Sigs_href, $sig);
     }
     print STDOUT Dumper %Sigs if $DEBUG;
-    return \%Sigs;
+    return;
 }
 sub get_signature_fields() {
     my ($Sigs_href, $sig) = @_;
@@ -825,18 +836,17 @@ sub get_signature_ports() {
     return;
 }
 sub import_auto_ips() {
-    my $auto_ips_file = shift;
-    my %Auto_ips;
+    my ($auto_ips_file, $Auto_ips_href) = @_;
     open AUTO, "< $auto_ips_file";
     my @lines = <AUTO>;
     close AUTO;
     for my $l (@lines) {
         next if ($l =~ /^#/);
         if ($l =~ /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+([0-5]|\-1)/) {
-            $Auto_ips{$1} = $2;
+            $Auto_ips_href->{$1} = $2;
         }
     }
-    return \%Auto_ips;
+    return;
 }
 sub reset_auto_tags() {
     my $Scan_href = shift;
@@ -854,7 +864,7 @@ sub check_range() {
     return $start, $end;
 }
 sub assign_danger_level() {
-    my ($Scan_href, $Auto_ips_href, $danger_levels_href) = @_;
+    my ($Scan_href, $Auto_ips_href) = @_;
     &automatic_ip_danger_assignment($Scan_href, $Auto_ips_href) if ($Auto_ips_href);
     for my $src (keys %$Scan_href) {
         print "assign_danger_level(): source ip: $src\n" if $DEBUG;
@@ -905,28 +915,28 @@ sub assign_danger_level() {
             }
             ### if $PORT_RANGE_SCAN_THRESHOLD is >= 1, then psad will not assign a
             ### danger level to repeated packets to the same port
-            if ($absnum < $danger_levels_href->{'1'}) {
+            if ($absnum < $DANGER_LEVELS{'1'}) {
                 ### we don't have enough packets to even reach danger level 1 yet.
                 next DST;
-            } elsif ($absnum < $danger_levels_href->{'2'} && $range >= $PORT_RANGE_SCAN_THRESHOLD) {
+            } elsif ($absnum < $DANGER_LEVELS{'2'} && $range >= $PORT_RANGE_SCAN_THRESHOLD) {
                 if ($Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} < 1
                         && $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} != -1) {
                     $Scan_href->{$src}->{$dst}->{'ALERTED'} = "N";
                     $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} = 1;
                 }
-            } elsif ($absnum < $danger_levels_href->{'3'} && $range >= $PORT_RANGE_SCAN_THRESHOLD) {
+            } elsif ($absnum < $DANGER_LEVELS{'3'} && $range >= $PORT_RANGE_SCAN_THRESHOLD) {
                 if ($Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} < 2
                         && $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} != -1) {
                     $Scan_href->{$src}->{$dst}->{'ALERTED'} = "N";
                     $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} = 2;
                 }
-            } elsif ($absnum < $danger_levels_href->{'4'} && $range >= $PORT_RANGE_SCAN_THRESHOLD) {
+            } elsif ($absnum < $DANGER_LEVELS{'4'} && $range >= $PORT_RANGE_SCAN_THRESHOLD) {
                 if ($Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} < 3
                         && $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} != -1) {
                     $Scan_href->{$src}->{$dst}->{'ALERTED'} = "N";
                     $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} = 3;
                 }
-            } elsif ($absnum < $danger_levels_href->{'5'} && $range >= $PORT_RANGE_SCAN_THRESHOLD) {
+            } elsif ($absnum < $DANGER_LEVELS{'5'} && $range >= $PORT_RANGE_SCAN_THRESHOLD) {
                 if ($Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} < 4
                         && $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} != -1) {
                     $Scan_href->{$src}->{$dst}->{'ALERTED'} = "N";
@@ -974,8 +984,7 @@ sub collect_errors() {
     close ERRORS;
 }
 sub scan_logr() {
-    my ($Scan_href, $output, $dnslookups,
-                    $whoislookups, $email_addresses_aref, $Cmds_href) = @_;
+    my ($Scan_href, $output, $dnslookups, $whoislookups, $Cmds_href) = @_;
     my $range;
     my ($tcp_newrange, $udp_newrange);
     my $dnsstring = "";
@@ -989,7 +998,7 @@ sub scan_logr() {
                 $Scan_href->{$src}->{$dst}->{'EMAIL_LIMIT'} = 0;
             } elsif ($Scan_href->{$src}->{$dst}->{'EMAIL_LIMIT'} > $EMAIL_LIMIT) {
                 unless (defined $Scan_href->{$src}->{$dst}->{'EMAIL_STOPPED'}) {
-                    &email_limit_reached($email_addresses_aref, $src, $dst, $Cmds_href);
+                    &email_limit_reached($src, $dst, $Cmds_href);
                     $Scan_href->{$src}->{$dst}->{'EMAIL_STOPPED'} = 1;
                 }
                 next DST;
@@ -1176,7 +1185,7 @@ sub scan_logr() {
                 &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=-=-=-=-=-=-=\n", \@print_array);
                 if ($Scan_href->{$src}->{$dst}->{'ALERTED'} eq "N"
                                         && $current_danger_level >= $EMAIL_ALERT_DANGER_LEVEL) {
-                    &send_email_alert($Scan_href, $src, $dst, $email_addresses_aref, $Cmds_href);
+                    &send_email_alert($Scan_href, $src, $dst, $Cmds_href);
                 }
                 $Scan_href->{$src}->{$dst}->{'LOGR'} = "N";
                 $Scan_href->{$src}->{$dst}->{'EMAIL_LIMIT'}++;
@@ -1248,14 +1257,14 @@ sub check_auto_blocked() {
     return;
 }
 sub auto_psad_response(){
-    my ($Scan_href, $Cmds_href, $email_addresses_aref) = @_;
+    my ($Scan_href, $Cmds_href) = @_;
     SOURCE: for my $src (keys %$Scan_href) {
         for my $dst (keys %{$Scan_href->{$src}}) {
             my $current_danger_level = $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'};
             ### We only want to block the IP once.  Currently this will block
             ### all traffic from the host to _all_ destinations that are protected
             ### by the firewall if the ip trips the $auto_psad_level threshold for
-            ### _any_ destination. 
+            ### _any_ destination.
             if ($current_danger_level >= $AUTO_IDS_DANGER_LEVEL && !(defined $Scan_href->{$src}->{$dst}->{'BLOCKED'})) {
                 if ($USE_IPCHAINS) {
                     my $chains_aref = &get_input_chains($Cmds_href->{'ipchains'});
@@ -1265,8 +1274,9 @@ sub auto_psad_response(){
                     for my $dst (keys %{$Scan_href->{$src}}) {
                         $Scan_href->{$src}->{$dst}->{'BLOCKED'} = "Y";
                     }
-                    for my $email_address (@$email_addresses_aref) {
-                        system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $src has been BLOCKED on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
+                    for my $email_address (@EMAIL_ADDRESSES) {
+                        system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $src" .
+                               " has been BLOCKED on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
                     }
                     ### write the $src ip to the $AUTO_BLOCKED_FILE
                     &write_blocked_ip($src);
@@ -1279,8 +1289,9 @@ sub auto_psad_response(){
                     for my $dst (keys %{$Scan_href->{$src}}) {
                         $Scan_href->{$src}->{$dst}->{'BLOCKED'} = "Y";
                     }
-                    for my $email_address (@$email_addresses_aref) {
-                        system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $src has been BLOCKED on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
+                    for my $email_address (@EMAIL_ADDRESSES) {
+                        system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $src" .
+                               " has been BLOCKED on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
                     }
                     ### write the $src ip to the $AUTO_BLOCKED_FILE
                     &write_blocked_ip($src);
@@ -1307,8 +1318,8 @@ sub write_blocked_ip() {
     return;
 }
 sub email_limit_reached() {
-    my ($email_addresses_aref, $src, $dst, $Cmds_href) = @_;
-    for my $email_address (@$email_addresses_aref) {
+    my ($src, $dst, $Cmds_href) = @_;
+    for my $email_address (@EMAIL_ADDRESSES) {
         system "$Cmds_href->{'mail'} $email_address -s \"psad: Email message limit for $src has been reached on $HOSTNAME ($dst)!!!\" < /dev/null > /dev/null 2>&1";
     }
     return;
@@ -1327,8 +1338,8 @@ sub get_input_chains() {
     return \@chains;
 }
 sub send_email_alert() {
-    my ($Scan_href, $src, $dst, $email_addresses_aref, $Cmds_href) = @_;
-    for my $email_address (@$email_addresses_aref) {
+    my ($Scan_href, $src, $dst, $Cmds_href) = @_;
+    for my $email_address (@EMAIL_ADDRESSES) {
         print "send_email_alert(): sending scan alert email to: $email_address\n" if $DEBUG;
         system "$Cmds_href->{'mail'} $email_address -s \"psad WARNING: $HOSTNAME ($dst) has been scanned!\" < $EMAIL_ALERTFILE > /dev/null 2>&1";
     }
@@ -1343,16 +1354,6 @@ sub print_scan() {  ### this should primarily be used for debugging
     chmod 0600, $scanfile;
     print STDOUT "\n ... Printing scan data structures to $scanfile\n\n";
     return;
-}
-sub print_scan_and_exit() {  ### this should primarily be used for debugging
-    my $scanfile = $PRINT_SCAN_HASH . ".$$";
-    open PSCAN, "> $scanfile";
-    print PSCAN Dumper \%Scan;
-    close PSCAN;
-    chmod 0600, $scanfile;
-    print STDOUT "\n ... Printing scan data structures to $scanfile\n\n";
-    system "$PSADCMD --Kill";
-    exit 0;
 }
 sub check_fw() {
     my $line = shift;
@@ -1560,6 +1561,21 @@ sub psad_usr1() {
     }
     return $rv;
 }
+sub archive_fwdata() {
+    unless (-e $FW_DATA) {
+        return;
+    }
+    open FW, "< $FW_DATA" or die "$FW_DATA exists but couldn't open it: $!";
+    my @fwlines = <FW>;
+    close FW;
+    open AR, ">> $FW_DATA_ARCHIVE" or die "Could not open $FW_DATA_ARCHIVE: $!";
+    print AR $_ for @fwlines;
+    close AR;
+    ### zero out $FW_DATA
+    open F, "> $FW_DATA";
+    close F;
+    return;
+}
 sub psad_setup() {
     my ($Cmds_href) = @_;
     unless (-d $PSAD_DIR) {
@@ -1583,9 +1599,9 @@ sub psad_setup() {
     unless (`$Cmds_href->{'grep'} psadfifo /etc/syslog.conf`) {
         copy("/etc/syslog.conf", "/etc/syslog.conf.orig") unless (-e "/etc/syslog.conf.orig");
         open SYSLOG, ">> /etc/syslog.conf" or die "@@@@@  Unable to open /etc/syslog.conf: $!";
-        print SYSLOG "kern.info  |/var/log/psadfifo\n\n";  #reinstate kernel logging to our named pipe
+        print SYSLOG "kern.info		|/var/log/psadfifo\n\n";  #reinstate kernel logging to our named pipe
         close SYSLOG;
-        system("$Cmds_href->{'syslog_init'} restart");
+        system "$Cmds_href->{'killall'} -HUP $Cmds_href->{'syslogd'}";
     }
     return;
 }

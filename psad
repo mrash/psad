@@ -783,7 +783,6 @@ sub check_scan() {
         $year     = This_Year();
     }
     PKT: for my $pkt (@fw_packets) {
-        chomp $pkt;
         my $sid = 0;
         my $dshield_str = '';
         print STDOUT $pkt, "\n" if $debug;
@@ -1950,7 +1949,7 @@ sub collect_errors() {
     open ERR, ">> $config{'FW_ERROR_LOG'}" or die ' ** Could not open ',
         "$config{'FW_ERROR_LOG'}: $!";
     for my $line (@$bad_packets_aref) {
-        print ERR "$line\n";
+        print ERR $line;
     }
     close ERR;
 }

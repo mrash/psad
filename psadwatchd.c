@@ -37,8 +37,6 @@
 /* INCLUDES *****************************************************************/
 #include "psad.h"
 
-#define DEBUG
-
 /* GLOBALS ******************************************************************/
 short int psad_syscalls_ctr     = 0;
 short int kmsgsd_syscalls_ctr   = 0;
@@ -81,7 +79,6 @@ int main(int argc, char *argv[]) {
     char kmsgsd_pid_file[MAX_PATH_LEN+1];
     char diskmondCmd[MAX_PATH_LEN+1];
     char diskmond_pid_file[MAX_PATH_LEN+1];
-//    char mailCmd[MAX_PATH_LEN+1];
     char psadwatchd_pid_file[MAX_PATH_LEN+1];
     unsigned int psadwatchd_check_interval = 5;  /* default to 5 seconds */
     unsigned int psadwatchd_max_retries = 10; /* default to 10 tries */

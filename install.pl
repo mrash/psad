@@ -280,7 +280,7 @@ sub install() {
 
     print "\n\n";
 
-    &logr(" ... Setting hostname to $HOSTNAME in psad.h\n");
+    &logr(" ... Setting hostname to \"$HOSTNAME\" in psad.h\n");
     if (-e 'psad.h') {
         open P, "< psad.h";
         my @lines = <P>;
@@ -295,6 +295,7 @@ sub install() {
                 print PH $line . "\n";
             }
         }
+        close PH;
     } else {
         die " ... @@@  Your source kit appears to be incomplete!  psad.h " .
             "is missing.\n       Download the latest sources from " .

@@ -329,23 +329,23 @@ sub assign_danger_level() {
 		# if $port_range_scan_threshold is >= 1, then psad will not assign a danger level to repeated packets to the same port
 		if (($absnum >= $danger_levels_href->{'1'} && $range >= $port_range_scan_threshold) 
 								|| defined $Scan_href->{$ip}->{'SIGMATCH'}) {
-			$Scan_href->{$ip}->{'ALERTED'} = "N" if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} != 1);
+			$Scan_href->{$ip}->{'ALERTED'} = "N" if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} < 1);
 			$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 1;
 		}
 		if ($absnum >= $danger_levels_href->{'2'} && $range >= $port_range_scan_threshold) {
-			$Scan_href->{$ip}->{'ALERTED'} = "N" if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} != 2);
+			$Scan_href->{$ip}->{'ALERTED'} = "N" if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} < 2);
 			$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 2;
 		}
 		if ($absnum >= $danger_levels_href->{'3'} && $range >= $port_range_scan_threshold) {
-			$Scan_href->{$ip}->{'ALERTED'} = "N" if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} != 3);
+			$Scan_href->{$ip}->{'ALERTED'} = "N" if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} < 3);
 			$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 3;
 		}
 		if ($absnum >= $danger_levels_href->{'4'} && $range >= $port_range_scan_threshold) {
-			$Scan_href->{$ip}->{'ALERTED'} = "N" if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} != 4);
+			$Scan_href->{$ip}->{'ALERTED'} = "N" if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} < 4);
 			$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 4;
 		}
 		if ($absnum >= $danger_levels_href->{'5'} && $range >= $port_range_scan_threshold) {
-			$Scan_href->{$ip}->{'ALERTED'} = "N" if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} != 5);
+			$Scan_href->{$ip}->{'ALERTED'} = "N" if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} < 5);
 			$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 5;
 		}
 	}

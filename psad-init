@@ -89,12 +89,12 @@ start)
 		echo -n "Starting the psad daemon: "
 		daemon /usr/local/bin/psad -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips
 		echo
-                echo -n "Starting the psadwatchd monitoring daemon: "
-                daemon /usr/local/bin/psadwatchd
-                echo
 		echo -n "Starting the disk monitoring daemon: "
 		daemon /usr/local/bin/diskmond
 		echo
+                echo -n "Starting the psadwatchd monitoring daemon: "
+                daemon /usr/local/bin/psadwatchd
+                echo
 	else
 	        echo "Syslog has not been configured to send kern.info messages to"
        		echo "/var/log/psadfifo.  Do you need to run the psad installer?"

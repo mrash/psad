@@ -31,6 +31,7 @@ usage_and_exit(1) unless (GetOptions (
         'firewall_check'	=> \$fwcheck,           # do not check firewall rules
 	'exec_psad'		=> \$execute_psad,
 	'uninstall'		=> \$uninstall,
+	'verbose'		=> \$verbose,
         'help'          	=> \$help,              # display help
 ));
 usage_and_exit(0) if ($help);
@@ -114,6 +115,7 @@ if ($uninstall) {
 	print "=-=-=  Psad has been uninstalled =-=-=\n";
 	exit 0;
 }
+### Start the install code...
 unless (-e "/var/log/psadfifo") {
 	print "=-=-=  Creating named pipe /var/log/psadfifo\n";
 	# create the named pipe
@@ -162,7 +164,7 @@ if ( -e "/usr/local/bin/psad" && (! $nopreserve)) {  # need to grab the old conf
 	perms_ownership("/usr/local/bin/psad", 0500);
 }
 if ( -e "/usr/local/bin/psadwatchd" && (! $nopreserve)) {  # need to grab the old config
-        print "=-=-=  Copying psad -> /usr/local/bin/psadwatchd\n";
+        print "=-=-=  Copying psadwatchd -> /usr/local/bin/psadwatchd\n";
         print "       Preserving old config within /usr/local/bin/psadwatchd\n";
         preserve_config("psadwatchd", "/usr/local/bin/psadwatchd", \%Cmds);
         perms_ownership("/usr/local/bin/psadwatchd", 0500)
@@ -259,19 +261,19 @@ unless($fwcheck) {
 					if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/) {
 						system "/usr/local/bin/kmsgsd";
                                                 system "/usr/local/bin/psad -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips";
-						system "/usr/local/bin/psadwatchd";
 						system "/usr/local/bin/diskmond";
+						system "/usr/local/bin/psadwatchd";
                                         } elsif ($kernel =~ /^2.2/) {
 						system "/usr/local/bin/kmsgsd";
                                                 system "/usr/local/bin/psad -a /etc/psad/psad_auto_ips";
-						system "/usr/local/bin/psadwatchd";
 						system "/usr/local/bin/diskmond";
+						system "/usr/local/bin/psadwatchd";
                                         } else {
                                                 print "=-=-=  You are running kernel $kernel.  Assuming ipchains support.\n";
 						system "/usr/local/bin/kmsgsd";
                                                 system "/usr/local/bin/psad -a /etc/psad/psad_auto_ips";
-						system "/usr/local/bin/psadwatchd";
 						system "/usr/local/bin/diskmond";
+						system "/usr/local/bin/psadwatchd";
                                         }
 				} else {
 					print "=-=-=  Starting the psad daemons...\n";
@@ -474,9 +476,10 @@ sub check_commands() {
 }
 sub preserve_config() {
 	my ($srcfile, $productionfile, $Cmds_href) = @_;
-	open PROD, "< $productionfile" or die "Could not open production file: $!\n";
 	my $start = 0;
-	my @config;
+	my @config = (), @defconfig = ();
+#	$#config = 0; $#defconfig = 0;
+	open PROD, "< $productionfile" or die "Could not open production file: $!\n";
 	GETCONFIG: while(<PROD>) {
 		my $l = $_;
 		chomp $l;
@@ -488,8 +491,51 @@ sub preserve_config() {
 			last GETCONFIG;
 		}
 	}
-	die "Could not get config info from $productionfile!!!\n" if ($#config == -1);
 	close PROD;
+	if ($config[0] !~ /\=\=\=\=\=\s+config\s+\=\=\=\=\=/ || $config[$#config] !~ /\=\=\=\=\=\s+end\s+config\s+\=\=\=\=\=/) {
+		die "Could not get config info from $productionfile!!!  Try running \"install.pl -n\" and\nedit the configuration sections of $productionfile directly.\n"
+	}
+	$start = 0;
+	open DEFCONFIG, "< $srcfile" or die "Could not open source file: $!\n";
+	GETDEFCONFIG: while(<DEFCONFIG>) {
+		my $l = $_;
+		chomp $l;
+               	if ($l =~ /\=\=\=\=\=\s+config\s+\=\=\=\=\=/) {
+                        $start = 1;
+                }
+		push @defconfig, $l if ($start);
+		if ($l =~ /\=\=\=\=\=\s+end\s+config\s+\=\=\=\=\=/) {
+                        last GETDEFCONFIG;
+                }
+	}
+	close DEFCONFIG;
+	# We only want to preserve the variables from the $productionfile.  Any commented lines will be discarded
+	# and replaced with the commented lines from the $srcfile.	
+	#
+	# First get the variables into a hash from the $productionfile
+	my %prodvars;
+	my %srcvars;
+	undef %prodvars;
+	undef %srcvars;
+	foreach my $p (@config) {
+		if ($p =~ /(\S+)\s+=\s+(.*?)\;/) {  # found a variable _assignment_ (does not include "my %var;"
+			my ($varname, $value) = ($1, $2);
+			my $type;
+			($varname, $type) = assign_var_type($varname);
+			$prodvars{$type}{$varname}{'VALUE'} = $value;
+			$prodvars{$type}{$varname}{'LINE'} = $p;
+			$prodvars{$type}{$varname}{'FOUND'} = "N";
+		}
+	}
+        foreach my $defc (@defconfig) {
+                if ($defc =~ /(\S+)\s+=\s+(.*?)\;/) {  # found a variable _assignment_ (does not include "my %var;"
+                        my ($varname, $value) = ($1, $2);
+                        my $type;
+			($varname, $type) = assign_var_type($varname);
+                        $srcvars{$type}{$varname}{'VALUE'} = $value;
+                        $srcvars{$type}{$varname}{'LINE'} = $defc;
+		}
+        }
 	open SRC, "< $srcfile" or die "Could not open source file: $!\n";
 	$start = 0;
 	my $print = 1;
@@ -499,11 +545,51 @@ sub preserve_config() {
 		my $l = $_;
 		chomp $l;
 		$start = 1 if ($l =~ /\=\=\=\=\=\s+config\s+\=\=\=\=\=/);
-		print TMP "$l\n" unless $start;
+		print TMP "$l\n" unless $start;   # print the "======= config =======" line
 		if ($start && $print) {
-			foreach my $c (@config) {
-				print TMP "$c\n";
+			PDEF: foreach my $defc (@defconfig) {
+				if ($defc =~ /(\S+)\s+=\s+(.*?)\;/) {  # found a variable
+					my ($varname, $value) = ($1, $2);
+					my $type;
+					($varname, $type) = assign_var_type($varname);
+					if ($varname eq "EMAIL_ADDRESSES" && defined $prodvars{'STRING'}{'EMAIL_ADDRESS'}{'VALUE'}) {  # old email format in production psad
+						if ($prodvars{'STRING'}{'EMAIL_ADDRESS'}{'VALUE'} =~ /\"(\S+).\@(\S+)\"/) {
+							my $mailbox = $1;
+							my $host = $2;
+							if ($mailbox ne "root" && $host ne "localhost") {
+								$defc =~ s/root/$mailbox/;
+								$defc =~ s/localhost/$host/;
+								print "-----  Removing depreciated email format.  Preserving email address in production installation.\n";
+								$prodvars{'STRING'}{'EMAIL_ADDRESS'}{'FOUND'} = "Y";
+								print TMP "$defc\n";
+								next PDEF;
+							}
+						}
+					}
+					if (defined $prodvars{$type}{$varname}{'VALUE'}) {
+						$defc = $prodvars{$type}{$varname}{'LINE'};
+						$prodvars{$type}{$varname}{'FOUND'} = "Y";
+						if ($verbose) {
+							print "*****  Using configuration value from production installation of psad for $type variable: $varname\n";
+						}
+						print TMP "$defc\n";
+					} else {
+						$prodvars{$type}{$varname}{'FOUND'} = "Y";
+						print "+++++  Adding new configuration $type variable \"$varname\" introduced in this version of psad.\n";
+						print TMP "$defc\n";
+					}
+				} else {
+					print TMP "$defc\n";  # it is some other non-variable-assignment line so print it from the $srcfile
+				}
 			}
+			foreach my $type (keys %prodvars) {
+				foreach my $varname (keys %{$prodvars{$type}}) {
+					next if ($varname =~ /EMAIL_ADDRESS/);
+					unless ($prodvars{$type}{$varname}{'FOUND'} eq "Y") {
+						print "-----  Removing depreciated $type variable: \"$varname\" not needed in this version of psad.\n";
+					}
+				}
+			}	
 			$print = 0;
 		}
 		$start = 0 if ($l =~ /\=\=\=\=\=\s+end\s+config\s+\=\=\=\=\=/);
@@ -512,6 +598,29 @@ sub preserve_config() {
 	close TMP;
 	`$Cmds_href->{'mv'} $prod_tmp $productionfile`;
 	return;
+}
+sub striphashsyntax() {
+	my $varname = shift;
+	$varname =~ s/\{//;
+	$varname =~ s/\}//;
+	$varname =~ s/\'//g;
+	return $varname;
+}
+sub assign_var_type() {
+	my $varname = shift;;
+	my $type;
+	if ($varname =~ /\$/ && $varname =~ /\{/) {
+		$type = "HSH_ELEM";
+		$varname = &striphashsyntax($varname);   # $DANGER_LEVELS{'1'}, etc...
+	} elsif ($varname =~ /\$/) { 
+		$type = "STRING";
+	} elsif ($varname =~ /\@/) {
+		$type = "ARRAY";
+	} elsif ($varname =~ /\%/) {  # this will probably never get used since psad will just scope a hash in the config section with "my"
+		$type = "HASH";
+	}
+	$varname =~ s/^.//;  # get rid of variable type since we have it in $type
+	return $varname, $type;
 }
 sub perms_ownership() {
 	my ($file, $perm_value) = @_;

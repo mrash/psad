@@ -35,7 +35,7 @@
 #    USA
 #
 # TODO:
-#   - More syslog messages from psadwatchd, diskmond, and kmsgsd.
+#   - More syslog messages from psad, psadwatchd, and kmsgsd.
 #   - Put a "psad signature strategy" link in all alert emails.
 #   - Module tests for Psad.pm
 #   - Add command line argument "-dl <n>" to --Status to show only
@@ -182,15 +182,14 @@ use lib '/usr/lib/psad';
 use Psad;
 use IPTables::Parse;
 use Net::IPv4Addr 'ipv4_in_network';
-use File::stat 'stat';
 use File::Copy;
 use File::Path;
 use Date::Calc qw(Timezone This_Year Decode_Month);
-use Getopt::Long 'GetOptions';
 use Socket;
 use POSIX;
 use IO::Handle;
 use Data::Dumper;
+use Getopt::Long 'GetOptions';
 use strict;
 
 ### ========================== main =================================
@@ -350,6 +349,7 @@ my $dump_conf        = 0;
 my $chk_interval     = 0;
 my $log_len          = 23;  ### used in scan_logr()
 my $fw_analyze       = 0;
+my $rm_data_ctr      = 0;
 my $netstat_lkup_ctr = 0;
 my $local_ips_lkup_ctr = 0;
 
@@ -417,8 +417,7 @@ Getopt::Long::Configure('no_ignore_case');
     'log-server'        => \$syslog_server,   # We are running psad on a syslog
                                               # logging server.
     'Kill'              => \$kill,            # Kill all running psad processes.
-                                              # (psadwatchd, psad, kmsgsd,
-                                              # diskmond).
+                                              # (psadwatchd, psad, kmsgsd)
     'Restart'           => \$restart,         # Restart psad with all options of
                                               # the currently running psad process.
     'Flush'             => \$flush_fw,        # Flush any rules that psad previously
@@ -552,22 +551,12 @@ unless ($no_daemon || $debug || $benchmark) {
 ### psad _requires_ that kmsgsd is running to receive any data, so let's
 ### start it here for good measure (as of 0.9.2 it makes use of the pid
 ### files and unique_pid(), so we don't have to worry about starting a
-### duplicate copy).  While we're at it, start psadwatchd and diskmond too.
+### duplicate copy).  While we're at it, start psadwatchd as well.
 ### Note that this is the best place to start the other daemons since we
 ### just wrote the psad pid to PSAD_PID_FILE above.
-if ($config_file eq '/etc/psad/psad.conf') {
-    unless ($benchmark) {
-        system $cmds{'kmsgsd'};
-        system $cmds{'diskmond'};
-        system $cmds{'psadwatchd'} unless $debug;
-    }
-} else {
-    ### start the other daemons with the new (non-default) config file
-    unless ($benchmark) {
-        system "$cmds{'kmsgsd'} $config_file";
-        system "$cmds{'diskmond'} $config_file";
-        system "$cmds{'psadwatchd'} $config_file" unless $debug;
-    }
+unless ($benchmark) {
+    system $cmds{'kmsgsd'};
+    system $cmds{'psadwatchd'} unless $debug;
 }
 
 ### Check to see if psad automatically blocked some ips from
@@ -599,18 +588,27 @@ if ($benchmark) {
     $no_rdns  = 1;  ### turn off network related functions
     $no_whois = 1;
     if ($b_packets) {
-        print scalar localtime(), " .. Executing a $b_packets packet test.\n";
+        print scalar localtime(),
+            " .. Executing a $b_packets packet test.\n";
     } else {
         print scalar localtime(), ' .. The --packets command line ',
             "option was not specified.\n";
-        print scalar localtime(), " .. Defaulting to a 10,000 packet test.\n";
+        print scalar localtime(),
+            " .. Defaulting to a 10,000 packet test.\n";
         $b_packets = 10000;
     }
 }
 
+### stop any old running diskmond process (psad now deals with
+### disk space directly).
+&stop_legacy_diskmond();
+
 if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
     $last_dshield_alert = time() unless $last_dshield_alert;
 }
+
+### Initialize current time for disk space checking.
+my $last_disk_check = time();
 
 ### Get an open filehandle for the main firewall data file FW_DATA_FILE.
 ### All firewall drop/deny/reject log messages are written to FW_DATA_FILE
@@ -626,7 +624,7 @@ for (;;) {
     if ($hup_flag) {
         $hup_flag = 0;  ### clear the HUP flag
 
-        &Psad::psyslog('psad', 'Received HUP signal, ' .
+        &Psad::psyslog('psad', '.. Received HUP signal, ' .
             're-importing psad.conf');
 
         my $orig_fwdata = $config{'FW_DATA_FILE'};
@@ -652,7 +650,7 @@ for (;;) {
     if ($usr1_flag) {
         $usr1_flag = 0;  ### clear the USR1 flag
 
-        &Psad::psyslog('psad', 'Received USR1 signal, printing scan hashes ' .
+        &Psad::psyslog('psad', '.. Received USR1 signal, printing scan hashes ' .
             "to $config{'PSAD_DIR'}/scan_hash.$$");
         &print_scan();
     }
@@ -693,11 +691,12 @@ for (;;) {
                 &auto_psad_response();
             }
         }
-        ### write the number of tcp/udp/icmp packets out
+        ### Write the number of tcp/udp/icmp packets out
         ### to the global packet counters file
         &write_global_packet_counters();
     }
-    ### timeout any auto-blocked ips that are past due (need to
+
+    ### Timeout any auto-blocked ips that are past due (need to
     ### check the timeouts against existing ips in the scan hash
     ### even if new packets are not found).
     if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
@@ -705,9 +704,26 @@ for (;;) {
         &timeout_auto_blocked_ips();
     }
 
-    ### send logs to dshield in dshield format
+    ### Send logs to dshield in dshield format
     if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
         &dshield_email_log();
+    }
+
+    if ((time() - $last_disk_check) > $config{'DISK_CHECK_INTERVAL'}) {
+        ### See how we are doing on disk space, and remove data
+        ### if necessary.
+        if (&disk_space_exceeded()) {
+            close FWDATA;
+
+            ### truncate fwdata file
+            open FWDATA, "> $config{'FW_DATA_FILE'}" or die $!;
+            close FWDATA;
+
+            ### re-open the fwdata file
+            open FWDATA, $config{'FW_DATA_FILE'} or die
+                " ** Could not open $config{'FW_DATA_FILE'}: $!"
+        }
+        $last_disk_check = time();
     }
 
     ### Print the number of new packets we saw in FW_DATA_FILE if we are
@@ -1263,7 +1279,7 @@ sub dshield_email_log() {
             close MAIL;
         }
 
-        &Psad::psyslog('psad', "sent $#dshield_data lines of log data to " .
+        &Psad::psyslog('psad', ".. Sent $#dshield_data lines of log data to " .
             $config{'DSHIELD_ALERT_EMAIL'});
 
         ### store the current time
@@ -3027,9 +3043,11 @@ sub file_permissions() {
 
 sub stop_psad() {
     my $rv = 0;
+
+    &Psad::psyslog('psad', '.. Shutting down psad daemons.');
     ### must kill psadwatchd first since if not, it might try to restart
     ### any of the other three daemons.
-    for my $pidname qw(psadwatchd psad kmsgsd diskmond) {
+    for my $pidname qw(psadwatchd kmsgsd psad) {
         my $pidfile = $pidfiles{$pidname};
         if (-e $pidfile) {
             open PIDFILE, "< $pidfile" or die ' ** Could not open ',
@@ -3083,7 +3101,7 @@ sub status() {
     &status_ip() if $status_ip;
 
     my $rv = 0;   ### assume psad is not running and test...
-    for my $pidname qw(psad psadwatchd kmsgsd diskmond) {
+    for my $pidname qw(psadwatchd kmsgsd psad) {
         my $pidfile = $pidfiles{$pidname};
         if (-e $pidfile) {
             open PIDFILE, "< $pidfile" or die ' ** Could not open ',
@@ -3101,10 +3119,9 @@ sub status() {
                     if ($line =~ /^\S+\s+$pid\s+(\S+)\s+(\S+)/) {
                         print "  %CPU: $1  %MEM: $2\n";
                         print "    Running since: " .
-                            localtime(stat($pidfile)->mtime) . "\n";
-                        next PS unless $pidname eq 'psad';
-                        &status_psad_daemon();  ### print individual ip info
-                        last PS;
+                            localtime((stat($pidfile))[9]) . "\n";
+                        ### print individual ip info
+                        &status_psad_daemon() if $pidname eq 'psad';
                     }
                 }
                 print "\n";
@@ -3419,7 +3436,7 @@ sub usr1_handler() {
 
 sub hup() {
     my $rv = 0;
-    for my $pidname qw(psadwatchd psad kmsgsd diskmond) {
+    for my $pidname qw(psadwatchd psad kmsgsd) {
         my $pidfile = $pidfiles{$pidname};
         open PID, "< $pidfile" or die " ** Could not open $pidfile: $!";
         my $pid = <PID>;
@@ -3567,7 +3584,6 @@ sub setup() {
         'psadwatchd' => $config{'PSADWATCHD_PID_FILE'},
         'psad'       => $config{'PSAD_PID_FILE'},
         'kmsgsd'     => $config{'KMSGSD_PID_FILE'},
-        'diskmond'   => $config{'DISKMOND_PID_FILE'}
     );
 
     unless (-d $config{'PSAD_DIR'}) {
@@ -3876,10 +3892,100 @@ sub ipt_chk_chain() {
     return;
 }
 
+sub disk_space_exceeded() {
+    my @df_data = `$cmds{'df'} $config{'PSAD_DIR'}`;
+    my ($prcnt) = ($df_data[$#df_data] =~ /(\d+)%/);
+    my $rv = 0;
+    if ($config{'DISK_MAX_PERCENTAGE'} > 0 and
+            $prcnt > $config{'DISK_MAX_PERCENTAGE'}) {  ### need to remove data
+        $rv = 1;
+        $rm_data_ctr++;
+        &Psad::psyslog('psad', ".. Disk partition associated with " .
+            "$config{'PSAD_DIR'} exceeded " .
+            "$config{'DISK_MAX_PERCENTAGE'} prct utilization.");
+        &Psad::sendmail(" ** psad: Exceeded max disk utilization for " .
+            "$config{'PSAD_DIR'} on $config{'HOSTNAME'}", '',
+            $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+        &Psad::psyslog('psad', ".. Removing data in $config{'PSAD_DIR'}");
+        if (-e "$config{'SCAN_DATA_ARCHIVE_DIR'}/fwdata_archive") {
+            open F, "> $config{'SCAN_DATA_ARCHIVE_DIR'}/fwdata_archive"
+                or die " ** Could not truncate ",
+                    "$config{'SCAN_DATA_ARCHIVE_DIR'}: $!";
+            close F;
+        }
+        opendir D, $config{'PSAD_DIR'} or
+            die " ** Could not open dir: $config{'PSAD_DIR'}: $!";
+        my @ipdirs = readdir D;
+        closedir D;
+        shift @ipdirs; shift @ipdirs;
+        chdir $config{'PSAD_DIR'} or die $!;
+        for my $ipdir (@ipdirs) {
+            if ($ipdir =~ /$ip_re/ and -d $ipdir) {
+                opendir IP, $ipdir or die $!;
+                my @scanfiles = readdir IP;
+                closedir IP;
+                for my $file (@scanfiles) {
+                    if (-e "${ipdir}/$file" and $file =~ /_signatures/) {
+                        unlink "${ipdir}/$file";
+                    }
+                }
+            }
+        }
+        if ($rm_data_ctr > $config{'DISK_MAX_RM_RETRIES'}) {
+            &Psad::psyslog('psad', "** Could not sufficiently reduce disk " .
+                "utilization in $config{'PSAD_DIR'} partition.  " .
+                "Stopping psad!");
+            &Psad::sendmail(" ** psad: Could not reduce disk utilization on " .
+                $config{'HOSTNAME'}, '', $config{'EMAIL_ADDRESSES'},
+                $cmds{'mail'});
+            &Psad::sendmail(" ** psad: Stopping psad on $config{'HOSTNAME'}!",
+                '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+            for my $pidname qw(psadwatchd kmsgsd) {
+                my $pidfile = $pidfiles{$pidname};
+                open PIDFILE, "< $pidfile" or die ' ** Could not open ',
+                    "$pidfile: $!";
+                my $pid = <PIDFILE>;
+                close PIDFILE;
+                chomp $pid;
+                if (kill 0, $pid) {
+                    unless (kill 15, $pid) {  ### attempt to stop with SIGTERM
+                        kill 9, $pid;
+                    }
+                }
+            }
+            exit 1;
+        }
+    } else {
+        ### the disk check interval was exceeded but the utilization is ok.
+        $rm_data_ctr = 0;
+    }
+    return $rv;
+}
+
+sub stop_legacy_diskmond() {
+    if (-e '/var/run/psad/diskmond.pid') {
+        open PIDFILE, '< /var/run/psad/diskmond.pid' or
+            die " ** Could not open /var/run/psad/diskmond.pid: $!";
+        my $pid = <PIDFILE>;
+        close PIDFILE;
+        chomp $pid;
+        if (kill 0, $pid) {
+            unless (kill 15, $pid) {  ### attempt to stop with SIGTERM
+                kill 9, $pid;
+            }
+        }
+        unlink '/var/run/psad/diskmond.pid';
+    }
+    if (-e '/etc/psad/diskmond.conf') {
+        unlink '/etc/psad/diskmond.conf';
+    }
+    return;
+}
+
 sub dump_conf() {
     print " .. Dumping psad config from: $config_file\n";
     for my $var (sort keys %config) {
-        printf("%-30s %s\n", " .. $var", $config{$var});
+        printf "%-30s %s\n", " .. $var", $config{$var};
     }
     return 0;
 }
@@ -3901,6 +4007,7 @@ sub required_vars() {
         ENABLE_EXT_SCRIPT_EXEC EXEC_EXT_SCRIPT_PER_ALERT
         ENABLE_DSHIELD_ALERTS DSHIELD_ALERT_INTERVAL
         DSHIELD_ALERT_EMAIL DSHIELD_USER_ID DSHIELD_USER_EMAIL
+        DISK_CHECK_INTERVAL DISK_MAX_PERCENTAGE DISK_MAX_RM_RETRIES
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

@@ -224,6 +224,9 @@ my %ipt_prefixes = ();
 ### ignore ports
 my %ignore_ports = ();
 
+### ignore protocols
+my %ignore_protocols = ();
+
 ### data array used for dshield.org logs
 my @dshield_data;
 
@@ -883,6 +886,14 @@ sub check_scan() {
             if ($pkt_ctr % $print_scale_factor == 0) {
                 print "    ", scalar localtime(),
                     " [+] Processed $pkt_ctr packets.\n";
+            }
+        }
+
+        ### see if we need to ignore this packet based on the
+        ### IGNORE_PROTOCOLS config keyword.
+        if (%ignore_protocols) {
+            for my $proto (keys %ignore_protocols) {
+                next PKT if $pkt =~ /\sPROTO=$proto\s/;
             }
         }
 
@@ -2031,6 +2042,9 @@ sub psad_init() {
     ### there is a set of ports that should be ignored
     &parse_ignore_ports() if $config{'IGNORE_PORTS'} ne 'NONE';
 
+    ### there is a set of protocols that should be ignored
+    &parse_ignore_protocols() if $config{'IGNORE_PROTOCOLS'} ne 'NONE';
+
     ### don't continue with init if we are running in firewall
     ### analysis mode or benchmarking mode
     return if $fw_analyze or $benchmark;
@@ -2044,8 +2058,6 @@ sub psad_init() {
 
     ### dump config
     &dump_conf() if $debug;
-
-    &Psad::psyslog('psad', 'starting psad');
 
     return;
 }
@@ -2177,6 +2189,7 @@ sub import_fw_search() {
 }
 
 sub parse_ignore_ports() {
+    %ignore_ports = ();
     my @fields = split /\s*,\s*/, $config{'IGNORE_PORTS'};
     for my $field (@fields) {
         if ($field =~ m/(tcp|udp)\/(\d+)\s*-\s*(\d+)/) {
@@ -2207,6 +2220,23 @@ sub parse_ignore_ports() {
     return;
 }
 
+sub parse_ignore_protocols() {
+    %ignore_protocols = ();
+    my @protos = split /\s*,\s*/, $config{'IGNORE_PROTOCOLS'};
+    for my $proto (@protos) {
+        if ($proto =~ /\W/) {
+            &Psad::psyslog('psad', 'invalid protocol in IGNORE_PROTOCOLS var');
+        } else {
+            if ($proto =~ /^\d+$/) {
+                $ignore_protocols{$proto} = '';
+            } else {
+                $ignore_protocols{uc($proto)} = '';
+            }
+        }
+    }
+    return;
+}
+
 sub import_snort_rules() {
     opendir D, $config{'SNORT_RULES_DIR'}
         or die "[*] Could not open $config{'SNORT_RULES_DIR'}";
@@ -2228,24 +2258,14 @@ sub import_snort_rules() {
             next RULE unless $line =~ /^\s*alert/;
             chomp $line;
             my $msg;
-            my $sid;     ### snort rule id
-#            my $psad_id; ### psad signature id   FIXME: not implemented yet.
+            my $sid;  ### snort rule id
             my $classtype;
             my $content;
-
-            ### can't handle multiple content fields
-            next RULE if ($line =~ /content:.*content:/);
-            next RULE if ($line =~ /content-list:/);
 
             $msg = $1 if $line =~ /msg:\s*\"(.*?)\"\s*;/;
             if ($line =~ /[\s;]sid:\s*(\d+)\s*;/) {
                 $sid = $1;
             }
-            ### Future?  Add psad-specific signatures?  Then what happens when
-            ### the "real" snort sig comes out for the same thing?
-#            } elsif ($line =~ /[\s;]sid:\s*psad_(\d+)\s*;/) {
-#                $psad_id = $1;
-#            }
             $classtype = $1 if $line =~ /[\s;]classtype:\s*(.*?)\s*;/;
             $content = $1 if $line =~ /[\s;]uricontent:\s*\"(.*?)\"\s*;/;
             $content = $1 if $line =~ /[\s;]content:\s*\"(.*?)\"\s*;/;
@@ -2259,7 +2279,7 @@ sub import_snort_rules() {
         }
     }
     print STDERR Dumper %snort_msgs if $debug and $verbose;
-    &Psad::psyslog('psad', 'imported snort-2.1 signatures');
+    &Psad::psyslog('psad', 'imported Snort rules');
     return;
 }
 
@@ -5652,7 +5672,7 @@ sub required_vars() {
         ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL ANALYSIS_MODE_DIR
         IMPORT_OLD_SCANS ICMP_TYPES_FILE SHOW_ALL_SIGNATURES
         IPT_PREFIX_COUNTER_FILE IGNORE_PORTS ENABLE_SCAN_ARCHIVE
-        EMAIL_LIMIT_STATUS_MSG P0F_FILE
+        EMAIL_LIMIT_STATUS_MSG P0F_FILE IGNORE_PROTOCOLS
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

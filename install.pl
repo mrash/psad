@@ -712,7 +712,8 @@ sub get_fw_search_string() {
     my $ans = "";
     while ($ans ne "y" && $ans ne "n") {
         print "     Would you like to add a new string that will be used to analyze\n"
-            . "     firewall log messages (y/[n])? ";
+            . "     firewall log messages?  (Is it usually safe to say \"n\" here).\n"
+            . "     (y/[n])? ";
         $ans = <STDIN>;
         chomp $ans;
     }

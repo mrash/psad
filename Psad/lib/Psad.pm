@@ -96,6 +96,12 @@ sub check_commands() {
     CMD: for my $cmd (keys %$cmds_href) {
         ### syslog is a special case (see SYSLOG_DAEMON var in psad code)
         next if $cmd =~ /syslog/i;
+
+        ### both mail and sendmail are special cases, mail is not required
+        ### if "nomail" is set in REPORT_METHOD, and sendmail is only
+        ### required if DShield alerting is enabled and a DShield user
+        ### email is set.
+        next if $cmd =~ /mail/i;
         unless (-x $cmds_href->{$cmd}) {
             my $found = 0;
             PATH: for my $dir (@path) {

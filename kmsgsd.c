@@ -117,9 +117,9 @@ int main(int argc, char *argv[]) {
      * O_NONBLOCK) and write it to the fwdata file if it is a firewall message
      */
     while ((numbytes = read(fifo_fd, buf, MAX_LINE_BUF)) >= 0) {
-        if ((strstr(buf, "Packet log") != NULL ||
-            (strstr(buf, "MAC") != NULL && strstr(buf, "IN") != NULL)) &&
-            (strstr(buf, fw_msg_search))) {
+        if ((strstr(buf, "Packet log") != NULL
+            || (strstr(buf, "MAC") != NULL && strstr(buf, "IN") != NULL))
+            && (strstr(buf, fw_msg_search) != NULL)) {
 
             if (write(fwdata_fd, buf, numbytes) < 0)
                 exit(EXIT_FAILURE);  /* could not write to the fwdata file */

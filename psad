@@ -35,8 +35,8 @@
 #   - Make use of other logging options available in iptables to detect
 #     more tcp signatures.  (E.g. --log-tcp-options, --log-ip-options,
 #     --log-tcp-sequence, etc.) for better signature recognition.
-#   - Allow ipchains to use udp signatures as well as tcp signatures that
-#     only require a syn packet to a port.
+#   - Allow ipchains to use tcp signatures that only require a syn packet]
+#     to a port as well as udp signatures.
 #   - Deal with the possibility that psad could eat lots of memory over
 #     time if $ENABLE_PERSISTENCE="Y". This should involve periodically
 #     deleting entries in %Scan (or maybe the entire hash), but this 

@@ -32,8 +32,6 @@
 #    USA
 #
 # TODO:
-#   - Build data directories by ip address in /var/log/psad in a manner
-#     similar to snort.
 #   - Make use of other logging options available in iptables to detect
 #     more tcp signatures.  (E.g. --log-tcp-options, --log-ip-options,
 #     --log-tcp-sequence, etc.) for better signature recognition.
@@ -849,7 +847,7 @@ sub check_import_config() {
 sub import_signatures() {
     %Sigs = ();  ### undef %Sigs so don't leave old signatures around
     open SIGS, "< $SIGS_FILE" or die
-            "Could not open the signatures file $SIGS_FILE: $!";
+            " ... @@@ Could not open the signatures file $SIGS_FILE: $!";
     my @sigs = <SIGS>;
     close SIGS;
     for my $sig (@sigs) {

@@ -106,7 +106,6 @@ my $iptablesCmd = "/usr/local/bin/iptables";
 my $wcCmd = "/usr/bin/wc";
 my $tailCmd = "/usr/bin/tail";
 my $mailCmd = "/bin/mail";
-my $touchCmd = "/bin/touch";
 my $ifconfigCmd = "/sbin/ifconfig";
 my $grepCmd = "/bin/grep";
 my $netstatCmd = "/bin/netstat";
@@ -116,6 +115,7 @@ my $whoisCmd = "/usr/local/bin/whois.psad";
 my $psadwatchdCmd = "/usr/local/bin/psadwatchd";
 my $kmsgsdCmd = "/usr/local/bin/kmsgsd";
 my $diskmondCmd = "/usr/local/bin/diskmond";
+my $psadCmd = "/usr/local/bin/psad";
 #================== end config ==================== ## do not remove this line (used by install.pl to preserve configs) ##
 #===================== main =======================
 
@@ -155,6 +155,7 @@ my $netstat_lookup = 0;
 my $fwcheck = 0;
 my $Syslog_server = 0;
 my $kill = 0;
+my $restart = 0;
 my $print_version = 0;
 
 ### save a copy of the command line arguments
@@ -176,7 +177,8 @@ usage_and_exit(1) unless (GetOptions (
         'localport'     => \$netstat_lookup,    # do not check to see if the firewall is listening on localport that has been scanned
         'errors'        => \$errors,            # do not write malformed packet messages to error log
         'Syslog_server' => \$Syslog_server,     # we are running psad on a syslog logging server
-        'kill'          => \$kill,              # kill all running psad processes (psadwatchd, psad, kmsgsd, diskmond)
+        'Kill'          => \$kill,              # kill all running psad processes (psadwatchd, psad, kmsgsd, diskmond)
+	'Restart'	=> \$restart,		# restart psad with all options of the currently running psad process
         'Version'       => \$print_version,     # print the psad version and exit
         'whois'         => \$whoislookups       # do not issue whois lookups against the scanning ip
 ));
@@ -187,19 +189,12 @@ print "psad version $Version, by Michael B. Rash (mbr\@cipherdyne.com)\n" and ex
 ### everthing after this point must be executed as root.
 $< == 0 && $> == 0 or die "\n@@@@@  (psad): You must be root (or equivalent UID 0 account) to execute psad!  Exiting.\n\n";
 
-### the -k command line argument was given
-kill_psad_processes(\@PIDFILES) if $kill;
-
-### check to make sure another psad process is not already running.
-unique_pid($PIDFILES[1]);
-
 my %Cmds = (
         "ipchains"      => $ipchainsCmd,
         "iptables"      => $iptablesCmd,
 	"wc"		=> $wcCmd,
 	"tail"		=> $tailCmd,
 	"mail"		=> $mailCmd,
-	"touch"		=> $touchCmd,
 	"ifconfig"	=> $ifconfigCmd,
 	"grep"		=> $grepCmd,
 	"netstat"	=> $netstatCmd,
@@ -208,11 +203,38 @@ my %Cmds = (
 	"whois"		=> $whoisCmd,
 	"psadwatchd"	=> $psadwatchdCmd,
 	"kmsgsd"	=> $kmsgsdCmd,
-	"diskmond"	=> $diskmondCmd
+	"diskmond"	=> $diskmondCmd,
+	"psad"		=> $psadCmd
 );
 
 ### check to make sure the commands specified in the config section are in the right place, and attempt to correct automatically if not.
 %Cmds = check_commands(\%Cmds);
+
+### the -k command line argument was given
+if ($kill) {
+        kill_psad_processes(\@PIDFILES);
+        exit 0;
+}
+
+### the -r command line argument was given
+if ($restart) {
+	my $cmdline;
+	if (-e $psad_cmdline) {
+        	open CMD, "< $psad_cmdline";
+        	$cmdline = <CMD>;
+        	close CMD;
+        	chomp $cmdline;
+	} else {
+		die "@@@@@  (psad):  No other psad process is currenly running!\n";
+	}
+        kill_psad_processes(\@PIDFILES);
+	print "=-=-=  Restarting the psad daemons.\n";
+        system "$Cmds{'psad'} $cmdline";
+        exit 0;
+}
+
+### check to make sure another psad process is not already running.
+unique_pid($PIDFILES[1]);
 
 ### make sure the permissions on these files is 0600
 check_permissions($PSAD_LOGFILE, $FW_DATA, $ERROR_LOG, $EMAIL_ALERTFILE);
@@ -271,7 +293,10 @@ if ($config) {
 	close CONF;
 }	
 
-`$Cmds{'touch'} $FW_DATA` unless (-e $FW_DATA);
+unless (-e $FW_DATA) {
+	open F, ">> $FW_DATA";
+	close F;
+}
 my $Sigs_href = import_signatures($signatures) if $signatures;
 my $Auto_ips_href;
 if ($auto_ips) {  # support automatic ip danger level increases/decreases.
@@ -1233,7 +1258,7 @@ sub kill_psad_processes() {
 			close PIDFILE;
 			chomp $pid;
 			if (kill 0, $pid) {
-				print "=-=-= Killing $pidname, pid: $pid\n";
+				print "=-=-=  Killing $pidname, pid: $pid\n";
 				kill 15, $pid or print "@@@@@  (psad): Could not kill $pidname, pid: $pid\n";
 			} else {
 				print "@@@@@  (psad): $pidname is not running.\n";
@@ -1242,7 +1267,7 @@ sub kill_psad_processes() {
 			print "@@@@@  (psad): pid file $pidfile does not exist for $pidname\n";
 		}
 	}
-	exit 0;
+	return;
 }
 sub unique_pid() {
 	my $pidfile = shift;
@@ -1265,7 +1290,8 @@ sub usage_and_exit() {
         print <<_HELP_;
 
 Usage: psad [-D] [-d] [-o] [-e] [-S] [-f] [-r] [-w] [-l] [-i <interval>] [-h]
-       [-V] [-k] [-c <config file>] [-s <signature file>] [-a <auto ips file>]
+       [-V] [-K] [-R] [-c <config file>] [-s <signature file>] 
+       [-a <auto ips file>]
 
         -D   --Daemon                   - do not run as a daemon.
         -e   --errors                   - do not write errors to the error
@@ -1291,7 +1317,8 @@ Usage: psad [-D] [-d] [-o] [-e] [-S] [-f] [-r] [-w] [-l] [-i <interval>] [-h]
                                           ip danger level increases/decreses.
         -l   --local_port_lookup        - disable local port lookups for scan
                                           signatures.
-	-k   --kill			- kill all running psad processes.
+	-K   --Kill			- kill all running psad processes.
+	-R   --Restart			- restart all running psad processes.
 	-V   --Version			- print the psad version and exit.
         -h   --help                     - prints this help message.
 

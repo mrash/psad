@@ -481,8 +481,7 @@ if ($benchmark) {
     $test_pktend = 'WINDOW=16384 RES=0x00 SYN URGP=0';
 }
 
-### print the startup message
-&Psad::psyslog('psad', '.. psad started ..');
+### let the user know where email alerts will be sent
 print STDOUT " .. Email alerts will be sent to:\n",
     " ----> $config{'EMAIL_ADDRESSES'}\n";
 
@@ -520,11 +519,6 @@ if ($config_file eq '/etc/psad/psad.conf') {
         system "$cmds{'psadwatchd'} $config_file" unless $debug;
     }
 }
-
-### import the scan signatures and auto ips file
-&import_signatures() unless $no_signatures;
-&import_auto_ips()   unless $no_auto_ips;
-&import_posf_sigs()  unless $no_posf;
 
 ### Check to see if psad automatically blocked some ips from
 ### a previous run.  This feature is most useful for preserving
@@ -716,7 +710,7 @@ sub check_scan() {
     }
     if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
         ### calculate the timezone offset
-        $timezone = sprintf("%.2d", Timezone())[3]) . ':00';
+        $timezone = sprintf("%.2d", (Timezone())[3]) . ':00';
         $year     = This_Year();
     }
     PKT: for my $pkt (@fw_packets) {
@@ -1351,6 +1345,8 @@ sub import_configs() {
     ### the --Restart command line switch was given
     exit &restart() if $restart;
 
+    &Psad::psyslog('psad', '.. starting psad ..');
+
     ### import psad signatures (XXX: these should be taken directly
     ### from the snort signatures instead)
     &import_signatures() unless $no_signatures;
@@ -1436,6 +1432,7 @@ sub import_snort_rules() {
         }
     }
     print Dumper %snort_msgs if $debug;
+    &Psad::psyslog('psad', '.. Imported Snort-2.0 signatures');
     return;
 }
 
@@ -1534,6 +1531,7 @@ sub import_signatures() {
         print STDOUT Dumper " ** signature attributes hash:\n";
         print STDOUT Dumper %sigs_attr;
     }
+    &Psad::psyslog('psad', '.. Imported psad-1.2 signatures');
     return;
 }
 
@@ -1658,6 +1656,7 @@ sub import_auto_ips() {
                 $cmds{'mail'});
         }
     }
+    &Psad::psyslog('psad', '.. Imported psad_auto_ips');
     return;
 }
 
@@ -1737,6 +1736,9 @@ sub import_posf_sigs() {
         }
     }
     print Dumper %posf_sigs if $debug;
+
+    &Psad::psyslog('psad', '.. Imported passive OS ' .
+        'fingerprinting signatures');
     return;
 }
 

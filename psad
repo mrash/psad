@@ -1070,13 +1070,13 @@ sub posf() {
     $posf{$src}{'win'}{$win}++;
     $posf{$src}{'ctr'}++;
     ### Require at least three packets before making an OS guess
-    if ($posf{$src}{'ctr'} == 4) {
+    if ($posf{$src}{'ctr'} >= 3) {
         my $id_incr_rv = &id_incr(\@{$posf{$src}{'id'}});
         my ($min_ttl, $max_ttl) = &ttl_range($posf{$src}{'ttl'});
         ### Windows 2000
         if (defined $posf{$src}{'win'}{'16384'}
-                && (defined $posf{$src}{'tos'}{'0x00'})
-                && (defined $posf{$src}{'len'}{'48'})
+                && defined $posf{$src}{'tos'}{'0x00'}
+                && defined $posf{$src}{'len'}{'48'}
                 && ($min_ttl > (128-$max_hops))
                 && ($max_ttl <= 128)
                 && $id_incr_rv) {
@@ -1084,8 +1084,8 @@ sub posf() {
         }
         ### Linux 2.2
         if (defined $posf{$src}{'win'}{'32120'}
-                && (defined $posf{$src}{'tos'}{'0x10'})
-                && (defined $posf{$src}{'len'}{'60'})
+                && defined $posf{$src}{'tos'}{'0x10'}
+                && defined $posf{$src}{'len'}{'60'}
                 && ($min_ttl > (64-$max_hops))
                 && ($max_ttl <= 64)
                 && ! $id_incr_rv) {  ### assume sessions are not established
@@ -1093,14 +1093,41 @@ sub posf() {
         }
         ### Linux 2.4
         if (defined $posf{$src}{'win'}{'5840'}
-                && (defined $posf{$src}{'tos'}{'0x10'})
-                && (defined $posf{$src}{'len'}{'60'})
+                && defined $posf{$src}{'tos'}{'0x10'}
+                && defined $posf{$src}{'len'}{'60'}
                 && ($min_ttl > (64-$max_hops))
                 && ($max_ttl <= 64)
                 && ! $id_incr_rv) {  ### assume sessions are not established
             $posf{$src}{'guess'} = 'Linux (2.4.x kernel)';
         }
-        return;
+        ### OpenBSD (require six packets to "confirm" randomness)
+        if ($posf{$src}{'ctr'} >= 6
+                && defined $posf{$src}{'win'}{'16384'}
+#                && defined $posf{$src}{'tos'}{'0x10'}
+                && defined $posf{$src}{'len'}{'64'}
+                && ($min_ttl > (64-$max_hops))
+                && ($max_ttl <= 64)
+                && ! $id_incr_rv) {  ### assume sessions are not established
+            $posf{$src}{'guess'} = 'OpenBSD';
+        }
+        ### Solaris 7
+        if (defined $posf{$src}{'win'}{'8760'}
+#                && defined $posf{$src}{'tos'}{'0x10'}
+                && defined $posf{$src}{'len'}{'44'}
+                && ($min_ttl > (255-$max_hops))
+                && ($max_ttl <= 255)
+                && $id_incr_rv) {  ### assume sessions are not established
+            $posf{$src}{'guess'} = 'Solaris 7';
+        }
+        ### AIX 4.3
+        if (defined $posf{$src}{'win'}{'16384'}
+#                && defined $posf{$src}{'tos'}{'0x10'}
+                && defined $posf{$src}{'len'}{'44'}
+                && ($min_ttl > (64-$max_hops))
+                && ($max_ttl <= 64)
+                && $id_incr_rv) {  ### assume sessions are not established
+            $posf{$src}{'guess'} = 'AIX 4.3';
+        }
     }
     return;
 }

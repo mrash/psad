@@ -171,7 +171,7 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 		} elsif ($USE_IPCHAINS) {
 			# could implement source port checking here
 			if ($l =~ /PROTO\=(\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\:(\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\:(\d+)/) {
-				($proto, $srcip, $dstip, $srcport, $dstport) = ($1,$2,$3,$4,$5);
+				($proto, $srcip, $srcport, $dstip, $dstport) = ($1,$2,$3,$4,$5);
 				$flags = "NONE";
 			} else {
 				push @bad_packets, $l;

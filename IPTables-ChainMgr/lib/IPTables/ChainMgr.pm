@@ -73,14 +73,14 @@ sub create_chain() {
 
     if (&modinternal_chain_exists($table, $chain, $iptables)) {
         ### the chain already exists
-        return 1, "$table $chain chain already exists.";
+        return 1, "Table: $table, chain: $chain, already exists.";
     } else {
         ### create the chain
         if (&modinternal_run_ipt_cmd("$iptables -t $table -N $chain") == 0) {
-            return 1, "$table $chain chain created.";
+            return 1, "Table: $table, chain: $chain, created.";
         } else {
             ### could not create the chain
-            return 0, "Could not create $table $chain chain.";
+            return 0, "Table: $table, chain: $chain, could not create.";
         }
     }
 }
@@ -130,15 +130,17 @@ sub delete_chain() {
             ### parse for the "0 references" under the -nL <chain> output).
             if (&modinternal_run_ipt_cmd("$iptables -t $table " .
                     "-X $del_chain") == 0) {
-                return 1, "$table $del_chain chain deleted.";
+                return 1, "Table: $table, chain: $del_chain, deleted.";
             } else {
-                return 0, "Could not delete $table $del_chain chain.";
+                return 0, "Table: $table, chain: $del_chain, " .
+                    "could not delete.";
             }
         } else {
-            return 0, "Could not flush $table $del_chain chain.";
+            return 0, "Table: $table, chain: $del_chain, " .
+                "could not flush.";
         }
     } else {
-        return 0, "$table $del_chain chain does not exist";
+        return 0, "Table: $table, chain: $del_chain, does not exist";
     }
 }
 
@@ -187,17 +189,17 @@ sub add_ip_rule() {
     ### first check to see if this rule already exists
     if (&modinternal_find_ip_rule($normalized_src, $normalized_dst, $table,
             $chain, $target, $iptables)) {
-        return 1, "$table $chain $normalized_src -> " .
+        return 1, "Table: $table, chain: $chain, $normalized_src -> " .
             "$normalized_dst rule already exists.";
     } else {
         ### we need to add the rule
         if (&modinternal_run_ipt_cmd("$iptables -t $table -I $chain $rulenum " .
                 "-s $normalized_src -d $normalized_dst -j $target") == 0) {
-            return 1, "Added $table $chain $normalized_src " .
+            return 1, "Table: $table, chain: $chain, added $normalized_src " .
                 "-> $normalized_dst";
         } else {
-            return 0, "Could not add $target rule for " .
-                "$normalized_src -> $normalized_dst";
+            return 0, "Table: $table, chain: $chain, could not add $target " .
+                "rule for $normalized_src -> $normalized_dst";
         }
     }
 }
@@ -250,13 +252,14 @@ sub delete_ip_rule() {
         ### we need to delete the rule
         if (&modinternal_run_ipt_cmd("$iptables " .
             "-t $table -D $chain $rulenum") == 0) {
-            return 1, "Deleted $table $chain rule #$rulenum";
+            return 1, "Table: $table, chain: $chain, deleted rule #$rulenum";
         } else {
-            return 0, "Could not delete $target rule " .
-                "#$rulenum for $normalized_src -> $normalized_dst.";
+            return 0, "Table: $table, chain: $chain, could not delete " .
+                "$target rule #$rulenum for $normalized_src -> " .
+                "$normalized_dst.";
         }
     } else {
-        return 0, "Rule does not exist in $chain chain.";
+        return 0, "Table: $table, chain: $chain, Rule does not exist.";
     }
 }
 
@@ -318,14 +321,14 @@ sub add_jump_rule() {
     ### first check to see if the jump rule already exists
     if (&modinternal_find_ip_rule('0.0.0.0/0', '0.0.0.0/0', $table,
             $from_chain, $to_chain, $iptables)) {
-        return 1, "$table $to_chain jump rule already exists.";
+        return 1, "Table: $table, chain: $to_chain, jump rule already exists.";
     } else {
         ### we need to add the rule
         if (&modinternal_run_ipt_cmd("$iptables " .
             "-t $table -I $from_chain 1 -j $to_chain") == 0) {
-            return 1, "Added $table $to_chain jump rule.";
+            return 1, "Table: $table, chain: $to_chain, added jump rule.";
         } else {
-            return 0, "Could not add jump rule for $table $to_chain.";
+            return 0, "Table: $table, chain: $to_chain, could not add jump.";
         }
     }
 }

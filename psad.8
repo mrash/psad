@@ -6,7 +6,7 @@
 .B psad
 \- The Port Scan Attack Detector
 .SH SYNOPSIS
-.B psad [-s <signature file>] [-a <auto ips file>] [-c <config file>] [-o] [-L] [-i <interval>] [-h] [-S] [-K] [-R] [-U] [-V] [--no_fwcheck] [--no_daemon] [--no_rdns] [--no_whois] [--no_netstat] [--no_errors]
+.B psad [-s <signature file>] [-a <auto ips file>] [-c <config file>] [-o] [-l] [-i <interval>] [-h] [-B] [-p] [-f][-S] [-K] [-R] [-U] [-V] [--no-fwcheck] [--no-daemon] [--no-rdns] [--no-whois] [--no-netstat] [--no-errors]
 .SH DESCRIPTION
 .B psad
 makes use of ipchains/iptables log messages to detect, alert, and
@@ -38,7 +38,7 @@ consists of four daemons: psad, kmsgsd, psadwatchd, and diskmond.
 .B psad
 is responsible for processing all packets that have been denied by the
 firewall and applying the signature logic in order to determine what type
-of scan has been leveraged against the network.
+of scan has been leveraged against the machine and/or network.
 .B kmsgsd
 reads all messages that have been written to the
 .B /var/lib/psad/psadfifo
@@ -50,9 +50,10 @@ is a software watchdog that will restart any of the other three daemons should
 a daemon die for any reason.
 .B diskmond
 is responsible for keeping track of the disk space utilization on the partition
-that contains the firewall data and scanning ip directories and will remove
-them as necessary if the available space becomes less than a threshold defined
-by the administrator.  The default maximum disk utilization threshold is 95%.
+that contains the firewall data and scanning ip directories.
+.B diskmond
+will remove these directories as necessary if the available space becomes
+less than a threshold defined by the administrator (the default is 95%).
 .SH OPTIONS
 .PP
 .PD 0
@@ -86,7 +87,7 @@ than syn and ack.  Psad also detects several udp and icmp signatures
 that were orginally included within Snort.
 .TP
 
-.BR \-a ", " \-\^\-auto_ips\ \<auto\ ips\ file>
+.BR \-a ", " \-\^\-auto-ips\ \<auto\ ips\ file>
 Occasionally certain ip addresses are repeat offenders and
 should automatically be given a higher danger level than
 would normally be assigned. Additionally, some ip addresses
@@ -132,9 +133,14 @@ a scan of 10,000 packets (see the --packets option) and then report
 the elapsed time.
 .TP
 
-.BR \-R ", " \-\^\-packets
+.BR \-p ", " \-\^\-packets
 Specify the number of packets to use in benchmark mode.  The
 default is 10,000 packets.
+.TP
+
+.BR \-f ", " \-\^\-fw-check
+Analyze the local firewall ruleset, send any alerts if errors are
+discovered, and then exit.
 .TP
 
 .BR \-i ", " \-\^\-interval\ \<seconds>
@@ -168,7 +174,7 @@ Passing the --output option instructs psad to write all alert
 messages to STDOUT.
 .TP
 
-.BR \-L ", " \-\^\-Logging_server
+.BR \-L ", " \-\^\-log-server
 This option should be used if psad is being executed on a syslog
 logging server. Running psad on a logging server requires that
 check_firewall_rules() and auto_psad_response() not be executed
@@ -179,14 +185,14 @@ since the firewall is probably not being run locally.
 Print the psad version and exit.
 .TP
 
-.BR \-\^\-no_daemon
+.BR \-\^\-no-daemon
 Do not run psad as a daemon. This option is most useful
 if used in conjunction with --output so that scan warning messages
 can be viewed on STDOUT instead of being written to
 .B /var/log/psad/scanlog.
 .TP
 
-.BR \-\^\-no_error
+.BR \-\^\-no-error
 Occasionally messages written by syslog to
 .B /var/lib/psad/psadfifo
 or to
@@ -198,13 +204,13 @@ by default. Passing the --no_error option will make psad ignore
 all such erroneous firewall messages.
 .TP
 
-.BR \-\^\-no_whois
+.BR \-\^\-no-whois
 By default psad will issue a whois query against any ip from which
 a scan has originated, but this can be disabled with the --no_whois
 command line argument.
 .TP
 
-.BR \-\^\-no_fwcheck
+.BR \-\^\-no-fwcheck
 psad performs a rudimentary check of the firewall ruleset that
 exists on the machine on which psad is deployed to determine
 whether or not the firewall has a compatible configuration.
@@ -212,13 +218,13 @@ Passing the --no_fwcheck or --Logging_server options will
 disable this check.
 .TP
 
-.BR \-\^\-no_rdns
+.BR \-\^\-no-rdns
 Psad normally attempts to find the name associated with a
 scanning ip address, but this feature can be disabled with
 the --no_rdns command line argument.
 .TP
 
-.BR \-\^\-no_netstat
+.BR \-\^\-no-netstat
 By default for iptables firewalls psad will determine whether
 or not your machine is listening on a port for which a tcp
 signature has been matched. Specifying --no_netstat

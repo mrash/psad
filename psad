@@ -538,8 +538,8 @@ unless ($config{'IMPORT_OLD_SCANS'} eq 'Y' or $benchmark) {
 ### and for reaping zombie whois processes.  Only install signal
 ### handlers if we are not running in benchmark mode
 unless ($benchmark or $fw_analyze) {
-    $SIG{'__WARN__'} = \&Psad::warn_handler;
-    $SIG{'__DIE__'}  = \&Psad::die_handler;
+    $SIG{'__WARN__'} = \&warn_handler;
+    $SIG{'__DIE__'}  = \&die_handler;
     $SIG{'CHLD'}     = \&REAPER;
     $SIG{'USR1'}     = \&usr1_handler;
     $SIG{'HUP'}      = \&hup_handler;
@@ -2542,15 +2542,23 @@ sub scan_logr() {
             my $pkt_ctr_file = "$config{'PSAD_DIR'}/${src}/${dst}_packet_ctr";
 
             ### print the current danger level to the danger_level file.
-            &Psad::logr("$curr_dl\n", {$dl_file => 0});
+            open DL, "> $dl_file" or die " ** Could not open $dl_file: $!";
+            print DL $curr_dl, "\n";
+            close DL;
 
             ### write out the os guess (if there is one).
             if (defined $posf{$src} and defined $posf{$src}{'guess'}) {
-                &Psad::logr("$posf{$src}{'guess'}\n", {$posf_file => 0});
+                open P, "> $posf_file" or
+                    die " ** Could not open $posf_file: $!";
+                print P $posf{$src}{'guess'}, "\n";
+                close P;
             }
 
             ### write out the start time.
-            &Psad::logr("$scan{$src}{$dst}{'s_time'}\n", {$s_time_file => 0});
+            open T, "> $s_time_file" or
+                die " ** Could not open $s_time_file: $!";
+            print T $scan{$src}{$dst}{'s_time'}, "\n";
+            close T;
 
             if (defined $scan{$src}{$dst}{'tcp'}
                     and defined $scan{$src}{$dst}{'tcp'}{'abs_sp'}) {
@@ -2817,8 +2825,10 @@ sub scan_logr() {
                     $scan{$src}{$dst}{'email_ctr'}++;
 
                     ### print the number of email alerts we have sent
-                    &Psad::logr("$scan{$src}{$dst}{'email_ctr'}\n",
-                        {$ecount_file => 0});
+                    open E, "> $ecount_file" or die " ** Could not open ",
+                        "$ecount_file: $!";
+                    print E $scan{$src}{$dst}{'email_ctr'}, "\n";
+                    close E;
 
                     if ($config{'ENABLE_EXT_SCRIPT_EXEC'} eq 'Y') {
                         if ($config{'EXEC_EXT_SCRIPT_PER_ALERT'} eq 'Y') {
@@ -4266,7 +4276,7 @@ sub import_old_scans() {
     close FD;
     if ($import_ctr) {
         &Psad::psyslog('psad',
-            ".. imported $import_ctr scanning IPs from previous run");
+            ".. imported $import_ctr scanning IPs from previous psad run");
     }
     return;
 }
@@ -4343,6 +4353,34 @@ sub hup() {
 
 sub hup_handler() {
     $hup_flag = 1;
+    return;
+}
+
+### write all die messages to a logfile.  This routine and the
+### warn_handler routine seem a bit risky because of potentially
+### non-reentrant code executed from the signal handler, but it
+### seems to work.  If there is a better way to do this (by setting
+### a global flag for example) send me an email.  The main problem
+### is how to get access to the warn/die message so we can write
+### it out to disk.
+sub die_handler() {
+    my $msg = shift;
+    my $caller = $0;
+    $caller =~ s|^.*/||;
+    open D, ">> $config{'PSAD_DIR'}/errs/${caller}.die";
+    print D scalar localtime(), " .. $caller (pid: $$): $msg";
+    close D;
+    croak $!;
+}
+
+### write all warnings to a logfile
+sub warn_handler() {
+    my $msg = shift;
+    my $caller = $0;
+    $caller =~ s|^.*/||;
+    open W, ">> $config{'PSAD_DIR'}/errs/${caller}.warn";
+    print W scalar localtime(), " .. $caller (pid: $$): $msg";
+    close W;
     return;
 }
 

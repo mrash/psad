@@ -1,0 +1,11 @@
+--- linux-2.4.4_orig/net/ipv4/netfilter/ip_conntrack_proto_tcp.c	Sun Oct 28 18:53:52 2001
++++ linux/net/ipv4/netfilter/ip_conntrack_proto_tcp.c	Wed Oct 24 15:27:12 2001
+@@ -55,7 +55,7 @@
+     2 MINS,	/*	TCP_CONNTRACK_FIN_WAIT,	*/
+     2 MINS,	/*	TCP_CONNTRACK_TIME_WAIT,	*/
+     10 SECS,	/*	TCP_CONNTRACK_CLOSE,	*/
+-    60 SECS,	/*	TCP_CONNTRACK_CLOSE_WAIT,	*/
++    2 MINS,	/*	TCP_CONNTRACK_CLOSE_WAIT,	*/
+     30 SECS,	/*	TCP_CONNTRACK_LAST_ACK,	*/
+     2 MINS,	/*	TCP_CONNTRACK_LISTEN,	*/
+ };

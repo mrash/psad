@@ -256,10 +256,6 @@ my %sigs = ();
 ### build such a ruleset from snort signatures.
 my %snort_msgs = ();
 
-### cache signature info that can be check quickly against
-### single hash keys
-my %sigs_fast = ();
-
 ### cache signature messages, danger levels, etc.
 my %sigs_attr = ();
 
@@ -1037,15 +1033,6 @@ sub check_scan() {
             ### found a snort sid in the packet log message
             &add_snort_sid($src, $dst, $chain, $proto, $sid);
         } else {
-            ### attempt to match any tcp/udp/icmp signatures in the
-            ### %sigs_fast hash
-            if ($proto eq 'tcp') {
-                &match_fastsigs_tcp($src, $dst, $chain, $sp, $dp,
-                    $flags, $len, $ttl);
-            } elsif ($proto eq 'udp') {
-                &match_fastsigs_udp($src, $dst, $chain, $sp, $dp,
-                    $len, $ttl);
-            }
 
             ### attempt to match any tcp/udp/icmp signatures in the
             ### main signatures hash
@@ -1076,153 +1063,6 @@ sub check_scan() {
     return;
 }
 
-sub match_fastsigs_tcp() {
-    my ($src, $dst, $chain, $sp, $dp, $flags, $len, $ttl) = @_;
-    print "match_fastsigs() call\n" if $debug;
-    return unless defined $sigs_fast{'tcp'};
-    if (defined $sigs_fast{'tcp'}{$dp}
-            and defined $sigs_fast{'tcp'}{$dp}{$sp}
-            and defined $sigs_fast{'tcp'}{$dp}{$sp}{$flags}) {
-        for my $sid (keys
-                %{$sigs_fast{'tcp'}{$dp}{$sp}{$flags}}) {
-            print "match_fastsigs(): matched: $dp,$sp,$flags, ",
-                "sid: $sid\n" if $debug;
-            unless ($scan_dl{$src} >= $sigs_attr{$sid}{'dlevel'}) {
-                $scan_dl{$src} = $sigs_attr{$sid}{'dlevel'};
-                $scan{$src}{$dst}{'alerted'} = 0
-                    if ($config{'ALERT_ALL'} eq 'N');
-            }
-            $scan{$src}{$dst}{'tcp'}{'curr_sig'}
-                {$sid}{$chain}{'dp'}{$dp}++;
-            $scan{$src}{$dst}{'tcp'}{'curr_sig'}
-                {$sid}{$chain}{'flags'}{$dp} = $flags;
-        }
-    }
-    if (defined $sigs_fast{'tcp'}{$dp}
-            and defined $sigs_fast{'tcp'}{$dp}{'any_sp'}
-            and defined $sigs_fast{'tcp'}{$dp}{'any_sp'}{$flags}) {
-        for my $sid (keys
-                %{$sigs_fast{'tcp'}{$dp}{'any_sp'}{$flags}}) {
-            print "matched $dp,any_sp,$flags, ",
-                "sid: $sid\n" if $debug;
-            unless ($scan_dl{$src} >= $sigs_attr{$sid}{'dlevel'}) {
-                $scan_dl{$src} = $sigs_attr{$sid}{'dlevel'};
-                $scan{$src}{$dst}{'alerted'} = 0
-                    if ($config{'ALERT_ALL'} eq 'N');
-            }
-            $scan{$src}{$dst}{'tcp'}{'curr_sig'}
-                {$sid}{$chain}{'dp'}{$dp}++;
-            $scan{$src}{$dst}{'tcp'}{'curr_sig'}
-                {$sid}{$chain}{'flags'}{$dp} = $flags;
-        }
-    }
-    if (defined $sigs_fast{'tcp'}{'any_dp'}
-            and defined $sigs_fast{'tcp'}{'any_dp'}{$sp}
-            and defined $sigs_fast{'tcp'}{'any_dp'}{$sp}{$flags}) {
-        for my $sid (keys
-                %{$sigs_fast{'tcp'}{'any_dp'}{$sp}{$flags}}) {
-            print "matched any_dp,$sp,$flags, ",
-                "sid: $sid\n" if $debug;
-            unless ($scan_dl{$src} >= $sigs_attr{$sid}{'dlevel'}) {
-                $scan_dl{$src} = $sigs_attr{$sid}{'dlevel'};
-                $scan{$src}{$dst}{'alerted'} = 0
-                    if ($config{'ALERT_ALL'} eq 'N');
-            }
-            $scan{$src}{$dst}{'tcp'}{'curr_sig'}
-                {$sid}{$chain}{'dp'}{$dp}++;
-            $scan{$src}{$dst}{'tcp'}{'curr_sig'}
-                {$sid}{$chain}{'flags'}{$dp} = $flags;
-        }
-    }
-    if (defined $sigs_fast{'tcp'}{'any_dp'}
-            and defined $sigs_fast{'tcp'}{'any_dp'}{'any_sp'}
-            and defined $sigs_fast{'tcp'}{'any_dp'}{'any_sp'}{$flags}) {
-        for my $sid (keys
-                %{$sigs_fast{'tcp'}{'any_dp'}{'any_sp'}{$flags}}) {
-            print "matched any_dp,any_sp,$flags, ",
-                "sid: $sid\n" if $debug;
-            unless ($scan_dl{$src} >= $sigs_attr{$sid}{'dlevel'}) {
-                $scan_dl{$src} = $sigs_attr{$sid}{'dlevel'};
-                $scan{$src}{$dst}{'alerted'} = 0
-                    if ($config{'ALERT_ALL'} eq 'N');
-            }
-            $scan{$src}{$dst}{'tcp'}{'curr_sig'}
-                {$sid}{$chain}{'dp'}{$dp}++;
-            $scan{$src}{$dst}{'tcp'}{'curr_sig'}
-                {$sid}{$chain}{'flags'}{$dp} = $flags;
-        }
-    }
-    return;
-}
-
-sub match_fastsigs_udp() {
-    my ($src, $dst, $chain, $sp, $dp, $len, $ttl) = @_;
-    print "match_fastsigs() call\n" if $debug;
-    return unless defined $sigs_fast{'udp'};
-    if (defined $sigs_fast{'udp'}{$dp}
-            and defined $sigs_fast{'udp'}{$dp}{$sp}) {
-        for my $sid (keys
-                %{$sigs_fast{'udp'}{$dp}{$sp}}) {
-            print "match_fastsigs_udp(): matched: $dp,$sp, ",
-                "sid: $sid\n" if $debug;
-            unless ($scan_dl{$src} >= $sigs_attr{$sid}{'dlevel'}) {
-                $scan_dl{$src} = $sigs_attr{$sid}{'dlevel'};
-                $scan{$src}{$dst}{'alerted'} = 0
-                    if ($config{'ALERT_ALL'} eq 'N');
-            }
-            $scan{$src}{$dst}{'udp'}{'curr_sig'}
-                {$sid}{$chain}{'dp'}{$dp}++;
-        }
-    }
-    if (defined $sigs_fast{'udp'}{$dp}
-            and defined $sigs_fast{'udp'}{$dp}{'any_sp'}) {
-        for my $sid (keys
-                %{$sigs_fast{'udp'}{$dp}{'any_sp'}}) {
-            print "matched $dp,any_sp, ",
-                "sid: $sid\n" if $debug;
-            unless ($scan_dl{$src} >= $sigs_attr{$sid}{'dlevel'}) {
-                $scan_dl{$src} = $sigs_attr{$sid}{'dlevel'};
-                $scan{$src}{$dst}{'alerted'} = 0
-                    if ($config{'ALERT_ALL'} eq 'N');
-            }
-            $scan{$src}{$dst}{'udp'}{'curr_sig'}
-                {$sid}{$chain}{'dp'}{$dp}++;
-        }
-    }
-    if (defined $sigs_fast{'udp'}{'any_dp'}
-            and defined $sigs_fast{'udp'}{'any_dp'}{$sp}
-            and defined $sigs_fast{'udp'}{'any_dp'}{$sp}) {
-        for my $sid (keys
-                %{$sigs_fast{'udp'}{'any_dp'}{$sp}}) {
-            print "matched any_dp,$sp, ",
-                "sid: $sid\n" if $debug;
-            unless ($scan_dl{$src} >= $sigs_attr{$sid}{'dlevel'}) {
-                $scan_dl{$src} = $sigs_attr{$sid}{'dlevel'};
-                $scan{$src}{$dst}{'alerted'} = 0
-                    if ($config{'ALERT_ALL'} eq 'N');
-            }
-            $scan{$src}{$dst}{'udp'}{'curr_sig'}
-                {$sid}{$chain}{'dp'}{$dp}++;
-        }
-    }
-    if (defined $sigs_fast{'udp'}{'any_dp'}
-            and defined $sigs_fast{'udp'}{'any_dp'}{'any_sp'}) {
-        for my $sid (keys
-                %{$sigs_fast{'udp'}{'any_dp'}{'any_sp'}}) {
-            print "matched any_dp,any_sp, ",
-                "sid: $sid\n" if $debug;
-            unless ($scan_dl{$src} >= $sigs_attr{$sid}{'dlevel'}) {
-                $scan_dl{$src} = $sigs_attr{$sid}{'dlevel'};
-                $scan{$src}{$dst}{'alerted'} = 0
-                    if ($config{'ALERT_ALL'} eq 'N');
-            }
-            $scan{$src}{$dst}{'udp'}{'curr_sig'}
-                {$sid}{$chain}{'dp'}{$dp}++;
-        }
-    }
-    return;
-}
-
 sub match_sigs() {
     my ($src, $dst, $chain, $sp, $dp, $proto,
         $flags, $len, $ttl, $type, $code, $id, $seq) = @_;
@@ -1230,12 +1070,13 @@ sub match_sigs() {
     if ($proto eq 'tcp') {
         for my $sid (keys %{$sigs{'tcp'}}) {
             next unless defined $sigs{'tcp'}{$sid}{'flags'};
-            if ($flags eq $sigs{'tcp'}{$sid}{'flags'}
-                    and &check_port($sp, $dp, $sigs{'tcp'}{$sid})) {
+            if (&check_src_dst($chain, $src, $dst, $sigs{'tcp'}{$sid})
+                    and &check_port($sp, $dp, $sigs{'tcp'}{$sid})
+                    and $flags eq $sigs{'tcp'}{$sid}{'flags'}) {
                 ### future
 #               && &check_misc_fields($sid, $proto, $len, $ttl)) {
                 ### tripped a tcp signature
-                print " .. match_sigs(): matched udp $dp,$sp,$flags, ",
+                print " .. match_sigs(): matched tcp $dp,$sp,$flags, ",
                     "sid: $sid\n" if $debug;
                 unless ($scan_dl{$src} >= $sigs_attr{$sid}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sid}{'dlevel'};
@@ -1250,10 +1091,11 @@ sub match_sigs() {
         }
     } elsif ($proto eq 'udp') {
         for my $sid (keys %{$sigs{'udp'}}) {
-            if (&check_port($sp, $dp, $sigs{'udp'}{$sid})) {
+            if (&check_src_dst($chain, $src, $dst, $sigs{'tcp'}{$sid})
+                    and &check_port($sp, $dp, $sigs{'udp'}{$sid})) {
 #               && &check_misc_fields($sid, $proto, $len, $ttl)) {
                 ### tripped a udp signature
-                print " .. match_sigs(): matched udp $dp,$sp,$flags, ",
+                print " .. match_sigs(): matched udp $dp,$sp, ",
                     "sid: $sid\n" if $debug;
                 unless ($scan_dl{$src} >= $sigs_attr{$sid}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sid}{'dlevel'};
@@ -1266,7 +1108,9 @@ sub match_sigs() {
         }
     } elsif ($proto eq 'icmp') {
         for my $sid (keys %{$sigs{'icmp'}}) {
-            if (&check_icmp_sigs($sid, $ttl, $type, $code, $id, $seq)) {
+            if (&check_src_dst($chain, $src, $dst, $sigs{'tcp'}{$sid})
+                    and &check_icmp_sig($sid, $ttl, $type, $code,
+                    $id, $seq)) {
                 print " .. match_sigs(): matched icmp sid: $sid\n"
                     if $debug;
                 unless ($scan_dl{$src} >= $sigs_attr{$sid}{'dlevel'}) {
@@ -1425,6 +1269,30 @@ sub chk_local_port() {
     return;
 }
 
+sub check_src_dst() {
+    my ($chain, $src, $dst, $sig_href) = @_;
+    if ($chain eq 'input') {
+        if ($sig_href->{'dst'} eq 'HOME_NET') {
+            if ($sig_href->{'src'} eq 'EXTERNAL_NET') {
+                return 1;
+            } else {
+            }
+        } else {
+        }
+    } elsif ($chain eq 'forward') {
+    } elsif ($chain eq 'output') {
+        if ($sig_href->{'src'} eq 'HOME_NET') {
+            if ($sig_href->{'dst'} eq 'EXTERNAL_NET') {
+                return 1;
+            } else {
+            }
+        } else {
+        }
+    }
+    ### we should have returned before this point
+    return 0;
+}
+
 sub check_port() {
     my ($sp, $dp, $sig_href) = @_;
 
@@ -1485,7 +1353,7 @@ sub check_port() {
     return 1;
 }
 
-sub check_icmp_sigs() {
+sub check_icmp_sig() {
     my ($sid, $ttl, $type, $code, $icmp_id, $icmp_seq) = @_;
     ### check icmp type first
     if (defined $sigs{'icmp'}{$sid}{'type'}) {
@@ -1814,8 +1682,6 @@ sub import_signatures() {
     if ($debug) {
         print STDOUT " ** main signatures hash:\n";
         print STDOUT Dumper %sigs;
-        print STDOUT " ** fast lookup hash:\n";
-        print STDOUT Dumper %sigs_fast;
         print STDOUT Dumper " ** signature attributes hash:\n";
         print STDOUT Dumper %sigs_attr;
     }
@@ -1988,8 +1854,8 @@ sub check_range() {
     return $start, $end;
 }
 
-### assign a danger level to a scan.  Note that match_fastsigs()
-### and match_sigs() may also assign a danger level.
+### assign a danger level to a scan.  Note that match_sigs()
+### may also assign a danger level.
 sub assign_danger_level() {
     my $current_scan_href = shift;
 

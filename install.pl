@@ -281,11 +281,11 @@ unless (-d $SBIN_DIR) {
     &logr(" ... Creating $SBIN_DIR\n");
     mkdir $SBIN_DIR,0755;
 }
-if (-d 'whois-4.5.21') {
+if (-d 'whois-4.5.29') {
     &logr(" ... Compiling Marco d'Itri's whois client\n");
-    if (! system("$Cmds{'make'} -C whois-4.5.21")) {  # remember unix return value...
+    if (! system("$Cmds{'make'} -C whois-4.5.29")) {  # remember unix return value...
         &logr(" ... Copying whois binary to $WHOIS_PSAD\n");
-        copy("whois-4.5.21/whois", $WHOIS_PSAD);
+        copy("whois-4.5.29/whois", $WHOIS_PSAD);
     }
 }
 &perms_ownership($WHOIS_PSAD, 0755);

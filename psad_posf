@@ -3,54 +3,54 @@ OS        Linux (2.2.x kernel);
 NUMPKTS   3;
 TOS       0x10;
 LEN       60;
-TTL       64
-ID        RAND;
+TTL       64;
+ID        RANDOM;
 WINDOW    32120;
 
 ### Linux 2.4
 OS        Linux (2.4.x kernel);
 NUMPKTS   3;
 TOS       0x10;
-LEN       60
-TTL       64
-ID        RAND;
+LEN       60;
+TTL       64;
+ID        RANDOM;
 WINDOW    5840;
 
 ### Windows 2000
 OS        Windows 2000;
 NUMPKTS   3;
-TOS       0x00
-LEN       48
-TTL       128
-ID        BYONE
-WINDOW    16384
+TOS       0x00;
+LEN       48;
+TTL       128;
+ID        SMALLINCR;
+WINDOW    16384;
 
 ### OpenBSD
-OS        OpenBSD
+OS        OpenBSD;
 NUMPKTS   6;
 #TOS       0x00
-LEN       64
-TTL       64
-ID        RAND
-WINDOW    16384
+LEN       64;
+TTL       64;
+ID        RANDOM;
+WINDOW    16384;
 
 ### Solaris 7
 OS        Solaris 7;
 NUMPKTS   3;
 #TOS       0x00
-LEN       44
-TTL       255
-ID        BYONE
-WINDOW    8760
+LEN       44;
+TTL       255;
+ID        SMALLINCR;
+WINDOW    8760;
 
 ### Solaris 8
 OS        Solaris 8;
 NUMPKTS   3;
-TOS       0x00
-LEN       48
-TTL       64
-ID        BYONE
-WINDOW    33360
+TOS       0x00;
+LEN       48;
+TTL       64;
+ID        SMALLINCR;
+WINDOW    33360;
 
 ### AIX 4.3
 OS       AIX 4.3;
@@ -58,4 +58,4 @@ WINDOW   16384;
 TOS      0x00;
 LEN      48;
 TTL      128;
-ID       BYONE;
+ID       SMALLINCR;

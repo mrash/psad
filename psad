@@ -1468,9 +1468,9 @@ sub import_auto_ips() {
         $i++;
         next if ($line =~ /^\s*#/);
         next unless ($line =~ /\S/);
-        if ($line =~ /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+([0-5])/) {
+        if ($line =~ /^\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+([0-5])/) {
             $auto_ips{'ip'}{$1} = $2;
-        } elsif ($line =~ m|^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d+)
+        } elsif ($line =~ m|^\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d+)
                             \s+([0-5])|x) {
             $auto_ips{'net'}{$1} = $2;
         } else {

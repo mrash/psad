@@ -20,7 +20,10 @@ case "$1" in
 start)
     if grep -q psadfifo /etc/syslog.conf; then
         echo -n "Starting the psad daemons. "
-        /usr/sbin/psad -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips
+        ### psad enables signature matching and auto
+        ### danger level assignment by default, so
+        ### command line args are not necessary here.
+        /usr/sbin/psad
         echo
     else
         echo "Syslog has not been configured to send kern.info messages to"

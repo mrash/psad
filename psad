@@ -313,7 +313,6 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 		} 
 		# hash initialization
 		$Scan{$srcip}{$dstip}{'LOGR'} = "Y";
-		$Scan{$srcip}{$dstip}{'ABSNUM'} = 0 unless (defined $Scan{$srcip}{$dstip});
 		if ($proto eq "TCP") {
 			$Scan{$srcip}{$dstip}{$proto}{'FLAGS'}{$flags} = 0 unless (defined $Scan{$srcip}{$dstip}{$proto}{'FLAGS'}{$flags});
 		}
@@ -339,7 +338,7 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 		$Scan{$srcip}{$dstip}{'END_TIME'} = $time;
 		$Scan{$srcip}{$dstip}{'END_TIME'}{'EPOCH_SECONDS'} = $epoch_seconds if ($enable_persistence eq "N");
 		# increment hash values
-		$Scan{$srcip}{$dstip}{'ABSNUM'}++;
+		$Scan{$srcip}{$dstip}{'ABSNUM'}++;  # if $Scan{$srcip}{$dstip}{'ABSNUM'} is not yet defined, incrementing it here will make it equal to 1 anyway
 		if ($proto eq "TCP") {
 			$Scan{$srcip}{$dstip}{'TCP'}{'FLAGS'}{$flags}++;
 		}

@@ -52,6 +52,8 @@
 #	  docs.)
 #	- Set an alarm for whois lookups since they may hang depending on
 #	  network accessibility of the whois databases.
+#	- (psad-init) make sure the init script will work on different Linux
+#	  distros.
 #
 # Sample packet (rejected by ipchains)
 # Dec 19 11:54:07 orthanc kernel: Packet log: input REJECT lo PROTO=1
@@ -161,12 +163,12 @@ usage_and_exit(1) unless (GetOptions (
         'help'          => \$help,		# display help
 	'auto_ips=s'	=> \$auto_ips,		# enable automatic ip danger level assignment
 	'output'	=> \$output,		# write scanlog messages to STDOUT
-	'daemon'	=> \$daemon,		# do not run as a daemon
+	'noDaemon'	=> \$daemon,		# do not run as a daemon
 	'debug'		=> \$DEBUG, 		# run in debug mode
-	'checkint=s'	=> \$CHECK_INTERVAL,	# set $CHECK_INTERVAL from the command line
+	'interval=s'	=> \$CHECK_INTERVAL,	# set $CHECK_INTERVAL from the command line
 	'firewallcheck'	=> \$fwcheck,		# do not check firewall rules
 	'config=s'	=> \$config,		# specify configuration file
-	'namelookups'	=> \$dnslookups,	# do not issue dns lookups against scanning ip address
+	'reversedns'	=> \$dnslookups,	# do not issue dns lookups against scanning ip address
 	'signatures=s'	=> \$signatures,	# scan signatures
 	'localport'	=> \$netstat_lookup,	# do not check to see if the firewall is listening on localport that has been scanned
 	'errors'	=> \$errors,		# do not write malformed packet messages to error log
@@ -1117,7 +1119,7 @@ sub check_commands() {
 }
 sub check_permissions() {
 	my @files = @_;
-	for $f (@files) {
+	for my $f (@files) {
 		if (-e $f) {
 			chmod 0600, $f;
 		} else {
@@ -1133,24 +1135,32 @@ sub usage_and_exit() {
         my $exitcode = shift;
         print <<_HELP_;
 
-Usage: psad [-d] [-o] [-e] [-f] [-c <config file>] [-s <signature file>] [-a <auto danger level file>] [-h]
+Usage: psad [-n] [-d] [-o] [-e] [-f] [-r] [-w] [-l] [-i <interval>] [-h]
+                [-c <config file>] [-s <signature file>] [-a <auto ips file>]
 
-        -daemon			- do not run as a daemon.
-	-error			- do not write errors to the error log.
-	-firewallcheck		- disable firewall rules verification.
-	-output			- print all messages to STDOUT (this 
-				  does not include bad packet messages
-				  that are printed to the error log).
-	-config <config file>	- use config file instead of the values
-				  contained within the psad script.
-	-namelookups		- disable name resolution against
-				  scanning ips.
-	-signatures <sig file>	- import scan signatures.
-	-auto_ips <ips file>	- import auto ips file for automatic 
-				  ip danger level increases/decreses.
-	-local_port_lookup	- disable local port lookups for scan
-				  signatures.
-        -h                      - prints this help message.
+        -n   --noDaemon                 - do not run as a daemon.
+        -e   --errors                   - do not write errors to the error
+                                          log.
+        -d   --debug                    - run psad in debugging mode.
+        -w   --whois                    - disable whois lookups.
+        -i   --interval                 - configure the check interval from
+                                          the command line to override the 15
+                                          second default.
+        -f   --firewallcheck            - disable firewall rules verification.
+        -o   --output                   - print all messages to STDOUT (this
+                                          does not include bad packet messages
+                                          that are printed to the error log).
+        -c   --config <config file>     - use config file instead of the
+                                          values contained within the psad
+                                          script.
+        -r   --reversedns               - disable name resolution against
+                                          scanning ips.
+        -s   --signatures <sig file>    - import scan signatures.
+        -a   --auto_ips <ips file>      - import auto ips file for automatic
+                                          ip danger level increases/decreses.
+        -l   --local_port_lookup        - disable local port lookups for scan
+                                          signatures.
+        -h   --help                     - prints this help message.
 
 _HELP_
         exit $exitcode;

@@ -216,6 +216,9 @@ my %snort_msgs = ();
 ### cache signature messages, danger levels, etc.
 my %sigs_attr = ();
 
+### cache iptables prefixes
+my %ipt_prefixes = ();
+
 ### data array used for dshield.org logs
 my @dshield_data;
 
@@ -595,7 +598,9 @@ if ($config{'IMPORT_OLD_SCANS'} eq 'Y') {
     unless $fw_analyze;
 
 ### zero out prefix counters
-&write_prefix_counters() unless $fw_analyze;
+unless ($fw_analyze) {
+    &write_prefix_counters() if %ipt_prefixes;
+}
 
 ### zero out dshield alert stats (note we do this here regardles of
 ### whether DShield alerting is enabled since if it isn't we will
@@ -882,6 +887,7 @@ sub check_scan() {
         ### if we are running with FW_SEARCH_ALL = Y).
         if ($pkt =~ /kernel:\s+(\S+?.*?)\s*IN=/) {
             $log_prefix = $1;
+            $ipt_prefixes{$log_prefix}++;
         }
 
         ### May 18 22:21:26 orthanc kernel: DROP IN=eth2 OUT=
@@ -2516,6 +2522,13 @@ sub write_global_packet_counters() {
 }
 
 sub write_prefix_counters() {
+    open P, "> $config{'IPT_PREFIX_COUNTER_FILE'}" or
+        die " ** Could not open $config{'IPT_PREFIX_COUNTER_FILE'}: $!";
+    for my $prefix (keys %ipt_prefixes) {
+        my $count = $ipt_prefixes{$prefix};
+        print P "$prefix: $count\n";
+    }
+    close P;
     return;
 }
 
@@ -2554,7 +2567,7 @@ sub write_src_packet_counters() {
 }
 
 sub collect_errors() {
-    my ($bad_packets_aref) = @_;
+    my $bad_packets_aref = shift;
     open ERR, ">> $config{'FW_ERROR_LOG'}" or die ' ** Could not open ',
         "$config{'FW_ERROR_LOG'}: $!";
     for my $line (@$bad_packets_aref) {
@@ -4200,16 +4213,41 @@ sub status_psad_daemon() {
     } else {
         print STDOUT "    [No scans detected]\n";
     }
+    if ($analyze_msgs) {
+        if (%ipt_prefixes) {
+            print "\n    Iptables prefix counters:\n";
+            for my $prefix (keys %ipt_prefixes) {
+                my $count = $ipt_prefixes{$prefix};
+                print "        $prefix: $count\n";
+            }
+        }
+    } else {
+        if (-e $config{'IPT_PREFIX_COUNTER_FILE'}) {
+            print "\n    Iptables prefix counters:\n";
+            open F, "< $config{'IPT_PREFIX_COUNTER_FILE'}" or
+                die " ** $config{'IPT_PREFIX_COUNTER_FILE'}: $!";
+            print STDOUT "        $_" while (<F>);
+            close F;
+        }
+    }
+
     ### print total stats
     if (not $analyze_msgs) {
         if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
                 and -e $config{'DSHIELD_COUNTER_FILE'}) {
-            print "\n    Dshield stats:\n";
+            print "\n    DShield stats:\n";
             open F, "< $config{'DSHIELD_COUNTER_FILE'}" or
                 die " ** $config{'DSHIELD_COUNTER_FILE'}: $!";
             print STDOUT "        $_" while (<F>);
             close F;
         }
+    }
+    if ($analyze_msgs) {
+        print "\n    Total packet counters:\n",
+            "        tcp: $tcp_ctr\n",
+            "        udp: $udp_ctr\n",
+            "        icmp: $icmp_ctr\n";
+    } else {
         if (-e $config{'PACKET_COUNTER_FILE'}) {
             print "\n    Total packet counters:\n";
             open F, "< $config{'PACKET_COUNTER_FILE'}" or
@@ -4401,7 +4439,7 @@ sub import_old_scans() {
     ### import global packet counters
     if (-e $config{'PACKET_COUNTER_FILE'}) {
         open CF, "< $config{'PACKET_COUNTER_FILE'}" or die " ** Could not ",
-            "open $config{'PACKET_COUNTER_FILE'}";
+            "open $config{'PACKET_COUNTER_FILE'}: $!";
         my @lines = <CF>;
         close CF;
         for my $line (@lines) {
@@ -4418,17 +4456,32 @@ sub import_old_scans() {
     if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
             and -e $config{'DSHIELD_COUNTER_FILE'}) {
         open DS, "< $config{'DSHIELD_COUNTER_FILE'}" or die " ** Could not ",
-            "open $config{'DSHIELD_COUNTER_FILE'}";
+            "open $config{'DSHIELD_COUNTER_FILE'}: $!";
         my @lines = <DS>;
         close DS;
         for my $line (@lines) {
             if ($line =~ /emails:\s+(\d+)/) {
                 $dshield_email_ctr = $1;
-            } elsif ($line =~ /lines:\s+(\d+)/) {
+            } elsif ($line =~ /packets:\s+(\d+)/) {
                 $dshield_lines_ctr = $1;
             }
         }
     }
+    ### import iptables prefix stats
+    if (-e $config{'IPT_PREFIX_COUNTER_FILE'}) {
+        open F, "< $config{'IPT_PREFIX_COUNTER_FILE'}" or die " ** Could not ",
+            "open $config{'IPT_PREFIX_COUNTER_FILE'}: $!";
+        my @lines = <F>;
+        close F;
+        for my $line (@lines) {
+            if ($line =~ /^\*(.*?):\s+(\d+)/) {
+                my $prefix = $1;
+                my $count = $2;
+                $ipt_prefixes{$prefix} = $count;
+            }
+        }
+    }
+
     ### zero out $FW_DATA_FILE
     open FD, "> $config{'FW_DATA_FILE'}" or die ' ** Could not open ',
         "$config{'FW_DATA_FILE'}: $!";

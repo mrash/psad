@@ -331,6 +331,13 @@ listed in the file
 .B psad_signatures.
 .TP
 
+.BR IGNORE_CONNTRACK_BUG_PKTS
+If "Y", all tcp packets that have the ACK or RST flag bits set will be ignored
+by psad since usually we see such packets being blocked as a result of the
+iptables connection tracking bug.  Note there are no signatures that make use
+of the RST flag and very few that use ACK flag.
+.TP
+
 .BR ALERT_ALL
 If "Y", send email for all new bad packets instead of just when a danger
 level increases.  ALERT_ALL is set to "Y" by default.

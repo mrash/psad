@@ -1,5 +1,8 @@
 psad-1.2.4 (10//2003):
     - Added danger level to subject line in email alerts.
+    - Removed diskmond altogether since psad now handles disk space
+      thresholds directly.  This allows filehandles to be handled
+      properly.
     - Added auto_block_ignore_ip() to prevent 0.0.0.0, 127.0.0.1,
       and local interface ips from being included in auto blocking
       routines.

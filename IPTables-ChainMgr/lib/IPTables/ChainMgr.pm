@@ -97,7 +97,11 @@ sub flush_chain() {
 sub modinternal_flush_chain() {
     my ($table, $chain, $iptables) = @_;
 
-    return &run_ipt_cmd("$iptables -t $table -F $chain");
+    if (&run_ipt_cmd("$iptables -t $table -F $chain") == 0) {
+        return 1;
+    } else {
+        return 0;
+    }
 }
 
 sub delete_chain() {
@@ -112,7 +116,7 @@ sub delete_chain() {
     ### see if the chain exists first
     if (&run_ipt_cmd("$iptables -t $table -n -L $del_chain") == 0) {
         ### flush the chain
-        if (&modinternal_flush_chain($table, $del_chain, $iptables) == 0) {
+        if (&modinternal_flush_chain($table, $del_chain, $iptables)) {
             ### find and delete jump rules to this chain (we can't delete
             ### the chain until there are no references to it)
             my $rulenum = &modinternal_find_ip_rule('0.0.0.0/0',
@@ -125,15 +129,15 @@ sub delete_chain() {
             ### of whether their were jump rules above (should probably
             ### parse for the "0 references" under the -nL <chain> output).
             if (&run_ipt_cmd("$iptables -t $table -X $del_chain") == 0) {
-                return 1, "[+] $del_chain chain deleted.";
+                return 1, "[+] $table $del_chain chain deleted.";
             } else {
-                return 0, "[-] Could not delete $del_chain chain.";
+                return 0, "[-] Could not delete $table $del_chain chain.";
             }
         } else {
-            return 0, "[-] Could not flush $del_chain chain.";
+            return 0, "[-] Could not flush $table $del_chain chain.";
         }
     } else {
-        return 1, "[+] $del_chain chain does not exist";
+        return 0, "[+] $table $del_chain chain does not exist";
     }
 }
 

@@ -3735,29 +3735,41 @@ sub renew_auto_blocked_ips() {
 }
 
 sub flush_auto_blocked_ips() {
-    my $found_blocked = 0;
-    if (-e $config{'AUTO_BLOCK_IPT_FILE'}) {
-        print "[+] Removing iptables auto-generated block rules.\n";
-        open B, "< $config{'AUTO_BLOCK_IPT_FILE'}" or
-            die "[*] Could not open $config{'AUTO_BLOCK_IPT_FILE'}: $!";
-        my @lines = <B>;
-        close B;
-        for my $line (@lines) {
-            if ($line =~ /($ip_re)/) {
-                my $ip = $1;
-                ### remove block rules for $ip if it has been blocked
-                ### (checks are built into ipt_remove_block())
-                &ipt_remove_block($ip);
-                $found_blocked = 1;
-            }
+
+    my $ipt = new IPTables::ChainMgr(
+        'iptables' => $cmds{'iptables'}
+    ) or die '[*] Could not acquire IPTables::ChainMgr object.';
+
+    print "[+] Flushing and deleting Netfilter IPT_AUTO_CHAIN chains...\n";
+    if (@ipt_block_config) {
+        my $flushed_chain = 0;
+        for my $block_hr (@ipt_block_config) {
+            my $table      = $block_hr->{'table'};
+            my $from_chain = $block_hr->{'from_chain'};
+            my $to_chain   = $block_hr->{'to_chain'};
+
+            my ($rv, $status_msg) = $ipt->delete_chain($table,
+                $from_chain, $to_chain);
+            print $status_msg, "\n";
+            $flushed_chain = 1 if $rv;
         }
+        unless ($flushed_chain) {
+            print "[-] Could not flush any IPT_AUTO_CHAIN chains.\n";
+        }
+    } else {
+        print "[-] No valid IPT_AUTO_CHAIN keywords.\n";
+    }
+
+    if (-e $config{'AUTO_BLOCK_IPT_FILE'}) {
         ### we have removed the iptables block rules, so truncate
         ### the cache file.
         open T, "> $config{'AUTO_BLOCK_IPT_FILE'}" or
             die "[*] Could not truncate $config{'AUTO_BLOCK_IPT_FILE'}: $!";
         close T;
     }
+
     if (-e $config{'AUTO_BLOCK_TCPWR_FILE'}) {
+        my $found_blocked = 0;
         print "[+] Removing tcpwrapper auto-generated block rules.\n";
         open B, "< $config{'AUTO_BLOCK_TCPWR_FILE'}" or
             die "[*] Could not open $config{'AUTO_BLOCK_TCPWR_FILE'}: $!";
@@ -3776,12 +3788,12 @@ sub flush_auto_blocked_ips() {
         open T, "> $config{'AUTO_BLOCK_TCPWR_FILE'}" or
             die "[*] Could not truncate $config{'AUTO_BLOCK_TCPWR_FILE'}: $!";
         close T;
+        unless ($found_blocked) {
+            print "[-] Currently there are no auto-generated ".
+                "tcpwrapper blocking rules in effect.\n";
+        }
     }
-    unless ($found_blocked) {
-        print "[-] Currently there are no auto-generated ".
-            "block rules in effect.\n";
-    }
-    exit $found_blocked;
+    exit 0;
 }
 
 sub ipt_block() {

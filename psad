@@ -80,13 +80,14 @@ use Getopt::Long "GetOptions";
 use autouse 'Data::Dumper' => "Dumper";  ### this one is not used very much so don't load immediately
 use autouse 'Socket' => "AF_INET";       ### not used until a scan is detected so don't load until it is needed
 use Sys::Hostname "hostname";
+# use Sys::Syslog qw(openlog syslog closelog);   ### this does not seem to play nice with perl-5.005_03
 use POSIX "setsid";
 # use strict;
 ### psad does not yet support 'strict refs' since several hashes have $hsh{key} = "someval" and $hsh{key1}{key2} = "anotherval"... should probably fix this.
 # no strict "refs";
 
 ### these are globals
-use vars qw(%Scan $PRINT_SCAN_HASH $USE_IPCHAINS $USE_IPTABLES $DEBUG $HOSTNAME);
+use vars qw($VERSION %Scan $PRINT_SCAN_HASH $USE_IPCHAINS $USE_IPTABLES $DEBUG $HOSTNAME);
 
 #==================== config ======================= ## do not remove this line (used by install.pl to preserve configs) ##
 ### Initialize config variables.  Some can be overriden with command line args
@@ -114,7 +115,7 @@ my $ENABLE_AUTO_IDS = "N"; 	# if "Y", enable automated IDS response (auto manage
 my $AUTO_IDS_DANGER_LEVEL = 5;  # Block all traffic from offending IP if danger level >= to this value 
 my $WHOIS_TIMEOUT = 60;
 
-### system binaries
+### system binaries ###
 my $ipchainsCmd = "/sbin/ipchains";
 my $iptablesCmd = "/usr/local/bin/iptables";
 my $wcCmd = "/usr/bin/wc";
@@ -133,7 +134,7 @@ my $psadCmd = "/usr/local/bin/psad";
 #===================== main =======================
 
 ### a few more configuration variables that should not really be in the config section
-my $VERSION = "0.9.1";
+$VERSION = "0.9.1";
 
 ### pid files
 my @PIDFILES = qw(/var/log/psad/pid.psadwatchd
@@ -265,7 +266,7 @@ unless ($fwcheck || $Syslog_server) {
 ### daemonize psad unless running with --Daemon or --debug
 fork and exit unless ($daemon || $DEBUG);
 
-POSIX::setsid() or die "@@@@@  (psad) Can't start a new session: $!\n";
+POSIX::setsid() or die "@@@@@  (psad): Can't start a new session: $!\n";
 
 ### write the current pid associated with psad to the psad pid file
 writepid($PIDFILES[1]);
@@ -905,6 +906,21 @@ sub logr() {
                                	print EMAILALERT "End time:                   $end_time\n";
                                	print EMAILALERT "Danger level:               $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} out of 5\n";
                                	print EMAILALERT "DNS info:                   $dnsstring\n" unless $dnslookups;
+
+				### write a syslog message
+#				openlog("psad", "ndelay", "daemon");
+#				my $syslog_print_range = "";
+#				if ($tcp) {
+#					$syslog_print_range .= "TCP ports: [$tcp_newrange] ";
+#				}
+#				if ($udp) {
+#					$syslog_print_range .= "UCP ports: [$udp_newrange] ";
+#				}
+#				my $syslog_num_pkts = $Scan_href->{$srcip}->{$dstip}->{'ABSNUM'};
+#				my $syslog_danger_level = $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'};
+#
+#				syslog("warning", "Port scan detected: src: $srcip, dst: $dstip, $syslog_print_range, pkts: $syslog_num_pkts, dangerlevel: $syslog_danger_level");
+#				closelog();
 				if ($DEBUG) {
 					print STDOUT "logr(): printing email..................\n";
 					print STDOUT "     $time: Portscan Detected by psad (pid $$) on $HOSTNAME.\n";
@@ -1253,7 +1269,7 @@ sub kill_psad() {
 			close PIDFILE;
 			chomp $pid;
 			if (kill 0, $pid) {
-				print "=-=-=  Killing $pidname, pid: $pid\n";
+				print " ----  Killing $pidname, pid: $pid  ----\n";
 				kill 15, $pid or print "@@@@@  (psad): Could not kill $pidname, pid: $pid\n";
 			} else {
 				print "@@@@@  (psad): $pidname is not running on $HOSTNAME.\n";
@@ -1276,7 +1292,7 @@ sub restart_psad() {
                 die "@@@@@  (psad):  No other psad process is currently running on $HOSTNAME!\n";
         }
         &kill_psad($pidfiles_aref);
-        print "=-=-=  Restarting the psad daemons on $HOSTNAME.\n";
+        print " ----  Restarting the psad daemons on $HOSTNAME.  ----\n";
         system "$Cmds_href->{'psad'} $cmdline";
 	return;
 }
@@ -1290,9 +1306,9 @@ sub psad_status() {
 			close PIDFILE;
 			chomp $pid;
 			if (kill 0, $pid) {
-				print "=-=-=  $pidname is currently running on $HOSTNAME as pid: $pid\n";
+				print " ----  $pidname is currently running on $HOSTNAME as pid: $pid  ----\n";
 			} else {
-				print "=-=-=  $pidname is not currently running on $HOSTNAME\n";
+				print " ----  $pidname is not currently running on $HOSTNAME  ----\n";
 			}
 		} else {
 			print "@@@@@  (psad): pid file $pidfile does not exist for $pidname on $HOSTNAME\n";
@@ -1341,10 +1357,15 @@ sub usage_and_exit() {
         my $exitcode = shift;
         print <<_HELP_;
 
-Usage: psad [-D] [-d] [-o] [-e] [-S] [-f] [-r] [-w] [-l] [-i <interval>] [-h]
-       [-V] [-K] [-R] [-L] [-c <config file>] [-s <signature file>] 
+psad; the Port Scan Attack Detector
+Version: $VERSION
+By Michael B. Rash (mbr\@cipherdyne.com, http://www.cipherdyne.com)
+
+USAGE: psad [-D] [-d] [-o] [-e] [-L] [-f] [-r] [-w] [-l] [-i <interval>] [-h]
+       [-V] [-K] [-R] [-S] [-c <config file>] [-s <signature file>] 
        [-a <auto ips file>]
 
+OPTIONS:
         -D   --Daemon                   - do not run as a daemon.
         -e   --errors                   - do not write errors to the error
                                           log.

@@ -68,7 +68,7 @@ my $RUNLEVEL;    ### This should only be set if install.pl
 my $WHOIS_PSAD   = '/usr/bin/whois_psad';
 
 ### directory in which to install snort rules
-my $SNORT_DIR    = "${PSAD_CONFDIR}/snort-1.8.7_rules";
+my $SNORT_DIR    = "${PSAD_CONFDIR}/snort_rules";
 
 ### system binaries ###
 my $chkconfigCmd = '/sbin/chkconfig';

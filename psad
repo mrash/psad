@@ -403,7 +403,7 @@ Getopt::Long::Configure('no_ignore_case');
     'Analyze-msgs'      => \$analyze_msgs,    # Analysis mode for old iptables
                                               # messages in the psad fwdata file
                                               # (or messages file; see --messages).
-    'messages-file'     => \$messages_file,   # Specify the path to file containing
+    'messages-file=s'   => \$messages_file,   # Specify the path to file containing
                                               # old iptables messages (fwdata by
                                               # default).
     'debug'             => \$debug,           # Run in debug mode.

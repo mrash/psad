@@ -92,7 +92,7 @@ $< == 0 && $> == 0 or die "You need to be root (or equivalent UID 0 account) to 
 
 if ($uninstall) {
 	my $t = localtime();
-	my $time = " ----     Uninstalling psad from $HOSTNAME: $t    ----\n";
+	my $time = " ----     Uninstalling psad from $HOSTNAME: $t\n";
 	&logr("\n", \@LOGR_FILES);
 	&logr($time, \@LOGR_FILES);
 	&logr("\n", \@LOGR_FILES);
@@ -488,24 +488,20 @@ sub preserve_config() {
 	undef %prodvars;
 	undef %srcvars;
 	foreach my $p (@config) {
-		if ($p =~ /(\S+)\s+=\s+(.*?)\;/) {  # found a variable _assignment_ (does not include "my %var;"
+		if ($p =~ /(\S+)\s+=\s+(.*?)\;/) {
 			my ($varname, $value) = ($1, $2);
 			my $type;
 			($varname, $type) = assign_var_type($varname);
 			$prodvars{$type}{$varname}{'VALUE'} = $value;
 			$prodvars{$type}{$varname}{'LINE'} = $p;
 			$prodvars{$type}{$varname}{'FOUND'} = "N";
+			if ($p =~ /^my/) {
+				$prodvars{$type}{$varname}{'MY'} = "Y";
+			} else {
+				$prodvars{$type}{$varname}{'MY'} = "N";
+			}
 		}
 	}
-        foreach my $defc (@defconfig) {
-                if ($defc =~ /(\S+)\s+=\s+(.*?)\;/) {  # found a variable _assignment_ (does not include "my %var;")
-                        my ($varname, $value) = ($1, $2);
-                        my $type;
-			($varname, $type) = assign_var_type($varname);
-                        $srcvars{$type}{$varname}{'VALUE'} = $value;
-                        $srcvars{$type}{$varname}{'LINE'} = $defc;
-		}
-        }
 	open SRC, "< $srcfile" or die "Could not open source file: $!\n";
 	$start = 0;
 	my $print = 1;
@@ -537,6 +533,9 @@ sub preserve_config() {
 						}
 					}
 					if (defined $prodvars{$type}{$varname}{'VALUE'}) {
+						if ($prodvars{$type}{$varname}{'MY'} eq "N" && $defc =~ /^my/) {
+							$prodvars{$type}{$varname}{'LINE'} = "my " . $prodvars{$type}{$varname}{'LINE'};
+						}
 						$defc = $prodvars{$type}{$varname}{'LINE'};
 						$prodvars{$type}{$varname}{'FOUND'} = "Y";
 						if ($verbose) {
@@ -677,7 +676,7 @@ Usage: install.pl [-f] [-n] [-e] [-u] [-v] [-h]
 	-n  --no_preserve	- disable preservation of old configs.
 	-e  --exec_psad		- execute psad after installing.
 	-u  --uninstall		- uninstall psad.
-	-v  --verbose		- verbose mode.
+	-v  --verbose           - verbose mode.
         -h  --help              - prints this help message.
 
 _HELP_

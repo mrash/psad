@@ -27,7 +27,7 @@
 #     only require a syn packet to a port.
 #   - Deal with the possibility that psad could eat lots of memory over
 #     time if $ENABLE_PERSISTENCE="Y". This should involve periodically
-#     undef'ing entries in %Scan (or maybe the entire hash), but this 
+#     deleting entries in %Scan (or maybe the entire hash), but this 
 #     should be done in a way that allows some scan data to persist.
 #   - Put source and destination ip addresses back into psad_signatures.
 #   - Ipfilter support on *BSD platforms.
@@ -59,7 +59,7 @@
 # Mar 11 13:15:52 orthanc kernel: DENY IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:08:00
 # SRC=127.0.0.1 DST=127.0.0.1 LEN=60 TOS=0x00 PREC=0x00 TTL=64 ID=0 DF PROTO=TCP SPT=44847 
 # DPT=35 WINDOW=32304 RES=0x00 SYN URGP=0
-
+#
 # Sample icmp packet rejected by iptables
 # Nov 27 15:45:51 orthanc kernel: DENY IN=eth1 OUT= MAC=00:a0:cc:e2:1f:f2:00:20:78:10:70:e7:08:00
 # SRC=192.168.10.20 DST=192.168.10.1 LEN=84 TOS=0x00 PREC=0x00 TTL=64 ID=0 DF PROTO=ICMP TYPE=8 
@@ -88,7 +88,6 @@ use strict;
 # use autouse 'Socket';       ### not used until a scan is detected so don't load until it is needed
 
 # use Sys::Syslog qw(openlog syslog closelog);   ### this does not seem to play nice with perl-5.005_03
-# use POSIX qw(:signal_h :errno_h :sys_wait_h setsid);
 
 ### globals
 use vars qw($VERSION %Scan $PRINT_SCAN_HASH $USE_IPCHAINS $USE_IPTABLES $DEBUG $HOSTNAME $PSADCMD);
@@ -359,7 +358,7 @@ for (;;) {
         if ($sigs_mtime_start != $sigs_mtime_end) {
             $Sigs_href = &import_signatures($signatures);
             for my $email_address (@EMAIL_ADDRESSES) {
-                system "$Cmds{'mail'} $email_address -s \"psad: re-read $signatures file on $HOSTNAME\" < /dev/null";
+                system "$Cmds{'mail'} $email_address -s \"psad: re-read $signatures file on $HOSTNAME\" < /dev/null > /dev/null 2>&1";
             }
         }
     }
@@ -371,7 +370,7 @@ for (;;) {
             ### need to set $Scan_href->{$src}->{$dst}->{'AUTO'} = "N" since $Auto_ips_href was updated.
             $Scan_href = &reset_auto_tags($Scan_href);
             for my $email_address (@EMAIL_ADDRESSES) {
-                system "$Cmds{'mail'} $email_address -s \"psad: re-read $auto_ips file on $HOSTNAME\" < /dev/null";
+                system "$Cmds{'mail'} $email_address -s \"psad: re-read $auto_ips file on $HOSTNAME\" < /dev/null > /dev/null 2>&1";
             }
         }
     }
@@ -471,7 +470,7 @@ sub check_scan() {
             if (defined $Scan{$src}{$dst}{'START_TIME'}{'EPOCH_SECONDS'}) {
                 my $tmp = $currtime - $Scan{$src}{$dst}{'START_TIME'}{'EPOCH_SECONDS'};
                 if (($currtime - $Scan{$src}{$dst}{'START_TIME'}{'EPOCH_SECONDS'}) >= $scan_timeout) {
-                    undef $Scan{$src}{$dst};
+                    delete $Scan{$src}{$dst};
                 }
             }
         } 
@@ -485,7 +484,7 @@ sub check_scan() {
             $Scan{$src}{$dst}{'END_PORT'} = 0; # make sure the initial end port is not too high
         }
         my $epoch_seconds = time() if ($enable_persistence eq "N");
-        my @time = split / /, scalar localtime;   # Get the current time as a nice ASCII string.
+        my @time = split /\s+/, scalar localtime;   # Get the current time as a nice ASCII string.
         pop @time; shift @time;    # Get rid of the day and the year to make the time consistent with syslog
         my $time = join ' ', @time;
         unless (defined $Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}) {  ### initialize values for the current interval
@@ -1076,8 +1075,8 @@ sub scan_logr() {
                         $flags_msg = "TCP flags:                   [$flags: $num_pkts packets]${nmapOpts}\n";
                         push @tcp_flags, $flags_msg;
                     }
-                    ### need to undef the current interval so it won't show up in the next alert
-                    undef $Scan_href->{$src}->{$dst}->{'TCP'}->{'CURRENT_INTERVAL'};
+                    ### need to delete the current interval so it won't show up in the next alert
+                    delete $Scan_href->{$src}->{$dst}->{'TCP'}->{'CURRENT_INTERVAL'};
                 }
                 if ($udp) {
                     if ($udp_new_start_range == $udp_new_end_range) {
@@ -1085,11 +1084,11 @@ sub scan_logr() {
                     } else {
                         $udp_newrange = "$udp_new_start_range-$udp_new_end_range";
                     }
-                    ### need to undef the current interval so it won't show up in the next alert
-                    undef $Scan_href->{$src}->{$dst}->{'UDP'}->{'CURRENT_INTERVAL'};
+                    ### need to delete the current interval so it won't show up in the next alert
+                    delete $Scan_href->{$src}->{$dst}->{'UDP'}->{'CURRENT_INTERVAL'};
                 }
                 if ($icmp) {
-                    undef $Scan_href->{$src}->{$dst}->{'ICMP'}->{'CURRENT_INTERVAL'};
+                    delete $Scan_href->{$src}->{$dst}->{'ICMP'}->{'CURRENT_INTERVAL'};
                 }
                 print STDOUT "scan_logr():  generating email......\n" if $DEBUG;
                 unlink $email_alertfile;  ### remove $email_alertfile so we don't send old alert info
@@ -1140,8 +1139,8 @@ sub scan_logr() {
                                 my $sig_num_packets = $Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_SIGMATCH'}->{$sigmatch};
                                 &Psad::logr("$sigmatch  Packets=$sig_num_packets\n", \@print_array);
                             }
-                            ### need to undef the current interval so it won't show up in the next alert
-                            undef $Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_SIGMATCH'};
+                            ### need to delete the current interval so it won't show up in the next alert
+                            delete $Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_SIGMATCH'};
                         }
                         if (defined $Scan_href->{$src}->{$dst}->{$proto}->{'SIGMATCH'} && $show_all_signatures eq "Y") {
                             &Psad::logr("\n", \@print_array);
@@ -1196,7 +1195,7 @@ sub auto_psad_response(){
                         $Scan_href->{$src}->{$dst}->{'BLOCKED'} = "Y";
                     }
                     for my $email_address (@$email_addresses_aref) {
-                        system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $src has been BLOCKED on $HOSTNAME ($dst)\" < /dev/null";
+                        system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $src has been BLOCKED on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
                     }
                     next SOURCE;
                 } elsif ($USE_IPTABLES) {
@@ -1208,7 +1207,7 @@ sub auto_psad_response(){
                         $Scan_href->{$src}->{$dst}->{'BLOCKED'} = "Y";
                     }
                     for my $email_address (@$email_addresses_aref) {
-                        system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $src has been BLOCKED on $HOSTNAME ($dst)\" < /dev/null";
+                        system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $src has been BLOCKED on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
                     }
                     next SOURCE;
                 }
@@ -1220,7 +1219,7 @@ sub auto_psad_response(){
 sub email_limit_reached() {
     my ($email_addresses_aref, $src, $dst, $Cmds_href) = @_;
     for my $email_address (@$email_addresses_aref) {
-        system "$Cmds_href->{'mail'} $email_address -s \"psad: Email message limit for $src has been reached on $HOSTNAME ($dst)!!!\" < /dev/null";
+        system "$Cmds_href->{'mail'} $email_address -s \"psad: Email message limit for $src has been reached on $HOSTNAME ($dst)!!!\" < /dev/null > /dev/null 2>&1";
     }
     return;
 }
@@ -1241,7 +1240,7 @@ sub send_email_alert() {
     my ($Scan_href, $src, $dst, $flags_msg, $email_alertfile, $email_addresses_aref, $Cmds_href) = @_;
     for my $email_address (@$email_addresses_aref) {
         print "send_email_alert(): sending scan alert email to: $email_address\n" if $DEBUG;
-        system("$Cmds_href->{'mail'} $email_address -s \"psad WARNING: $HOSTNAME ($dst) has been scanned!\" < $email_alertfile");
+        system "$Cmds_href->{'mail'} $email_address -s \"psad WARNING: $HOSTNAME ($dst) has been scanned!\" < $email_alertfile > /dev/null 2>&1";
     }
     $Scan_href->{$src}->{$dst}->{'ALERTED'} = "Y";
     return $Scan_href;
@@ -1425,6 +1424,8 @@ sub psad_status() {
                         print "     %CPU: $1  %MEM: $2\n";
                         if ($pidname eq "psad" && $cmdline) {
                             print "     Command line arguments: $cmdline\n";
+                        } elsif ($pidname eq "psad") {
+                            print "     Command line arguments: [none specified]\n";
                         }
                         last GP;
                     }

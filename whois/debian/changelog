@@ -1,3 +1,50 @@
+whois (4.6.14) unstable; urgency=medium
+
+  * Removed whois.oleane.net from the list of RIPE-like servers, because
+    apparently it's not one anymore.
+
+ -- Marco d'Itri <md@linux.it>  Fri, 16 Apr 2004 18:39:21 +0200
+
+whois (4.6.13) unstable; urgency=medium
+
+  * Fix the DENIC code. (Closes: #242424)
+
+ -- Marco d'Itri <md@linux.it>  Thu,  8 Apr 2004 13:16:58 +0200
+
+whois (4.6.12) unstable; urgency=medium
+
+  * Added a workaround for DENIC brokeness. (Closes: #242424)
+  * Added the new IPv4 networks allocated to RIPE.
+
+ -- Marco d'Itri <md@linux.it>  Tue,  6 Apr 2004 19:25:20 +0200
+
+whois (4.6.11) unstable; urgency=medium
+
+  * Fix parsing of IPv4 addresses on 64 bit architectures, spotted by
+    Paul Slootman. (Closes: #229809)
+  * Add support for ARIN whois referrals. (Closes: #229810, #231694)
+  * Cleaned up some code and added support for ARIN referrals, based
+    on a patch by Kees Cook.
+
+ -- Marco d'Itri <md@linux.it>  Sat, 31 Jan 2004 17:41:39 +0100
+
+whois (4.6.10) unstable; urgency=high
+
+  * Compiled with libidn11. (Closes: #227350)
+  * Fixed a disclaimer. (Closes: #226949)
+  * Updated Greek .po file from Velonis Petros.
+
+ -- Marco d'Itri <md@linux.it>  Tue, 13 Jan 2004 12:55:51 +0100
+
+whois (4.6.9) unstable; urgency=medium
+
+  * Removed .ac.cn SLD. (Closes: #219883)
+  * Added support for 6to4 IPv6 addresses. (Closes: #219028)
+  * Updated 145/8 after ERX transfer. (Closes: #220400)
+  * Added IDN support.
+
+ -- Marco d'Itri <md@linux.it>  Mon,  1 Dec 2003 18:58:54 +0100
+
 whois (4.6.8) unstable; urgency=medium
 
   * Update the version number. (Closes: #211550)
@@ -75,7 +122,7 @@ whois (4.6.0) unstable; urgency=medium
   * Added .ai .bo, .bt, .dz, .gi, .pn, .tp and .uz TLDs.
   * Updated .ae, .ar, .at, .bi, .co, .cu, .do, .fm, .ge, .jo, .kr, .lu,
     .lv, .mt, .mu, .mw, .nr, .ph, .pk, .sa, .sb, .ua, .uy, .vi, .vu TLDs
-    (courtesy of Frédéric L. W. Meunier).
+    (courtesy of FrÃ©dÃ©ric L. W. Meunier).
   * Rewritten the IPv6-matching code. Fixed a few bugs there too.
   * Generalized and deuglyfied some parts of the code.
   * Added support for RPSL objects like AS8627:fltr-TRANSIT-OUT.

@@ -1,11 +1,8 @@
 /* Program version */
 /* not for the inetutils version */
-#define VERSION "4.6.8"
+#define VERSION "4.6.13"
 
 /* Configurable features */
-
-/* 6bone referto: support */
-#define EXT_6BONE
 
 /* Always hide legal disclaimers */
 #undef ALWAYS_HIDE_DISCL

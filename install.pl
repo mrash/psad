@@ -446,10 +446,10 @@ sub install() {
     print "\n\n";
 
     ### put the fwcheck_psad.pl script in place
-    &logr(" .. Copying fwcheck_psad.pl -> ${USRSBIN_DIR}/fwcheck_psad.pl\n");
-    unlink "${USRSBIN_DIR}/fwcheck_psad.pl" if -e "${USRSBIN_DIR}/fwcheck_psad.pl";
-    copy 'fwcheck_psad.pl', "${USRSBIN_DIR}/fwcheck_psad.pl";
-    &perms_ownership("${USRSBIN_DIR}/fwcheck_psad.pl", 0500);
+    &logr(" .. Copying fwcheck_psad.pl -> ${USRSBIN_DIR}/fwcheck_psad\n");
+    unlink "${USRSBIN_DIR}/fwcheck_psad" if -e "${USRSBIN_DIR}/fwcheck_psad";
+    copy 'fwcheck_psad.pl', "${USRSBIN_DIR}/fwcheck_psad";
+    &perms_ownership("${USRSBIN_DIR}/fwcheck_psad", 0500);
 
     ### put the psad daemons in place
     &logr(" .. Copying psad -> ${USRSBIN_DIR}/psad\n");

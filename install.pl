@@ -63,28 +63,28 @@ my $verbose      = 0;
 my $help         = 0;
 
 &usage_and_exit(1) unless (GetOptions (
-    'no_preserve'   => \$nopreserve,    # don't preserve existing configs
-    'exec_psad'     => \$execute_psad,
-    'uninstall'     => \$uninstall,
-    'verbose'       => \$verbose,
-    'help'          => \$help           # display help
+    'no_preserve' => \$nopreserve,    # don't preserve existing configs
+    'exec_psad'   => \$execute_psad,
+    'uninstall'   => \$uninstall,
+    'verbose'     => \$verbose,
+    'help'        => \$help           # display help
 ));
 &usage_and_exit(0) if ($help);
 
 my %Cmds = (
-    "mknod"     => $mknodCmd,
-    "grep"      => $grepCmd,
-    "find"      => $findCmd,
-    "make"      => $makeCmd,
-    "perl"      => $perlCmd,
-    "ipchains"  => $ipchainsCmd,
-    "iptables"  => $iptablesCmd,
+    "mknod"    => $mknodCmd,
+    "grep"     => $grepCmd,
+    "find"     => $findCmd,
+    "make"     => $makeCmd,
+    "perl"     => $perlCmd,
+    "ipchains" => $ipchainsCmd,
+    "iptables" => $iptablesCmd,
 );
 
 my $distro = &get_distro();
 
 if ($distro =~ /redhat/) {
-    $Cmds{'chkconfig'}  = $chkconfigCmd;
+    $Cmds{'chkconfig'} = $chkconfigCmd;
 }
 
 ### need to make sure this exists before attempting to write anything to the install log.
@@ -267,7 +267,7 @@ print "\n\n";
 my $email_str = "";
 if ( -e "${INSTALL_DIR}/psad" && (! $nopreserve)) {  # need to grab the old config
     &logr(" ... Copying psad -> ${INSTALL_DIR}/psad\n", \@LOGR_FILES);
-    &logr("       Preserving old config within ${INSTALL_DIR}/psad\n", \@LOGR_FILES);
+    &logr("     Preserving old config within ${INSTALL_DIR}/psad\n", \@LOGR_FILES);
     &preserve_config("psad", "${INSTALL_DIR}/psad", \%Cmds);
     ### we don't need to run with -w for production code, and they are daemons so nothing would see warnings anyway if there are any.
     $email_str = &query_email("${INSTALL_DIR}/psad");
@@ -294,7 +294,7 @@ if ( -e "${INSTALL_DIR}/psad" && (! $nopreserve)) {  # need to grab the old conf
 }
 if ( -e "${INSTALL_DIR}/psadwatchd" && (! $nopreserve)) {  # need to grab the old config
     &logr(" ... Copying psadwatchd -> ${INSTALL_DIR}/psadwatchd\n", \@LOGR_FILES);
-    &logr("       Preserving old config within ${INSTALL_DIR}/psadwatchd\n", \@LOGR_FILES);
+    &logr("     Preserving old config within ${INSTALL_DIR}/psadwatchd\n", \@LOGR_FILES);
     &preserve_config("psadwatchd", "${INSTALL_DIR}/psadwatchd", \%Cmds);
     if ($email_str) {
         &put_email("${INSTALL_DIR}/psadwatchd", $email_str);
@@ -312,7 +312,7 @@ if ( -e "${INSTALL_DIR}/psadwatchd" && (! $nopreserve)) {  # need to grab the ol
 }
 if (-e "${INSTALL_DIR}/kmsgsd" && (! $nopreserve)) { 
     &logr(" ... Copying kmsgsd -> ${INSTALL_DIR}/kmsgsd\n", \@LOGR_FILES);
-    &logr("       Preserving old config within ${INSTALL_DIR}/kmsgsd\n", \@LOGR_FILES);
+    &logr("     Preserving old config within ${INSTALL_DIR}/kmsgsd\n", \@LOGR_FILES);
     &preserve_config("kmsgsd", "${INSTALL_DIR}/kmsgsd", \%Cmds);
     &rm_perl_options("${INSTALL_DIR}/kmsgsd", \%Cmds);
     &perms_ownership("${INSTALL_DIR}/kmsgsd", 0500);
@@ -328,7 +328,7 @@ if (-e "${INSTALL_DIR}/kmsgsd" && (! $nopreserve)) {
 }
 if (-e "${INSTALL_DIR}/diskmond" && (! $nopreserve)) {
     &logr(" ... Copying diskmond -> ${INSTALL_DIR}/diskmond\n", \@LOGR_FILES);
-    &logr("       Preserving old config within ${INSTALL_DIR}/diskmond\n", \@LOGR_FILES);
+    &logr("     Preserving old config within ${INSTALL_DIR}/diskmond\n", \@LOGR_FILES);
     &preserve_config("diskmond", "${INSTALL_DIR}/diskmond", \%Cmds);
     &rm_perl_options("${INSTALL_DIR}/diskmond", \%Cmds);
     &perms_ownership("${INSTALL_DIR}/diskmond", 0500);
@@ -344,7 +344,7 @@ mkdir "/etc/psad",400;
 }
 if (-e "/etc/psad/psad_signatures") {
     &logr(" ... Copying psad_signatures -> /etc/psad/psad_signatures\n", \@LOGR_FILES);
-    &logr("       Preserving old signatures file as /etc/psad/psad_signatures.old\n", \@LOGR_FILES);
+    &logr("     Preserving old signatures file as /etc/psad/psad_signatures.old\n", \@LOGR_FILES);
     move("/etc/psad/psad_signatures", "/etc/psad/psad_signatures.old");
     copy("psad_signatures", "/etc/psad/psad_signatures");
     &perms_ownership("/etc/psad/psad_signatures", 0600);
@@ -355,7 +355,7 @@ if (-e "/etc/psad/psad_signatures") {
 }
 if (-e "/etc/psad/psad_auto_ips") {
     &logr(" ... Copying psad_auto_ips -> /etc/psad/psad_auto_ips\n", \@LOGR_FILES);
-    &logr("       Preserving old auto_ips file as /etc/psad/psad_auto_ips.old\n", \@LOGR_FILES);
+    &logr("     Preserving old auto_ips file as /etc/psad/psad_auto_ips.old\n", \@LOGR_FILES);
     move("/etc/psad/psad_auto_ips", "/etc/psad/psad_auto_ips.old");
     copy("psad_auto_ips", "/etc/psad/psad_auto_ips");
     &perms_ownership("/etc/psad/psad_auto_ips", 0600);
@@ -366,7 +366,7 @@ if (-e "/etc/psad/psad_auto_ips") {
 }
 if (-e "/etc/psad/psad.conf") {
     &logr(" ... Copying psad.conf -> /etc/psad/psad.conf\n", \@LOGR_FILES);
-    &logr("       Preserving old psad.conf file as /etc/psad/psad.conf\n", \@LOGR_FILES);
+    &logr("     Preserving old psad.conf file as /etc/psad/psad.conf\n", \@LOGR_FILES);
     move("/etc/psad/psad.conf", "/etc/psad/psad.conf.old");
     copy("psad.conf", "/etc/psad/psad.conf");
     &perms_ownership("/etc/psad/psad.conf", 0600);
@@ -628,7 +628,7 @@ sub preserve_config() {
                 for my $varname (keys %{$prodvars{$type}}) {
                     next if ($varname =~ /EMAIL_ADDRESS/);
                     unless ($prodvars{$type}{$varname}{'FOUND'} eq "Y") {
-                        &logr(" ... Removing depreciated $type variable: \"$varname\" not needed in this version of psad.\n", \@LOGR_FILES);
+                        &logr("-----  Removing depreciated $type variable: \"$varname\" not needed in this version of psad.\n", \@LOGR_FILES);
                     }
                 }
             }
@@ -702,14 +702,14 @@ sub get_fw_search_string() {
     print "     string.  (Note that ipchains firewalls are unaffected by this.)\n\n";
     my $ans = "";
     while ($ans ne "y" && $ans ne "n") {
-        print "       Would you like to add a string that will be used to analyze firewall\n";
-        print "       log messages (y/n)?\n";
+        print "     Would you like to add a string that will be used to analyze firewall\n";
+        print "     log messages (y/n)?\n";
         $ans = <STDIN>;
         chomp $ans;
     }
     my $fw_string = "";
     if ($ans eq "y") {
-        print "       Enter a string (i.e. \"Audit\"):  ";
+        print "     Enter a string (i.e. \"Audit\"):  ";
         $fw_string = <STDIN>;
         chomp $fw_string;
     }
@@ -737,7 +737,7 @@ sub query_email() {
     print "       $email_address\n\n";
     my $ans = "";
     while ($ans ne "y" && $ans ne "n") {
-        print "       Would you like alerts sent to a different address (y/n)?  ";
+        print "     Would you like alerts sent to a different address (y/n)?  ";
         $ans = <STDIN>;
         chomp $ans;
     }

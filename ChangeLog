@@ -26,6 +26,8 @@ psad-1.4.1 (02//2005):
     - Added the ability to import an IP into the Netfilter auto-blocking
       chains from the command line with --fw-block-ip.  This allows psad to
       apply its timeout mechanism against such IPs/nets.
+    - Added the ability to ignore packets based on input interface with
+      IGNORE_INTERFACES in psad.conf.
 
 psad-1.4.0 (11/26/2004):
     - Added p0f-style passive OS fingerprinting through the use of the OPT

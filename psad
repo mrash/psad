@@ -1665,7 +1665,7 @@ sub scan_logr_signatures() {
         ### need to delete the current signature so it
         ### won't show up in the next alert
         delete $scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_SIG'}
-            unless $config{'SHOW_ALL_SIGNATURES'};
+            unless $config{'SHOW_ALL_SIGNATURES'} eq 'Y';
     }
     return;
 }

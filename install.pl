@@ -482,8 +482,10 @@ sub install() {
         unlink "${PSAD_CONFDIR}/diskmond.conf";
     }
 
-    ### deal with psad_auto_ips, psad_signatures, and psad_posf
-    for my $file qw(psad_signatures psad_posf psad_auto_ips) {
+    ### deal with psad_auto_ips, psad_signatures,
+    ### psad_icmp_types, and psad_posf
+    for my $file qw(psad_signatures psad_icmp_types
+            psad_posf psad_auto_ips) {
         if (-e "${PSAD_CONFDIR}/$file") {
             &archive("${PSAD_CONFDIR}/$file") unless $noarchive;
             unless (&query_preserve_sigs_autoips("${PSAD_CONFDIR}/$file")) {

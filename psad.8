@@ -132,10 +132,10 @@ file.
 
 .BR \-e ", " \-\^\-email-analysis
 Send alert emails when run in --Analyze-msgs mode.  Depending on the size of
-the iptables logfile psad is used to parse using the --email-analysis option
-could extend the runtime of psad by quite a bit since normally both DNS and
-whois lookups will be issued against each scanning IP address.  As usual these
-lookups can be disabled with the --no-rdns and --no-whois options respectively.
+the iptables logfile, using the --email-analysis option could extend the runtime
+of psad by quite a bit since normally both DNS and whois lookups will be issued
+against each scanning IP address.  As usual these lookups can be disabled with
+the --no-rdns and --no-whois options respectively.
 .TP
 
 .BR \-w ", " \-\^\-whois-analysis

@@ -347,7 +347,13 @@ my $local_ips_href = &get_local_ips();
 
 ### disable whois lookups if for some reason the whois client that is
 ### bundled with psad can't be found
-$no_whois = 1 if ($cmds{'whois.psad'} !~ /psad/);
+unless ($no_whois) {
+    unless ($cmds{'whois.psad'}) {  ### we couldn't find whois.psad
+        warn " ... @@@ Could not locate whois.psad binary.  " .
+            "Disabling whois lookups.\n";
+        $no_whois = 1;
+    }
+}
 
 ### if psad is running on a syslog server, don't check the firewall
 ### rules since they may not be local.

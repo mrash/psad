@@ -172,4 +172,8 @@ Zenon Panoussis         Submitted patch for rpm spec that replaced the
 
 Dennis Freise           Submitted a patch to add metalog support to psad.
                         Helped find kmsgsd bug for missing null string in
-                        buffer read from psadfifo.
+                        buffer read from psadfifo.  Submitted patch for
+                        kmsgsd to open psadfifo in O_RDWR mode to fix a
+                        bug where kmsgsd would spike the cpu if the system
+                        logger did not keep the psadfifo open.  Found and
+                        submitted patch for buffer overflow in kmsgsd.

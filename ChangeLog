@@ -1,3 +1,10 @@
+psad-1.4.0 (11//2004):
+    - Added p0f-style passive OS fingerprinting through the use of the OPT
+      field in iptables log messages (which is only logged through the use
+      of the --log-tcp-options command line arg to iptables).
+    - Bugfix for iptables log messages that include tcp sequence numbers
+      (see the iptables --log-tcp-sequence command line argument).
+
 psad-1.3.4 (10/17/2004):
     - Bugfix for init script directory on Slackware systems.
     - Bugfix for null prefix counters.

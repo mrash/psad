@@ -44,7 +44,7 @@
 #	  denied without requiring overly complicated firewall rules to detect 
 #	  odd tcp flag combinations.
 #	- Investigate the possibility of passive OS fingerprinting by looking
-#	  at TTL and other fields in the headers.
+#	  at TTL and other fields in the headers (good idea Jay).
 #	- Sometimes packets (particularly ACK and RST packets) seem to not
 #	  recognized by ipt_state/ip_conntrack, so such packets get denied and
 #	  hence are picked up by psad.  Solution: parse /proc/net/ip_conntrack

@@ -1,10 +1,8 @@
 #!/usr/bin/perl -w
 
-# TODO:  - clean up preserve_config() to take variable type changes into
-#          account.  Recall the 'if (defined $hash{one}{two})' test will 
-#	   automatically define $hash{one} if it did not exist before the
-#	   test.
-#	 - clean up check_firewall_rules() to support tcp and/or udp 
+# TODO: 
+#	- perhaps an $INSTALL directory to put psad, psadwatchd, 
+#	  kmsgsd, and diskmond.
 
 #============== config ===============
 my $SYSLOG_INIT = "/etc/rc.d/init.d/syslog";
@@ -19,6 +17,8 @@ my $cpCmd = "/bin/cp";
 my $mvCmd = "/bin/mv";
 my $rmCmd = "/bin/rm";
 my $unameCmd = "/bin/uname";
+my $findCmd = "/usr/bin/find";
+my $perlCmd = "/usr/bin/perl";
 my $ifconfigCmd = "/sbin/ifconfig";
 my $ipchainsCmd = "/sbin/ipchains";
 my $iptablesCmd = "/usr/local/bin/iptables";
@@ -26,6 +26,7 @@ my $iptablesCmd = "/usr/local/bin/iptables";
 
 use Getopt::Long;
 
+### set the default execution
 my $fwcheck = 0;
 my $execute_psad = 0;
 my $nopreserve = 0;
@@ -37,7 +38,7 @@ usage_and_exit(1) unless (GetOptions (
 	'exec_psad'		=> \$execute_psad,
 	'uninstall'		=> \$uninstall,
 	'verbose'		=> \$verbose,
-        'help'          	=> \$help,              # display help
+        'help'          	=> \$help               # display help
 ));
 usage_and_exit(0) if ($help);
 
@@ -51,7 +52,9 @@ my %Cmds = (
 	"mv"		=> $mvCmd,
 	"rm" 		=> $rmCmd,
 	"uname"		=> $unameCmd,
+	"find"		=> $findCmd,
 	"make"		=> $makeCmd,
+	"perl"		=> $perlCmd,
 	"ifconfig"	=> $ifconfigCmd,
 	"ipchains"      => $ipchainsCmd,
 	"iptables"	=> $iptablesCmd
@@ -59,7 +62,18 @@ my %Cmds = (
 
 %Cmds = check_commands(\%Cmds);
 
-$< == 0 && $> == 0 or die "You need to be root (or equivalent UID 0 account) to install psad!\n";
+$< == 0 && $> == 0 or die "You need to be root (or equivalent UID 0 account) to install/uninstall psad!\n";
+
+### make sure we know where the syslog init script is.
+unless (-e $SYSLOG_INIT) {
+	my $s = `$Cmds{'find'} / -name syslog 2> /dev/null |$Cmds{'grep'} init |$Cmds{'grep'} -v grep`;
+	chomp $s;
+	if ($s) {
+		$SYSLOG_INIT = $s;
+	} else {
+		die "@@@ Could not find the syslog init script.  The current path is: $SYSLOG_INIT.\n@@@ Please edit the config section of install.pl.  Exiting.\n";
+	}
+}
 
 if ($uninstall) {
 	my $ans = "";
@@ -162,40 +176,49 @@ if ( -e "/usr/local/bin/psad" && (! $nopreserve)) {  # need to grab the old conf
 	print "=-=-=  Copying psad -> /usr/local/bin/psad\n";
 	print "       Preserving old config within /usr/local/bin/psad\n";
 	preserve_config("psad", "/usr/local/bin/psad", \%Cmds);
+	### we don't need to run with -w for production code, and they are daemons so nothing would see warnings anyway if there are any.
+	rm_perl_options("/usr/local/bin/psad", \%Cmds);
 	perms_ownership("/usr/local/bin/psad", 0500)
 } else {
 	print "=-=-=  Copying psad -> /usr/local/bin/\n";
 	`$Cmds{'cp'} psad /usr/local/bin/psad`;
+	rm_perl_options("/usr/local/bin/psad", \%Cmds);
 	perms_ownership("/usr/local/bin/psad", 0500);
 }
 if ( -e "/usr/local/bin/psadwatchd" && (! $nopreserve)) {  # need to grab the old config
         print "=-=-=  Copying psadwatchd -> /usr/local/bin/psadwatchd\n";
         print "       Preserving old config within /usr/local/bin/psadwatchd\n";
         preserve_config("psadwatchd", "/usr/local/bin/psadwatchd", \%Cmds);
+	rm_perl_options("/usr/local/bin/psadwatchd", \%Cmds);
         perms_ownership("/usr/local/bin/psadwatchd", 0500)
 } else {
         print "=-=-=  Copying psadwatchd -> /usr/local/bin/\n";
         `$Cmds{'cp'} psadwatchd /usr/local/bin/psadwatchd`;
+	rm_perl_options("/usr/local/bin/psadwatchd", \%Cmds);
         perms_ownership("/usr/local/bin/psadwatchd", 0500);
 }
 if (-e "/usr/local/bin/kmsgsd" && (! $nopreserve)) { 
 	print "=-=-=  Copying kmsgsd -> /usr/local/bin/kmsgsd\n";
 	print "       Preserving old config within /usr/local/bin/kmsgsd\n";
 	preserve_config("kmsgsd", "/usr/local/bin/kmsgsd", \%Cmds);
+	rm_perl_options("/usr/local/bin/kmsgsd", \%Cmds);
 	perms_ownership("/usr/local/bin/kmsgsd", 0500);
 } else {
 	print "=-=-=  Copying kmsgsd -> /usr/local/bin/kmsgsd\n";
 	`$Cmds{'cp'} kmsgsd /usr/local/bin/kmsgsd`;
+	rm_perl_options("/usr/local/bin/kmsgsd", \%Cmds);
 	perms_ownership("/usr/local/bin/kmsgsd", 0500);
 }
 if (-e "/usr/local/bin/diskmond" && (! $nopreserve)) {
 	print "=-=-=  Copying diskmond -> /usr/local/bin/diskmond\n";
 	print "       Preserving old config within /usr/local/bin/diskmond\n";
         preserve_config("diskmond", "/usr/local/bin/diskmond", \%Cmds);
+	rm_perl_options("/usr/local/bin/diskmond", \%Cmds);
         perms_ownership("/usr/local/bin/diskmond", 0500);
 } else {
 	print "=-=-=  Copying diskmond -> /usr/local/bin/diskmond\n";
 	`$Cmds{'cp'} diskmond /usr/local/bin/diskmond`;
+	rm_perl_options("/usr/local/bin/diskmond", \%Cmds);
 	perms_ownership("/usr/local/bin/diskmond", 0500);
 }
 unless (-e "/etc/psad") {
@@ -274,7 +297,7 @@ if ($distro eq "redhat61" || $distro eq "redhat62") {
 	# remove signature checking from psad process if we are not running an iptables-enabled kernel
 	print "=-=-=  Copying psad-init -> /etc/rc.d/init.d/psad-init\n";
 	`$Cmds{'cp'} psad-init /etc/rc.d/init.d/psad-init`;
-	system "perl -p -i -e 's|\\-s\\s/etc/psad/psad_signatures||' /etc/rc.d/init.d/psad-init" if ($kernel !~ /^2.3/ && $kernel !~ /^2.4/);
+	system "$Cmds{'perl'} -p -i -e 's|\\-s\\s/etc/psad/psad_signatures||' /etc/rc.d/init.d/psad-init" if ($kernel !~ /^2.3/ && $kernel !~ /^2.4/);
 } 
 # need to put checks in here for redhat vs. other systems.
 unless($fwcheck) {
@@ -359,6 +382,7 @@ unless($fwcheck) {
 		print "=-=-=  After setting up your firewall per the above note, execute \"/etc/rc.d/init.d/psad-init start\" to start psad\n";
 	}
 }
+
 exit 0;
 #==================== end main =====================
 sub check_firewall_rules() {
@@ -537,7 +561,6 @@ sub preserve_config() {
 	my ($srcfile, $productionfile, $Cmds_href) = @_;
 	my $start = 0;
 	my @config = (), @defconfig = ();
-#	$#config = 0; $#defconfig = 0;
 	open PROD, "< $productionfile" or die "Could not open production file: $!\n";
 	GETCONFIG: while(<PROD>) {
 		my $l = $_;
@@ -587,7 +610,7 @@ sub preserve_config() {
 		}
 	}
         foreach my $defc (@defconfig) {
-                if ($defc =~ /(\S+)\s+=\s+(.*?)\;/) {  # found a variable _assignment_ (does not include "my %var;"
+                if ($defc =~ /(\S+)\s+=\s+(.*?)\;/) {  # found a variable _assignment_ (does not include "my %var;")
                         my ($varname, $value) = ($1, $2);
                         my $type;
 			($varname, $type) = assign_var_type($varname);
@@ -685,6 +708,21 @@ sub perms_ownership() {
 	my ($file, $perm_value) = @_;
 	chmod $perm_value, $file;
 	chown 0, 0, $file;	# chown uid, gid, $file
+	return;
+}
+sub rm_perl_options() {
+	my ($file, $Cmds_href) = @_;
+	my $tmp = $file . ".tmp";
+	system "$Cmds_href->{'mv'} $file $tmp";
+	open TMP, "< $tmp";
+	my @lines = <TMP>;
+	close TMP;
+	unlink $tmp;
+	shift @lines;  ### get rid of the "#!/usr/bin/perl -w" line
+	open F, "> $file";
+	print F "#!$Cmds_href->{'perl'}\n";  ### put "#!/path/to/perl" line in with no perl options.
+	print F $_ for (@lines);
+	close F;
 	return;
 }
 sub usage_and_exit() {

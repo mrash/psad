@@ -1391,9 +1391,9 @@ sub scan_logr() {
                     && $current_danger_level >= $Config{'EMAIL_ALERT_DANGER_LEVEL'}) {
                     my $subject;
                     if ($rdns) {
-                        $subject = "psad: SCAN DETECTED: $rdns ($src) -> $HOSTNAME ($dst)";
+                        $subject = "psad: SCAN DETECTED from: $rdns";
                     } else {
-                        $subject = "psad: SCAN DETECTED: $src -> $HOSTNAME ($dst)";
+                        $subject = "psad: SCAN DETECTED from: $src";
                     }
                     &Psad::sendmail($subject, $email_alert, $Emails_aref, $Cmds{'mail'});
                     $Scan{$src}{$dst}{'ALERTED'} = 1;

@@ -208,8 +208,8 @@ Getopt::Long::Configure("no_ignore_case");  # make Getopts case sensitive
 	'Restart'	=> \$restart,		# restart psad with all options of the currently running psad process
 	'Status'	=> \$status,		# display status of any currently running psad processes
 	'USR1'		=> \$usr1, 		# send an existing psad process a USR1 signal (useful for debugging)
-	'Version'=> \$print_version,		# print the psad version and exit
-	'whois'=> \$whoislookups		# do not issue whois lookups against the scanning ip
+	'Version'	=> \$print_version,		# print the psad version and exit
+	'whois'		=> \$whoislookups		# do not issue whois lookups against the scanning ip
 ));
 &usage_and_exit(0) if ($help);
 
@@ -1370,7 +1370,7 @@ sub get_whois_data() {
 }
 sub REAPER {
 	my $pid;
-	$pid = waitpid(-1, &WNOHANG);
+	$pid = waitpid(-1, WNOHANG);
 #	if (WIFEXITED($?)) {
 #		print STDERR "@@@@@  Process $pid exited.\n";
 #	}

@@ -64,5 +64,6 @@ void check_unique_pid(const char *, const char *);
 void write_pid(const char *, pid_t);
 void daemonize_process(const char *);
 void find_char_var(char *, char *, char *);
+int check_import_config(time_t *config_mtime, char *config_file);
 
 #endif  /* __PSAD_H__ */

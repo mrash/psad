@@ -538,9 +538,9 @@ file that is bundled with the psad source distribution.
 .B psad
 also requires that syslog be configured to write all kern.info messages to
 the named pipe
-\fB/var/log/psadfifo\fR.  A simple
+\fB/var/lib/psad/psadfifo\fR.  A simple
 .IP
-.B echo -e 'kern.info\\\\t|/var/run/psadfifo' >> /etc/syslog.conf
+.B echo -e 'kern.info\\\\t|/var/lib/psad/psadfifo' >> /etc/syslog.conf
 .PP
 will do.  Remember also to restart \fBsyslog\fR after the changes to
 this file.

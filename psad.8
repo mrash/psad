@@ -236,6 +236,106 @@ parameters are specified within the configuration section of the psad
 program itself. See
 .B /usr/sbin/psad.
 
+.SH PSAD CONFIGURATION VARIABLES
+This section describes what each of the more important psad configuration
+variables do and how they can be tuned to meet your needs.  These variables
+are located in the psad configuration file
+.B /etc/psad/psad.conf
+and are assigned sensible defaults for most network architectures during
+the install process.
+
+.PP
+.PD
+.TP
+
+.BR ENABLE_PERSISTENCE
+If "Y" then psad will keep all scans in memory and not let them timeout.
+This can help discover stealthy scans where an attacker tries to slip beneath
+IDS thresholds by only scanning a few ports over a long period of time.
+.TP
+
+.BR SCAN_TIMEOUT
+If ENABLE_PERSISTENCE is "N" then psad will use the value set by SCAN_TIMEOUT
+to remove packets from the scan threshold calculation.  The default is 3600
+seconds (1 hour).
+.TP
+
+.BR DANGER_LEVEL{1,2,3,4,5}
+The DANGER_LEVEL{n} variables define the number of packets that must be
+dropped by the firewall before psad will assign the respective danger level
+to the scan.  There are five possible danger levels with one being the
+lowest and five the highest.  Note there are several factors that can
+influence how danger levels are calculated: whether or not a scan matches a
+signature listed in
+.B psad_signatures,
+the value of PORT_RANGE_SCAN_THREHOLD (see below), whether or not a scan comes
+from an ip that is listed in the
+.B psad_auto_ips
+file, and finally whether or not scans are allowed to timeout
+as determined by SCAN_TIMEOUT above.  If a signature is matched or the scanning
+ip is listed in
+.B psad_auto_ips,
+then the corrsponding danger level is automatically assigned to the scan.
+.TP
+
+.BR PORT_RANGE_SCAN_THRESHOLD
+Defines the minimum difference between the lowest port and the highest port
+scanned before an alert is sent (the default is 1 which means that at least
+two ports must be scanned to generate an alert).  For example, suppose an ip
+repeatedly scans a single port for which there is no special signature in
+.B psad_signatures.
+Then if PORT_RANGE_SCAN_THRESHOLD=1, psad will never send
+an alert for this "scan" no matter how many packets are sent to the port (i.e.
+no matter what the value of DANGER_LEVEL1 is).  The reason for the default of
+1 is that a "scan" usually means that at least two ports are probed, but if
+you want psad to be extra paranoid you can set PORT_RANGE_SCAN_THRESHOLD=0
+to alert on scans to single ports (as long as the number of packets also
+exceeds DANGER_LEVEL1).
+.TP
+
+.BR SHOW_ALL_SIGNATURES
+If "Y" then psad will display all signatures detected from a single scanning
+ip since a scan was first detected instead of just displaying newly-detected
+signatures.  All signatures are listed in the file
+.B psad_signatures.
+.TP
+
+.BR ALERT_ALL
+If "Y", send email for all new bad packets instead of just when a danger
+level increases (this is the default).
+.TP
+
+.BR PSAD_EMAIL_LIMIT
+Defines the maximum number of emails that will be sent for a single scanning
+ip (default is 50).  This variable gives you some protection from psad
+sending countless alerts if an ip scans your machine constantly.  psad
+will send a special alert if an ip has exceedes the email limit.
+.TP
+
+.BR EMAIL_ALERT_DANGER_LEVEL
+Defines the danger level a scan must reach before any alert is sent.
+.TP
+
+.BR ENABLE_AUTO_IDS
+.B psad
+has the capability of dynmaically blockng all traffic from an ip that
+has reached a (configurable) danger level through modification of tcpwrapper,
+ipchains, or iptables rulesets.
+.B NOTE:
+This feature is disabled by default since it is possible for an attacker
+to spoof packets from a well known (web)site in an effort to make it
+look as though the site is scanning your machine, and then psad will
+consequently block all access to it.  Also, psad works by parsing firewall
+messages for packets the firewall has already dropped, so the "scans" are
+unsuccessful anyway.  However, if an ip is scanning you it might be wise
+to not allow the ip to connect to servers that you do allow access to, and
+this is the reason the auto blocking capability was included in psad.
+.TP
+
+.BR AUTO_IDS_DANGER_LEVEL
+Defines the danger level a scan must reach before psad will automatically
+block the ip (ENABLE_AUTO_IDS must be set to "Y").
+
 .SH EXAMPLES
 The following examples illustrate the command line arguments that could
 be supplied to psad in a few situations:

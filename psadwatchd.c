@@ -179,7 +179,7 @@ int main(int argc, char *argv[]) {
                 &psadwatchd_max_retries
             );
             slogr("psad(psadwatchd)",
-                    "Received HUP signal, re-imported psadwatchd.conf");
+                    ".. received HUP signal, re-imported psadwatchd.conf");
         }
     }
 

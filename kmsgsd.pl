@@ -55,9 +55,6 @@ my %cmds;
 ### flag used for HUP signal
 my $hup_flag = 0;
 
-### syslog config file
-my $syslog = '/etc/syslog.conf';
-
 ### handle command line arguments
 die " ** Specify the path to the psad.conf file with " .
     "\"-c <file>\".\n\n" unless (GetOptions (
@@ -111,7 +108,7 @@ for (;;) {
         close FIFO;
         open FIFO, "< $config{'PSAD_FIFO'}" or
             die "Can't open file : $!\n";
-        &Psad::psyslog('psad(kmsgsd)', 'Received HUP signal, ' .
+        &Psad::psyslog('psad(kmsgsd)', '.. received HUP signal, ' .
             're-importing kmsgsd.conf');
     }
 }

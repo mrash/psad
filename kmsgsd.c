@@ -161,7 +161,7 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_FAILURE);  /* could not open fwdata file */
             }
             slogr("psad(kmsgsd)",
-                    "Received HUP signal, re-imported kmsgsd.conf");
+                    ".. received HUP signal, re-imported kmsgsd.conf");
         }
 
         /* see if we matched a firewall message and write it to the

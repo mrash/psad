@@ -58,10 +58,12 @@ my $LIBDIR       = '/usr/lib/psad';
 my $INSTALL_LOG  = "${PSAD_DIR}/install.log";
 my $PSAD_FIFO    = "${VARLIBDIR}/psadfifo";
 my $INIT_DIR     = '/etc/rc.d/init.d';
-my $SBIN_DIR     = '/usr/sbin';  ### consistent with FHS (Filesystem Hierarchy Standard)
+my $SBIN_DIR     = '/usr/sbin';  ### consistent with FHS (Filesystem
+                                 ### Hierarchy Standard)
 my $CONF_ARCHIVE = "${PSAD_CONFDIR}/archive";
 my @LOGR_FILES   = (*STDOUT, $INSTALL_LOG);
-my $RUNLEVEL;    ### This should only be set if install.pl cannot determine the correct runlevel
+my $RUNLEVEL;    ### This should only be set if install.pl
+                 ### cannot determine the correct runlevel
 my $WHOIS_PSAD   = '/usr/bin/whois.psad';
 
 ### system binaries ###
@@ -182,29 +184,38 @@ sub install() {
     }
     unless (-e $PSAD_FIFO) {
         &logr(" ... Creating named pipe $PSAD_FIFO\n");
-        ### create the named pipe
-        `$Cmds{'mknod'} -m 600 $PSAD_FIFO p`;    ### die does not seem to work right here.
+        ### create the named pipe (die does not seem to work correctly here...
+        ### should use the return value of system()).
+        `$Cmds{'mknod'} -m 600 $PSAD_FIFO p`;
         unless (-e $PSAD_FIFO) {
             &logr(" ... @@@  Could not create the named pipe \"$PSAD_FIFO\"!" .
-                "\n ... @@@  Psad requires this file to exist!  Aborting install.\n");
+                "\n ... @@@  Psad requires this file to exist!  Aborting " .
+                "install.\n");
             die;
         }
     }
-    &logr(" ... Modifying /etc/syslog.conf to write kern.info messages to $PSAD_FIFO\n");
-    copy('/etc/syslog.conf', '/etc/syslog.conf.orig') unless (-e '/etc/syslog.conf.orig');
+    &logr(" ... Modifying /etc/syslog.conf to write kern.info " .
+        "messages to $PSAD_FIFO\n");
+    unless (-e '/etc/syslog.conf.orig') {
+        copy('/etc/syslog.conf', '/etc/syslog.conf.orig');
+    }
     &archive('/etc/syslog.conf');
-    open RS, '< /etc/syslog.conf' or die " ... @@@  Unable to open /etc/syslog.conf: $!\n";
+    open RS, '< /etc/syslog.conf' or
+        die " ... @@@  Unable to open /etc/syslog.conf: $!\n";
     my @slines = <RS>;
     close RS;
-    open SYSLOG, '> /etc/syslog.conf' or die " ... @@@  Unable to open /etc/syslog.conf: $!\n";
+    open SYSLOG, '> /etc/syslog.conf' or
+        die " ... @@@  Unable to open /etc/syslog.conf: $!\n";
     for my $line (@slines) {
         chomp $line;
         unless ($line =~ /psadfifo/) {
             print SYSLOG "$line\n";
         }
     }
-    print SYSLOG "# Send kern.info messages to psadfifo for analysis by kmsgsd\n";
-    print SYSLOG "kern.info		|$PSAD_FIFO\n";  ### reinstate kernel logging to our named pipe
+    print SYSLOG "# Send kern.info messages to psadfifo for " .
+        "analysis by kmsgsd\n";
+    ### reinstate kernel logging to our named pipe
+    print SYSLOG "kern.info		|$PSAD_FIFO\n";
     close SYSLOG;
     print " ... Restarting syslog.\n";
     system "$Cmds{'killall'} -HUP syslogd";
@@ -226,9 +237,12 @@ sub install() {
     }
     if (-d 'whois-4.5.31') {
         &logr(" ... Compiling Marco d'Itri's whois client\n");
-        if (! system("$Cmds{'make'} -C whois-4.5.31")) {  # remember unix return value...
+        system "$Cmds{'make'} -C whois-4.5.31";
+        if (-e 'whois-4.5.31/whois') {
             &logr(" ... Copying whois binary to $WHOIS_PSAD\n");
             copy("whois-4.5.31/whois", $WHOIS_PSAD);
+        } else {
+            die " ... @@@ Could not compile whois-4.5.31";
         }
     }
     &perms_ownership($WHOIS_PSAD, 0755);
@@ -238,8 +252,9 @@ sub install() {
 
     chdir 'Psad.pm';
     unless (-e 'Makefile.PL' && -e 'Psad.pm') {
-        die " ... @@@  Your source distribution appears to be incomplete!  Psad.pm is missing.\n" .
-            "        Download the latest sources from http://www.cipherdyne.com\n";
+        die " ... @@@  Your source distribution appears to be incomplete!  " .
+            "Psad.pm is missing.\n        Download the latest sources from " .
+            "http://www.cipherdyne.com\n";
     }
     system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
     system "$Cmds{'make'}";
@@ -254,8 +269,9 @@ sub install() {
 
     chdir 'Unix-Syslog-0.98';
     unless (-e 'Makefile.PL' && -e 'Syslog.pm') {
-        die " ... @@@  Your source kit appears to be incomplete!  Syslog.pm is missing.\n" .
-            "       Download the latest sources from http://www.cipherdyne.com\n";
+        die " ... @@@  Your source kit appears to be incomplete!  Syslog.pm " .
+            "is missing.\n       Download the latest sources from " .
+            "http://www.cipherdyne.com\n";
     }
     system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
     system "$Cmds{'make'}";
@@ -273,16 +289,16 @@ sub install() {
             " latest sources from:\n\nhttp://www.cipherdyne.com\n";
     }
     unless ((system "$Cmds{'perl'} -c psadwatchd") == 0) {
-        die " ... @@@ psadwatchd does not compile with \"perl -c\".  Download the" .
-            " latest sources from:\n\nhttp://www.cipherdyne.com\n";
+        die " ... @@@ psadwatchd does not compile with \"perl -c\".  Download " .
+            "the latest sources from:\n\nhttp://www.cipherdyne.com\n";
     }
     unless ((system "$Cmds{'perl'} -c kmsgsd") == 0) {
         die " ... @@@ kmsgsd does not compile with \"perl -c\".  Download the" .
             " latest sources from:\n\nhttp://www.cipherdyne.com\n";
     }
     unless ((system "$Cmds{'perl'} -c diskmond") == 0) {
-        die " ... @@@ diskmond does not compile with \"perl -c\".  Download the" .
-            " latest sources from:\n\nhttp://www.cipherdyne.com\n";
+        die " ... @@@ diskmond does not compile with \"perl -c\".  Download "
+            "the latest sources from:\n\nhttp://www.cipherdyne.com\n";
     }
     print "\n";
 
@@ -313,21 +329,25 @@ sub install() {
     }
     if (-e "${PSAD_CONFDIR}/psad_signatures") {
         &archive("${PSAD_CONFDIR}/psad_signatures") unless $nopreserve;
-        &logr(" ... Copying psad_signatures -> ${PSAD_CONFDIR}/psad_signatures\n");
+        &logr(" ... Copying psad_signatures -> " .
+            "${PSAD_CONFDIR}/psad_signatures\n");
         copy('psad_signatures', "${PSAD_CONFDIR}/psad_signatures");
         &perms_ownership("${PSAD_CONFDIR}/psad_signatures", 0600);
     } else {
-        &logr(" ... Copying psad_signatures -> ${PSAD_CONFDIR}/psad_signatures\n");
+        &logr(" ... Copying psad_signatures -> " .
+            "${PSAD_CONFDIR}/psad_signatures\n");
         copy('psad_signatures', "${PSAD_CONFDIR}/psad_signatures");
         &perms_ownership("${PSAD_CONFDIR}/psad_signatures", 0600);
     }
     if (-e "${PSAD_CONFDIR}/psad_auto_ips") {
         &archive("${PSAD_CONFDIR}/psad_auto_ips") unless $nopreserve;
-        &logr(" ... Copying psad_auto_ips -> ${PSAD_CONFDIR}/psad_auto_ips\n");
+        &logr(" ... Copying psad_auto_ips -> " .
+            "${PSAD_CONFDIR}/psad_auto_ips\n");
         copy('psad_auto_ips', "${PSAD_CONFDIR}/psad_auto_ips");
         &perms_ownership("${PSAD_CONFDIR}/psad_auto_ips", 0600);
     } else {
-        &logr(" ... Copying psad_auto_ips -> ${PSAD_CONFDIR}/psad_auto_ips\n");
+        &logr(" ... Copying psad_auto_ips -> " .
+            "${PSAD_CONFDIR}/psad_auto_ips\n");
         copy('psad_auto_ips', "${PSAD_CONFDIR}/psad_auto_ips");
         &perms_ownership("${PSAD_CONFDIR}/psad_auto_ips", 0600);
     }
@@ -351,7 +371,8 @@ sub install() {
     ### else other than the normal "DROP", "DENY", or "REJECT" strings.
     my $append_fw_search_str = &get_fw_search_string();
     if ($append_fw_search_str) {
-        &logr(" ... Appending \"$append_fw_search_str\" to \$FW_MSG_SEARCH in ${PSAD_CONFDIR}/psad.conf\n");
+        &logr(" ... Appending \"$append_fw_search_str\" to " .
+            "\$FW_MSG_SEARCH in ${PSAD_CONFDIR}/psad.conf\n");
         &put_fw_search_str("${PSAD_CONFDIR}/psad.conf", $append_fw_search_str);
     }
     ### make sure the PSAD_DIR and PSAD_FIFO variables are correctly defined
@@ -366,8 +387,10 @@ sub install() {
     ### /etc/man.config
     my $mpath = '/usr/share/man/man8';
     if (-e '/etc/man.config') {
-        ### prefer to install psad.8 in /usr/local/man/man8 if this directory is configured in /etc/man.config
-        open M, '< /etc/man.config' or die " ... @@@ Could not open /etc/man.config: $!";
+        ### prefer to install psad.8 in /usr/local/man/man8 if
+        ### this directory is configured in /etc/man.config
+        open M, '< /etc/man.config' or
+            die " ... @@@ Could not open /etc/man.config: $!";
         my @lines = <M>;
         close M;
         ### prefer the path "/usr/share/man"
@@ -414,11 +437,11 @@ sub install() {
             copy('psad-init', "${INIT_DIR}/psad");
             &perms_ownership("${INIT_DIR}/psad", 0744);
             &enable_psad_at_boot($distro);
-            # remove signature checking from psad process if we are not running an iptables-enabled kernel
-    #       system "$Cmds{'perl'} -p -i -e 's|\\-s\\s/etc/psad/psad_signatures||' ${INIT_DIR}/psad" if ($kernel !~ /^2.3/ && $kernel !~ /^2.4/);
         } else {
-            &logr(" ... @@@  The init script directory, \"${INIT_DIR}\" does not exist!.\n");
-            &logr("Edit the \$INIT_DIR variable in the config section to point to where the init scripts are.\n");
+            &logr(" ... @@@  The init script directory, \"${INIT_DIR}\" " .
+                "does not exist!.\n");
+            &logr("Edit the \$INIT_DIR variable in the config section to " .
+                "point to where the init scripts are.\n");
         }
     } else {  ### psad is being installed on a non-redhat distribution
         if (-d $INIT_DIR) {
@@ -426,10 +449,10 @@ sub install() {
             copy('psad-init.generic', "${INIT_DIR}/psad");
             &perms_ownership("${INIT_DIR}/psad", 0744);
             &enable_psad_at_boot($distro);
-            # remove signature checking from psad process if we are not running an iptables-enabled kernel
-    #       system "$Cmds{'perl'} -p -i -e 's|\\-s\\s/etc/psad/psad_signatures||' ${INIT_DIR}/psad" if ($kernel !~ /^2.3/ && $kernel !~ /^2.4/);
         } else {
-            &logr(" ... @@@  The init script directory, \"${INIT_DIR}\" does not exist!.  Edit the \$INIT_DIR variable in the config section.\n");
+            &logr(" ... @@@  The init script directory, \"${INIT_DIR}\" does " .
+                "not exist!.  Edit the \$INIT_DIR variable in the config " .
+                "section.\n");
         }
     }
     my $running;
@@ -445,18 +468,21 @@ sub install() {
     }
     if ($distro =~ /redhat/) {
         if ($running) {
-            &logr(" ... An older version of psad is already running.  To execute, " .
-                  "run \"${INIT_DIR}/psad restart\"\n");
+            &logr(" ... An older version of psad is already running.  To ".
+                "execute, run \"${INIT_DIR}/psad restart\"\n");
         } else {
             &logr(" ... To execute psad, run \"${INIT_DIR}/psad start\"\n");
         }
     } else {
         if ($running) {
-            &logr(" ... An older version of psad is already running.  kill pid $pid, and then execute:\n");
-            &logr("${SBIN_DIR}/psad -s ${PSAD_CONFDIR}/psad_signatures -a ${PSAD_CONFDIR}/psad_auto_ips\n");
+            &logr(" ... An older version of psad is already running.  kill " .
+                "pid $pid, and then execute:\n");
+            &logr("${SBIN_DIR}/psad -s ${PSAD_CONFDIR}/psad_signatures -a " .
+                "${PSAD_CONFDIR}/psad_auto_ips\n");
         } else {
-            &logr("To start psad, execute: ${SBIN_DIR}/psad -s ${PSAD_CONFDIR}/psad_signatures " .
-                  "-a ${PSAD_CONFDIR}/psad_auto_ips\n");
+            &logr("To start psad, execute: ${SBIN_DIR}/psad -s " .
+                "${PSAD_CONFDIR}/psad_signatures -a ${PSAD_CONFDIR}/" .
+                "psad_auto_ips\n");
         }
     }
     &logr("\n ... Psad has been installed!\n");
@@ -471,16 +497,18 @@ sub uninstall() {
 
     my $ans = '';
     while ($ans ne 'y' && $ans ne 'n') {
-        print wrap('', $SUB_TAB, ' ... This will completely remove psad from your system.  Are you sure (y/n)? ');
+        print wrap('', $SUB_TAB, ' ... This will completely remove psad ' .
+            'from your system.  Are you sure (y/n)? ');
         $ans = <STDIN>;
         chomp $ans;
     }
     if ($ans eq 'n') {
-        &logr(" @@@ User aborted uninstall by answering \"n\" to the remove question!  Exiting.\n");
+        &logr(" @@@ User aborted uninstall by answering \"n\" to the remove " .
+            "question!  Exiting.\n");
         exit 0;
     }
-    ### after this point, psad will really be uninstalled so stop writing stuff to
-    ### the install.log file.  Just print everything to STDOUT
+    ### after this point, psad will really be uninstalled so stop writing stuff
+    ### to the install.log file.  Just print everything to STDOUT
     if (-e "${SBIN_DIR}/psad" && system "${SBIN_DIR}/psad --Status > /dev/null") {
         print " ... Stopping psad daemons!\n";
         if (-e "${INIT_DIR}/psad") {
@@ -490,11 +518,16 @@ sub uninstall() {
         }
     }
     if (-e "${SBIN_DIR}/psad") {
-        print wrap('', $SUB_TAB, " ... Removing psad daemons: ${SBIN_DIR}/(psad, psadwatchd, kmsgsd, diskmond)\n");
-        unlink "${SBIN_DIR}/psad"       or warn " ... @@@  Could not remove ${SBIN_DIR}/psad!!!\n";
-        unlink "${SBIN_DIR}/psadwatchd" or warn " ... @@@  Could not remove ${SBIN_DIR}/psadwatchd!!!\n";
-        unlink "${SBIN_DIR}/kmsgsd"     or warn " ... @@@  Could not remove ${SBIN_DIR}/kmsgsd!!!\n";
-        unlink "${SBIN_DIR}/diskmond"   or warn " ... @@@  Could not remove ${SBIN_DIR}/diskmond!!!\n";
+        print wrap('', $SUB_TAB, " ... Removing psad daemons: ${SBIN_DIR}/" .
+            "(psad, psadwatchd, kmsgsd, diskmond)\n");
+        unlink "${SBIN_DIR}/psad"       or
+            warn " ... @@@  Could not remove ${SBIN_DIR}/psad!!!\n";
+        unlink "${SBIN_DIR}/psadwatchd" or
+            warn " ... @@@  Could not remove ${SBIN_DIR}/psadwatchd!!!\n";
+        unlink "${SBIN_DIR}/kmsgsd"     or
+            warn " ... @@@  Could not remove ${SBIN_DIR}/kmsgsd!!!\n";
+        unlink "${SBIN_DIR}/diskmond"   or
+            warn " ... @@@  Could not remove ${SBIN_DIR}/diskmond!!!\n";
     }
     if (-e "${INIT_DIR}/psad") {
         print " ... Removing ${INIT_DIR}/psad\n";
@@ -536,14 +569,17 @@ sub uninstall() {
     if (-e '/etc/syslog.conf.orig') {
         move('/etc/syslog.conf.orig', '/etc/syslog.conf');
     } else {
-        print wrap('', $SUB_TAB, " ... /etc/syslog.conf.orig does not exist.  Editing /etc/syslog.conf directly.\n");
-        open ESYS, '< /etc/syslog.conf' or die " ... @@@  Unable to open /etc/syslog.conf: $!\n";
+        print wrap('', $SUB_TAB, " ... /etc/syslog.conf.orig does not exist. " .
+            " Editing /etc/syslog.conf directly.\n");
+        open ESYS, '< /etc/syslog.conf' or
+            die " ... @@@  Unable to open /etc/syslog.conf: $!\n";
         my @sys = <ESYS>;
         close ESYS;
         open CSYS, '> /etc/syslog.conf';
-            for my $s (@sys) {
-            chomp $s;
-            print CSYS "$s\n" if ($s !~ /psadfifo/);  ### don't print the psadfifo line
+            for my $line (@sys) {
+            chomp $line;
+            ### don't print the psadfifo line
+            print CSYS "$s\n" if ($line !~ /psadfifo/);
         }
         close CSYS;
     }
@@ -557,13 +593,27 @@ sub uninstall() {
 
 sub check_old_psad_installation() {
     my $old_install_dir = '/usr/local/bin';
-    move("${old_install_dir}/psad", "${SBIN_DIR}/psad")             if (-e "${old_install_dir}/psad");
-    move("${old_install_dir}/psadwatchd", "${SBIN_DIR}/psadwatchd") if (-e "${old_install_dir}/psadwatchd");
-    move("${old_install_dir}/diskmond", "${SBIN_DIR}/diskmond")     if (-e "${old_install_dir}/diskmond");
-    move("${old_install_dir}/kmsgsd", "${SBIN_DIR}/kmsgsd")         if (-e "${old_install_dir}/kmsgsd");
-    unlink "${PSAD_CONFDIR}/psad_signatures.old" if (-e "${PSAD_CONFDIR}/psad_signatures.old");
-    unlink "${PSAD_CONFDIR}/psad_auto_ips.old"   if (-e "${PSAD_CONFDIR}/psad_auto_ips.old");
-    unlink "${PSAD_CONFDIR}/psad.conf.old"       if (-e "${PSAD_CONFDIR}/psad.conf.old");
+    if (-e "${old_install_dir}/psad") {
+        move("${old_install_dir}/psad", "${SBIN_DIR}/psad");
+    }
+    if (-e "${old_install_dir}/psadwatchd") {
+        move("${old_install_dir}/psadwatchd", "${SBIN_DIR}/psadwatchd");
+    }
+    if (-e "${old_install_dir}/diskmond") {
+        move("${old_install_dir}/diskmond", "${SBIN_DIR}/diskmond");
+    }
+    if (-e "${old_install_dir}/kmsgsd") {
+        move("${old_install_dir}/kmsgsd", "${SBIN_DIR}/kmsgsd");
+    }
+    if (-e "${PSAD_CONFDIR}/psad_signatures.old") {
+        unlink "${PSAD_CONFDIR}/psad_signatures.old";
+    }
+    if (-e "${PSAD_CONFDIR}/psad_auto_ips.old") {
+        unlink "${PSAD_CONFDIR}/psad_auto_ips.old";
+    }
+    if (-e "${PSAD_CONFDIR}/psad.conf.old") {
+        unlink "${PSAD_CONFDIR}/psad.conf.old";
+    }
     ### Psad.pm will be installed The Right Way using "make"
     unlink "${PERL_INSTALL_DIR}/Psad.pm" if (-e "${PERL_INSTALL_DIR}/Psad.pm");
     if (-e '/var/log/psadfifo') {  ### this is the old psadfifo location
@@ -581,9 +631,9 @@ sub get_distro() {
         ### Red Hat Linux release 6.2 (Zoot)
         open ISSUE, '< /etc/issue';
         while(<ISSUE>) {
-            my $l = $_;
-            chomp $l;
-            return 'redhat' if ($l =~ /Red\s*Hat/i);
+            my $line = $_;
+            chomp $line;
+            return 'redhat' if ($line =~ /Red\s*Hat/i);
         }
         close ISSUE;
         return 'NA';
@@ -631,9 +681,9 @@ sub query_email() {
     my @clines = <F>;
     close F;
     my $email_addresses;
-    for my $l (@clines) {
+    for my $line (@clines) {
         chomp $l;
-        if ($l =~ /^\s*EMAIL_ADDRESSES\s+\((.+)\)/) {
+        if ($line =~ /^\s*EMAIL_ADDRESSES\s+\((.+)\)/) {
             $email_addresses = $1;
             last;
         }
@@ -647,7 +697,8 @@ sub query_email() {
     while ($ans ne 'y' && $ans ne 'n') {
         print " ... Would you like alerts sent to a different address ([y]/n)?  ";
         $ans = <STDIN>;
-        if ($ans eq "\n") {  ### allow the default of "y" to take over when just "Enter" is pressed.
+        if ($ans eq "\n") {  ### allow the default of "y" to take over
+                             ### when just "Enter" is pressed.
             $ans = 'y';
         }
         chomp $ans;
@@ -655,8 +706,10 @@ sub query_email() {
     print "\n";
     if ($ans eq 'y') {
         print "\n";
-        print " ... To which email address(es) would you like psad alerts to be sent?\n";
-        print " ... You can enter as many email addresses as you like separated by spaces.\n";
+        print " ... To which email address(es) would you like " .
+            "psad alerts to be sent?\n";
+        print " ... You can enter as many email addresses as you like " .
+            "separated by spaces.\n";
         my $emailstr = '';
         my $correct = 0;
         while (! $correct) {
@@ -685,8 +738,8 @@ sub put_email() {
     my @lines = <RF>;
     close RF;
     open F, "> $file";
-    for my $l (@lines) {
-        if ($l =~ /EMAIL_ADDRESSES\s*\(/) {
+    for my $line (@lines) {
+        if ($line =~ /EMAIL_ADDRESSES\s*\(/) {
             print F "EMAIL_ADDRESSES            ($emailstr);\n";
         } else {
             print F $l;
@@ -701,8 +754,8 @@ sub put_fw_search_str() {
     my @lines = <RF>;
     close RF;
     open F, "> $file";
-    for my $l (@lines) {
-        if ($l =~ /^\s*FW_MSG_SEARCH\s*(.*);/) {
+    for my $line (@lines) {
+        if ($line =~ /^\s*FW_MSG_SEARCH\s*(.*);/) {
             my $fw_string = $1;
             $fw_string .= "|$append_fw_search";
             print F "FW_MSG_SEARCH              $fw_string;\n";
@@ -719,8 +772,8 @@ sub put_string() {
     my @lines = <RF>;
     close RF;
     open F, "> $file";
-    for my $l (@lines) {
-        if ($l =~ /^\s*$key\s*.*;/) {
+    for my $line (@lines) {
+        if ($line =~ /^\s*$key\s*.*;/) {
             print F "$key                    $value;\n";
         } else {
             print F $l;
@@ -762,31 +815,40 @@ sub enable_psad_at_boot() {
     if ($ans eq 'y') {
         if ($distro =~ /redhat/) {
             system "$Cmds{'chkconfig'} --add psad";
-        } else {  ### it is a non-redhat distro, try to get the runlevel from /etc/inittab
+        } else {  ### it is a non-redhat distro, try to
+                  ### get the runlevel from /etc/inittab
             if ($RUNLEVEL) {
-                unless (-e "/etc/rc.d/rc${RUNLEVEL}.d/S99psad") {  ### the link already exists, so don't re-create it
-                    symlink '/etc/rc.d/init.d/psad', "/etc/rc.d/rc${RUNLEVEL}.d/S99psad";
+                ### the link already exists, so don't re-create it
+                unless (-e "/etc/rc.d/rc${RUNLEVEL}.d/S99psad") {
+                    symlink '/etc/rc.d/init.d/psad',
+                        "/etc/rc.d/rc${RUNLEVEL}.d/S99psad";
                 }
             } elsif (-e '/etc/inittab') {
                 open I, '< /etc/inittab';
                 my @ilines = <I>;
                 close I;
-                for my $l (@ilines) {
+                for my $line (@ilines) {
                     chomp $l;
-                    if ($l =~ /^id\:(\d)\:initdefault/) {
+                    if ($line =~ /^id\:(\d)\:initdefault/) {
                         $RUNLEVEL = $1;
                         last;
                     }
                 }
                 unless ($RUNLEVEL) {
-                    print " ... @@@  Could not determine the runlevel.  Set the runlevel\nmanually in the config section of install.pl\n";
+                    print " ... @@@  Could not determine the runlevel.  Set " .
+                        "the runlevel\nmanually in the config section of " .
+                        "install.pl\n";
                     return;
                 }
-                unless (-e "/etc/rc.d/rc${RUNLEVEL}.d/S99psad") {  ### the link already exists, so don't re-create it
-                    symlink '/etc/rc.d/init.d/psad', "/etc/rc.d/rc${RUNLEVEL}.d/S99psad";
+                ### the link already exists, so don't re-create it
+                unless (-e "/etc/rc.d/rc${RUNLEVEL}.d/S99psad") {
+                    symlink '/etc/rc.d/init.d/psad',
+                        "/etc/rc.d/rc${RUNLEVEL}.d/S99psad";
                 }
             } else {
-                print " ... @@@  /etc/inittab does not exist!  Set the runlevel\nmanually in the config section of install.pl.\n";
+                print " ... @@@  /etc/inittab does not exist!  Set the " .
+                    "runlevel\nmanually in the config section of " .
+                    "install.pl.\n";
                 return;
             }
         }
@@ -811,13 +873,14 @@ sub check_commands() {
             }
             unless ($found) {
                 next CMD if ($cmd eq 'ipchains' || $cmd eq 'iptables');
-                die "\n ... @@@  ($caller): Could not find $cmd anywhere!!!  Please" .
-                    " edit the config section to include the path to $cmd.\n";
+                die "\n ... @@@  ($caller): Could not find $cmd anywhere!!!  " .
+                    "Please edit the config section to include the path to " .
+                    "$cmd.\n";
             }
         }
         unless (-x $Cmds_href->{$cmd}) {
-            die "\n ... @@@  ($caller):  $cmd_name is located at $Cmds_href->{$cmd}" .
-                                            " but is not executable by uid: $<\n";
+            die "\n ... @@@  ($caller):  $cmd_name is located at " .
+                "$Cmds_href->{$cmd} but is not executable by uid: $<\n";
         }
     }
     return;

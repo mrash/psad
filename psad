@@ -760,8 +760,8 @@ sub check_scan() {
                 }
                 $matched_packet = 1;
             } elsif ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+).*
-                               TTL=(\d+).*PROTO=ICMP\s+TYPE=(\d+)\s+
-                               CODE=(\d+)\s+ID=(\d+)\s+SEQ=(\d+)/x) {
+                              TTL=(\d+).*PROTO=ICMP\s+TYPE=(\d+)\s+
+                              CODE=(\d+)\s+ID=(\d+)\s+SEQ=(\d+)/x) {
                 ($src, $dst, $len, $ttl, $type, $code, $id, $seq) =
                     ($1,$2,$3,$4,$5,$6,$7,$8);
                 $proto = 'ICMP';
@@ -828,25 +828,25 @@ sub check_scan() {
             $scan{$src}{$dst}{'S_TIME'} = time();
         }
 
-        ### inialize the start and end port for the scanned port range
-        unless (defined $scan{$src}{$dst}{$proto}{'S_PORT'}
+        ### initialize the start and end port for the scanned port range
+        unless (defined $scan{$src}{$dst}{$proto}{'ABS_SP'}
             || $proto eq 'ICMP') {
             ### This is the absolute starting port since the
             ### first packet was detected.  Make sure the initial
             ### start port is not too low
-            $scan{$src}{$dst}{$proto}{'S_PORT'} = 65535;
+            $scan{$src}{$dst}{$proto}{'ABS_SP'} = 65535;
             ### make sure the initial end port is not too high
-            $scan{$src}{$dst}{$proto}{'E_PORT'} = 0;
+            $scan{$src}{$dst}{$proto}{'ABS_EP'} = 0;
         }
 
         ### initialize values for the current interval
         unless (defined $scan{$src}{$dst}{$proto}{'CURR_INT'}) {
             unless ($proto eq 'ICMP') {
                 ### make sure the initial start port is not too low
-                $scan{$src}{$dst}{$proto}{'CURR_INT'}{'S_PORT'}
+                $scan{$src}{$dst}{$proto}{'CURR_INT'}{'SP'}
                     = 65535;
                 ### make sure the initial end port is not too high
-                $scan{$src}{$dst}{$proto}{'CURR_INT'}{'E_PORT'}
+                $scan{$src}{$dst}{$proto}{'CURR_INT'}{'EP'}
                     = 0;
             }
         }
@@ -857,22 +857,21 @@ sub check_scan() {
         $scan{$src}{$dst}{$proto}{'PKTS'}++;
 
         ### keep track of tcp flags
-        if ($proto eq 'TCP') {
-            $scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'FLAGS'}{$flags}++;
-        }
+        $scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'FLAGS'}{$flags}++
+            if $proto eq 'TCP';
 
         ### see if the destination port lies outside our current range
         ### and change if needed
         unless ($proto eq 'ICMP') {
-            ($scan{$src}{$dst}{$proto}{'S_PORT'},
-                $scan{$src}{$dst}{$proto}{'E_PORT'}) = &check_range($dstport,
-                    $scan{$src}{$dst}{$proto}{'S_PORT'},
-                    $scan{$src}{$dst}{$proto}{'E_PORT'});
-            ($scan{$src}{$dst}{$proto}{'CURR_INT'}{'S_PORT'},
-                $scan{$src}{$dst}{$proto}{'CURR_INT'}{'E_PORT'}) =
+            ($scan{$src}{$dst}{$proto}{'ABS_SP'},
+                $scan{$src}{$dst}{$proto}{'ABS_EP'}) = &check_range($dstport,
+                    $scan{$src}{$dst}{$proto}{'ABS_SP'},
+                    $scan{$src}{$dst}{$proto}{'ABS_EP'});
+            ($scan{$src}{$dst}{$proto}{'CURR_INT'}{'SP'},
+                $scan{$src}{$dst}{$proto}{'CURR_INT'}{'EP'}) =
                 &check_range($dstport,
-                    $scan{$src}{$dst}{$proto}{'CURR_INT'}{'S_PORT'},
-                    $scan{$src}{$dst}{$proto}{'CURR_INT'}{'E_PORT'});
+                    $scan{$src}{$dst}{$proto}{'CURR_INT'}{'SP'},
+                    $scan{$src}{$dst}{$proto}{'CURR_INT'}{'EP'});
         }
         if ($debug) {
             print STDOUT "check_scan(): src: $src, dst: $dst\n";
@@ -1525,16 +1524,12 @@ sub assign_danger_level() {
 
             ### calculate the range over _both_ tcp and udp
             for my $proto qw(TCP UDP) {
-                next unless defined $scan{$src}{$dst}{$proto};
-                if ($s_port < $scan{$src}{$dst}{$proto}{'S_PORT'}) {
-                    $s_port = $scan{$src}{$dst}{$proto}{'S_PORT'};
+                next unless defined $scan{$src}{$dst}{$proto}{'ABS_SP'};
+                if ($s_port < $scan{$src}{$dst}{$proto}{'ABS_SP'}) {
+                    $s_port = $scan{$src}{$dst}{$proto}{'ABS_SP'};
                 }
-                if ($e_port < $scan{$src}{$dst}{$proto}{'E_PORT'}) {
-                    $e_port = $scan{$src}{$dst}{$proto}{'E_PORT'};
-                }
-                if (defined $scan{$src}{$dst}{$proto}{'S_PORT'}) {
-                    $range = $scan{$src}{$dst}{$proto}{'E_PORT'} -
-                        $scan{$src}{$dst}{$proto}{'S_PORT'};
+                if ($e_port > $scan{$src}{$dst}{$proto}{'ABS_EP'}) {
+                    $e_port = $scan{$src}{$dst}{$proto}{'ABS_EP'};
                 }
             }
             if ($e_port) {
@@ -1548,10 +1543,10 @@ sub assign_danger_level() {
                     "$scan{$src}{$dst}{'ABSNUM'}\n";
                 for my $proto qw(TCP UDP) {
                     next unless defined $scan{$src}{$dst}{$proto};
-                    if (defined $scan{$src}{$dst}{$proto}{'S_PORT'}) {
-                        print "assign_danger_level(): S_PORT: ",
-                            "$scan{$src}{$dst}{$proto}{'S_PORT'}, E_PORT: ",
-                            "$scan{$src}{$dst}{$proto}{'E_PORT'}\n";
+                    if (defined $scan{$src}{$dst}{$proto}{'ABS_SP'}) {
+                        print "assign_danger_level(): ABS_SP: ",
+                            "$scan{$src}{$dst}{$proto}{'ABS_SP'}, ABS_EP: ",
+                            "$scan{$src}{$dst}{$proto}{'ABS_EP'}\n";
                     }
                 }
                 print 'assign_danger_level(): DL (before assignment) = ',
@@ -1692,11 +1687,11 @@ sub scan_logr() {
             $tot_icmp = $scan{$src}{$dst}{'ICMP'}{'PKTS'}
                 if defined $scan{$src}{$dst}{'ICMP'}{'PKTS'};
 
-            if (defined $scan{$src}{$dst}{'TCP'}{'S_PORT'}) {
+            if (defined $scan{$src}{$dst}{'TCP'}{'ABS_SP'}) {
                 my $tcp_s_port
-                    = $scan{$src}{$dst}{'TCP'}{'S_PORT'};
+                    = $scan{$src}{$dst}{'TCP'}{'ABS_SP'};
                 my $tcp_e_port
-                    = $scan{$src}{$dst}{'TCP'}{'E_PORT'};
+                    = $scan{$src}{$dst}{'TCP'}{'ABS_EP'};
                 if ($tcp_s_port == $tcp_e_port) {
                     $tcp_absrange = $tcp_s_port;
                 } else {
@@ -1706,9 +1701,9 @@ sub scan_logr() {
             if (defined $scan{$src}{$dst}{'TCP'}{'CURR_INT'}) {
                 $tcp_f = 1;
                 my $tcp_s_port
-                    = $scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'S_PORT'};
+                    = $scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'SP'};
                 my $tcp_e_port
-                    = $scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'E_PORT'};
+                    = $scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'EP'};
                 if ($tcp_s_port == $tcp_e_port) {
                     $tcp_newrange = $tcp_s_port;
                 } else {
@@ -1717,11 +1712,11 @@ sub scan_logr() {
                 $tcp_newpkts = $scan{$src}{$dst}{'TCP'}
                     {'CURR_INT'}{'PKTS'};
             }
-            if (defined $scan{$src}{$dst}{'UDP'}{'S_PORT'}) {
+            if (defined $scan{$src}{$dst}{'UDP'}{'ABS_SP'}) {
                 my $udp_s_port
-                    = $scan{$src}{$dst}{'UDP'}{'S_PORT'};
+                    = $scan{$src}{$dst}{'UDP'}{'ABS_SP'};
                 my $udp_e_port
-                    = $scan{$src}{$dst}{'UDP'}{'E_PORT'};
+                    = $scan{$src}{$dst}{'UDP'}{'ABS_EP'};
                 if ($udp_s_port == $udp_e_port) {
                     $udp_absrange = $udp_s_port;
                 } else {
@@ -1731,9 +1726,9 @@ sub scan_logr() {
             if (defined $scan{$src}{$dst}{'UDP'}{'CURR_INT'}) {
                 $udp_f = 1;
                 my $udp_s_port
-                    = $scan{$src}{$dst}{'UDP'}{'CURR_INT'}{'S_PORT'};
+                    = $scan{$src}{$dst}{'UDP'}{'CURR_INT'}{'SP'};
                 my $udp_e_port
-                    = $scan{$src}{$dst}{'UDP'}{'CURR_INT'}{'E_PORT'};
+                    = $scan{$src}{$dst}{'UDP'}{'CURR_INT'}{'EP'};
                 if ($udp_s_port == $udp_e_port) {
                     $udp_newrange = $udp_s_port;
                 } else {
@@ -2740,7 +2735,7 @@ sub fw_check() {
                 'defined chains and so it is possible your firewall config ' .
                 "is compatible with psad anyway.\n",
                 {"$config{'PSAD_DIR'}/fw_check.txt" => 1});
-            &Psad::sendmail(" ** psad: firewall setup warning!",
+            &Psad::sendmail(" ** psad: firewall setup warning on $hostname!",
                 "$config{'PSAD_DIR'}/fw_check.txt",
                 $config{'EMAIL_ADDRESSES'},
                 $cmds{'mail'}

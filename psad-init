@@ -85,16 +85,14 @@ if grep -q psadfifo /etc/syslog.conf; then
 	# See how we were called.
 	case "$1" in
   	start)
-		echo -n "Restarting syslog: "
-		/etc/rc.d/init.d/syslog restart
 		echo
-		echo -n "Starting up the kmsgs daemon: "
+		echo -n "Starting the kmsgs daemon: "
 		daemon /usr/local/bin/kmsgsd
 		echo
-		echo -n "Starting up the psad daemon: "
-		daemon /usr/local/bin/psad
+		echo -n "Starting the psad daemon: "
+		daemon /usr/local/binn/psad
 		echo
-		echo -n "Starting up the disk monitoring daemon: "
+		echo -n "Starting the disk monitoring daemon: "
 		daemon /usr/local/bin/diskmond
 		echo
 		;;

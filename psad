@@ -2575,7 +2575,6 @@ sub write_global_packet_counters() {
 }
 
 sub write_prefix_counters() {
-return;
     open P, "> $config{'IPT_PREFIX_COUNTER_FILE'}" or
         die "[*] Could not open $config{'IPT_PREFIX_COUNTER_FILE'}: $!";
     for my $prefix (keys %ipt_prefixes) {
@@ -4891,8 +4890,9 @@ sub setup() {
                 print SYSLOGNG "\n",
                     'destination psadpipe { pipe(',
                     "\"$config{'PSAD_FIFO'}\"); };\n",
-                    "filter f_kerninfo { facility(kern) ",
-                    "and level(info); };\n",
+                    "filter f_kerninfo { facility(kern); };\n",
+#                    "filter f_kerninfo { facility(kern) ",
+#                    "and level(info); };\n",
                     'log { source(src); ',
                     "filter(f_kerninfo); destination(psadpipe); };\n";
                 close SYSLOGNG;

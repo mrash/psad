@@ -11,8 +11,6 @@
 #
 # Credits:  (see the CREDITS file)
 #
-# Version: 1.3.2
-#
 # Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.org)
 #
 # License (GNU Public License):
@@ -802,11 +800,9 @@ sub stop_psad() {
         chomp $pid;
         if (kill 0, $pid) {
             print "[+] Stopping running psad daemons.\n";
-            if ($init_dir) {
-                system "$init_dir/psad stop";
-            } else {
-                system "$USRSBIN_DIR/psad -K";
-            }
+            ### psad may have been started from the command line
+            ### without using the init script, so stop with -K
+            system "$USRSBIN_DIR/psad -K";
         }
     }
     return;
@@ -960,7 +956,8 @@ sub append_fifo_syslog_ng() {
             die "[*] Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
         print SYSLOGNG "\n",
             "destination psadpipe { pipe(\"/var/lib/psad/psadfifo\"); };\n",
-            "filter f_kerninfo { facility(kern) and level(info); };\n",
+#            "filter f_kerninfo { facility(kern) and level(info); };\n",
+            "filter f_kerninfo { facility(kern); };\n",
             "log { source(src); filter(f_kerninfo); destination(psadpipe); };\n";
         close SYSLOGNG;
     }

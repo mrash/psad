@@ -172,14 +172,14 @@ my $debug = 0;
 my $use_ipchains = 0;
 my $use_iptables = 0;
 
-my $checked_iptables_flags = 0;
-my $flush_fw_rules         = 0;
+my $chk_ipt_chains = 0;
+my $flush_fw       = 0;
 
 ### Cache the default table->chain relationships used
 ### by the auto blocking code for iptables firewalls.
 ### The nat and mangle PREROUTING chains will be added
 ### by iptables_flags().
-my %iptables_chains;
+my %ipt_chains;
 
 ### define the input chains for ipchains firewalls (this
 ### is very simplistic).
@@ -191,6 +191,13 @@ my %scan;
 
 ### cache all scan signatures (initialized by default)
 my %sigs;
+
+### Cache snort rule messages if --snort-sids switch was
+### given.  This is only useful if iptables includes rule
+### that log things like "SID123".  "fwsnort"
+### (http://www.cipherdyne.com/fwsnort/) will automatically
+### build such a ruleset from snort signatures.
+my %snort_sids;
 
 ### cache signature info that can be check quickly against
 ### single hash keys
@@ -209,7 +216,7 @@ my %whois_cache;
 
 ### cache ports the local machine is listening on (periodically
 ### updated by get_listening_ports()).
-my %local_listening_ports;
+my %local_ports;
 
 ### packet counters
 my $tcp_ctr  = 0;
@@ -218,22 +225,22 @@ my $icmp_ctr = 0;
 
 ### initialize and scope some default variables (command
 ### line args can override some default values)
-my $found_new_packets = 0;
-my $output            = 0;
-my $syslog_server     = 0;
-my $kill              = 0;
-my $restart           = 0;
-my $status            = 0;
-my $benchmark         = 0;
-my $b_packets         = 0;
-my $usr1              = 0;
-my $ver               = 0;
-my $help              = 0;
-my $dump_conf         = 0;
-my $check_interval    = 0;
-my $netstat_lkup_ctr  = 0;
-my $log_len           = 29;  ### used in scan_logr()
-my $fw_analyze        = 0;
+my $snort_sids       = 0;
+my $output           = 0;
+my $syslog_server    = 0;
+my $kill             = 0;
+my $restart          = 0;
+my $status           = 0;
+my $benchmark        = 0;
+my $b_packets        = 0;
+my $usr1             = 0;
+my $ver              = 0;
+my $help             = 0;
+my $dump_conf        = 0;
+my $chk_interval     = 0;
+my $netstat_lkup_ctr = 0;
+my $log_len          = 29;  ### used in scan_logr()
+my $fw_analyze       = 0;
 
 ### these flags are used to disable several features
 ### in psad if specified from the command line
@@ -263,11 +270,8 @@ my $oldarg_logserv;
 
 ### used in --Benchmark test
 my $b_time;
-my $test_pkt = 'Feb 15 16:42:58 orthanc kernel: DROP IN=eth0 ' .
-    'OUT= MAC=00:a0:cc:28:42:5a:00:03:6c:00:98:54:08:00 ' .
-    'SRC=10.0.0.1 DST=10.0.0.2 LEN=48 TOS=0x00 PREC=0x00 ' .
-    'TTL=110 ID=13383 DF PROTO=TCP SPT=1389 DPT=';
-my $test_pktend = 'WINDOW=16384 RES=0x00 SYN URGP=0';
+my $test_pkt;
+my $test_pktend;
 
 ### get the hostname of the machine
 my $hostname = hostname;
@@ -280,12 +284,14 @@ Getopt::Long::Configure('no_ignore_case');
 
 &usage(1) unless (GetOptions(
     'signatures=s'  => \$sigs_file,      # Path to psad signatures file.
+    'snort-sids'    => \$snort_sids,     # Enable search for snort SID's
+                                         # in iptables messages.
     'auto-ips=s'    => \$autoips_file,   # Path to psad auto ips file for
                                          # auto-setting ip danger level.
     'output'        => \$output,         # Write scanlog messages to STDOUT.
     'debug'         => \$debug,          # Run in debug mode.
     'Dump-conf'     => \$dump_conf,      # Dump config and exit.
-    'interval=i'    => \$check_interval, # Set $check_interval from the
+    'interval=i'    => \$chk_interval,   # Set $chk_interval from the
                                          # command line.
     'config=s'      => \$config_file,    # Specify configuration file.
     'fw-check'      => \$fw_analyze,     # Analyze the firewall ruleset and
@@ -297,7 +303,7 @@ Getopt::Long::Configure('no_ignore_case');
                                          # diskmond).
     'Restart'       => \$restart,        # Restart psad with all options of
                                          # the currently running psad process.
-    'Flush'         => \$flush_fw_rules, # Flush any rules that psad added
+    'Flush'         => \$flush_fw, # Flush any rules that psad added
                                          # via the auto blocking code.
     'Status'        => \$status,         # Display status of any currently
                                          # running psad processes.
@@ -389,7 +395,7 @@ if ($kill) {
 }
 
 ### The --Flush command line switch was given.
-if ($flush_fw_rules) {
+if ($flush_fw) {
     if (-e $auto_blocked_file) {
         print " .. Removing auto-generated block rules.\n";
         &old_auto_blocked_ips();
@@ -407,8 +413,8 @@ if ($usr1) {
 }
 
 ### The -i <check interval> command line argument was given
-if ($check_interval) {
-    $config{'PSAD_CHECK_INTERVAL'} = $check_interval;
+if ($chk_interval) {
+    $config{'PSAD_CHECK_INTERVAL'} = $chk_interval;
 }
 
 ### check to make sure the commands specified in the config section
@@ -482,6 +488,16 @@ unless ($no_fwcheck || $syslog_server) {
         print localtime() . " .. Exiting.\n";
         exit 0;
     }
+}
+
+### initialize benchmarking test packets if we are running
+### in benchmark mode
+if ($benchmark) {
+    $test_pkt = 'Feb 15 16:42:58 orthanc kernel: DROP IN=eth0 ' .
+        'OUT= MAC=00:a0:cc:28:42:5a:00:03:6c:00:98:54:08:00 ' .
+        'SRC=10.0.0.1 DST=10.0.0.2 LEN=48 TOS=0x00 PREC=0x00 ' .
+        'TTL=110 ID=13383 DF PROTO=TCP SPT=1389 DPT=';
+    $test_pktend = 'WINDOW=16384 RES=0x00 SYN URGP=0';
 }
 
 ### daemonize psad unless running with --no_daemon or --debug
@@ -686,8 +702,6 @@ sub check_scan() {
     PKT: for my $line (@$fw_lines_aref) {
         chomp $line;
         if ($use_iptables) {
-            ### Sometimes the log entry is messed up by iptables so
-            ### we write it to the error log.
             if ($line =~ /SRC=(\S+)\s+DST=(\S+)\s+
                           LEN=(\d+).*TTL=(\d+).*PROTO=(\S+)\s+
                           SPT=(\d+)\s+DPT=(\d+)/x) {
@@ -709,12 +723,11 @@ sub check_scan() {
 #                        $dstport > 1024 && ($flags =~ /ACK/ ||
                         ($flags =~ /ACK/ || $flags =~ /RST/)) {
                         ### XXX ignore TCP packets that have the ACK or RST
-                        ### bits set ### since _usually_ we see these packets
+                        ### bits set since _usually_ we see these packets
                         ### as a result of the iptables connection tracking
-                        ### bug.  Also, note that there are no signatures
-                        ### make use of the RST flag and very few that use
-                        ### the ACK flag (need to add code back in for these
-                        ### signatures).
+                        ### bug.  Also, note that no signatures make use of
+                        ### the RST flag and very few that use the ACK flag
+                        ### (need to add code back in for these signatures).
                         next PKT;
                     }
                     ### per page 595 of the Camel book, "if /blah1|blah2/"
@@ -746,6 +759,8 @@ sub check_scan() {
                 $icmp_ctr++;
                 $matched_packet = 1;
             } else {
+                ### Sometimes the iptables log entry gets messed up due to
+                ### buffering issues so we write it to the error log.
                 push @bad_packets, $line;
                 next PKT;
             }
@@ -1018,7 +1033,7 @@ sub cache_dst_port() {
     ### to the destination port on the remote machine, but
     ### it should not do this so it is not implemented. :)
     if (defined $local_ips_href->{$dst}) {
-        if (defined $local_listening_ports{$proto}{$dstport}) {
+        if (defined $local_ports{$proto}{$dstport}) {
             $scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_SIG'}
             {$sig_id}{'LISTEN'}{$dstport}{'PKTS'}++;
             if ($flags) {
@@ -1843,13 +1858,13 @@ sub old_auto_blocked_ips() {
             }
         }
         if ($use_iptables) {
-            &iptables_flags unless $checked_iptables_flags;
+            &iptables_flags() unless $chk_ipt_chains;
             for my $blockip (@block_ips) {
-                if ($flush_fw_rules) {
+                if ($flush_fw) {
                     print " .. Removing rules for: $blockip\n";
                 }
-                for my $table (keys %iptables_chains) {
-                    for my $chain (keys %{$iptables_chains{$table}}) {
+                for my $table (keys %ipt_chains) {
+                    for my $chain (keys %{$ipt_chains{$table}}) {
                         ### The rule numbers can change for each ip
                         my @rules = `$cmds{'iptables'} -t $table -nL $chain`;
                         my $blocked = 0;
@@ -1862,7 +1877,7 @@ sub old_auto_blocked_ips() {
                             if ($rule =~ /^DROP\s+all.*?$blockip\s+0\.0\.0\.0\/0/) {
                                 ### all traffic from $blockip is being blocked
                                 $blocked = 1;
-                                if ($flush_fw_rules) {
+                                if ($flush_fw) {
                                     print "     Deleting rule $table $chain: $rule\n";
                                     system "$cmds{'iptables'} -t $table -D $chain $rulenum";
                                 } else {
@@ -1871,10 +1886,10 @@ sub old_auto_blocked_ips() {
                             }
                             $rulenum++;
                         }
-                        unless ($blocked || $flush_fw_rules) {
+                        unless ($blocked || $flush_fw) {
                             &iptables_block($table, $chain, $blockip);
                         }
-                        if ($flush_fw_rules && ! $blocked) {
+                        if ($flush_fw && ! $blocked) {
                             print " .. Could not locate any $table $chain ",
                                 "auto-generated rules for $blockip\n";
                         }
@@ -1888,7 +1903,7 @@ sub old_auto_blocked_ips() {
                     my @rules = `$cmds{'ipchains'} -nL $chain`;
                     my $blocked = 0;
                     my $rulenum = 1;
-                    if ($flush_fw_rules) {
+                    if ($flush_fw) {
                         print " .. Removing rules for: $blockip\n";
                     }
                     RULE: for my $rule (@rules) {
@@ -1897,7 +1912,7 @@ sub old_auto_blocked_ips() {
                         if ($rule =~ /^DENY\s+all.*?$blockip.*0\.0\.0\.0\/0\s+\*\s+\-\>\s+\*/) {
                             ### all traffic from $blockip is being blocked
                             $blocked = 1;
-                            if ($flush_fw_rules) {
+                            if ($flush_fw) {
                                 print "     Deleting rule: $rule\n";
                                 system "$cmds{'ipchains'} -D $chain $rulenum";
                             } else {
@@ -1906,10 +1921,10 @@ sub old_auto_blocked_ips() {
                         }
                         $rulenum++;
                     }
-                    unless ($blocked || $flush_fw_rules) {
+                    unless ($blocked || $flush_fw) {
                         &ipchains_block($chain, $blockip);
                     }
-                    if ($flush_fw_rules && ! $blocked) {
+                    if ($flush_fw && ! $blocked) {
                         print " .. Could not locate any auto-generated ",
                             "rules for: $blockip\n";
                     }
@@ -1921,7 +1936,7 @@ sub old_auto_blocked_ips() {
 }
 
 sub auto_psad_response() {
-    if ($use_iptables && ! $checked_iptables_flags) {
+    if ($use_iptables && ! $chk_ipt_chains) {
         ### determine whether or not the NAT or mangle code has
         ### been compiled into iptables
         &iptables_flags();
@@ -1968,8 +1983,8 @@ sub auto_psad_response() {
                 } elsif ($use_iptables) {
                     my $blocked_str = '';
                     if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
-                        for my $table (keys %iptables_chains) {
-                            for my $chain (keys %{$iptables_chains{$table}}) {
+                        for my $table (keys %ipt_chains) {
+                            for my $chain (keys %{$ipt_chains{$table}}) {
                                 &iptables_block($table, $chain, $src);
                             }
                         }
@@ -2004,18 +2019,18 @@ sub auto_psad_response() {
 }
 
 sub iptables_flags() {
-    $checked_iptables_flags = 1;
-    $iptables_chains{'filter'}{'INPUT'}   = '';
-    $iptables_chains{'filter'}{'FORWARD'} = '';
-    my $nat_rv    = (system "$cmds{'iptables'} -nL -t nat " .
+    $chk_ipt_chains = 1;
+    $ipt_chains{'filter'}{'INPUT'}   = '';
+    $ipt_chains{'filter'}{'FORWARD'} = '';
+    my $nat_rv = (system "$cmds{'iptables'} -nL -t nat " .
         "> /dev/null 2>&1") >> 8;
     my $mangle_rv = (system "$cmds{'iptables'} -nL -t mangle " .
         "> /dev/null 2>&1") >> 8;
     if ($nat_rv == 0) {
-        $iptables_chains{'nat'}{'PREROUTING'} = '';
+        $ipt_chains{'nat'}{'PREROUTING'} = '';
     }
     if ($mangle_rv == 0) {
-        $iptables_chains{'mangle'}{'PREROUTING'} = '';
+        $ipt_chains{'mangle'}{'PREROUTING'} = '';
     }
     return;
 }
@@ -2093,7 +2108,7 @@ sub get_local_ips() {
 }
 
 sub get_listening_ports() {
-    %local_listening_ports = ();
+    %local_ports = ();
     my @lines = `$cmds{'netstat'} -an`;
     for my $line (@lines) {
         chomp $line;
@@ -2101,7 +2116,7 @@ sub get_listening_ports() {
             ### $1 == protoco (tcp/udp), $2 == port number
             ### convert to upper case to be consistent with iptables
             ### messages (protocol is upper case 'TCP', etc.)
-            $local_listening_ports{uc($1)}{$2} = '';
+            $local_ports{uc($1)}{$2} = '';
         }
     }
     return;

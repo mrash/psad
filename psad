@@ -283,11 +283,10 @@ $whoislookups = 1 if ($Cmds{'whois.psad'} !~ /psad/);
 ### if psad is running on a syslog server, don't check the firewall
 ### rules since they may not be local.
 unless ($fwcheck || $Syslog_server) {
-    unlink "$Config{'PSAD_DIR'}/fw_check.txt";
     &Psad::check_firewall_rules(
         $Config{'FW_MSG_SEARCH'},
         $Emails_aref,
-        ["$Config{'PSAD_DIR'}/fw_check.txt"],
+        {"$Config{'PSAD_DIR'}/fw_check.txt" => 0},  ### overwrite-mode for logr()
         \%Cmds
     );
 }
@@ -1116,7 +1115,8 @@ sub collect_errors() {
 sub scan_logr() {
     my ($output, $dnslookups, $whoislookups) = @_;
     my $range;
-    my ($tcp_newrange, $udp_newrange);
+    my $tcp_newrange;
+    my $udp_newrange;
     my $dnsstring = '';
     my $whois_info_aref;
     for my $src (keys %Scan) {
@@ -1146,10 +1146,20 @@ sub scan_logr() {
                 my $scanlog     = "$Config{'PSAD_DIR'}/${src}/scanlog";
                 my $email_alert = "$Config{'PSAD_DIR'}/${src}/email_alert";
                 my $whois_file  = "$Config{'PSAD_DIR'}/${src}/whois";
+                my $dl_file     = "$Config{'PSAD_DIR'}/${src}/danger_level";
+
+                ### unlink $email_alert here since we print to this
+                ### file multiple times
+                unlink $email_alert;
+
+                ### print the current danger level to the danger_level file
+                &Psad::logr("$current_danger_level\n", {$dl_file => 0});
 
                 ### log everything to stdout if $output of $DEBUG is set
                 $scanlog = *STDOUT if ($output || $DEBUG);
-                my @print_array = ($scanlog, $email_alert);
+
+                ### file => append?   e.g.  filename => 0  means don't append
+                my %print_hsh = ($scanlog => 1, $email_alert => 1);
 
                 ### scope these vars
                 my $abs_start_range;
@@ -1267,65 +1277,64 @@ sub scan_logr() {
                     delete $Scan{$src}{$dst}{'ICMP'}{'CURR_INT'};
                 }
                 print STDOUT "scan_logr():  generating email......\n" if $DEBUG;
-                ### remove old $email_alert so we don't send old alert info
-                unlink $email_alert;
+
                 &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-" .
-                            "=-=-=-=-=-=-=\n", \@print_array);
+                            "=-=-=-=-=-=-=\n", \%print_hsh);
                 &Psad::logr("psad: portscan detected against $HOSTNAME ($dst).\n",
-                                                                    \@print_array);
-                &Psad::logr("\n", \@print_array);
-                &Psad::logr("Source:                      $src\n", \@print_array);
-                &Psad::logr("Destination:                 $dst\n", \@print_array);
+                                                                    \%print_hsh);
+                &Psad::logr("\n", \%print_hsh);
+                &Psad::logr("Source:                      $src\n", \%print_hsh);
+                &Psad::logr("Destination:                 $dst\n", \%print_hsh);
                 if ($tcp) {
                     &Psad::logr("Newly scanned TCP ports:     [$tcp_newrange]   " .
-                                "(since: $tcp_new_start_time)\n", \@print_array);
+                                "(since: $tcp_new_start_time)\n", \%print_hsh);
                     &Psad::logr("Newly Blocked TCP packets:   [$tcp_new_num_pkts] " .
-                                "  (since: $tcp_new_start_time)\n", \@print_array);
+                                "  (since: $tcp_new_start_time)\n", \%print_hsh);
                 }
                 if (@tcp_flags) {
                     for my $flag (@tcp_flags) {
-                        &Psad::logr($flag, \@print_array);
+                        &Psad::logr($flag, \%print_hsh);
                     }
                 }
                 if ($udp) {
                     &Psad::logr("Newly scanned UDP ports:     [$udp_newrange]   " .
-                                "(since: $udp_new_start_time)\n", \@print_array);
+                                "(since: $udp_new_start_time)\n", \%print_hsh);
                     &Psad::logr("Newly Blocked UDP packets:   [$udp_new_num_pkts]  " .
-                                "(since: $udp_new_start_time)\n", \@print_array);
+                                "(since: $udp_new_start_time)\n", \%print_hsh);
                 }
                 if ($icmp) {
                     &Psad::logr("Newly Blocked ICMP packets:  [$icmp_new_num_pkts]  " .
-                                "(since: $icmp_new_start_time)\n", \@print_array);
+                                "(since: $icmp_new_start_time)\n", \%print_hsh);
                 }
                 unless ($icmp) {
                     &Psad::logr("Complete TCP/UDP port range: [$range]  (since: " .
-                                "$start_time)\n", \@print_array);
+                                "$start_time)\n", \%print_hsh);
                 }
                 &Psad::logr("Total blocked packets:       " .
-                            "$Scan{$src}{$dst}{'ABSNUM'}\n", \@print_array);
+                            "$Scan{$src}{$dst}{'ABSNUM'}\n", \%print_hsh);
                 &Psad::logr("Start time:                  " .
-                            "$start_time\n", \@print_array);
+                            "$start_time\n", \%print_hsh);
                 &Psad::logr("End time:                    " .
-                            "$end_time\n", \@print_array);
+                            "$end_time\n", \%print_hsh);
                 &Psad::logr("Danger level:                " .
-                            "$Scan{$src}{$dst}{'CURR_DL'} out of 5\n", \@print_array);
+                            "$Scan{$src}{$dst}{'CURR_DL'} out of 5\n", \%print_hsh);
                 &Psad::logr("DNS info:                    " .
-                            "$dnsstring\n", \@print_array) unless $dnslookups;
+                            "$dnsstring\n", \%print_hsh) unless $dnslookups;
 
 #                my $syslog_print_sig_title = "";
                 if ($USE_IPTABLES) {
                     SIGS: for my $proto ('TCP', 'UDP', 'ICMP') {
                         if (defined $Scan{$src}{$dst}{$proto}{'CURR_SIG'}) {
                             my $sig_start_time = $tcp_new_start_time;
-                            &Psad::logr("\n", \@print_array);
+                            &Psad::logr("\n", \%print_hsh);
                             &Psad::logr("---- $proto alert signatures found since " .
-                                        "[$sig_start_time]\n", \@print_array);
+                                        "[$sig_start_time]\n", \%print_hsh);
                             for my $sigmatch (keys %{$Scan{$src}{$dst}{$proto}{'CURR_SIG'}}) {
                                 next if ($sigmatch eq 'PKTS' || $sigmatch eq 'S_TIME');
                                 my $sig_num_packets =
                                     $Scan{$src}{$dst}{$proto}{'CURR_SIG'}{$sigmatch};
                                 &Psad::logr("$sigmatch  Packets=$sig_num_packets\n",
-                                                                       \@print_array);
+                                                                       \%print_hsh);
                                 ### signature logging with syslog is not yet supported
                                 ### (requires a message for each matched signature).
 #                                if ($sigmatch =~ /^(\".*\")/) {
@@ -1338,14 +1347,14 @@ sub scan_logr() {
                         }
                         if (defined $Scan{$src}{$dst}{$proto}{'SIGMATCH'} &&
                                         $Config{'SHOW_ALL_SIGNATURES'} == 1) {
-                            &Psad::logr("\n", \@print_array);
+                            &Psad::logr("\n", \%print_hsh);
                             &Psad::logr("---- ALL $proto alert signatures " .
-                                        "found since [$start_time]\n", \@print_array);
+                                        "found since [$start_time]\n", \%print_hsh);
                             for my $sigmatch (keys %{$Scan{$src}{$dst}{$proto}{'SIGMATCH'}}) {
                                 my $sig_num_packets =
                                     $Scan{$src}{$dst}{$proto}{'SIGMATCH'}->{$sigmatch};
                                 &Psad::logr("$sigmatch  Packets=$sig_num_packets\n",
-                                                                    \@print_array);
+                                                                    \%print_hsh);
                             }
                         }
                     }
@@ -1366,15 +1375,15 @@ sub scan_logr() {
                         "pkts=$syslog_num_pkts dangerlevel: $syslog_danger_level";
                 closelog();
                 unless ($whoislookups) {
-                    &Psad::logr("\n\n", \@print_array);
-                    &Psad::logr("---- Whois Information: ----\n", \@print_array);
+                    &Psad::logr("\n\n", \%print_hsh);
+                    &Psad::logr("---- Whois Information: ----\n", \%print_hsh);
                     for my $w (@$whois_info_aref) {
-                        &Psad::logr($w, \@print_array);
+                        &Psad::logr($w, \%print_hsh);
                     }
-                    &Psad::logr("\n", \@print_array);
+                    &Psad::logr("\n", \%print_hsh);
                 }
                 &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=-" .
-                            "=-=-=-=-=-=\n", \@print_array);
+                            "=-=-=-=-=-=\n", \%print_hsh);
                 if ($Scan{$src}{$dst}{'ALERTED'} == 0
                     && $current_danger_level >= $Config{'EMAIL_ALERT_DANGER_LEVEL'}) {
                     my $subject = "psad WARNING: $HOSTNAME ($dst) has been scanned!";

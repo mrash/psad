@@ -105,7 +105,6 @@ $DANGER_LEVELS{'2'}           = 50;
 $DANGER_LEVELS{'3'}           = 1000;
 $DANGER_LEVELS{'4'}           = 5000;
 $DANGER_LEVELS{'5'}           = 10000;
-my $ENABLE_EMAIL_ALERTS       = "Y";
 my $EMAIL_ALERT_DANGER_LEVEL  = 1;                  ### Send email alert if danger level >= to this value.
 my $EMAIL_LIMIT               = 50;                 ### Send no more than this number of emails for a single scanning source ip.
 my @EMAIL_ADDRESSES           = qw(root@localhost); ### Supports multiple email addresses.
@@ -250,7 +249,7 @@ if ($status) {
 }
 
 ### make sure $PSAD_DIR, $FW_DATA, and /var/log/psadfifo, etc. actually exist
-&psad_setup($PSAD_DIR, $FW_DATA, $ERROR_LOG, \%Cmds);
+&psad_setup(\%Cmds);
 
 ### the --Restart command line switch was given
 if ($restart) {
@@ -321,10 +320,6 @@ if ($config) {
     close CONF;
 }
 
-unless (-e $FW_DATA) {
-    open F, ">> $FW_DATA";
-    close F;
-}
 my $Sigs_href = &import_signatures($signatures) if $signatures;
 my $Auto_ips_href;
 if ($auto_ips) {  ### support automatic ip danger level increases/decreases.
@@ -378,19 +373,15 @@ for (;;) {
         my $grabnum = $fwdata_end_lines - $fwdata_start_lines;
         my @process_lines = `$Cmds{'tail'} -$grabnum $FW_DATA`;
         $found_new_packets = &check_scan(\%Scan, \@process_lines, $Sigs_href, $signatures,
-                                                 $netstat_lookup, $local_ips_href, $errors, $ERROR_LOG,
-                                                       $ENABLE_PERSISTENCE, $SHOW_ALL_SIGNATURES, $SCAN_TIMEOUT, \%Cmds);
+                                                 $netstat_lookup, $local_ips_href, $errors, \%Cmds);
         if ($found_new_packets) {
             ### Assign a danger level to the scan.
-            &assign_danger_level(\%Scan, $Auto_ips_href, $PORT_RANGE_SCAN_THRESHOLD, $ALERT_ALL, \%DANGER_LEVELS);
+            &assign_danger_level(\%Scan, $Auto_ips_href, \%DANGER_LEVELS);
             ### Log and send an email alert about the scan.
-            &scan_logr(\%Scan, $PSAD_LOGFILE, $WHOIS_DATAFILE, $output, $dnslookups,
-                            $whoislookups, $WHOIS_TIMEOUT, $ENABLE_EMAIL_ALERTS, $EMAIL_ALERT_DANGER_LEVEL,
-                                $EMAIL_ALERTFILE, $EMAIL_LIMIT, \@EMAIL_ADDRESSES, $SHOW_ALL_SIGNATURES, \%Cmds);
-
+            &scan_logr(\%Scan, $output, $dnslookups, $whoislookups, \@EMAIL_ADDRESSES, \%Cmds);
             ### Don't manage the firewall rules if psad is running on a syslog server.
             if ($ENABLE_AUTO_IDS eq "Y" && ! $Syslog_server) {
-                &auto_psad_response(\%Scan, $AUTO_IDS_DANGER_LEVEL, \%Cmds, \@EMAIL_ADDRESSES);
+                &auto_psad_response(\%Scan, \%Cmds, \@EMAIL_ADDRESSES);
             }
         }
     }
@@ -407,7 +398,7 @@ exit 0;
 ### keep track of tcp flags for each scan (iptables only)
 sub check_scan() {
     my ($Scan_href, $process_lines_aref, $sigs_href, $signatures, $netstat_lookup, $local_ips_href, $errors,
-            $error_log, $enable_persistence, $show_all_signatures, $scan_timeout, $Cmds_href) = @_;
+            $Cmds_href) = @_;
     my @bad_packets;
     my $local_listening_ports_href;
     my ($src, $dst, $len, $ttl, $proto, $srcport, $dstport, $flags, $type, $code, $id, $seq);
@@ -459,11 +450,11 @@ sub check_scan() {
                 next READPKT;
             }
         }
-        if ($enable_persistence eq "N") {
+        if ($ENABLE_PERSISTENCE eq "N") {
             my $currtime = time();
             if (defined $Scan_href->{$src}->{$dst}->{'START_TIME'}->{'EPOCH_SECONDS'}) {
                 my $tmp = $currtime - $Scan_href->{$src}->{$dst}->{'START_TIME'}->{'EPOCH_SECONDS'};
-                if (($currtime - $Scan_href->{$src}->{$dst}->{'START_TIME'}->{'EPOCH_SECONDS'}) >= $scan_timeout) {
+                if (($currtime - $Scan_href->{$src}->{$dst}->{'START_TIME'}->{'EPOCH_SECONDS'}) >= $SCAN_TIMEOUT) {
                     delete $Scan_href->{$src}->{$dst};
                 }
             }
@@ -477,7 +468,7 @@ sub check_scan() {
             $Scan_href->{$src}->{$dst}->{'START_PORT'} = 65535; # make sure the initial start port is not too low
             $Scan_href->{$src}->{$dst}->{'END_PORT'} = 0; # make sure the initial end port is not too high
         }
-        my $epoch_seconds = time() if ($enable_persistence eq "N");
+        my $epoch_seconds = time() if ($ENABLE_PERSISTENCE eq "N");
         my @time = split /\s+/, scalar localtime;   # Get the current time as a nice ASCII string.
         pop @time; shift @time;    # Get rid of the day and the year to make the time consistent with syslog
         my $time = join ' ', @time;
@@ -496,13 +487,13 @@ sub check_scan() {
         }
         unless (defined $Scan_href->{$src}->{$dst}->{'START_TIME'}->{'READABLE'}) {
             $Scan_href->{$src}->{$dst}->{'START_TIME'}->{'READABLE'} = $time;
-            if ($enable_persistence eq "N") {
+            if ($ENABLE_PERSISTENCE eq "N") {
                 $Scan_href->{$src}->{$dst}->{'START_TIME'}->{'EPOCH_SECONDS'} = $epoch_seconds;
             }
         }
         $Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_INTERVAL'}->{'PACKETS'}++;
         $Scan_href->{$src}->{$dst}->{'END_TIME'}->{'READABLE'}= $time;
-        if ($enable_persistence eq "N") {
+        if ($ENABLE_PERSISTENCE eq "N") {
             $Scan_href->{$src}->{$dst}->{'END_TIME'}->{'EPOCH_SECONDS'} = $epoch_seconds;
         }
         ### increment hash values
@@ -530,9 +521,9 @@ sub check_scan() {
             print STDOUT "     Scan{src}{dst}{'START_PORT'} = $Scan_href->{$src}->{$dst}->{'START_PORT'}\n" unless ($proto eq "ICMP");
             print STDOUT "     Scan{src}{dst}{'END_PORT'} = $Scan_href->{$src}->{$dst}->{'END_PORT'}\n" unless ($proto eq "ICMP");
             print STDOUT "     Scan{src}{dst}{'START_TIME'}{'READABLE'} = $Scan_href->{$src}->{$dst}->{'START_TIME'}->{'READABLE'}\n";
-            print STDOUT "     Scan{src}{dst}{'START_TIME'}{'EPOCH_SECONDS'} = $Scan_href->{$src}->{$dst}->{'START_TIME'}->{'EPOCH_SECONDS'}\n" if ($enable_persistence eq "N");
+            print STDOUT "     Scan{src}{dst}{'START_TIME'}{'EPOCH_SECONDS'} = $Scan_href->{$src}->{$dst}->{'START_TIME'}->{'EPOCH_SECONDS'}\n" if ($ENABLE_PERSISTENCE eq "N");
             print STDOUT "     Scan{src}{dst}{'END_TIME'}{'READABLE'} = $Scan_href->{$src}->{$dst}->{'END_TIME'}->{'READABLE'}\n";
-            print STDOUT "     Scan{src}{dst}{'END_TIME'}{'EPOCH_SECONDS'} = $Scan_href->{$src}->{$dst}->{'END_TIME'}->{'EPOCH_SECONDS'}\n" if ($enable_persistence eq "N");
+            print STDOUT "     Scan{src}{dst}{'END_TIME'}{'EPOCH_SECONDS'} = $Scan_href->{$src}->{$dst}->{'END_TIME'}->{'EPOCH_SECONDS'}\n" if ($ENABLE_PERSISTENCE eq "N");
             unless ($proto eq "ICMP") {
                 print "     Scan{src}{dst}->{$proto}->{'CURRENT_INTERVAL'}->{'START_PORT'} = "
                     . "$Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_INTERVAL'}->{'START_PORT'}\n";
@@ -617,7 +608,7 @@ sub check_scan() {
             } 
         }
     }
-    &collect_errors(\@bad_packets, $error_log) unless $errors;
+    &collect_errors(\@bad_packets) unless $errors;
     return $matched_packet;
 }
 # check_tcp_flags will eventually need to include all possible permutations of the six 
@@ -849,7 +840,7 @@ sub check_range() {
     return $start, $end;
 }
 sub assign_danger_level() {
-    my ($Scan_href, $Auto_ips_href, $port_range_scan_threshold, $alert_all, $danger_levels_href) = @_;
+    my ($Scan_href, $Auto_ips_href, $danger_levels_href) = @_;
     &automatic_ip_danger_assignment($Scan_href, $Auto_ips_href) if ($Auto_ips_href); 
     for my $src (keys %$Scan_href) {
         print "assign_danger_level(): source ip: $src\n" if $DEBUG;
@@ -898,45 +889,45 @@ sub assign_danger_level() {
                 print "assign_danger_level(): danger level: "
                     . "$Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'}\n" if $DEBUG;
             }
-            ### if $port_range_scan_threshold is >= 1, then psad will not assign a
+            ### if $PORT_RANGE_SCAN_THRESHOLD is >= 1, then psad will not assign a
             ### danger level to repeated packets to the same port
             if ($absnum < $danger_levels_href->{'1'}) {
                 ### we don't have enough packets to even reach danger level 1 yet.
                 next DST;
-            } elsif ($absnum < $danger_levels_href->{'2'} && $range >= $port_range_scan_threshold) {
+            } elsif ($absnum < $danger_levels_href->{'2'} && $range >= $PORT_RANGE_SCAN_THRESHOLD) {
                 if ($Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} < 1
                         && $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} != -1) {
                     $Scan_href->{$src}->{$dst}->{'ALERTED'} = "N";
                     $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} = 1;
                 }
-            } elsif ($absnum < $danger_levels_href->{'3'} && $range >= $port_range_scan_threshold) {
+            } elsif ($absnum < $danger_levels_href->{'3'} && $range >= $PORT_RANGE_SCAN_THRESHOLD) {
                 if ($Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} < 2
                         && $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} != -1) {
                     $Scan_href->{$src}->{$dst}->{'ALERTED'} = "N";
                     $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} = 2;
                 }
-            } elsif ($absnum < $danger_levels_href->{'4'} && $range >= $port_range_scan_threshold) {
+            } elsif ($absnum < $danger_levels_href->{'4'} && $range >= $PORT_RANGE_SCAN_THRESHOLD) {
                 if ($Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} < 3
                         && $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} != -1) {
                     $Scan_href->{$src}->{$dst}->{'ALERTED'} = "N";
                     $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} = 3;
                 }
-            } elsif ($absnum < $danger_levels_href->{'5'} && $range >= $port_range_scan_threshold) {
+            } elsif ($absnum < $danger_levels_href->{'5'} && $range >= $PORT_RANGE_SCAN_THRESHOLD) {
                 if ($Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} < 4
                         && $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} != -1) {
                     $Scan_href->{$src}->{$dst}->{'ALERTED'} = "N";
                     $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} = 4;
                 }
-            } elsif ($range >= $port_range_scan_threshold) {
+            } elsif ($range >= $PORT_RANGE_SCAN_THRESHOLD) {
                 if ($Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} < 5
                         && $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} != -1) {
                     $Scan_href->{$src}->{$dst}->{'ALERTED'} = "N";
                     $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} = 5;
                 }
             }
-            ### we will always send an alert email for any new "bad" packet if $alert_all eq "Y"...
+            ### we will always send an alert email for any new "bad" packet if $ALERT_ALL eq "Y"...
             ### Else email sent only if the scan increments its D.L.
-            if ($alert_all eq "Y") {
+            if ($ALERT_ALL eq "Y") {
                 $Scan_href->{$src}->{$dst}->{'ALERTED'} = "N";
             }
             print "assign_danger_level(): CURRENT_DANGER_LEVEL (after assignment) = "
@@ -961,17 +952,16 @@ sub automatic_ip_danger_assignment() {
     return;
 }
 sub collect_errors() {
-    my ($bad_packets_aref, $error_log) = @_;
-    open ERRORS, ">> $error_log";
+    my ($bad_packets_aref) = @_;
+    open ERRORS, ">> $ERROR_LOG";
     for my $l (@$bad_packets_aref) {
         print ERRORS "$l\n";
     }
     close ERRORS;
 }
 sub scan_logr() {
-    my ($Scan_href, $logfile, $whois_datafile, $output, $dnslookups, $whoislookups, $whois_timeout,
-                    $enable_email_alerts, $email_alert_danger_level, $email_alertfile,
-                        $email_limit, $email_addresses_aref, $show_all_signatures, $Cmds_href) = @_;
+    my ($Scan_href, $output, $dnslookups, $whoislookups,
+                        $email_addresses_aref, $Cmds_href) = @_;
     my $flags_msg;
     my $range;
     my ($tcp_newrange, $udp_newrange, $tcp_new_start_range, $tcp_new_end_range);
@@ -979,14 +969,14 @@ sub scan_logr() {
     my ($tcp_new_start_time, $udp_new_start_time, $icmp_new_start_time);
     my $dnsstring = "";
     my $whois_info_aref;
-    $logfile = *STDOUT if ($output || $DEBUG);
-    my @print_array = ($logfile, $email_alertfile);
+    $PSAD_LOGFILE = *STDOUT if ($output || $DEBUG);
+    my @print_array = ($PSAD_LOGFILE, $EMAIL_ALERTFILE);
     for my $src (keys %$Scan_href) {
         print STDOUT "scan_logr(): source ip: $src\n" if $DEBUG;
         DST: for my $dst (keys %{$Scan_href->{$src}}) {
             unless (defined $Scan_href->{$src}->{$dst}->{'EMAIL_LIMIT'}) {
                 $Scan_href->{$src}->{$dst}->{'EMAIL_LIMIT'} = 0;
-            } elsif ($Scan_href->{$src}->{$dst}->{'EMAIL_LIMIT'} > $email_limit) {
+            } elsif ($Scan_href->{$src}->{$dst}->{'EMAIL_LIMIT'} > $EMAIL_LIMIT) {
                 unless (defined $Scan_href->{$src}->{$dst}->{'EMAIL_STOPPED'}) {
                     &email_limit_reached($email_addresses_aref, $src, $dst, $Cmds_href);
                     $Scan_href->{$src}->{$dst}->{'EMAIL_STOPPED'} = 1;
@@ -1088,10 +1078,10 @@ sub scan_logr() {
                     delete $Scan_href->{$src}->{$dst}->{'ICMP'}->{'CURRENT_INTERVAL'};
                 }
                 print STDOUT "scan_logr():  generating email......\n" if $DEBUG;
-                unlink $email_alertfile;  ### remove $email_alertfile so we don't send old alert info
+                unlink $EMAIL_ALERTFILE;  ### remove $EMAIL_ALERTFILE so we don't send old alert info
                 &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=-=-=-=-=-=-=\n", \@print_array);
                 &Psad::logr("psad: Portscan Detected on $HOSTNAME ($dst).\n", \@print_array);
-                &Psad::logr("\n", [$logfile, $email_alertfile]);
+                &Psad::logr("\n", [$PSAD_LOGFILE, $EMAIL_ALERTFILE]);
                 &Psad::logr("Source:                      $src\n", \@print_array);
                 &Psad::logr("Destination:                 $dst\n", \@print_array);
                 &Psad::logr("Newly scanned TCP ports:     [$tcp_newrange]   (since: $tcp_new_start_time)\n", \@print_array) if $tcp;
@@ -1139,7 +1129,7 @@ sub scan_logr() {
                             ### need to delete the current interval so it won't show up in the next alert
                             delete $Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_SIGMATCH'};
                         }
-                        if (defined $Scan_href->{$src}->{$dst}->{$proto}->{'SIGMATCH'} && $show_all_signatures eq "Y") {
+                        if (defined $Scan_href->{$src}->{$dst}->{$proto}->{'SIGMATCH'} && $SHOW_ALL_SIGNATURES eq "Y") {
                             &Psad::logr("\n", \@print_array);
                             &Psad::logr("=-=-= ALL $proto alert signatures found since [$start_time]\n", \@print_array);
                             for my $sigmatch (keys %{$Scan_href->{$src}->{$dst}->{$proto}->{'SIGMATCH'}}) {
@@ -1153,7 +1143,7 @@ sub scan_logr() {
                 }
                 unless ($whoislookups) {
                     &Psad::logr("\n\n", \@print_array);
-                    &Psad::logr("=-=-=-=-=-=-= Whois Information: =-=-=-=-=-=-=\n", [$logfile, $email_alertfile]);
+                    &Psad::logr("=-=-=-=-=-=-= Whois Information: =-=-=-=-=-=-=\n", [$PSAD_LOGFILE, $EMAIL_ALERTFILE]);
                     for my $w (@$whois_info_aref) {
                         &Psad::logr($w, \@print_array);
                     }
@@ -1163,7 +1153,7 @@ sub scan_logr() {
                 if ($Scan_href->{$src}->{$dst}->{'ALERTED'} eq "N"
                                         && $current_danger_level >= $EMAIL_ALERT_DANGER_LEVEL) {
                     &send_email_alert($Scan_href, $src, $dst, $flags_msg,
-                                                    $email_alertfile, $email_addresses_aref, $Cmds_href);
+                                                    $email_addresses_aref, $Cmds_href);
                 }
                 $Scan_href->{$src}->{$dst}->{'LOGR'} = "N";
                 $Scan_href->{$src}->{$dst}->{'EMAIL_LIMIT'}++;
@@ -1173,13 +1163,13 @@ sub scan_logr() {
     return;
 }
 sub auto_psad_response(){
-    my ($Scan_href, $auto_psad_level, $Cmds_href, $email_addresses_aref) = @_;
+    my ($Scan_href, $Cmds_href, $email_addresses_aref) = @_;
     SOURCE: for my $src (keys %$Scan_href) {
         for my $dst (keys %{$Scan_href->{$src}}) {
             my $current_danger_level = $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'};
             ### We only want to block the IP once.  Currently this will block all traffic from the host to _all_ destinations
             ### that are protected by the firewall if the ip trips the $auto_psad_level threshold for _any_ destination. 
-            if ($current_danger_level >= $auto_psad_level && !(defined $Scan_href->{$src}->{$dst}->{'BLOCKED'})) {
+            if ($current_danger_level >= $AUTO_IDS_DANGER_LEVEL && !(defined $Scan_href->{$src}->{$dst}->{'BLOCKED'})) {
                 if ($USE_IPCHAINS) {
                     my @chains = &get_input_chains($Cmds_href->{'ipchains'});
                     for my $inchain (@chains) {
@@ -1231,10 +1221,10 @@ sub get_input_chains() {
     return @chains;
 }
 sub send_email_alert() {
-    my ($Scan_href, $src, $dst, $flags_msg, $email_alertfile, $email_addresses_aref, $Cmds_href) = @_;
+    my ($Scan_href, $src, $dst, $flags_msg, $email_addresses_aref, $Cmds_href) = @_;
     for my $email_address (@$email_addresses_aref) {
         print "send_email_alert(): sending scan alert email to: $email_address\n" if $DEBUG;
-        system "$Cmds_href->{'mail'} $email_address -s \"psad WARNING: $HOSTNAME ($dst) has been scanned!\" < $email_alertfile > /dev/null 2>&1";
+        system "$Cmds_href->{'mail'} $email_address -s \"psad WARNING: $HOSTNAME ($dst) has been scanned!\" < $EMAIL_ALERTFILE > /dev/null 2>&1";
     }
     $Scan_href->{$src}->{$dst}->{'ALERTED'} = "Y";
     return;
@@ -1468,20 +1458,20 @@ sub psad_usr1() {
     return $rv;
 }
 sub psad_setup() {
-    my ($psad_dir, $fw_data, $error_log, $Cmds_href) = @_;
-    unless (-d $psad_dir) {
-        mkdir $psad_dir, 400;
+    my ($Cmds_href) = @_;
+    unless (-d $PSAD_DIR) {
+        mkdir $PSAD_DIR, 400;
     }
-    unless (-e $fw_data) {
-        open F, "> $fw_data";
+    unless (-e $FW_DATA) {
+        open F, "> $FW_DATA";
         close F;
     }
     unless (-e $PSAD_LOGFILE) {
         open L, "> $PSAD_LOGFILE";
         close L;
     }
-    unless (-e $error_log) {
-        open E, "> $error_log";
+    unless (-e $ERROR_LOG) {
+        open E, "> $ERROR_LOG";
         close E;
     }
     unless (-e "/var/log/psadfifo") {

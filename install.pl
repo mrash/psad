@@ -158,7 +158,7 @@ if (-d $INIT_DIR) {
     $init_dir = '/etc/init.d';
 } else {
     &logr(" ** Cannot find the init script directory, edit " .
-    "the \$INIT_DIR variable.\n");
+        "the \$INIT_DIR variable.\n");
 }
 
 ### need to make sure this exists before attempting to

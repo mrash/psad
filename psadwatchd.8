@@ -1,34 +1,34 @@
 .\"
 .TH PSADWATCHD 8 "November 2002" "Debian/GNU Linux"
 .SH NAME
-psadwatchd \- checks to make sure kmsgsd and psad are running.
+.B psadwatchd
+\- checks to make sure kmsgsd, diskmond, and psad are running.
 .SH SYNOPSIS
-psadwatchd [-c <config file>]
+.B psadwatchd [<config file>]
 .SH DESCRIPTION
 .B psadwatchd
-psadwatchd checks on an interval of every five seconds to make sure that both kmsgsd and psad are running on the box.  If either daemon has died, psadwatchd will restart it notify each email address in @email_addresses that the daemon has been restarted.
-.SH OPTIONS
-.PP
-.PD 0
-.TP
-
-.BR \-c " config file
-
-.SH FILES
-.B /etc/psad/psad.conf
-.RS
-The psad configuration file is used if and only if the --c
-option is specified on the command line. Normally all configuration
-parameters are specified within the configuration section of the psad
-program itself. See
-.B /usr/sbin/psad.
+checks on an interval of every five seconds to make sure that kmsgsd,
+diskmond, and psad are running on the box.  If any of the three daemons
+have died, psadwatchd will restart the daemon and notify each
+email address listed in the EMAIL_ADDRESSES variable (see
+/etc/psad/psad.conf) that the daemon has been restarted.
+.B psadwatchd
+uses the psad.conf configuration file which by default is
+located at /etc/psad/psad.conf, but a different path can be specified
+on the command line.
 
 .SH SEE ALSO
 .BR psad (8),
-.BR psadwatchd (8),
+.BR diskmond (8),
 .BR kmsgd (8),
 .SH AUTHOR
 Michael B. Rash (mbr@cipherdyne.com)
 
-This manual page was written by Daniel Gubser <daniel.gubser@gutreu.ch> for the Debian GNU/Linux system (but may be used by others).
+This manual page was written by Daniel Gubser <daniel.gubser@gutreu.ch>
+for the Debian GNU/Linux system (but may be used by others).
 
+.SH DISTRIBUTION
+.B psad
+is distributed under the GNU General Public License (GPL), and the latest
+version may be downloaded from
+.B http://www.cipherdyne.com

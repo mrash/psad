@@ -4,7 +4,7 @@
 .B diskmond
 \- monitors disk space used by psad
 .SH SYNOPSIS
-.B diskmond <config_file>
+.B diskmond [<config_file>]
 .SH DESCRIPTION
 .B diskmond
 checks every 60 seconds to make sure that the disk utilization for
@@ -15,6 +15,10 @@ administrator defines (the default is 95%).
 will also remove the scanlog for each ip that has scanned your
 machine; scanlog is located at /var/log/psad/<ip>/scanlog for each
 scanning ip.
+.B diskmond
+uses the psad.conf configuration file which by default is
+located at /etc/psad/psad.conf, but a different path can be specified
+on the command line.
 .SH SEE ALSO
 .BR psad (8),
 .BR psadwatchd (8),

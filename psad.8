@@ -361,23 +361,23 @@ Signature checking and automatic ip danger level assignment (best for
 most situations) is enabled by default without having to specify any
 command line arguments:
 
-.B psad
+.B # psad
 
 The psad.conf, psad_signatures, and psad_auto_ips files are normally
-located within the /etc/psad directory, but the paths to each of these
+located within the /etc/psad/ directory, but the paths to each of these
 files can be changed:
 
-.B psad -c <config file> -s <signatures file> -a <auto ips file>
+.B # psad -c <config file> -s <signatures file> -a <auto ips file>
 
 Disable the firewall check and the local port lookup subroutines; most useful
 if psad is deployed on a syslog logging server:
 
-.B psad --Logging_server --no_netstat
+.B # psad --Logging_server --no_netstat
 
 Disable reverse dns and whois lookups of scanning ip addresses; most useful
 if speed of psad is the main concern:
 
-.B psad --no_rdns --no_whois
+.B # psad --no_rdns --no_whois
 
 .SH DEPENDENCIES
 .B psad

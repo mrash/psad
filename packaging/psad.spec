@@ -62,7 +62,7 @@ cd Date-Calc && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
 cd ..
 
 %build
-### build psad binaries (kmsgsd, psadwatchd, and diskmond)
+### build psad binaries (kmsgsd and psadwatchd)
 make OPTS="$RPM_OPT_FLAGS"
 
 ### build the whois client
@@ -109,10 +109,10 @@ mkdir -p $RPM_BUILD_ROOT%_sysconfdir/%name
 ### psad init script
 mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
 
-install -m 500 {psad,kmsgsd,psadwatchd,diskmond} $RPM_BUILD_ROOT%_sbindir/
+install -m 500 {psad,kmsgsd,psadwatchd} $RPM_BUILD_ROOT%_sbindir/
 install -m 755 whois/whois $RPM_BUILD_ROOT/usr/bin/whois_psad
 install -m 755 psad-init $RPM_BUILD_ROOT/etc/rc.d/init.d/psad
-install -m 644 {psad.conf,kmsgsd.conf,psadwatchd.conf,diskmond.conf} $RPM_BUILD_ROOT%_sysconfdir/%name/
+install -m 644 {psad.conf,kmsgsd.conf,psadwatchd.conf} $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 {psad_signatures,psad_auto_ips,psad_posf} $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 *.8 $RPM_BUILD_ROOT%{_mandir}/man8/
 
@@ -159,10 +159,9 @@ cp -r snort_rules $RPM_BUILD_ROOT%psadetcdir
 
 %post
 ### put the current hostname into the psad C binaries
-### (diskmond and psadwatchd).
+### (kmsgsd and psadwatchd).
 perl -p -i -e 'use Sys::Hostname; my $hostname = hostname(); s/HOSTNAME(\s+)_?CHANGE.?ME_?/HOSTNAME${1}$hostname/' /etc/psad/psad.conf
 perl -p -i -e 'use Sys::Hostname; my $hostname = hostname(); s/HOSTNAME(\s+)_?CHANGE.?ME_?/HOSTNAME${1}$hostname/' /etc/psad/psadwatchd.conf
-perl -p -i -e 'use Sys::Hostname; my $hostname = hostname(); s/HOSTNAME(\s+)_?CHANGE.?ME_?/HOSTNAME${1}$hostname/' /etc/psad/diskmond.conf
 
 /bin/touch %psadlogdir/fwdata
 chown root.root %psadlogdir/fwdata
@@ -191,9 +190,10 @@ fi
 if grep -q "EMAIL.*root.*localhost" %psadetcdir/psad.conf;
 then
 echo " .. You can edit the EMAIL_ADDRESSES variable in"
-echo "    /etc/psad/psad.conf, /etc/psad/psadwatchd.conf, and"
-echo "    /etc/psad/diskmond.conf to have email alerts sent to"
-echo "    an address other than root@localhost"
+echo "    /etc/psad/psad.conf and /etc/psad/psadwatchd.conf"
+echo "    to have email alerts sent to an address other than
+echo "    root\@localhost"
+
 fi
 
 %preun
@@ -219,10 +219,14 @@ fi
 %_libdir/%name
 
 %changelog
+* Mon Oct 14 2003 Michael Rash <mbr@cipherydne.org>
+- Removed diskmond since psad handles disk space thresholds
+  directly.
+
 * Sat Oct 11 2003 Michael Rash <mbr@cipherydne.org>
 - Updated spec file to build properly on both Red Hat 7.2 and
   Red Hat 9 systems.
- 
+
 * Tue Sep 23 2003 Lenny Cartier <lenny@mandrakesoft.com> 1.2.3-1mdk
 - mandrakized specfile
 

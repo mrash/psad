@@ -201,12 +201,12 @@ sub install() {
         &logr(" .. Creating named pipe $PSAD_FIFO\n");
         unless (((system "$Cmds{'mknod'} -m 600 $PSAD_FIFO p")>>8) == 0) {
             &logr(" ** Could not create the named pipe \"$PSAD_FIFO\"!" .
-                " ** Psad requires this file to exist!  Aborting install.\n");
+                " ** psad requires this file to exist!  Aborting install.\n");
             die;
         }
         unless (-p $PSAD_FIFO) {
             &logr(" ** Could not create the named pipe \"$PSAD_FIFO\"!" .
-                " ** Psad requires this file to exist!  Aborting " .
+                " ** psad requires this file to exist!  Aborting " .
                 "install.\n");
             die;
         }
@@ -289,7 +289,7 @@ sub install() {
             "is missing.\n    Download the latest sources from " .
             "http://www.cipherdyne.org\n";
     }
-    system "$Cmds{'perl'} Makefile.PL";
+    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
     system "$Cmds{'make'}";
 #    system "$Cmds{'make'} test";
     system "$Cmds{'make'} install";
@@ -305,7 +305,7 @@ sub install() {
             "is missing.\n    Download the latest sources from " .
             "http://www.cipherdyne.org\n";
     }
-    system "$Cmds{'perl'} Makefile.PL";
+    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
     system "$Cmds{'make'}";
 #    system "$Cmds{'make'} test";
     system "$Cmds{'make'} install";
@@ -321,7 +321,7 @@ sub install() {
             "Net::IPv4Addr is missing.\n    Download the latest sources " .
             "from http://www.cipherdyne.org\n";
     }
-    system "$Cmds{'perl'} Makefile.PL";
+    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
     system "$Cmds{'make'}";
 #    system "$Cmds{'make'} test";
     system "$Cmds{'make'} install";
@@ -337,7 +337,7 @@ sub install() {
             "IPTables::Parse is missing.\n    Download the latest sources " .
             "from http://www.cipherdyne.org\n";
     }
-    system "$Cmds{'perl'} Makefile.PL";
+    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
     system "$Cmds{'make'}";
 #    system "$Cmds{'make'} test";
     system "$Cmds{'make'} install";

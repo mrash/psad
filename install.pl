@@ -170,9 +170,9 @@ exit 0;
 
 sub install() {
     ### make sure install.pl is being called from the source directory
-    unless (-e 'psad' && -e 'Psad.pm/Psad.pm') {
-        die " ** install.pl can only be executed from the directory" .
-            " that contains the psad sources!  Exiting.\n\n";
+    unless (-e 'psad' && -e 'Psad-1.1/Psad.pm') {
+        die " ** install.pl can only be executed from the directory\n",
+            "    that contains the psad sources!  Exiting.";
     }
     &logr("\n .. " . localtime() . " Installing psad on hostname: $HOSTNAME\n");
     unless (-d $RUNDIR) {
@@ -264,7 +264,7 @@ sub install() {
     ### installing Psad.pm
     &logr(" .. Installing the Psad.pm perl module\n");
 
-    chdir 'Psad.pm';
+    chdir 'Psad-1.1';
     unless (-e 'Makefile.PL' && -e 'Psad.pm') {
         die " ** Your source distribution appears to be incomplete!  " .
             "Psad.pm is missing.\n    Download the latest sources from " .

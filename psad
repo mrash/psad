@@ -348,7 +348,8 @@ my $local_ips_href = &get_local_ips();
 ### disable whois lookups if for some reason the whois client that is
 ### bundled with psad can't be found
 unless ($no_whois) {
-    unless ($cmds{'whois.psad'}) {  ### we couldn't find whois.psad
+    unless (defined $cmds{'whois.psad'}
+            && -x $cmds{'whois.psad'}) {  ### we couldn't find whois.psad
         warn " ... @@@ Could not locate whois.psad binary.  " .
             "Disabling whois lookups.\n";
         $no_whois = 1;

@@ -122,11 +122,11 @@ my $ifconfigCmd = "/sbin/ifconfig";
 my $grepCmd = "/bin/grep";
 my $netstatCmd = "/bin/netstat";
 my $unameCmd = "/bin/uname";
-my $whoisCmd = "/usr/local/bin/whois.psad";
-my $psadwatchdCmd = "/usr/local/bin/psadwatchd";
-my $kmsgsdCmd = "/usr/local/bin/kmsgsd";
-my $diskmondCmd = "/usr/local/bin/diskmond";
-my $psadCmd = "/usr/local/bin/psad";
+my $whoisCmd = "/usr/bin/whois.psad";
+my $psadwatchdCmd = "/usr/sbin/psadwatchd";
+my $kmsgsdCmd = "/usr/sbin/kmsgsd";
+my $diskmondCmd = "/usr/sbin/diskmond";
+my $psadCmd = "/usr/sbin/psad";
 #================== end config ==================== ## do not remove this line (used by install.pl to preserve configs) ##
 #===================== main =======================
 
@@ -1238,7 +1238,7 @@ sub psad_usr1() {
 		close PIDFILE;
 		chomp $pid;
 		if (kill 0, $pid) {  ### make sure psad is actually running
-			if (kill USR1, $pid) {
+			if (kill "USR1", $pid) {
 				$rv = 1;
 				sleep 1;  ### sleep to give time for the USR1 signal to be delivered and for the file to be created.
 				open U, "< /var/log/psad/scan_hash.${pid}" 

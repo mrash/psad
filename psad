@@ -23,12 +23,12 @@
 #	- put source and destination ip addresses back into psad_signatures.
 #	- make line counts of fwdata file take high-rate scans into
 #	  account.
-#	- include time within scan logic.
+#	- ipfilter support on *BSD platforms.
+#	- icmp/udp...
 #	- signal handler for configuration updating. 
-#	- "ignore ips" file so that psad will ignore scans originating
-#	  from any ip contained within this file.
 #	- use umask for newly created files.
 #	- make CHECK_INTERVAL configurable from the command line.
+#	- man page
 #
 # Sample packet (rejected by ipchains)
 # Dec 19 11:54:07 orthanc kernel: Packet log: input REJECT lo PROTO=1
@@ -98,10 +98,12 @@ my $output = 0;
 my $errors = 0;
 my $dnslookups = 0;
 my $signatures = 0;
+my $auto_ips = 0;
 my $netstat_lookup = 0;
 my $fwcheck = 0;
 my $dnsstring;
 
+use File::stat;
 use Getopt::Long;
 use Data::Dumper;
 use Socket;
@@ -128,6 +130,7 @@ $SIG{USR1} = \&print_scan;  # install signal handler for debugging the %Scan has
 
 usage_and_exit(1) unless (GetOptions (
         'help'          => \$help,		# display help
+	'auto_ips=s'	=> \$auto_ips,		# enable automatic ip danger level assignment
 	'output'	=> \$output,		# write scanlog messages to STDOUT
 	'daemon'	=> \$daemon,		# do not run as a daemon
 	'firewallcheck'	=> \$fwcheck,		# do not check firewall rules
@@ -159,20 +162,41 @@ unless ($errors) {
 }
 `$Cmds{'touch'} $FW_DATA` unless (-e $FW_DATA);
 my $Sigs_href = import_signatures($signatures) if $signatures;
+my $Auto_ips_href;
+if ($auto_ips) {  # support automatic ip danger level increases/decreases.
+	$Auto_ips_href = import_auto_ips($auto_ips);
+} else {
+	$Auto_ips_href = 0;
+}
 # main loop
 for (;;) {
 	check_kmsgsd($EMAIL_ADDRESS, \%Cmds);
-	$fwdata_start_lines = (split /\s+/, `$Cmds{'wc'} -l $FW_DATA`)[1];
+	my $auto_ips_mtime_start = stat($auto_ips)->mtime if $auto_ips;
+	my $sigs_mtime_start = stat($signatures)->mtime if $signatures;
+	my $fwdata_start_lines = (split /\s+/, `$Cmds{'wc'} -l $FW_DATA`)[1];
 #	print "Current number of lines: $fwdata_start_lines\n";   # this will be useful for the TODO
 	sleep $CHECK_INTERVAL;
-	$fwdata_end_lines = (split /\s+/, `$Cmds{'wc'} -l $FW_DATA`)[1];
+	my $fwdata_end_lines = (split /\s+/, `$Cmds{'wc'} -l $FW_DATA`)[1];
+	if ($signatures) {
+		my $sigs_mtime_end = stat($signatures)->mtime;
+		if ($sigs_mtime_start != $sigs_mtime_end) {  # the signatures were update... import the new signatures
+			$Sigs_href = import_signatures($signatures);
+		}
+	}
+	if ($auto_ips) {
+		my $auto_ips_mtime_end = stat($auto_ips)->mtime;
+		if ($auto_ips_mtime_start != $auto_ips_mtime_end) {  # the auto ips file was updated... import the new ip/danger level pairs.
+			$Auto_ips_href = import_auto_ips($auto_ips);
+			$Scan_href = reset_auto_tags($Scan_href);  # need to set $Scan_href->{$ip}->{'AUTO'} = "N" since $Auto_ips_href was updated.
+		}
+	}
 	if ($fwdata_end_lines - $fwdata_start_lines > 0) {
 		my $grabnum = $fwdata_end_lines - $fwdata_start_lines;
 		my @process_lines = `$Cmds{'tail'} -$grabnum $FW_DATA`;
 #		print "Number of lines to process: $#process_lines\n";  # this will be useful for the TODO
 		$Scan_href = check_scan(\@process_lines, $Sigs_href, $signatures, $netstat_lookup, $errors, 
 									$ERROR_LOG, $ENABLE_PERSISTENCE, $SCAN_TIMEOUT, \%Cmds);
-		$Scan_href = assign_danger_level($Scan_href, $PORT_RANGE_SCAN_THRESHOLD, $ALERT_ALL, \%DANGER_LEVELS);
+		$Scan_href = assign_danger_level($Scan_href, $Auto_ips_href, $PORT_RANGE_SCAN_THRESHOLD, $ALERT_ALL, \%DANGER_LEVELS);
 		$Scan_href = logr($Scan_href, $PSAD_LOGFILE, $output, $dnslookups, $ENABLE_EMAIL_ALERTS,
 					$EMAIL_ALERT_DANGER_LEVEL, $EMAIL_ALERTFILE, $EMAIL_ADDRESS, $LONG_FORMAT, $SHOW_ALL_SIGNATURES, \%Cmds);
 		if ($ENABLE_AUTO_IDS eq "Y") {
@@ -184,7 +208,6 @@ for (;;) {
 #================== end main ======================
 sub check_scan() {  # keeps track of scanning ip's, increments packet counters, keep track of tcp flags for each
 		    # scan (iptables only)
-		# include udp/icmp scans
 	my ($process_lines_aref, $sigs_href, $signatures, $netstat_lookup, $errors, $error_log, $enable_persistence, $scan_timeout, $Cmds_href) = @_;
 	my @bad_packets;
 	my ($srcip, $dstip, $proto, $srcport, $dstport, $flags);
@@ -230,6 +253,7 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 		$Scan{$srcip}{'ABSNUM'} = 0 unless (defined $Scan{$srcip});
 		$Scan{$srcip}{'DSTIP'} = $dstip unless (defined $Scan{$srcip}{'DSTIP'});
 		$Scan{$srcip}{'FLAGS'}{$flags} = 0 unless (defined $Scan{$srcip}{'FLAGS'}{$flags});
+		$Scan{$srcip}{'AUTO'} = "N" unless (defined $Scan{$srcip}{'AUTO'});
 		$Scan{$srcip}{'CURRENT_DANGER_LEVEL'} = 0 unless (defined $Scan{$srcip}{'CURRENT_DANGER_LEVEL'});
 		unless (defined $Scan{$srcip}{'START_PORT'}) {  # this is the absolute starting port since the first packet was detected
 			$Scan{$srcip}{'START_PORT'} = 65535; # make sure the initial start port is not too low
@@ -390,6 +414,26 @@ sub import_signatures() {
 	}
 	return \%Sigs;	
 }
+sub import_auto_ips() {
+	my $auto_ips_file = shift;
+	open AUTO, "< $auto_ips_file";
+	my @lines = <AUTO>;
+	close AUTO;
+	foreach my $l (@lines) {
+		next if ($l =~ /^#/);
+		if ($l =~ /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+([0-5]|\-1)/) {
+			$Auto_ips{$1} = $2;
+		}
+	}
+	return \%Auto_ips;
+}
+sub reset_auto_tags() {
+	my $Scan_href = shift;
+	foreach my $ip (keys %$Scan_href) {
+		$Scan_href->{$ip}->{'AUTO'} = "N";
+	}
+	return $Scan_href;
+}
 sub check_range() {
 	my ($port, $start, $end) = @_;
 	$start = $port if ($port < $start);
@@ -397,40 +441,64 @@ sub check_range() {
 	return $start, $end;
 }
 sub assign_danger_level() {
-	my ($Scan_href, $port_range_scan_threshold, $alert_all, $danger_levels_href) = @_;
+	my ($Scan_href, $Auto_ips_href, $port_range_scan_threshold, $alert_all, $danger_levels_href) = @_;
+	$Scan_href = automatic_ip_danger_assignment($Scan_href, $Auto_ips_href) if ($Auto_ips_href); 
 	foreach my $ip (keys %$Scan_href) {
 		my $absnum = $Scan_href->{$ip}->{'ABSNUM'};
 		my $range = $Scan_href->{$ip}->{'END_PORT'} - $Scan_href->{$ip}->{'START_PORT'};
 		# If a scan signature packet has been detected but no other packets are detected, assign a danger
 		# level of 1.  (This should really look at the danger level field for each signature to assign a real
-		# danger level that is based on the type of signature.)
+		# danger level that is based on the type of signature... see the TODO)
 		if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} == 0 && defined $Scan_href->{$ip}->{'SIGMATCH'}) {
 			$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 1;
 		}
-		# if $port_range_scan_threshold is >= 1, then psad will not assign a danger level to repeated packets to the same port
-		if (($absnum >= $danger_levels_href->{'1'} && $absnum < $danger_levels_href->{'2'} && $range >= $port_range_scan_threshold)) {
-					#			|| defined $Scan_href->{$ip}->{'SIGMATCH'}) {
-			$Scan_href->{$ip}->{'ALERTED'} = "N" if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} < 1);
-			$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 1;
+		# if $port_range_scan_threshold is >= 1, then psad will not assign a danger level to repeated packets to the same tcp port
+		if ($absnum >= $danger_levels_href->{'1'} && $absnum < $danger_levels_href->{'2'} && $range >= $port_range_scan_threshold) {
+			if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} < 1 && $Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} != -1) {
+				$Scan_href->{$ip}->{'ALERTED'} = "N";
+				$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 1;
+			}
 		}
 		if ($absnum >= $danger_levels_href->{'2'} && $absnum < $danger_levels_href->{'3'} && $range >= $port_range_scan_threshold) {
-			$Scan_href->{$ip}->{'ALERTED'} = "N" if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} < 2);
-			$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 2;
+			if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} < 2 && $Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} != -1) {
+				$Scan_href->{$ip}->{'ALERTED'} = "N";
+				$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 2;
+			}
 		}
 		if ($absnum >= $danger_levels_href->{'3'} && $absnum < $danger_levels_href->{'4'} && $range >= $port_range_scan_threshold) {
-			$Scan_href->{$ip}->{'ALERTED'} = "N" if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} < 3);
-			$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 3;
+			if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} < 3 && $Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} != -1) {
+				$Scan_href->{$ip}->{'ALERTED'} = "N";
+				$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 3;
+			}
 		}
 		if ($absnum >= $danger_levels_href->{'4'} && $absnum < $danger_levels_href->{'5'} && $range >= $port_range_scan_threshold) {
-			$Scan_href->{$ip}->{'ALERTED'} = "N" if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} < 4);
-			$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 4;
+			if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} < 4 && $Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} != -1) {
+				$Scan_href->{$ip}->{'ALERTED'} = "N";
+				$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 4;
+			}
 		}
 		if ($absnum >= $danger_levels_href->{'5'} && $range >= $port_range_scan_threshold) {
-			$Scan_href->{$ip}->{'ALERTED'} = "N" if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} < 5);
-			$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 5;
+			if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} < 5 && $Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} != -1) {
+				$Scan_href->{$ip}->{'ALERTED'} = "N";
+				$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 5;
+			}
 		}
-		if ($alert_all eq "Y") {  # we will always send an alert email for any new "bad" packet if $alert_alll eq "Y"
-			$Scan_href->{$ip}->{'ALERTED'} = "N"
+		if ($alert_all eq "Y") {  # we will always send an alert email for any new "bad" packet if $alert_all eq "Y"
+			$Scan_href->{$ip}->{'ALERTED'} = "N";
+		}
+	}
+	return $Scan_href;
+}
+sub automatic_ip_danger_assignment() {
+	my ($Scan_href, $Auto_ips_href) = @_;
+	foreach my $scan_ip (keys %$Scan_href) {
+		foreach my $auto_ip (keys %$Auto_ips_href) {
+			if ($scan_ip eq $auto_ip && $Scan_href->{$scan_ip}->{'AUTO'} eq "N") {
+				$Scan_href->{$scan_ip}->{'CURRENT_DANGER_LEVEL'} = $Auto_ips_href->{$auto_ip};
+#				print "Assigning $scan_ip danger level: $Auto_ips_href->{$auto_ip}\n";
+				$Scan_href->{$scan_ip}->{'ALERTED'} = "N";
+				$Scan_href->{$scan_ip}->{'AUTO'} = "Y";
+			}
 		}
 	}
 	return $Scan_href;
@@ -517,6 +585,10 @@ sub logr() {
                                 print EMAILALERT "End time:                 $end_time\n";
                                 print EMAILALERT "Danger level:             $Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} out of 5\n";
                                 print EMAILALERT "DNS info:                 $dnsstring\n";
+				if ($USE_IPCHAINS) {
+					print $hndl "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
+					print EMAILALERT "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
+				}
 			} else {
 				print $hndl "$mesg\n";
 				print EMAILALERT "$mesg\n";
@@ -571,8 +643,8 @@ sub logr() {
 				$Scan_href = send_email_alert($Scan_href, $ip, $mesg, $flags_mesg, $email_alertfile, $email_address, $Cmds_href);
 			}
 			$Scan_href->{$ip}->{'LOGR'} = "N";
+			print $hndl "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
 		}
-		print $hndl "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
 	}
 	close $hndl unless $output;
 	return $Scan_href;
@@ -629,7 +701,7 @@ sub print_scan() {  # this should primarily be used for debugging
 }
 sub check_fw() {
 	my $line = shift;
-	if ($line !~ /MAC/) {
+	if ($line !~ /MAC/) {  # ipchains log messages do not have a MAC address field
 		$USE_IPCHAINS = 1;
 	} else {
 		$USE_IPTABLES = 1;
@@ -687,8 +759,15 @@ sub check_firewall_rules() {
 #                                                print STDOUT "*** Your firewall setup looks good.  Unauthorized tcp packets will be dropped and logged.\n";
                                                 return 1;
                                         }
-                                }
-                        }
+				}		
+                        } elsif ($rule =~ /^(\w+)\s+(\w+)\s+(\S+)\s+\S+\s+(\S+)\s+(n\/a)/) {
+                                my ($target, $proto, $opt, $dst, $srcpt, $dstpt) = ($1, $2, $3, $4, $5);
+                                if ($target =~ /drop|reject|deny/i && $proto =~ /all|tcp/ && $opt =~ /....l./) {
+                                        if (check_destination($dst, \@localips)) {
+						return 1;
+					}
+				}
+			}
                 }
                 print STDERR "*** Your firewall does not include rules that will log dropped/rejected packets.  Psad will not work with such a firewall setup.\n";
                 return 0;
@@ -744,7 +823,7 @@ sub usage_and_exit() {
         my $exitcode = shift;
         print <<_HELP_;
 
-Usage: psad [-d] [-o] [-e] [-f] [-c <config file>] [-s <signature file> [-h]
+Usage: psad [-d] [-o] [-e] [-f] [-c <config file>] [-s <signature file>] [-a <auto danger level file>] [-h]
 
         -daemon			- do not run as a daemon.
 	-error			- do not write errors to the error log.
@@ -757,6 +836,8 @@ Usage: psad [-d] [-o] [-e] [-f] [-c <config file>] [-s <signature file> [-h]
 	-namelookups		- disable name resolution against
 				  scanning ips.
 	-signatures <sig file>	- import scan signatures.
+	-auto_ips <ips file>	- import auto ips file for automatic 
+				  ip danger level increases/decreses.
 	-local_port_lookup	- disable local port lookups for scan
 				  signatures.
         -h                      - prints this help message.

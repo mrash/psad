@@ -101,15 +101,15 @@ start)
 	fi
 	;;
 stop)
-	echo -n "Shutting down the kmsgs daemon: "
-	psadkillproc kmsgsd
-	echo 
-	echo -n "Shutting down the psad daemon: "
-	psadkillproc psad 
-	echo
-        echo -n "Shutting down the psadwatchd monitoring daemon: "
+	echo -n "Shutting down the psadwatchd monitoring daemon: "
         psadkillproc psadwatchd
         echo
+        echo -n "Shutting down the psad daemon: "
+        psadkillproc psad
+	echo
+	echo -n "Shutting down the kmsgs daemon: "
+	psadkillproc kmsgsd
+	echo
 	echo -n "Shutting down the disk monitoring daemon: "
 	psadkillproc diskmond
 	echo

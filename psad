@@ -1666,10 +1666,24 @@ sub scan_logr() {
             my %print_hsh = ($scanlog => 1, $email_alert => 1);
 
             ### set the overall packet counters
-            $tot_tcp  = $scan{$src}{$dst}{'TCP'}{'PKTS'};
-            $tot_udp  = $scan{$src}{$dst}{'UDP'}{'PKTS'};
-            $tot_icmp = $scan{$src}{$dst}{'ICMP'}{'PKTS'};
+            $tot_tcp  = $scan{$src}{$dst}{'TCP'}{'PKTS'}
+                if defined $scan{$src}{$dst}{'TCP'}{'PKTS'};
+            $tot_udp  = $scan{$src}{$dst}{'UDP'}{'PKTS'}
+                if defined $scan{$src}{$dst}{'UDP'}{'PKTS'};
+            $tot_icmp = $scan{$src}{$dst}{'ICMP'}{'PKTS'}
+                if defined $scan{$src}{$dst}{'ICMP'}{'PKTS'};
 
+            if (defined $scan{$src}{$dst}{'TCP'}{'S_PORT'}) {
+                my $tcp_s_port
+                    = $scan{$src}{$dst}{'TCP'}{'S_PORT'};
+                my $tcp_e_port
+                    = $scan{$src}{$dst}{'TCP'}{'E_PORT'};
+                if ($tcp_s_port == $tcp_e_port) {
+                    $tcp_absrange = $tcp_s_port;
+                } else {
+                    $tcp_absrange = "$tcp_s_port-$tcp_e_port";
+                }
+            }
             if (defined $scan{$src}{$dst}{'TCP'}{'CURR_INT'}) {
                 $tcp_f = 1;
                 my $tcp_s_port
@@ -1681,17 +1695,19 @@ sub scan_logr() {
                 } else {
                     $tcp_newrange = "$tcp_s_port-$tcp_e_port";
                 }
-                $tcp_s_port
-                    = $scan{$src}{$dst}{'TCP'}{'S_PORT'};
-                $tcp_e_port
-                    = $scan{$src}{$dst}{'TCP'}{'E_PORT'};
-                if ($tcp_s_port == $tcp_e_port) {
-                    $tcp_absrange = $tcp_s_port;
-                } else {
-                    $tcp_absrange = "$tcp_s_port-$tcp_e_port";
-                }
                 $tcp_newpkts = $scan{$src}{$dst}{'TCP'}
                     {'CURR_INT'}{'PKTS'};
+            }
+            if (defined $scan{$src}{$dst}{'UDP'}{'S_PORT'}) {
+                my $udp_s_port
+                    = $scan{$src}{$dst}{'UDP'}{'S_PORT'};
+                my $udp_e_port
+                    = $scan{$src}{$dst}{'UDP'}{'E_PORT'};
+                if ($udp_s_port == $udp_e_port) {
+                    $udp_absrange = $udp_s_port;
+                } else {
+                    $udp_absrange = "$udp_s_port-$udp_e_port";
+                }
             }
             if (defined $scan{$src}{$dst}{'UDP'}{'CURR_INT'}) {
                 $udp_f = 1;
@@ -1703,15 +1719,6 @@ sub scan_logr() {
                     $udp_newrange = $udp_s_port;
                 } else {
                     $udp_newrange = "$udp_s_port-$udp_e_port";
-                }
-                $udp_s_port
-                    = $scan{$src}{$dst}{'UDP'}{'S_PORT'};
-                $udp_e_port
-                    = $scan{$src}{$dst}{'UDP'}{'E_PORT'};
-                if ($udp_s_port == $udp_e_port) {
-                    $udp_absrange = $udp_s_port;
-                } else {
-                    $udp_absrange = "$udp_s_port-$udp_e_port";
                 }
                 $udp_newpkts = $scan{$src}{$dst}{'UDP'}
                     {'CURR_INT'}{'PKTS'};

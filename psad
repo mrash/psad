@@ -100,7 +100,6 @@ usage_and_exit(0) if ($help);
 fork and exit unless ($daemon);
 
 if ($config) {
-	print "Config file: $config\n";
 	open CONF, "< $config";
 	eval $_ while(<CONF>);
 	close CONF;
@@ -110,9 +109,8 @@ unless ($errors) {
 	print ERR "============= psad: pid $$ ===============\n";
 	close ERR;
 }
-print "danger 3: $DANGER_LEVELS{'3'}\n";
 `$touchCmd $FW_DATA` unless (-e $FW_DATA);
-
+# main loop
 for (;;) {
 	$fwdata_start_lines = (split /\s+/, `$wcCmd -l $FW_DATA`)[1];
 #	print "Current number of lines: $fwdata_start_lines\n";   # this will be useful for the TODO

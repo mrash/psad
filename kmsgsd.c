@@ -1,35 +1,38 @@
-/**
- **  $Id$
- **
- **  File: kmsgsd.c
- **
- **  Purpose: kmsgsd separates ipchains/iptables messages from all other
- **           kernel messages.
- **
- **  Strategy: read messages from the /var/log/psadfifo named pipe and
- **            print any firewall related dop/reject/deny messages to
- **            the psad data file "/var/log/psad/fwdata".
- **
- **  Author: Michael B. Rash (mbr@cipherdyne.com)
- **
- **  Credits:  (see the CREDITS file)
- **
- **  Version: 1.0.0
- **
- **  Copyright (C) 1999-2001 Michael B. Rash (mbr@cipherdyne.com)
- **
- **  License (GNU Public License):
- **
- **     This program is distributed in the hope that it will be useful,
- **     but WITHOUT ANY WARRANTY; without even the implied warranty of
- **     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- **     GNU General Public License for more details.
- **
- **     You should have received a copy of the GNU General Public License
- **     along with this program; if not, write to the Free Software
- **     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
- **     USA
- ****************************************************************************/
+/*
+******************************************************************************
+*
+*  File: kmsgsd.c
+*
+*  Purpose: kmsgsd separates ipchains/iptables messages from all other
+*           kernel messages.
+*
+*  Strategy: read messages from the /var/log/psadfifo named pipe and
+*            print any firewall related dop/reject/deny messages to
+*            the psad data file "/var/log/psad/fwdata".
+*
+*  Author: Michael B. Rash (mbr@cipherdyne.com)
+*
+*  Credits:  (see the CREDITS file)
+*
+*  Version: 1.0.0-pre3
+*
+*  Copyright (C) 1999-2001 Michael B. Rash (mbr@cipherdyne.com)
+*
+*  License (GNU Public License):
+*
+*     This program is distributed in the hope that it will be useful,
+*     but WITHOUT ANY WARRANTY; without even the implied warranty of
+*     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*     GNU General Public License for more details.
+*
+*     You should have received a copy of the GNU General Public License
+*     along with this program; if not, write to the Free Software
+*     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
+*     USA
+******************************************************************************
+*
+*  $Id$
+*/
 
 /* INCLUDES *****************************************************************/
 #include "psad.h"

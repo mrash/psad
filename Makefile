@@ -1,11 +1,11 @@
 #
-#  $Id$
+##########################################################################
 #
 #  Author: Michael B. Rash (mbr@cipherdyne.com)
 #
 #  Credits:  (see the CREDITS file)
 #
-#  Version: 0.9.8
+#  Version: 1.0.0-pre3
 #
 #  Copyright (C) 1999-2002 Michael B. Rash (mbr@cipherdyne.com)
 #
@@ -22,11 +22,14 @@
 #     USA
 #
 ##########################################################################
+#
+#  $Id$
+#
 
 ### default
 all : kmsgsd.c psad_funcs.c psad.h
 	/usr/bin/gcc -Wall kmsgsd.c psad_funcs.c -o kmsgsd
-	/usr/bin/gcc -Wall psadwatchd.c psad_funcs.c -o psadwatchd
+#	/usr/bin/gcc -Wall psadwatchd.c psad_funcs.c -o psadwatchd
 
 #install : kmsgsd
 #	if [ -x kmsgsd ]; then \

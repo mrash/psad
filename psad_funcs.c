@@ -1,40 +1,41 @@
-/**
-************************************************************************************
-***
-***  File: psad_funcs.c
-***
-***  Purpose: psad_funcs.c contains several functions that are needed by
-***           the all of the psad daemons, so putting these functions in
-***           a single file make sense.
-***
-***  Author: Michael B. Rash (mbr@cipherdyne.com)
-***
-***  Credits:  (see the CREDITS file)
-***
-***  Version: 0.9.8
-***
-***  Copyright (C) 1999-2002 Michael B. Rash (mbr@cipherdyne.com)
-***
-***  License (GNU Public License):
-***
-***     This program is distributed in the hope that it will be useful,
-***     but WITHOUT ANY WARRANTY; without even the implied warranty of
-***     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-***     GNU General Public License for more details.
-***
-***     You should have received a copy of the GNU General Public License
-***     along with this program; if not, write to the Free Software
-***     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
-***     USA
-************************************************************************************
-***
-***  $Id$
-***/
+/*
+********************************************************************************
+*
+*  File: psad_funcs.c
+*
+*  Purpose: psad_funcs.c contains several functions that are needed by
+*           the all of the psad daemons, so putting these functions in
+*           a single file make sense.
+*
+*  Author: Michael B. Rash (mbr@cipherdyne.com)
+*
+*  Credits:  (see the CREDITS file)
+*
+*  Version: 1.0.0-pre3
+*
+*  Copyright (C) 1999-2002 Michael B. Rash (mbr@cipherdyne.com)
+*
+*  License (GNU Public License):
+*
+*     This program is distributed in the hope that it will be useful,
+*     but WITHOUT ANY WARRANTY; without even the implied warranty of
+*     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*     GNU General Public License for more details.
+*
+*     You should have received a copy of the GNU General Public License
+*     along with this program; if not, write to the Free Software
+*     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
+*     USA
+*
+********************************************************************************
+*
+*  $Id$
+*/
 
-/* INCLUDES ********************************************************************/
+/* INCLUDES *****************************************************************/
 #include "psad.h"
 
-/* FUNCTIONS *******************************************************************/
+/* FUNCTIONS ****************************************************************/
 void check_unique_pid(const char *pid_file, const char *prog_name)
 {
     FILE *pidfile_ptr;

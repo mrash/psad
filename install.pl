@@ -321,10 +321,10 @@ if (-e "/etc/psad/psad.conf") {
 	copy("psad.conf", "/etc/psad/psad.conf");
 	&perms_ownership("/etc/psad/psad.conf", 0600);
 }
-&logr(" ----  Installing psad(8) man page  ----\n", \@LOGR_FILES);
 if (-e "/etc/man.config") {
 	# prefer to install psad.8 in /usr/local/man/man8 if this directory is configured in /etc/man.config
 	if (open MPATH, "< /etc/man.config" and grep /MANPATH\s+\/usr\/local\/man/, <MPATH> and close MPATH) {
+		&logr(" ----  Installing psad(8) man page as /usr/local/man/man8/psad.8  ----\n", \@LOGR_FILES);
 		copy("psad.8", "/usr/local/man/man8/psad.8");
 		&perms_ownership("/usr/local/man/man8/psad.8", 0644);
 	} else {
@@ -341,14 +341,17 @@ if (-e "/etc/man.config") {
 		close MPATH;
 		if ($mpath) {
 			my $path = $mpath . "/man8/psad.8";
+			&logr(" ----  Installing psad(8) man page as $path  ----\n", \@LOGR_FILES);
 			copy("psad.8", $path);
 			&perms_ownership($path, 0644);
 		} else {
+			&logr(" ----  Installing psad(8) man page as /usr/man/man8/psad.8  ----\n", \@LOGR_FILES);
 			copy("psad.8", "/usr/man/man8/psad.8");
 			&perms_ownership("/usr/man/man8/psad.8", 0644);
 		}
 	}
 } else {
+	&logr(" ----  Installing psad(8) man page as /usr/man/man8/psad.8 ----\n", \@LOGR_FILES);
 	copy("psad.8", "/usr/man/man8/psad.8");
 	&perms_ownership("/usr/man/man8/psad.8", 0644);
 }

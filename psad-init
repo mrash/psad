@@ -17,7 +17,7 @@ restart() {
 case "$1" in
 start)
 	if grep -q psadfifo /etc/syslog.conf; then
-		echo -n "Starting the psad daemon: "
+		echo -n "Starting the psad daemons: "
 		daemon /usr/sbin/psad -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips
 		RETVAL=$?
 		echo

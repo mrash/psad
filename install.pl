@@ -262,22 +262,6 @@ sub install() {
         }
     }
     &perms_ownership($WHOIS_PSAD, 0755);
-
-    ### installing Psad.pm
-    &logr(" .. Installing the Psad.pm perl module\n");
-
-    chdir 'Psad';
-    unless (-e 'Makefile.PL' && -e 'Psad.pm') {
-        die " ** Your source distribution appears to be incomplete!  " .
-            "Psad.pm is missing.\n    Download the latest sources from " .
-            "http://www.cipherdyne.org\n";
-    }
-    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
-    system  $Cmds{'make'};
-    system "$Cmds{'make'} test";
-    system "$Cmds{'make'} install";
-    chdir '..';
-
     print "\n\n";
 
     ### installing Unix::Syslog
@@ -343,6 +327,22 @@ sub install() {
     system "$Cmds{'make'} install";
     chdir '../..';
     print "\n\n";
+
+    ### installing Psad.pm
+    &logr(" .. Installing the Psad.pm perl module\n");
+
+    chdir 'Psad';
+    unless (-e 'Makefile.PL' && -e 'Psad.pm') {
+        die " ** Your source distribution appears to be incomplete!  " .
+            "Psad.pm is missing.\n    Download the latest sources from " .
+            "http://www.cipherdyne.org\n";
+    }
+    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
+    system  $Cmds{'make'};
+    system "$Cmds{'make'} test";
+    system "$Cmds{'make'} install";
+    chdir '..';
+
 
     &logr(" .. Installing snort-2.0 signatures in $SNORT_DIR\n");
     unless (-d $SNORT_DIR) {
@@ -1374,7 +1374,7 @@ sub install_manpage() {
     &logr(" .. Compressing manpage $mfile\n");
     ### remove the old one so gzip doesn't prompt us
     unlink "${mfile}.gz" if -e "${mfile}.gz";
-    system "$gzipCmd $mfile";
+    system "$Cmds{'gzip'} $mfile";
     return;
 }
 

@@ -10,6 +10,7 @@ my $mknodCmd = "/bin/mknod";
 my $grepCmd = "/bin/grep";
 my $cpCmd = "/bin/cp";
 my $idCmd = "/usr/bin/id";
+my $mvCmd = "/bin/mv";
 my $unameCmd = "/bin/uname";
 my $ifconfigCmd = "/sbin/ifconfig";
 my $ipchainsCmd = "/sbin/ipchains";
@@ -36,6 +37,7 @@ my %Cmds = (
 	"grep"		=> $grepCmd,
 	"cp"		=> $cpCmd,
 	"id"		=> $idCmd,
+	"mv"		=> $mvCmd,
 	"uname"		=> $unameCmd,
 	"ifconfig"	=> $ifconfigCmd,
 	"ipchains"      => $ipchainsCmd,
@@ -58,7 +60,7 @@ unless (`$Cmds{'grep'} psadfifo /etc/syslog.conf`) {
 	print SYSLOG "kern.info  |/var/log/psadfifo\n\n";  #reinstate kernel logging to our named pipe
 	close SYSLOG;
 	print "*** Restarting syslog\n";
-	system("$SYSLOG_INIT");      # restart syslog
+	system("$SYSLOG_INIT") or warn "*** Unable to restart syslog!!!\n";      # restart syslog
 }
 unless (-e "/var/log/psad") {
 	print "*** Creating /var/log/psad/\n";
@@ -68,23 +70,68 @@ unless (-e "/var/log/psad/fwdata") {
 	print "*** Creating /var/log/psad/fwdata file\n";
 	`$Cmds{'touch'} /var/log/psad/fwdata`;
 	chmod 0600, "/var/log/psad/fwdata";
+	perms_ownership("/var/log/psad/fwdata", 0600);
+}
+unless (-e "/usr/local/bin") {
+	print "*** Creating /usr/local/bin/\n";
+	mkdir "/usr/local/bin",755;
+}
+if ( -e "/usr/local/bin/psad") {  # need to grab the old config
+	print "*** Copying psad -> /usr/local/bin/psad\n";
+	print "***	Preserving old config within /usr/local/bin/psad\n";
+	preserve_config("psad", "/usr/local/bin/psad", \%Cmds);
+	perms_ownership("/usr/local/bin/psad", 0500)
+} else {
+	print "*** Copying psad -> /usr/local/bin/\n";
+	`$Cmds{'cp'} psad /usr/local/bin/psad`;
+	perms_ownership("/usr/local/bin/psad", 0500);
+}
+if (-e "/usr/local/bin/kmsgsd") { 
+	print "*** Copying kmsgsd -> /usr/local/bin/kmsgsd\n";
+	print "***	Preserving old config within /usr/local/bin/kmsgsd\n";
+	preserve_config("kmsgsd", "/usr/local/bin/kmsgsd", \%Cmds);
+	perms_ownership("/usr/local/bin/kmsgsd", 0500);
+} else {
+	print "*** Copying kmsgsd -> /usr/local/bin/kmsgsd\n";
+	`$Cmds{'cp'} kmsgsd /usr/local/bin/kmsgsd`;
+	perms_ownership("/usr/local/bin/kmsgsd", 0500);
+}
+if (-e "/usr/local/bin/diskmond") {
+	print "*** Copying diskmond -> /usr/local/bin/diskmond\n";
+	print "*** 	Preserving old config within /usr/local/bin/diskmond\n";
+        preserve_config("diskmond", "/usr/local/bin/diskmond", \%Cmds);
+        perms_ownership("/usr/local/bin/diskmond", 0500);
+} else {
+	print "*** Copying diskmond -> /usr/local/bin/diskmond\n";
+	`$Cmds{'cp'} diskmond /usr/local/bin/diskmond`;
+	perms_ownership("/usr/local/bin/diskmond", 0500);
 }
 unless (-e "/etc/psad") {
-	print "*** Creating /etc/psad/\n";
-	mkdir "/etc/psad",400;
+        print "*** Creating /etc/psad/\n";
+        mkdir "/etc/psad",400;
 }
-print "*** Copying psad,kmsgsd,diskmond -> /usr/local/bin/\n";
-`$Cmds{'cp'} psad /usr/local/bin/psad`;
-chmod 0500, "/usr/local/bin/psad";
-`$Cmds{'cp'} kmsgsd /usr/local/bin/kmsgsd`;
-chmod 0500, "/usr/local/bin/kmsgsd";
-`$Cmds{'cp'} diskmond /usr/local/bin/diskmond`;
-chmod 0500, "/usr/local/bin/diskmond";
-print "*** Copying psad.conf,psad_signatures -> /etc/psad/\n";
-`$Cmds{'cp'} psad.conf /etc/psad/psad.conf`;
-chmod 0600, "/etc/psad/psad.conf";
-`$Cmds{'cp'} psad_signatures /etc/psad/psad_signatures`;
-chmod 0600, "/etc/psad/psad_signatures";
+if (-e "/etc/psad/psad.conf") {
+	print "*** Copying psad_signatures -> /etc/psad/psad_signatures\n";
+	print "***	Preserving old signatures file as /etc/psad/psad_signatures.old\n";
+	`$Cmds{'mv'} /etc/psad/psad_signatures /etc/psad/psad_signatures.old`;
+	`$Cmds{'cp'} psad_signatures /etc/psad/psad_signatures`;
+	perms_ownership("/etc/psad/psad_signatures", 0600);
+} else {
+	print "*** Copying psad_signatures -> /etc/psad/psad_signatures\n";
+	`$Cmds{'cp'} psad_signatures /etc/psad/psad_signatures`;
+	perms_ownership("/etc/psad/psad_signatures", 0600);
+}
+if (-e "/etc/psad/psad.conf") {
+	print "*** Copying psad.conf -> /etc/psad/psad.conf\n";
+	print "***	Preserving old psad.conf file as /etc/psad/psad.conf\n";
+	`$Cmds{'mv'} /etc/psad/psad.conf /etc/psad/psad.conf.old`;
+	`$Cmds{'cp'} psad.conf /etc/psad/psad.conf`;
+	perms_ownership("/etc/psad/psad.conf", 0600);
+} else {
+	print "*** Copying psad.conf -> /etc/psad/psad.conf\n";
+	`$Cmds{'cp'} psad.conf /etc/psad/psad.conf`;
+	perms_ownership("/etc/psad/psad.conf", 0600);
+}
 
 my $distro = get_distro();
 my $kernel = get_kernel(\%Cmds);
@@ -169,7 +216,7 @@ unless($fwcheck) {
 	}
 }
 exit 0;
-#==================== end mail =====================
+#==================== end main =====================
 sub check_firewall_rules() {
 	my $Cmds_href = shift;
 	my @localips;
@@ -295,6 +342,53 @@ sub check_commands() {
 		}
 	}
 	return %$Cmds_href;
+}
+sub preserve_config() {
+	my ($srcfile, $productionfile, $Cmds_href) = @_;
+	open PROD, "< $productionfile" or die "Could not open production file: $!\n";
+	my $start = 0;
+	my @config;
+	GETCONFIG: while(<PROD>) {
+		my $l = $_;
+		chomp $l;
+		if ($l =~ /\=\=\=\=\=\s+config\s+\=\=\=\=\=/) {
+			$start = 1;
+		}
+		push @config, $l if ($start);
+		if ($l =~ /\=\=\=\=\=\s+end\s+config\s+\=\=\=\=\=/) {
+			last GETCONFIG;
+		}
+	}
+	die "Could not get config info from $productionfile!!!\n" unless (defined @config);
+	close PROD;
+	open SRC, "< $srcfile" or die "Could not open source file: $!\n";
+	$start = 0;
+	my $print = 1;
+	my $prod_tmp = $productionfile . "_tmp";
+	open TMP, "> $prod_tmp";
+	while(<SRC>) {
+		my $l = $_;
+		chomp $l;
+		$start = 1 if ($l =~ /\=\=\=\=\=\s+config\s+\=\=\=\=\=/);
+		print TMP "$l\n" unless $start;
+		if ($start && $print) {
+			foreach my $c (@config) {
+				print TMP "$c\n";
+			}
+			$print = 0;
+		}
+		$start = 0 if ($l =~ /\=\=\=\=\=\s+end\s+config\s+\=\=\=\=\=/);
+	}
+	close SRC;
+	close TMP;
+	`$Cmds_href->{'mv'} $prod_tmp $productionfile`;
+	return;
+}
+sub perms_ownership() {
+	my ($file, $perm_value) = @_;
+	chmod $perm_value, $file;
+	chown 0, 0, $file;	# chown uid, gid, $file
+	return;
 }
 sub usage_and_exit() {
         my $exitcode = shift;

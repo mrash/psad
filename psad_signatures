@@ -1,3 +1,5 @@
+#
+###############################################################################
 # This is the signatures file used by psad to look for suspect network traffic
 # that is readily identifiable through attributes in single packets rather than
 # setting thresholds on several packets in order to determine whether some ip
@@ -42,36 +44,36 @@ tcp any -> 20432 msg:"IDS254 - DDoS shaft client to handler"; flags: AP; dlevel:
 # Miscellaneous signatures
 tcp 53 -> :1023 msg:"IDS007 - MISC-Source Port Traffic 53 TCP"; flags: S; dlevel: 1; 
 tcp 20 -> :1023 msg:"IDS006 - MISC-Source Port Traffic 20 TCP"; flags: S; dlevel: 1;  
-# tcp any -> any msg:"MISC-Traceroute TCP"; ttl:"1"; dlevel: 1; 
 tcp !53 -> 1080 msg:"MISC-WinGate-1080-Attempt"; flags: S; dlevel: 1; 
 tcp 6000:6005 ->  any msg:"IDS126 - Outgoing Xterm"; flags: AS; dlevel: 1; 
 tcp !53 -> 8080 msg:"MISC-WinGate-8080-Attempt"; flags: S; dlevel: 1; 
 tcp any -> 32771 msg:"MISC-Attempted Sun RPC high port access"; dlevel: 1; 
+tcp 7161 -> any msg:"IDS129 - CVE-1999-0430 - Cisco Catalyst Remote Access"; flags: AS; dlevel: 1; 
+# tcp any -> any msg:"MISC-Traceroute TCP"; ttl:"1"; dlevel: 1; 
 # tcp any -> any ipopts: lsrr; msg: "Source routed packet"; dlevel: 1; 
 # tcp any -> 617 msg:"MISC Knox Arkeia DOS"; flags:AP; dsize:>1445; dlevel: 1; 
 # tcp any -> any ipopts: ssrr; msg: "Source routed packet"; dlevel: 1; 
 # tcp any -> 617 msg:"IDS261 - MISC DoS arkiea backup"; flags: AP; dsize: >1445; dlevel: 1; 
-tcp 7161 -> any msg:"IDS129 - CVE-1999-0430 - Cisco Catalyst Remote Access"; flags: AS; dlevel: 1; 
 
 # "tcp ping" signature
 # tcp any -> any msg:"IDS028 - PING NMAP TCP"; flags:A; ack:0; dlevel: 1; 
 
-# DNS probe
+### DNS probe
 tcp any -> 53 msg:"DNS tcp probe"; flags:SF; dlevel: 2;
 
-# oddball scans OS fingerprinting, SYN-FIN, etc...
-# tcp any -> any flags: A; ack: 0; msg:"NMAP TCP ping!"; dlevel: 1;
+### oddball scans OS fingerprinting, SYN-FIN, etc...
 tcp any -> any msg:"Possible NMAP Fingerprint attempt"; flags: UPSF; dlevel: 2;
-# tcp any -> any msg:"Possible Queso Fingerprint attempt"; flags: S12; dlevel: 1;
 tcp any -> any msg:"IDS005 - SCAN-Possible NMAP Fingerprint attempt"; flags: UPSF; dlevel: 2; 
-# tcp any -> any msg:"IDS236 - SCAN-IP Eye SYN Scan"; flags: S; seq: 1958810375; dlevel: 1; 
-# tcp any -> any msg:"IDS004 - SCAN-NULL Scan"; flags:0; seq:0; ack:0; dlevel: 1; 
-# tcp any -> any msg:"IDS029 - SCAN-Possible Queso Fingerprint attempt"; flags:S12; dlevel: 1; 
 tcp any -> any msg:"SCAN-SYN FIN"; flags:SF; dlevel: 2; 
 tcp any -> any msg:"SCAN-NULL"; flags:NULL; dlevel: 2; 
 tcp any -> any msg:"NMAP XMAS scan"; flags: UPF; dlevel: 2;
-# tcp any -> 80 msg:"IDS146 - SCAN-Cybercop OS Probe sf12"; flags: SF12; dsize: 0; dlevel: 1; 
 tcp any -> any msg:"IDS027 - SCAN-FIN"; flags: F; dlevel: 2; 
+# tcp any -> any msg:"IDS236 - SCAN-IP Eye SYN Scan"; flags: S; seq: 1958810375; dlevel: 1; 
+# tcp any -> any msg:"IDS004 - SCAN-NULL Scan"; flags:0; seq:0; ack:0; dlevel: 1; 
+# tcp any -> any msg:"IDS029 - SCAN-Possible Queso Fingerprint attempt"; flags:S12; dlevel: 1; 
+# tcp any -> any msg:"Possible Queso Fingerprint attempt"; flags: S12; dlevel: 1;
+# tcp any -> any flags: A; ack: 0; msg:"NMAP TCP ping!"; dlevel: 1;
+# tcp any -> 80 msg:"IDS146 - SCAN-Cybercop OS Probe sf12"; flags: SF12; dsize: 0; dlevel: 1; 
 
 # IIS scans.  Ha, ha, our Linux box is not vulnerable but if it is the firewall for a network that runs
 # Windoze boxen wouldn't you want to know when someone is trying these?
@@ -83,7 +85,6 @@ tcp 1024: -> 1038 msg:"IIS - Possible Attempt at NT TCPSVCS.EXE 100% CPU Utiliza
 
 ############# udp signatures #############
 # psad needs to support other packet fields such as ttl, len, etc. to recognize more signatures
-
 udp any -> 31337 msg:"Back Orifice"; dlevel: 2; 
 udp any -> 31338 msg:"Deep Back Orifice"; dlevel: 2;
 udp 53 -> 138:1023 msg:"MISC-Source Port Traffic 138-1023"; dlevel: 1;
@@ -91,7 +92,6 @@ udp 53 -> 54:136 msg:"MISC-Source Port Traffic 54-136"; dlevel: 1;
 udp 53 -> 0:52 msg:"MISC-Source Port Traffic 0-52"; dlevel: 1;
 
 ############ icmp signatures #############
-# icmp 3.3.3.3/32 any -> $EXTERNAL_NET any (msg:"IDS193 - DDoS - Stacheldraht server-spoof"; itype: 0; icmp_id: 666;
 icmp msg:"IDS183 - DDoS - TFN client command LE"; itype: 0; icmp_id: 51201; icmp_seq: 0; dlevel: 1;
 icmp msg:"IDS184 - DDoS - TFN client command BE"; itype: 0; icmp_id: 456; icmp_seq: 0; dlevel: 1;
 icmp msg:"MISC-IRDP-Router-Selection(l0phtattack)";itype:10; dlevel: 1;
@@ -111,3 +111,4 @@ icmp msg:"ICMP Information Reply"; itype:16; dlevel: 1;
 icmp msg:"IDS216 - ICMP Subnet Mask Request"; itype:17; dlevel: 1;
 icmp msg:"Windows Traceroute"; TTL: 1; itype: 8; dlevel: 1;
 # icmp msg:"echo request"; TTL: 64; itype: 8; dlevel: 1;
+# icmp 3.3.3.3/32 any -> $EXTERNAL_NET any (msg:"IDS193 - DDoS - Stacheldraht server-spoof"; itype: 0; icmp_id: 666;

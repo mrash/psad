@@ -27,10 +27,10 @@
 #
 
 ### default
-all : kmsgsd.c psad_funcs.c psad.h
-	/usr/bin/gcc -Wall kmsgsd.c psad_funcs.c -o kmsgsd
-	/usr/bin/gcc -Wall diskmond.c psad_funcs.c -o diskmond
-	/usr/bin/gcc -Wall psadwatchd.c psad_funcs.c -o psadwatchd
+all : kmsgsd.c diskmond.c psadwatchd.c psad_funcs.c strlcpy.c strlcat.c psad.h
+	/usr/bin/gcc -Wall kmsgsd.c psad_funcs.c strlcpy.c strlcat.c -o kmsgsd
+	/usr/bin/gcc -Wall diskmond.c psad_funcs.c strlcpy.c strlcat.c -o diskmond
+	/usr/bin/gcc -Wall psadwatchd.c psad_funcs.c strlcpy.c strlcat.c -o psadwatchd
 
 #install : kmsgsd
 #	if [ -x kmsgsd ]; then \

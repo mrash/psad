@@ -146,7 +146,7 @@ void find_char_var(char *search_str, char *charvar, char *line)
             exit(EXIT_FAILURE);
         }
 
-        if (char_ctr > 48) {
+        if (char_ctr > MAX_GEN_LEN-1) {
             printf(" ** find_char_var(): the config line for %s is too long.  Exiting.\n",
                     search_str);
             exit(EXIT_FAILURE);

@@ -337,6 +337,7 @@ my $restart          = 0;
 my $status           = 0;
 my $status_ip        = '';
 my $status_sort_dl   = 0;
+my $status_dl        = 0;
 my $benchmark        = 0;
 my $b_packets        = 0;
 my $usr1             = 0;
@@ -427,6 +428,8 @@ Getopt::Long::Configure('no_ignore_case');
     'status-ip=s'       => \$status_ip,       # Display status for a specific ip.
     'status-sort-dl'    => \$status_sort_dl,  # Sort by danger level instead of by
                                               # ip address in --Status output.
+    'status-dl=i'       => \$status_dl,       # Display status for scans that have
+                                              # reached at least this danger level.
     'Benchmark'         => \$benchmark,       # Run in benchmark mode.
     'packets=i'         => \$b_packets,       # Specify number of packets to use
                                               # in benchmark test.
@@ -478,13 +481,20 @@ if ($ver) {
     exit 0;
 }
 
-if ($status_ip && ! $status) {
+if ($status_ip && not $status) {
     die ' ** The --status-ip option can only be specified along with ',
         'the --Status option.  Exiting.';
 }
-if ($status_sort_dl && ! $status) {
+if ($status_sort_dl && not $status) {
     die ' ** The --status-sort-dl option can only be specified along with ',
         'the --Status option.  Exiting.';
+}
+if ($status_dl && not $status) {
+    die ' ** The --status-dl option can only be specified along with ',
+        'the --Status option.  Exiting.';
+}
+if ($status_dl and $status_dl > 5) {
+    die ' ** The --status-dl must be between 1 and 5.  Exiting.';
 }
 
 ### check for any old command line arguements
@@ -3210,7 +3220,12 @@ sub status_psad_daemon() {
         printf "    %-17s%-17s%-8s%-12s%-6s%-6s%-7s%-7s\n", 'src:', 'dst:',
             'chain:', 'interface:', 'tcp:', 'udp:', 'icmp:', 'dl:';
         if ($status_sort_dl) {
+            my $found_equal_status = 0;
             for my $dl (sort {$b <=> $a} keys %scan_srcs) {
+                if ($status_dl) {
+                    next unless $dl >= $status_dl;
+                }
+                $found_equal_status = 1;
                 for my $src (keys %{$scan_srcs{$dl}}) {
                     for my $dst (keys %{$scan_srcs{$dl}{$src}}) {
                         for my $chain qw(input forward) {
@@ -3240,11 +3255,19 @@ sub status_psad_daemon() {
                         }
                     }
                 }
+                unless ($found_equal_status) {
+                    print STDOUT "    [No level $status_dl scans detected]\n";
+                }
             }
         } else {
+            my $found_equal_status = 0;
             for my $src (sort keys %scan_srcs) {
                 for my $dst (keys %{$scan_srcs{$src}}) {
                     my $dl = $scan_srcs{$src}{$dst}{'dl'};
+                    if ($status_dl) {
+                        next unless $dl >= $status_dl;
+                    }
+                    $found_equal_status = 1;
                     for my $chain qw(input forward) {
                         next unless defined
                             $scan_srcs{$src}{$dst}{$chain};
@@ -3271,6 +3294,9 @@ sub status_psad_daemon() {
                         }
                     }
                 }
+            }
+            unless ($found_equal_status) {
+                print STDOUT "    [No level $status_dl scans detected]\n";
             }
         }
     } else {
@@ -3938,11 +3964,14 @@ Options:
     -R   --Restart                - Restart all running psad processes.
     -S   --Status                 - Displays the status of any
                                     currently running psad processes.
-    --status-ip    <ip address>   - View status for a specific ip.
+    --status-ip <ip address>      - View status for a specific ip.
     --status-sort-dl              - Sort --Status output by danger level
                                     instead of by ip address.
+    --status-dl <dl>              - Display status information for only
+                                    those scans that have reach at least
+                                    <dl> (from 1 to 5).
     -B   --Benchmark              - run psad in benchmark mode.
-    --packets                     - Specify number of packets to use in
+    --packets <number>            - Specify number of packets to use in
                                     benchmark test (default is 10,000).
     -U   --USR1                   - Send a running psad process a USR1
                                     signal (generates a dump of psad

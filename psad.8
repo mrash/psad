@@ -23,6 +23,8 @@
 .I posf-file
 .B ] [--status-ip
 .I ip
+.B ] [--status-dl
+.I dl
 .B ] [--status-sort-dl] [--no-fwcheck] [--no-daemon] [--no-rdns]
 .B [--no-whois] [--no-netstat] [--no-ipt-errors]
 .B [--no-passive-os] [--no-snort-sids]
@@ -161,6 +163,12 @@ Display status information associated with
 .I ip
 such as the protocol packet counters as well as the last 10 packets
 logged by iptables.
+.TP
+
+.BI \-\^\-status-dl "  dl"
+Display status information only for scans that have reached a danger
+level of at least
+.I dl
 .TP
 
 .BR \-\^\-status-sort-dl

@@ -43,6 +43,9 @@
 short int psad_syscalls_ctr     = 0;
 short int kmsgsd_syscalls_ctr   = 0;
 short int diskmond_syscalls_ctr = 0;
+const char mail_redr[] = " < /dev/null > /dev/null 2>&1";
+char mail_addrs[MAX_GEN_LEN+1];
+char mailCmd[MAX_GEN_LEN+1];
 
 /* PROTOTYPES ***************************************************************/
 static void parse_config(
@@ -54,6 +57,7 @@ static void parse_config(
     char *diskmond_binary,
     char *diskmond_pid_file,
     char *mailCmd,
+    char *mail_addrs,
     char *psadwatchd_pid_file,
     unsigned int *psadwatchd_check_interval,
     unsigned int *psadwatchd_max_retries
@@ -77,7 +81,7 @@ int main(int argc, char *argv[]) {
     char kmsgsd_pid_file[MAX_PATH_LEN+1];
     char diskmondCmd[MAX_PATH_LEN+1];
     char diskmond_pid_file[MAX_PATH_LEN+1];
-    char mailCmd[MAX_PATH_LEN+1];
+//    char mailCmd[MAX_PATH_LEN+1];
     char psadwatchd_pid_file[MAX_PATH_LEN+1];
     unsigned int psadwatchd_check_interval = 5;  /* default to 5 seconds */
     unsigned int psadwatchd_max_retries = 10; /* default to 10 tries */
@@ -112,12 +116,11 @@ int main(int argc, char *argv[]) {
         diskmondCmd,
         diskmond_pid_file,
         mailCmd,
+        mail_addrs,
         psadwatchd_pid_file,
         &psadwatchd_check_interval,
         &psadwatchd_max_retries
     );
-
-    printf("max: %d\n", psadwatchd_max_retries);
 
     /* first make sure there isn't another psadwatchd already running */
     check_unique_pid(psadwatchd_pid_file, "psadwatchd");
@@ -146,7 +149,7 @@ int main(int argc, char *argv[]) {
         sleep(psadwatchd_check_interval);
     }
 
-    /* these statements don't get executed, but for completeness... */
+    /* this statements don't get executed, but for completeness... */
     exit(EXIT_SUCCESS);
 }
 /******************** end main ********************/
@@ -159,6 +162,7 @@ static void check_process(
 {
     FILE *pidfile_ptr;
     pid_t pid;
+    char mail_str[MAX_MSG_LEN+1] = "";
     char pid_line[MAX_PID_SIZE+1];
 
     if ((pidfile_ptr = fopen(pid_file, "r")) == NULL) {
@@ -167,7 +171,24 @@ static void check_process(
 #ifdef DEBUG
     printf(" ... Could not open pid_file: %s\n", pid_file);
 #endif
-        // system(binary_path);
+        strcat(mail_str, mailCmd);
+        strcat(mail_str, " -s \" ... @@@ psadwatchd: Restarting ");
+        strcat(mail_str, pid_name);
+        strcat(mail_str, " on HOSTNAME.\" ");
+        strcat(mail_str, mail_addrs);
+        strcat(mail_str, mail_redr);
+
+#ifdef DEBUG
+    printf("sending mail:  %s\n", mail_str);
+#endif
+        /* send the email */
+        system(mail_str);
+
+        /* restart the process */
+        system(binary_path);
+
+        /* increment the number of times we have tried to restart the binary */
+        incr_syscall_ctr(pid_name, max_retries);
         return;
     }
 
@@ -187,12 +208,27 @@ static void check_process(
     fclose(pidfile_ptr);
 
     if (kill(pid, 0) != 0) {  /* the process is not running so start it */
-        incr_syscall_ctr(pid_name, max_retries);
-        // system(binary_path);
 #ifdef DEBUG
         printf(" ... Executing system(%s)\n", binary_path);
 #endif
-        system("/bin/true");
+        strcat(mail_str, mailCmd);
+        strcat(mail_str, " -s \" ... @@@ psadwatchd: Restarting ");
+        strcat(mail_str, pid_name);
+        strcat(mail_str, " on HOSTNAME.\" ");
+        strcat(mail_str, mail_addrs);
+        strcat(mail_str, mail_redr);
+
+#ifdef DEBUG
+    printf("sending mail:  %s\n", mail_str);
+#endif
+        /* send the email */
+        system(mail_str);
+
+        /* execute the binary_path psad daemon */
+        system(binary_path);
+
+        /* increment the number of times we have tried to restart the binary */
+        incr_syscall_ctr(pid_name, max_retries);
     } else {
 #ifdef DEBUG
         printf(" ... %s is running.\n", pid_name);
@@ -246,9 +282,19 @@ static void reset_syscall_ctr(const char *pid_name)
 
 static void give_up(const char *pid_name)
 {
+    char mail_str[MAX_MSG_LEN+1] = "";
 #ifdef DEBUG
     printf(" ... @@@ Could not restart %s process.  Exiting.\n", pid_name);
 #endif
+    strcat(mail_str, mailCmd);
+    strcat(mail_str, " -s \"... @@@ psadwatchd: Could not restart ");
+    strcat(mail_str, pid_name);
+    strcat(mail_str, " on HOSTNAME.  Exiting.\" ");
+    strcat(mail_str, mail_addrs);
+    strcat(mail_str, mail_redr);
+
+    /* Send the email */
+    system(mail_str);
     exit(EXIT_FAILURE);
 }
 
@@ -261,6 +307,7 @@ static void parse_config(
     char *diskmondCmd,
     char *diskmond_pid_file,
     char *mailCmd,
+    char *mail_addrs,
     char *psadwatchd_pid_file,
     unsigned int *psadwatchd_check_interval,
     unsigned int *psadwatchd_max_retries)
@@ -296,6 +343,7 @@ static void parse_config(
             find_char_var("diskmondCmd ", diskmondCmd, index);
             find_char_var("DISKMOND_PID_FILE ", diskmond_pid_file, index);
             find_char_var("mailCmd ", mailCmd, index);
+            find_char_var("EMAIL_ADDRESSES ", mail_addrs, index);
             find_char_var("PSADWATCHD_CHECK_INTERVAL ",
                 char_psadwatchd_check_interval, index);
             find_char_var("PSADWATCHD_MAX_RETRIES ",

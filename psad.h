@@ -46,13 +46,18 @@
 #include <signal.h>
 
 /* DEFINES ********************************************************************/
-/* #define DEBUG */
+#define CONFIG_FILE "/etc/psad/psad.conf" /* default config file */
+
+/* this will automatically be set by install.pl */
+#define HOSTNAME HOSTNAME
+
 #define MAX_LINE_BUF 1024
 #define MAX_PID_SIZE 5
 #define MAX_PATH_LEN 50
+#define MAX_MSG_LEN 120
+#define MAX_GEN_LEN 80
 #define MAX_NUM_LEN 5
 
-#define CONFIG_FILE "/etc/psad/psad.conf" /* default config file */
 
 /* PROTOTYPES *****************************************************************/
 void check_unique_pid(const char *, const char *);

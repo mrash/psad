@@ -280,6 +280,27 @@ sub install() {
 
     print "\n\n";
 
+    &logr(" ... Setting hostname to $HOSTNAME in psad.h\n");
+    if (-e 'psad.h') {
+        open P, "< psad.h";
+        my @lines = <P>;
+        close P;
+        ### replace the "#define HOSTNAME HOSTNAME" line with $HOSTNAME
+        open PH, "> psad.h";
+        for my $line (@lines) {
+            chomp $line;
+            if ($line =~ /^#define\s+HOSTNAME\s+HOSTNAME/) {
+                print PH "#define HOSTNAME $HOSTNAME\n";
+            } else {
+                print PH $line . "\n";
+            }
+        }
+    } else {
+        die " ... @@@  Your source kit appears to be incomplete!  psad.h " .
+            "is missing.\n       Download the latest sources from " .
+            "http://www.cipherdyne.com\n";
+    }
+
     &logr(" ... Compiling kmsgsd and psadwatchd:\n");
     ### remove any previously compiled kmsgsd
     unlink 'kmsgsd' if -e 'kmsgsd';

@@ -58,6 +58,7 @@ tcp any -> any msg:"IDS005 - SCAN-Possible NMAP Fingerprint attempt"; flags: UPS
 # tcp any -> any msg:"IDS004 - SCAN-NULL Scan"; flags:0; seq:0; ack:0; 
 # tcp any -> any msg:"IDS029 - SCAN-Possible Queso Fingerprint attempt"; flags:S12; 
 tcp any -> any msg:"SCAN-SYN FIN"; flags:SF; 
+tcp any -> any msg:"SCAN-NULL"; flags:NULL; 
 tcp any -> any msg:"NMAP XMAS scan"; flags: UPF;
 # tcp any -> 80 msg:"IDS146 - SCAN-Cybercop OS Probe sf12"; flags: SF12; dsize: 0; 
 tcp any -> any msg:"IDS027 - SCAN-FIN"; flags: F; 

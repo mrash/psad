@@ -115,7 +115,7 @@ my $verbose      = 0;
 my $help         = 0;
 
 &usage(1) unless (GetOptions(
-    'no_preserve' => \$nopreserve,    # don't preserve existing configs
+    'no-preserve' => \$nopreserve,    # don't preserve existing configs
     'uninstall'   => \$uninstall,
     'verbose'     => \$verbose,
     'help'        => \$help           # display help
@@ -1223,7 +1223,7 @@ sub usage() {
 
 Usage: install.pl [-n] [-u] [-v] [-h]
 
-    -n  --no_preserve   - disable preservation of old configs.
+    -n  --no-preserve   - disable preservation of old configs.
     -u  --uninstall     - uninstall psad.
     -v  --verbose       - verbose mode.
     -h  --help          - prints this help message.

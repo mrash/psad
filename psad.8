@@ -10,7 +10,7 @@
 .I auto-dl-file
 .B ] [-c
 .I config-file
-.B ] [-l] [-h] [-B] [-A] [-F] [-S] [-K] [-R] [-U] [-H] [-V] [-p] [-e] [-D] [-d] [--signatures
+.B ] [-l] [-h] [-B] [-A] [-F] [-S] [-K] [-R] [-U] [-H] [-V] [-p] [-e] [-w] [-D] [-d] [--signatures
 .I sig-file
 .B ] [--interval
 .I interval
@@ -136,6 +136,15 @@ the iptables logfile psad is used to parse using the --email-analysis option
 could extend the runtime of psad by quite a bit since normally both DNS and
 whois lookups will be issued against each scanning IP address.  As usual these
 lookups can be disabled with the --no-rdns and --no-whois options respectively.
+.TP
+
+.BR \-w ", " \-\^\-whois-analysis
+By default
+.B psad
+does not issue whois lookups when running in --Analyze-msgs mode.  The
+--whois-analysis option will override this behavior (when run in analysis mode)
+and instruct psad to issue whois lookups against IP addresses from which scans
+or other suspect traffic has originated.
 .TP
 
 .BR \-\^\-snort-type\ \<type>

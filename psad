@@ -3498,7 +3498,8 @@ sub setup() {
 
     die ' ** No system logger config file could be found.'
         unless (-e $config{'ETC_SYSLOG_CONF'}
-                or -e $config{'ETC_SYSLOGNG_CONF'});
+                or -e $config{'ETC_SYSLOGNG_CONF'}
+                or -e $config{'ETC_METALOG_CONF'});
 
     ### look for psadfifo in some system logger config file
     ### (syslog, syslog-ng, etc.) and attempt to correct if not
@@ -3576,6 +3577,53 @@ sub setup() {
                 "kern.info messages to $config{'PSAD_FIFO'}");
             system "$cmds{'killall'} -HUP syslog-ng";
         }
+    }
+    ### Metalog support added by Dennis Freise <cat@final-frontier.ath.cx>
+    if (-e $config{'ETC_METALOG_CONF'}) {
+        unless (-e "$config{'ETC_METALOG_CONF'}.orig") {
+            copy $config{'ETC_METALOG_CONF'},
+                "$config{'ETC_METALOG_CONF'}.orig";
+        }
+        open RS, "< $config{'ETC_METALOG_CONF'}" or
+        die " ** Unable to open $config{'ETC_METALOG_CONF'}: $!\n";
+        my @lines = <RS>;
+        close RS;
+
+        my $found = 0;
+        for my $line (@lines) {
+            if ($line =~ m/psadpipe\.sh/) {
+                $found = 1;
+                last;
+            }
+        }
+        unless ($found) {
+            open METALOG, "> $config{'ETC_METALOG_CONF'}" or
+                die " ** Unable to open $config{'ETC_METALOG_CONF'}: $!";
+
+            print METALOG "\n";
+            print METALOG "\nPSAD :\n",
+            "  facility = \"kern\"\n";
+            print METALOG '  command  = ',
+            "\"/usr/sbin/psadpipe.sh\"\n";
+            close METALOG;
+            &Psad::psyslog('psad', '.. reconfiguring metalog to write ' .
+                    "kern-facility messages to /usr/sbin/psadpipe.sh");
+
+            open PIPESCRIPT, '> /usr/sbin/psadpipe.sh' or
+                die " ** Unable to open /usr/sbin/psadpipe.sh: $!";
+            print PIPESCRIPT "#!/bin/sh\n\n";
+            print PIPESCRIPT "echo \"\$3\" >> $config{'PSAD_FIFO'}\n";
+            close PIPESCRIPT;
+            chmod 0700, '/usr/sbin/psadpipe.sh';
+            &Psad::psyslog('psad', '.. generated /usr/sbin/psadpipe.sh ' .
+                    "which writes to $config{'PSAD_FIFO'}");
+
+            ### Metalog seems to simply die on SIGHUP and SIGALRM, and I
+            ### found no signal or option to reload it's config... :-(
+            die ' ** All files written. You have to manually restart metalog! ',
+                'When done, start psad again.';
+#          system "$cmds{'killall'} -HUP metalog";
+       }
     }
 
     ### make sure the permissions on these files is 0600

@@ -13,6 +13,11 @@ psad-1.3.4 (09//2004):
     - Added default_log() function to IPTables::Parse.  This function
       parses user defined chains in an effort to find default logging
       rules.
+    - Added EMAIL_LIMIT_STATUS_MSG to control whether or not psad sends a
+      status email when the PSAD_EMAIL_LIMIT threshold has been reached by
+      an IP address.
+    - Added ENABLE_SCAN_ARCHIVE to control whether or not psad archives old
+      scan data within /var/log/psad/scan_archive at start time.
 
 psad-1.3.3 (09/09/2004):
     - Fixed __WARN__ and __DIE__ exception handlers so that they

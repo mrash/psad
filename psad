@@ -1192,14 +1192,14 @@ sub psad_status() {
 	my $pidfiles_aref = shift;
 	my $rv = 0;   ### assume psad is not running and test...
 	for my $pidfile (@$pidfiles_aref) {
-		my $pidname = (split /\./, $pidfile)[1];
+		my $pidname = (split /\./, (split /\//, $pidfile)[$#_])[0];
 		if (-e $pidfile) {
 			open PIDFILE, "< $pidfile";
 			my $pid = <PIDFILE>;
 			close PIDFILE;
 			chomp $pid;
 			if (kill 0, $pid) {
-				print " ----  $pidname is currently running on $HOSTNAME as pid: $pid  ----\n";
+				print " ----  $pidname is currently running on $HOSTNAME as pid: $pid\n";
 				$rv = 1;
 			} else {
 				print " ----  $pidname is not currently running on $HOSTNAME  ----\n";

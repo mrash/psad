@@ -7,6 +7,17 @@ there will be a minimal number of things to change to get psad to work
 on your system, but if system binaries are in places the scripts don't
 know about then you will need to provide the correct paths.  After the
 config sections are the way you want them, just run 'install.pl', and 
-then run '/etc/rc.d/init.d/psad-init start' to get start psad, kmsgsd, 
+then run '/etc/rc.d/init.d/psad-init start' to start psad, kmsgsd, 
 and diskmond, or just run them from the command line.  The install.pl
-script installs psad, kmsgsd, and diskmond in /usr/local/bin by default.
+script installs psad, kmsgsd, and diskmond in /usr/local/bin/ by 
+default.  
+
+	Note: You can install a new version of psad over an
+existing one; just run install.pl.
+	
+	Note: Even though it is a good idea to edit the config sections
+of each of the programs included with psad, both install.pl and psad
+attempt to use the correct system binaries even if an incorrect path
+is given.  This is accomplished by simply using the path provided by
+'which <system binary>' if the binary is not found in the place 
+specified in the config section.

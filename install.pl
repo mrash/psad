@@ -320,6 +320,25 @@ chdir '..';
 
 print "\n\n";
 
+### make sure all of the psad daemons compile (validates
+### the source distribution)
+unless (system "$Cmds{'perl'} -c psad" == 0) {
+    die " ... @@@ psad does not compile with \"perl -c\".  Download the" .
+        " latest sources from:\n\nhttp://www.cipherdyne.com";
+}
+unless (system "$Cmds{'perl'} -c psadwatchd" == 0) {
+    die " ... @@@ psadwatchd does not compile with \"perl -c\".  Download the" .
+        " latest sources from:\n\nhttp://www.cipherdyne.com";
+}
+unless (system "$Cmds{'perl'} -c kmsgsd" == 0) {
+    die " ... @@@ kmsgsd does not compile with \"perl -c\".  Download the" .
+        " latest sources from:\n\nhttp://www.cipherdyne.com";
+}
+unless (system "$Cmds{'perl'} -c diskmond" == 0) {
+    die " ... @@@ diskmond does not compile with \"perl -c\".  Download the" .
+        " latest sources from:\n\nhttp://www.cipherdyne.com";
+}
+
 ### put the psad daemons in place
 &logr(" ... Copying psad -> ${SBIN_DIR}/psad\n");
 copy('psad', "${SBIN_DIR}/psad");

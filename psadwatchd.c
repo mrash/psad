@@ -42,6 +42,7 @@ short int psad_syscalls_ctr     = 0;
 short int kmsgsd_syscalls_ctr   = 0;
 short int diskmond_syscalls_ctr = 0;
 const char mail_redr[] = " < /dev/null > /dev/null 2>&1";
+const char hostname[] = HOSTNAME;
 char mail_addrs[MAX_GEN_LEN+1];
 char mailCmd[MAX_GEN_LEN+1];
 
@@ -171,7 +172,9 @@ static void check_process(
         strcat(mail_str, mailCmd);
         strcat(mail_str, " -s \" ... @@@ psadwatchd: Restarting ");
         strcat(mail_str, pid_name);
-        strcat(mail_str, " on HOSTNAME.\" ");
+        strcat(mail_str, " on ");
+        strcat(mail_str, hostname);
+        strcat(mail_str, ".\" ");
         strcat(mail_str, mail_addrs);
         strcat(mail_str, mail_redr);
 
@@ -211,7 +214,9 @@ static void check_process(
         strcat(mail_str, mailCmd);
         strcat(mail_str, " -s \" ... @@@ psadwatchd: Restarting ");
         strcat(mail_str, pid_name);
-        strcat(mail_str, " on HOSTNAME.\" ");
+        strcat(mail_str, " on ");
+        strcat(mail_str, hostname);
+        strcat(mail_str, ".\" ");
         strcat(mail_str, mail_addrs);
         strcat(mail_str, mail_redr);
 
@@ -286,7 +291,9 @@ static void give_up(const char *pid_name)
     strcat(mail_str, mailCmd);
     strcat(mail_str, " -s \"... @@@ psadwatchd: Could not restart ");
     strcat(mail_str, pid_name);
-    strcat(mail_str, " on HOSTNAME.  Exiting.\" ");
+    strcat(mail_str, " on ");
+    strcat(mail_str, hostname);
+    strcat(mail_str, ".  Exiting.\" ");
     strcat(mail_str, mail_addrs);
     strcat(mail_str, mail_redr);
 

@@ -794,8 +794,8 @@ sub check_scan() {
         ### packets that the firewall dropped.
 
         ### initialize the danger level to 0 if it is not already defined
-        unless (defined $scan{$src}{$dst}{'CURR_DL'}) {
-            $scan{$src}{$dst}{'CURR_DL'} = 0;
+        unless (defined $scan{$src}{$dst}{'DL'}) {
+            $scan{$src}{$dst}{'DL'} = 0;
         }
 
         ### we will always send an alert email for any new "bad" packet
@@ -890,9 +890,9 @@ sub match_fastsigs() {
                 %{$sigs_fast{'TCP'}{$dstport}{$srcport}{$flags}}) {
                 print "matched: $dstport,$srcport,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
-                unless ($scan{$src}{$dst}{'CURR_DL'}
+                unless ($scan{$src}{$dst}{'DL'}
                     >= $sigs_attr{$sig_id}{'dlevel'}) {
-                    $scan{$src}{$dst}{'CURR_DL'}
+                    $scan{$src}{$dst}{'DL'}
                         = $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
@@ -906,9 +906,9 @@ sub match_fastsigs() {
                 %{$sigs_fast{'TCP'}{$dstport}{'any_src_port'}{$flags}}) {
                 print "matched $dstport,any_src_port,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
-                unless ($scan{$src}{$dst}{'CURR_DL'}
+                unless ($scan{$src}{$dst}{'DL'}
                     >= $sigs_attr{$sig_id}{'dlevel'}) {
-                    $scan{$src}{$dst}{'CURR_DL'}
+                    $scan{$src}{$dst}{'DL'}
                         = $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
@@ -921,9 +921,9 @@ sub match_fastsigs() {
                 %{$sigs_fast{'TCP'}{'any_dst_port'}{$srcport}{$flags}}) {
                 print "matched any_dst_port,$srcport,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
-                unless ($scan{$src}{$dst}{'CURR_DL'}
+                unless ($scan{$src}{$dst}{'DL'}
                     >= $sigs_attr{$sig_id}{'dlevel'}) {
-                    $scan{$src}{$dst}{'CURR_DL'}
+                    $scan{$src}{$dst}{'DL'}
                         = $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
@@ -936,9 +936,9 @@ sub match_fastsigs() {
                 %{$sigs_fast{'TCP'}{'any_dst_port'}{'any_src_port'}{$flags}}) {
                 print "matched any_dst_port,any_src_port,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
-                unless ($scan{$src}{$dst}{'CURR_DL'}
+                unless ($scan{$src}{$dst}{'DL'}
                     >= $sigs_attr{$sig_id}{'dlevel'}) {
-                    $scan{$src}{$dst}{'CURR_DL'}
+                    $scan{$src}{$dst}{'DL'}
                         = $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
@@ -949,9 +949,9 @@ sub match_fastsigs() {
     } elsif ($proto eq 'UDP') {
         if (defined $sigs_fast{'UDP'}{$dstport}{$srcport}) {
             for my $sig_id (keys %{$sigs_fast{'UDP'}{$dstport}{$srcport}}) {
-                unless ($scan{$src}{$dst}{'CURR_DL'}
+                unless ($scan{$src}{$dst}{'DL'}
                     >= $sigs_attr{$sig_id}{'dlevel'}) {
-                    $scan{$src}{$dst}{'CURR_DL'} =
+                    $scan{$src}{$dst}{'DL'} =
                         $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
@@ -980,9 +980,9 @@ sub match_sigs() {
 #               && &check_misc_fields($sig_id, $proto, $len, $ttl)) {
                 print "main sigs matched $dstport,$srcport,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
-                unless ($scan{$src}{$dst}{'CURR_DL'}
+                unless ($scan{$src}{$dst}{'DL'}
                     >= $sigs_attr{$sig_id}{'dlevel'}) {
-                    $scan{$src}{$dst}{'CURR_DL'} =
+                    $scan{$src}{$dst}{'DL'} =
                         $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
@@ -992,9 +992,9 @@ sub match_sigs() {
             if (&check_port_range($sig_id, $srcport, $dstport, $proto)) {
 #               && &check_misc_fields($sig_id, $proto, $len, $ttl)) {
                 ### tripped a udp signature
-                unless ($scan{$src}{$dst}{'CURR_DL'}
+                unless ($scan{$src}{$dst}{'DL'}
                     >= $sigs_attr{$sig_id}{'dlevel'}) {
-                    $scan{$src}{$dst}{'CURR_DL'}
+                    $scan{$src}{$dst}{'DL'}
                         = $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
@@ -1002,9 +1002,9 @@ sub match_sigs() {
             }
         } elsif ($proto eq 'ICMP') {
             if (&check_icmp_sigs($sig_id, $ttl, $type, $code, $id, $seq)) {
-                unless ($scan{$src}{$dst}{'CURR_DL'}
+                unless ($scan{$src}{$dst}{'DL'}
                     >= $sigs_attr{$sig_id}{'dlevel'}) {
-                    $scan{$src}{$dst}{'CURR_DL'} =
+                    $scan{$src}{$dst}{'DL'} =
                         $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
@@ -1022,10 +1022,10 @@ sub match_sigs() {
 sub add_snort_sid() {
     my ($src, $dst, $proto, $sid) = @_;
     if (defined $snort_msgs{$sid}) {
-        unless ($scan{$src}{$dst}{'CURR_DL'} >= 2) {
+        unless ($scan{$src}{$dst}{'DL'} >= 2) {
             ### for now hardcode snort sid matches at
             ### a danger level of two
-            $scan{$src}{$dst}{'CURR_DL'} = 2;
+            $scan{$src}{$dst}{'DL'} = 2;
             $scan{$src}{$dst}{'ALERTED'} = 0;
         }
         $scan{$src}{$dst}{'PROTO'}{$proto}{'SNORT_SID'}{$sid}++;
@@ -1476,7 +1476,7 @@ sub assign_danger_level() {
         if (%auto_ips) {
             if (defined $auto_ips{'ip'}{$src}) {
                 for my $dst (keys %{$scan{$src}}) {
-                    $scan{$src}{$dst}{'CURR_DL'} = $auto_ips{'ip'}{$src};
+                    $scan{$src}{$dst}{'DL'} = $auto_ips{'ip'}{$src};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
                 ### ignore $src if the auto danger level is zero
@@ -1485,7 +1485,7 @@ sub assign_danger_level() {
                 for my $net (keys %{$auto_ips{'net'}}) {
                     if (ipv4_in_network($net, $src)) {
                         for my $dst (keys %{$scan{$src}}) {
-                            $scan{$src}{$dst}{'CURR_DL'}
+                            $scan{$src}{$dst}{'DL'}
                                 = $auto_ips{'net'}{$net};
                             $scan{$src}{$dst}{'ALERTED'} = 0;
                         }
@@ -1513,8 +1513,8 @@ sub assign_danger_level() {
                         "$scan{$src}{$dst}{'S_PORT'}, E_PORT: ",
                         "$scan{$src}{$dst}{'E_PORT'}\n";
                 }
-                print 'assign_danger_level(): CURR_DL (before assignment) = ',
-                    "$scan{$src}{$dst}{'CURR_DL'}\n";
+                print 'assign_danger_level(): DL (before assignment) = ',
+                    "$scan{$src}{$dst}{'DL'}\n";
             }
 
             ### if $PORT_RANGE_SCAN_THRESHOLD is >= 1, then psad will not assign
@@ -1525,33 +1525,33 @@ sub assign_danger_level() {
             }
             if ($range >= $config{'PORT_RANGE_SCAN_THRESHOLD'}) {
                 if ($absnum < $config{'DANGER_LEVEL2'}) {
-                    if ($scan{$src}{$dst}{'CURR_DL'} < 1) {
+                    if ($scan{$src}{$dst}{'DL'} < 1) {
                         $scan{$src}{$dst}{'ALERTED'} = 0;
-                        $scan{$src}{$dst}{'CURR_DL'} = 1;
+                        $scan{$src}{$dst}{'DL'} = 1;
                     }
                 } elsif ($absnum < $config{'DANGER_LEVEL3'}) {
-                    if ($scan{$src}{$dst}{'CURR_DL'} < 2) {
+                    if ($scan{$src}{$dst}{'DL'} < 2) {
                         $scan{$src}{$dst}{'ALERTED'} = 0;
-                        $scan{$src}{$dst}{'CURR_DL'} = 2;
+                        $scan{$src}{$dst}{'DL'} = 2;
                     }
                 } elsif ($absnum < $config{'DANGER_LEVEL4'}) {
-                    if ($scan{$src}{$dst}{'CURR_DL'} < 3) {
+                    if ($scan{$src}{$dst}{'DL'} < 3) {
                         $scan{$src}{$dst}{'ALERTED'} = 0;
-                        $scan{$src}{$dst}{'CURR_DL'} = 3;
+                        $scan{$src}{$dst}{'DL'} = 3;
                     }
                 } elsif ($absnum < $config{'DANGER_LEVEL5'}) {
-                    if ($scan{$src}{$dst}{'CURR_DL'} < 4) {
+                    if ($scan{$src}{$dst}{'DL'} < 4) {
                         $scan{$src}{$dst}{'ALERTED'} = 0;
                         $scan{$src}{$dst}{'ALERTED'} = 0;
-                        $scan{$src}{$dst}{'CURR_DL'} = 4;
+                        $scan{$src}{$dst}{'DL'} = 4;
                     }
-                } elsif ($scan{$src}{$dst}{'CURR_DL'} < 5) {
+                } elsif ($scan{$src}{$dst}{'DL'} < 5) {
                     $scan{$src}{$dst}{'ALERTED'} = 0;
-                    $scan{$src}{$dst}{'CURR_DL'} = 5;
+                    $scan{$src}{$dst}{'DL'} = 5;
                 }
             }
-            print 'assign_danger_level(): CURR_DL (after assignment) = ',
-                "$scan{$src}{$dst}{'CURR_DL'}\n" if $debug;
+            print 'assign_danger_level(): DL (after assignment) = ',
+                "$scan{$src}{$dst}{'DL'}\n" if $debug;
         }
     }
     return;
@@ -1581,9 +1581,9 @@ sub scan_logr() {
         print STDOUT "scan_logr(): source ip: $src\n" if $debug;
         DST: for my $dst (keys %{$scan{$src}}) {
             next DST if $scan{$src}{$dst}{'ALERTED'};  ### already sent an alert
-            next DST unless $scan{$src}{$dst}{'CURR_DL'} >= 1;
+            next DST unless $scan{$src}{$dst}{'DL'} >= 1;
             my $syslog_flags = '';
-            my $dnsstring    = '';
+            my $dns_str      = '';
             my $rdns         = '';
             my $syslog_range = '';
             my $abs_s_port   = '';
@@ -1602,7 +1602,7 @@ sub scan_logr() {
 
             ### get the current danger level and the absolute number
             ### of packets used in the scan so far
-            my $curr_dlevel = $scan{$src}{$dst}{'CURR_DL'};
+            my $curr_dlevel = $scan{$src}{$dst}{'DL'};
             my $abs_numpkts = $scan{$src}{$dst}{'ABSNUM'};
 
             unless (defined $scan{$src}{$dst}{'EMAIL_COUNT'}) {
@@ -1686,14 +1686,14 @@ sub scan_logr() {
                     my $ipaddr = gethostbyname $src;
                     ### my $rdns = gethostbyaddr($ipaddr, AF_INET);
                     if ($rdns = gethostbyaddr $ipaddr, 2) {
-                        $dnsstring = $rdns;
+                        $dns_str = $rdns;
                     } else {
-                        $dnsstring = "[No reverse dns info available]";
+                        $dns_str = "[No reverse dns info available]";
                     }
                 } else {
                     ### $ipaddr was already reported as
-                    ### a host name by iptables
-                    $dnsstring = $src;
+                    ### a host name by iptables (does this actually
+                    $dns_str = $src;
                 }
             }
 
@@ -1724,11 +1724,11 @@ sub scan_logr() {
             &Psad::logr(sprintf("%${log_len}s%s", 'Source: ', "$src\n"),
                 \%print_hsh);
             &Psad::logr(sprintf("%${log_len}s%s", 'Source DNS: ',
-                "$dnsstring\n"), \%print_hsh) unless $no_rdns;
+                "$dns_str\n"), \%print_hsh) unless $no_rdns;
             &Psad::logr(sprintf("%${log_len}s%s", 'Destination: ', "$dst\n"),
                 \%print_hsh);
             &Psad::logr(sprintf("%${log_len}s%s", 'Danger level: ',
-                "[$scan{$src}{$dst}{'CURR_DL'}] (out of 5)\n\n"), \%print_hsh);
+                "[$scan{$src}{$dst}{'DL'}] (out of 5)\n\n"), \%print_hsh);
             &Psad::logr(sprintf("%${log_len}s%s", 'Current interval: ',
                 "$s_time (start)\n"), \%print_hsh);
             &Psad::logr(sprintf("%${log_len}s%s", '',
@@ -2054,7 +2054,7 @@ sub auto_psad_response() {
     }
     SOURCE: for my $src (keys %scan) {
         for my $dst (keys %{$scan{$src}}) {
-            my $current_danger_level = $scan{$src}{$dst}{'CURR_DL'};
+            my $current_danger_level = $scan{$src}{$dst}{'DL'};
             ### We only want to block the IP once.  Currently this will block
             ### all traffic from the host to _all_ destinations that are
             ### protected by the firewall if the ip trips the $auto_psad_level

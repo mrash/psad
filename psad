@@ -226,6 +226,10 @@ my $last_dshield_alert;
 ### calculate how often a dshield alert will be sent
 my $dshield_alert_interval;
 
+### dshield stats counters
+my $dshield_email_ctr = 0;
+my $dshield_lines_ctr = 0;
+
 ### get the current timezone for dshield (this is calculated
 ### and re-calculated since the timezone may change).
 my $timezone;
@@ -579,6 +583,12 @@ if ($config{'IMPORT_OLD_SCANS'} eq 'Y') {
 ### importing old scans).
 &write_global_packet_counters()
     unless $fw_analyze;
+
+### zero out dshield alert stats
+if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
+        and not $fw_analyze) {
+    &write_dshield_stats();
+}
 
 ### Get an open filehandle for the main firewall data file FW_DATA_FILE.
 ### All firewall drop/reject log messages are written to FW_DATA_FILE
@@ -1305,6 +1315,13 @@ sub dshield_email_log() {
         ### clear the dshield data array so we don't re-send
         ### any old data.
         @dshield_data = ();
+
+        ### increment stats counters
+        $dshield_email_ctr++;
+        $dshield_lines_ctr += $#dshield_data;
+
+        ### Write Dshield stats to disk
+        &write_dshield_stats();
     }
     return;
 }
@@ -2412,6 +2429,15 @@ sub write_global_packet_counters() {
         "udp:  $udp_ctr\n",
         "icmp: $icmp_ctr\n";
     close P;
+    return;
+}
+
+sub write_dshield_stats() {
+    open D, "> $config{'DSHIELD_COUNTER_FILE'}" or
+        die " ** Could not open $config{'DSHIELD_COUNTER_FILE'}: $!";
+    print D "total emails: $dshield_email_ctr\n",
+        "total data lines: $dshield_lines_ctr\n";
+    close D;
     return;
 }
 
@@ -4006,13 +4032,23 @@ sub status_psad_daemon() {
     } else {
         print STDOUT "    [No scans detected]\n";
     }
-    ### print the global packet counters
-    if (not $analyze_msgs and -e $config{'PACKET_COUNTER_FILE'}) {
-        print "\n    Global packet counters:\n";
-        open F, "< $config{'PACKET_COUNTER_FILE'}" or
-            die " ** $config{'PACKET_COUNTER_FILE'}: $!";
-        print STDOUT "        $_" while (<F>);
-        close F;
+    ### print total stats
+    if (not $analyze_msgs) {
+        if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
+                and -e $config{'DSHIELD_COUNTER_FILE'}) {
+            print "\n    Dshield stats:\n";
+            open F, "< $config{'DSHIELD_COUNTER_FILE'}" or
+                die " ** $config{'DSHIELD_COUNTER_FILE'}: $!";
+            print STDOUT "        $_" while (<F>);
+            close F;
+        }
+        if (-e $config{'PACKET_COUNTER_FILE'}) {
+            print "\n    Total packet counters:\n";
+            open F, "< $config{'PACKET_COUNTER_FILE'}" or
+                die " ** $config{'PACKET_COUNTER_FILE'}: $!";
+            print STDOUT "        $_" while (<F>);
+            close F;
+        }
     }
     return;
 }
@@ -4194,7 +4230,7 @@ sub import_old_scans() {
         }
         $import_ctr++;
     }
-    ### increment global packet counters
+    ### import global packet counters
     if (-e $config{'PACKET_COUNTER_FILE'}) {
         open CF, "< $config{'PACKET_COUNTER_FILE'}" or die " ** Could not ",
             "open $config{'PACKET_COUNTER_FILE'}";
@@ -4207,6 +4243,21 @@ sub import_old_scans() {
                 $udp_ctr = $1;
             } elsif ($line =~ /icmp:\s+(\d+)/) {
                 $icmp_ctr = $1;
+            }
+        }
+    }
+    ### import dshield stats
+    if ($config{'ENABLE_DSHEILD_ALERTS'} eq 'Y'
+            and -e $config{'DSHIELD_COUNTER_FILE'}) {
+        open DS, "< $config{'DSHIELD_COUNTER_FILE'}" or die " ** Could not ",
+            "open $config{'DSHIELD_COUNTER_FILE'}";
+        my @lines = <DS>;
+        close DS;
+        for my $line (@lines) {
+            if ($line =~ /emails:\s+(\d+)/) {
+                $dshield_email_ctr = $1;
+            } elsif ($line =~ /lines:\s+(\d+)/) {
+                $dshield_lines_ctr = $1;
             }
         }
     }
@@ -4974,8 +5025,8 @@ sub required_vars() {
         DANGER_LEVEL4 DANGER_LEVEL5 PORT_RANGE_SCAN_THRESHOLD ALERT_ALL
         PSAD_EMAIL_LIMIT IPTABLES_BLOCK_METHOD TCPWRAPPERS_BLOCK_METHOD
         EMAIL_ALERT_DANGER_LEVEL PSAD_FIFO WHOIS_LOOKUP_THRESHOLD
-        DNS_LOOKUP_THRESHOLD WHOIS_TIMEOUT SNORT_RULES_DIR
-        PACKET_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR HOSTNAME
+        DNS_LOOKUP_THRESHOLD WHOIS_TIMEOUT SNORT_RULES_DIR HOSTNAME
+        PACKET_COUNTER_FILE DSHIELD_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR
         PROC_FORWARD_FILE ENABLE_PERSISTENCE AUTO_BLOCK_IPT_FILE
         AUTO_BLOCK_TCPWR_FILE PSAD_SIGS_FILE PSAD_AUTO_IPS_FILE
         AUTO_BLOCK_TIMEOUT EXTERNAL_SCRIPT ENABLE_EXT_SCRIPT_EXEC

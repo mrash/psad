@@ -30,7 +30,7 @@
 .B [--no-passive-os] [--no-snort-sids]
 .SH DESCRIPTION
 .B psad
-makes use of ipchains/iptables log messages to detect, alert, and
+makes use of iptables log messages to detect, alert, and
 (optionally) block port scans in real time.  psad configures syslog to
 write all kern.info messages to a named pipe
 .B /var/lib/psad/psadfifo
@@ -90,20 +90,17 @@ line with the --config option.
 .BI \-s "\fR,\fP " \-\^\-signatures "  signatures-file"
 The iptables firewalling code included within the linux 2.4.x kernel
 series has the ability to distinguish and log any of the tcp flags
-present within tcp packets that traverse the interfaces.  Psad makes
-use of this logging capability to detect several types of tcp scan
+present within tcp packets that traverse the firewall interfaces.  Psad
+makes use of this logging capability to detect several types of tcp scan
 signatures included within
 .B /etc/psad/psad_signatures.
 The signatures were
 originally included within the Snort intrusion detection
 system.  New signatures can be included and modifications to existing
 signatures can be made to the signature file and psad will import
-the change automatically without having to restart the psad process.
-Unfortunately, tcp signature checking is not compatible with the
-ipchains firewalling code built into the 2.2.x kernel series due
-to the fact that ipchains cannot distinguish any tcp flags other
-than syn and ack.  Psad also detects several udp and icmp signatures
-that were originally included within Snort.
+the changes upon receiving a USR1 signal (see the --USR1 command line
+option) without having to restart the psad process.  Psad also detects
+many udp and icmp signatures that were originally included within Snort.
 .TP
 
 .BI \-\^\-snort-type "  type"
@@ -476,8 +473,8 @@ EMAIL_ALERT_DANGER_LEVEL is set to 1 by default.
 .BR ENABLE_AUTO_IDS
 .B psad
 has the capability of dynamically blocking all traffic from an ip that
-has reached a (configurable) danger level through modification of tcpwrapper,
-ipchains, or iptables rulesets.
+has reached a (configurable) danger level through modification of iptables
+or tcpwrapper rulesets.
 .B IMPORTANT:
 This feature is disabled by default since it is possible for an attacker
 to spoof packets from a well known (web)site in an effort to make it
@@ -528,15 +525,14 @@ if speed of psad is the main concern:
 
 .SH DEPENDENCIES
 .B psad
-requires that ipchains/iptables is configured with a "drop/deny/reject
-and log" policy for any traffic that is not explicitly allowed through.
-This is consistent with a secure network configuration since all traffic
-that has not been explicitly allowed should be blocked by the firewall
-ruleset.  By default, psad attempts to determine whether or not the
-firewall has been configured in this way.  This feature can be disabled with
-the --no-fwcheck or --log-server options.  The --log-server option
-is useful if psad is running on a syslog logging server that is separate
-from the firewall.  For more information on compatible ipchains/iptables
+requires that iptables is configured with a "drop and log" policy for any
+traffic that is not explicitly allowed through.  This is consistent with a
+secure network configuration since all traffic that has not been explicitly
+allowed should be blocked by the firewall ruleset.  By default, psad attempts
+to determine whether or not the firewall has been configured in this way.  This
+feature can be disabled with the --no-fwcheck or --log-server options.  The
+--log-server option is useful if psad is running on a syslog logging server
+that is separate from the firewall.  For more information on compatible iptables
 rulesets, see the
 .B FW_EXAMPLE_RULES
 file that is bundled with the psad source distribution.
@@ -566,7 +562,6 @@ represents the pid of the psad process.
 
 .SH "SEE ALSO"
 .BR iptables (8),
-.BR ipchains (8),
 .BR kmsgsd (8),
 .BR psadwatchd (8),
 .BR snort (8),

@@ -7,31 +7,35 @@ Just run the psad installation script "install.pl":
 # ./install.pl
 
 Done.  Enough said.  :)  This will result in a functional installation
-of psad on your system with the default configuration.
+of psad on your system.  It is safe to run the install.pl script even
+if you already have psad installed on your system.  The configuration
+can (optionally) be preserved from the previous installation.
 
 
 For more information, read on:
 
 IMPORTANT:
     psad makes use of drop/deny/reject messages that are generated
-by ipchains or iptables, and appear in /var/log/messages.  Hence if
-your firewall is not configured to drop/deny/reject packets (and log
-them), then psad will NOT detect port scans.  Usually the best and most
-secure way to configure your firewall is to first put the minimal rules
-needed to allow only necessary traffic to and from your machine, and
-then have a default drop/deny/reject-and-log rule toward the end of the
-firewall ruleset.  Some example firewall rulesets that are compatible
-with psad are contained within the file FW_EXAMPLES.
+by iptables, and appear in /var/log/messages.  Hence if your firewall
+is not configured to drop/deny/reject packets (and log them), then psad
+will NOT detect port scans.  Usually the best and most secure way to
+configure your firewall is to first put the minimal rules needed to
+allow only necessary traffic to and from your machine, and then have a
+default drop/deny/reject-and-log rule toward the end of the firewall
+ruleset.  Some example firewall rulesets that are compatible with psad
+are contained within the file FW_EXAMPLES.
 
-    The functionality of psad is affected by the version of the
-Linux kernel on which the software is deployed.  For kernel versions
-2.2.x (and 2.0.x?) the built-in ipchains firewalling code does not have
-any capability to log or distinguish any tcp flags other than syn, or ack.
-Hence, most of the tcp signatures included in psad_signatures cannot be
-detected by psad running on these kernel versions.  By contrast, the
-iptables firewalling code (see http://netfilter.gnumonks.org)
-integrated within the 2.4.x kernels can distinguish all tcp flags and
-hence make the signature logic possible within psad.
+    For psad versions less than 1.3, the functionality of psad is
+affected by the version of the Linux kernel on which the software is
+deployed.  For kernel versions 2.2.x (and 2.0.x?) the built-in ipchains
+firewalling code does not have any capability to log or distinguish any
+tcp flags other than syn, or ack.  Hence, most of the tcp signatures
+included in psad_signatures cannot be detected by psad running on these
+kernel versions.  By contrast, the iptables firewalling code (see
+http://www.netfilter.org) integrated within the 2.4.x kernels can
+distinguish all tcp flags and hence make the signature logic possible
+within psad.  NOTE: ipchains support has been removed from psad as of
+version 1.3.
 
 A note on iptables:  As of kernel version 2.4.13, there is a bug in the
 connection tracking code that denies packets that are part of legitimate

@@ -3,7 +3,7 @@
 *
 *  File: kmsgsd.c
 *
-*  Purpose: kmsgsd separates ipchains/iptables messages from all other
+*  Purpose: kmsgsd separates iptables messages from all other
 *           kernel messages.
 *
 *  Strategy: read messages from the /var/log/psadfifo named pipe and

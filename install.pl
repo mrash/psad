@@ -80,7 +80,6 @@ my $mknodCmd     = '/bin/mknod';
 my $makeCmd      = '/usr/bin/make';
 my $killallCmd   = '/usr/bin/killall';
 my $perlCmd      = '/usr/bin/perl';
-my $ipchainsCmd  = '/sbin/ipchains';
 my $iptablesCmd  = '/sbin/iptables';
 my $psadCmd      = "${USRSBIN_DIR}/psad";
 #============ end config ============
@@ -132,7 +131,6 @@ my %Cmds = (
     'make'     => $makeCmd,
     'killall'  => $killallCmd,
     'perl'     => $perlCmd,
-#    'ipchains' => $ipchainsCmd,
     'iptables' => $iptablesCmd,
 );
 

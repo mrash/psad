@@ -35,8 +35,6 @@
 #    USA
 #
 # TODO:
-#   - More verbose --Status output to include scan start time, end time,
-#     whether or not each ip has an auto-assigned danger level, etc.
 #   - Add a density calculation for a range of scanned ports, and also
 #     add a "verbose" mode that will display which of the scanned ports
 #     actually resolve to something in the IANA spec.
@@ -71,8 +69,6 @@
 #     stream provided to psad by kmsgsd since more packet types will be
 #     denied without requiring overly complicated firewall rules to detect
 #     odd tcp flag combinations.
-#   - Investigate the possibility of passive OS fingerprinting by looking
-#     at TTL and other fields in the headers (good idea Jay).
 #   - Handle various logging daemons other than syslog such as msyslog,
 #     and metalog (syslog-ng support was added).
 #   - perldoc
@@ -3315,7 +3311,7 @@ sub ipt_chk_chain() {
 
     print Dumper $ld_hr if $debug;
 
-    my $fw_check_file = "$config{'FW_CHECK_FILE'}/fw_check";
+    my $fwc = $config{'FW_CHECK_FILE'};
     if (defined $ld_hr && keys %$ld_hr) {
         my @protos;
         my $found_all = 0;
@@ -3340,8 +3336,8 @@ sub ipt_chk_chain() {
                     "$hostname does not include a default LOG rule $str1.  " .
                     "psad will not be able to detect $str2 without such a " .
                     "rule.\n",
-                    {$fw_check_file => 1});
-                &Psad::logr("\n", {$fw_check_file => 1});
+                    {$fwc => 1});
+                &Psad::logr("\n", {$fwc => 1});
                 $rv = 0;
             }
             if (defined $ld_hr->{$proto}->{'LOG'}->{'prefix'}
@@ -3363,8 +3359,8 @@ sub ipt_chk_chain() {
                     qq(the log prefix is set to "$ld_hr->{$proto}->{'LOG'}->{'prefix'}".) .
                     qq(  psad will not be able to detect $str2 without adding ) .
                     qq(--log-prefix "$config{'FW_MSG_SEARCH'}" to the rule.\n),
-                    {$fw_check_file => 1});
-                &Psad::logr("\n", {$fw_check_file => 1});
+                    {$fwc => 1});
+                &Psad::logr("\n", {$fwc => 1});
                 $rv = 0;
             }
             if (! defined $ld_hr->{$proto}->{'DROP'}) {
@@ -3375,8 +3371,8 @@ sub ipt_chk_chain() {
                 }
                 &Psad::logr(" ** The $chain chain in the iptables ruleset on " .
                     "$hostname does not include a default DROP rule $str1.\n",
-                    {$fw_check_file => 1});
-                &Psad::logr("\n", {$fw_check_file => 1});
+                    {$fwc => 1});
+                &Psad::logr("\n", {$fwc => 1});
                 $rv = 0;
             }
             if ($found_all) {  ### avoid $ld_hr->{'all'} auto vivification
@@ -3387,11 +3383,11 @@ sub ipt_chk_chain() {
             &Psad::logr(' ** The best way to fix the above errors is to ' .
                 'first setup iptables to accept traffic that you need ' .
                 "to/through the iptables $chain chain, and then execute the " .
-                "following commands:\n", {$fw_check_file => 1});
+                "following commands:\n", {$fwc => 1});
             &Psad::logr("        iptables -A $chain -j LOG --log-prefix " .
-                qq("$config{'FW_MSG_SEARCH'}"\n), {$fw_check_file => 1});
+                qq("$config{'FW_MSG_SEARCH'}"\n), {$fwc => 1});
             &Psad::logr("        iptables -A $chain -j DROP\n",
-                {$fw_check_file => 1});
+                {$fwc => 1});
         }
     } else {
         &Psad::logr(" ** The $chain chain in the iptables ruleset on " .
@@ -3401,24 +3397,24 @@ sub ipt_chk_chain() {
             'rules (this rule should have a logging prefix of ' .
             "\"$config{'FW_MSG_SEARCH'}\"), and a final rule that drops any " .
             "unwanted packets.\n",
-            {$fw_check_file => 1});
-        &Psad::logr("\n", {$fw_check_file => 1});
+            {$fwc => 1});
+        &Psad::logr("\n", {$fwc => 1});
         &Psad::logr("    FOR EXAMPLE:  Assuming you have already setup " .
             "iptables rules to accept traffic you want to accept, you can " .
             "probably execute the following two commands to have iptables " .
             "log and drop unwanted packets in the $chain chain by " .
             "default.\n",
-            {$fw_check_file => 1});
-        &Psad::logr("\n", {$fw_check_file => 1});
+            {$fwc => 1});
+        &Psad::logr("\n", {$fwc => 1});
         &Psad::logr("              iptables -A $chain -j LOG --log-prefix " .
-            qq(" $config{'FW_MSG_SEARCH'}"\n), {$fw_check_file => 1});
+            qq(" $config{'FW_MSG_SEARCH'}"\n), {$fwc => 1});
         &Psad::logr("              iptables -A $chain -j DROP\n\n",
-            {$fw_check_file => 1});
+            {$fwc => 1});
         &Psad::logr(" ** Psad will not detect in the iptables $chain chain " .
             'scans without an iptables ruleset that includes rules similar ' .
             "to the two rules above.\n",
-            {$fw_check_file => 1});
-        &Psad::logr("\n", {$fw_check_file => 1});
+            {$fwc => 1});
+        &Psad::logr("\n", {$fwc => 1});
     }
     return;
 }

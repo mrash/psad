@@ -1311,13 +1311,13 @@ sub dshield_email_log() {
         ### store the current time
         $last_dshield_alert = time();
 
-        ### clear the dshield data array so we don't re-send
-        ### any old data.
-        @dshield_data = ();
-
         ### increment stats counters
         $dshield_email_ctr++;
         $dshield_lines_ctr += $#dshield_data;
+
+        ### clear the dshield data array so we don't re-send
+        ### any old data.
+        @dshield_data = ();
 
         ### Write Dshield stats to disk
         &write_dshield_stats();
@@ -4256,7 +4256,7 @@ sub import_old_scans() {
         }
     }
     ### import dshield stats
-    if ($config{'ENABLE_DSHEILD_ALERTS'} eq 'Y'
+    if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
             and -e $config{'DSHIELD_COUNTER_FILE'}) {
         open DS, "< $config{'DSHIELD_COUNTER_FILE'}" or die " ** Could not ",
             "open $config{'DSHIELD_COUNTER_FILE'}";

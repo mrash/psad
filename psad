@@ -333,7 +333,7 @@ if ($auto_ips) {  ### support automatic ip danger level increases/decreases.
     $Auto_ips_href = 0;
 }
 
-### install signal handlers for debugging %Scan with Data::Dumper, 
+### install signal handlers for debugging %Scan with Data::Dumper,
 ### and for reaping zombie whois processes
 $SIG{'USR1'} = \&print_scan;
 $SIG{'CHLD'} = \&REAPER;
@@ -1383,6 +1383,18 @@ sub psad_status() {
             $timevars[4] += 1;
             if ($timevars[4] =~ /^\d$/) {
                 $timevars[4] = "0" . $timevars[4];
+            }
+            if ($timevars[3] =~ /^\d$/) {
+                $timevars[3] = "0" . $timevars[3];
+            }
+            if ($timevars[0] =~ /^\d$/) {
+                $timevars[0] = "0" . $timevars[0];
+            }
+            if ($timevars[1] =~ /^\d$/) {
+                $timevars[1] = "0" . $timevars[1];
+            }
+            if ($timevars[2] =~ /^\d$/) {
+                $timevars[2] = "0" . $timevars[2];
             }
             $timevars[5] += 1900;
             open PIDFILE, "< $pidfile";

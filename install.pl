@@ -269,7 +269,7 @@ chdir "Psad.pm";
 unless (-e "Makefile.PL" && -e "Psad.pm") {
     die "@@@@@  Your source kit appears to be incomplete!  Psad.pm is missing.\n";
 }
-system "perl Makefile.PL";
+system "$Cmds{'perl'} Makefile.PL";
 system "$Cmds{'make'}";
 system "$Cmds{'make'} test";
 system "$Cmds{'make'} install";
@@ -284,7 +284,7 @@ chdir "Unix-Syslog-0.98";
 unless (-e "Makefile.PL" && -e "Syslog.pm") {
     die "@@@@@  Your source kit appears to be incomplete!  Syslog.pm is missing.\n";
 }
-system "perl Makefile.PL";
+system "$Cmds{'perl'} Makefile.PL";
 system "$Cmds{'make'}";
 system "$Cmds{'make'} test";
 system "$Cmds{'make'} install";

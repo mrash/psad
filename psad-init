@@ -93,7 +93,7 @@ start)
 	;;
 stop)
 	echo -n "Shutting down the psadwatchd monitoring daemon: "
-        psadkillproc psadwatchd
+	psadkillproc psadwatchd
         echo
         echo -n "Shutting down the psad daemon: "
         psadkillproc psad

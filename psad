@@ -137,13 +137,13 @@ my $psadCmd = "/usr/local/bin/psad";
 $VERSION = "0.9.1";
 
 ### pid files
-my @PIDFILES = qw(/var/log/psad/pid.psadwatchd
-		  /var/log/psad/pid.psad
-		  /var/log/psad/pid.kmsgsd
-		  /var/log/psad/pid.diskmond);
+my @PIDFILES = qw(/var/run/psadwatchd.pid
+		  /var/run/psad.pid
+		  /var/run/kmsgsd.pid
+		  /var/run/diskmond.pid);
 
 ### file used to store the psad command line
-my $cmdline_file = "/var/log/psad/cmd.psad";
+my $cmdline_file = "/var/run/psad.cmd";
 
 ### these are global variables
 $USE_IPCHAINS = 0;
@@ -1262,7 +1262,8 @@ sub kill_psad() {
 	### must kill psadwatchd first since if not, it might try to restart any of the other three daemons; 
 	### (it's the first element of $pidfiles_aref)
 	for my $pidfile (@$pidfiles_aref) {
-		my $pidname = (split /\./, $pidfile)[1];
+		# my $pidname = (split /\./, $pidfile)[1];
+		my $pidname = (split /\./, (split /\//, $pidfile)[$#_])[0];
 		if (-e $pidfile) {
 			open PIDFILE, "< $pidfile";
 			my $pid = <PIDFILE>;

@@ -165,11 +165,14 @@ if (-d $INIT_DIR) {
 ### write anything to the install log.
 mkdir $PSAD_DIR, 0500 unless -d $PSAD_DIR;
 
+### make sure the system binaries are where we expect
+### them to be.
 &check_commands();
+
 $Cmds{'psad'} = $psadCmd;
 
 ### check to make sure we are running as root
-$< == 0 && $> == 0 or die "You need to be root (or equivalent UID 0" .
+$< == 0 && $> == 0 or die "You need to be root (or equivalent UID 0",
     " account) to install/uninstall psad!\n";
 
 ### check for a pre-0.9.2 installation of psad.
@@ -284,12 +287,12 @@ sub install() {
     chdir 'Unix-Syslog' or die " ** Could not chdir to ",
         "Unix-Syslog: $!";
     unless (-e 'Makefile.PL' && -e 'Syslog.pm') {
-        die " ** Your source directory appears to be incomplete!  Syslog.pm " .
-            "is missing.\n    Download the latest sources from " .
+        die " ** Your source directory appears to be incomplete!  Syslog.pm ",
+            "is missing.\n    Download the latest sources from ",
             "http://www.cipherdyne.org\n";
     }
     system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
-    system "$Cmds{'make'}";
+    system $Cmds{'make'};
 #    system "$Cmds{'make'} test";
     system "$Cmds{'make'} install";
     chdir '..';
@@ -300,12 +303,12 @@ sub install() {
     chdir 'Date-Calc' or die " ** Could not chdir to ",
         "Date-Calc: $!";
     unless (-e 'Makefile.PL') {
-        die " ** Your source directory appears to be incomplete!  Date::Calc " .
-            "is missing.\n    Download the latest sources from " .
+        die " ** Your source directory appears to be incomplete!  Date::Calc ",
+            "is missing.\n    Download the latest sources from ",
             "http://www.cipherdyne.org\n";
     }
     system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
-    system "$Cmds{'make'}";
+    system $Cmds{'make'};
 #    system "$Cmds{'make'} test";
     system "$Cmds{'make'} install";
     chdir '..';
@@ -316,12 +319,12 @@ sub install() {
     chdir 'Net-IPv4Addr' or die " ** Could not chdir to ",
         "Net-IPv4Addr: $!";
     unless (-e 'Makefile.PL') {
-        die " ** Your source directory appears to be incomplete!  " .
+        die " ** Your source directory appears to be incomplete!  ",
             "Net::IPv4Addr is missing.\n    Download the latest sources " .
             "from http://www.cipherdyne.org\n";
     }
     system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
-    system "$Cmds{'make'}";
+    system $Cmds{'make'};
 #    system "$Cmds{'make'} test";
     system "$Cmds{'make'} install";
     chdir '..';
@@ -332,12 +335,12 @@ sub install() {
     chdir 'IPTables/Parse' or die " ** Could not chdir to ",
         "IPTables/Parse: $!";
     unless (-e 'Makefile.PL') {
-        die " ** Your source directory appears to be incomplete!  " .
+        die " ** Your source directory appears to be incomplete!  ",
             "IPTables::Parse is missing.\n    Download the latest sources " .
             "from http://www.cipherdyne.org\n";
     }
     system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
-    system "$Cmds{'make'}";
+    system $Cmds{'make'};
 #    system "$Cmds{'make'} test";
     system "$Cmds{'make'} install";
     chdir '../..';
@@ -348,8 +351,8 @@ sub install() {
 
     chdir 'Psad';
     unless (-e 'Makefile.PL' && -e 'Psad.pm') {
-        die " ** Your source distribution appears to be incomplete!  " .
-            "Psad.pm is missing.\n    Download the latest sources from " .
+        die " ** Your source distribution appears to be incomplete!  ",
+            "Psad.pm is missing.\n    Download the latest sources from ",
             "http://www.cipherdyne.org\n";
     }
     system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
@@ -362,7 +365,7 @@ sub install() {
     unless (-d $SNORT_DIR) {
         mkdir $SNORT_DIR, 0500 or die " ** Could not create $SNORT_DIR: $!";
     }
-    opendir D, 'snort_rules' or die " ** Could not open " .
+    opendir D, 'snort_rules' or die " ** Could not open ",
         'the snort_rules directory';
     my @rfiles = readdir D;
     closedir D;
@@ -390,7 +393,7 @@ sub install() {
     if (! -e 'kmsgsd' && -e 'kmsgsd.pl') {
         &logr(" ** Could not compile kmsgsd.c.  Installing perl kmsgsd.\n");
         unless (((system "$Cmds{'perl'} -c kmsgsd.pl")>>8) == 0) {
-            die " ** kmsgsd.pl does not compile with \"perl -c\".  " .
+            die " ** kmsgsd.pl does not compile with \"perl -c\".  ",
                 "Download the latest sources " .
                 "from:\n\nhttp://www.cipherdyne.org\n";
         }
@@ -400,7 +403,7 @@ sub install() {
         &logr(" ** Could not compile psadwatchd.c.  " .
             "Installing perl psadwatchd.\n");
         unless (((system "$Cmds{'perl'} -c psadwatchd.pl")>>8) == 0) {
-            die " ** psadwatchd.pl does not compile with \"perl -c\".  " .
+            die " ** psadwatchd.pl does not compile with \"perl -c\".  ",
                 "Download the latest sources " .
                 "from:\n\nhttp://www.cipherdyne.org\n";
         }
@@ -411,7 +414,7 @@ sub install() {
         &logr(" ** Could not compile diskmond.c.  Installing " .
             "perl diskmond.\n");
         unless (((system "$Cmds{'perl'} -c diskmond.pl")>>8) == 0) {
-            die " ** diskmond.pl does not compile with \"perl -c\".  " .
+            die " ** diskmond.pl does not compile with \"perl -c\".  ",
                 "Download the latest sources " .
                 "from:\n\nhttp://www.cipherdyne.org\n";
         }
@@ -423,7 +426,7 @@ sub install() {
     ### daemons have all been re-written in C.
     &logr(" .. Verifying compilation of psad perl daemon:\n");
     unless (((system "$Cmds{'perl'} -c psad")>>8) == 0) {
-        die " ** psad does not compile with \"perl -c\".  Download the" .
+        die " ** psad does not compile with \"perl -c\".  Download the",
             " latest sources from:\n\nhttp://www.cipherdyne.org\n";
     }
     print "\n\n";
@@ -720,8 +723,8 @@ sub set_hostname() {
         }
         close PH;
     } else {
-        die " ** Your source directory appears to be incomplete!  $file " .
-            "is missing.\n    Download the latest sources from " .
+        die " ** Your source directory appears to be incomplete!  $file ",
+            "is missing.\n    Download the latest sources from ",
             "http://www.cipherdyne.org\n";
     }
     return;
@@ -850,7 +853,7 @@ sub append_fifo_syslog() {
             print SYSLOG $line;
         }
     }
-    print SYSLOG '### Send kern.info messages to psadfifo for ' .
+    print SYSLOG '### Send kern.info messages to psadfifo for ',
         "analysis by kmsgsd\n";
     ### reinstate kernel logging to our named pipe
     print SYSLOG "kern.info\t\t|$PSAD_FIFO\n";
@@ -1074,7 +1077,7 @@ sub get_distro() {
 
 sub perms_ownership() {
     my ($file, $perm_value) = @_;
-    chmod $perm_value, $file or die " ** Could not " .
+    chmod $perm_value, $file or die " ** Could not ",
         "chmod($perm_value, $file): $!";
     ### chown uid, gid, $file  (root :)
     chown 0, 0, $file or die " ** Could not chown 0,0,$file: $!";
@@ -1296,7 +1299,6 @@ sub enable_psad_at_boot() {
 
 ### check paths to commands and attempt to correct if any are wrong.
 sub check_commands() {
-    my $caller = $0;
     my @path = qw(
         /bin
         /sbin
@@ -1316,13 +1318,13 @@ sub check_commands() {
                 }
             }
             unless ($found) {
-                die "\n **  ($caller): Could not find $cmd anywhere!!!  " .
-                    "Please edit the config section to include the path to " .
+                die "\n ** Could not find $cmd anywhere!!!  ",
+                    "Please edit the config section to include the path to ",
                     "$cmd.\n";
             }
         }
         unless (-x $Cmds{$cmd}) {
-            die "\n **  ($caller):  $cmd is located at " .
+            die "\n ** $cmd is located at ",
                 "$Cmds{$cmd} but is not executable by uid: $<\n";
         }
     }
@@ -1380,7 +1382,7 @@ sub install_manpage() {
     mkdir $mpath, 0755 unless -d $mpath;
     my $mfile = "${mpath}/${manpage}";
     &logr(" .. Installing $manpage man page at $mfile\n");
-    copy $manpage, $mfile or die " ** Could not copy $manpage to " .
+    copy $manpage, $mfile or die " ** Could not copy $manpage to ",
         "$mfile: $!";
     &perms_ownership($mfile, 0644);
     &logr(" .. Compressing manpage $mfile\n");

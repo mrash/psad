@@ -304,10 +304,10 @@ sub install() {
     &install_perl_module('Bit::Vector', 'Bit-Vector', '6.3');
     &install_perl_module('Date::Calc', 'Date-Calc', '5.3');
     &install_perl_module('Net::IPv4Addr', 'Net-IPv4Addr', '0.10');
-    &install_perl_module('IPTables::Parse', 'IPTables/Parse', '0.10');
+    &install_perl_module('IPTables::Parse', 'IPTables-Parse', '0.2');
     &install_perl_module('Psad', 'Psad', '1.3.3');
 
-    &logr("[+] Installing snort-2.1 signatures in $SNORT_DIR\n");
+    &logr("[+] Installing Snort-2.3 signatures in $SNORT_DIR\n");
     unless (-d $SNORT_DIR) {
         mkdir $SNORT_DIR, 0500 or die "[*] Could not create $SNORT_DIR: $!";
     }
@@ -1059,7 +1059,7 @@ sub config_metalog() {
 sub query_preserve_config() {
     my $ans = '';
     while ($ans ne 'y' && $ans ne 'n') {
-        &logr('[+] Would you like to preserve the config from the ' .
+        &logr('[+] Would you like to merge the config from the ' .
             "existing\n");
         &logr("    psad installation ([y]/n)?  ");
         $ans = <STDIN>;
@@ -1077,7 +1077,7 @@ sub query_preserve_sigs_autodl() {
     my $ans = '';
     while ($ans ne 'y' && $ans ne 'n') {
         &logr("\n");
-        &logr("[+] Preserve any user modfications in $file ([y]/n)?  ");
+        &logr("[+] Merge any user modfications in $file ([y]/n)?  ");
         $ans = <STDIN>;
         $ans = 'y' if $ans eq "\n";
         chomp $ans;

@@ -48,7 +48,7 @@ use strict;
 my $CONFIG_FILE = '/etc/psad/psad.conf';
 
 ### handle command line arguments
-die " @@@ Specify the path to the psad.conf file with " . 
+die " ** Specify the path to the psad.conf file with " . 
     "\"-c <file>\".\n\n" unless (GetOptions (
     'config=s' => \$CONFIG_FILE
 ));
@@ -75,8 +75,8 @@ $SIG{'__DIE__'}  = \&Psad::die_handler;
 
 my $pid = fork;
 exit if $pid;
-die " ... @@@  $0: Couldn't fork: $!" unless defined($pid);
-POSIX::setsid() or die " ... @@@  $0: Can't start a new session: $!\n";
+die " ** $0: Couldn't fork: $!" unless defined($pid);
+POSIX::setsid() or die " ** $0: Can't start a new session: $!\n";
 
 ### write the pid to the pid file
 &Psad::writepid($Config{'DISKMOND_PID_FILE'});
@@ -128,7 +128,7 @@ sub get_usage() {
 
 sub rm_data() {
     chdir $Config{'PSAD_DIR'} or die
-        " ... @@@ Could not chdir $Config{'PSAD_DIR'}: $!";
+        " ** Could not chdir $Config{'PSAD_DIR'}: $!";
 
     &rm_scanlog($Config{'PSAD_DIR'});
     &rm_scanlog($Config{'SCAN_DATA_ARCHIVE_DIR'});
@@ -146,14 +146,14 @@ sub rm_data() {
 
 sub rm_scanlog() {
     my $dir = shift;
-    chdir $dir or die " ... @@@ Could not chdir($dir): $!\n";
+    chdir $dir or die " ** Could not chdir($dir): $!\n";
     opendir D, $dir or
-        die " ... @@@ Could not open dir: $dir: $!";
+        die " ** Could not open dir: $dir: $!";
     my @files = readdir D;
     closedir D;
     shift @files; shift @files;
     for my $file (@files) {
-        if ($file =~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/ && -d $file) {
+        if ($file =~ /(?:\d{1,3}\.){3}\d{1,3}/ && -d $file) {
             ### we found a directory like /var/log/psad/<ip>, which
             ### contains the scanlog file for this ip
             if (-e "${file}/scanlog") {

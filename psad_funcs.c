@@ -43,7 +43,7 @@ void check_unique_pid(const char *pid_file, const char *prog_name)
     char pid_line[MAX_PID_SIZE+1];
 
 #ifdef DEBUG
-    printf(" ... check_unique_pid(): opening pid file %s\n", pid_file);
+    printf(" .. check_unique_pid(): opening pid file %s\n", pid_file);
 #endif
 
     if ((pidfile_ptr = fopen(pid_file, "r")) == NULL) {
@@ -65,11 +65,11 @@ void check_unique_pid(const char *pid_file, const char *prog_name)
     fclose(pidfile_ptr);
 
 #ifdef DEBUG
-    printf(" ... check_unique_pid(): checking pid: %d with kill 0\n", pid);
+    printf(" .. check_unique_pid(): checking pid: %d with kill 0\n", pid);
 #endif
 
     if (kill(pid, 0) == 0) {  /* another kmsgsd is already running */
-        printf(" ... @@@ %s is already running as pid: %d\n", prog_name, pid);
+        printf(" ** %s is already running as pid: %d\n", prog_name, pid);
         exit(EXIT_FAILURE);
     } else {
         return;
@@ -83,7 +83,7 @@ int check_import_config(time_t *config_mtime, char *config_file)
     struct stat statbuf_tmp;
 
     if (stat(config_file, &statbuf_tmp)) {
-        printf(" ... @@@ Could not get mtime for config file: %s\n",
+        printf(" ** Could not get mtime for config file: %s\n",
             config_file);
         exit(EXIT_FAILURE);
     }
@@ -101,13 +101,13 @@ void write_pid(const char *pid_file, const pid_t pid)
 
     if ((pidfile_ptr = fopen(pid_file, "w")) == NULL) {
         /* could not open the pid file */
-        perror(" ... @@@ Could not open the pid file");
+        perror(" ** Could not open the pid file");
         exit(EXIT_FAILURE);
     }
 
     /* write the pid to the pid file */
     if (fprintf(pidfile_ptr, "%d\n", pid) == 0) {
-        printf(" ... @@@ pid: %d could not be written to pid file: %s", pid, pid_file);
+        printf(" ** pid: %d could not be written to pid file: %s", pid, pid_file);
         exit(EXIT_FAILURE);
     }
 
@@ -128,7 +128,7 @@ void find_char_var(char *search_str, char *charvar, char *line)
     if (strstr(index_tmp, search_str) != NULL) {
 
 #ifdef DEBUG
-        printf(" ... find_char_var(): found %s in line: %s", search_str, line);
+        printf(" .. find_char_var(): found %s in line: %s", search_str, line);
 #endif
 
         /* increment the pointer past the variable name */
@@ -145,12 +145,12 @@ void find_char_var(char *search_str, char *charvar, char *line)
             char_ctr++;
 
         if (index_tmp[char_ctr] != ';') {
-            printf(" ... @@@ find_char_var(): No ending semicolon found for: %s.\n", search_str);
+            printf(" ** find_char_var(): No ending semicolon found for: %s.\n", search_str);
             exit(EXIT_FAILURE);
         }
 
         if (char_ctr > 48) {
-            printf(" ... @@@ find_char_var(): the config line for %s is too long.  Exiting.\n", search_str);
+            printf(" ** find_char_var(): the config line for %s is too long.  Exiting.\n", search_str);
             exit(EXIT_FAILURE);
         }
 
@@ -169,13 +169,13 @@ void daemonize_process(const char *pid_file)
     pid_t child_pid, sid;
 
     if ((child_pid = fork()) < 0) {
-        perror(" ... @@@ Could not fork()");
+        perror(" ** Could not fork()");
         exit(EXIT_FAILURE);
     }
 
     if (child_pid > 0) {
 #ifdef DEBUG
-        printf(" ... writing pid: %d to pid file: %s\n", child_pid, pid_file);
+        printf(" .. writing pid: %d to pid file: %s\n", child_pid, pid_file);
 #endif
         write_pid(pid_file, child_pid);
         exit(EXIT_SUCCESS);   /* exit the parent process */
@@ -187,13 +187,13 @@ void daemonize_process(const char *pid_file)
 
     /* start a new session */
     if ((sid = setsid()) < 0) {
-        perror(" ... @@@ setsid() Could not start a new session");
+        perror(" ** setsid() Could not start a new session");
         exit(EXIT_FAILURE);
     }
 
     /* make "/" the current directory */
     if ((chdir("/")) < 0) {
-        perror(" ... @@@ Could not chdir() to /");
+        perror(" ** Could not chdir() to /");
         exit(EXIT_FAILURE);
     }
 

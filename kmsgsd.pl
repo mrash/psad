@@ -47,7 +47,7 @@ use strict;
 my $CONFIG_FILE = '/etc/psad/psad.conf';
 
 ### handle command line arguments
-die " @@@ Specify the path to the psad.conf file with " .
+die " ** Specify the path to the psad.conf file with " .
     "\"-c <file>\".\n\n" unless (GetOptions (
     'config=s' => \$CONFIG_FILE
 ));
@@ -73,8 +73,8 @@ $SIG{'__DIE__'}  = \&Psad::die_handler;
 
 my $pid = fork;
 exit if $pid;
-die " ... @@@  $0: Couldn't fork: $!" unless defined($pid);
-POSIX::setsid() or die " ... @@@  $0: Can't start a new session: $!\n";
+die " ** $0: Couldn't fork: $!" unless defined($pid);
+POSIX::setsid() or die " ** $0: Can't start a new session: $!\n";
 
 ### write the pid to the pid file
 &Psad::writepid($PIDFILE);
@@ -82,7 +82,7 @@ POSIX::setsid() or die " ... @@@  $0: Can't start a new session: $!\n";
 my $append_other = &check_facility();
 if ($append_other) {
     open MESSAGES, '>> /var/log/messages' or die
-                    "Could not open /var/log/messages: $!\n";
+        "Could not open /var/log/messages: $!\n";
 }
 
 ### open the fwdata file

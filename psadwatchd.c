@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
     struct stat statbuf;
 
 #ifdef DEBUG
-    printf(" ... Entering DEBUG mode ...\n");
+    printf(" .. Entering DEBUG mode ..n");
     sleep(1);
 #endif
 
@@ -99,13 +99,13 @@ int main(int argc, char *argv[]) {
                                 supplied on the command line */
         strcpy(config_file, argv[1]);
     } else {
-        printf(" ... You may only specify the path to a single config file:  ");
+        printf(" .. You may only specify the path to a single config file:  ");
         printf("Usage:  psadwatchd <configfile>\n");
         exit(EXIT_FAILURE);
     }
 
     if (stat(config_file, &statbuf)) {
-        printf(" ... @@@ Could not get mtime for config file: %s\n",
+        printf(" ** Could not get mtime for config file: %s\n",
             config_file);
         exit(EXIT_FAILURE);
     }
@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
 
 
 #ifdef DEBUG
-    printf(" ... parsing config_file: %s\n", config_file);
+    printf(" .. parsing config_file: %s\n", config_file);
 #endif
 
     /* parse the config file */
@@ -157,7 +157,7 @@ int main(int argc, char *argv[]) {
         /* check to see if we need to re-import the config file */
         if (check_import_config(&config_mtime, config_file)) {
 #ifdef DEBUG
-    printf(" ... re-parsing config file: %s\n", config_file);
+    printf(" .. re-parsing config file: %s\n", config_file);
 #endif
             /* reparse the config file since it was updated */
             parse_config(
@@ -199,10 +199,10 @@ static void check_process(
         /* the pid file must not exist (or we can't read it), so
          * start the appropriate process and return */
 #ifdef DEBUG
-    printf(" ... Could not open pid_file: %s\n", pid_file);
+    printf(" .. Could not open pid_file: %s\n", pid_file);
 #endif
         strcat(mail_str, mailCmd);
-        strcat(mail_str, " -s \" ... @@@ psadwatchd: Restarting ");
+        strcat(mail_str, " -s \" ** psadwatchd: Restarting ");
         strcat(mail_str, pid_name);
         strcat(mail_str, " on ");
         strcat(mail_str, hostname);
@@ -228,7 +228,7 @@ static void check_process(
      * process id of any running pid_name process. */
     if (fgets(pid_line, MAX_PID_SIZE+1, pidfile_ptr) == NULL) {
 #ifdef DEBUG
-    printf(" ... Could not read the pid_file: %s\n", pid_file);
+    printf(" .. Could not read the pid_file: %s\n", pid_file);
 #endif
         return;
     }
@@ -241,10 +241,10 @@ static void check_process(
 
     if (kill(pid, 0) != 0) {  /* the process is not running so start it */
 #ifdef DEBUG
-        printf(" ... Executing system(%s)\n", binary_path);
+        printf(" .. Executing system(%s)\n", binary_path);
 #endif
         strcat(mail_str, mailCmd);
-        strcat(mail_str, " -s \" ... @@@ psadwatchd: Restarting ");
+        strcat(mail_str, " -s \" ** psadwatchd: Restarting ");
         strcat(mail_str, pid_name);
         strcat(mail_str, " on ");
         strcat(mail_str, hostname);
@@ -265,7 +265,7 @@ static void check_process(
         incr_syscall_ctr(pid_name, max_retries);
     } else {
 #ifdef DEBUG
-        printf(" ... %s is running.\n", pid_name);
+        printf(" .. %s is running.\n", pid_name);
 #endif
         reset_syscall_ctr(pid_name); /* reset the syscall counter */
     }
@@ -277,7 +277,7 @@ static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries)
     if (strcmp("psad", pid_name) == 0) {
         psad_syscalls_ctr++;
 #ifdef DEBUG
-        printf(" ... %s not running.  Trying to restart (%d tries so far).\n",
+        printf(" .. %s not running.  Trying to restart (%d tries so far).\n",
             pid_name, psad_syscalls_ctr);
 #endif
         if (psad_syscalls_ctr >= max_retries)
@@ -285,7 +285,7 @@ static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries)
     } else if (strcmp("diskmond", pid_name) == 0) {
         diskmond_syscalls_ctr++;
 #ifdef DEBUG
-        printf(" ... %s not running.  Trying to restart (%d tries so far).\n",
+        printf(" .. %s not running.  Trying to restart (%d tries so far).\n",
             pid_name, diskmond_syscalls_ctr);
 #endif
         if (diskmond_syscalls_ctr >= max_retries)
@@ -293,7 +293,7 @@ static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries)
     } else if (strcmp("kmsgsd", pid_name) == 0) {
         kmsgsd_syscalls_ctr++;
 #ifdef DEBUG
-        printf(" ... %s not running.  Trying to restart (%d tries so far).\n",
+        printf(" .. %s not running.  Trying to restart (%d tries so far).\n",
             pid_name, kmsgsd_syscalls_ctr);
 #endif
         if (kmsgsd_syscalls_ctr >= max_retries)
@@ -318,10 +318,10 @@ static void give_up(const char *pid_name)
 {
     char mail_str[MAX_MSG_LEN+1] = "";
 #ifdef DEBUG
-    printf(" ... @@@ Could not restart %s process.  Exiting.\n", pid_name);
+    printf(" ** Could not restart %s process.  Exiting.\n", pid_name);
 #endif
     strcat(mail_str, mailCmd);
-    strcat(mail_str, " -s \"... @@@ psadwatchd: Could not restart ");
+    strcat(mail_str, " -s \"** psadwatchd: Could not restart ");
     strcat(mail_str, pid_name);
     strcat(mail_str, " on ");
     strcat(mail_str, hostname);
@@ -356,7 +356,7 @@ static void parse_config(
     char *index;
 
     if ((config_ptr = fopen(config_file, "r")) == NULL) {
-        perror(" ... @@@ Could not open config file");
+        perror(" ** Could not open config file");
         exit(EXIT_FAILURE);
     }
 

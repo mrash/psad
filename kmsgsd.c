@@ -61,8 +61,8 @@ int main(int argc, char *argv[]) {
 #endif
 
 #ifdef DEBUG
-    printf(" ... Entering DEBUG mode ...\n");
-    printf(" ... Firewall messages will be written to both ");
+    printf(" .. Entering DEBUG mode ..n");
+    printf(" .. Firewall messages will be written to both ");
     printf("STDOUT _and_ to fwdata\n\n");
 #endif
 
@@ -74,13 +74,13 @@ int main(int argc, char *argv[]) {
         /* the path to the config file was supplied on the command line */
         strcpy(config_file, argv[1]);
     } else {
-        printf(" ... You may only specify the path to a single config file:  ");
+        printf(" .. You may only specify the path to a single config file:  ");
         printf("Usage:  kmsgsd <configfile>\n");
         exit(EXIT_FAILURE);
     }
 
 #ifdef DEBUG
-    printf(" ... parsing config_file: %s\n", config_file);
+    printf(" .. parsing config_file: %s\n", config_file);
 #endif
     /* parse the config file */
     parse_config(config_file, psadfifo_file,
@@ -101,14 +101,14 @@ int main(int argc, char *argv[]) {
      * _without_ the O_NONBLOCK flag since we want the read on the file
      * descriptor to block until there is something new in the pipe. */
     if ((fifo_fd = open(psadfifo_file, O_RDONLY)) < 0) {
-        perror(" ... @@@ Could not open psadfifo");
+        perror(" ** Could not open psadfifo");
         exit(EXIT_FAILURE);  /* could not open psadfifo named pipe */
     }
 
     /* open the fwdata file in append mode so we can write messages from
      * the pipe into this file. */
     if ((fwdata_fd = open(fwdata_file, O_CREAT|O_WRONLY|O_APPEND, 0600)) < 0) {
-        perror(" ... @@@ Could not open the fwdata_file");
+        perror(" ** Could not open the fwdata_file");
         exit(EXIT_FAILURE);  /* could not open fwdata file */
     }
 
@@ -128,7 +128,7 @@ int main(int argc, char *argv[]) {
             puts(buf);
             fwlinectr++;
             if (fwlinectr % 50 == 0)
-                printf(" ... Processed %d firewall lines.\n", fwlinectr);
+                printf(" .. Processed %d firewall lines.\n", fwlinectr);
 #endif
         }
     }
@@ -150,7 +150,7 @@ static void parse_config(char *config_file, char *psadfifo_file,
     char *index;
 
     if ((config_ptr = fopen(config_file, "r")) == NULL) {
-        perror(" ... @@@ Could not open config file");
+        perror(" ** Could not open config file");
         exit(EXIT_FAILURE);
     }
 
@@ -176,10 +176,10 @@ static void parse_config(char *config_file, char *psadfifo_file,
     }
     fclose(config_ptr);
 #ifdef DEBUG
-    printf(" ... PSAD_FIFO: %s\n", psadfifo_file);
-    printf(" ... FW_DATA: %s\n", fwdata_file);
-    printf(" ... FW_MSG_SEARCH: %s\n", fw_msg_search);
-    printf(" ... KMSGSD_PID_FILE: %s\n", kmsgsd_pid_file);
+    printf(" .. PSAD_FIFO: %s\n", psadfifo_file);
+    printf(" .. FW_DATA: %s\n", fwdata_file);
+    printf(" .. FW_MSG_SEARCH: %s\n", fw_msg_search);
+    printf(" .. KMSGSD_PID_FILE: %s\n", kmsgsd_pid_file);
 #endif
     return;
 }

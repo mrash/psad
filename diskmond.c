@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
     struct statfs statfsbuf;
 
 #ifdef DEBUG
-    printf(" ... Entering DEBUG mode ...\n");
+    printf(" .. Entering DEBUG mode ..\n");
     sleep(1);
 #endif
 
@@ -91,13 +91,13 @@ int main(int argc, char *argv[]) {
                                 supplied on the command line */
         strcpy(config_file, argv[1]);
     } else {
-        printf(" ... You may only specify the path to a single config file:  ");
+        printf(" .. You may only specify the path to a single config file:  ");
         printf("Usage:  diskmond <configfile>\n");
         exit(EXIT_FAILURE);
     }
 
     if (stat(config_file, &statbuf)) {
-        printf(" ... @@@ Could not get mtime for config file: %s\n",
+        printf(" ** Could not get mtime for config file: %s\n",
             config_file);
         exit(EXIT_FAILURE);
     }
@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
     config_mtime = statbuf.st_mtime;
 
 #ifdef DEBUG
-    printf(" ... parsing config_file: %s\n", config_file);
+    printf(" .. parsing config_file: %s\n", config_file);
 #endif
 
     /* parse the config file */
@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
 
     if (chdir(psad_dir) < 0) {
 #ifdef DEBUG
-    printf(" ... @@@ Could not chdir() into: %s\n", psad_dir);
+    printf(" ** Could not chdir() into: %s\n", psad_dir);
 #endif
         exit(EXIT_FAILURE);
     }
@@ -153,7 +153,7 @@ int main(int argc, char *argv[]) {
         /* check to see if we need to re-import the config file */
         if (check_import_config(&config_mtime, config_file)) {
 #ifdef DEBUG
-    printf(" ... re-parsing config file: %s\n", config_file);
+    printf(" .. re-parsing config file: %s\n", config_file);
 #endif
             /* reparse the config file since it was updated */
             parse_config(
@@ -199,7 +199,7 @@ static void parse_config(
     char *index;
 
     if ((config_ptr = fopen(config_file, "r")) == NULL) {
-        perror(" ... @@@ Could not open config file");
+        perror(" ** Could not open config file");
         exit(EXIT_FAILURE);
     }
 
@@ -250,7 +250,7 @@ void rm_data(char *fwdata_file, char *psad_dir, char *archive_dir) {
 
     if (chdir(psad_dir) < 0) {
 #ifdef DEBUG
-    printf(" ... @@@ Could not chdir() into: %s\n", psad_dir);
+    printf(" ** Could not chdir() into: %s\n", psad_dir);
 #endif
         exit(EXIT_FAILURE);
     }
@@ -282,7 +282,7 @@ void rm_scanlog(char *dir) {
     } else {
         if (chdir(dir) < 0) {
 #ifdef DEBUG
-    printf(" ... @@@ Could not chdir(%s)\n", dir);
+    printf(" ** Could not chdir(%s)\n", dir);
 #endif
             closedir(dir_ptr);
             return;

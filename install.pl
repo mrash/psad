@@ -323,6 +323,7 @@ sub install() {
 
     ### install perl modules
     &install_perl_module('Unix::Syslog', 'Unix-Syslog', '0.100');
+    &install_perl_module('Bit::Vector', 'Bit-Vector', '6.3');
     &install_perl_module('Date::Calc', 'Date-Calc', '5.3');
     &install_perl_module('Net::IPv4Addr', 'Net-IPv4Addr', '0.10');
     &install_perl_module('IPTables::Parse', 'IPTables/Parse', '0.10');

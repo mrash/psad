@@ -465,9 +465,9 @@ unless ($no_whois) {
 ### rules since they may not be local.
 unless ($no_fwcheck || $syslog_server) {
     my $rv = &Psad::check_firewall_rules(
-        $config{'FW_MSG_SEARCH1'},  ### FW_MSG_SEARCH2 is normally used for
-                                    ### snort "sid" values so don't include
-                                    ### it within the firewall check
+        $config{'FW_MSG_SEARCH'},  ### SNORT_SID_STR is normally used for
+                                   ### snort "sid" values so don't include
+                                   ### it within the firewall check
         $config{'EMAIL_ADDRESSES'},
         "$config{'PSAD_DIR'}/fw_check.txt",
         \%cmds
@@ -2510,7 +2510,7 @@ sub setup() {
 sub check_config() {
     my @required_vars = qw(
         EMAIL_ADDRESSES  PSAD_CHECK_INTERVAL FW_DATA ERROR_LOG
-        FW_MSG_SEARCH1 FW_MSG_SEARCH2 ENABLE_AUTO_IDS
+        FW_MSG_SEARCH SNORT_SID_STR ENABLE_AUTO_IDS
         IGNORE_CONNTRACK_BUG_PKTS SCAN_TIMEOUT DANGER_LEVEL1
         DANGER_LEVEL2 DANGER_LEVEL3 DANGER_LEVEL4 DANGER_LEVEL5
         PORT_RANGE_SCAN_THRESHOLD ALERT_ALL PSAD_EMAIL_LIMIT

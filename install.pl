@@ -474,6 +474,7 @@ sub install() {
     ### install auto_dl, signatures, icmp_types, posf, and pf.os files
     for my $file qw(signatures icmp_types posf auto_dl pf.os) {
         if (-e "${PSAD_CONFDIR}/$file") {
+            &archive("${PSAD_CONFDIR}/$file") unless $noarchive;
             unless (&query_preserve_sigs_autodl("${PSAD_CONFDIR}/$file")) {
                 ### keep the installed file intact (the user must have
                 ### modified it).
@@ -482,7 +483,6 @@ sub install() {
                     "copy $file -> ${PSAD_CONFDIR}/$file: $!";
                 &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
             }
-            &archive("${PSAD_CONFDIR}/$file") unless $noarchive;
         } else {
             &logr("[+] Copying $file -> ${PSAD_CONFDIR}/$file\n");
             copy $file, "${PSAD_CONFDIR}/$file" or die "[*] Could not copy ",
@@ -1046,7 +1046,7 @@ sub query_preserve_sigs_autodl() {
     my $ans = '';
     while ($ans ne 'y' && $ans ne 'n') {
         &logr("\n");
-        &logr("[+] Preserve the existing $file file ([y]/n)?  ");
+        &logr("[+] Preserve any user modfications in $file ([y]/n)?  ");
         $ans = <STDIN>;
         $ans = 'y' if $ans eq "\n";
         chomp $ans;

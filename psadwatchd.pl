@@ -46,6 +46,9 @@ use strict;
 ### over-ridden with the -c <file> command line option.
 my $CONFIG_FILE = '/etc/psad/psadwatchd.conf';
 
+my $warn_msg = '';
+my $die_msg  = '';
+
 ### configuration hash
 my %config;
 
@@ -100,7 +103,7 @@ for (;;) {
         ### clear the HUP flag
         $hup_flag = 0;
         &import_config();
-        &Psad::psyslog('psad(psadwatchd)', '.. received HUP signal, ' .
+        &Psad::psyslog('psad(psadwatchd)', 'received HUP signal, ' .
             're-importing psadwatchd.conf');
     }
 
@@ -109,10 +112,21 @@ for (;;) {
     &check_process('kmsgsd', '',
         $config{'KMSGSD_PID_FILE'}, \$k_emails);
 
+    if ($die_msg) {
+        &Psad::print_msg($die_msg, "$config{'PSAD_DIR'}/errs/psadwatchd.die");
+        $die_msg = '';
+    }
+
+    if ($warn_msg) {
+        &Psad::print_msg($warn_msg, "$config{'PSAD_DIR'}/errs/psadwatchd.warn");
+        $warn_msg = '';
+    }
+
     sleep $config{'PSADWATCHD_CHECK_INTERVAL'};
 }
 exit 0;
 #=================== end main ==================
+
 sub check_process() {
     my ($pidname, $pidcmdline, $pidfile, $email_count_ref) = @_;
     if (-e $pidfile) {
@@ -210,30 +224,12 @@ sub hup_sig() {
     return;
 }
 
-### write all die messages to a logfile.  This routine and the
-### warn_handler routine seem a bit risky because of potentially
-### non-reentrant code executed from the signal handler, but it
-### seems to work.  If there is a better way to do this (by setting
-### a global flag for example) send me an email.  The main problem
-### is how to get access to the warn/die message so we can write
-### it out to disk.
 sub die_handler() {
-    my $msg = shift;
-    my $caller = $0;
-    $caller =~ s|^.*/||;
-    open D, ">> $config{'PSAD_DIR'}/errs/${caller}.die";
-    print D scalar localtime(), " .. $caller (pid: $$): $msg";
-    close D;
-    croak $!;
+    $die_msg = shift;
+    return;
 }
 
-### write all warnings to a logfile
 sub warn_handler() {
-    my $msg = shift;
-    my $caller = $0;
-    $caller =~ s|^.*/||;
-    open W, ">> $config{'PSAD_DIR'}/errs/${caller}.warn";
-    print W scalar localtime(), " .. $caller (pid: $$): $msg";
-    close W;
+    $warn_msg = shift;
     return;
 }

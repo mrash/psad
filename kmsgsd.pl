@@ -67,10 +67,6 @@ die " ** Specify the path to the psad.conf file with " .
 ### make sure there is not another kmsgsd already running
 &Psad::unique_pid($config{'KMSGSD_PID_FILE'});
 
-### install WARN and DIE handlers
-$SIG{'__WARN__'} = \&warn_handler;
-$SIG{'__DIE__'}  = \&die_handler;
-
 ### install HUP handler so config can be re-imported
 $SIG{'HUP'}  = \&hup_sig;
 
@@ -108,7 +104,7 @@ for (;;) {
         close FIFO;
         open FIFO, "< $config{'PSAD_FIFO'}" or
             die "Can't open file : $!\n";
-        &Psad::psyslog('psad(kmsgsd)', '.. received HUP signal, ' .
+        &Psad::psyslog('psad(kmsgsd)', 'received HUP signal, ' .
             're-importing kmsgsd.conf');
     }
 }
@@ -143,33 +139,5 @@ sub required_vars() {
 
 sub hup_sig() {
     $hup_flag = 1;
-    return;
-}
-
-### write all die messages to a logfile.  This routine and the
-### warn_handler routine seem a bit risky because of potentially
-### non-reentrant code executed from the signal handler, but it
-### seems to work.  If there is a better way to do this (by setting
-### a global flag for example) send me an email.  The main problem
-### is how to get access to the warn/die message so we can write
-### it out to disk.
-sub die_handler() {
-    my $msg = shift;
-    my $caller = $0;
-    $caller =~ s|^.*/||;
-    open D, ">> $config{'PSAD_DIR'}/errs/${caller}.die";
-    print D scalar localtime(), " .. $caller (pid: $$): $msg";
-    close D;
-    croak $!;
-}
-
-### write all warnings to a logfile
-sub warn_handler() {
-    my $msg = shift;
-    my $caller = $0;
-    $caller =~ s|^.*/||;
-    open W, ">> $config{'PSAD_DIR'}/errs/${caller}.warn";
-    print W scalar localtime(), " .. $caller (pid: $$): $msg";
-    close W;
     return;
 }

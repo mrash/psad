@@ -758,12 +758,12 @@ for (;;) {
     }
 
     if ($die_msg) {
-        &Psad::print_msg($die_msg, "$config{'PSAD_DIR'}/errs/psad.die");
+        &Psad::print_sys_msg($die_msg, "$config{'PSAD_DIR'}/errs/psad.die");
         $die_msg = '';
     }
 
     if ($warn_msg) {
-        &Psad::print_msg($warn_msg, "$config{'PSAD_DIR'}/errs/psad.warn");
+        &Psad::print_sys_msg($warn_msg, "$config{'PSAD_DIR'}/errs/psad.warn");
         $warn_msg = '';
     }
 

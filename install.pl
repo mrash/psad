@@ -981,8 +981,6 @@ sub config_metalog() {
         print METALOG '  command  = ',
             "\"/usr/sbin/psadpipe.sh\"\n";
         close METALOG;
-        &Psad::psyslog('psad', '.. reconfiguring metalog to write ' .
-                "kern-facility messages to /usr/sbin/psadpipe.sh");
 
         open PIPESCRIPT, '> /usr/sbin/psadpipe.sh' or
             die "[*] Unable to open /usr/sbin/psadpipe.sh: $!";

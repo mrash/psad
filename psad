@@ -165,6 +165,7 @@ my $Syslog_server = 0;
 my $kill = 0;
 my $restart = 0;
 my $status = 0;
+my $usr1 = 0;
 my $print_version = 0;
 my $help = 0;
 my $config = 0;
@@ -191,6 +192,7 @@ Getopt::Long::Configure("no_ignore_case");  # make Getopts case sensitive
         'Kill'           => \$kill,             # kill all running psad processes (psadwatchd, psad, kmsgsd, diskmond)
 	'Restart'	 => \$restart,		# restart psad with all options of the currently running psad process
 	'Status'	 => \$status,		# display status of any currently running psad processes
+	'USR1'		 => \$usr1, 		# send an existing psad process a USR1 signal (useful for debugging)
         'Version'        => \$print_version,    # print the psad version and exit
         'whois'          => \$whoislookups      # do not issue whois lookups against the scanning ip
 ));
@@ -210,8 +212,14 @@ if ($kill) {
 
 ### the --Status command line switch was given
 if ($status) {
-        $rv = &psad_status(\@PIDFILES);
+        my $rv = &psad_status(\@PIDFILES);
         exit $rv;
+}
+
+### the --USR1 command line switch was given
+if ($usr1) {
+	my $rv = &psad_usr1(\@PIDFILES);
+	exit $rv;
 }
 
 my %Cmds = (
@@ -1206,6 +1214,27 @@ sub psad_status() {
 			}
 		} else {
 			print "@@@@@  psad: pid file $pidfile does not exist for $pidname on $HOSTNAME\n";
+		}
+	}
+	return $rv;
+}
+sub psad_usr1() {
+	my $pidfiles_aref = shift;
+	my $rv = 0;
+	my $psad_pidfile = $pidfiles_aref->[1];
+	if (-e $psad_pidfile) {
+		open PIDFILE, "< $psad_pidfile" or die "@@@@@  Could not open $psad_pidfile: $!\n";
+		my $pid = <PIDFILE>;
+		close PIDFILE;
+		chomp $pid;
+		if (kill 0, $pid) {  ### make sure psad is actually running
+			if (kill USR1, $pid) {
+				$rv = 1;
+			} else {
+				print "@@@@@  Counld not send psad the USR1 signal on $HOSTNAME\n";
+			}
+		} else {
+			print " ----  psad is not currently running on $HOSTNAME  ----\n";
 		}
 	}
 	return $rv;

@@ -40,10 +40,8 @@ sub new() {
 
 sub chain_action_rules() {
     my $self   = shift;
-    my $table  = shift || croak "[*] Specify a table, e.g. \"nat\"";
-    my $chain  = shift || croak "[*] Specify a chain, e.g. \"OUTPUT\"";
-    my $action = shift || croak "[*] Specify either ",
-        "\"ACCEPT\", \"DROP\", or \"LOG\"";
+    my $table  = shift || croak '[*] Specify a table, e.g. "nat"';
+    my $chain  = shift || croak '[*] Specify a chain, e.g. "OUTPUT"';
     my $file   = shift || '';
     my $iptables  = $self->{'_iptables'};
     my @ipt_lines;
@@ -83,15 +81,18 @@ sub chain_action_rules() {
         ### LOG  all  --  0.0.0.0/0  0.0.0.0/0  LOG flags 0 level 4 prefix `DROP '
         ### LOG  all  --  127.0.0.2  0.0.0.0/0  LOG flags 0 level 4
 
-        if ($line =~ /^\s*Chain\s+$chain\s+\(policy\s+(\w+)\)/) {
+        if ($line =~ /^\s*Chain\s+$chain\s+\(policy\s+(\w+)\)/i) {
             $found_chain = 1;
+            next LINE;
         }
+        next LINE if $line =~ /^\s*target\s/i;
         next unless $found_chain;
-        if ($line =~ m|^$action\s+(\S+)\s+\-\-\s+(\S+)\s+(\S+)\s*(.*)|) {
-            my $proto = $1;
-            my $src   = $2;
-            my $dst   = $3;
-            my $p_str = $4;
+        if ($line =~ m|^\s*(\S+)\s+(\S+)\s+\-\-\s+(\S+)\s+(\S+)\s*(.*)|) {
+            my $target = $1;
+            my $proto  = $2;
+            my $src    = $3;
+            my $dst    = $4;
+            my $p_str  = $5;
             if ($p_str and ($proto eq 'tcp' or $proto eq 'udp')) {
                 my $s_port  = '0:0';  ### any to any
                 my $d_port  = '0:0';
@@ -101,10 +102,10 @@ sub chain_action_rules() {
                 if ($p_str =~ /spts?:(\S+)/) {
                     $s_port = $1;
                 }
-                $chain{$proto}{$s_port}{$d_port}{$src}{$dst}
+                $chain{$target}{$proto}{$s_port}{$d_port}{$src}{$dst}
                     = $rule_ctr;
             } else {
-                $chain{$proto}{$src}{$dst} = $rule_ctr;
+                $chain{$target}{$proto}{$src}{$dst} = $rule_ctr;
             }
         }
     }

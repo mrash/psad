@@ -67,7 +67,7 @@ sub create_chain() {
 sub delete_chain() {
     my $self = shift;
     my $table = shift || croak '[*] Must specify a table, e.g. "filter".';
-    my $chain = shift || croak '[*] Must specify a chain to create.';
+    my $chain = shift || croak '[*] Must specify a chain to delete.';
     my $iptables = $self->{'_iptables'};
 
     ### see if the chain exists first
@@ -90,13 +90,13 @@ sub delete_chain() {
 sub add_rule() {
     my $self = shift;
     my $src = shift || croak '[-] Must specify a src address/network.';
-    my $table = shift || croak '[-] Must specify a table, e.g. "filter".';
-    my $chain = shift || croak '[-] Must specify a chain.';
+    my $table  = shift || croak '[-] Must specify a table, e.g. "filter".';
+    my $chain  = shift || croak '[-] Must specify a chain.';
     my $target = shift ||
         croak '[-] Must specify a Netfilter target, e.g. "DROP"';
     my $iptables = $self->{'_iptables'};
 
-    ### regex to match an ip address
+    ### regex to match an IP address
     my $ip_re = '(?:\d{1,3}\.){3}\d{1,3}';
 
     ### normalize src network if necessary; this is because Netfilter
@@ -127,6 +127,49 @@ sub add_rule() {
     }
 }
 
+sub delete_rule() {
+    my $self = shift;
+    my $src = shift || croak '[-] Must specify a src address/network.';
+    my $table  = shift || croak '[-] Must specify a table, e.g. "filter".';
+    my $chain  = shift || croak '[-] Must specify a chain.';
+    my $target = shift ||
+        croak '[-] Must specify a Netfilter target, e.g. "DROP"';
+    my $iptables = $self->{'_iptables'};
+
+    ### regex to match an IP address
+    my $ip_re = '(?:\d{1,3}\.){3}\d{1,3}';
+
+    ### normalize src network if necessary; this is because Netfilter
+    ### always reports network address for subnets
+    my $normalized_src = '';
+    if ($src =~ m|($ip_re)/($ip_re)|) {
+        my ($net_addr, $cidr) = ipv4_network($1, $2);
+        $normalized_src = "$net_addr/$cidr";
+    } elsif ($src =~ m|($ip_re)/(\d+)|) {
+        my ($net_addr, $cidr) = ipv4_network($1, $2);
+        $normalized_src = "$net_addr/$cidr";
+    } else {
+        ### it is a hostname or an individual IP
+        $normalized_src = $src;
+    }
+
+    ### first check to see if this rule already exists
+    my $rulenum = &find_rule($normalized_src, $table,
+            $chain, $target, $iptables);
+    if ($rulenum) {
+        ### we need to delete the rule
+        if (&run_ipt_cmd($iptables,
+            "-t $table -D $chain $rulenum") == 0) {
+            return 1, "[+] Deleted rule #$rulenum";
+        } else {
+            return 0, "[+] Could not delete $target rule " .
+                "#$rulenum for $normalized_src.";
+        }
+    } else {
+        return 0, "[-] Rule does not exist in $chain chain.";
+    }
+}
+
 sub find_rule() {
     my ($src, $table, $chain, $target, $iptables) = @_;
 
@@ -138,11 +181,12 @@ sub find_rule() {
         if (defined $chain_href->{$target}->{'all'}) {
             ### all protocols
             if (defined $chain_href->{$target}->{'all'}->{$src}) {
-                ### src
+                ### $src to any destination
                 if (defined $chain_href->{$target}->{'all'}
                         ->{$src}->{'0.0.0.0/0'}) {
-                    ### any source
-                    return 1;
+                    ### return Netfilter rule number
+                    return $chain_href->{$target}->{'all'}
+                        ->{$src}->{'0.0.0.0/0'};
                 }
             }
         }

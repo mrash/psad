@@ -162,7 +162,7 @@ my $fw_search_file = '/etc/psad/fw_search.conf';
 ### disable debugging by default
 my $debug = 0;
 
-my $flush_fw       = 0;
+my $flush_fw = 0;
 
 ### Cache the default table->chain relationships used
 ### by the auto blocking code for iptables firewalls.
@@ -193,7 +193,10 @@ my %scan_ext_exec = ();
 ### cache passive os fingerprinting information
 my %posf = ();
 
-### cache passive os fingerprinting signature information
+### cache p0f-based passive os fingerprinting signature information
+my %p0f_sigs = ();
+
+### cache TOS-based passive os fingerprinting signature information
 my %posf_sigs = ();
 
 ### cache all scan signatures (initialized by default)
@@ -300,6 +303,7 @@ my $usr1             = 0;
 my $hup              = 0;
 my $usr1_flag        = 0;
 my $hup_flag         = 0;
+my $verbose          = 0;
 my $ver              = 0;
 my $help             = 0;
 my $dump_conf        = 0;
@@ -433,6 +437,8 @@ Getopt::Long::Configure('no_ignore_case');
                                               # messages to error log.
     'no-kmsgsd'         => \$no_kmsgsd,       # Do not start kmsgsd (used for
                                               # debugging).
+    'verbose'           => \$verbose,         # Verbose output (for both alerts
+                                              # and debug info).
     'Version'           => \$ver,             # Print the psad version and exit.
     'help'              => \$help,            # Display help.
     ### old args
@@ -471,7 +477,7 @@ $< == 0 && $> == 0 or
 &psad_init();
 
 ### check to make sure another psad process is not already running.
-&Psad::unique_pid($config{'PSAD_PID_FILE'})
+&Psad::unique_pid($config{'PID_FILE'})
     unless $fw_analyze or $benchmark;
 
 ### get the ip addresses that are local to this machine
@@ -521,7 +527,7 @@ unless ($no_daemon or $debug or $benchmark) {
 }
 
 ### write the current pid associated with psad to the psad pid file
-&Psad::writepid($config{'PSAD_PID_FILE'})
+&Psad::writepid($config{'PID_FILE'})
     unless $benchmark;
 
 ### write the command line args used to start psad to $cmdline_file
@@ -533,7 +539,7 @@ unless ($no_daemon or $debug or $benchmark) {
 ### files and unique_pid(), so we don't have to worry about starting a
 ### duplicate copy).  While we're at it, start psadwatchd as well.
 ### Note that this is the best place to start the other daemons since we
-### just wrote the psad pid to PSAD_PID_FILE above.
+### just wrote the psad pid to PID_FILE above.
 unless ($benchmark or $fw_analyze) {
     system $cmds{'kmsgsd'} unless $no_kmsgsd;
     system $cmds{'psadwatchd'}
@@ -779,7 +785,7 @@ for (;;) {
     FWDATA->clearerr();
 
     ### sleep for the check interval seconds
-    sleep $config{'PSAD_CHECK_INTERVAL'};
+    sleep $config{'CHECK_INTERVAL'};
 }
 exit 0;
 ###=========================================================###
@@ -843,9 +849,11 @@ sub check_scan() {
         my $code  = -1;
         my $seq   = -1;
         my $flags = '';
+        my $frag_bit = 0;
         my $sid   = 0;
         my $chain    = '';
         my $intf     = '';
+        my $tcp_options = '';
         my $dshield_str = '';
         my $syslog_host = '';
         my $log_prefix  = '';
@@ -953,6 +961,10 @@ sub check_scan() {
                 print STDERR "[-] err packet: bad tcp flags.\n" if $debug;
                 push @err_pkts, $pkt;
                 next PKT;
+            }
+            $frag_bit = 1 if $pkt =~ /\sDF\s+PROTO/;
+            if ($pkt =~ /\sOPT\s+\((\S+)\)/) {
+                $tcp_options = $1;
             }
 
             ### make sure we have a "reasonable" packet (note that nmap
@@ -1717,7 +1729,7 @@ sub psad_init() {
     &required_vars();
 
     ### store the psad command line.
-    $cmdline_file = $config{'PSAD_CMDLINE_FILE'};
+    $cmdline_file = $config{'CMDLINE_FILE'};
 
     ### import FW_MSG_SEARCH strings
     &import_fw_search();
@@ -1725,7 +1737,7 @@ sub psad_init() {
     ### pid file hash
     %pidfiles = (
         'psadwatchd' => $config{'PSADWATCHD_PID_FILE'},
-        'psad'       => $config{'PSAD_PID_FILE'},
+        'psad'       => $config{'PID_FILE'},
         'kmsgsd'     => $config{'KMSGSD_PID_FILE'},
     );
 
@@ -1774,7 +1786,10 @@ sub psad_init() {
     ### file.
     &import_icmp_types() unless $no_icmp_types;
 
-    ### import passive OS fingerprinting signatures
+    ### import p0f-based passive OS fingerprinting signatures
+    &import_p0f_sigs() unless $no_posf;
+
+    ### import TOS-based passive OS fingerprinting signatures
     &import_posf_sigs() unless $no_posf;
 
     ### import auto_dl file for automatic ip/network danger
@@ -2023,7 +2038,7 @@ sub import_snort_rules() {
             }
         }
     }
-    print STDERR Dumper %snort_msgs if $debug;
+    print STDERR Dumper %snort_msgs if $debug and $verbose;
     &Psad::psyslog('psad', 'imported snort-2.1 signatures');
     return;
 }
@@ -2032,8 +2047,8 @@ sub import_signatures() {
     ### undef %sigs so we don't leave old signatures around if
     ### we execute this code after receiving a HUP signal.
     %sigs = ();
-    open SIGS, "< $config{'PSAD_SIGS_FILE'}" or die
-        "[*] Could not open the signatures file $config{'PSAD_SIGS_FILE'}: $!";
+    open SIGS, "< $config{'SIGS_FILE'}" or die
+        "[*] Could not open the signatures file $config{'SIGS_FILE'}: $!";
     my @lines = <SIGS>;
     close SIGS;
     SIG: for my $line (@lines) {
@@ -2220,9 +2235,9 @@ sub import_signatures() {
     }
     if ($debug) {
         print STDERR "[-] main signatures hash:\n";
-        print STDERR Dumper %sigs;
+        print STDERR Dumper %sigs if $verbose;
         print STDERR Dumper "[-] signature attributes hash:\n";
-        print STDERR Dumper %sigs_attr;
+        print STDERR Dumper %sigs_attr if $verbose;
     }
     &Psad::psyslog('psad', 'imported psad-1.3 signatures');
     return;
@@ -2230,8 +2245,8 @@ sub import_signatures() {
 
 sub import_icmp_types() {
     %valid_icmp_types = ();
-    open TYPES, "< $config{'PSAD_ICMP_TYPES_FILE'}" or die
-        "[*] Could not open $config{'PSAD_ICMP_TYPES_FILE'}: $!";
+    open TYPES, "< $config{'ICMP_TYPES_FILE'}" or die
+        "[*] Could not open $config{'ICMP_TYPES_FILE'}: $!";
     my @lines = <TYPES>;
     close TYPES;
     my $icmp_type = -1;
@@ -2257,7 +2272,7 @@ sub import_icmp_types() {
             $valid_icmp_types{$icmp_type}{'codes'}{$icmp_code} = '';
         }
     }
-    print STDERR Dumper %valid_icmp_types if $debug;
+    print STDERR Dumper %valid_icmp_types if $debug and $verbose;
     &Psad::psyslog('psad', 'imported valid icmp types and codes');
     return;
 }
@@ -2321,8 +2336,8 @@ sub build_sig_ports() {
 
 sub import_auto_dl() {
     %auto_dl = ();  ### undef so we don't leave old ips in %auto_dl
-    open A, "< $config{'PSAD_AUTO_DL_FILE'}" or die '[*] Could not open ',
-        "$config{'PSAD_AUTO_DL_FILE'}: $!";
+    open A, "< $config{'AUTO_DL_FILE'}" or die '[*] Could not open ',
+        "$config{'AUTO_DL_FILE'}: $!";
     my @lines = <A>;
     close A;
     my $i = 1;
@@ -2374,7 +2389,7 @@ sub import_auto_dl() {
             }
         } else {
             my $subject = "[psad-error] import warning: " .
-                "$config{'PSAD_AUTO_DL_FILE'} error on line: $i";
+                "$config{'AUTO_DL_FILE'} error on line: $i";
             &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
                 $cmds{'mail'});
         }
@@ -2390,9 +2405,48 @@ sub import_auto_dl() {
     return;
 }
 
+sub import_p0f_sigs() {
+    my $p0f_file = $config{'P0F_FILE'};
+    open P, "< $p0f_file" or die '[*] Could not open ',
+        "$p0f_file: $!";
+    my @lines = <P>;
+    close P;
+    my $os = '';
+    for my $line (@lines) {
+        chomp $line;
+        next if $line =~ /^\s*#/;
+        next unless $line =~ /\S/;
+
+        ### S3:64:1:60:M*,S,T,N,W1:        Linux:2.5::Linux 2.5 (sometimes 2.4)
+        ### 16384:64:1:60:M*,N,W0,N,N,T:   FreeBSD:4.4::FreeBSD 4.4
+        ### 16384:64:1:44:M*:              FreeBSD:2.0-2.2::FreeBSD 2.0-4.1
+
+        if ($line =~ /^(\S+?):(\S+?):(\S+?):(\S+?):(\S+?):\s+(.*)\s*/) {
+            my $win_size = $1;
+            my $ttl      = $2;
+            my $frag_bit = $3;
+            my $len      = $4;
+            my $options  = $5;
+            my $os       = $6;
+
+            my $sig_str = "$win_size:$ttl:$frag_bit:$len:$options";
+            ### don't know how to handle MTU-based window size yet
+            unless ($win_size =~ /T/) {
+                $p0f_sigs{$len}{$frag_bit}{$ttl}{$win_size}{$options}{$os}
+                    = $sig_str;
+            }
+        }
+    }
+
+    print STDERR Dumper %p0f_sigs if $debug and $verbose;
+    &Psad::psyslog('psad',
+        'imported p0f-based passive OS fingerprinting signatures');
+    return;
+}
+
 sub import_posf_sigs() {
     %posf_sigs = ();
-    my $posf_file = $config{'PSAD_POSF_FILE'};
+    my $posf_file = $config{'POSF_FILE'};
     open P, "< $posf_file" or die '[*] Could not open ',
         "$posf_file: $!";
     my @lines = <P>;
@@ -2465,9 +2519,9 @@ sub import_posf_sigs() {
             next OS;
         }
     }
-    print STDERR Dumper %posf_sigs if $debug;
+    print STDERR Dumper %posf_sigs if $debug and $verbose;
     &Psad::psyslog('psad',
-        'imported passive OS fingerprinting signatures');
+        'imported TOS-based passive OS fingerprinting signatures');
     return;
 }
 
@@ -2751,10 +2805,10 @@ sub scan_logr() {
 
             unless (defined $scan{$src}{$dst}{'email_ctr'}) {
                 $scan{$src}{$dst}{'email_ctr'} = 1;
-            } elsif ($config{'PSAD_EMAIL_LIMIT'} > 0
+            } elsif ($config{'EMAIL_LIMIT'} > 0
                     and $scan{$src}{$dst}{'email_ctr'}
-                    > $config{'PSAD_EMAIL_LIMIT'}) {
-                ### ignore PSAD_EMAIL_LIMIT if it is zero
+                    > $config{'EMAIL_LIMIT'}) {
+                ### ignore EMAIL_LIMIT if it is zero
                 unless (defined $scan{$src}{$dst}{'stop_email'}
                         or $config{'EMAIL_LIMIT_STATUS_MSG'} eq 'N') {
                     &email_limit_reached($src, $dst);
@@ -2898,12 +2952,12 @@ sub scan_logr() {
                 $abs_s_time = scalar localtime $scan{$src}{$dst}{'s_time'};
             }
             my $s_time = '';
-            if (not $analyze_msgs and time() - $config{'PSAD_CHECK_INTERVAL'} <
+            if (not $analyze_msgs and time() - $config{'CHECK_INTERVAL'} <
                     $scan{$src}{$dst}{'s_time'}) {
                 $s_time = $abs_s_time;
             } else {
                 $s_time = scalar localtime((time()
-                    - $config{'PSAD_CHECK_INTERVAL'}));
+                    - $config{'CHECK_INTERVAL'}));
             }
             my $time = scalar localtime();
 
@@ -4955,19 +5009,19 @@ sub handle_cmdline() {
         if $analyze_msgs or $syslog_server or $benchmark;
 
     ### The -i switch was given
-    $config{'PSAD_CHECK_INTERVAL'} = $chk_interval if $chk_interval;
+    $config{'CHECK_INTERVAL'} = $chk_interval if $chk_interval;
 
     ### The --snort-rdir switch was given
     $config{'SNORT_RULES_DIR'} = $snort_rules_dir if $snort_rules_dir;
 
     ### The --signatures switch was given
-    $config{'PSAD_SIGS_FILE'} = $sigs_file if $sigs_file;
+    $config{'SIGS_FILE'} = $sigs_file if $sigs_file;
 
     ### The --passive-os-file switch was given
-    $config{'PSAD_POSD_FILE'} = $posf_file if $posf_file;
+    $config{'POSF_FILE'} = $posf_file if $posf_file;
 
     ### The --auto-dl switch was given
-    $config{'PSAD_AUTO_DL_FILE'} = $auto_dl_file if $auto_dl_file;
+    $config{'AUTO_DL_FILE'} = $auto_dl_file if $auto_dl_file;
 
     ### make sure to go into status display mode if any of the following
     ### args were given.
@@ -4993,16 +5047,16 @@ sub setup() {
 
     ### scale back the alerting interval from 24 hours by just enough
     ### to make sure that an alert will be sent each day.
-    $dshield_alert_interval -= 1 + $config{'PSAD_CHECK_INTERVAL'}
+    $dshield_alert_interval -= 1 + $config{'CHECK_INTERVAL'}
         if $config{'DSHIELD_ALERT_INTERVAL'} == 24;
 
     unless (-d $config{'PSAD_DIR'}) {
         mkdir $config{'PSAD_DIR'}, 0500 or
             die "[*] Could not mkdir $config{'PSAD_DIR'}: $!";
     }
-    unless (-d $config{'PSAD_ERROR_DIR'}) {
-        mkdir $config{'PSAD_ERROR_DIR'}, 0500 or
-            die "[*] Could not mkdir $config{'PSAD_ERROR_DIR'}: $!";
+    unless (-d $config{'ERROR_DIR'}) {
+        mkdir $config{'ERROR_DIR'}, 0500 or
+            die "[*] Could not mkdir $config{'ERROR_DIR'}: $!";
     }
 
     unless (-e $config{'PSAD_FIFO'}) {
@@ -5306,25 +5360,25 @@ sub dump_conf() {
 
 sub required_vars() {
     my @required_vars = qw(
-        EMAIL_ADDRESSES PSAD_CHECK_INTERVAL FW_DATA_FILE FW_ERROR_LOG
+        EMAIL_ADDRESSES CHECK_INTERVAL FW_DATA_FILE FW_ERROR_LOG
         HOME_NET SNORT_SID_STR ENABLE_AUTO_IDS IGNORE_CONNTRACK_BUG_PKTS
         SCAN_TIMEOUT DANGER_LEVEL1 DANGER_LEVEL2 DANGER_LEVEL3
         DANGER_LEVEL4 DANGER_LEVEL5 PORT_RANGE_SCAN_THRESHOLD ALERT_ALL
-        PSAD_EMAIL_LIMIT IPTABLES_BLOCK_METHOD TCPWRAPPERS_BLOCK_METHOD
+        EMAIL_LIMIT IPTABLES_BLOCK_METHOD TCPWRAPPERS_BLOCK_METHOD
         EMAIL_ALERT_DANGER_LEVEL PSAD_FIFO WHOIS_LOOKUP_THRESHOLD
         DNS_LOOKUP_THRESHOLD WHOIS_TIMEOUT SNORT_RULES_DIR HOSTNAME
         PACKET_COUNTER_FILE DSHIELD_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR
         PROC_FORWARD_FILE ENABLE_PERSISTENCE AUTO_BLOCK_IPT_FILE
-        AUTO_BLOCK_TCPWR_FILE PSAD_SIGS_FILE PSAD_AUTO_DL_FILE
-        AUTO_BLOCK_TIMEOUT EXTERNAL_SCRIPT ENABLE_EXT_SCRIPT_EXEC
-        EXEC_EXT_SCRIPT_PER_ALERT ENABLE_DSHIELD_ALERTS SYSLOG_DAEMON
-        DSHIELD_ALERT_INTERVAL DSHIELD_ALERT_EMAIL DSHIELD_USER_ID
-        DSHIELD_USER_EMAIL DSHIELD_DL_THRESHOLD DISK_CHECK_INTERVAL
-        DISK_MAX_PERCENTAGE DISK_MAX_RM_RETRIES ETC_HOSTS_DENY
-        ETC_SYSLOG_CONF ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL
-        ANALYSIS_MODE_DIR IMPORT_OLD_SCANS PSAD_ICMP_TYPES_FILE
-        SHOW_ALL_SIGNATURES IPT_PREFIX_COUNTER_FILE IGNORE_PORTS
-        ENABLE_SCAN_ARCHIVE EMAIL_LIMIT_STATUS_MSG
+        AUTO_BLOCK_TCPWR_FILE SIGS_FILE AUTO_DL_FILE AUTO_BLOCK_TIMEOUT
+        EXTERNAL_SCRIPT ENABLE_EXT_SCRIPT_EXEC EXEC_EXT_SCRIPT_PER_ALERT
+        ENABLE_DSHIELD_ALERTS SYSLOG_DAEMON DSHIELD_ALERT_INTERVAL
+        DSHIELD_ALERT_EMAIL DSHIELD_USER_ID DSHIELD_USER_EMAIL
+        DSHIELD_DL_THRESHOLD DISK_CHECK_INTERVAL DISK_MAX_PERCENTAGE
+        DISK_MAX_RM_RETRIES ETC_HOSTS_DENY ETC_SYSLOG_CONF
+        ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL ANALYSIS_MODE_DIR
+        IMPORT_OLD_SCANS ICMP_TYPES_FILE SHOW_ALL_SIGNATURES
+        IPT_PREFIX_COUNTER_FILE IGNORE_PORTS ENABLE_SCAN_ARCHIVE
+        EMAIL_LIMIT_STATUS_MSG P0F_FILE
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;
@@ -5339,8 +5393,8 @@ psad; the Port Scan Attack Detector
 [+] By Michael Rash (mbr\@cipherdyne.org, http://www.cipherdyne.org)
 
 Usage: psad [-a <auto ips file>] [-c <config file>] [-l] [-i <interval>]
-       [-h] [-B] [-A] [-F] [-S] [-K] [-R] [-U] [-V] [-o] [-p] [-D] [-d]
-       [--signatures <sig file>] [--passive-os-sigs <posf file>]
+       [-h] [-B] [-A] [-F] [-S] [-K] [-R] [-U] [-v] [-V] [-o] [-p] [-D]
+       [-d] [--signatures <sig file>] [--passive-os-sigs <posf file>]
        [--snort-type <type>] [--snort-rdir <rules dir>] [--fw-analyze]
        [--fw-file <file>] [--fw-search <file>] [-m <messages file>]
        [--interval <seconds>] [--status-brief] [--status-ip <ip>]
@@ -5408,6 +5462,7 @@ Options:
                                     data structures on STDOUT).
     -H,  --HUP                    - Send all psad daemons a HUP signal
                                     to have them re-import configs.
+    -v,  --verbose                - Run in verbose mode.
     -V,  --Version                - Print the psad version and exit.
 
     --no-snort-sids               - Disable examination for snort sids

@@ -461,7 +461,7 @@ my $local_ips_href = &get_local_ips();
 unless ($no_whois) {
     unless (defined $cmds{'whois'}
             && -x $cmds{'whois'}) {  ### we couldn't find whois_psad
-        warn " ** Could not locate whois_psad binary.  ",
+        warn ' ** Could not locate whois_psad binary.  ',
             "Disabling whois lookups.\n";
         $no_whois = 1;
     }
@@ -556,7 +556,7 @@ if ($benchmark) {
     if ($b_packets) {
         print localtime() . " .. Executing a $b_packets packet test.\n";
     } else {
-        print localtime() . " .. The --packets command line ",
+        print localtime() . ' .. The --packets command line ',
             "option was not specified.\n";
         print localtime() . " .. Defaulting to a 10,000 packet test.\n";
         $b_packets = 10000;
@@ -1921,13 +1921,12 @@ sub scan_logr_signatures() {
             if (defined $snort_msgs{$sid}{'content'}) {
                 $content = $snort_msgs{$sid}{'content'};
             }
-            &Psad::logr("\"$msg\"\n", $print_hr);
+            &Psad::logr(qq("$msg"\n), $print_hr);
             &Psad::logr("       classtype: $classtype\n", $print_hr);
             &Psad::logr("       sid:       $sid\n", $print_hr);
             &Psad::logr(qq(       content:   "$content"\n), $print_hr)
                 if $content;
-            &Psad::logr("       packets:   $pkts\n", $print_hr);
-            &Psad::logr("\n", $print_hr);
+            &Psad::logr("       packets:   $pkts\n\n", $print_hr);
         }
         for my $sig_id (keys %{$scan{$src}{$dst}{$proto}{'CURR_SIG'}}) {
             my $msg = $sigs_attr{$sig_id}{'msg'};
@@ -1943,7 +1942,7 @@ sub scan_logr_signatures() {
                         {'CURR_SIG'}{$sig_id}{'LISTEN'}{$dp}{'PKTS'};
                     my $l_str = "** Your machine is listening on TCP port: $dp!\n";
                     ### avoid "." operator
-                    &Psad::logr("\"$msg\" dp=$dp flags=[$flags] packets=$pkts $l_str",
+                    &Psad::logr(qq("$msg" dp=$dp flags=[$flags] packets=$pkts $l_str),
                         $print_hr);
                 }
                 for my $dp (keys
@@ -1956,7 +1955,7 @@ sub scan_logr_signatures() {
                         $scan{$src}{$dst}{'TCP'}{'CURR_SIG'}
                         {$sig_id}{'NO_LISTEN'}{$dp}{'PKTS'};
                     my $l_str = "No server on TCP port: $dp\n";
-                    &Psad::logr("\"$msg\" dp=$dp flags=[$flags] packets=$pkts $l_str",
+                    &Psad::logr(qq("$msg" dp=$dp flags=[$flags] packets=$pkts $l_str),
                         $print_hr);
                 }
             } elsif ($proto eq 'UDP') {
@@ -1967,7 +1966,7 @@ sub scan_logr_signatures() {
                         $scan{$src}{$dst}{'UDP'}{'CURR_SIG'}
                         {$sig_id}{'LISTEN'}{$dp}{'PKTS'};
                     my $l_str = "** Your machine is listening on UDP port: $dp!\n";
-                    &Psad::logr("\"$msg\" dp=$dp packets=$pkts $l_str",
+                    &Psad::logr(qq("$msg" dp=$dp packets=$pkts $l_str),
                         $print_hr);
                 }
                 for my $dp (keys
@@ -1977,13 +1976,13 @@ sub scan_logr_signatures() {
                         $scan{$src}{$dst}{'UDP'}{'CURR_SIG'}
                         {$sig_id}{'NO_LISTEN'}{$dp}{'PKTS'};
                     my $l_str = "No server on UDP port: $dp\n";
-                    &Psad::logr("\"$msg\" dp=$dp packets=$pkts $l_str",
+                    &Psad::logr(qq("$msg" dp=$dp packets=$pkts $l_str),
                         $print_hr);
                 }
             } else {
                 my $pkts = $scan{$src}{$dst}{'ICMP'}
                     {'CURR_SIG'}{$sig_id}{'PKTS'};
-                &Psad::logr("\"$msg\" packets=$pkts\n", $print_hr);
+                &Psad::logr(qq("$msg" packets=$pkts\n), $print_hr);
             }
 
             ### signature logging with syslog is not yet supported
@@ -2073,8 +2072,9 @@ sub old_auto_blocked_ips() {
                     }
                     RULE: for my $rule (@rules) {
                         chomp $rule;
-                        ### DENY       udp  ------  0.0.0.0/0      0.0.0.0/0      * ->   *
-                        if ($rule =~ /^DENY\s+all.*?$blockip.*0\.0\.0\.0\/0\s+\*\s+\-\>\s+\*/) {
+                        ### DENY   udp  ------  0.0.0.0/0   0.0.0.0/0   * -> *
+                        if ($rule =~ /^DENY\s+all.*?$blockip.*0\.0\.0\.0\/0
+                                \s+\*\s+\-\>\s+\*/x) {
                             ### all traffic from $blockip is being blocked
                             $blocked = 1;
                             if ($flush_fw) {
@@ -2591,7 +2591,7 @@ sub check_old_cmdargs() {
 
 sub print_old_arg() {
     my ($oldarg, $newarg) = @_;
-    print " ** The \"$oldarg\" option has been changed to \"$newarg\"\n";
+    print qq( ** The "$oldarg" option has been changed to "$newarg"\n);
     &usage(1);
     return;
 }
@@ -2638,7 +2638,7 @@ sub setup() {
             }
         }
         ### reinstate kernel logging to our named pipe
-        print SYSLOG "### Send kern.info messages to psadfifo for ",
+        print SYSLOG '### Send kern.info messages to psadfifo for ',
             "analysis by kmsgsd\n";
         print SYSLOG "kern.info\t\t|$config{'PSAD_FIFO'}\n";
         close SYSLOG;
@@ -2659,11 +2659,11 @@ sub setup() {
             open SYSLOGNG, '>> /etc/syslog-ng/syslog-ng.conf' or
                 die " ** Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
             print SYSLOGNG "\n";
-            print SYSLOGNG "destination psadpipe { pipe(",
+            print SYSLOGNG 'destination psadpipe { pipe(',
                 "\"/var/run/psadfifo\"); };\n";
             print SYSLOGNG "filter f_kerninfo { facility(kern) ",
                 "and level(info); };\n";
-            print SYSLOGNG "log { source(src); ",
+            print SYSLOGNG 'log { source(src); ',
                 "filter(f_kerninfo); destination(psadpipe); };\n";
             close SYSLOGNG;
             system "$cmds{'killall'} -HUP syslog-ng";
@@ -2703,8 +2703,8 @@ sub fw_check() {
             $rv = 1;
         } else {
             &Psad::logr("\n", {"$config{'PSAD_DIR'}/fw_check.txt" => 1});
-            &Psad::logr(" .. NOTE: IPTables::Parse does not yet parse user " .
-                "defined chains and so it is possible your firewall config " .
+            &Psad::logr(' .. NOTE: IPTables::Parse does not yet parse user ' .
+                'defined chains and so it is possible your firewall config ' .
                 "is compatible with psad anyway.\n",
                 {"$config{'PSAD_DIR'}/fw_check.txt" => 1});
             &Psad::sendmail(" ** psad: firewall setup warning!",
@@ -2836,9 +2836,9 @@ sub ipt_chk_chain() {
                     $str2 = "$proto scans";
                 }
                 &Psad::logr("$str1 but the rule does not have a log prefix " .
-                    "of \"$config{'FW_MSG_SEARCH'}\"  psad will not be able " .
+                    qq(of "$config{'FW_MSG_SEARCH'}"  psad will not be able ) .
                     "to detect $str2 without adding --log-prefix " .
-                    "\"$config{'FW_MSG_SEARCH'}\" to the rule.\n",
+                    qq("$config{'FW_MSG_SEARCH'}" to the rule.\n),
                     {$fw_check_file => 1});
                 &Psad::logr("\n", {$fw_check_file => 1});
                 $rv = 0;
@@ -2860,21 +2860,21 @@ sub ipt_chk_chain() {
             }
         }
         unless ($found_all) {
-            &Psad::logr(" ** The best way to fix the above errors is to " .
-                "first setup iptables to accept traffic that you need " .
+            &Psad::logr(' ** The best way to fix the above errors is to ' .
+                'first setup iptables to accept traffic that you need ' .
                 "to/through the iptables $chain chain, and then execute the " .
                 "following commands:\n", {$fw_check_file => 1});
             &Psad::logr("        iptables -A $chain -j LOG --log-prefix " .
-                "\"$config{'FW_MSG_SEARCH'}\"\n", {$fw_check_file => 1});
+                qq("$config{'FW_MSG_SEARCH'}"\n), {$fw_check_file => 1});
             &Psad::logr("        iptables -A $chain -j DROP\n",
                 {$fw_check_file => 1});
         }
     } else {
         &Psad::logr(" ** The $chain chain in the iptables ruleset on " .
             "$hostname does not include default rules that will log and " .
-            "drop unwanted packets. You need to include two default rules; ".
-            "one that logs packets that have not been accepted by previous " .
-            "rules (this rule should have a logging prefix of " .
+            'drop unwanted packets. You need to include two default rules; '.
+            'one that logs packets that have not been accepted by previous ' .
+            'rules (this rule should have a logging prefix of ' .
             "\"$config{'FW_MSG_SEARCH'}\"), and a final rule that drops any " .
             "unwanted packets.\n",
             {$fw_check_file => 1});
@@ -2887,11 +2887,11 @@ sub ipt_chk_chain() {
             {$fw_check_file => 1});
         &Psad::logr("\n", {$fw_check_file => 1});
         &Psad::logr("              iptables -A $chain -j LOG --log-prefix " .
-            "\" $config{'FW_MSG_SEARCH'}\"\n", {$fw_check_file => 1});
+            qq(" $config{'FW_MSG_SEARCH'}"\n), {$fw_check_file => 1});
         &Psad::logr("              iptables -A $chain -j DROP\n\n",
             {$fw_check_file => 1});
         &Psad::logr(" ** Psad will not detect in the iptables $chain chain " .
-            "scans without an iptables ruleset that includes rules similar " .
+            'scans without an iptables ruleset that includes rules similar ' .
             "to the two rules above.\n",
             {$fw_check_file => 1});
         &Psad::logr("\n", {$fw_check_file => 1});

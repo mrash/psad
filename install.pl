@@ -207,7 +207,7 @@ sub install() {
     close SYSLOG;
     print " ... Restarting syslog.\n";
     system "$Cmds{'killall'} -HUP syslogd";
-    
+
     unless (-d $PSAD_DIR) {
         &logr(" ... Creating $PSAD_DIR\n");
         mkdir $PSAD_DIR, 0400;
@@ -498,7 +498,6 @@ sub uninstall() {
         print " ... Removing ${INIT_DIR}/psad\n";
         unlink "${INIT_DIR}/psad";
     }
-    ### deal with the uninstallation of Psad.pm later...
     if (-e "${PERL_INSTALL_DIR}/Psad.pm") {
         print " ----  Removing ${PERL_INSTALL_DIR}/Psad.pm  ----\n";
         unlink "${PERL_INSTALL_DIR}/Psad.pm";
@@ -518,6 +517,18 @@ sub uninstall() {
     if (-e $WHOIS_PSAD) {
         print " ... Removing $WHOIS_PSAD\n";
         unlink $WHOIS_PSAD;
+    }
+    if (-d $VARLIBDIR) {
+        print " ... Removing $VARLIBDIR\n";
+        rmtree $VARLIBDIR;
+    }
+    if (-d $RUNDIR) {
+        print " ... Removing $RUNDIR";
+        rmtree $RUNDIR;
+    }
+    if (-d $LIBDIR) {
+        print " ... Removing $LIBDIR";
+        rmtree $LIBDIR;
     }
     print " ... Restoring /etc/syslog.conf.orig -> /etc/syslog.conf\n";
     if (-e '/etc/syslog.conf.orig') {

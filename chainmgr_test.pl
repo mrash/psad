@@ -33,4 +33,8 @@ print "$status_msg: $rv\n";
 ($rv, $status_msg) = $ipt->delete_chain('filter', 'INPUT', 'PSAD');
 print "$status_msg: $rv\n";
 
+my $aref = ();
+($rv, $aref) = $ipt->run_ipt_cmd_output("/sbin/iptables -n -L INPUT");
+print for @$aref;
+
 exit 0;

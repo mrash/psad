@@ -89,6 +89,7 @@
 #
 
 ### modules used by psad
+use lib '/usr/lib/psad';
 use Psad;
 use File::stat 'stat';
 use File::Copy;
@@ -1724,7 +1725,6 @@ sub restart_psad() {
 ### display the status of all four psad daemons
 sub status_psad() {
     my $cmdline;
-    print "\n";
     ### only the psad daemon (normally) runs with command line arguments
     if (-e $CMDLINE_FILE) {
         open CMD, "< $CMDLINE_FILE";
@@ -1810,11 +1810,12 @@ sub status_psad() {
                                     }
                                 }
                             }
-                            print STDOUT "     Scan source ip addresses and danger levels:\n";
+#                            print STDOUT "     Scan source ip addresses and danger levels:\n";
+                            print STDOUT "     IP:           Danger Level:\n";
                             if (%scan_source_ips) {
                                 for my $src (keys %scan_source_ips) {
-                                    print STDOUT "        " . sprintf("%16s", $src) .
-                                                 "  $scan_source_ips{$src}\n";
+                                    print STDOUT "   " . sprintf("%16s", $src) .
+                                                 "    $scan_source_ips{$src}\n";
                                 }
                             } else {
                                 print STDOUT "     [No scans detected.]\n";

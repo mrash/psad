@@ -1,5 +1,7 @@
 #!/usr/bin/perl -w
 #
+#########################################################################
+#
 # File: install.pl
 #
 # Purpose:  install.pl is the installation script for psad.  It is safe
@@ -48,12 +50,13 @@ use strict;
 ### you're really sure.
 my $PSAD_DIR     = '/var/log/psad';
 my $PSAD_CONFDIR = '/etc/psad';
-my $LIBDIR       = '/var/lib/psad';
+my $VARLIBDIR    = '/var/lib/psad';
 my $RUNDIR       = '/var/run/psad';
+my $LIBDIR       = '/usr/lib/psad';
 
 #============== config ===============
 my $INSTALL_LOG  = "${PSAD_DIR}/install.log";
-my $PSAD_FIFO    = "${LIBDIR}/psadfifo";
+my $PSAD_FIFO    = "${VARLIBDIR}/psadfifo";
 my $INIT_DIR     = '/etc/rc.d/init.d';
 my $SBIN_DIR     = '/usr/sbin';  ### consistent with FHS (Filesystem Hierarchy Standard)
 my $CONF_ARCHIVE = "${PSAD_CONFDIR}/archive";
@@ -161,6 +164,10 @@ sub install() {
         &logr(" ... Creating $RUNDIR\n");
         mkdir $RUNDIR,0400;
     }
+    unless (-d $VARLIBDIR) {
+        &logr(" ... Creating $VARLIBDIR\n");
+        mkdir $VARLIBDIR,0400;
+    }
     unless (-d $LIBDIR) {
         &logr(" ... Creating $LIBDIR\n");
         mkdir $LIBDIR,0400;
@@ -233,7 +240,7 @@ sub install() {
         die " ... @@@  Your source distribution appears to be incomplete!  Psad.pm is missing.\n" .
             "        Download the latest sources from http://www.cipherdyne.com\n";
     }
-    system "$Cmds{'perl'} Makefile.PL";
+    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
     system "$Cmds{'make'}";
     system "$Cmds{'make'} test";
     system "$Cmds{'make'} install";
@@ -249,7 +256,7 @@ sub install() {
         die " ... @@@  Your source kit appears to be incomplete!  Syslog.pm is missing.\n" .
             "       Download the latest sources from http://www.cipherdyne.com\n";
     }
-    system "$Cmds{'perl'} Makefile.PL";
+    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
     system "$Cmds{'make'}";
 #    system "$Cmds{'make'} test";
     system "$Cmds{'make'} install";

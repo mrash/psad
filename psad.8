@@ -53,10 +53,9 @@ the administrator to define what constitutes a port scan or other suspect
 traffic.  Email alerts sent by psad contain the scanning ip, number of
 packets sent to each port, any tcp, udp, or icmp signatures that have been
 matched (e.g. "NMAP XMAS scan"), the scanned port range, the current danger
-level (from 1 to 5), reverse dns info, and whois information.  To top it
-off, psad makes use of packet length, ttl, tos, ip id, and tcp window size,
-to passively fingerprint remote operating systems from which scans are
-launched.
+level (from 1 to 5), reverse dns info, and whois information.  Psad also
+makes use of packet length, ttl, tos, ip id, and tcp window sizes
+to passively fingerprint remote operating systems from which scans originate.
 
 .B psad
 consists of four daemons: psad, kmsgsd, psadwatchd, and diskmond.

@@ -3377,20 +3377,21 @@ sub stop_psad() {
 }
 
 sub restart() {
-    my $cmdline;
+    my $cmdline = '';
     if (-e $cmdline_file) {
         open CMD, "< $cmdline_file" or die ' ** Could not open ',
             "$cmdline_file: $!";
         $cmdline = <CMD>;
         close CMD;
         chomp $cmdline;
-    } else {
-        die " ** psad:  No other psad process is ",
-            "running on $config{'HOSTNAME'}!";
     }
     &stop_psad();
     print " .. Restarting psad daemons on $config{'HOSTNAME'}\n";
-    system "$cmds{'psad'} $cmdline";
+    if ($cmdline) {
+        system "$cmds{'psad'} $cmdline";
+    } else {
+        system $cmds{'psad'};
+    }
     return 0;
 }
 

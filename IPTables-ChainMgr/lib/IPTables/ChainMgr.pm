@@ -50,15 +50,7 @@ sub chain_exists() {
     my $chain = shift || croak '[*] Must specify a chain to create.';
     my $iptables = $self->{'_iptables'};
 
-    return &modinternal_chain_exists($table, $chain, $iptables);
-}
-
-sub modinternal_chain_exists() {
-    my $table = shift || croak '[*] Must specify a table, e.g. "filter".';
-    my $chain = shift || croak '[*] Must specify a chain to create.';
-    my $iptables = shift || croak '[*] Must specify iptables command.';
-
-    if (&modinternal_run_ipt_cmd("$iptables -t $table -n -L $chain") == 0) {
+    if ($self->run_ipt_cmd("$iptables -t $table -n -L $chain") == 0) {
         return 1;
     } else {
         return 0;
@@ -71,12 +63,12 @@ sub create_chain() {
     my $chain = shift || croak '[*] Must specify a chain to create.';
     my $iptables = $self->{'_iptables'};
 
-    if (&modinternal_chain_exists($table, $chain, $iptables)) {
+    if ($self->chain_exists($table, $chain, $iptables)) {
         ### the chain already exists
         return 1, "Table: $table, chain: $chain, already exists.";
     } else {
         ### create the chain
-        if (&modinternal_run_ipt_cmd("$iptables -t $table -N $chain") == 0) {
+        if ($self->run_ipt_cmd("$iptables -t $table -N $chain") == 0) {
             return 1, "Table: $table, chain: $chain, created.";
         } else {
             ### could not create the chain
@@ -91,13 +83,7 @@ sub flush_chain() {
     my $chain = shift || croak '[*] Must specify a chain.';
     my $iptables = $self->{'_iptables'};
 
-    return &modinternal_flush_chain($table, $chain, $iptables);
-}
-
-sub modinternal_flush_chain() {
-    my ($table, $chain, $iptables) = @_;
-
-    if (&modinternal_run_ipt_cmd("$iptables -t $table -F $chain") == 0) {
+    if ($self->run_ipt_cmd("$iptables -t $table -F $chain") == 0) {
         return 1;
     } else {
         return 0;
@@ -114,21 +100,21 @@ sub delete_chain() {
     my $iptables = $self->{'_iptables'};
 
     ### see if the chain exists first
-    if (&modinternal_run_ipt_cmd("$iptables -t $table -n -L $del_chain") == 0) {
+    if ($self->run_ipt_cmd("$iptables -t $table -n -L $del_chain") == 0) {
         ### flush the chain
-        if (&modinternal_flush_chain($table, $del_chain, $iptables)) {
+        if ($self->flush_chain($table, $del_chain, $iptables)) {
             ### find and delete jump rules to this chain (we can't delete
             ### the chain until there are no references to it)
-            my $rulenum = &modinternal_find_ip_rule('0.0.0.0/0',
+            my $rulenum = $self->find_ip_rule('0.0.0.0/0',
                 '0.0.0.0/0', $table, $jump_from_chain, $del_chain, $iptables);
             if ($rulenum) {
-                &modinternal_run_ipt_cmd("$iptables -t $table " .
+                $self->run_ipt_cmd("$iptables -t $table " .
                     "-D $jump_from_chain $rulenum");
             }
             ### note that we try to delete the chain now regardless
             ### of whether their were jump rules above (should probably
             ### parse for the "0 references" under the -nL <chain> output).
-            if (&modinternal_run_ipt_cmd("$iptables -t $table " .
+            if ($self->run_ipt_cmd("$iptables -t $table " .
                     "-X $del_chain") == 0) {
                 return 1, "Table: $table, chain: $del_chain, deleted.";
             } else {
@@ -187,13 +173,13 @@ sub add_ip_rule() {
     }
 
     ### first check to see if this rule already exists
-    if (&modinternal_find_ip_rule($normalized_src, $normalized_dst, $table,
+    if ($self->find_ip_rule($normalized_src, $normalized_dst, $table,
             $chain, $target, $iptables)) {
         return 1, "Table: $table, chain: $chain, $normalized_src -> " .
             "$normalized_dst rule already exists.";
     } else {
         ### we need to add the rule
-        if (&modinternal_run_ipt_cmd("$iptables -t $table -I $chain $rulenum " .
+        if ($self->run_ipt_cmd("$iptables -t $table -I $chain $rulenum " .
                 "-s $normalized_src -d $normalized_dst -j $target") == 0) {
             return 1, "Table: $table, chain: $chain, added $normalized_src " .
                 "-> $normalized_dst";
@@ -246,11 +232,11 @@ sub delete_ip_rule() {
     }
 
     ### first check to see if this rule already exists
-    my $rulenum = &modinternal_find_ip_rule($normalized_src,
+    my $rulenum = $self->find_ip_rule($normalized_src,
         $normalized_dst, $table, $chain, $target, $iptables);
     if ($rulenum) {
         ### we need to delete the rule
-        if (&modinternal_run_ipt_cmd("$iptables " .
+        if ($self->run_ipt_cmd("$iptables " .
             "-t $table -D $chain $rulenum") == 0) {
             return 1, "Table: $table, chain: $chain, deleted rule #$rulenum";
         } else {
@@ -259,7 +245,8 @@ sub delete_ip_rule() {
                 "$normalized_dst.";
         }
     } else {
-        return 0, "Table: $table, chain: $chain, Rule does not exist.";
+        return 0, "Table: $table, chain: $chain, rule $normalized_src -> " .
+            "$normalized_dst does not exist.";
     }
 }
 
@@ -273,21 +260,8 @@ sub find_ip_rule() {
         croak '[*] Must specify Netfilter target (this may be a chain).';
     my $iptables = $self->{'_iptables'};
 
-    return &modinternal_find_ip_rule($src, $dst,
-        $table, $chain, $target, $iptables);
-}
-
-sub modinternal_find_ip_rule() {
-    my $src   = shift || croak '[*] Must specify source address.';
-    my $dst   = shift || croak '[*] Must specify destination address.';
-    my $table = shift || croak '[*] Must specify Netfilter table.';
-    my $chain = shift || croak '[*] Must specify Netfilter chain.';
-    my $target = shift ||
-        croak '[*] Must specify Netfilter target (this may be a chain).';
-    my $iptables = shift || croak '[*] Must specify iptables command.]';
-
     ### first make sure the chain actually exists
-    unless (&modinternal_chain_exists($table, $chain, $iptables)) {
+    unless ($self->chain_exists($table, $chain, $iptables)) {
         return 0;
     }
 
@@ -296,6 +270,7 @@ sub modinternal_find_ip_rule() {
 
     my $chain_aref = $ipt_parse->chain_action_rules($table, $chain);
 
+    my $rulenum = 1;
     for my $rule_href (@$chain_aref) {
         if ($rule_href->{'target'} eq $target
                 and $rule_href->{'protocol'} eq 'all'
@@ -305,8 +280,9 @@ sub modinternal_find_ip_rule() {
                 ### port numbers) in the rule. Note that we are
                 ### also not checking interfaces
                 and not $rule_href->{'extended'}) {
-            return 1;
+            return $rulenum;
         }
+        $rulenum++;
     }
     return 0;
 }
@@ -319,12 +295,12 @@ sub add_jump_rule() {
     my $iptables = $self->{'_iptables'};
 
     ### first check to see if the jump rule already exists
-    if (&modinternal_find_ip_rule('0.0.0.0/0', '0.0.0.0/0', $table,
+    if ($self->find_ip_rule('0.0.0.0/0', '0.0.0.0/0', $table,
             $from_chain, $to_chain, $iptables)) {
         return 1, "Table: $table, chain: $to_chain, jump rule already exists.";
     } else {
         ### we need to add the rule
-        if (&modinternal_run_ipt_cmd("$iptables " .
+        if ($self->run_ipt_cmd("$iptables " .
             "-t $table -I $from_chain 1 -j $to_chain") == 0) {
             return 1, "Table: $table, chain: $to_chain, added jump rule.";
         } else {
@@ -340,11 +316,6 @@ sub run_ipt_cmd() {
     croak "[*] $cmd does not look like an iptables command."
         unless $cmd =~ /iptables/;
 
-    return &modinternal_run_ipt_cmd($cmd);
-}
-
-sub modinternal_run_ipt_cmd() {
-    my $cmd = shift;
     return (system "$cmd > /dev/null 2>&1") >> 8;
 }
 
@@ -355,13 +326,6 @@ sub run_ipt_cmd_output() {
     croak "[*] $cmd does not look like an iptables command."
         unless $cmd =~ /iptables/;
 
-    my ($rv, $output_aref) = &modinternal_run_ipt_cmd_output($cmd);
-
-    return $rv, $output_aref;
-}
-
-sub modinternal_run_ipt_cmd_output() {
-    my $cmd = shift;
     my @output = ();
     my $rv = 0;
     eval {

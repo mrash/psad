@@ -1241,7 +1241,7 @@ sub auto_psad_response(){
                     }
                     if ($Config{'TCPWRAPPERS_BLOCK_METHOD'} eq "Y") {
                         open H, ">> /etc/hosts.deny" or die "Could not open /etc/hosts.deny: $!";
-                        print H "ALL: $src";
+                        print H "ALL: $src\n";
                         close H;
                         $blocked_str = "via tcp wrappers";
                     }
@@ -1574,8 +1574,8 @@ sub psad_setup() {
         open E, "> $Config{'ERROR_LOG'}";
         close E;
     }
-    unless (-e "/var/log/psadfifo") {
-        system "$Cmds{'mknod'} -m 600 /var/log/psadfifo p";
+    unless (-e $Config{'PSAD_FIFO'}) {
+        system "$Cmds{'mknod'} -m 600 $Config{'PSAD_FIFO'} p";
     }
     unless (`$Cmds{'grep'} psadfifo /etc/syslog.conf`) {
         copy("/etc/syslog.conf", "/etc/syslog.conf.orig") unless (-e "/etc/syslog.conf.orig");
@@ -1593,7 +1593,8 @@ sub check_config() {
                            DANGER_LEVEL1     DANGER_LEVEL2      DANGER_LEVEL3
                            DANGER_LEVEL4 DANGER_LEVEL5 PORT_RANGE_SCAN_THRESHOLD
                            ALERT_ALL    PSAD_EMAIL_LIMIT   IPTABLES_BLOCK_METHOD
-                           TCPWRAPPERS_BLOCK_METHOD EMAIL_ALERT_DANGER_LEVEL);
+                           TCPWRAPPERS_BLOCK_METHOD EMAIL_ALERT_DANGER_LEVEL
+                           PSAD_FIFO);
     &Psad::validate_config($CONFIG_FILE, \@required_vars, $Config_href);
     return;
 }

@@ -442,7 +442,8 @@ if ($distro =~ /redhat/) {
         # remove signature checking from psad process if we are not running an iptables-enabled kernel
 #       system "$Cmds{'perl'} -p -i -e 's|\\-s\\s/etc/psad/psad_signatures||' ${INIT_DIR}/psad" if ($kernel !~ /^2.3/ && $kernel !~ /^2.4/);
     } else {
-        &logr("@@@@@  The init script directory, \"${INIT_DIR}\" does not exist!.  Edit the \$INIT_DIR variable in the config section.\n", \@LOGR_FILES);
+        &logr("@@@@@  The init script directory, \"${INIT_DIR}\" does not exist!.\n", \@LOGR_FILES);
+        &logr("Edit the \$INIT_DIR variable in the config section to point to where the init scripts are.\n", \@LOGR_FILES);
     }
 } else {  ### psad is being installed on a non-redhat distribution
     if (-d $INIT_DIR) {

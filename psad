@@ -243,7 +243,7 @@ my $help             = 0;
 my $dump_conf        = 0;
 my $chk_interval     = 0;
 my $netstat_lkup_ctr = 0;
-my $log_len          = 29;  ### used in scan_logr()
+my $log_len          = 25;  ### used in scan_logr()
 my $fw_analyze       = 0;
 
 ### these flags are used to disable several features
@@ -1163,7 +1163,7 @@ sub check_import() {
 
 sub check_import_config() {
     my $mtime_ref = shift;
-    my $mtime_tmp = stat($file)->mtime;
+    my $mtime_tmp = stat($config_file)->mtime;
     if ($mtime_tmp != $$mtime_ref) {  ### the file was modified, so import
 
         ($config_href, $cmds_href) = &Psad::buildconf($config_file);
@@ -1173,7 +1173,7 @@ sub check_import_config() {
 
         %config = %$config_href;
         %cmds   = %$cmds_href;
-        my $subject = " ** psad: re-read $file on $hostname";
+        my $subject = " ** psad: re-read $config_file on $hostname";
         &Psad::sendmail($subject, '',
             $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         $$mtime_ref = $mtime_tmp;
@@ -1686,9 +1686,9 @@ sub scan_logr() {
                     my $ipaddr = gethostbyname $src;
                     ### my $rdns = gethostbyaddr($ipaddr, AF_INET);
                     if ($rdns = gethostbyaddr $ipaddr, 2) {
-                        $dnsstring = "$src -> $rdns";
+                        $dnsstring = $rdns;
                     } else {
-                        $dnsstring = "$src -> No reverse dns info available";
+                        $dnsstring = "[No reverse dns info available]";
                     }
                 } else {
                     ### $ipaddr was already reported as
@@ -1705,41 +1705,63 @@ sub scan_logr() {
 
             ### get the absolute starting time for the scan and the
             ### current time
-            my $s_time = scalar localtime $scan{$src}{$dst}{'S_TIME'};
+            my $abs_s_time = scalar localtime $scan{$src}{$dst}{'S_TIME'};
+            my $s_time = scalar localtime((time()
+                - $config{'PSAD_CHECK_INTERVAL'}));
             my $time   = scalar localtime();
 
             &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=" .
                 "-=-=-=-=\n", \%print_hsh);
-            &Psad::logr("psad: portscan detected against $hostname ($dst).\n",
-                \%print_hsh);
+            &Psad::logr("-**- psad: suspicious traffic detected against " .
+                "$hostname ($dst).\n\n", \%print_hsh);
             &Psad::logr("\n", \%print_hsh);
             &Psad::logr(sprintf("%${log_len}s%s", 'Source: ', "$src\n"),
                 \%print_hsh);
+            &Psad::logr(sprintf("%${log_len}s%s", 'Source dns: ',
+                "$dnsstring\n"), \%print_hsh) unless $no_rdns;
             &Psad::logr(sprintf("%${log_len}s%s", 'Destination: ', "$dst\n"),
                 \%print_hsh);
+            &Psad::logr(sprintf("%${log_len}s%s", 'Danger level: ',
+                "[$scan{$src}{$dst}{'CURR_DL'}] (out of 5)\n\n"), \%print_hsh);
+            &Psad::logr(sprintf("%${log_len}s%s", 'Current interval: ',
+                "$s_time (start)\n"), \%print_hsh);
+            &Psad::logr(sprintf("%${log_len}s%s", ' ',
+                "$time (end)\n"), \%print_hsh);
             if ($tcp) {
-                &Psad::logr(sprintf("%${log_len}s%s", 'Newly scanned TCP ports: ',
-                    "[$tcp_newrange]\n"), \%print_hsh);
-                &Psad::logr(sprintf("%${log_len}s%s",
-                    'Newly Blocked TCP packets: ',
-                    "[$scan{$src}{$dst}{'PROTO'}{'TCP'}{'CURR_INT'}{'PKTS'}]\n"),
-                    \%print_hsh);
+                my $n_pkts = $scan{$src}{$dst}{'PROTO'}{'TCP'}
+                    {'CURR_INT'}{'PKTS'};
+                &Psad::logr(sprintf("%${log_len}s%s", 'Scanned TCP ports: ',
+                    "[$tcp_newrange: $n_pkts packets]\n"), \%print_hsh);
+#                &Psad::logr(sprintf("%${log_len}s%s",
+#                    'Newly Blocked TCP packets: ',
+#                    "[$scan{$src}{$dst}{'PROTO'}{'TCP'}{'CURR_INT'}{'PKTS'}]\n"),
+#                    \%print_hsh);
+                my $nmap_opts  = '';
+                my $print_fh   = 0;
+                my $print_nmap = 0;
                 for my $flags (keys
                     %{$scan{$src}{$dst}{'PROTO'}{'TCP'}{'CURR_INT'}{'FLAGS'}}) {
-                    my $num_pkts =
-                        $scan{$src}{$dst}{'PROTO'}{'TCP'}
-                        {'CURR_INT'}{'FLAGS'}{$flags};
                     $syslog_flags .= "$flags ";
+                    my $n_pkts = $scan{$src}{$dst}{'PROTO'}{'TCP'}
+                        {'CURR_INT'}{'FLAGS'}{$flags};
                     &Psad::logr(sprintf("%${log_len}s%s", 'TCP flags: ',
-                        "[$flags -- packets: $num_pkts]\n"), \%print_hsh);
-                    my $nmap_opts;
-                    $nmap_opts = '[-sT or -sS]' if $flags eq 'SYN';
-                    $nmap_opts = '[-sF]' if $flags eq 'FIN';
-                    $nmap_opts = '[-sX]' if $flags eq 'URG PSH FIN';
-                    $nmap_opts = '[-sN]' if $flags eq 'NULL';
-                    $nmap_opts = '[-O]'  if $flags eq 'URG PSH SYN FIN';
-                    &Psad::logr(sprintf("%${log_len}s%s", 'Nmap options: ',
-                        "$nmap_opts\n"), \%print_hsh) if $nmap_opts;
+                        "[$flags: $n_pkts packets]\n"), \%print_hsh);
+                    if ($flags eq 'SYN') {
+                        $nmap_opts .= '-sT or -sS, ';
+                    } elsif ($flags eq 'FIN') {
+                        $nmap_opts .= '-sF, ';
+                    } elsif ($flags eq 'URG PSH FIN') {
+                        $nmap_opts .= '-sX, ';
+                    } elsif ($flags eq 'NULL') {
+                        $nmap_opts .= '-sN , ';
+                    } elsif ($flags eq 'URG PSH SYN FIN') {
+                        $nmap_opts .= '-O, ';
+                    }
+                }
+                if ($nmap_opts) {
+                    $nmap_opts =~ s/,\s*$//;
+                    &Psad::logr(sprintf("%${log_len}s%s", 'Nmap: ',
+                        "[$nmap_opts]\n"), \%print_hsh);
                 }
                 $syslog_range .= "tcp=[$tcp_newrange] $syslog_flags";
             }
@@ -1755,20 +1777,17 @@ sub scan_logr() {
                     "[$scan{$src}{$dst}{'PROTO'}{'ICMP'}{'CURR_INT'}{'PKTS'}]\n"),
                     \%print_hsh);
             }
+            &Psad::logr("\n", \%print_hsh);
+
+            ### print the overall stats since the scan began
+            &Psad::logr(sprintf("%${log_len}s%s", "Overall stats since: ",
+                "$abs_s_time\n"), \%print_hsh);
             if ($range) {
                 &Psad::logr(sprintf("%${log_len}s%s", 'Complete TCP/UDP port range: ',
                     "[$range]\n"), \%print_hsh);
             }
             &Psad::logr(sprintf("%${log_len}s%s", 'Total blocked packets: ',
                 "$scan{$src}{$dst}{'ABSNUM'}\n"), \%print_hsh);
-            &Psad::logr(sprintf("%${log_len}s%s", 'Start time: ',
-                "$s_time\n"), \%print_hsh);
-            &Psad::logr(sprintf("%${log_len}s%s", 'End time: ',
-                "$time\n"), \%print_hsh);
-            &Psad::logr(sprintf("%${log_len}s%s", 'Danger level: ',
-                "$scan{$src}{$dst}{'CURR_DL'} out of 5\n"), \%print_hsh);
-            &Psad::logr(sprintf("%${log_len}s%s", 'DNS info: ',
-                "$dnsstring\n"), \%print_hsh) unless $no_rdns;
 
             if ($use_iptables) {
                 ### print any matched signatures to the alert

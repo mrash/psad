@@ -404,7 +404,7 @@ sub install() {
     system "$Cmds{'make'} install";
     chdir '..';
 
-    &logr(" .. Installing snort-2.0 signatures in $SNORT_DIR\n");
+    &logr(" .. Installing snort-2.1 signatures in $SNORT_DIR\n");
     unless (-d $SNORT_DIR) {
         mkdir $SNORT_DIR, 0500 or die " ** Could not create $SNORT_DIR: $!";
     }

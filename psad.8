@@ -12,7 +12,7 @@
 makes use of ipchains/iptables log messages to detect, alert, and
 (optionally) block port scans in real time. psad configures syslog to
 write all kern.info messages to a named pipe
-.B /var/log/psadfifo
+.B /var/lib/psad/psadfifo
 and then reads all messages out of the pipe that are matched by a regular
 expression designed to catch any packets that have been
 dropped/denied/rejected by the firewall. In this way psad is supplied
@@ -41,7 +41,7 @@ order to determine what type of scan has been leveraged against the
 network.
 .B kmsgsd
 reads all messages that have been written to the
-.B /var/log/psadfifo
+.B /var/lib/psad/psadfifo
 named pipe and writes any message that matches a particular regular
 expression to
 .B /var/log/psad/fwdata.
@@ -193,7 +193,7 @@ can be viewed on STDOUT instead of being written to
 
 .BR \-e ", " \-\^\-error
 Occasionally messages written by syslog to
-.B /var/log/psadfifo
+.B /var/lib/psad/psadfifo
 or to
 .B /var/log/messages
 do not conform to the normal firewall logging format. psad

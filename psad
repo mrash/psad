@@ -16,7 +16,7 @@
 #
 # Author: Michael Rash (mbr@cipherdyne.org)
 #
-# Credits:  (see the CREDITS file)
+# Credits: (see the CREDITS file)
 #
 # Version: 1.2.2
 #
@@ -35,11 +35,14 @@
 #    USA
 #
 # TODO:
+#   - Add the interface(s) from which iptables log messages are generated
+#     to alert emails.
+#   - Put a "psad signature strategy" link in all alert emails.
 #   - Module tests for Psad.pm
 #   - Extract default behavior into psad.conf.
 #   - Remove dependency on DROP tag in iptables messages.
 #   - Custom logging line upon auto-blocking an ip.
-#   - Customizable subject line that include the danger level.
+#   - Customizable subject line that includes the danger level.
 #   - Signature based auto block rules.  (Peter Abraham)
 #   - Include the ability to specify a network in CIDR notation with
 #     --Status output.
@@ -50,8 +53,6 @@
 #     packets than just tcp/syn packets.
 #   - Extend passive OS fingerprinting to include signatures from
 #     Xprobe from http://www.sys-security.com.
-#   - Enhance --Status output to include the iptables chains to which
-#     packets are logged.
 #   - Add a density calculation for a range of scanned ports, and also
 #     add a "verbose" mode that will display which of the scanned ports
 #     actually resolve to something in the IANA spec.
@@ -116,24 +117,26 @@
 #   psad daemons.  Lines are generally limited to 80 characters for easy
 #   reading.
 #
-# Sample packets:
+# Sample iptables log messages:
 #
 #  Sample tcp packet (rejected by iptables... --log-prefix = "DROP ")
 #  Mar 11 13:15:52 orthanc kernel: DROP IN=lo OUT= MAC=00:00:00:00:00:00:00:00:
 #  00:00:00:00:08:00 SRC=127.0.0.1 DST=127.0.0.1 LEN=60 TOS=0x00 PREC=0x00
 #  TTL=64 ID=0 DF PROTO=TCP SPT=44847 DPT=35 WINDOW=32304 RES=0x00 SYN URGP=0
 #
-#  Sample icmp packet rejected by iptables INPUT chain.
+#  Sample icmp packet rejected by iptables INPUT chain:
 #  Nov 27 15:45:51 orthanc kernel: DROP IN=eth1 OUT= MAC=00:a0:cc:e2:1f:f2:00:
 #  20:78:10:70:e7:08:00 SRC=192.168.10.20 DST=192.168.10.1 LEN=84 TOS=0x00
 #  PREC=0x00 TTL=64 ID=0 DF PROTO=ICMP TYPE=8 CODE=0 ID=61055 SEQ=256
 #
-#  Sample icmp packet logged through FORWARD chain.
+#  Sample icmp packet logged through FORWARD chain:
 #  Aug 20 21:23:32 orthanc kernel: SID365 IN=eth2 OUT=eth1 SRC=192.168.20.25
 #  DST=192.168.10.15 LEN=84 TOS=0x00 PREC=0x00 TTL=63 ID=0 DF PROTO=ICMP TYPE=8
 #  CODE=0 ID=19467 SEQ=256
 #
-#  Sample packet (rejected by ipchains)
+#  Sample packet (rejected by ipchains).  NOTE: ipchains support in
+#  psad has not been maintained for a long time and will probably end
+#  up being removed.
 #  Dec 19 11:54:07 orthanc kernel: Packet log: input REJECT lo PROTO=1
 #  10.0.0.4:3127.0.0.1:3 L=88 S=0xC0 I=49513 F=0x0000 T=255
 #
@@ -660,7 +663,6 @@ for (;;) {
         print localtime() . " .. Creating packet array.\n";
         my $dp = 1000;
         for (my $i=0; $i <= $b_packets; $i++) {
-            ### avert "." operator
             push @fw_packets, "$test_pkt DPT=$dp $test_pktend";
             $dp++ if $dp < 50000;
         }
@@ -2682,7 +2684,7 @@ sub tcpwr_test_block() {
 
 sub tcpwr_block() {
     my $ip = shift;
-    open T, "< /etc/hosts.deny" or die " ** Could not open ",
+    open T, ">> /etc/hosts.deny" or die " ** Could not open ",
         "/etc/hosts.deny: $!";
     print T "ALL: $ip\n";
     close T;

@@ -94,8 +94,7 @@ use strict;
 
 ### ====================== config defaults ==========================
 my $CONFIG_DIR        = "/etc/psad";
-#my $CONFIG_FILE       = "${CONFIG_DIR}/psad.conf";
-my $CONFIG_FILE       = "/tmp/psad.conf";
+my $CONFIG_FILE       = "${CONFIG_DIR}/psad.conf";
 my $SIGS_FILE         = "${CONFIG_DIR}/psad_signatures";
 my $AUTOIPS_FILE      = "${CONFIG_DIR}/psad_auto_ips";
 my $AUTO_BLOCKED_FILE = "${CONFIG_DIR}/psad_auto_blocked_ips";
@@ -112,7 +111,6 @@ my @PIDFILES     = qw(/var/run/psadwatchd.pid
 ### =================================================================
 
 ### ========================== main =================================
-
 ### main psad data structure; contains ips, port ranges, tcp flags, and danger levels
 my %Scan;
 
@@ -162,7 +160,8 @@ Getopt::Long::Configure("no_ignore_case");  ### make Getopts case sensitive
 print "psad version $VERSION, by Michael B. Rash (mbr\@cipherdyne.com)\n" and exit 0 if $print_version;
 
 ### Everthing after this point must be executed as root.
-$< == 0 && $> == 0 or die "\n@@@@@  psad: You must be root (or equivalent UID 0 account) to execute psad!  Exiting.\n\n";
+$< == 0 && $> == 0 or die "\n@@@@@  psad: You must be root (or equivalent UID" .
+                          " 0 account) to execute psad!  Exiting.\n\n";
 
 ### The --Kill command line switch was given.
 if ($kill) {
@@ -172,12 +171,14 @@ if ($kill) {
 
 ### The --USR1 command line switch was given.
 if ($usr1) {
-    my $rv = &psad_usr1();
-    exit $rv;
+    &psad_usr1();
 }
 
 ### read in configuration file
 my ($Config_href, $Cmds_href) = &Psad::buildconf($CONFIG_FILE);
+
+### make sure the configuration is complete
+&check_config();
 
 my %Config = %$Config_href;
 my %Cmds   = %$Cmds_href;
@@ -185,7 +186,7 @@ my $emailaddrs_aref = $Config{'EMAIL_ADDRESSES'};
 
 ### The -i <check interval> command line argument was given
 if ($check_interval) {
-    $Config{'CHECK_INTERVAL'} = $check_interval;
+    $Config{'PSAD_CHECK_INTERVAL'} = $check_interval;
 }
 
 ### check to make sure the commands specified in the config section
@@ -246,20 +247,25 @@ unless ($daemon || $DEBUG) {
 ### write the command line args used to start psad to $cmdline_file
 &Psad::writecmdline(\@args_cp, $CMDLINE_FILE);
 
-### psad _requires_ that kmsgsd is running to receive any data, so let's 
-### start it here for good measure (as of 0.9.2 it makes use of the pid 
-### files and unique_pid(), so we don't have to worry about starting a 
-### duplicate copy).  While we're at it, start psadwatchd and diskmond too.
-### Note that this is the best place to start the other daemons since we 
+### psad _requires_ that kmsgsd is running to receive any data, so let's
+### start it here for good measure (as of 0.9.2 it makes use of the pid
+### files and unique_pid(), so we don't have to worry about starting a
+### duplicate copy).  While we're at it, start psadwatchd and diskmond too
+### Note that this is the best place to start the other daemons since we
 ### just wrote the psad pid to $PIDFILES[1] above.
-system "$Cmds{'kmsgsd'}";
-system "$Cmds{'diskmond'}";
-system "$Cmds{'psadwatchd'}" unless ($DEBUG);   ### If running in debug mode, starting psadwatchd can start unwanted
-                                                ### copies of psad after the debugging process is killed.
+if ($CONFIG_FILE eq "/etc/psad/psad.conf") {
+    system "$Cmds{'kmsgsd'}";
+    system "$Cmds{'diskmond'}";
+    system "$Cmds{'psadwatchd'}" unless ($DEBUG);
+} else {  ### start the other daemons with the new (non-default) config file
+    system "$Cmds{'kmsgsd'} -c $CONFIG_FILE";
+    system "$Cmds{'diskmond'} -c $CONFIG_FILE";
+    system "$Cmds{'psadwatchd'} -c $CONFIG_FILE" unless ($DEBUG);
+}
 
 ### import the scan signatures and auto ips file
-&import_signatures()  if $SIGS_FILE;
-&import_auto_ips()    if $AUTOIPS_FILE;
+&import_signatures() if $SIGS_FILE;
+&import_auto_ips()   if $AUTOIPS_FILE;
 
 ### Check to see if psad automatically blocked some ips from
 ### a previous run.  This feature is most useful for preserving
@@ -284,22 +290,24 @@ $SIG{'USR1'}     = \&print_scan;
 open FWDATA, $Config{'FW_DATA'};
 
 ### Get the mtimes of the signatures and auto ips files.
-my $sigs_mtime     = stat($SIGS_FILE)->mtime if $SIGS_FILE;
-my $auto_ips_mtime = stat($AUTOIPS_FILE)->mtime if $AUTOIPS_FILE;
+my $sigs_mtime     = stat($SIGS_FILE)->mtime;
+my $auto_ips_mtime = stat($AUTOIPS_FILE)->mtime;
+my $config_mtime   = stat($CONFIG_FILE)->mtime;
 
 
 ###=========================================================###
 ######                    MAIN LOOP                      ######
 ###=========================================================###
 for (;;) {
+    ### See if we need to import any changed config variables
+    &check_import_config(\$config_mtime, $CONFIG_FILE);
+
     ### See if we need to import any new signatures
-    if ($SIGS_FILE) {
-        &check_import(\$sigs_mtime, $SIGS_FILE, 1);
-    }
+    &check_import(\$sigs_mtime, $SIGS_FILE, 1);
+
     ### See if we need to re-import the psad_auto_ips file
-    if ($AUTOIPS_FILE) {
-        &check_import(\$auto_ips_mtime, $AUTOIPS_FILE, 0);
-    }
+    &check_import(\$auto_ips_mtime, $AUTOIPS_FILE, 0);
+
     ### Get any new packets have been written to
     ### $FW_DATA by kmsgsd for psad analysis.
     my @new_packets = <FWDATA>;
@@ -327,7 +335,7 @@ for (;;) {
         print "MAIN: number of new packets: $#new_packets\n";
     }
 
-    sleep $Config{'CHECK_INTERVAL'};
+    sleep $Config{'PSAD_CHECK_INTERVAL'};
     ### clearerr() on the FWDATA filehandle to be ready for new packets
     FWDATA->clearerr();
 }
@@ -663,6 +671,41 @@ sub check_import() {
     }
     return;
 }
+sub check_import_config() {
+    my ($mtime_ref, $file) = @_;
+    my $mtime_tmp = stat($file)->mtime;
+    if ($mtime_tmp != $$mtime_ref) {  ### the file was modified, so import
+
+        ($Config_href, $Cmds_href) = &Psad::buildconf($file);
+
+        ### make sure the configuration is complete
+        &check_config();
+
+        %Config = %$Config_href;
+        %Cmds   = %$Cmds_href;
+        $emailaddrs_aref = $Config{'EMAIL_ADDRESSES'};
+        for my $email_address (@$emailaddrs_aref) {
+            system "$Cmds{'mail'} $email_address -s \"psad: re-read $file" .
+                            " file on $HOSTNAME\" < /dev/null > /dev/null 2>&1";
+        }
+        $$mtime_ref = $mtime_tmp;
+
+        ### restart kmsgsd since it does not have the capability of
+        ### checking for a modified config file
+        open K, "< $PIDFILES[2]" or warn " @@@ Could not open $PIDFILES[2]";
+        my $pid = <K>;
+        close K;
+        if (kill 0, $pid) {
+            kill 15, $pid;
+            if ($file eq "/etc/psad/psad.conf") {
+                system "$Cmds{'kmsgsd'}";
+            } else {
+                system "$Cmds{'kmsgsd'} -c $file";
+            }
+        }
+    }
+    return;
+}
 sub import_signatures() {
     open SIGS, "< $SIGS_FILE" or die "Could not open the signatures file $SIGS_FILE: $!";
     my @sigs = <SIGS>;
@@ -924,7 +967,7 @@ sub scan_logr() {
         DST: for my $dst (keys %{$Scan{$src}}) {
             unless (defined $Scan{$src}{$dst}{'EMAIL_LIMIT'}) {
                 $Scan{$src}{$dst}{'EMAIL_LIMIT'} = 0;
-            } elsif ($Scan{$src}{$dst}{'EMAIL_LIMIT'} > $Config{'EMAIL_LIMIT'}) {
+            } elsif ($Scan{$src}{$dst}{'EMAIL_LIMIT'} > $Config{'PSAD_EMAIL_LIMIT'}) {
                 unless (defined $Scan{$src}{$dst}{'EMAIL_STOPPED'}) {
                     &email_limit_reached($src, $dst);
                     $Scan{$src}{$dst}{'EMAIL_STOPPED'} = 1;
@@ -1479,7 +1522,7 @@ sub psad_usr1() {
             print " ... psad is not currently running on $HOSTNAME\n";
         }
     }
-    return $rv;
+    exit $rv;
 }
 sub archive_fwdata() {
     unless (-e $Config{'FW_DATA'}) {
@@ -1522,6 +1565,17 @@ sub psad_setup() {
         close SYSLOG;
         system "$Cmds{'killall'} -HUP $Cmds{'syslogd'}";
     }
+    return;
+}
+sub check_config() {
+    my @required_vars = qw(EMAIL_ADDRESSES  PSAD_CHECK_INTERVAL  PSAD_LOGFILE
+                           FW_DATA ERROR_LOG  EMAIL_ALERTFILE   FW_MSG_SEARCH
+                           ENABLE_AUTO_IDS  ENABLE_PERSISTENCE   SCAN_TIMEOUT
+                           DANGER_LEVEL1     DANGER_LEVEL2      DANGER_LEVEL3
+                           DANGER_LEVEL4 DANGER_LEVEL5 PORT_RANGE_SCAN_THRESHOLD
+                           ALERT_ALL       PSAD_EMAIL_LIMIT
+                           EMAIL_ALERT_DANGER_LEVEL);
+    &Psad::validate_config($CONFIG_FILE, \@required_vars, $Config_href);
     return;
 }
 sub usage_and_exit() {

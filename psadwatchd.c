@@ -39,7 +39,6 @@
 
 /* defines */
 #define PSADWATCHD_CONF "/etc/psad/psadwatchd.conf"
-#define DEBUG
 
 /* globals */
 short int psad_syscalls_ctr     = 0;

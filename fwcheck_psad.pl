@@ -143,11 +143,13 @@ sub fw_check() {
     }
 
     if ($send_alert) {
-        print FWCHECK
+        unless ($fw_search_all) {
+            print FWCHECK
 "\n[+] NOTE: IPTables::Parse does not yet parse user defined chains and so\n",
 "    it is possible your firewall config is compatible with psad anyway.\n";
+        }
 
-        &Psad::sendmail("[-] psad: firewall setup warning on " .
+        &Psad::sendmail("[psad-status] firewall setup warning on " .
             "$config{'HOSTNAME'}!", $config{'FW_CHECK_FILE'},
             $config{'EMAIL_ADDRESSES'},
             $cmds{'mail'}
@@ -255,7 +257,39 @@ sub ipt_chk_chain() {
         print "[+] Parsing iptables $chain chain rules.\n";
     }
 
-    unless ($fw_search_all) {
+    if ($fw_search_all) {
+        ### we are not looking for specific log
+        ### prefixes, but we need _some_ logging rule
+        my $ipt_log;
+        if ($fw_file) {
+            $ipt_log = $ipt->default_log('filter', $chain, $fw_file);
+        } else {
+            $ipt_log = $ipt->default_log('filter', $chain);
+        }
+        return 0 unless $ipt_log;
+        if (defined $ipt_log->{'all'}) {
+            ### found real default logging rule (assuming it is above a default
+            ### drop rule, which we are not actually checking here).
+            return 1;
+        } else {
+            my $log_protos    = '';
+            my $no_log_protos = '';
+            for my $proto qw(tcp udp icmp) {
+                if (defined $ipt_log->{$proto}) {
+                    $log_protos .= "$proto ";
+                } else {
+                    $no_log_protos .= "$proto ";
+                }
+            }
+            $log_protos =~ s/\s*$//;
+            $no_log_protos =~ s/\s*$//;
+
+            print FWCHECK
+"[-] Your firewall config on $config{'HOSTNAME'} includes logging rules for\n",
+"    $log_protos but not for $no_log_protos in the $chain chain.\n\n";
+            return 0;
+        }
+    } else {
         ### we are looking for specific log prefixes.
         ### for now we are only looking at the filter table, so if
         ### the iptables ruleset includes the log and drop rules in
@@ -337,34 +371,6 @@ sub ipt_chk_chain() {
         ### make sure there was _something_ returned from the IPTables::Parse
         ### module.
         return 0 unless $num_keys > 0;
-    } else {
-        ### we are not looking for specific log
-        ### prefixes, but we need _some_ logging rule
-        my $ipt_log;
-        if ($fw_file) {
-            $ipt_log = $ipt->chain_action_rules('filter', $chain, 'LOG', $fw_file);
-        } else {
-            $ipt_log = $ipt->chain_action_rules('filter', $chain, 'LOG');
-        }
-        return 0 unless $ipt_log;
-        if (defined $ipt_log->{'all'}
-                and defined $ipt_log->{'all'}->{'0.0.0.0/0'}
-                and defined $ipt_log->{'all'}->{'0.0.0.0/0'}->{'0.0.0.0/0'}) {
-            ### found real default logging rule (assuming it is above a default
-            ### drop rule, which we are not actually checking here).
-            return 1;
-        } elsif (defined $ipt_log->{'all'}) {
-            print FWCHECK
-"[-] Indeterminate firewall logging config for chain $chain on $config{'HOSTNAME'}.\n",
-"    There are logging rules however, so at least psad will be able to analyze\n",
-"    packets logged through these rules.\n\n";
-            return 1;
-        } else {
-            print FWCHECK
-"[-] Your firewall config no $config{'HOSTNAME'} does not include any logging\n",
-"    rules at all in the $chain chain.\n\n";
-            return 0;
-        }
     }
     return $rv;
 }

@@ -24,6 +24,8 @@ psad-1.3.3 (09//2003):
     - Added check for existing psad process in install.pl.
     - Updated to a new psad email alert subject format.  Prefixes of
       "[psad-alert]", "[psad-error]", and "[psad-status]" are used now.
+    - Permissions fixes with umask() setting in /var/log/psad, permissions
+      fixes for files in /etc/psad at install time.
 
 psad-1.3.2 (06/25/2003):
     - Removed FW_MSG_SEARCH from psad.conf, and created a new config

@@ -309,7 +309,7 @@ sub install() {
     shift @rfiles; shift @rfiles;
     for my $rfile (@rfiles) {
         next unless $rfile =~ /\.rules$/;
-        &logr(" .. Installing snort-1.8.7_rules/${rfile} ");
+        &logr(" .. Installing snort-1.8.7_rules/${rfile}\n");
         copy "snort-1.8.7_rules/${rfile}", "${SNORT_DIR}/${rfile}";
     }
     print "\n\n";

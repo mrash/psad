@@ -121,6 +121,25 @@
 #   psad daemons.  Lines are generally limited to 80 characters for easy
 #   reading.
 #
+# Scan hash key explanation:
+#   chain     - Iptables chain under which the scan packets appear in the
+#               logs.
+#   c_int     - Current interval.
+#   s_time    - Start time for the first packet seen from src to dst.
+#   alerted   - An alert has been sent.
+#   pkts      - Number of packets (used for signatures and a packet counter
+#               for the current interval.
+#   flags     - Keeps track of tcp flags.
+#   no_listen - No server running locally on the destination port used in
+#               the scan packet.
+#   listen    - There is a server running locally on the destination port
+#               used in the scan packet.
+#   curr_sig  - Current signature.
+#   abs_sp    - Absolute starting port.
+#   abs_ep    - Absolute ending port.
+#   sp        - Starting port.
+#   ep        - Ending port.
+#
 # Sample iptables log messages:
 #
 #  Sample tcp packet (rejected by iptables... --log-prefix = "DROP ")
@@ -367,6 +386,7 @@ my $no_rdns       = 0;
 my $no_whois      = 0;
 my $no_netstat    = 0;
 my $no_fwcheck    = 0;
+my $no_kmsgsd     = 0;
 
 ### old command line options
 my $oldarg_snort_sids;
@@ -455,6 +475,8 @@ Getopt::Long::Configure('no_ignore_case');
                                               # that has been scanned.
     'no-ipt-errors'     => \$no_ipt_errors,   # Do not write malformed packet.
                                               # messages to error log.
+    'no-kmsgsd'         => \$no_kmsgsd,       # Do not start kmsgsd (used for
+                                              # debugging).
     'Version'           => \$ver,             # Print the psad version and exit.
     'help'              => \$help,            # Display help.
     ### old args
@@ -489,7 +511,12 @@ if ($status_dl and $status_dl > 5) {
     die ' ** The --status-dl must be between 1 and 5.  Exiting.';
 }
 
-### check for any old command line arguements
+if ($no_kmsgsd and not $debug) {
+    die ' ** The --no-kmsgsd option can only be used with ' .
+        '--debug.  Exiting.';
+}
+
+### check for any old command line arguments
 &check_old_cmdargs();
 
 ### Everthing after this point must be executed as root.
@@ -557,7 +584,7 @@ unless ($no_daemon || $debug || $benchmark) {
 ### Note that this is the best place to start the other daemons since we
 ### just wrote the psad pid to PSAD_PID_FILE above.
 unless ($benchmark) {
-    system $cmds{'kmsgsd'};
+    system $cmds{'kmsgsd'} unless $no_kmsgsd;
     system $cmds{'psadwatchd'} unless $debug;
 }
 
@@ -744,11 +771,11 @@ for (;;) {
         exit 0;
     }
 
-    ### sleep for the check interval number of seconds
-    sleep $config{'PSAD_CHECK_INTERVAL'};
-
     ### clearerr() on the FWDATA filehandle to be ready for new packets
     FWDATA->clearerr() unless $benchmark;
+
+    ### sleep for the check interval number of seconds
+    sleep $config{'PSAD_CHECK_INTERVAL'};
 }
 exit 0;
 ###=========================================================###
@@ -777,7 +804,7 @@ sub check_scan() {
     my $type;
     my $code;
     my $seq;
-    my $chain = 'input';
+    my $chain = 'NA';
     my $intf = 'ethNN';  ### for ipchains
     my $matched_packet = 0;
 
@@ -833,8 +860,8 @@ sub check_scan() {
                     "len: $len\n    sp: $sp dp: $dp, proto: $proto, flags: " .
                     "$flags\n" if $debug;
                 if (!$sid && $config{'IGNORE_CONNTRACK_BUG_PKTS'} eq 'Y' &&
-#                    $dp > 1024 && ($flags =~ /ACK/ ||
                         ($flags =~ /ACK/ || $flags =~ /RST/)) {
+#                    $dp > 1024 && ($flags =~ /ACK/ ||
                     ### XXX ignore TCP packets that have the ACK or RST
                     ### bits set (unless we matched a snort sid) since
                     ### _usually_ we see these packets as a result of the
@@ -903,6 +930,9 @@ sub check_scan() {
             } elsif ($pkt =~ /IN=(\S+)\s+OUT=\S/) {
                 $intf = $1;
                 $chain = 'forward';
+            } elsif ($pkt =~ /IN=\s+OUT=(\S+)/) {
+                $intf = $1;
+                $chain = 'output';
             }
             if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
                 if ($pkt =~ /^\s*(\w+)\s+(\d+)\s+(\S+)/) {
@@ -939,8 +969,8 @@ sub check_scan() {
 
         ### see if we need to timeout any old scans
         if ($config{'ENABLE_PERSISTENCE'} eq 'N') {
-            if (defined $scan{$src}{$dst}{'S_TIME'}) {
-                if ((time() - $scan{$src}{$dst}{'S_TIME'})
+            if (defined $scan{$src}{$dst}{'s_time'}) {
+                if ((time() - $scan{$src}{$dst}{'s_time'})
                         >= $config{'SCAN_TIMEOUT'}) {
                     delete $scan{$src}{$dst};
                 }
@@ -951,7 +981,12 @@ sub check_scan() {
         ### packets that the firewall logged (and maybe dropped).
         $matched_packet = 1;
 
+        print " .. valid packet\n" if $debug;
+
         ### initialize the danger level to 0 if it is not already defined
+        ### (note the same source address might have already scanned a
+        ### different destination ip, so the danger level represents the
+        ### aggregate danger level).
         unless (defined $scan_dl{$src}) {
             $scan_dl{$src} = 0;
         }
@@ -974,55 +1009,55 @@ sub check_scan() {
         ### if $ALERT_ALL eq "Y"... else email sent only if the scan
         ### increments its danger level or trips a signature
         if ($config{'ALERT_ALL'} eq 'Y') {
-            $scan{$src}{$dst}{'ALERTED'} = 0;
+            $scan{$src}{$dst}{'alerted'} = 0;
         }
 
         ### record the absolute starting time of the scan
-        unless (defined $scan{$src}{$dst}{'S_TIME'}) {
-            $scan{$src}{$dst}{'S_TIME'} = time();
+        unless (defined $scan{$src}{$dst}{'s_time'}) {
+            $scan{$src}{$dst}{'s_time'} = time();
         }
 
         ### increment hash values
-        $scan{$src}{$dst}{'ABSNUM'}++;
-        $scan{$src}{$dst}{$proto}{'C_INT'}{'PKTS'}++;
-        $scan{$src}{$dst}{$chain}{$intf}{$proto}++;
+        $scan{$src}{$dst}{'absnum'}++;
+        $scan{$src}{$dst}{$proto}{'c_int'}{'pkts'}++;
+        $scan{$src}{$dst}{'chain'}{$chain}{$intf}{$proto}++;
 
         ### keep track of tcp flags
-        $scan{$src}{$dst}{'tcp'}{'C_INT'}{'FLAGS'}{$flags}++
+        $scan{$src}{$dst}{'tcp'}{'c_int'}{'flags'}{$flags}++
             if $proto eq 'tcp';
 
         ### initialize the start and end port for the scanned port range
         unless ($proto eq 'icmp' ||
-                defined $scan{$src}{$dst}{$proto}{'ABS_SP'}) {
+                defined $scan{$src}{$dst}{$proto}{'abs_sp'}) {
             ### This is the absolute starting port since the
             ### first packet was detected.  Make sure the initial
             ### start port is not too low
-            $scan{$src}{$dst}{$proto}{'ABS_SP'} = 65535;
+            $scan{$src}{$dst}{$proto}{'abs_sp'} = 65535;
             ### make sure the initial end port is not too high
-            $scan{$src}{$dst}{$proto}{'ABS_EP'} = 0;
+            $scan{$src}{$dst}{$proto}{'abs_ep'} = 0;
         }
 
         ### initialize values for the current interval
         unless ($proto eq 'icmp' ||
-                defined $scan{$src}{$dst}{$proto}{'C_INT'}{'SP'}) {
+                defined $scan{$src}{$dst}{$proto}{'c_int'}{'sp'}) {
             ### make sure the initial start port is not too low
-            $scan{$src}{$dst}{$proto}{'C_INT'}{'SP'} = 65535;
+            $scan{$src}{$dst}{$proto}{'c_int'}{'sp'} = 65535;
             ### make sure the initial end port is not too high
-            $scan{$src}{$dst}{$proto}{'C_INT'}{'EP'} = 0;
+            $scan{$src}{$dst}{$proto}{'c_int'}{'ep'} = 0;
         }
 
         ### see if the destination port lies outside our current range
         ### and change if needed
         unless ($proto eq 'icmp') {
-            ($scan{$src}{$dst}{$proto}{'ABS_SP'},
-                $scan{$src}{$dst}{$proto}{'ABS_EP'}) = &check_range($dp,
-                    $scan{$src}{$dst}{$proto}{'ABS_SP'},
-                    $scan{$src}{$dst}{$proto}{'ABS_EP'});
-            ($scan{$src}{$dst}{$proto}{'C_INT'}{'SP'},
-                $scan{$src}{$dst}{$proto}{'C_INT'}{'EP'}) =
+            ($scan{$src}{$dst}{$proto}{'abs_sp'},
+                $scan{$src}{$dst}{$proto}{'abs_ep'}) = &check_range($dp,
+                    $scan{$src}{$dst}{$proto}{'abs_sp'},
+                    $scan{$src}{$dst}{$proto}{'abs_ep'});
+            ($scan{$src}{$dst}{$proto}{'c_int'}{'sp'},
+                $scan{$src}{$dst}{$proto}{'c_int'}{'ep'}) =
                 &check_range($dp,
-                    $scan{$src}{$dst}{$proto}{'C_INT'}{'SP'},
-                    $scan{$src}{$dst}{$proto}{'C_INT'}{'EP'});
+                    $scan{$src}{$dst}{$proto}{'c_int'}{'sp'},
+                    $scan{$src}{$dst}{$proto}{'c_int'}{'ep'});
         }
         if ($debug) {
             print STDOUT "check_scan(): src: $src, dst: $dst\n";
@@ -1074,7 +1109,7 @@ sub match_fastsigs() {
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
-                    $scan{$src}{$dst}{'ALERTED'} = 0;
+                    $scan{$src}{$dst}{'alerted'} = 0;
                 }
                 &chk_local_port($src, $dst, 'tcp', $dp, $flags, $sig_id)
                     unless $no_netstat;
@@ -1087,7 +1122,7 @@ sub match_fastsigs() {
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
-                    $scan{$src}{$dst}{'ALERTED'} = 0;
+                    $scan{$src}{$dst}{'alerted'} = 0;
                 }
                 &chk_local_port($src, $dst, 'tcp', $dp, $flags, $sig_id)
                     unless $no_netstat;
@@ -1100,7 +1135,7 @@ sub match_fastsigs() {
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
-                    $scan{$src}{$dst}{'ALERTED'} = 0;
+                    $scan{$src}{$dst}{'alerted'} = 0;
                 }
                 &chk_local_port($src, $dst, 'tcp', $dp, $flags, $sig_id)
                     unless $no_netstat;
@@ -1113,7 +1148,7 @@ sub match_fastsigs() {
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
-                    $scan{$src}{$dst}{'ALERTED'} = 0;
+                    $scan{$src}{$dst}{'alerted'} = 0;
                 }
                 &chk_local_port($src, $dst, 'tcp', $dp, $flags, $sig_id)
                     unless $no_netstat;
@@ -1124,7 +1159,7 @@ sub match_fastsigs() {
             for my $sig_id (keys %{$sigs_fast{'udp'}{$dp}{$sp}}) {
                 unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
-                    $scan{$src}{$dst}{'ALERTED'} = 0;
+                    $scan{$src}{$dst}{'alerted'} = 0;
                 }
                 &chk_local_port($src, $dst, 'udp', $dp, '', $sig_id)
                     unless $no_netstat;
@@ -1154,7 +1189,7 @@ sub match_sigs() {
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
-                    $scan{$src}{$dst}{'ALERTED'} = 0;
+                    $scan{$src}{$dst}{'alerted'} = 0;
                 }
                 $matched_sig = 1;
             }
@@ -1164,7 +1199,7 @@ sub match_sigs() {
                 ### tripped a udp signature
                 unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
-                    $scan{$src}{$dst}{'ALERTED'} = 0;
+                    $scan{$src}{$dst}{'alerted'} = 0;
                 }
                 $matched_sig = 1;
             }
@@ -1172,10 +1207,10 @@ sub match_sigs() {
             if (&check_icmp_sigs($sig_id, $ttl, $type, $code, $id, $seq)) {
                 unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
-                    $scan{$src}{$dst}{'ALERTED'} = 0;
+                    $scan{$src}{$dst}{'alerted'} = 0;
                 }
-                $scan{$src}{$dst}{'icmp'}{'CURR_SIG'}
-                {$sig_id}{'PKTS'}++;
+                $scan{$src}{$dst}{'icmp'}{'curr_sig'}
+                {$sig_id}{'pkts'}++;
             }
         }
         if ($matched_sig && !$no_netstat) {
@@ -1249,7 +1284,7 @@ sub add_snort_sid() {
             ### FIXME: for now hardcode snort sid matches at
             ### a danger level of two
             $scan_dl{$src} = 2;
-            $scan{$src}{$dst}{'ALERTED'} = 0;
+            $scan{$src}{$dst}{'alerted'} = 0;
         }
         $scan{$src}{$dst}{$proto}{'SNORT_SID'}{$sid}++;
     }
@@ -1276,11 +1311,10 @@ sub dshield_email_log() {
         } else {
             open MAIL, "| $cmds{'sendmail'} -oi -t" or die ' ** Could not ',
                 'send dshield alert email.';
-            print MAIL "From: $config{'DSHIELD_USER_EMAIL'}\n";
-            print MAIL "To: $config{'DSHIELD_ALERT_EMAIL'}\n";
-            print MAIL "Subject: $subject\n";
+            print MAIL "From: $config{'DSHIELD_USER_EMAIL'}\n",
+                "To: $config{'DSHIELD_ALERT_EMAIL'}\n",
+                "Subject: $subject\n";
             print MAIL for @dshield_data;
-            print STDOUT "sendmail: $_" for @dshield_data;
             close MAIL;
         }
 
@@ -1291,7 +1325,7 @@ sub dshield_email_log() {
         $last_dshield_alert = time();
 
         ### clear the dshield data array so we don't re-send
-        ### any data.
+        ### any old data.
         @dshield_data = ();
     }
     return;
@@ -1308,19 +1342,19 @@ sub chk_local_port() {
     ### implemented. :)
     if (defined $local_ips{$dst}) {
         if (defined $local_ports{$proto}{$dp}) {
-            $scan{$src}{$dst}{$proto}{'CURR_SIG'}
-            {$sig_id}{'LISTEN'}{$dp}{'PKTS'}++;
+            $scan{$src}{$dst}{$proto}{'curr_sig'}
+            {$sig_id}{'listen'}{$dp}{'pkts'}++;
             if ($flags) {
-                $scan{$src}{$dst}{$proto}{'CURR_SIG'}
-                {$sig_id}{'LISTEN'}{$dp}{'FLAGS'}
+                $scan{$src}{$dst}{$proto}{'curr_sig'}
+                {$sig_id}{'listen'}{$dp}{'flags'}
                     = $flags;
             }
         } else {
-            $scan{$src}{$dst}{$proto}{'CURR_SIG'}
-            {$sig_id}{'NO_LISTEN'}{$dp}{'PKTS'}++;
+            $scan{$src}{$dst}{$proto}{'curr_sig'}
+            {$sig_id}{'no_listen'}{$dp}{'pkts'}++;
             if ($flags) {
-                $scan{$src}{$dst}{$proto}{'CURR_SIG'}
-                {$sig_id}{'NO_LISTEN'}{$dp}{'FLAGS'}
+                $scan{$src}{$dst}{$proto}{'curr_sig'}
+                {$sig_id}{'no_listen'}{$dp}{'flags'}
                     = $flags;
             }
         }
@@ -1864,7 +1898,7 @@ sub assign_danger_level() {
             if (defined $auto_ips{'ip'}{$src}) {
                 for my $dst (keys %{$scan{$src}}) {
                     $scan_dl{$src} = $auto_ips{'ip'}{$src};
-                    $scan{$src}{$dst}{'ALERTED'} = 0;
+                    $scan{$src}{$dst}{'alerted'} = 0;
                 }
                 ### ignore $src if the auto danger level is zero
                 next SRC if $auto_ips{'ip'}{$src} == 0;
@@ -1873,7 +1907,7 @@ sub assign_danger_level() {
                     if (ipv4_in_network($net, $src)) {
                         for my $dst (keys %{$scan{$src}}) {
                             $scan_dl{$src} = $auto_ips{'net'}{$net};
-                            $scan{$src}{$dst}{'ALERTED'} = 0;
+                            $scan{$src}{$dst}{'alerted'} = 0;
                         }
                         ### ignore $src if the auto danger level is zero
                         next SRC if $auto_ips{'net'}{$net} == 0;
@@ -1882,19 +1916,19 @@ sub assign_danger_level() {
             }
         }
         DST: for my $dst (keys %{$scan{$src}}) {
-            my $absnum = $scan{$src}{$dst}{'ABSNUM'};
+            my $absnum = $scan{$src}{$dst}{'absnum'};
             my $range;
             my $s_port = 65535;
             my $e_port = 0;
 
             ### calculate the range over _both_ tcp and udp
             for my $proto qw(tcp udp) {
-                next unless defined $scan{$src}{$dst}{$proto}{'ABS_SP'};
-                if ($s_port > $scan{$src}{$dst}{$proto}{'ABS_SP'}) {
-                    $s_port = $scan{$src}{$dst}{$proto}{'ABS_SP'};
+                next unless defined $scan{$src}{$dst}{$proto}{'abs_sp'};
+                if ($s_port > $scan{$src}{$dst}{$proto}{'abs_sp'}) {
+                    $s_port = $scan{$src}{$dst}{$proto}{'abs_sp'};
                 }
-                if ($e_port < $scan{$src}{$dst}{$proto}{'ABS_EP'}) {
-                    $e_port = $scan{$src}{$dst}{$proto}{'ABS_EP'};
+                if ($e_port < $scan{$src}{$dst}{$proto}{'abs_ep'}) {
+                    $e_port = $scan{$src}{$dst}{$proto}{'abs_ep'};
                 }
             }
             if ($e_port) {
@@ -1904,16 +1938,15 @@ sub assign_danger_level() {
             }
             if ($debug) {
                 print "assign_danger_level(): destination ip: $dst\n";
-                print "assign_danger_level(): ABSNUM: ",
-                    "$scan{$src}{$dst}{'ABSNUM'}\n";
+                print "assign_danger_level(): absnum: ",
+                    "$scan{$src}{$dst}{'absnum'}\n";
                 for my $proto qw(tcp udp) {
-                    next unless defined $scan{$src}{$dst}{$proto}{'ABS_SP'};
-                    print "assign_danger_level(): ABS_SP: ",
-                        "$scan{$src}{$dst}{$proto}{'ABS_SP'}, ABS_EP: ",
-                        "$scan{$src}{$dst}{$proto}{'ABS_EP'}\n";
+                    next unless defined $scan{$src}{$dst}{$proto}{'abs_sp'};
+                    print "assign_danger_level(): abs_sp: ",
+                        "$scan{$src}{$dst}{$proto}{'abs_sp'}, abs_ep: ",
+                        "$scan{$src}{$dst}{$proto}{'abs_ep'}\n";
                 }
-                print 'assign_danger_level(): DL (before assignment) = ',
-                    "$scan_dl{$src}\n";
+                print "assign_danger_level(): DL: $scan_dl{$src}\n";
             }
 
             ### if PORT_RANGE_SCAN_THRESHOLD is >= 1, then psad will not assign
@@ -1925,26 +1958,26 @@ sub assign_danger_level() {
             if ($range >= $config{'PORT_RANGE_SCAN_THRESHOLD'}) {
                 if ($absnum < $config{'DANGER_LEVEL2'}) {
                     if ($scan_dl{$src} < 1) {
-                        $scan{$src}{$dst}{'ALERTED'} = 0;
+                        $scan{$src}{$dst}{'alerted'} = 0;
                         $scan_dl{$src} = 1;
                     }
                 } elsif ($absnum < $config{'DANGER_LEVEL3'}) {
                     if ($scan_dl{$src} < 2) {
-                        $scan{$src}{$dst}{'ALERTED'} = 0;
+                        $scan{$src}{$dst}{'alerted'} = 0;
                         $scan_dl{$src} = 2;
                     }
                 } elsif ($absnum < $config{'DANGER_LEVEL4'}) {
                     if ($scan_dl{$src} < 3) {
-                        $scan{$src}{$dst}{'ALERTED'} = 0;
+                        $scan{$src}{$dst}{'alerted'} = 0;
                         $scan_dl{$src} = 3;
                     }
                 } elsif ($absnum < $config{'DANGER_LEVEL5'}) {
                     if ($scan_dl{$src} < 4) {
-                        $scan{$src}{$dst}{'ALERTED'} = 0;
+                        $scan{$src}{$dst}{'alerted'} = 0;
                         $scan_dl{$src} = 4;
                     }
                 } elsif ($scan_dl{$src} < 5) {
-                    $scan{$src}{$dst}{'ALERTED'} = 0;
+                    $scan{$src}{$dst}{'alerted'} = 0;
                     $scan_dl{$src} = 5;
                 }
             }
@@ -1969,8 +2002,7 @@ sub write_src_packet_counters() {
     my ($hr, $file) = @_;
     open P, "> $file" or
         die " ** Could not open $file: $!";
-    for my $chain qw(input forward) {
-        next unless defined $hr->{$chain};
+    for my $chain (keys %$hr) {
         for my $intf (keys %{$hr->{$chain}}) {
             for my $proto qw(tcp udp icmp) {
             next unless defined $hr->{$chain}->{$intf}->{$proto};
@@ -1998,7 +2030,7 @@ sub scan_logr() {
         print STDOUT "scan_logr(): source ip: $src\n" if $debug;
         DST: for my $dst (keys %{$scan{$src}}) {
             ### already sent an alert
-            next DST if $scan{$src}{$dst}{'ALERTED'};
+            next DST if $scan{$src}{$dst}{'alerted'};
             next DST unless $scan_dl{$src} >= 1;
             my $syslog_flags = '';
             my $dns_str      = '';
@@ -2049,62 +2081,63 @@ sub scan_logr() {
             &Psad::logr("$curr_dlevel\n", {$dl_file => 0});
 
             ### write out the overall packet counters for $src
-            &write_src_packet_counters($scan{$src}{$dst}, $pkt_ctr_file);
+            &write_src_packet_counters($scan{$src}{$dst}{'chain'},
+                $pkt_ctr_file);
 
-            if (defined $scan{$src}{$dst}{'tcp'}{'ABS_SP'}) {
+            if (defined $scan{$src}{$dst}{'tcp'}{'abs_sp'}) {
                 my $tcp_s_port
-                    = $scan{$src}{$dst}{'tcp'}{'ABS_SP'};
+                    = $scan{$src}{$dst}{'tcp'}{'abs_sp'};
                 my $tcp_e_port
-                    = $scan{$src}{$dst}{'tcp'}{'ABS_EP'};
+                    = $scan{$src}{$dst}{'tcp'}{'abs_ep'};
                 if ($tcp_s_port == $tcp_e_port) {
                     $tcp_absrange = $tcp_s_port;
                 } else {
                     $tcp_absrange = "$tcp_s_port-$tcp_e_port";
                 }
             }
-            if (defined $scan{$src}{$dst}{'tcp'}{'C_INT'}) {
+            if (defined $scan{$src}{$dst}{'tcp'}{'c_int'}) {
                 $tcp_f = 1;
                 my $tcp_s_port
-                    = $scan{$src}{$dst}{'tcp'}{'C_INT'}{'SP'};
+                    = $scan{$src}{$dst}{'tcp'}{'c_int'}{'sp'};
                 my $tcp_e_port
-                    = $scan{$src}{$dst}{'tcp'}{'C_INT'}{'EP'};
+                    = $scan{$src}{$dst}{'tcp'}{'c_int'}{'ep'};
                 if ($tcp_s_port == $tcp_e_port) {
                     $tcp_newrange = $tcp_s_port;
                 } else {
                     $tcp_newrange = "$tcp_s_port-$tcp_e_port";
                 }
                 $tcp_newpkts = $scan{$src}{$dst}{'tcp'}
-                    {'C_INT'}{'PKTS'};
+                    {'c_int'}{'pkts'};
             }
-            if (defined $scan{$src}{$dst}{'udp'}{'ABS_SP'}) {
+            if (defined $scan{$src}{$dst}{'udp'}{'abs_sp'}) {
                 my $udp_s_port
-                    = $scan{$src}{$dst}{'udp'}{'ABS_SP'};
+                    = $scan{$src}{$dst}{'udp'}{'abs_sp'};
                 my $udp_e_port
-                    = $scan{$src}{$dst}{'udp'}{'ABS_EP'};
+                    = $scan{$src}{$dst}{'udp'}{'abs_ep'};
                 if ($udp_s_port == $udp_e_port) {
                     $udp_absrange = $udp_s_port;
                 } else {
                     $udp_absrange = "$udp_s_port-$udp_e_port";
                 }
             }
-            if (defined $scan{$src}{$dst}{'udp'}{'C_INT'}) {
+            if (defined $scan{$src}{$dst}{'udp'}{'c_int'}) {
                 $udp_f = 1;
                 my $udp_s_port
-                    = $scan{$src}{$dst}{'udp'}{'C_INT'}{'SP'};
+                    = $scan{$src}{$dst}{'udp'}{'c_int'}{'sp'};
                 my $udp_e_port
-                    = $scan{$src}{$dst}{'udp'}{'C_INT'}{'EP'};
+                    = $scan{$src}{$dst}{'udp'}{'c_int'}{'ep'};
                 if ($udp_s_port == $udp_e_port) {
                     $udp_newrange = $udp_s_port;
                 } else {
                     $udp_newrange = "$udp_s_port-$udp_e_port";
                 }
                 $udp_newpkts = $scan{$src}{$dst}{'udp'}
-                    {'C_INT'}{'PKTS'};
+                    {'c_int'}{'pkts'};
             }
-            if (defined $scan{$src}{$dst}{'icmp'}{'C_INT'}) {
+            if (defined $scan{$src}{$dst}{'icmp'}{'c_int'}) {
                 $icmp_f = 1;
                 $icmp_newpkts = $scan{$src}{$dst}{'icmp'}
-                    {'C_INT'}{'PKTS'};
+                    {'c_int'}{'pkts'};
             }
 
             ### get reverse dns info
@@ -2133,10 +2166,10 @@ sub scan_logr() {
 
             ### get the absolute starting time for the scan and the
             ### current time
-            my $abs_s_time = scalar localtime $scan{$src}{$dst}{'S_TIME'};
+            my $abs_s_time = scalar localtime $scan{$src}{$dst}{'s_time'};
             my $s_time;
             if (time() - $config{'PSAD_CHECK_INTERVAL'} <
-                $scan{$src}{$dst}{'S_TIME'}) {
+                $scan{$src}{$dst}{'s_time'}) {
                 $s_time = $abs_s_time;
             } else {
                 $s_time = scalar localtime((time()
@@ -2170,11 +2203,11 @@ sub scan_logr() {
                     "[$tcp_newrange: $tcp_newpkts packets]\n";
                 my $prefix = 'tcp flags: ';
                 for my $flags (keys
-                        %{$scan{$src}{$dst}{'tcp'}{'C_INT'}{'FLAGS'}}) {
+                        %{$scan{$src}{$dst}{'tcp'}{'c_int'}{'flags'}}) {
                     my $nmap_opts;
                     $syslog_flags .= "$flags ";
                     my $n_pkts = $scan{$src}{$dst}{'tcp'}
-                        {'C_INT'}{'FLAGS'}{$flags};
+                        {'c_int'}{'flags'}{$flags};
                     ### FUTURE: replace this with a simple hash lookup
                     if ($flags eq 'SYN') {
                         $nmap_opts = '-sT or -sS';
@@ -2223,21 +2256,22 @@ sub scan_logr() {
             print E "\n";
             printf E "    %-9s%-13s%-7s%-7s%-7s\n", 'chain:', 'interface:',
                 'tcp:', 'udp:', 'icmp:';
-            for my $chain qw(input forward) {
+            for my $chain qw(input forward output) {
+#            for my $chain qw(input forward output) {
 #                if (!defined $scan{$src}{$dst}{$chain}) {
 #                    printf E "    %-11%s\n", $chain, '[No packets]';
 #                    next;
 #                }
-                for my $intf (keys %{$scan{$src}{$dst}{$chain}}) {
+                for my $intf (keys %{$scan{$src}{$dst}{'chain'}{$chain}}) {
                     my $tot_tcp  = 0;
                     my $tot_udp  = 0;
                     my $tot_icmp = 0;
-                    $tot_tcp = $scan{$src}{$dst}{$chain}{$intf}{'tcp'}
-                        if defined $scan{$src}{$dst}{$chain}{$intf}{'tcp'};
-                    $tot_udp = $scan{$src}{$dst}{$chain}{$intf}{'udp'}
-                        if defined $scan{$src}{$dst}{$chain}{$intf}{'udp'};
-                    $tot_icmp = $scan{$src}{$dst}{$chain}{$intf}{'icmp'}
-                        if defined $scan{$src}{$dst}{$chain}{$intf}{'icmp'};
+                    $tot_tcp = $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'tcp'}
+                        if defined $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'tcp'};
+                    $tot_udp = $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'udp'}
+                        if defined $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'udp'};
+                    $tot_icmp = $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'icmp'}
+                        if defined $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'icmp'};
                     printf E "    %-9s%-13s%-7s%-7s%-7s\n", $chain,
                         $intf, $tot_tcp, $tot_udp, $tot_icmp;
                 }
@@ -2301,12 +2335,12 @@ sub scan_logr() {
             }
             ### delete all current intervals so they won't show up
             ### in the next alert
-            delete $scan{$src}{$dst}{'tcp'}{'C_INT'};
-            delete $scan{$src}{$dst}{'udp'}{'C_INT'};
-            delete $scan{$src}{$dst}{'icmp'}{'C_INT'};
+            delete $scan{$src}{$dst}{'tcp'}{'c_int'};
+            delete $scan{$src}{$dst}{'udp'}{'c_int'};
+            delete $scan{$src}{$dst}{'icmp'}{'c_int'};
 
             ### we have sent an alert for $dst
-            $scan{$src}{$dst}{'ALERTED'} = 1;
+            $scan{$src}{$dst}{'alerted'} = 1;
         }
     }
     return;
@@ -2316,7 +2350,7 @@ sub scan_logr_signatures() {
     my ($src, $dst, $email_fh, $log_sigs) = @_;
     open LS, ">> $log_sigs" or die " ** Could not open $log_sigs: $!";
     for my $proto qw(tcp udp icmp) {
-        next unless (defined $scan{$src}{$dst}{$proto}{'CURR_SIG'}
+        next unless (defined $scan{$src}{$dst}{$proto}{'curr_sig'}
             || defined $scan{$src}{$dst}{$proto}{'SNORT_SID'});
         print $email_fh "\n";
         print LS "\n";
@@ -2345,18 +2379,18 @@ sub scan_logr_signatures() {
             print $email_fh "       packets:   $pkts\n\n";
             print LS "       packets:   $pkts\n\n";
         }
-        for my $sig_id (keys %{$scan{$src}{$dst}{$proto}{'CURR_SIG'}}) {
+        for my $sig_id (keys %{$scan{$src}{$dst}{$proto}{'curr_sig'}}) {
             my $msg = $sigs_attr{$sig_id}{'msg'};
             if ($proto eq 'tcp') {
                 for my $dp (keys
-                        %{$scan{$src}{$dst}{'tcp'}{'CURR_SIG'}
-                        {$sig_id}{'LISTEN'}}) {
+                        %{$scan{$src}{$dst}{'tcp'}{'curr_sig'}
+                        {$sig_id}{'listen'}}) {
                     my $flags =
                         $scan{$src}{$dst}{'tcp'}
-                        {'CURR_SIG'}{$sig_id}{'LISTEN'}{$dp}{'FLAGS'};
+                        {'curr_sig'}{$sig_id}{'listen'}{$dp}{'flags'};
                     my $pkts =
                         $scan{$src}{$dst}{'tcp'}
-                        {'CURR_SIG'}{$sig_id}{'LISTEN'}{$dp}{'PKTS'};
+                        {'curr_sig'}{$sig_id}{'listen'}{$dp}{'pkts'};
                     print $email_fh "\"$msg\" dp=$dp flags=[$flags] packets=$pkts ",
                         "** Your machine is listening on tcp port: $dp!\n";
                     print LS "\"$msg\" dp=$dp flags=[$flags] packets=$pkts ",
@@ -2364,13 +2398,13 @@ sub scan_logr_signatures() {
                 }
                 for my $dp (keys
                         %{$scan{$src}{$dst}{'tcp'}
-                        {'CURR_SIG'}{$sig_id}{'NO_LISTEN'}}) {
+                        {'curr_sig'}{$sig_id}{'no_listen'}}) {
                     my $flags =
-                        $scan{$src}{$dst}{'tcp'}{'CURR_SIG'}
-                        {$sig_id}{'NO_LISTEN'}{$dp}{'FLAGS'};
+                        $scan{$src}{$dst}{'tcp'}{'curr_sig'}
+                        {$sig_id}{'no_listen'}{$dp}{'flags'};
                     my $pkts =
-                        $scan{$src}{$dst}{'tcp'}{'CURR_SIG'}
-                        {$sig_id}{'NO_LISTEN'}{$dp}{'PKTS'};
+                        $scan{$src}{$dst}{'tcp'}{'curr_sig'}
+                        {$sig_id}{'no_listen'}{$dp}{'pkts'};
                     print $email_fh "\"$msg\" dp=$dp ",
                         "flags=[$flags] packets=$pkts No server ",
                         "on tcp port: $dp\n";
@@ -2380,22 +2414,22 @@ sub scan_logr_signatures() {
                 }
             } elsif ($proto eq 'udp') {
                 for my $dp (keys
-                        %{$scan{$src}{$dst}{'udp'}{'CURR_SIG'}
-                        {$sig_id}{'LISTEN'}}) {
+                        %{$scan{$src}{$dst}{'udp'}{'curr_sig'}
+                        {$sig_id}{'listen'}}) {
                     my $pkts =
-                        $scan{$src}{$dst}{'udp'}{'CURR_SIG'}
-                        {$sig_id}{'LISTEN'}{$dp}{'PKTS'};
+                        $scan{$src}{$dst}{'udp'}{'curr_sig'}
+                        {$sig_id}{'listen'}{$dp}{'pkts'};
                     print $email_fh qq("$msg" dp=$dp packets=$pkts ** Your ",
                         "machine is listening on udp port: $dp!\n);
                     print LS qq("$msg" dp=$dp packets=$pkts ** Your ",
                         "machine is listening on udp port: $dp!\n);
                 }
                 for my $dp (keys
-                        %{$scan{$src}{$dst}{'udp'}{'CURR_SIG'}
-                        {$sig_id}{'NO_LISTEN'}}) {
+                        %{$scan{$src}{$dst}{'udp'}{'curr_sig'}
+                        {$sig_id}{'no_listen'}}) {
                     my $pkts =
-                        $scan{$src}{$dst}{'udp'}{'CURR_SIG'}
-                        {$sig_id}{'NO_LISTEN'}{$dp}{'PKTS'};
+                        $scan{$src}{$dst}{'udp'}{'curr_sig'}
+                        {$sig_id}{'no_listen'}{$dp}{'pkts'};
                     print $email_fh qq("$msg" dp=$dp packets=$pkts No ",
                         "server on udp port: $dp\n");
                     print LS qq("$msg" dp=$dp packets=$pkts No ",
@@ -2403,7 +2437,7 @@ sub scan_logr_signatures() {
                 }
             } else {
                 my $pkts = $scan{$src}{$dst}{'icmp'}
-                    {'CURR_SIG'}{$sig_id}{'PKTS'};
+                    {'curr_sig'}{$sig_id}{'pkts'};
                 print $email_fh qq("$msg" packets=$pkts\n);
                 print LS qq("$msg" packets=$pkts\n);
             }
@@ -2416,7 +2450,7 @@ sub scan_logr_signatures() {
         }
         ### need to delete the current signature so it
         ### won't show up in the next alert
-        delete $scan{$src}{$dst}{$proto}{'CURR_SIG'}
+        delete $scan{$src}{$dst}{$proto}{'curr_sig'}
             unless $config{'SHOW_ALL_SIGNATURES'} eq 'Y';
         delete $scan{$src}{$dst}{$proto}{'SNORT_SID'}
             unless $config{'SHOW_ALL_SIGNATURES'} eq 'Y';
@@ -3241,7 +3275,7 @@ sub status_psad_daemon() {
                 $found_equal_status = 1;
                 for my $src (keys %{$scan_srcs{$dl}}) {
                     for my $dst (keys %{$scan_srcs{$dl}{$src}}) {
-                        for my $chain qw(input forward) {
+                        for my $chain qw(input forward output) {
                             next unless defined
                                 $scan_srcs{$dl}{$src}{$dst}{$chain};
                             for my $intf (keys
@@ -3281,7 +3315,7 @@ sub status_psad_daemon() {
                         next unless $dl >= $status_dl;
                     }
                     $found_equal_status = 1;
-                    for my $chain qw(input forward) {
+                    for my $chain qw(input forward output) {
                         next unless defined
                             $scan_srcs{$src}{$dst}{$chain};
                         for my $intf (keys

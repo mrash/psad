@@ -185,8 +185,10 @@ sub install() {
     }
     unless (-d $LIBDIR) {
         &logr(" .. Creating $LIBDIR\n");
-        mkdir $LIBDIR, 0500;
+        mkdir $LIBDIR, 0755;
     }
+    ### change any existing psad module directory to allow anyone to execute
+    chmod 0755, $LIBDIR;
     unless (-d $PSAD_CONFDIR) {
         &logr(" .. Creating $PSAD_CONFDIR\n");
         mkdir $PSAD_CONFDIR, 0500;

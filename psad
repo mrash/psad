@@ -2864,9 +2864,10 @@ sub ipt_chk_chain() {
                     $str2 = "$proto scans";
                 }
                 &Psad::logr("$str1 but the rule does not have a log prefix " .
-                    qq(of "$config{'FW_MSG_SEARCH'}"  psad will not be able ) .
-                    "to detect $str2 without adding --log-prefix " .
-                    qq("$config{'FW_MSG_SEARCH'}" to the rule.\n),
+                    qq(of "$config{'FW_MSG_SEARCH'}".  It appears as though ) .
+                    qq(the log prefix is set to "$ld_hr->{$proto}->{'LOG'}->{'prefix'}".) .
+                    qq(  psad will not be able to detect $str2 without adding ) .
+                    qq(--log-prefix "$config{'FW_MSG_SEARCH'}" to the rule.\n),
                     {$fw_check_file => 1});
                 &Psad::logr("\n", {$fw_check_file => 1});
                 $rv = 0;

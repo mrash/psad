@@ -4007,9 +4007,9 @@ sub setup() {
 
             print METALOG "\n";
             print METALOG "\nPSAD :\n",
-            "  facility = \"kern\"\n";
+                "  facility = \"kern\"\n";
             print METALOG '  command  = ',
-            "\"/usr/sbin/psadpipe.sh\"\n";
+                "\"/usr/sbin/psadpipe.sh\"\n";
             close METALOG;
             &Psad::psyslog('psad', '.. reconfiguring metalog to write ' .
                     "kern-facility messages to /usr/sbin/psadpipe.sh");

@@ -1,5 +1,7 @@
 #!/usr/bin/perl -w
 #
+#################################################################################################
+#
 # File: psad
 #
 # Purpose: psad makes use of ipchains/iptables logs to detect port
@@ -127,9 +129,25 @@ my %Auto_ips;
 my %whois_cache;
 
 ### initialize and scope some default variables (command line args can override some default values)
-my ($found_new_packets, $daemon, $output, $errors, $dnslookups, $whoislookups,
-    $netstat_lookup, $fwcheck, $Syslog_server, $kill, $restart, $status, $usr1,
-    $print_version, $help, $check_interval) = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0);
+my $found_new_packets = 0;
+my $tcp_ctr           = 0;
+my $udp_ctr           = 0;
+my $icmp_ctr          = 0;
+my $daemon            = 0;
+my $output            = 0;
+my $errors            = 0;
+my $dnslookups        = 0;
+my $whoislookups      = 0;
+my $netstat_lookup    = 0;
+my $fwcheck           = 0;
+my $Syslog_server     = 0;
+my $kill              = 0;
+my $restart           = 0;
+my $status            = 0;
+my $usr1              = 0;
+my $print_version     = 0;
+my $help              = 0;
+my $check_interval    = 0;
 
 ### save a copy of the command line arguments
 my @args_cp = @ARGV;
@@ -293,6 +311,10 @@ my $sigs_mtime     = stat($SIGS_FILE)->mtime;
 my $auto_ips_mtime = stat($AUTOIPS_FILE)->mtime;
 my $config_mtime   = stat($CONFIG_FILE)->mtime;
 
+### zero out the packet counter file (the counters
+### are all zero at this point).
+&write_packet_counters();
+
 ### Get an open filehandle for the main firewall data file $FW_DATA.
 ### All firewall drop/deny/reject log messages are written to $FW_DATA
 ### by kmsgsd.
@@ -331,6 +353,9 @@ for (;;) {
                 &auto_psad_response();
             }
         }
+        ### write the number of tcp/udp/icmp packets out
+        ### to the packet counters file
+        &write_packet_counters();
     }
     ### Print how many new packets we got in $FW_DATA if we are
     ### running in $DEBUG mode
@@ -366,29 +391,37 @@ sub check_scan() {
     READPKT: for my $l (@$process_lines_aref) {
         chomp $l;
         if ($USE_IPTABLES) {
-            ### Sometimes the log entry is messed up by iptables so we write it to the error log.
+            ### Sometimes the log entry is messed up by iptables so
+            ### we write it to the error log.
             if ($l =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+).*TTL=(\d+).*PROTO=(\S+)\s+SPT=(\d+)\s+DPT=(\d+)/) {
                 ($src, $dst, $len, $ttl, $proto, $srcport, $dstport) = ($1,$2,$3,$4,$5,$6,$7,$8);
-                if ($proto ne 'TCP' && $proto ne 'UDP') {  ### it was some weird non-tcp/udp packet with source and destination ports
+                if ($proto ne 'TCP' && $proto ne 'UDP') {  ### it was some weird non-tcp/udp packet
+                                                           ### with source and destination ports
                     push @bad_packets, $l;
                     next READPKT;
                 }
                 if ($proto eq 'TCP') {
+                    $tcp_ctr++;
                     if ($l =~ /RES=\S+\s+(.*)\s+URGP=/) {
                         $flags = $1;
                     } else {
                         $flags = 'NULL';
                     }
-                    ### per page 595 of the Camel book, "if /blah1|blah2/" can be slower than "if /blah1/ || /blah2/
+                    ### per page 595 of the Camel book, "if /blah1|blah2/"
+                    ### can be slower than "if /blah1/ || /blah2/
                     unless (($flags =~ /SYN/ || $flags =~ /FIN/ || $flags =~ /URG/ || $flags =~ /PSH/ || $flags =~ /ACK/
                                  || $flags =~ /RST/ || $flags =~ /NULL/) && ($flags !~ /WINDOW/)) {
                         push @bad_packets, $l;
                         next READPKT;
                     }
-                } ### else it is UDP, but there are no more fields we need to define since we already have the ports, etc.
+                } else {  ### it is UDP, but there are no more fields we need to
+                          ### define since we already have the ports, etc.
+                    $udp_ctr++;
+                }
             } elsif ($l =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+).*TTL=(\d+).*PROTO=ICMP\s+TYPE=(\d+)\s+CODE=(\d+)\s+ID=(\d+)\s+SEQ=(\d+)/) {
                 ($src, $dst, $len, $ttl, $type, $code, $id, $seq) = ($1,$2,$3,$4,$5,$6,$7,$8);
                 $proto = 'ICMP';
+                $icmp_ctr++;
             } else {
                 push @bad_packets, $l;
                 next READPKT;
@@ -424,16 +457,25 @@ sub check_scan() {
         ### hash initialization
         $Scan{$src}{$dst}{'LOGR'} = 'Y';
         $Scan{$src}{$dst}{'AUTO'} = 'N' unless (defined $Scan{$src}{$dst}{'AUTO'});
-        $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} = 0 unless (defined $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'});
-        unless (defined $Scan{$src}{$dst}{'START_PORT'} || $proto eq 'ICMP') { ### this is the absolute starting port since the first packet was detected
-            $Scan{$src}{$dst}{'START_PORT'} = 65535; ### make sure the initial start port is not too low
-            $Scan{$src}{$dst}{'END_PORT'} = 0; ### make sure the initial end port is not too high
+        unless (defined $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'}) {
+            $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} = 0;
+        }
+        unless (defined $Scan{$src}{$dst}{'START_PORT'} || $proto eq 'ICMP') { ### this is the absolute
+                                                                               ### starting port since the
+                                                                               ### first packet was detected
+            ### make sure the initial start port is not too low
+            $Scan{$src}{$dst}{'START_PORT'} = 65535;
+            ### make sure the initial end port is not too high
+            $Scan{$src}{$dst}{'END_PORT'} = 0;
         }
         my $epoch_seconds = time() if ($Config{'ENABLE_PERSISTENCE'} eq 'N');
-        my @time = split /\s+/, scalar localtime; ### Get the current time as a nice ASCII string.
-        pop @time; shift @time; ### Get rid of the day and the year to make the time consistent with syslog
+        ### Get the current time as a nice ASCII string.
+        my @time = split /\s+/, scalar localtime;
+        pop @time; shift @time; ### Get rid of the day and the year to make
+                                ### the time consistent with syslog
         my $time = join ' ', @time;
-        unless (defined $Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}) {  ### initialize values for the current interval
+        ### initialize values for the current interval
+        unless (defined $Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}) {
             $Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}{'START_TIME'} = $time;
             $Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}{'PACKETS'} = 0;
             unless ($proto eq 'ICMP') {
@@ -458,7 +500,8 @@ sub check_scan() {
             $Scan{$src}{$dst}{'END_TIME'}{'EPOCH_SECONDS'} = $epoch_seconds;
         }
         ### increment hash values
-        ### if $Scan{$src}{$dst}{'ABSNUM'} is not yet defined, incrementing it here will make it equal to 1 anyway
+        ### if $Scan{$src}{$dst}{'ABSNUM'} is not yet defined, incrementing
+        ### it here will make it equal to 1 anyway
         $Scan{$src}{$dst}{'ABSNUM'}++;
         if ($proto eq 'TCP') {
             $Scan{$src}{$dst}{'TCP'}{'CURRENT_INTERVAL'}{'FLAGS'}{$flags}++;
@@ -492,8 +535,10 @@ sub check_scan() {
                       "$Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'}\n";
             }
         }
-        if ($signatures && $USE_IPTABLES) { ### might try to use ipchains also, but then cannot use tcp flags except for -y -l rules
-            for my $msg (keys %{$Sigs{$proto}}) { ### need to iterate through all signatures since a packet may match several
+        if ($signatures && $USE_IPTABLES) { ### might try to use ipchains also, but then
+                                            ### cannot use tcp flags except for -y -l rules
+            for my $msg (keys %{$Sigs{$proto}}) { ### need to iterate through all signatures
+                                                  ### since a packet may match several
                 my $dstport_criteria = 0;
                 my $srcport_criteria = 0;
                 my $rv = 0;
@@ -941,6 +986,14 @@ sub assign_danger_level() {
                 . "$Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'}\n" if $DEBUG;
         }
     }
+    return;
+}
+sub write_packet_counters() {
+    open P, "> $Config{'PACKET_COUNTER_FILE'}" or die " ... @@@ Could not open $Config{'PACKET_COUNTER_FILE'}: $!";
+    print P "     tcp:  $tcp_ctr\n";
+    print P "     udp:  $udp_ctr\n";
+    print P "     icmp: $icmp_ctr\n";
+    close P;
     return;
 }
 sub automatic_ip_danger_assignment() {
@@ -1521,9 +1574,17 @@ sub psad_status() {
                     if ($g =~ /^\S+\s+$pid\s+(\S+)\s+(\S+)/) {
                         print "     %CPU: $1  %MEM: $2\n";
                         if ($pidname eq 'psad' && $cmdline) {
-                            print "     Command line arguments: $cmdline\n";
-                        } elsif ($pidname eq 'psad') {
-                            print "     Command line arguments: [none specified]\n";
+                            if ($cmdline) {
+                                print "     Command line arguments: $cmdline\n";
+                            } else {
+                                print "     Command line arguments: [none specified]\n";
+                            }
+                            if (-e $Config{'PACKET_COUNTER_FILE'}) {
+                                print "     Packets Counters (packets blocked by the firewall and processed by psad):\n";
+                                open F, "< $Config{'PACKET_COUNTER_FILE'}" or die " ... $Config{'PACKET_COUNTER_FILE'}: $!";
+                                print STDOUT $_ while (<F>);
+                                close F;
+                            }
                         }
                         last GP;
                     }
@@ -1637,7 +1698,7 @@ sub check_config() {
         ALERT_ALL    PSAD_EMAIL_LIMIT   IPTABLES_BLOCK_METHOD
         IPCHAINS_BLOCK_METHOD TCPWRAPPERS_BLOCK_METHOD
         EMAIL_ALERT_DANGER_LEVEL PSAD_FIFO WHOIS_THRESHOLD
-        WHOIS_TIMEOUT
+        WHOIS_TIMEOUT   PACKET_COUNTER_FILE
     );
     &Psad::validate_config($CONFIG_FILE, \@required_vars, $Config_href);
     return;

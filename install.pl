@@ -1474,7 +1474,6 @@ sub query_dshield() {
 }
 
 sub query_email() {
-    my $filename = 'psad.conf';
     my $email_str = '';
     open F, "< ${PSAD_CONFDIR}/psad.conf" or die "[*] Could not open ",
         "${PSAD_CONFDIR}/psad.conf: $!";

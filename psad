@@ -2004,8 +2004,8 @@ sub import_signatures() {
         }
 
         ### add the signature message string to the %sig_attr cache
-        $sigs_attr{$sid}{'dl'} = $dlevel;
-        $sigs_attr{$sid}{'msg'}    = $msg;
+        $sigs_attr{$sid}{'dl'}  = $dlevel;
+        $sigs_attr{$sid}{'msg'} = $msg;
 
         ### assign source and destination
         $sigs{$proto}{$sid}{'src'} = $src;

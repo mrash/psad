@@ -149,7 +149,7 @@ sub check_destination() {
 }
 sub check_commands() {
 	my $Cmds_href = shift;
-	foreach my $cmd (keys %$Cmds_href) {
+	CMD: foreach my $cmd (keys %$Cmds_href) {
 		unless (-e $Cmds_href->{$cmd}) {
 			$real_location = `which $cmd 2> /dev/null`;
 			chomp $real_location;
@@ -162,10 +162,18 @@ sub check_commands() {
 				} elsif (defined $Cmds_href->{'uname'}) {
         				my $kernel = (split /\s+/, `$Cmds_href->{'uname'} -a`)[2];
         				if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/) {
-						die "*** You appear to be running kernel $kernel so you should be running iptables but iptables is not\nlocated at $Cmds_href->{'iptables'}.  Please edit the config section to include the path to iptables.\n";	
+						if ($cmd eq "ipchains") {
+							next CMD;
+						} else {
+							die "*** You appear to be running kernel $kernel so you should be running iptables but iptables is not\nlocated at $Cmds_href->{'iptables'}.  Please edit the config section to include the path to iptables.\n";	
+						}
 					}      
   					if ($kernel =~ /^2.2/) { # and also 2.0.x ?
-						die "*** You appear to be running kernel $kernel so you should be running ipchains but ipchains is not\nlocated at $Cmds_href->{'ipchains'}.  Please edit the config section to include the path to ipchains.\n";
+						if ($cmd eq "iptables") {
+							next CMD;
+						} else {
+							die "*** You appear to be running kernel $kernel so you should be running ipchains but ipchains is not\nlocated at $Cmds_href->{'ipchains'}.  Please edit the config section to include the path to ipchains.\n";
+						}
 					}
 				}
 			}

@@ -74,8 +74,6 @@
 #   DINDOW=32304 RES=0x00 SYN URGP=0
 #
 #
- # my $pid = $$;
-
 #==================== config ======================= ## do not remove this line (used by install.pl to preserve configs) ##
 ### Initialize config variables.  Some can be overriden with command line args
 my $PSAD_LOGFILE = "/var/log/psad/scanlog";
@@ -111,7 +109,6 @@ my $mailCmd = "/bin/mail";
 my $touchCmd = "/bin/touch";
 my $ifconfigCmd = "/sbin/ifconfig";
 my $grepCmd = "/bin/grep";
-my $psCmd = "/bin/ps";
 my $netstatCmd = "/bin/netstat";
 my $unameCmd = "/bin/uname";
 my $hostnameCmd = "/bin/hostname";
@@ -137,6 +134,9 @@ my @PIDFILES = qw(/var/log/psad/pid.psadwatchd
 		  /var/log/psad/pid.kmsgsd
 		  /var/log/psad/pid.diskmond);
 
+### file used to store the psad command line
+my $psad_cmdline = "/var/log/psad/cmd.psad";
+
 ### these three are global variables
 $USE_IPCHAINS = 0;
 $USE_IPTABLES = 0;
@@ -156,6 +156,9 @@ my $fwcheck = 0;
 my $Syslog_server = 0;
 my $kill = 0;
 my $print_version = 0;
+
+### save a copy of the command line arguments
+my @args_cp = @ARGV;
 
 Getopt::Long::Configure("no_ignore_case");  # make Getopts case sensitive
 
@@ -179,8 +182,10 @@ usage_and_exit(1) unless (GetOptions (
 ));
 usage_and_exit(0) if ($help);
 
+### print the version number and exit if -V given on the command line
+print "psad version $Version, by Michael B. Rash (mbr\@cipherdyne.com)\n" and exit 0 if $print_version;
 ### everthing after this point must be executed as root.
-$< == 0 && $> == 0 or die "\n@@@ You must be root (or equivalent UID 0 account) to execute psad!  Exiting.\n\n";
+$< == 0 && $> == 0 or die "\n@@@@@  (psad): You must be root (or equivalent UID 0 account) to execute psad!  Exiting.\n\n";
 
 ### the -k command line argument was given
 kill_psad_processes(\@PIDFILES) if $kill;
@@ -197,7 +202,6 @@ my %Cmds = (
 	"touch"		=> $touchCmd,
 	"ifconfig"	=> $ifconfigCmd,
 	"grep"		=> $grepCmd,
-	"ps"		=> $psCmd,
 	"netstat"	=> $netstatCmd,
 	"uname"		=> $unameCmd,
 	"hostname"	=> $hostnameCmd,
@@ -209,13 +213,6 @@ my %Cmds = (
 
 ### check to make sure the commands specified in the config section are in the right place, and attempt to correct automatically if not.
 %Cmds = check_commands(\%Cmds);
-
-### psad _requires_ that kmsgsd is running to receive any data, so let's start it here for good measure (as of 0.9.2 it has
-### makes use of the pid files and unique_pid(), so we don't have to worry about starting a duplicate copy).  While we're at
-### it, start psadwatchd and diskmond too.
-system "$Cmds{'kmsgsd'}";
-system "$Cmds{'diskmond'}";
-system "$Cmds{'psadwatchd'}";
 
 ### make sure the permissions on these files is 0600
 check_permissions($PSAD_LOGFILE, $FW_DATA, $ERROR_LOG, $EMAIL_ALERTFILE);
@@ -239,10 +236,25 @@ unless ($fwcheck || $Syslog_server) {
 ### daemonize psad unless running with --Daemon or --debug
 fork and exit unless ($daemon || $DEBUG);
 
-open PIDFILE, "> $PIDFILES[1]";  # this is the psad pid file
+### write the current pid associated with psad to the psad pid file
+open PIDFILE, "> $PIDFILES[1]";
 print PIDFILE "$$\n";
 close PIDFILE;
 chmod 0600, $PIDFILES[1];
+
+### write the command line args used to start psad to $psad_cmdline
+open CMD, "> $psad_cmdline";
+print CMD "@args_cp\n";
+close CMD;
+chmod 0600, $psad_cmdline;
+
+### psad _requires_ that kmsgsd is running to receive any data, so let's start it here for good measure (as of 0.9.2 it
+### makes use of the pid files and unique_pid(), so we don't have to worry about starting a duplicate copy).  While we're at
+### it, start psadwatchd and diskmond too.  Note that this is the best place to start the other daemons since we just wrote
+### the psad pid to $PIDFILES[1] above.
+system "$Cmds{'kmsgsd'}";
+system "$Cmds{'diskmond'}";
+system "$Cmds{'psadwatchd'}";
 
 ### import config variables from the config file if running with --config=<config file>
 if ($config) {
@@ -1222,12 +1234,12 @@ sub kill_psad_processes() {
 			chomp $pid;
 			if (kill 0, $pid) {
 				print "=-=-= Killing $pidname, pid: $pid\n";
-				kill 15, $pid or print "@@@ Could not kill $pidname, pid: $pid\n";
+				kill 15, $pid or print "@@@@@  (psad): Could not kill $pidname, pid: $pid\n";
 			} else {
-				print "@@@ $pidname is not running.\n";
+				print "@@@@@  (psad): $pidname is not running.\n";
 			}
 		} else {
-			print "@@@ pid file $pidfile does not exist for $pidname\n";
+			print "@@@@@  (psad): pid file $pidfile does not exist for $pidname\n";
 		}
 	}
 	exit 0;
@@ -1244,7 +1256,7 @@ sub unique_pid() {
 		close PIDFILE;
 		chomp $pid;
 		if (kill 0, $pid) {  # psad is already running
-			die "\n@@@ $pidname (pid: $pid) is already running!  Exiting.\n\n";
+			die "\n@@@@@  (psad): $pidname (pid: $pid) is already running!  Exiting.\n\n";
 		}
 	}
 }			

@@ -21,11 +21,13 @@ use Getopt::Long;
 
 my $fwcheck = 0;
 my $execute_psad = 0;
+my $nopreserve = 0;
 
 usage_and_exit(1) unless (GetOptions (
-        'help'          => \$help,              # display help
-        'firewallcheck' => \$fwcheck,           # do not check firewall rules
-	'execpsad'	=> \$execute_psad
+	'nopreserve'		=> \$nopreserve,	# don't preserve existing configs
+        'firewall_check'	=> \$fwcheck,           # do not check firewall rules
+	'exec_psad'		=> \$execute_psad,
+        'help'          	=> \$help,              # display help
 ));
 usage_and_exit(0) if ($help);
 
@@ -76,7 +78,7 @@ unless (-e "/usr/local/bin") {
 	print "*** Creating /usr/local/bin/\n";
 	mkdir "/usr/local/bin",755;
 }
-if ( -e "/usr/local/bin/psad") {  # need to grab the old config
+if ( -e "/usr/local/bin/psad" && (! $nopreserve)) {  # need to grab the old config
 	print "*** Copying psad -> /usr/local/bin/psad\n";
 	print "***	Preserving old config within /usr/local/bin/psad\n";
 	preserve_config("psad", "/usr/local/bin/psad", \%Cmds);
@@ -86,7 +88,7 @@ if ( -e "/usr/local/bin/psad") {  # need to grab the old config
 	`$Cmds{'cp'} psad /usr/local/bin/psad`;
 	perms_ownership("/usr/local/bin/psad", 0500);
 }
-if (-e "/usr/local/bin/kmsgsd") { 
+if (-e "/usr/local/bin/kmsgsd" && (! $nopreserve)) { 
 	print "*** Copying kmsgsd -> /usr/local/bin/kmsgsd\n";
 	print "***	Preserving old config within /usr/local/bin/kmsgsd\n";
 	preserve_config("kmsgsd", "/usr/local/bin/kmsgsd", \%Cmds);
@@ -96,7 +98,7 @@ if (-e "/usr/local/bin/kmsgsd") {
 	`$Cmds{'cp'} kmsgsd /usr/local/bin/kmsgsd`;
 	perms_ownership("/usr/local/bin/kmsgsd", 0500);
 }
-if (-e "/usr/local/bin/diskmond") {
+if (-e "/usr/local/bin/diskmond" && (! $nopreserve)) {
 	print "*** Copying diskmond -> /usr/local/bin/diskmond\n";
 	print "*** 	Preserving old config within /usr/local/bin/diskmond\n";
         preserve_config("diskmond", "/usr/local/bin/diskmond", \%Cmds);
@@ -359,7 +361,7 @@ sub preserve_config() {
 			last GETCONFIG;
 		}
 	}
-	die "Could not get config info from $productionfile!!!\n" unless (defined @config);
+	die "Could not get config info from $productionfile!!!\n" if ($#config == -1);
 	close PROD;
 	open SRC, "< $srcfile" or die "Could not open source file: $!\n";
 	$start = 0;
@@ -396,7 +398,8 @@ sub usage_and_exit() {
 
 Usage: psad [-f] [-h]
 	
-	-execpsad		- execute psad after installing.
+	-nopreserve		- disable preservation of old configs.
+	-exec_psad		- execute psad after installing.
         -firewallcheck          - disable firewall rules verification.
         -h                      - prints this help message.
 

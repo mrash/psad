@@ -42,6 +42,7 @@
 #include <unistd.h>    /* read(), write(), and close() */
 #include <fcntl.h>     /* open() */
 #include <sys/stat.h>  /* umask */
+#include <sys/wait.h>
 #include <sys/types.h>
 #include <signal.h>
 
@@ -56,12 +57,14 @@
 #define MAX_PATH_LEN 100
 #define MAX_MSG_LEN 120
 #define MAX_GEN_LEN 80
+#define MAX_ARG_LEN 30
 #define MAX_NUM_LEN 6
 
 /* PROTOTYPES *****************************************************************/
 void check_unique_pid(const char *, const char *);
 void write_pid(const char *, pid_t);
 void daemonize_process(const char *);
+void send_alert_email(const char *, const char *, const char *);
 void find_char_var(char *, char *, char *);
 int check_import_config(time_t *config_mtime, char *config_file);
 

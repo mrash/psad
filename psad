@@ -70,7 +70,14 @@
 #   locations to these files with the --signatures and --auto_ips options.
 #   The signature matching and the auto_ips danger level assignments can
 #   be disabled by using the --no_signatures and --no_auto_ips options
-#   respectively.
+#   respectively.  In addition the psad adheres to the following
+#   defaults:
+#       -write errors to error log            = yes
+#       -daemon mode                          = yes
+#       -reverse dns lookups                  = yes
+#       -check firewall rules                 = yes
+#       -whois lookups of scanning ips        = yes
+#       -parse netstat output for local ports = yes
 #
 # Coding Style:  All configuration variables from psad.conf are stored in
 #   the $config hash ref by keys that are in capital letters.  This is
@@ -127,15 +134,15 @@ use strict;
 
 ### ========================== main =================================
 
+### set current the psad version number
+my $version = '1.0.0-pre2';
+
 ### establish some default paths
 my $config_dir        = '/etc/psad';
 my $config_file       = "${config_dir}/psad.conf";
 my $sigs_file         = "${config_dir}/psad_signatures";
 my $autoips_file      = "${config_dir}/psad_auto_ips";
 my $auto_blocked_file = "${config_dir}/psad_auto_blocked_ips";
-
-### set current the psad version number
-my $version = '1.0.0-pre2';
 
 ### get the hostname of the machine
 my $hostname = hostname;
@@ -176,13 +183,7 @@ my $icmp_ctr = 0;
 ### initialize and scope some default variables (command
 ### line args can override some default values)
 my $found_new_packets = 0;
-my $daemon            = 0;
 my $output            = 0;
-my $errors            = 0;
-my $dnslookups        = 0;
-my $whoislookups      = 0;
-my $netstat_lookup    = 0;
-my $fwcheck           = 0;
 my $syslog_server     = 0;
 my $kill              = 0;
 my $restart           = 0;
@@ -192,31 +193,54 @@ my $print_version     = 0;
 my $help              = 0;
 my $check_interval    = 0;
 
+### these flags are used to disable several features
+### in psad if specified from the command line
+my $no_signatures = 0;
+my $no_auto_ips   = 0;
+my $no_daemon     = 0;
+my $no_errors     = 0;
+my $no_rdns       = 0;
+my $no_whois      = 0;
+my $no_netstat    = 0;
+my $no_fwcheck    = 0;
+
+### old command line options
+my $errors;
+my $dnslookups;
+my $whoislookups;
+my $netstat_lookup;
+my $fwcheck;
+my $daemon;
+
 ### save a copy of the command line arguments
 my @args_cp = @ARGV;
 
-Getopt::Long::configure("no_ignore_case");  ### make Getopts case sensitive
+### make Getopts case sensitive
+Getopt::Long::configure("no_ignore_case");
 
 &usage_and_exit(1) unless (GetOptions (
-    'help'           => \$help,           # Display help.
-    'auto_ips=s'     => \$autoips_file,   # Enable automatic ip danger level
-                                          # assignment.
+    'signatures=s'   => \$sigs_file,      # Path to psad signatures file.
+    'auto_ips=s'     => \$autoips_file,   # Path to psad auto ips file for
+                                          # auto-setting ip danger level.
     'output'         => \$output,         # Write scanlog messages to STDOUT.
-    'Daemon'         => \$daemon,         # Do not run as a daemon.
-    'debug'          => \$debug,          # Run in debug mode.
-    'interval=s'     => \$check_interval, # Set $CHECK_INTERVAL from the
-                                          # command line.
-    'firewallcheck'  => \$fwcheck,        # Do not check firewall rules.
-    'config=s'       => \$config_file,    # Specify configuration file.
-    'reversedns'     => \$dnslookups,     # Do not issue dns lookups against
+    'no_whois'       => \$no_whois,       # Do not issue whois lookups against
+    'no_signatures'  => \$no_signatures,  # Disable signature processing.
+    'no_auto_ips'    => \$no_auto_ips,    # Disable auto danger level
+                                          # assignment.
+    'no_daemon'      => \$no_daemon,      # Do not run as a daemon.
+    'no_fw_check'    => \$no_fwcheck,     # Do not check firewall rules.
+    'no_rdns'        => \$no_rdns,        # Do not issue dns lookups against
                                           # Scanning ip address.
-    'signatures=s'   => \$sigs_file,      # Scan signatures.
-    'localport'      => \$netstat_lookup, # Do not check to see if the
+    'no_localport'   => \$no_netstat,     # Do not check to see if the
                                           # firewall is listening on localport
                                           # that has been scanned.
-    'errors'         => \$errors,         # Do not write malformed packet.
+    'no_errors'      => \$no_errors,      # Do not write malformed packet.
                                           # messages to error log.
-    'Logging_server' => \$syslog_server,  # We are running psad on a syslog
+    'debug'          => \$debug,          # Run in debug mode.
+    'interval=s'     => \$check_interval, # Set $check_interval from the
+                                          # command line.
+    'config=s'       => \$config_file,    # Specify configuration file.
+    'logging_server' => \$syslog_server,  # We are running psad on a syslog
                                           # logging server.
     'Kill'           => \$kill,           # Kill all running psad processes.
                                           # (psadwatchd, psad, kmsgsd,
@@ -228,7 +252,13 @@ Getopt::Long::configure("no_ignore_case");  ### make Getopts case sensitive
     'USR1'           => \$usr1,           # Send an existing psad process a
                                           # USR1 signal (useful for debugging).
     'Version'        => \$print_version,  # Print the psad version and exit.
-    'whois'          => \$whoislookups,   # Do not issue whois lookups against
+    'Daemon'         => \$daemon,         #    old command line arg
+    'firewallcheck'  => \$fwcheck,        #    old command line arg
+    'reversedns'     => \$dnslookups,     #    old command line arg
+    'localport'      => \$netstat_lookup, #    old command line arg
+    'errors'         => \$errors,         #    old command line arg
+    'whois'          => \$whoislookups,   #    old command line arg
+    'help'           => \$help,           # Display help.
 ));
 &usage_and_exit(0) if ($help);
 
@@ -237,6 +267,9 @@ if ($print_version) {
     print " .. psad version $version, by Michael B. Rash (mbr\@cipherdyne.com)\n";
     exit 0;
 }
+
+### check for any old command line arguements
+&check_old_cmdargs();
 
 ### Everthing after this point must be executed as root.
 $< == 0 && $> == 0 or
@@ -314,11 +347,11 @@ my %Local_ips;
 
 ### disable whois lookups if for some reason the whois client that is
 ### bundled with psad can't be found
-$whoislookups = 1 if ($cmds{'whois.psad'} !~ /psad/);
+$no_whois = 1 if ($cmds{'whois.psad'} !~ /psad/);
 
 ### if psad is running on a syslog server, don't check the firewall
 ### rules since they may not be local.
-unless ($fwcheck || $syslog_server) {
+unless ($no_fwcheck || $syslog_server) {
     &Psad::check_firewall_rules(
         $config{'FW_MSG_SEARCH'},
         $emails_aref,
@@ -328,8 +361,8 @@ unless ($fwcheck || $syslog_server) {
 }
 
 ### daemonize psad unless running with --Daemon or --debug
-unless ($daemon || $debug) {
-    my $pid = fork;
+unless ($no_daemon || $debug) {
+    my $pid = fork();
     exit if $pid;
     die " ... @@@  $0: Couldn't fork: $!" unless defined($pid);
     POSIX::setsid() or die " ... @@@  $0: Can't start a new session: $!";
@@ -412,8 +445,6 @@ for (;;) {
         my $found_potential_scan = &check_scan(
             \@new_packets,
             $sigs_file,
-            $netstat_lookup,
-            $errors
         );
         if ($found_potential_scan) {
 
@@ -421,7 +452,7 @@ for (;;) {
             &assign_danger_level();
 
             ### Log and send an email/syslog alert
-            &scan_logr($output, $dnslookups, $whoislookups);
+            &scan_logr();
 
             ### Don't manage the firewall rules if
             ### psad is running on a syslog server
@@ -453,7 +484,7 @@ exit 0;
 ### Keeps track of scanning ip's, increments packet counters,
 ### keep track of tcp flags for each scan (iptables only)
 sub check_scan() {
-    my ($process_lines_aref, $signatures, $netstat_lookup, $errors) = @_;
+    my ($process_lines_aref, $signatures) = @_;
     my @bad_packets;
     my $local_listening_ports_href;
     my $src;
@@ -474,7 +505,7 @@ sub check_scan() {
     unless ($use_ipchains || $use_iptables) {
         &check_fw($process_lines_aref->[0]);
     }
-    unless ($netstat_lookup) {
+    unless ($no_netstat) {
         $local_listening_ports_href = &get_listening_ports();
     }
     READPKT: for my $line (@$process_lines_aref) {
@@ -668,7 +699,7 @@ sub check_scan() {
                         }
                     }
                     my $listening_port = '';
-                    unless ($netstat_lookup || $proto eq 'ICMP') {
+                    unless ($no_netstat || $proto eq 'ICMP') {
                         my $lprot;
                         $lprot = 'tcp' if ($proto eq 'TCP');
                         $lprot = 'udp' if ($proto eq 'UDP');
@@ -718,7 +749,7 @@ sub check_scan() {
             }
         }
     }
-    &collect_errors(\@bad_packets) unless $errors;
+    &collect_errors(\@bad_packets) unless $no_errors;
     return $matched_packet;
 }
 
@@ -1144,7 +1175,6 @@ sub collect_errors() {
 }
 
 sub scan_logr() {
-    my ($output, $dnslookups, $whoislookups) = @_;
     my $range;
     my $tcp_newrange;
     my $udp_newrange;
@@ -1233,7 +1263,7 @@ sub scan_logr() {
                 pop @time; shift @time;    ### Get rid of the day and the year to make
                                            ### the time consistent with syslog
                 my $time = join ' ', @time;
-                unless ($dnslookups) {
+                unless ($no_rdns) {
                     my $src_tmp = $src;
                     $src_tmp =~ s/\.//g;
                     if ($src_tmp =~ /\D/) {
@@ -1247,7 +1277,7 @@ sub scan_logr() {
                         $dnsstring = "$src -> $rdns";
                     }
                 }
-                unless ($whoislookups) {
+                unless ($no_whois) {
                     $whois_info_aref = &get_whois_data($src, $whois_file);
                 }
                 if ($tcp || $udp) {
@@ -1342,9 +1372,9 @@ sub scan_logr() {
                 &Psad::logr("Danger level:                " .
                     "$scan{$src}{$dst}{'CURR_DL'} out of 5\n", \%print_hsh);
                 &Psad::logr("DNS info:                    " .
-                    "$dnsstring\n", \%print_hsh) unless $dnslookups;
+                    "$dnsstring\n", \%print_hsh) unless $no_rdns;
 
-#                my $syslog_print_sig_title = "";
+#                my $syslog_print_sig_title = '';
                 if ($use_iptables) {
                     SIGS: for my $proto ('TCP', 'UDP', 'ICMP') {
                         if (defined $scan{$src}{$dst}{$proto}{'CURR_SIG'}) {
@@ -1406,7 +1436,7 @@ sub scan_logr() {
                 syslog LOG_INFO, "psad: scan detected: $src -> $dst $syslog_print_range " .
                         "pkts=$syslog_num_pkts dangerlevel: $syslog_danger_level";
                 closelog();
-                unless ($whoislookups) {
+                unless ($no_whois) {
                     &Psad::logr("\n\n", \%print_hsh);
                     &Psad::logr("---- Whois Information: ----\n", \%print_hsh);
                     for my $w (@$whois_info_aref) {
@@ -1997,6 +2027,34 @@ sub archive_data() {
     ### zero out $FW_DATA
     open F, "> $fwdata";
     close F;
+    return;
+}
+
+sub check_old_cmdargs() {
+    if ($errors) {
+        print " ... @@@ The \"errors\" option has been changed to \"no_errors.\"\n";
+        &usage_and_exit(1);
+    }
+    if ($errors) {
+        print " ... @@@ The \"reversedns\" option has been changed to \"no_rdns.\"\n";
+        &usage_and_exit(1);
+    }
+    if ($errors) {
+        print " ... @@@ The \"whois\" option has been changed to \"no_whois.\"\n";
+        &usage_and_exit(1);
+    }
+    if ($errors) {
+        print " ... @@@ The \"localport\" option has been changed to \"no_netstat.\"\n";
+        &usage_and_exit(1);
+    }
+    if ($errors) {
+        print " ... @@@ The \"firewallcheck\" option has been changed to \"no_fwcheck.\"\n";
+        &usage_and_exit(1);
+    }
+    if ($errors) {
+        print " ... @@@ The \"Daemon\" option has been changed to \"Daemon.\"\n";
+        &usage_and_exit(1);
+    }
     return;
 }
 

@@ -811,7 +811,7 @@ sub enable_psad_at_boot() {
                 my @ilines = <I>;
                 close I;
                 for my $l (@ilines) {
-                    chmop $l;
+                    chomp $l;
                     if ($l =~ /^id\:(\d)\:initdefault/) {
                         $runlevel = $1;
                         last;

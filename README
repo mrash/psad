@@ -129,7 +129,7 @@ USAGE:
 
 	-a  -auto_ips <auto ips file>
 		  Occasionally certain ip addresses are repeat offenders and 
-		  should automatcially be given a higher danger level than
+		  should automatically be given a higher danger level than
 		  would normally be assigned.  Additionally, some ip addresses
 		  can always be ignored depending on your network configuration
 		  (the loopback interface 127.0.0.1 might be a good candidate
@@ -143,7 +143,7 @@ USAGE:
 		  By default for iptables firewalls psad will determine whether 
 		  or not your machine is listening on a port for which a tcp 
 		  signature has been matched.  Specifying the -l command line 
-		  argument diables this feature.
+		  argument disables this feature.
 
 
 Usage: psad [-d] [-o] [-e] [-f] [-c <config file>] [-s <signature file>] [-a <auto ips file>] [-h]

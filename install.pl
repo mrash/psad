@@ -150,7 +150,7 @@ exit 0;
 sub install() {
     ### make sure install.pl is being called from the source directory
     unless (-e 'psad' && -e 'Psad.pm/Psad.pm') {
-        die "\n@@@@@  install.pl can only be executed from the directory" .
+        die "\n ... @@@  install.pl can only be executed from the directory" .
                        " that contains the psad sources!  Exiting.\n\n";
     }
     my $t = localtime();
@@ -178,18 +178,18 @@ sub install() {
         ### create the named pipe
         `$Cmds{'mknod'} -m 600 $PSAD_FIFO p`;    ### die does not seem to work right here.
         unless (-e $PSAD_FIFO) {
-            &logr("@@@@@  Could not create the named pipe \"$PSAD_FIFO\"!" .
-                "\n@@@@@  Psad requires this file to exist!  Aborting install.\n");
+            &logr(" ... @@@  Could not create the named pipe \"$PSAD_FIFO\"!" .
+                "\n ... @@@  Psad requires this file to exist!  Aborting install.\n");
             die;
         }
     }
     &logr(" ... Modifying /etc/syslog.conf to write kern.info messages to $PSAD_FIFO\n");
     copy('/etc/syslog.conf', '/etc/syslog.conf.orig') unless (-e '/etc/syslog.conf.orig');
     &archive('/etc/syslog.conf');
-    open RS, '< /etc/syslog.conf' or die "@@@@@  Unable to open /etc/syslog.conf: $!\n";
+    open RS, '< /etc/syslog.conf' or die " ... @@@  Unable to open /etc/syslog.conf: $!\n";
     my @slines = <RS>;
     close RS;
-    open SYSLOG, '> /etc/syslog.conf' or die "@@@@@  Unable to open /etc/syslog.conf: $!\n";
+    open SYSLOG, '> /etc/syslog.conf' or die " ... @@@  Unable to open /etc/syslog.conf: $!\n";
     for my $l (@slines) {
         chomp $l;
         unless ($l =~ /psadfifo/) {
@@ -230,7 +230,7 @@ sub install() {
 
     chdir 'Psad.pm';
     unless (-e 'Makefile.PL' && -e 'Psad.pm') {
-        die "@@@@@  Your source distribution appears to be incomplete!  Psad.pm is missing.\n" .
+        die " ... @@@  Your source distribution appears to be incomplete!  Psad.pm is missing.\n" .
             "        Download the latest sources from http://www.cipherdyne.com\n";
     }
     system "$Cmds{'perl'} Makefile.PL";
@@ -246,7 +246,7 @@ sub install() {
 
     chdir 'Unix-Syslog-0.98';
     unless (-e 'Makefile.PL' && -e 'Syslog.pm') {
-        die "@@@@@  Your source kit appears to be incomplete!  Syslog.pm is missing.\n" .
+        die " ... @@@  Your source kit appears to be incomplete!  Syslog.pm is missing.\n" .
             "       Download the latest sources from http://www.cipherdyne.com\n";
     }
     system "$Cmds{'perl'} Makefile.PL";
@@ -408,7 +408,7 @@ sub install() {
             # remove signature checking from psad process if we are not running an iptables-enabled kernel
     #       system "$Cmds{'perl'} -p -i -e 's|\\-s\\s/etc/psad/psad_signatures||' ${INIT_DIR}/psad" if ($kernel !~ /^2.3/ && $kernel !~ /^2.4/);
         } else {
-            &logr("@@@@@  The init script directory, \"${INIT_DIR}\" does not exist!.\n");
+            &logr(" ... @@@  The init script directory, \"${INIT_DIR}\" does not exist!.\n");
             &logr("Edit the \$INIT_DIR variable in the config section to point to where the init scripts are.\n");
         }
     } else {  ### psad is being installed on a non-redhat distribution
@@ -420,7 +420,7 @@ sub install() {
             # remove signature checking from psad process if we are not running an iptables-enabled kernel
     #       system "$Cmds{'perl'} -p -i -e 's|\\-s\\s/etc/psad/psad_signatures||' ${INIT_DIR}/psad" if ($kernel !~ /^2.3/ && $kernel !~ /^2.4/);
         } else {
-            &logr("@@@@@  The init script directory, \"${INIT_DIR}\" does not exist!.  Edit the \$INIT_DIR variable in the config section.\n");
+            &logr(" ... @@@  The init script directory, \"${INIT_DIR}\" does not exist!.  Edit the \$INIT_DIR variable in the config section.\n");
         }
     }
     my $running;
@@ -482,10 +482,10 @@ sub uninstall() {
     }
     if (-e "${SBIN_DIR}/psad") {
         print wrap('', $SUB_TAB, " ... Removing psad daemons: ${SBIN_DIR}/(psad, psadwatchd, kmsgsd, diskmond)\n");
-        unlink "${SBIN_DIR}/psad"       or warn "@@@@@  Could not remove ${SBIN_DIR}/psad!!!\n";
-        unlink "${SBIN_DIR}/psadwatchd" or warn "@@@@@  Could not remove ${SBIN_DIR}/psadwatchd!!!\n";
-        unlink "${SBIN_DIR}/kmsgsd"     or warn "@@@@@  Could not remove ${SBIN_DIR}/kmsgsd!!!\n";
-        unlink "${SBIN_DIR}/diskmond"   or warn "@@@@@  Could not remove ${SBIN_DIR}/diskmond!!!\n";
+        unlink "${SBIN_DIR}/psad"       or warn " ... @@@  Could not remove ${SBIN_DIR}/psad!!!\n";
+        unlink "${SBIN_DIR}/psadwatchd" or warn " ... @@@  Could not remove ${SBIN_DIR}/psadwatchd!!!\n";
+        unlink "${SBIN_DIR}/kmsgsd"     or warn " ... @@@  Could not remove ${SBIN_DIR}/kmsgsd!!!\n";
+        unlink "${SBIN_DIR}/diskmond"   or warn " ... @@@  Could not remove ${SBIN_DIR}/diskmond!!!\n";
     }
     if (-e "${INIT_DIR}/psad") {
         print " ... Removing ${INIT_DIR}/psad\n";
@@ -517,7 +517,7 @@ sub uninstall() {
         move('/etc/syslog.conf.orig', '/etc/syslog.conf');
     } else {
         print wrap('', $SUB_TAB, " ... /etc/syslog.conf.orig does not exist.  Editing /etc/syslog.conf directly.\n");
-        open ESYS, '< /etc/syslog.conf' or die "@@@@@  Unable to open /etc/syslog.conf: $!\n";
+        open ESYS, '< /etc/syslog.conf' or die " ... @@@  Unable to open /etc/syslog.conf: $!\n";
         my @sys = <ESYS>;
         close ESYS;
         open CSYS, '> /etc/syslog.conf';
@@ -757,14 +757,14 @@ sub enable_psad_at_boot() {
                     }
                 }
                 unless ($RUNLEVEL) {
-                    print "@@@@@  Could not determine the runlevel.  Set the runlevel\nmanually in the config section of install.pl\n";
+                    print " ... @@@  Could not determine the runlevel.  Set the runlevel\nmanually in the config section of install.pl\n";
                     return;
                 }
                 unless (-e "/etc/rc.d/rc${RUNLEVEL}.d/S99psad") {  ### the link already exists, so don't re-create it
                     symlink '/etc/rc.d/init.d/psad', "/etc/rc.d/rc${RUNLEVEL}.d/S99psad";
                 }
             } else {
-                print "@@@@@  /etc/inittab does not exist!  Set the runlevel\nmanually in the config section of install.pl.\n";
+                print " ... @@@  /etc/inittab does not exist!  Set the runlevel\nmanually in the config section of install.pl.\n";
                 return;
             }
         }
@@ -789,12 +789,12 @@ sub check_commands() {
             }
             unless ($found) {
                 next CMD if ($cmd eq 'ipchains' || $cmd eq 'iptables');
-                die "\n@@@@@  ($caller): Could not find $cmd anywhere!!!  Please" .
+                die "\n ... @@@  ($caller): Could not find $cmd anywhere!!!  Please" .
                     " edit the config section to include the path to $cmd.\n";
             }
         }
         unless (-x $Cmds_href->{$cmd}) {
-            die "\n@@@@@  ($caller):  $cmd_name is located at $Cmds_href->{$cmd}" .
+            die "\n ... @@@  ($caller):  $cmd_name is located at $Cmds_href->{$cmd}" .
                                             " but is not executable by uid: $<\n";
         }
     }

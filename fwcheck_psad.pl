@@ -180,34 +180,10 @@ sub fw_check() {
 sub print_fw_help() {
     my $chain = shift;
     print FWCHECK
-"[-] The $chain chain in the iptables ruleset on $config{'HOSTNAME'} does not\n",
-"    appear to include default rules that will log and drop unwanted packets.\n",
-"    You need to include two default rules; one that logs packets that have\n",
-"    not been accepted by previous rules ";
-    if ($fw_search_all) {
-        print FWCHECK "(this rule can have a logging\n",
-"    prefix such as \"DROP\" or \"REJECT\"), and a final rule\n";
-    } else {
-        print FWCHECK "(this rule should have a logging\n",
-"    prefix of one of the search strings mentioned above), and a final rule\n";
-    }
-    print FWCHECK
-"    that drops any unwanted packets.\n\n",
-"    FOR EXAMPLE:  Assuming you have already setup iptables rules to accept\n",
-"    traffic you want to allow, you can probably execute the following two\n",
-"    commands to have iptables log and drop unwanted packets in the $chain\n",
-"    chain by default.\n\n";
-    if ($fw_search_all) {
-        print FWCHECK
-"              iptables -A $chain -j LOG\n";
-    } else {
-        print FWCHECK
-"              iptables -A $chain -j LOG --log-prefix \"$fw_search[0] \"\n";
-    }
-        print FWCHECK
-"              iptables -A $chain -j DROP\n\n",
-"[-] Psad will not detect in the iptables $chain chain scans without an\n",
-"    iptables ruleset that includes rules similar to the two rules above.\n\n";
+"[-] You may just need to add a default logging rule to the $chain chain on\n",
+"    $config{'HOSTNAME'}.  For more information, see the file \"FW_HELP\" in\n",
+"    the psad sources directory or visit:\n\n",
+"    http://www.cipherdyne.org/psad/fw_help.html\n\n";
     return;
 }
 
@@ -276,13 +252,13 @@ sub ipt_chk_chain() {
             my $no_log_protos = '';
             for my $proto qw(tcp udp icmp) {
                 if (defined $ipt_log->{$proto}) {
-                    $log_protos .= "$proto ";
+                    $log_protos .= "$proto/";
                 } else {
-                    $no_log_protos .= "$proto ";
+                    $no_log_protos .= "$proto/";
                 }
             }
-            $log_protos =~ s/\s*$//;
-            $no_log_protos =~ s/\s*$//;
+            $log_protos =~ s|/$||;
+            $no_log_protos =~ s|/$||;
 
             print FWCHECK
 "[-] Your firewall config on $config{'HOSTNAME'} includes logging rules for\n",

@@ -81,14 +81,14 @@ my $iptablesCmd  = '/sbin/iptables';
 my $psadCmd      = "${USRSBIN_DIR}/psad";
 #============ end config ============
 
+### get the hostname of the system
+my $HOSTNAME = hostname;
+
 if (-e $INSTALL_LOG) {
     open INSTALL, "> $INSTALL_LOG" or
         die " ... @@@ Could not open $INSTALL_LOG: $!";
     close INSTALL;
 }
-
-### get the hostname of the system
-my $HOSTNAME = hostname;
 
 ### scope these vars
 my $PERL_INSTALL_DIR;  ### This is used to find pre-0.9.2 installations of psad
@@ -113,7 +113,7 @@ my $uninstall    = 0;
 my $verbose      = 0;
 my $help         = 0;
 
-&usage(1) unless (GetOptions (
+&usage(1) unless (GetOptions(
     'no_preserve' => \$nopreserve,    # don't preserve existing configs
     'uninstall'   => \$uninstall,
     'verbose'     => \$verbose,
@@ -136,7 +136,7 @@ my %Cmds = (
 my $distro = &get_distro();
 
 ### add chkconfig only if we are runing on a redhat distro
-if ($distro =~ /redhat/i) {
+if ($distro =~ /red.*hat/i) {
     $Cmds{'chkconfig'} = $chkconfigCmd;
 }
 
@@ -146,14 +146,15 @@ unless (-d $PSAD_DIR) {
     mkdir $PSAD_DIR, 0500;
 }
 
-&check_commands(\%Cmds);
+&check_commands();
 $Cmds{'psad'} = $psadCmd;
 
 ### check to make sure we are running as root
 $< == 0 && $> == 0 or die "You need to be root (or equivalent UID 0" .
     " account) to install/uninstall psad!\n";
 
-&check_old_psad_installation();  ### check for a pre-0.9.2 installation of psad.
+### check for a pre-0.9.2 installation of psad.
+&check_old_psad_installation();
 
 if ($uninstall) {
     &uninstall();
@@ -205,31 +206,31 @@ sub install() {
             die;
         }
     }
-    &logr(' ... Modifying /etc/syslog.conf to write kern.info ' .
-        "messages to $PSAD_FIFO\n");
-    unless (-e '/etc/syslog.conf.orig') {
-        copy '/etc/syslog.conf', '/etc/syslog.conf.orig';
-    }
-    &archive('/etc/syslog.conf');
-    open RS, '< /etc/syslog.conf' or
-        die " ... @@@  Unable to open /etc/syslog.conf: $!\n";
-    my @slines = <RS>;
-    close RS;
-    open SYSLOG, '> /etc/syslog.conf' or
-        die " ... @@@  Unable to open /etc/syslog.conf: $!\n";
-    for my $line (@slines) {
-        unless ($line =~ /psadfifo/) {
-            print SYSLOG $line;
-        }
-    }
-    print SYSLOG '### Send kern.info messages to psadfifo for ' .
-        "analysis by kmsgsd\n";
-    ### reinstate kernel logging to our named pipe
-    print SYSLOG "kern.info		|$PSAD_FIFO\n";
-    close SYSLOG;
-    &logr(" ... Restarting syslog.\n");
-    system "$Cmds{'killall'} -HUP syslogd";
 
+    if (-e '/etc/syslog.conf') {
+        &append_fifo_syslog();
+    }
+    if (-e '/etc/syslog-ng/syslog-ng.conf') {
+        &append_fifo_syslog_ng();
+    }
+#    &append_metalog();   ### metalog support some day
+
+    ### restart any running syslog daemon (killall should really work here)
+#    &hup_syslog();
+
+    my $restarted_syslog = 0;
+    if (((system "$Cmds{'killall'} -HUP syslogd 2> /dev/null")>>8) == 0) {
+        &logr(" ... Restarted syslog.\n");
+        $restarted_syslog = 1;
+    }
+    if (((system "$Cmds{'killall'} -HUP syslog-ng 2> /dev/null")>>8) == 0) {
+        &logr(" ... Restarted syslog.\n");
+        $restarted_syslog = 1;
+    }
+
+    unless ($restarted_syslog) {
+        &logr(" ... @@@ Could not restart any syslog daemons.\n");
+    }
     unless (-d $PSAD_DIR) {
         &logr(" ... Creating $PSAD_DIR\n");
         mkdir $PSAD_DIR, 0500;
@@ -453,7 +454,8 @@ sub install() {
     if ($custom_fw_search_str) {
         &logr(" ... Setting \$FW_MSG_SEARCH to \"$custom_fw_search_str\" " .
             "in ${PSAD_CONFDIR}/psad.conf\n");
-        &put_custom_fw_search_str("${PSAD_CONFDIR}/psad.conf", $custom_fw_search_str);
+        &put_custom_fw_search_str("${PSAD_CONFDIR}/psad.conf",
+            $custom_fw_search_str);
     }
     ### make sure the PSAD_DIR and PSAD_FIFO variables are correctly defined
     ### in the config file.
@@ -613,6 +615,73 @@ sub uninstall() {
     print "\n";
     print " ... Psad has been uninstalled!\n";
 
+    return;
+}
+
+sub append_fifo_syslog_ng() {
+    &logr(' ... Modifying /etc/syslog-ng/syslog-ng.conf to write kern.info ' .
+        "messages to $PSAD_FIFO\n");
+    unless (-e '/etc/syslog-ng/syslog-ng.conf.orig') {
+        copy '/etc/syslog-ng/syslog-ng.conf',
+            '/etc/syslog-ng/syslog-ng.conf.orig';
+    }
+    &archive('/etc/syslog-ng/syslog-ng.conf');
+    open RS, '< /etc/syslog-ng/syslog-ng.conf' or
+        die " ... @@@  Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
+    my @slines = <RS>;
+    close RS;
+
+    my $found_fifo = 0;
+    for my $line (@slines) {
+        $found_fifo = 1 if ($line =~ /psadfifo/);
+    }
+
+    unless ($found_fifo) {
+        open SYSLOGNG, '>> /etc/syslog-ng/syslog-ng.conf' or
+            die " ... @@@ Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
+        print SYSLOGNG "\n";
+        print SYSLOGNG "destination psadpipe { pipe(\"/var/run/psadfifo\"); };\n";
+        print SYSLOGNG "filter f_kerninfo { facility(kern) and level(info); };\n";
+        print SYSLOGNG "log { source(src); filter(f_kerninfo); destination(psadpipe); };\n";
+        close SYSLOGNG;
+    }
+    return;
+}
+
+sub append_fifo_syslog() {
+    &logr(' ... Modifying /etc/syslog.conf to write kern.info ' .
+        "messages to $PSAD_FIFO\n");
+    unless (-e '/etc/syslog.conf.orig') {
+        copy '/etc/syslog.conf', '/etc/syslog.conf.orig';
+    }
+    &archive('/etc/syslog.conf');
+    open RS, '< /etc/syslog.conf' or
+        die " ... @@@  Unable to open /etc/syslog.conf: $!\n";
+    my @slines = <RS>;
+    close RS;
+    open SYSLOG, '> /etc/syslog.conf' or
+        die " ... @@@  Unable to open /etc/syslog.conf: $!\n";
+    for my $line (@slines) {
+        unless ($line =~ /psadfifo/) {
+            print SYSLOG $line;
+        }
+    }
+    print SYSLOG '### Send kern.info messages to psadfifo for ' .
+        "analysis by kmsgsd\n";
+    ### reinstate kernel logging to our named pipe
+    print SYSLOG "kern.info		|$PSAD_FIFO\n";
+    close SYSLOG;
+    return;
+}
+
+sub hup_syslog() {
+    my @ps_out = `$Cmds{'ps'} -auxww`;
+    for my $line (@ps_out) {
+        ### root  416  0.0  0.3  1476  624 ?  S  10:11   0:00 syslogd -m 0
+        if ($line =~ /^\S+\s+(\d+)(?:\s+\S+){8}\s+syslog/) {
+            kill 1, $1;  ### "kill -l" => signal 1 = HUP
+        }
+    }
     return;
 }
 
@@ -957,7 +1026,7 @@ sub archive() {
         }
     }
     if (-e $targetbase) {
-        my $newfile = $targetbase . "2";
+        my $newfile = $targetbase . '2';
         move $targetbase, $newfile;
     }
     &logr(" ... Archiving $file -> $targetbase\n");
@@ -1022,7 +1091,6 @@ sub enable_psad_at_boot() {
 
 ### check paths to commands and attempt to correct if any are wrong.
 sub check_commands() {
-    my $Cmds_href = shift;
     my $caller = $0;
     my @path = qw(
         /bin
@@ -1032,12 +1100,12 @@ sub check_commands() {
         /usr/local/bin
         /usr/local/sbin
     );
-    CMD: for my $cmd (keys %$Cmds_href) {
-        unless (-x $Cmds_href->{$cmd}) {
+    CMD: for my $cmd (keys %Cmds) {
+        unless (-x $Cmds{$cmd}) {
             my $found = 0;
             PATH: for my $dir (@path) {
                 if (-x "${dir}/${cmd}") {
-                    $Cmds_href->{$cmd} = "${dir}/${cmd}";
+                    $Cmds{$cmd} = "${dir}/${cmd}";
                     $found = 1;
                     last PATH;
                 }
@@ -1049,9 +1117,9 @@ sub check_commands() {
                     "$cmd.\n";
             }
         }
-        unless (-x $Cmds_href->{$cmd}) {
+        unless (-x $Cmds{$cmd}) {
             die "\n ... @@@  ($caller):  $cmd is located at " .
-                "$Cmds_href->{$cmd} but is not executable by uid: $<\n";
+                "$Cmds{$cmd} but is not executable by uid: $<\n";
         }
     }
     return;

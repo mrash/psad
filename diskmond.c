@@ -58,8 +58,8 @@ int main(int argc, char *argv[]) {
     char config_file[MAX_PATH_LEN+1];
     char diskmond_pid_file[MAX_PATH_LEN+1];
     unsigned short int max_disk_percentage = 95; /* default to 95% utilization */
-    unsigned int diskmond_check_interval = 5;  /* default to 5 seconds */
-    unsigned int diskmond_max_retries = 10;    /* default to 10 tries */
+    unsigned int diskmond_check_interval   = 5;  /* default to 5 seconds */
+    unsigned int diskmond_max_retries      = 10; /* default to 10 tries */
     time_t config_mtime;
     struct stat statbuf;
 
@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
         strcpy(config_file, argv[1]);
     } else {
         printf(" ... You may only specify the path to a single config file:  ");
-        printf("Usage:  psadwatchd <configfile>\n");
+        printf("Usage:  diskmond <configfile>\n");
         exit(EXIT_FAILURE);
     }
 
@@ -99,18 +99,18 @@ int main(int argc, char *argv[]) {
         config_file,
         mailCmd,
         mail_addrs,
-        disdmond_pid_file,
+        diskmond_pid_file,
         &max_disk_percentage,
         &diskmond_check_interval,
         &diskmond_max_retries
     );
 
-    /* first make sure there isn't another psadwatchd already running */
-    check_unique_pid(psadwatchd_pid_file, "psadwatchd");
+    /* first make sure there isn't another diskmond already running */
+    check_unique_pid(diskmond_pid_file, "diskmond");
 
 #ifndef DEBUG
     /* become a daemon */
-    daemonize_process(psadwatchd_pid_file);
+    daemonize_process(diskmond_pid_file);
 #endif
 
     /* start doing the real work now that the daemon is running and
@@ -122,7 +122,7 @@ int main(int argc, char *argv[]) {
 
     /* MAIN LOOP: */
     for (;;) {
-        sleep(psadwatchd_check_interval);
+        sleep(diskmond_check_interval);
 
         /* check to see if we need to re-import the config file */
         if (check_import_config(&config_mtime, config_file)) {
@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    /* this statements don't get executed, but for completeness... */
+    /* this statement doesn't get executed, but for completeness... */
     exit(EXIT_SUCCESS);
 }
 /******************** end main ********************/
@@ -159,6 +159,7 @@ static void parse_config(
     FILE *config_ptr;         /* FILE pointer to the config file */
     int linectr = 0;
     char config_buf[MAX_LINE_BUF];
+    char char_max_disk_percentage[MAX_NUM_LEN+1];
     char char_diskmond_check_interval[MAX_NUM_LEN+1];
     char char_diskmond_max_retries[MAX_NUM_LEN+1];
     char *index;

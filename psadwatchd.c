@@ -182,7 +182,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    /* this statements don't get executed, but for completeness... */
+    /* this statement doesn't get executed, but for completeness... */
     exit(EXIT_SUCCESS);
 }
 /******************** end main ********************/

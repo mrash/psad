@@ -1522,10 +1522,10 @@ sub assign_danger_level() {
             ### calculate the range over _both_ tcp and udp
             for my $proto qw(TCP UDP) {
                 next unless defined $scan{$src}{$dst}{$proto}{'ABS_SP'};
-                if ($s_port < $scan{$src}{$dst}{$proto}{'ABS_SP'}) {
+                if ($s_port > $scan{$src}{$dst}{$proto}{'ABS_SP'}) {
                     $s_port = $scan{$src}{$dst}{$proto}{'ABS_SP'};
                 }
-                if ($e_port > $scan{$src}{$dst}{$proto}{'ABS_EP'}) {
+                if ($e_port < $scan{$src}{$dst}{$proto}{'ABS_EP'}) {
                     $e_port = $scan{$src}{$dst}{$proto}{'ABS_EP'};
                 }
             }

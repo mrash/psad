@@ -262,6 +262,7 @@ my $no_fwcheck    = 0;
 my $oldarg_autoips;
 my $oldarg_errs;
 my $oldarg_nerrs;
+my $oldarg_nerrs2;
 my $oldarg_rdns;
 my $oldarg_nrdns;
 my $oldarg_whois;
@@ -333,7 +334,7 @@ Getopt::Long::Configure('no_ignore_case');
     'no-localport'  => \$no_netstat,      # Do not check to see if the
                                           # firewall is listening on localport
                                           # that has been scanned.
-    'no-errors'     => \$no_errors,       # Do not write malformed packet.
+    'no-ipt-errors' => \$no_ipt_errors,   # Do not write malformed packet.
                                           # messages to error log.
     'Version'       => \$ver,             # Print the psad version and exit.
     'help'          => \$help,            # Display help.
@@ -346,6 +347,7 @@ Getopt::Long::Configure('no_ignore_case');
     'localport'      => \$oldarg_netstat, # old command line arg
     'errors'         => \$oldarg_errs,    # old command line arg
     'no_errors'      => \$oldarg_nerrs,   # old command line arg
+    'no-errors'      => \$oldarg_nerrs2,  # old command line arg
     'whois'          => \$oldarg_whois,   # old command line arg
     'no_whois'       => \$oldarg_nwhois,  # old command line arg
     'no_rdns'        => \$oldarg_nrdns,   # old command line arg
@@ -2575,8 +2577,9 @@ sub archive_data() {
 sub check_old_cmdargs() {
     &print_old_arg('auto_ips', 'auto-ips') if $oldarg_autoips;
     &print_old_arg('Logging_server', 'log-server') if $oldarg_logserv;
-    &print_old_arg('errors', 'no-errors') if $oldarg_errs;
-    &print_old_arg('no_errors', 'no-errors') if $oldarg_nerrs;
+    &print_old_arg('errors', 'no-ipt-errors') if $oldarg_errs;
+    &print_old_arg('no_errors', 'no-ipt-errors') if $oldarg_nerrs;
+    &print_old_arg('no-errors', 'no-ipt-errors') if $oldarg_nerrs2;
     &print_old_arg('reversedns', 'no-rdns') if $oldarg_rdns;
     &print_old_arg('no_rdns', 'no-rdns') if $oldarg_nrdns;
     &print_old_arg('whois', 'no-whois') if $oldarg_whois;
@@ -2918,7 +2921,7 @@ Usage: psad [-a <auto ips file>] [-c <config file>] [-l] [-i <interval>]
        [-h] [-B] [-F] [-S] [-K] [-R] [-U] [-V] [-f] [-o] [-p] [-D] [-d]
        [--signatures <sig file>] [--snort-sids] [--snort-type <type>]
        [--no-fwcheck] [--no-daemon] [--no-rdns] [--no-whois]
-       [--no-netstat] [--no-errors]
+       [--no-netstat] [--no-ipt-errors]
 
 Options:
     --signatures <sig file>       - Manually specify the path to the
@@ -2964,7 +2967,7 @@ Options:
     --no-signatures               - Disable signature processing.
     --no-auto-ips                 - Disable auto danger level assignment.
     --no-daemon                   - Do not run as a daemon.
-    --no-errors                   - Do not write errors to the error
+    --no-ipt-errors               - Do not write errors to the error
                                     log.
     --no-whois                    - Disable whois lookups.
     --no-fwcheck                  - Disable firewall rules verification.

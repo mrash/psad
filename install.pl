@@ -170,7 +170,7 @@ exit 0;
 
 sub install() {
     ### make sure install.pl is being called from the source directory
-    unless (-e 'psad' && -e 'Psad-1.1/Psad.pm') {
+    unless (-e 'psad' && -e 'Psad/Psad.pm') {
         die " ** install.pl can only be executed from the directory\n",
             "    that contains the psad sources!  Exiting.";
     }
@@ -249,14 +249,14 @@ sub install() {
         &logr(" .. Creating $USRSBIN_DIR\n");
         mkdir $USRSBIN_DIR,0755;
     }
-    if (-d 'whois-4.6.2') {
-        &logr(" .. Compiling Marco d'Itri's whois client\n");
-        system "$Cmds{'make'} -C whois-4.6.2";
-        if (-e 'whois-4.6.2/whois') {
+    if (-d 'whois') {
+        &logr(" .. Compiling Marco d'Itri's whois-4.6.3 client\n");
+        system "$Cmds{'make'} -C whois";
+        if (-e 'whois/whois') {
             &logr(" .. Copying whois binary to $WHOIS_PSAD\n");
-            copy "whois-4.6.2/whois", $WHOIS_PSAD;
+            copy "whois/whois", $WHOIS_PSAD;
         } else {
-            die " ** Could not compile whois-4.6.2";
+            die " ** Could not compile whois";
         }
     }
     &perms_ownership($WHOIS_PSAD, 0755);
@@ -264,7 +264,7 @@ sub install() {
     ### installing Psad.pm
     &logr(" .. Installing the Psad.pm perl module\n");
 
-    chdir 'Psad-1.1';
+    chdir 'Psad';
     unless (-e 'Makefile.PL' && -e 'Psad.pm') {
         die " ** Your source distribution appears to be incomplete!  " .
             "Psad.pm is missing.\n    Download the latest sources from " .
@@ -279,9 +279,9 @@ sub install() {
     print "\n\n";
 
     ### installing Unix::Syslog
-    &logr(" .. Installing the Unix::Syslog perl module\n");
-    chdir 'Unix-Syslog-0.100' or die " ** Could not chdir to ",
-        "Unix-Syslog-0.100: $!";
+    &logr(" .. Installing the Unix::Syslog (0.100) perl module\n");
+    chdir 'Unix-Syslog' or die " ** Could not chdir to ",
+        "Unix-Syslog: $!";
     unless (-e 'Makefile.PL' && -e 'Syslog.pm') {
         die " ** Your source directory appears to be incomplete!  Syslog.pm " .
             "is missing.\n    Download the latest sources from " .
@@ -295,9 +295,9 @@ sub install() {
     print "\n\n";
 
     ### installing Net::IPv4Addr
-    &logr(" .. Installing the Net::IPv4Addr perl module\n");
-    chdir 'Net-IPv4Addr-0.10' or die " ** Could not chdir to ",
-        "Net-IPv4Addr-0.10: $!";
+    &logr(" .. Installing the Net::IPv4Addr (0.10) perl module\n");
+    chdir 'Net-IPv4Addr' or die " ** Could not chdir to ",
+        "Net-IPv4Addr: $!";
     unless (-e 'Makefile.PL') {
         die " ** Your source directory appears to be incomplete!  " .
             "Net::IPv4Addr is missing.\n    Download the latest sources " .
@@ -311,9 +311,9 @@ sub install() {
     print "\n\n";
 
     ### installing IPTables::Parse
-    &logr(" .. Installing the IPTables::Parse perl module\n");
-    chdir 'IPTables-0.10/Parse' or die " ** Could not chdir to ",
-        "IPTables-0.10/Parse: $!";
+    &logr(" .. Installing the IPTables::Parse (0.10) perl module\n");
+    chdir 'IPTables/Parse' or die " ** Could not chdir to ",
+        "IPTables/Parse: $!";
     unless (-e 'Makefile.PL') {
         die " ** Your source directory appears to be incomplete!  " .
             "IPTables::Parse is missing.\n    Download the latest sources " .
@@ -326,19 +326,19 @@ sub install() {
     chdir '../..';
     print "\n\n";
 
-    &logr(" .. Installing snort-1.8.7 signatures in $SNORT_DIR\n");
+    &logr(" .. Installing snort-2.0 signatures in $SNORT_DIR\n");
     unless (-d $SNORT_DIR) {
         mkdir $SNORT_DIR, 0500 or die " ** Could not create $SNORT_DIR: $!";
     }
-    opendir D, 'snort-1.8.7_rules' or die " ** Could not open " .
-        'the snort-1.8.7_rules directory';
+    opendir D, 'snort_rules' or die " ** Could not open " .
+        'the snort_rules directory';
     my @rfiles = readdir D;
     closedir D;
     shift @rfiles; shift @rfiles;
     for my $rfile (@rfiles) {
         next unless $rfile =~ /\.rules$/;
-        &logr(" .. Installing snort-1.8.7_rules/${rfile}\n");
-        copy "snort-1.8.7_rules/${rfile}", "${SNORT_DIR}/${rfile}";
+        &logr(" .. Installing snort_rules/${rfile}\n");
+        copy "snort_rules/${rfile}", "${SNORT_DIR}/${rfile}";
     }
     print "\n\n";
 
@@ -557,9 +557,6 @@ sub install() {
         &logr(" .. To execute psad, run \"${INIT_DIR}/psad start\"\n");
     }
     &logr("\n .. Psad has been installed!\n");
-
-    ### remove old whois.psad location
-    unlink '/usr/bin/whois.psad' if (-e '/usr/bin/whois.psad');
     return;
 }
 

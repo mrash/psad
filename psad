@@ -68,6 +68,7 @@ my $iptablesCmd = "/usr/local/bin/iptables";
 my $wcCmd = "/usr/bin/wc";
 my $tailCmd = "/usr/bin/tail";
 my $mailCmd = "/bin/mail";
+my $touchCmd = "/bin/touch";
 #================== end config ====================
 #===================== main =======================
 
@@ -100,6 +101,9 @@ unless ($errors) {
 	print ERR "============= psad: pid $$ ===============\n";
 	close ERR;
 }
+
+`$touchCmd $FW_DATA` unless (-e $FW_DATA);
+
 for (;;) {
 	$fwdata_start_lines = (split /\s+/, `$wcCmd -l $FW_DATA`)[1];
 #	print "Current number of lines: $fwdata_start_lines\n";   # this will be useful for the TODO

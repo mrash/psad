@@ -64,8 +64,6 @@ die " ** Specify the path to the psad.conf file with " .
 ### import config
 &import_config();
 
-#my $Archive_files_aref = $config{'ARCHIVE_FILES'};
-
 &Psad::unique_pid($config{'DISKMOND_PID_FILE'});
 
 ### install WARN and DIE handlers
@@ -173,6 +171,7 @@ sub rm_scanlog() {
 }
 
 sub import_config() {
+
     ### read in the configuration file
     &Psad::buildconf(\%config, \%cmds, $CONFIG_FILE);
 

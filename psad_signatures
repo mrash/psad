@@ -45,8 +45,6 @@ tcp any -> 53 msg:"DNS tcp probe"; flags:SF;
 # tcp any -> any flags: A; ack: 0; msg:"NMAP TCP ping!";
 tcp any -> any msg:"Possible NMAP Fingerprint attempt"; flags: SFPU;
 # tcp any -> any msg:"Possible Queso Fingerprint attempt"; flags: S12;
-tcp any -> 1080 msg:"WinGate 1080 Attempt"; flags: S;
-tcp any -> 8080 msg:"WinGate 8080 Attempt"; flags: S;
 tcp any -> any msg:"IDS005 - SCAN-Possible NMAP Fingerprint attempt"; flags:SFPU; 
 # tcp any -> any msg:"IDS236 - SCAN-IP Eye SYN Scan"; flags: S; seq: 1958810375; 
 # tcp any -> any msg:"IDS004 - SCAN-NULL Scan"; flags:0; seq:0; ack:0; 

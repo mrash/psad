@@ -148,7 +148,7 @@ sub fw_check() {
         );
         if ($fw_analyze) {
             print scalar localtime(), " ** Errors found in firewall config.\n";
-            print scalar localtime(), " ** Results in " .
+            print scalar localtime(), " ** Results in ",
                 "$config{'FW_CHECK_FILE'}\n";
             print scalar localtime(), "    emailed to ",
                 "$config{'EMAIL_ADDRESSES'}\n";
@@ -262,13 +262,13 @@ sub ipt_chk_chain() {
             return 1;
         } elsif (defined $ipt_log->{'all'}) {
             print FWCHECK
-" ** Indeterminate firewall logging config for chain $chain on $config{'HOSTNAME'}. ",
-"    There are logging rules however, so at least psad will be able to analyze ",
+" ** Indeterminate firewall logging config for chain $chain on $config{'HOSTNAME'}.\n",
+"    There are logging rules however, so at least psad will be able to analyze\n",
 "    packets logged through these rules.\n\n";
             return 1;
         } else {
             print FWCHECK
-" ** Your firewall config no $config{'HOSTNAME'} does not include any logging ",
+" ** Your firewall config no $config{'HOSTNAME'} does not include any logging\n",
 "    rules at all in the $chain chain.\n\n";
             return 0;
         }

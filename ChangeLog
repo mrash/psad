@@ -1,6 +1,9 @@
 psad-1.3 ():
     - Added support for the iptables output chain.
+    - Added chain tracking for all signatures.
     - Removed support for ipchains.
+    - Bugfix for missing NULL char in kmsgsd.c.
+    - Added --no-kmsgsd option to aid in psad --debug mode.
 
 psad-1.2.4 (10/15/2003):
     - Added danger level to subject line in email alerts.

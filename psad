@@ -4,7 +4,7 @@
 # - uses ipchains/iptables logs.  Uses input from /var/log/psad/fwdata 
 # generated kmsgsd
 #
-# version 0.9.2
+# version 0.9.3
 # Copyright (C) 1999-2001 Michael B. Rash (mbr@cipherdyne.com)
 #
 # Credits:  (see the CREDITS file)
@@ -44,10 +44,6 @@
 #	  odd tcp flag combinations.
 #	- Investigate the possibility of passive OS fingerprinting by looking
 #	  at TTL and other fields in the headers (good idea Jay).
-#	- Sometimes packets (particularly ACK and RST packets) seem to not
-#	  recognized by ipt_state/ip_conntrack, so such packets get denied and
-#	  hence are picked up by psad.  Solution: parse /proc/net/ip_conntrack
-#	  for existing sessions and don't alert on these packets.
 #	- Enhance the check_firewall_rules() routine to correct any problems
 #	  with the firewall ruleset.  This is part of the integration of psad 
 #	  with Bastille Linux.
@@ -133,7 +129,7 @@ my $psadCmd = "/usr/local/bin/psad";
 #===================== main =======================
 
 ### a few more configuration variables that should not really be in the config section
-$VERSION = "0.9.2";
+$VERSION = "0.9.3";
 
 ### pid files
 my @PIDFILES = qw(/var/run/psadwatchd.pid

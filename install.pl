@@ -91,7 +91,7 @@ $< == 0 && $> == 0 or die "You need to be root (or equivalent UID 0 account) to 
 
 if ($uninstall) {
 	my $t = localtime();
-	my $time = " ----     Uninstalling psad from $HOSTNAME: $t\n";
+	my $time = " ----  Uninstalling psad from $HOSTNAME: $t\n";
 	&logr("\n", \@LOGR_FILES);
 	&logr($time, \@LOGR_FILES);
 	&logr("\n", \@LOGR_FILES);
@@ -174,7 +174,7 @@ unless (-e "psad" && -e "Psad.pm/Psad.pm") {
 }
 
 my $t = localtime();
-my $time = " ----     Installing psad on $HOSTNAME: $t    ----\n";
+my $time = " ----  Installing psad on $HOSTNAME: $t  ----\n";
 &logr("\n", \@LOGR_FILES);
 &logr($time, \@LOGR_FILES);
 &logr("\n", \@LOGR_FILES);
@@ -195,6 +195,9 @@ unless (-e "/var/log/psadfifo") {
 	&logr(" ----  Creating named pipe /var/log/psadfifo  ----\n", \@LOGR_FILES);
 	# create the named pipe
 	`$Cmds{'mknod'} -m 600 /var/log/psadfifo p`;	#  die does not seem to work right here.
+	unless (-e "/var/log/psadfifo") {
+		die "@@@@@  Could not create the named pipe \"/var/log/psadfifo\"!\n@@@@@  Psad require this file to exist!  Aborting install.\n";
+	}
 }
 unless (`$Cmds{'grep'} psadfifo /etc/syslog.conf`) {
 	&logr(" ----  Modifying /etc/syslog.conf  ----\n", \@LOGR_FILES);

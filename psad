@@ -1860,7 +1860,7 @@ sub scan_logr_signatures() {
             my $msg = $snort_msgs{$sid}{'msg'};
             my $classtype = $snort_msgs{$sid}{'classtype'};
             my $pkts = $scan{$src}{$dst}{'PROTO'}{$proto}{'SNORT_SID'}{$sid};
-            &Psad::logr("\"$msg\" classtype=$classtype packets=$pkts\n",
+            &Psad::logr("\"$msg\" sid=$sid classtype=$classtype packets=$pkts\n",
                 $print_hsh_href);
         }
         for my $sig_id (keys %{$scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_SIG'}}) {

@@ -193,7 +193,7 @@ sub give_up() {
 
 sub import_config() {
     ### read in the configuration file
-    &Psad::buildconf(\%config, \%cmds, $CONFIG_FILE);
+    &Psad::buildconf(\%config, \%cmds, {}, $CONFIG_FILE);
 
     ### make sure the configuration is complete
     &required_vars();

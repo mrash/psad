@@ -39,6 +39,7 @@
 
 /* defines */
 #define PSADWATCHD_CONF "/etc/psad/psadwatchd.conf"
+#define DEBUG
 
 /* globals */
 short int psad_syscalls_ctr     = 0;
@@ -97,7 +98,7 @@ int main(int argc, char *argv[]) {
     unsigned int psadwatchd_max_retries = 10; /* default to 10 tries */
 
 #ifdef DEBUG
-    printf(" .. Entering DEBUG mode ..n");
+    printf(" .. Entering DEBUG mode ..\n");
     sleep(1);
 #endif
 
@@ -109,7 +110,7 @@ int main(int argc, char *argv[]) {
                                 supplied on the command line */
         strlcpy(config_file, argv[1], MAX_PATH_LEN);
     } else {
-        printf(" .. You may only specify the path to a single config file:  ");
+        printf(" .. You can only specify the path to a single config file:  ");
         printf("Usage:  psadwatchd <configfile>\n");
         exit(EXIT_FAILURE);
     }
@@ -208,38 +209,19 @@ static void check_process(
 {
     FILE *pidfile_ptr;
     pid_t pid;
+    unsigned short int restart = 0;
     char mail_str[MAX_MSG_LEN] = "";
     char pid_line[MAX_PID_SIZE];
 
     if ((pidfile_ptr = fopen(pid_file, "r")) == NULL) {
-        /* the pid file must not exist (or we can't read it), so
-         * start the appropriate process and return */
 #ifdef DEBUG
     printf(" .. Could not open pid_file: %s\n", pid_file);
 #endif
-        strlcat(mail_str, " -s \" ** psadwatchd: Restarting ", MAX_MSG_LEN);
-        strlcat(mail_str, pid_name, MAX_MSG_LEN);
-        strlcat(mail_str, " on ", MAX_MSG_LEN);
-        strlcat(mail_str, hostname, MAX_MSG_LEN);
-        strlcat(mail_str, "\" ", MAX_MSG_LEN);
-        strlcat(mail_str, mail_addrs, MAX_MSG_LEN);
-        strlcat(mail_str, mail_redr, MAX_MSG_LEN);
-
-#ifdef DEBUG
-    printf(" .. sending mail:  %s\n", mail_str);
-#endif
-        /* send the email */
-        send_alert_email(shCmd, mailCmd, mail_str);
-
-        /* restart the process */
-        exec_binary(binary_path, cmdline_file);
-
-        /* increment the number of times we have tried to
-         * restart the binary (this will also call give_up()
-         * if necessary).*/
-        incr_syscall_ctr(pid_name, max_retries);
-        return;
+        /* the pid file must not exist (or we can't read it), so
+         * setup to start the appropriate process */
+        restart = 1;
     }
+
 
     /* read the first line of the pid_file, which will contain the
      * process id of any running pid_name process. */
@@ -259,7 +241,13 @@ static void check_process(
     /* close the pid_file now that we have read it */
     fclose(pidfile_ptr);
 
-    if (kill(pid, 0) != 0) {  /* the process is not running so start it */
+    if (kill(pid, 0) != 0) {
+        /* the process is not running so start it */
+        restart = 1;
+    }
+
+
+    if (restart) {
 #ifdef DEBUG
         printf(" .. executing exec_binary(%s)\n", binary_path);
 #endif

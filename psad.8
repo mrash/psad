@@ -98,7 +98,7 @@ series has the ability to distinguish and log any of the tcp flags
 present within tcp packets that traverse the firewall interfaces.  Psad
 makes use of this logging capability to detect several types of tcp scan
 signatures included within
-.B /etc/psad/psad_signatures.
+.B /etc/psad/signatures.
 The signatures were
 originally included within the snort intrusion detection
 system.  New signatures can be included and modifications to existing
@@ -144,7 +144,7 @@ The default is
 .BR \-\^\-passive-os-sigs\ \<passive-os-sigs-file>
 Manually specify the path to the passive operating system fingerprinting
 signatures file.  The default is
-.B /etc/psad/psad_posf.
+.B /etc/psad/posf.
 .TP
 
 .BR \-a "\fR,\fP " \-\^\-auto-dl\ \<auto-dl-file>
@@ -154,10 +154,10 @@ would normally be assigned.  Additionally, some IP addresses
 can always be ignored depending on your network configuration
 (the loopback interface 127.0.0.1 might be a good candidate
 for example).
-.B /etc/psad/psad_auto_dl
+.B /etc/psad/auto_dl
 provides an interface for psad to automatically
 increase/decrease/ignore scanning IP danger levels.  Modifications
-can be made to psad_auto_dl (installed by default in /etc/psad)
+can be made to auto_dl (installed by default in /etc/psad)
 and psad will import them without having to restart the psad process.
 .TP
 
@@ -331,7 +331,7 @@ iptables has been configured to log packets).  Passing the
 .BR \-\^\-no-auto-dl
 Disable auto danger level assignments.  This will instruct to not import
 any IP addresses or networks from the file
-.B /etc/psad/psad_auto_dl.
+.B /etc/psad/auto_dl.
 .TP
 
 .BR \-\^\-no-snort-sids
@@ -402,7 +402,7 @@ those that match specific log prefix strings (see the --log-prefix option
 to iptables).
 .RE
 
-.B /etc/psad/psad_signatures
+.B /etc/psad/signatures
 .RS
 Contains the signatures
 .B psad
@@ -411,7 +411,7 @@ signatures are written in a manner similar to the *lib signature
 files used in the snort IDS.
 .RE
 
-.B /etc/psad/psad_icmp_types
+.B /etc/psad/icmp_types
 .RS
 Contains all valid icmp types and corresponding codes as defined by RFC 792.
 By default, icmp packets are validated against these values and an alert
@@ -424,7 +424,7 @@ Snort rules files that are consulted by default unless the --no-snort-sids
 commmand line argument is given.
 .RE
 
-.B /etc/psad/psad_auto_dl
+.B /etc/psad/auto_dl
 .RS
 Contains a listing of any IP addresses that should be assigned
 a danger level based on any traffic that is logged by the
@@ -434,7 +434,7 @@ all traffic from <IP address>, and 5 is to assign the highest danger
 level to <IP address>.
 .RE
 
-.B /etc/psad/psad_posf
+.B /etc/psad/posf
 .RS
 Contains a listing of all passive operating system fingerprinting
 signatures.  These signatures include packet lengths, ttl, tos,
@@ -534,19 +534,19 @@ define the number of packets that must be dropped by the firewall before psad
 will assign the respective danger level to the scan.  A scan may also be
 assigned a danger level if the scan matches a particular signature contained
 in the
-.B psad_signatures
+.B signatures
 file.  There are five
 possible danger levels with one being the lowest and five the highest.
 Note there are several factors that can influence how danger levels are
 calculated: whether or not a scan matches a signature listed in
-.B psad_signatures,
+.B /etc/psad/signatures,
 the value of PORT_RANGE_SCAN_THRESHOLD (see below), whether or not a scan comes
 from an IP that is listed in the
-.B psad_auto_dl
+.B /etc/psad/auto_dl
 file, and finally whether or not scans are allowed to timeout
 as determined by SCAN_TIMEOUT above.  If a signature is matched or the scanning
 IP is listed in
-.B psad_auto_dl,
+.B /etc/psad/auto_dl,
 then the corresponding danger level is automatically assigned to the scan.
 .TP
 
@@ -555,7 +555,7 @@ Defines the minimum difference between the lowest port and the highest port
 scanned before an alert is sent (the default is 1 which means that at least
 two ports must be scanned to generate an alert).  For example, suppose an ip
 repeatedly scans a single port for which there is no special signature in
-.B psad_signatures.
+.B signatures.
 Then if PORT_RANGE_SCAN_THRESHOLD=1, psad will never send
 an alert for this "scan" no matter how many packets are sent to the port (i.e.
 no matter what the value of DANGER_LEVEL1 is).  The reason for the default of
@@ -570,7 +570,7 @@ If "Y", psad will display all signatures detected from a single scanning
 IP since a scan was first detected instead of just displaying newly-detected
 signatures.  SHOW_ALL_SIGNATURES is set to "N" by default.  All signatures are
 listed in the file
-.B psad_signatures.
+.B /etc/psad/signatures.
 .TP
 
 .BR SNORT_SID_STR
@@ -654,9 +654,9 @@ file if the -m option is not specified):
 
 The
 .B psad.conf,
-.B psad_signatures,
+.B signatures,
 and
-.B psad_auto_dl
+.B auto_dl
 files are normally
 located within the /etc/psad/ directory, but the paths to each of these
 files can be changed:

@@ -299,16 +299,31 @@ sub install() {
     chdir 'Net-IPv4Addr-0.10' or die " ** Could not chdir to ",
         "Net-IPv4Addr-0.10: $!";
     unless (-e 'Makefile.PL') {
-        die " ** Your source directory appears to be incomplete!  Net::IPv4Addr " .
-            "is missing.\n    Download the latest sources from " .
-            "http://www.cipherdyne.com\n";
+        die " ** Your source directory appears to be incomplete!  " .
+            "Net::IPv4Addr is missing.\n    Download the latest sources " .
+            "from http://www.cipherdyne.com\n";
     }
     system "$Cmds{'perl'} Makefile.PL";
     system "$Cmds{'make'}";
 #    system "$Cmds{'make'} test";
     system "$Cmds{'make'} install";
     chdir '..';
+    print "\n\n";
 
+    ### installing IPTables::Parse
+    &logr(" .. Installing the IPTables::Parse perl module\n");
+    chdir 'IPTables/Parse' or die " ** Could not chdir to ",
+        "IPTables/Parse: $!";
+    unless (-e 'Makefile.PL') {
+        die " ** Your source directory appears to be incomplete!  " .
+            "IPTables::Parse is missing.\n    Download the latest sources " .
+            "from http://www.cipherdyne.com\n";
+    }
+    system "$Cmds{'perl'} Makefile.PL";
+    system "$Cmds{'make'}";
+#    system "$Cmds{'make'} test";
+    system "$Cmds{'make'} install";
+    chdir '../..';
     print "\n\n";
 
     &logr(" .. Installing snort-1.8.7 signatures in $SNORT_DIR\n");
@@ -554,7 +569,7 @@ sub uninstall() {
     my $ans = '';
     while ($ans ne 'y' && $ans ne 'n') {
         print wrap('', $SUB_TAB, ' .. This will completely remove psad ' .
-            'from your system.  Are you sure (y/n)? ');
+            "from your system.\n    Are you sure (y/n)? ");
         $ans = <STDIN>;
         chomp $ans;
     }
@@ -626,11 +641,11 @@ sub uninstall() {
         rmtree $VARLIBDIR;
     }
     if (-d $RUNDIR) {
-        print " .. Removing $RUNDIR";
+        print " .. Removing $RUNDIR\n";
         rmtree $RUNDIR;
     }
     if (-d $LIBDIR) {
-        print " .. Removing $LIBDIR";
+        print " .. Removing $LIBDIR\n";
         rmtree $LIBDIR;
     }
     print " .. Restoring /etc/syslog.conf.orig -> /etc/syslog.conf\n";

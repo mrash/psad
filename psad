@@ -211,7 +211,9 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 							$listening_port = "There is no server listening on port $dstport";
 						}
 					}
-					print "Caught: $msg.  sp=$srcport, dp=$dstport, flags=$flags.  $listening_port\n";
+					my $alert_string = "$msg.  sp=$srcport, dp=$dstport, flags=$flags.  $listening_port";
+					$Scan{$srcip}{'SIGMATCH'}{$alert_string} = "";
+#					print "Caught: $msg.  sp=$srcport, dp=$dstport, flags=$flags.  $listening_port\n";
 				}
 			} 
 		}
@@ -323,6 +325,7 @@ sub assign_danger_level() {
 		my $range = $Scan_href->{$ip}->{'SCAN_RANGE'}->{'END_PORT'} - $Scan_href->{$ip}->{'SCAN_RANGE'}->{'START_PORT'};
 		# if $port_range_scan_threshold is >= 1, then psad will not assign a danger level to repeated packets to the same port
 		$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 1 if ($absnum >= $danger_levels_href->{'1'} && $range >= $port_range_scan_threshold);
+		$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 1 if (defined $Scan_href->{$ip}->{'SIGMATCH'});
 		$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 2 if ($absnum >= $danger_levels_href->{'2'} && $range >= $port_range_scan_threshold);
 		$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 3 if ($absnum >= $danger_levels_href->{'3'} && $range >= $port_range_scan_threshold);
 		$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} = 4 if ($absnum >= $danger_levels_href->{'4'} && $range >= $port_range_scan_threshold);
@@ -382,6 +385,11 @@ sub logr() {
 					} else {
 						print $hndl "\n";
 						$flags_mesg = join '  ', $flags_mesg, "   TCP_flags: [$flags]  Number_of_packets: $Scan_href->{$ip}->{'FLAGS'}->{$flags}\n";
+					}
+				}
+				if (defined $Scan_href->{$ip}->{'SIGMATCH'}) {
+					foreach my $sigmatch (keys %{$Scan_href->{$ip}->{'SIGMATCH'}}) {
+						print $hndl "$sigmatch\n";
 					}
 				}
 			} else {

@@ -190,11 +190,14 @@ my %scan_dl = ();
 ### ENABLE_EXT_SCRIPT_EXEC is set to 'Y');
 my %scan_ext_exec = ();
 
-### cache passive os fingerprinting information
-my %posf = ();
+### cache p0f-based passive os fingerprinting information
+my %p0f;
 
 ### cache p0f-based passive os fingerprinting signature information
 my %p0f_sigs = ();
+
+### cache TOS-based passive os fingerprinting information
+my %posf = ();
 
 ### cache TOS-based passive os fingerprinting signature information
 my %posf_sigs = ();
@@ -355,6 +358,21 @@ my $oldarg_logserv;
 my $b_time;
 my $test_pkt;
 my $test_pktend;
+
+### tcp option types
+my $tcp_nop_type       = 1;
+my $tcp_mss_type       = 2;
+my $tcp_win_scale_type = 3;
+my $tcp_sack_type      = 4;
+my $tcp_timestamp_type = 8;
+
+my %tcp_p0f_opt_types = (
+    'N' => $tcp_nop_type,
+    'M' => $tcp_mss_type,
+    'W' => $tcp_win_scale_type,
+    'S' => $tcp_sack_type,
+    'T' => $tcp_timestamp_type
+);
 
 ### save a copy of the command line arguments
 my @args_cp = @ARGV;
@@ -1167,11 +1185,18 @@ sub check_scan() {
             ### make sure we have not already guessed the OS,
             ### and if we have been unsuccessful in guessing
             ### the OS after 100 packets don't keep trying.
-            if (not defined $posf{$src}{'guess'}
-                    and $scan{$src}{$dst}{'absnum'} < 100
-                    and $proto eq 'tcp'
-                    and $flags =~ /SYN/) {
-                &posf($src, $len, $tos, $ttl, $id, $win)
+            if ($proto eq 'tcp' and $flags =~ /SYN/) {
+                if ($tcp_options) {  ### got the tcp options portion of the header
+
+                    ### p0f based fingerprinting
+                    &p0f($src, $len, $frag_bit, $ttl, $win, $tcp_options);
+
+                } elsif (not defined $posf{$src}{'guess'}
+                        and $scan{$src}{$dst}{'absnum'} < 100
+                        and $proto eq 'tcp'
+                        and $flags =~ /SYN/) {
+                    &posf($src, $len, $tos, $ttl, $id, $win)
+                }
             }
         }
 
@@ -1230,9 +1255,6 @@ sub match_sigs() {
     my $dl = 0;
     if ($proto eq 'tcp') {
         for my $sid (keys %{$sigs{'tcp'}}) {
-            print STDERR "[+] match_sigs(): sid: $sid ",
-                "$sigs{'tcp'}{$sid}{'src'} -> ",
-                "$sigs{'tcp'}{$sid}{'dst'}\n" if $debug;
             next unless defined $sigs{'tcp'}{$sid}{'flags'};
             if (&check_port($sp, $dp, $sigs{'tcp'}{$sid})
                     and $flags eq $sigs{'tcp'}{$sid}{'flags'}
@@ -1317,6 +1339,208 @@ sub ignore_port() {
         }
     }
     return 0;
+}
+
+sub p0f() {
+    my ($src, $len, $frag_bit, $ttl, $win, $tcp_options) = @_;
+
+    print STDERR "[+] p0f(): $src len: $len, frag_bit: $frag_bit, " ,
+        "ttl: $ttl, win: $win\n" if $debug;
+
+    my ($options_aref) = &parse_tcp_options($tcp_options);
+
+    return unless $options_aref;
+
+    ### try to match SYN packet length
+    LEN: for my $sig_len (keys %p0f_sigs) {
+        my $matched_len = 0;
+        if ($sig_len eq '*') {  ### len can be wildcarded in pf.os
+            $matched_len = 1;
+        } elsif ($sig_len =~ /^\%(\d+)/) {
+            if (($len % $1) == 0) {
+                $matched_len = 1;
+            }
+        } elsif ($len == $sig_len) {
+            $matched_len = 1;
+        }
+        next LEN unless $matched_len;
+
+        ### try to match fragmentation bit
+        FRAG: for my $test_frag_bit ($frag_bit, '*') {  ### don't need "%nnn" check
+            next FRAG unless defined $p0f_sigs{$sig_len}{$test_frag_bit};
+
+            ### find out for which p0f sigs the TTL is within range
+            TTL: for my $sig_ttl (keys %{$p0f_sigs{$sig_len}{$test_frag_bit}}) {
+                unless ($ttl > $sig_ttl - $config{'MAX_HOPS'}
+                        and $ttl <= $sig_ttl) {
+                    next TTL;
+                }
+
+                ### match tcp window size
+                WIN: for my $sig_win_size (keys
+                        %{$p0f_sigs{$sig_len}{$test_frag_bit}{$sig_ttl}}) {
+                    my $matched_win_size = 0;
+                    if ($sig_win_size eq '*') {
+                        $matched_win_size = 1;
+                    } elsif ($sig_win_size =~ /^\%(\d+)/) {
+                        if (($win % $1) == 0) {
+                            $matched_win_size = 1;
+                        }
+                    } elsif ($sig_win_size =~ /^S(\d+)/) {
+                        ### window size must be a multiple of maximum
+                        ### seqment size
+                        my $multiple = $1;
+                        for my $opt_hr (@$options_aref) {
+                            if (defined $opt_hr->{$tcp_p0f_opt_types{'M'}}) {
+                                my $mss_val = $opt_hr->{$tcp_p0f_opt_types{'M'}};
+                                if ($win == $mss_val * $multiple) {
+                                    $matched_win_size = 1;
+                                }
+                            }
+                            last;
+                        }
+                    } elsif ($sig_win_size == $win) {
+                        $matched_win_size = 1;
+                    }
+
+                    next WIN unless $matched_win_size;
+
+                    TCPOPTS: for my $sig_opts (keys %{$p0f_sigs{$sig_len}
+                            {$test_frag_bit}{$sig_ttl}{$sig_win_size}}) {
+                        my @sig_opts = split /\,/, $sig_opts;
+                        for (my $i=0; $i<=$#sig_opts; $i++) {
+                            ### tcp option order is important.  Check to see if
+                            ### the option order in the packet matches the order we
+                            ### expect to see in the signature
+                            if ($sig_opts[$i] =~ /^([NMWST])/) {
+                                my $sig_letter = $1;
+
+                                unless (defined $options_aref->[$i]->
+                                        {$tcp_p0f_opt_types{$sig_letter}}) {
+                                    next TCPOPTS;  ### could not match tcp option order
+                                }
+
+                                ### MSS, window scale, and timestamp have
+                                ### specific signatures requirements on values
+                                if ($sig_letter eq 'M') {
+                                    if ($sig_opts[$i] =~ /M(\d+)/) {
+                                        my $sig_mss_val = $1;
+                                        next TCPOPTS unless $options_aref->[$i]->
+                                            {$tcp_p0f_opt_types{$sig_letter}}
+                                                == $sig_mss_val;
+                                    } elsif ($sig_opts[$i] =~ /M\%(\d+)/) {
+                                        my $sig_mss_mod_val = $1;
+                                        next TCPOPTS unless (($options_aref->[$i]->
+                                            {$tcp_p0f_opt_types{$sig_letter}}
+                                                % $sig_mss_mod_val) == 0);
+                                    } ### else it is "M*" which always matches
+                                } elsif ($sig_letter eq 'W') {
+                                    if ($sig_opts[$i] =~ /W(\d+)/) {
+                                        my $sig_win_val = $1;
+                                        next TCPOPTS unless $options_aref->[$i]->
+                                            {$tcp_p0f_opt_types{$sig_letter}}
+                                                == $sig_win_val;
+                                    } elsif ($sig_opts[$i] =~ /W\%(\d+)/) {
+                                        my $sig_win_mod_val = $1;
+                                        next TCPOPTS unless (($options_aref->[$i]->
+                                            {$tcp_p0f_opt_types{$sig_letter}}
+                                                % $sig_win_mod_val) == 0);
+                                    } ### else it is "W*" which always matches
+                                } elsif ($sig_letter eq 'T') {
+                                    if ($sig_opts[$i] =~ /T0/) {
+                                        next TCPOPTS unless $options_aref->[$i]->
+                                            {$tcp_p0f_opt_types{$sig_letter}}
+                                                == 0;
+                                    }  ### else it is just "T" which matches
+                                }
+
+                            }
+                        }
+                        OS: for my $os (keys %{$p0f_sigs{$sig_len}
+                                {$test_frag_bit}{$sig_ttl}{$sig_win_size}
+                                {$sig_opts}}) {
+                            my $sig = $p0f_sigs{$sig_len}
+                                {$test_frag_bit}{$sig_ttl}{$sig_win_size}
+                                {$sig_opts}{$os};
+                            print STDERR "[+] os: $os, $sig\n" if $debug;
+                            $p0f{$src}{$os} = '';
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return;
+}
+
+sub parse_tcp_options() {
+    my $tcp_options = shift;
+    my @opts = ();
+    my @hex_nums = ();
+    my $debug_str = '';
+
+    if (length($tcp_options) % 2 != 0) {  ### make sure length a multiple of two
+        print 'tcp options length not a multiple of two.' if $debug;
+        return '';
+    }
+    ### $tcp_options is a hex string like "020405B401010402" from the iptables
+    ### log message
+    my @chars = split //, $tcp_options;
+    for (my $i=0; $i <= $#chars; $i += 2) {
+        my $str = $chars[$i] . $chars[$i+1];
+        push @hex_nums, $str;
+    }
+    OPT: for (my $opt_kind=0; $opt_kind <= $#hex_nums;) {
+        last OPT unless defined $hex_nums[$opt_kind+1];
+
+        my $is_nop = 0;
+        my $len = hex($hex_nums[$opt_kind+1]);
+        if (hex($hex_nums[$opt_kind]) == $tcp_nop_type) {
+            $debug_str .= 'NOP, ' if $debug;
+            push @opts, {$tcp_nop_type => ''};
+            $is_nop = 1;
+        } elsif (hex($hex_nums[$opt_kind]) == $tcp_mss_type) {  ### MSS
+            my $mss_hex = '';
+            for (my $i=$opt_kind+2; $i < ($opt_kind+$len); $i++) {
+                $mss_hex .= $hex_nums[$i];
+            }
+            my $mss = hex($mss_hex);
+            push @opts, {$tcp_mss_type => $mss};
+            $debug_str .= 'MSS: ' . hex($mss_hex) . ', ' if $debug;
+        } elsif (hex($hex_nums[$opt_kind]) == $tcp_win_scale_type) {
+            my $window_scale_hex = '';
+            for (my $i=$opt_kind+2; $i < ($opt_kind+$len); $i++) {
+                $window_scale_hex .= $hex_nums[$i];
+            }
+            my $win_scale = hex($window_scale_hex);
+            push @opts, {$tcp_win_scale_type => $win_scale};
+            $debug_str .= 'Win Scale: ' . hex($window_scale_hex) . ', ' if $debug;
+        } elsif (hex($hex_nums[$opt_kind]) == $tcp_sack_type) {
+            push @opts, {$tcp_sack_type => ''};
+            $debug_str .= 'SACK, ' if $debug;
+        } elsif (hex($hex_nums[$opt_kind]) == $tcp_timestamp_type) {
+            my $timestamp_hex = '';
+            for (my $i=$opt_kind+2; $i < ($opt_kind+$len) - 4; $i++) {
+                $timestamp_hex .= $hex_nums[$i];
+            }
+            my $timestamp = hex($timestamp_hex);
+            push @opts, {$tcp_timestamp_type => $timestamp};
+            $debug_str .= 'Timestamp: ' . hex($timestamp_hex) . ', ' if $debug;
+        } elsif (hex($hex_nums[$opt_kind]) == 0) {  ### End of option list
+            last OPT;
+        }
+        if ($is_nop) {
+            $opt_kind += 1;
+        } else {
+            ### get to the next option-kind field
+            $opt_kind += $len;
+        }
+    }
+    if ($debug) {
+        $debug_str =~ s/\,$//;
+        print STDERR "[+] $debug_str\n" if $debug;
+    }
+    return \@opts;
 }
 
 sub posf() {
@@ -1998,8 +2222,6 @@ sub import_snort_rules() {
             next FILE unless $rfile =~ /^${srules_type}\.rules$/;
         }
         my ($type) = ($rfile =~ /(\w+)\.rules/);
-#        printf("%-30s", "[+] $rfile");
-#        &logr("[+] Parsing $rfile\n", $logfile);
         open R, "< ${config{'SNORT_RULES_DIR'}}/${rfile}" or
             die "[*] Could not open: ${srules_type}/${rfile}";
         my @lines = <R>;
@@ -2825,6 +3047,7 @@ sub scan_logr() {
             my $ecount_file  = "${src_dir}/email_count";
             my $dl_file      = "${src_dir}/danger_level";
             my $posf_file    = "${src_dir}/os_guess";
+            my $p0f_file     = "${src_dir}/p0f_guess";
             my $whois_file   = "${src_dir}/whois";
             my $email_file   = "${src_dir}/${dst}_email_alert";
             my $log_sigs     = "${src_dir}/${dst}_signatures";
@@ -2836,11 +3059,21 @@ sub scan_logr() {
             print DL $curr_dl, "\n";
             close DL;
 
-            ### write out the os guess (if there is one).
+            ### write out the TOS-based os guess (if there is one).
             if (defined $posf{$src} and defined $posf{$src}{'guess'}) {
                 open P, "> $posf_file" or
                     die "[*] Could not open $posf_file: $!";
                 print P $posf{$src}{'guess'}, "\n";
+                close P;
+            }
+
+            ### write out the p0f-based os guess(es) (if there is one).
+            if (defined $p0f{$src}) {
+                open P, "> $p0f_file" or
+                    die "[*] Could not open $p0f_file: $!";
+                for my $os (keys %{$p0f{$src}}) {
+                    print P "$os\n";
+                }
                 close P;
             }
 
@@ -3052,9 +3285,23 @@ sub scan_logr() {
             printf $fh "\n%${log_len}s%s\n", 'Source: ', $src;
             printf $fh "%${log_len}s%s\n", 'DNS: ', $src_dns_str
                 unless $no_rdns;
-            if (!$no_posf and defined $posf{$src}{'guess'}) {
-                printf $fh "%${log_len}s%s\n", 'OS guess: ',
-                    $posf{$src}{'guess'};
+
+            unless ($no_posf) {
+                if (defined $p0f{$src}) {  ### prefer p0f-based fingerprinting
+                    my $printed_guess_line = 0;
+                    for my $os (keys %{$p0f{$src}}) {
+                        if ($printed_guess_line) {
+                            printf $fh "%${log_len}s%s\n", ' ', $os;
+                        } else {
+                            printf $fh "%${log_len}s%s\n", 'OS guess: ',
+                                $os;
+                        }
+                        $printed_guess_line = 1;
+                    }
+                } elsif (defined $posf{$src}{'guess'}) {
+                    printf $fh "%${log_len}s%s\n", 'OS guess: ',
+                        $posf{$src}{'guess'};
+                }
             }
             printf $fh "\n%${log_len}s%s\n", 'Destination: ', $dst;
             printf $fh "%${log_len}s%s\n", 'DNS: ', $dst_dns_str
@@ -4678,6 +4925,15 @@ sub import_old_scans() {
             chomp $os_guess;
             ### set the os guess for $src
             $posf{$src}{'guess'} = $os_guess;
+        }
+        if (-e "${src}/p0f_guess") {
+            open OS, "< ${src}/p0f_guess" or next SRCIP;
+            my @lines = <OS>;
+            close OS;
+            for my $line (@lines) {
+                chomp $line;
+                $p0f{$src}{$line} = '';
+            }
         }
         opendir IPDIR, $src or next SRCIP;
         my @scan_files = readdir IPDIR;

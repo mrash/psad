@@ -405,6 +405,10 @@ sub install() {
         &logr("[+] Creating $PSAD_CONFDIR\n");
         mkdir $PSAD_CONFDIR,0500;
     }
+
+    ### get syslog daemon (e.g. syslog, syslog-ng, or metalog)
+    my $syslog_str = &query_syslog();
+
     my $preserve_rv = 0;
     if (-e "${PSAD_CONFDIR}/psad.conf") {
         $preserve_rv = &query_preserve_config();
@@ -532,54 +536,33 @@ sub install() {
         }
     }
 
-    ### get syslog daemon (e.g. syslog, syslog-ng, or metalog)
-    my $syslog_str = &query_syslog();
-
     &put_string('SYSLOG_DAEMON', $syslog_str,
         "${PSAD_CONFDIR}/psad.conf");
 
     my $restarted_syslog = 0;
     if ($syslog_str eq 'syslogd') {
-        ### allow command line --syslog-conf arg to take over
-        $syslog_conf = '/etc/syslog.conf' unless $syslog_conf;
         if (-e $syslog_conf) {
             &append_fifo_syslog($syslog_conf);
             if (((system "$Cmds{'killall'} -HUP syslogd 2> /dev/null")>>8) == 0) {
                 &logr("[+] HUP signal sent to syslogd.\n");
                 $restarted_syslog = 1;
             }
-        } else {
-            die
-"[-] The config file $syslog_conf for syslogd does not exist. Re-run\n",
-"    install.pl with the --syslog-conf argument.\n";
         }
     } elsif ($syslog_str eq 'syslog-ng') {
-        ### allow command line --syslog-conf arg to take over
-        $syslog_conf = '/etc/syslog-ng/syslog-ng.conf' unless $syslog_conf;
         if (-e $syslog_conf) {
             &append_fifo_syslog_ng($syslog_conf);
             if (((system "$Cmds{'killall'} -HUP syslog-ng 2> /dev/null")>>8) == 0) {
                 &logr("[+] HUP signal sent to syslog-ng.\n");
                 $restarted_syslog = 1;
             }
-        } else {
-            die
-"[-] The config file $syslog_conf for syslog-ng does not\n",
-"    exist. Re-run install.pl with the --syslog-conf argument.\n";
         }
     } elsif ($syslog_str eq 'metalog') {
-        ### allow command line --syslog-conf arg to take over
-        $syslog_conf = '/etc/metalog/metalog.conf' unless $syslog_conf;
         if (-e $syslog_conf) {
             &config_metalog($syslog_conf);
             &logr("[-] Metalog support is shaky in psad.  " .
                 "Use at your own risk.\n");
             ### don't send warning about not restarting metalog daemon
             $restarted_syslog = 1;
-        } else {
-            die
-"[-] The config file $syslog_conf for metalog does not\n",
-"    exist. Re-run install.pl with the --syslog-conf argument.\n";
         }
     }
 
@@ -870,6 +853,9 @@ sub install_perl_module() {
 
 sub set_home_net() {
     my $file = shift;
+
+    ### get all interfaces; even those that are down since they may
+    ### brought up any time.
     my @ifconfig_out = `$Cmds{'ifconfig'} -a`;
     my $home_net_str = '';
     my $intf_name = '';
@@ -890,7 +876,25 @@ sub set_home_net() {
         }
         if ($intf_name and
                 $line =~ /^\s+inet\s+.*?:($ip_re).*:($ip_re)/) {
-            $connected_subnets{$intf_name} = "$1/$2";
+            my $ip = $1;
+            my $mask = $2;
+
+            my @ipbytes = split /\./, $ip;
+            my @mbytes  = split /\./, $mask;
+
+            my $netaddr = '';
+            for (my $i=0; $i < 4; $i++) {
+                my $byte1 = $mbytes[$i]+0;
+                my $byte2 = $ipbytes[$i]+0;
+                my $netaddr_byte = $byte1 & $byte2;
+                if ($i != 0) {
+                    $netaddr = $netaddr . '.' . $netaddr_byte;
+                } else {
+                    $netaddr = $netaddr_byte;
+                }
+            }
+
+            $connected_subnets{$intf_name} = "$netaddr/$mask";
             $net_ctr++;
         }
     }
@@ -1597,6 +1601,23 @@ sub query_syslog() {
             "syslog-ng, metalog)?  ");
         $ans = <STDIN>;
         $ans =~ s/\s*//g;
+
+        if ($ans eq 'syslogd') {
+            ### allow command line --syslog-conf arg to take over
+            $syslog_conf = '/etc/syslog.conf' unless $syslog_conf;
+        } elsif ($ans eq 'syslog-ng') {
+            ### allow command line --syslog-conf arg to take over
+            $syslog_conf = '/etc/syslog-ng/syslog-ng.conf' unless $syslog_conf;
+        } elsif ($ans eq 'metalog') {
+            ### allow command line --syslog-conf arg to take over
+            $syslog_conf = '/etc/metalog/metalog.conf' unless $syslog_conf;
+        }
+        if ($syslog_conf and not -e $syslog_conf) {
+            die
+"[-] The config file $syslog_conf does not exist. Re-run install.pl\n",
+"    with the --syslog-conf argument to specify the path to the syslog\n",
+"    daemon config file.\n";
+        }
     }
     die "[-] Invalid syslog daemon \"$ans\"\n"
         unless ($ans and

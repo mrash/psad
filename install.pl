@@ -69,6 +69,7 @@ my $WHOIS_PSAD   = '/usr/bin/whois.psad';
 
 ### system binaries ###
 my $chkconfigCmd = '/sbin/chkconfig';
+my $gzipCmd      = '/usr/bin/gzip';
 my $psCmd        = '/bin/ps';
 my $netstatCmd   = '/bin/netstat';
 my $ifconfigCmd  = '/sbin/ifconfig';
@@ -206,26 +207,25 @@ sub install() {
         }
     }
 
+    my $restarted_syslog = 0;
     if (-e '/etc/syslog.conf') {
         &append_fifo_syslog();
+        if (((system "$Cmds{'killall'} -HUP syslogd 2> /dev/null")>>8) == 0) {
+            &logr(" .. Restarted syslog.\n");
+            $restarted_syslog = 1;
+        }
     }
     if (-e '/etc/syslog-ng/syslog-ng.conf') {
         &append_fifo_syslog_ng();
+        if (((system "$Cmds{'killall'} -HUP syslog-ng 2> /dev/null")>>8) == 0) {
+            &logr(" .. Restarted syslog-ng.\n");
+            $restarted_syslog = 1;
+        }
     }
 #    &append_metalog();   ### metalog support some day
 
     ### restart any running syslog daemon (killall should really work here)
 #    &hup_syslog();
-
-    my $restarted_syslog = 0;
-    if (((system "$Cmds{'killall'} -HUP syslogd 2> /dev/null")>>8) == 0) {
-        &logr(" .. Restarted syslog.\n");
-        $restarted_syslog = 1;
-    }
-    if (((system "$Cmds{'killall'} -HUP syslog-ng 2> /dev/null")>>8) == 0) {
-        &logr(" .. Restarted syslog.\n");
-        $restarted_syslog = 1;
-    }
 
     unless ($restarted_syslog) {
         &logr(" ** Could not restart any syslog daemons.\n");
@@ -870,8 +870,10 @@ sub get_distro() {
 
 sub perms_ownership() {
     my ($file, $perm_value) = @_;
-    chmod $perm_value, $file;
-    chown 0, 0, $file;  ### chown uid, gid, $file  (root :)
+    chmod $perm_value, $file or die " ** Could not " .
+        "chmod($perm_value, $file): $!";
+    ### chown uid, gid, $file  (root :)
+    chown 0, 0, $file or die " ** Could not chown 0,0,$file: $!";
     return;
 }
 
@@ -1176,8 +1178,13 @@ sub install_manpage() {
     mkdir $mpath, 0755 unless -d $mpath;
     my $mfile = "${mpath}/${manpage}";
     &logr(" .. Installing $manpage man page as $mfile\n");
-    copy $manpage, $mfile;
+    copy $manpage, $mfile or die " ** Could not copy $manpage to " .
+        "$mfile: $!";
     &perms_ownership($mfile, 0644);
+    &logr(" .. Compressing manpage $mfile\n");
+    ### remove the old one so gzip doesn't prompt us
+    unlink "${mfile}.gz" if -e "${mfile}.gz";
+    system "$gzipCmd $mfile";
     return;
 }
 

@@ -340,7 +340,7 @@ if ($config) {
 }
 
 ### import the scan signatures and auto ips file
-&import_signatures($sigs_file, \%Sigs) if $sigs_file;
+&import_signatures($sigs_file, \%Sigs)       if $sigs_file;
 &import_auto_ips($auto_ips_file, \%Auto_ips) if $auto_ips_file;
 
 ### Check to see if psad automatically blocked some ips from
@@ -400,7 +400,8 @@ for (;;) {
             ### Log and send an email/syslog alert
             &scan_logr(\%Scan, $output, $dnslookups, $whoislookups);
 
-            ### Don't manage the firewall rules if psad is running on a syslog server
+            ### Don't manage the firewall rules if
+            ### psad is running on a syslog server
             if ($ENABLE_AUTO_IDS eq "Y" && ! $Syslog_server) {
                 &auto_psad_response(\%Scan);
             }

@@ -8,7 +8,7 @@ use File::Path; # used for the 'rmtree' function for removing directories
 use File::Copy; # used for copying/moving files
 use Getopt::Long;
 use Text::Wrap;
-use Sys::Hostname "hostname";
+use Sys::Hostname;
 use strict;
 
 ### Note that Psad.pm is not included within the above list (installation
@@ -239,19 +239,37 @@ if (-d "whois-4.5.21") {
     }
 }
 &perms_ownership("/usr/bin/whois.psad", 0755);
+
+### installing Psad.pm
 &logr(" ... Installing the Psad.pm perl module\n", \@LOGR_FILES);
     
 chdir "Psad.pm";
 unless (-e "Makefile.PL" && -e "Psad.pm") {
-    die "@@@@@  Your source kit appears to be incomplete!\n";
+    die "@@@@@  Your source kit appears to be incomplete!  Psad.pm is missing.\n";
 }
 system "perl Makefile.PL";
-system "make";
-system "make test";
-system "make install";
+system "$Cmds{'make'}";
+system "$Cmds{'make'} test";
+system "$Cmds{'make'} install";
 chdir "..";
 
 print "\n\n";
+
+### installing Unix::Syslog
+&logr(" ... Installing the Unix::Syslog perl module\n", \@LOGR_FILES);
+    
+chdir "Unix-Syslog-0.98";
+unless (-e "Makefile.PL" && -e "Syslog.pm") {
+    die "@@@@@  Your source kit appears to be incomplete!  Syslog.pm is missing.\n";
+}
+system "perl Makefile.PL";
+system "$Cmds{'make'}";
+system "$Cmds{'make'} test";
+system "$Cmds{'make'} install";
+chdir "..";
+
+print "\n\n";
+
 # my $append_fw_search_str = "";
 
 ### give the admin the opportunity to add to the strings that are normally

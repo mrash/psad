@@ -1480,13 +1480,13 @@ sub auto_psad_response(){
                 if ($USE_IPCHAINS) {
                     my $chains_aref = &get_input_chains($Cmds{'ipchains'});
                     my $blocked_str = '';
-                    if ($Config{'IPCHAINS_BLOCK_METHOD'} == 1) {
+                    if ($Config{'IPCHAINS_BLOCK_METHOD'} eq 'Y') {
                         for my $inchain (@$chains_aref) {
                             system "$Cmds{'ipchains'} -I $inchain 1 -s $src " .
                                 "-j DENY 2> /dev/null 1>&2";
                         }
                         $blocked_str = 'via ipchains';
-                    } elsif ($Config{'TCPWRAPPERS_BLOCK_METHOD'} == 1) {
+                    } elsif ($Config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
                         ### NOTE the elsif here since we only really want
                         ### to block the ip in one way, and we prefer
                         ### the firewall.
@@ -1499,7 +1499,7 @@ sub auto_psad_response(){
                     for my $dst (keys %{$Scan{$src}}) {
                         $Scan{$src}{$dst}{'BLOCKED'} = 1;
                     }
-                    if ($Config{'ALERT_AUTO_BLOCKED'} && $blocked_str) {
+                    if ($Config{'ALERT_AUTO_BLOCKED'} eq 'Y' && $blocked_str) {
                         my $subject = "psad: All traffic from $src has been " .
                             "BLOCKED $blocked_str on $HOSTNAME ($dst)";
                         &Psad::sendmail($subject, '', $Emails_aref, $Cmds{'mail'});
@@ -1510,13 +1510,13 @@ sub auto_psad_response(){
                 } elsif ($USE_IPTABLES) {
                     my $chains_aref = &get_input_chains($Cmds{'iptables'});
                     my $blocked_str = '';
-                    if ($Config{'IPTABLES_BLOCK_METHOD'}) {
+                    if ($Config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
                         for my $inchain (@$chains_aref) {
                             system "$Cmds{'iptables'} -I $inchain 1 -s $src " .
                                 "-j DROP 2> /dev/null 1>&2";
                         }
                         $blocked_str = 'via iptables';
-                    } elsif ($Config{'TCPWRAPPERS_BLOCK_METHOD'}) {
+                    } elsif ($Config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
                         ### NOTE the elsif here since we only really want
                         ### to block the ip in one way, and we prefer
                         ### the firewall.
@@ -1529,7 +1529,7 @@ sub auto_psad_response(){
                     for my $dst (keys %{$Scan{$src}}) {
                         $Scan{$src}{$dst}{'BLOCKED'} = 1;
                     }
-                    if ($Config{'ALERT_AUTO_BLOCKED'} && $blocked_str) {
+                    if ($Config{'ALERT_AUTO_BLOCKED'} eq 'Y' && $blocked_str) {
                         my $subject = "psad: All traffic from $src has been ".
                             "BLOCKED $blocked_str on $HOSTNAME ($dst)";
                         &Psad::sendmail($subject, '', $Emails_aref, $Cmds{'mail'});

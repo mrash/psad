@@ -79,3 +79,12 @@ Jason Czerak            Found and submitted a fix for a bug in which an
                         0 danger level in psad_auto_ips.  Also suggested
                         using the PREROUTING iptables chain along with
                         "-t mangle" for the auto-blocking code.
+
+Colin Rose              Discovered and helped troubleshoot a bug
+                        introduced when psad and bastille are installed
+                        on the same machine (bastille installs an older
+                        version of psad).
+
+Ugo Viti                Discovered bug in auto-blocking code where the
+                        subject line would incorrectly identify the
+                        action that had been taken.

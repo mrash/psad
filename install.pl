@@ -1218,9 +1218,10 @@ sub test_syslog_config() {
         return;
     }
 
-    ### remove any "test_DROP" lines from fwdata before
-    ### seeing if new ones can be written
+    ### remove any "test_DROP" lines from fwdata file and ipt_prefix_ctr
+    ### before seeing if new ones can be written
     &scrub_fwdata();
+    &scrub_prefix_ctr();
 
     my $start_kmsgsd = 1;
     if (-e "${RUNDIR}/kmsgsd.pid") {
@@ -1298,17 +1299,36 @@ sub test_syslog_config() {
 }
 
 sub scrub_fwdata() {
-    open SCRUB, "< ${PSAD_DIR}/fwdata" or
-        die " ** Could not open ${PSAD_DIR}/fwdata: $!";
-    my @lines = <SCRUB>;
-    close SCRUB;
+    if (-e "${PSAD_DIR}/fwdata") {
+        open SCRUB, "< ${PSAD_DIR}/fwdata" or
+            die " ** Could not open ${PSAD_DIR}/fwdata: $!";
+        my @lines = <SCRUB>;
+        close SCRUB;
 
-    open SCRUB, "> ${PSAD_DIR}/fwdata" or
-        die " ** Could not open ${PSAD_DIR}/fwdata: $!";
-    for my $line (@lines) {
-        print SCRUB $line unless $line =~ /test_DROP/;
+        open SCRUB, "> ${PSAD_DIR}/fwdata" or
+            die " ** Could not open ${PSAD_DIR}/fwdata: $!";
+        for my $line (@lines) {
+            print SCRUB $line unless $line =~ /test_DROP/;
+        }
+        close SCRUB;
     }
-    close SCRUB;
+    return;
+}
+
+sub scrub_prefix_ctr() {
+    if (-e "${PSAD_DIR}/ipt_prefix_ctr") {
+        open SCRUB, "< ${PSAD_DIR}/ipt_prefix_ctr" or
+            die " ** Could not open ${PSAD_DIR}/ipt_prefix_ctr: $!";
+        my @lines = <SCRUB>;
+        close SCRUB;
+
+        open SCRUB, "> ${PSAD_DIR}/ipt_prefix_ctr" or
+            die " ** Could not open ${PSAD_DIR}/ipt_prefix_ctr: $!";
+        for my $line (@lines) {
+            print SCRUB $line unless $line =~ /test_DROP/;
+        }
+        close SCRUB;
+    }
     return;
 }
 

@@ -134,7 +134,7 @@
 use lib '/usr/lib/psad';
 use Psad;
 use IPTables::ChainMgr;
-use Net::IPv4Addr qw(ipv4_network ipv4_in_network);
+use Net::IPv4Addr qw(ipv4_network ipv4_in_network ipv4_broadcast);
 use File::Copy;
 use File::Path;
 use Date::Calc qw(Timezone This_Year Decode_Month);
@@ -2672,49 +2672,38 @@ sub import_auto_dl() {
         $i++;
         next unless $line =~ /\S/;
         next if $line =~ /^\s*#/;
-        if ($line =~ m|^\s*($ip_re)\s+([0-5])|) {
-            my $ip = $1;
-            my $dl = $2;
-            my $all_proto = 1;
-            ### check for optional protocol (any combination of tcp, udp
-            ### or icmp is allowed)
-            if ($line =~ m|tcp|i) {
-                $auto_dl{'ip'}{$ip}{'tcp'} = $dl;
-                $all_proto = 0;
-            }
-            if ($line =~ m|udp|i) {
-                $auto_dl{'ip'}{$ip}{'udp'} = $dl;
-                $all_proto = 0;
-            }
-            if ($line =~ m|icmp|i) {
-                $auto_dl{'ip'}{$ip}{'icmp'} = $dl;
-                $all_proto = 0;
-            }
-            if ($all_proto) {
-                $auto_dl{'ip'}{$ip}{'allproto'} = $dl;
-            }
-        } elsif ($line =~ m|^\s*($ip_re/\d+)\s+([0-5])|) {
-            my $net = $1;
-            my $dl  = $2;
-            my $all_proto = 1;
-            ### check for optional protocol (any combination of tcp, udp
-            ### or icmp is allowed)
-            if ($line =~ m|tcp|i) {
-                $auto_dl{'net'}{$net}{'tcp'} = $dl;
-                $all_proto = 0;
-            }
-            if ($line =~ m|udp|i) {
-                $auto_dl{'net'}{$net}{'udp'} = $dl;
-                $all_proto = 0;
-            }
-            if ($line =~ m|icmp|i) {
-                $auto_dl{'net'}{$net}{'icmp'} = $dl;
-                $all_proto = 0;
-            }
-            if ($all_proto) {
-                $auto_dl{'net'}{$net}{'allproto'} = $dl;
-            }
-        } else {
+        my $ip   = '';
+        my $mask = '';
+        my $dl   = '';
+        if ($line =~ m|^\s*($ip_re)\s*/\s*($ip_re)\s+([0-5])|) {
+            $ip   = $1;
+            $mask = $2;
+            $dl   = $3;
+        } elsif ($line =~ m|^\s*($ip_re)\s*/\s*(\d+)\s+([0-5])|) {
+            $ip   = $1;
+            $mask = $2;
+            $dl   = $3;
+        } elsif ($line =~ m|^\s*($ip_re)\s+([0-5])|) {
+            $ip   = $1;
+            $mask = '32';  ### single IP
+            $dl   = $2;
+        }
+
+        $auto_dl{$ip}{'mask'} = $mask;
+        $auto_dl{$ip}{'dl'}   = $dl;
+
+        ### check for optional protocol (any combination of tcp, udp
+        ### or icmp is allowed)
+        if ($line =~ m|tcp|i) {
+            push @{$auto_dl{$ip}{'proto'}}, 'tcp';
+        }
+        if ($line =~ m|udp|i) {
+            push @{$auto_dl{$ip}{'proto'}}, 'udp';
+        }
+        if ($line =~ m|icmp|i) {
+            push @{$auto_dl{$ip}{'proto'}}, 'icmp';
+        }
+        unless ($ip and $mask) {
             unless ($fw_block_ip) {
                 my $subject = "[psad-error] import warning: " .
                     "$config{'AUTO_DL_FILE'} error on line: $i";
@@ -2726,9 +2715,14 @@ sub import_auto_dl() {
     if (%auto_dl) {
         my $ip_ctr = 0;
         my $net_ctr = 0;
-        $ip_ctr++ for keys %{$auto_dl{'ip'}};
-        $net_ctr++ for keys %{$auto_dl{'net'}};
-
+        for my $ip (keys %auto_dl) {
+            my $mask = $auto_dl{$ip}{'mask'};
+            if ($mask eq '32') {
+                $ip_ctr++;
+            } else {
+                $net_ctr++;
+            }
+        }
         ### don't write syslog message if we are running in --fw-block-ip
         ### mode
         unless ($fw_block_ip) {
@@ -2968,59 +2962,52 @@ sub assign_auto_danger_level() {
 
     ### see if the source should automatically be assigned a
     ### danger level
-    if (defined $auto_dl{'ip'} and defined $auto_dl{'ip'}{$src}) {
-        if (defined $auto_dl{'ip'}{$src}{'allproto'}) {
-            if ($auto_dl{'ip'}{$src}{'allproto'} == 0) {
-                return 0;
-            }
-            if ($scan_dl{$src} < $auto_dl{'ip'}{$src}{'allproto'}) {
-                $scan_dl{$src} = $auto_dl{'ip'}{$src}{'allproto'};
-                $auto_assigned_msg{$src} = '';
-                &Psad::psyslog('psad', "auto-assigned danger level: " .
-                    "$scan_dl{$src} for IP: $src");
-                return $auto_dl{'ip'}{$src}{'allproto'};
-            }
-        } elsif (defined $auto_dl{'ip'}{$src}{$scan_proto}) {
-            if ($auto_dl{'ip'}{$src}{$scan_proto} == 0) {
-                return 0;
-            }
-            if ($scan_dl{$src} < $auto_dl{'ip'}{$src}{$scan_proto}) {
-                $scan_dl{$src} = $auto_dl{'ip'}{$src}{$scan_proto};
-                $auto_assigned_msg{$src} = '';
-                &Psad::psyslog('psad', "auto-assigned danger level: " .
-                    "$scan_dl{$src} for IP: $src");
-                return $auto_dl{'ip'}{$src}{$scan_proto};
-            }
-        }
-    } elsif (defined $auto_dl{'net'}) {
-        NET: for my $net (keys %{$auto_dl{'net'}}) {
-            next NET unless ipv4_in_network($net, $src);
-            if (defined $auto_dl{'net'}{$net}{'allproto'}) {
-                if ($auto_dl{'net'}{$net}{'allproto'} == 0) {
-                    return 0;
-                }
-                if ($scan_dl{$src} < $auto_dl{'net'}{$net}{'allproto'}) {
-                    $scan_dl{$src} = $auto_dl{'net'}{$net}{'allproto'};
-                    $auto_assigned_msg{$src} = '';
-                    &Psad::psyslog('psad', "auto-assigned danger level: " .
-                        "$scan_dl{$src} for IP: $src");
-                    return $auto_dl{'net'}{$net}{'allproto'};
-                }
-            } elsif (defined $auto_dl{'net'}{$net}{$scan_proto}) {
-                if ($auto_dl{'net'}{$net}{$scan_proto} == 0) {
-                    return 0;
-                }
-                if ($scan_dl{$src} < $auto_dl{'net'}{$net}{$scan_proto}) {
-                    $scan_dl{$src} = $auto_dl{'net'}{$net}{$scan_proto};
-                    $auto_assigned_msg{$src} = '';
-                    &Psad::psyslog('psad', "auto-assigned danger level: " .
-                        "$scan_dl{$src} for IP: $src");
-                    return $auto_dl{'net'}{$net}{$scan_proto};
+    NET: for my $net (keys %auto_dl) {
+        my $dl   = $auto_dl{$net}{'dl'};
+        my $mask = $auto_dl{$net}{'mask'};  ### may be a /32 (single IP)
+
+        ### check to see if $src is contained within an auto_dl network
+        next NET unless ipv4_in_network("$net/$mask", $src);
+
+        ### $src is part of an ignored network
+        return 0 if $dl == 0;
+
+        if ($scan_dl{$src} < $dl) {
+            if (not defined $auto_dl{$net}{'proto'}) {
+                ### all protocols are applicable
+                $scan_dl{$src} = $dl;
+                &Psad::psyslog('psad', 'auto-assigned danger level: ' .
+                    "$dl for IP: $src");
+                return $dl;
+            } else {
+                for my $proto (@{$auto_dl{$net}{'proto'}}) {
+                    if ($scan_proto eq $proto) {
+                        $scan_dl{$src} = $dl;
+                        &Psad::psyslog('psad', 'auto-assigned danger ' .
+                            "level: $dl for IP: $src");
+                        return $dl;
+                    }
                 }
             }
         }
     }
     return -1;
+}
+
+sub net_overlap() {
+    my ($net, $mask, $block_ip, $block_mask) = @_;
+
+    my ($block_net_addr, $block_net_mask) =
+        ipv4_network($block_ip, $block_mask);
+    my $block_net_br = ipv4_broadcast("$block_net_addr/$block_net_mask");
+
+    if (ipv4_in_network("$net/$mask", $block_net_addr)) {
+        return 1;
+    }
+    if (ipv4_in_network("$net/$mask", $block_net_br)) {
+        return 1;
+    }
+    return 0;
 }
 
 sub check_scan_proto() {
@@ -3819,7 +3806,7 @@ sub flush_auto_blocked_ips() {
     }
     if (&Psad::pidrunning($config{'PID_FILE'})) {
         print "    WARNING: psad is currently running, so flushing the ",
-            "chains may cause some\n    warning syslog messages to appear.\n";
+            "chains may\n    cause some warning syslog messages to appear.\n";
     }
     if (@ipt_block_config) {
         for my $block_hr (@ipt_block_config) {
@@ -4101,6 +4088,11 @@ sub ipt_list_auto_chains() {
     ) or die '[*] Could not acquire IPTables::ChainMgr object.';
 
     print "[+] Listing chains from IPT_AUTO_CHAIN keywords...\n";
+    if ($config{'ENABLE_AUTO_IDS'} eq 'N') {
+        print '[-] NOTE: ENABLE_AUTO_IDS is currently disabled ',
+            "in $config_file\n";
+    }
+    print "\n";
     for my $block_hr (@ipt_block_config) {
         my $table      = $block_hr->{'table'};
         my $to_chain   = $block_hr->{'to_chain'};
@@ -4152,56 +4144,36 @@ sub check_ipt_add_ip() {
 
 sub cache_file_add_ipt_block_ip() {
     unless ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
-        print "[-] ENABLE_AUTO_IDS is not enabled. Exiting.";
+        print "[-] ENABLE_AUTO_IDS is not enabled. Exiting.\n";
         return 0;
     }
 
-    my $block_ip     = '';
-    my $block_subnet = '';
+    my $block_ip   = '';
+    my $block_mask = '';
     if ($fw_block_ip =~ m|^\s*($ip_re)\s*$|) {
-        $block_ip = $1;
-        $block_subnet = '32';
+        $block_ip   = $1;
+        $block_mask = '32';
     } elsif ($fw_block_ip =~ m|^\s*($ip_re)/(.*)\s*$|) {
-        $block_ip     = $1;
-        $block_subnet = $2;
+        $block_ip   = $1;
+        $block_mask = $2;  ### CIDR or regular
     }
 
     ### import auto_dl file
     &import_auto_dl();
 
     ### make sure $fw_block_ip is not supposed to be ignored
-#    if (defined $auto_dl{'ip'}) {
-#        for my $ip (keys %{$auto_dl{'ip'}}) {
-#            ### note that we only check for all protocols being
-#            ### ignored (i.e. the IP is whitelisted).
-#            if (defined $auto_dl{'ip'}{$ip}{'allproto'}) {
-#                my $dl = $auto_dl{'ip'}{$ip}{'allproto'};
-#                if ($dl == 0) {
-#                    ### see if there is any overlap
-#                    if (&net_overlap($block_ip, $block_subnet, $ip, '32')) {
-#                        die "[*] $fw_block_ip overlaps with a whitelisted ",
-#                            "IP/net in $config{'AUTO_DL_FILE'}";
-#                    }
-#                }
-#            }
-#        }
-#    } elsif (defined $auto_dl{'net'}) {
-#        for my $net (keys %{$auto_dl{'net'}}) {
-#            ### note that we only check for all protocols being
-#            ### ignored (i.e. the IP is whitelisted).
-#            if (defined $auto_dl{'net'}{$net}{'allproto'}) {
-#                my $dl = $auto_dl{'net'}{$net}{'allproto'};
-#                if ($dl == 0) {
-#                    ### see if there is any overlap
-#                    my $
-#                    if (&net_overlap($block_ip, $block_subnet, $net, '32')) {
-#                        die "[*] $fw_block_ip overlaps with a whitelisted ",
-#                            "IP/net in $config{'AUTO_DL_FILE'}";
-#                    }
-#                }
-#            }
-#        }
-#    }
+    NET: for my $net (keys %auto_dl) {
+        my $dl   = $auto_dl{$net}{'dl'};
+        my $mask = $auto_dl{$net}{'mask'};  ### may be a /32 (single IP)
+
+        next unless $dl == 0;  ### only care about the ignored IPs/nets
+
+        if (&net_overlap($net, $mask, $block_ip, $block_mask)) {
+            die "[*] $fw_block_ip overlaps with whitelisted ",
+                "$net/$mask in $config{'AUTO_DL_FILE'}";
+        }
+    }
+
 
     if (-e $config{'PID_FILE'}) {
         if (&Psad::pidrunning($config{'PID_FILE'})) {
@@ -5944,6 +5916,8 @@ Options:
     --fw-file <rules file>        - Analyze the iptables ruleset
                                     contained within <rules file>
                                     instead of a running policy.
+    --fw-del-chains               - Delete Netfilter chains used by
+                                    psad for auto-blocking rules.
     -snort-rdir <rule dir>        - Path to snort rules directory.
     -d,  --debug                  - Run psad in debugging mode.
     -D,  --Dump-conf              - Dump psad configuration on STDOUT

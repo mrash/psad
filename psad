@@ -1711,12 +1711,23 @@ sub import_signatures() {
         if ($proto eq 'tcp') {
             my $flags = '';
             my $sig_flags;
+            my $sig_flow = '';
+
+            if ($rule_options =~ /flow:\s*(.*?)\s*;/i) {
+                $sig_flow = $1;
+            }
+
             if ($rule_options =~ /[\s;]flags:\s*(.*?)\s*;/) {
                 $sig_flags = $1;
                 ### make flags identical to what iptables log messages
                 ### would report (check in iptables flag reporting order).
                 $flags .= 'URG ' if $sig_flags =~ /U/;
                 $flags .= 'ACK ' if $sig_flags =~ /A/;
+                ### flags can also be deduced from the "flow" field in
+                ### snort signatures.
+                if ($sig_flow =~ /established/ and $flags !~ /ACK/) {
+                    $flags .= 'ACK ';
+                }
                 $flags .= 'PSH ' if $sig_flags =~ /P/;
                 $flags .= 'RST ' if $sig_flags =~ /R/;
                 $flags .= 'SYN ' if $sig_flags =~ /S/;
@@ -1740,8 +1751,6 @@ sub import_signatures() {
             &build_sig_ports($sid, 'udp', $sp, $dp);
 
         } elsif ($proto eq 'icmp') {
-            $sigs{'icmp'}{$sid}{'src'} = $src;
-            $sigs{'icmp'}{$sid}{'dst'} = $dst;
             if ($rule_options =~ /ttl:\s*(\d+)/i) {
                 $sigs{'icmp'}{$sid}{'ttl'} = $1;
             }

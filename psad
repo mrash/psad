@@ -459,14 +459,14 @@ sub check_flags() {
 	my ($sigs_href, $msg, $flags_to_check, $proto) = @_;
 	return 0 if ($proto ne "TCP");
 	my $msgflags = $sigs_href->{$proto}->{$msg}->{'FLAGS'};
-	return 1 if ($msgflags eq "S" && $flags_to_check eq "SYN");
+	return 1 if ($msgflags eq "S" && $flags_to_check eq "SYN");		# syn scan
 	return 1 if ($msgflags eq "F" && $flags_to_check eq "FIN");		# fin scan
-	return 1 if ($msgflags =~ /SF/o && $flags_to_check eq "SYN FIN"); 	# "syn/fin" scan
-	return 1 if ($msgflags =~ /UPF/o && $flags_to_check eq "URG PSH FIN");  # nmap Xmas scan
-	return 1 if ($msgflags =~ /NULL/o && $flags_to_check eq "NULL");	# nmap NULL scan
-	return 1 if ($msgflags =~ /UPSF/o && $flags_to_check eq "URG PSH SYN FIN");  # nmap finger print scan
-	return 1 if ($msgflags =~ /AP/o && $flags_to_check eq "ACK PSH");
-	return 1 if ($msgflags =~ /AS/o && $flags_to_check eq "ACK SYN");
+	return 1 if ($msgflags eq "SF" && $flags_to_check eq "SYN FIN"); 	# "syn/fin" scan
+	return 1 if ($msgflags eq "UPF" && $flags_to_check eq "URG PSH FIN");	# nmap Xmas scan
+	return 1 if ($msgflags eq "NULL" && $flags_to_check eq "NULL");		# nmap NULL scan
+	return 1 if ($msgflags eq "UPSF" && $flags_to_check eq "URG PSH SYN FIN");  # nmap fingerprint scan
+	return 1 if ($msgflags eq "AP" && $flags_to_check eq "ACK PSH");	# see the signatures for these
+	return 1 if ($msgflags eq "AS" && $flags_to_check eq "ACK SYN");
 	return 0;
 }
 sub check_port() {

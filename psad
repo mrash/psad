@@ -1362,7 +1362,7 @@ sub dshield_email_log() {
             || (($#dshield_data > 10000)
             && ((time() - $last_dshield_alert) >= 2*3600))) {
         my $subject = "FORMAT DSHIELD USERID $config{'DSHIELD_USER_ID'} " .
-            "TZ $timezone psad Version 1.2";
+            "TZ $timezone psad Version 1.3";
         if ($config{'DSHIELD_USER_EMAIL'} eq 'NONE') {
             open MAIL, qq(| $cmds{'mail'} -s "$subject" ) .
                 $config{'DSHIELD_ALERT_EMAIL'} or die ' ** Could not send ',
@@ -2103,6 +2103,7 @@ sub scan_logr() {
             my $src_dns_str  = '';
             my $dst_dns_str  = '';
             my $rdns         = '';
+            my $src_subj     = '';
             my $syslog_range = '';
             my $tcp_newrange = '';
             my $tcp_absrange = '';
@@ -2213,14 +2214,17 @@ sub scan_logr() {
                     ### my $rdns = gethostbyaddr($ipaddr, AF_INET);
                     if ($rdns = gethostbyaddr $ipaddr, 2) {
                         $src_dns_str = $rdns;
+                        $src_subj    = $rdns;
                     } else {
                         $src_dns_str = '[No reverse dns info available]';
+                        $src_subj    = $src;
                     }
                 } else {
                     ### $ipaddr was already reported as
                     ### a host name by iptables (does this actually
                     ### happen?)
                     $src_dns_str = $src;
+                    $src_subj    = $src;
                 }
                 if ($dst =~ /$ip_re/) {
                     my $ipaddr = gethostbyname $dst;
@@ -2376,20 +2380,10 @@ sub scan_logr() {
             close E;
             if ($curr_dl >= $config{'EMAIL_ALERT_DANGER_LEVEL'}) {
                 my $subject;
-                if ($rdns) {
-                    if ($benchmark) {
-                        $subject = " ** psad: BENCHMARK SCAN from: $rdns";
-                    } else {
-                        $subject
-                            = " ** psad: [DL$curr_dl] SCAN from: $rdns";
-                    }
+                if ($benchmark) {
+                    $subject = " ** psad: BENCHMARK SCAN from: $src_subj";
                 } else {
-                    if ($benchmark) {
-                        $subject = " ** psad: BENCHMARK SCAN from: $src";
-                    } else {
-                        $subject
-                            = " ** psad: [DL$curr_dl] SCAN from: $src";
-                    }
+                    $subject = " ** psad: [DL$curr_dl] SCAN from: $src_subj";
                 }
                 &Psad::psyslog('psad', ".. sending email alert to: " .
                     "$config{'EMAIL_ADDRESSES'}\n");

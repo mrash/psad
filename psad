@@ -791,7 +791,7 @@ sub logr() {
 									print $hndl "$flags_mesg\n";
 									print EMAILALERT "$flags_mesg\n";
 								} else {
-									$flags_mesg = "TCP flags:                  [$flags: $Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'FLAGS'}->{$flags} packets]\n";
+									$flags_mesg = "TCP flags:                  [$flags: $Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'FLAGS'}->{$flags} packets]";
 									print $hndl "$flags_mesg\n";
 									print EMAILALERT "$flags_mesg\n";
 								}

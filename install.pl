@@ -487,17 +487,27 @@ sub install() {
             &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
         }
     }
-    ### deal with psad_auto_ips, psad_signatures, psad_posf here
-    ### add &query_preserve_sigs_autoips();
-    my $preserve_sigs_rv = 0;
-    if (-e "${PSAD_CONFDIR}/psad_signatures") {
-#        $preserve_sigs_rv = &query_preserve_sigs_autoips();
-    }
+    ### deal with psad_auto_ips, psad_signatures, and psad_posf
     for my $file qw(psad_signatures psad_posf psad_auto_ips) {
+        if (-e "${PSAD_CONFDIR}/$file") {
+            &archive("${PSAD_CONFDIR}/$file") unless $noarchive;
+            unless (&query_preserve_sigs_autoips("${PSAD_CONFDIR}/$file")) {
+                ### keep the installed file intact (the user must have
+                ### modified it).
+                &logr(" .. Copying $file -> ${PSAD_CONFDIR}/$file\n");
+                copy $file, "${PSAD_CONFDIR}/$file";
+                &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
+            }
+        } else {
+            &logr(" .. Copying $file -> ${PSAD_CONFDIR}/$file\n");
+            copy $file, "${PSAD_CONFDIR}/$file";
+            &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
+        }
     }
+    &logr("\n");
 
     if (-x $Cmds{'iptables'}) {
-        &logr(" .. Found iptables.  Testing syslog configuration.\n");
+        &logr(" .. Found iptables.  Testing syslog configuration:\n");
         ### make sure we actually see packets being logged by
         ### the firewall.
         &test_syslog_config();
@@ -577,7 +587,8 @@ sub install() {
         &logr("\n .. Psad has been installed.\n");
     }
     if ($running) {
-        &logr("\n .. An older version of psad is already running.  To ".
+        &logr("\n");
+        &logr(" .. An older version of psad is already running.  To ".
             "start the new version, run \"${USRSBIN_DIR}/psad --Restart\"\n");
     } else {
         &logr("\n .. To execute psad, run \"${INIT_DIR}/psad start\"\n");
@@ -733,6 +744,24 @@ sub query_preserve_config() {
             'existing psad installation ([y]/n)?  ');
         $ans = <STDIN>;
         return 1 if $ans eq "\n";
+        chomp $ans;
+    }
+    if ($ans eq 'y') {
+        return 1;
+    }
+    return 0;
+}
+
+sub query_preserve_sigs_autoips() {
+    my $file = shift;
+    my $ans = '';
+    while ($ans ne 'y' && $ans ne 'n') {
+        &logr("\n");
+        &logr(" .. Preserve the existing $file file?\n");
+        &logr('    (NOTE: This is only recommended if you have manually ' .
+            "edited $file)  (y/[n])?  ");
+        $ans = <STDIN>;
+        return 0 if $ans eq "\n";
         chomp $ans;
     }
     if ($ans eq 'y') {

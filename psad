@@ -53,7 +53,7 @@ my $FW_DATA = "/var/log/psad/fwdata";
 my $ERROR_LOG = "/var/log/psad/fwerrorlog";
 my $EMAIL_ALERTFILE = "/var/log/psad/email_alert";
 $PRINT_SCAN_HASH = "/var/log/psad/scan_hash.$$";  # global for sub print_scan
-my $CHECK_INTERVAL = 5;
+my $CHECK_INTERVAL = 15;
 my $PORT_RANGE_SCAN_THRESHOLD = 1;
 my %DANGER_LEVELS;
 $DANGER_LEVELS{'1'} = 10;

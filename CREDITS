@@ -114,6 +114,9 @@ Albert E. Whale         Discovered bug in 1.1 that made fw_check() too
                         strict with looking for precisely FW_MSG_SEARCH
                         in a logging prefix instead of just looking for
                         FW_MSG_SEARCH _within_ the logging prefix.
+                        Suggested use of CPAN downloads of perl modules
+                        in install.pl.  Bugfix for "-" character missing
+                        from Mandrake version of ps.
 
 David Krider            Discovered iptables path bug on SuSE 8.2.
 
@@ -121,3 +124,6 @@ Ciapato Manfredi        Reported psadwatchd bug where multiple useless
                         processes were being spawned.
 
 Ben Alcala              Helped troubleshoot diskmond utilization bug.
+
+Sebastian Mastropiero   Suggested bugfix for missing pipe character in
+                        psad man page for psadfifo line in syslog.conf.

@@ -3,27 +3,26 @@
 # TODO: 
 #	- perhaps an $INSTALL directory to put psad, psadwatchd, 
 #	  kmsgsd, and diskmond.
-
+#	- make install.pl preserve psad_signatures and psad_auto_ips
+#	  with "diff" and "patch" from the old to the new.
 #============== config ===============
 my $SYSLOG_INIT = "/etc/rc.d/init.d/syslog";
 
-my $killCmd = "/bin/kill";
 my $psCmd = "/bin/ps";
-my $touchCmd = "/bin/touch";
 my $mknodCmd = "/bin/mknod";
 my $grepCmd = "/bin/grep";
 my $makeCmd = "/usr/bin/make";
-my $cpCmd = "/bin/cp";
-my $mvCmd = "/bin/mv";
-my $rmCmd = "/bin/rm";
 my $unameCmd = "/bin/uname";
 my $findCmd = "/usr/bin/find";
 my $perlCmd = "/usr/bin/perl";
 my $ifconfigCmd = "/sbin/ifconfig";
 my $ipchainsCmd = "/sbin/ipchains";
 my $iptablesCmd = "/usr/local/bin/iptables";
+my $psadCmd = "/usr/local/bin/psad";
 #============ end config ============
 
+use File::Path;	# used for the 'rmtree' function for removing directories
+use File::Copy;	# used for copying/moving files
 use Getopt::Long;
 
 ### set the default execution
@@ -43,21 +42,17 @@ usage_and_exit(1) unless (GetOptions (
 usage_and_exit(0) if ($help);
 
 my %Cmds = (
-	"kill"		=> $killCmd,
 	"ps"		=> $psCmd,
-	"touch"		=> $touchCmd,
 	"mknod"         => $mknodCmd,
 	"grep"		=> $grepCmd,
-	"cp"		=> $cpCmd,
-	"mv"		=> $mvCmd,
-	"rm" 		=> $rmCmd,
 	"uname"		=> $unameCmd,
 	"find"		=> $findCmd,
 	"make"		=> $makeCmd,
 	"perl"		=> $perlCmd,
 	"ifconfig"	=> $ifconfigCmd,
 	"ipchains"      => $ipchainsCmd,
-	"iptables"	=> $iptablesCmd
+	"iptables"	=> $iptablesCmd,
+	"psad"		=> $psadCmd
 );
 
 %Cmds = check_commands(\%Cmds);
@@ -98,12 +93,11 @@ if ($uninstall) {
 	}
 	if (-e "/etc/psad") {
 		print "=-=-=  Removing configuration directory: /etc/psad\n";
-		# "rm -rf" is easier than checking to make sure the directory is empty and then using perl's rmdir
-		`$Cmds{'rm'} -rf /etc/psad`;
+		rmtree("/etc/psad", 1, 0);
 	}
 	if (-e "/var/log/psad") {
 		print "=-=-=  Removing logging directory: /var/log/psad\n";
-		`$Cmds{'rm'} -rf /var/log/psad`;
+		rmtree("/var/log/psad", 1, 0);
 	}
 	if (-e "/var/log/psadfifo") {
 		print "=-=-=  Removing named pipe: /var/log/psadfifo\n";
@@ -115,7 +109,8 @@ if ($uninstall) {
 	}
 	print "=-=-=  Restoring /etc/syslog.conf.orig -> /etc/syslog.conf\n";
 	if (-e "/etc/syslog.conf.orig") {
-		`$Cmds{'mv'} /etc/syslog.conf.orig /etc/syslog.conf`;
+		move("/etc/syslog.conf.orig", "/etc/syslog.conf");
+#		`$Cmds{'mv'} /etc/syslog.conf.orig /etc/syslog.conf`;
 	} else {
 		print "=-=-= /etc/syslog.conf.orig does not exist.  Editing /etc/syslog.conf directly.\n";
 		open ESYS, "< /etc/syslog.conf" or die "=-=-= Unable to open /etc/syslog.conf: $!\n";
@@ -142,7 +137,7 @@ unless (-e "/var/log/psadfifo") {
 }
 unless (`$Cmds{'grep'} psadfifo /etc/syslog.conf`) {
 	print "=-=-=  Modifying /etc/syslog.conf\n";
-	`$Cmds{'cp'} /etc/syslog.conf /etc/syslog.conf.orig` unless (-e "/etc/syslog.conf.orig");	
+	copy("/etc/syslog.conf", "/etc/syslog.conf.orig") unless (-e "/etc/syslog.conf.orig");
 	open SYSLOG, ">> /etc/syslog.conf" or die "=-=-=  Unable to open /etc/syslog.conf: $!\n";
 	print SYSLOG "kern.info  |/var/log/psadfifo\n\n";  #reinstate kernel logging to our named pipe
 	close SYSLOG;
@@ -155,7 +150,8 @@ unless (-e "/var/log/psad") {
 }
 unless (-e "/var/log/psad/fwdata") {
 	print "=-=-=  Creating /var/log/psad/fwdata file\n";
-	`$Cmds{'touch'} /var/log/psad/fwdata`;
+	open F, ">> /var/log/psad/fwdata";
+	close F;
 	chmod 0600, "/var/log/psad/fwdata";
 	perms_ownership("/var/log/psad/fwdata", 0600);
 }
@@ -168,7 +164,7 @@ unless (-e "/usr/local/bin/whois.psad") {
 		print "=-=-=  Compiling Marco d'Itri's whois client\n";
 		if (! system("$Cmds{'make'} -C whois-4.5.6")) {  # remember unix return value...
 			print "=-=-=  Copying whois binary to /usr/local/bin/whois.psad\n";
-			`$Cmds{'cp'} whois-4.5.6/whois /usr/local/bin/whois.psad`;
+			copy("whois-4.5.6/whois", "/usr/local/bin/whois.psad");
 		}
 	}
 }
@@ -181,7 +177,7 @@ if ( -e "/usr/local/bin/psad" && (! $nopreserve)) {  # need to grab the old conf
 	perms_ownership("/usr/local/bin/psad", 0500)
 } else {
 	print "=-=-=  Copying psad -> /usr/local/bin/\n";
-	`$Cmds{'cp'} psad /usr/local/bin/psad`;
+	copy("psad", "/usr/local/bin/psad");
 	rm_perl_options("/usr/local/bin/psad", \%Cmds);
 	perms_ownership("/usr/local/bin/psad", 0500);
 }
@@ -193,7 +189,7 @@ if ( -e "/usr/local/bin/psadwatchd" && (! $nopreserve)) {  # need to grab the ol
         perms_ownership("/usr/local/bin/psadwatchd", 0500)
 } else {
         print "=-=-=  Copying psadwatchd -> /usr/local/bin/\n";
-        `$Cmds{'cp'} psadwatchd /usr/local/bin/psadwatchd`;
+	copy("psadwatchd", "/usr/local/bin/psadwatchd");
 	rm_perl_options("/usr/local/bin/psadwatchd", \%Cmds);
         perms_ownership("/usr/local/bin/psadwatchd", 0500);
 }
@@ -205,7 +201,7 @@ if (-e "/usr/local/bin/kmsgsd" && (! $nopreserve)) {
 	perms_ownership("/usr/local/bin/kmsgsd", 0500);
 } else {
 	print "=-=-=  Copying kmsgsd -> /usr/local/bin/kmsgsd\n";
-	`$Cmds{'cp'} kmsgsd /usr/local/bin/kmsgsd`;
+	copy("kmsgsd", "/usr/local/bin/kmsgsd");
 	rm_perl_options("/usr/local/bin/kmsgsd", \%Cmds);
 	perms_ownership("/usr/local/bin/kmsgsd", 0500);
 }
@@ -217,7 +213,7 @@ if (-e "/usr/local/bin/diskmond" && (! $nopreserve)) {
         perms_ownership("/usr/local/bin/diskmond", 0500);
 } else {
 	print "=-=-=  Copying diskmond -> /usr/local/bin/diskmond\n";
-	`$Cmds{'cp'} diskmond /usr/local/bin/diskmond`;
+	copy("diskmond", "/usr/local/bin/diskmond");
 	rm_perl_options("/usr/local/bin/diskmond", \%Cmds);
 	perms_ownership("/usr/local/bin/diskmond", 0500);
 }
@@ -228,41 +224,41 @@ unless (-e "/etc/psad") {
 if (-e "/etc/psad/psad_signatures") {
 	print "=-=-=  Copying psad_signatures -> /etc/psad/psad_signatures\n";
 	print "       Preserving old signatures file as /etc/psad/psad_signatures.old\n";
-	`$Cmds{'mv'} /etc/psad/psad_signatures /etc/psad/psad_signatures.old`;
-	`$Cmds{'cp'} psad_signatures /etc/psad/psad_signatures`;
+	move("/etc/psad/psad_signatures", "/etc/psad/psad_signatures.old");
+	copy("psad_signatures", "/etc/psad/psad_signatures");
 	perms_ownership("/etc/psad/psad_signatures", 0600);
 } else {
 	print "=-=-=  Copying psad_signatures -> /etc/psad/psad_signatures\n";
-	`$Cmds{'cp'} psad_signatures /etc/psad/psad_signatures`;
+	copy("psad_signatures", "/etc/psad/psad_signatures");
 	perms_ownership("/etc/psad/psad_signatures", 0600);
 }
 if (-e "/etc/psad/psad_auto_ips") {
 	print "=-=-=  Copying psad_auto_ips -> /etc/psad/psad_auto_ips\n";
 	print "       Preserving old auto_ips file as /etc/psad/psad_auto_ips.old\n";
-	`$Cmds{'mv'} /etc/psad/psad_auto_ips /etc/psad/psad_auto_ips.old`;
-	`$Cmds{'cp'} psad_auto_ips /etc/psad/psad_auto_ips`;
+	move("/etc/psad/psad_auto_ips", "/etc/psad/psad_auto_ips.old");
+	copy("psad_auto_ips", "/etc/psad/psad_auto_ips");
 	perms_ownership("/etc/psad/psad_auto_ips", 0600);
 } else {
 	print "=-=-=  Copying psad_auto_ips -> /etc/psad/psad_auto_ips\n";
-	`$Cmds{'cp'} psad_auto_ips /etc/psad/psad_auto_ips`;
+	copy("psad_auto_ips", "/etc/psad/psad_auto_ips");
 	perms_ownership("/etc/psad/psad_auto_ips", 0600);
 }
 if (-e "/etc/psad/psad.conf") {
 	print "=-=-=  Copying psad.conf -> /etc/psad/psad.conf\n";
 	print "       Preserving old psad.conf file as /etc/psad/psad.conf\n";
-	`$Cmds{'mv'} /etc/psad/psad.conf /etc/psad/psad.conf.old`;
-	`$Cmds{'cp'} psad.conf /etc/psad/psad.conf`;
+	move("/etc/psad/psad.conf", "/etc/psad/psad.conf.old");
+	copy("psad.conf", "/etc/psad/psad.conf");
 	perms_ownership("/etc/psad/psad.conf", 0600);
 } else {
 	print "=-=-=  Copying psad.conf -> /etc/psad/psad.conf\n";
-	`$Cmds{'cp'} psad.conf /etc/psad/psad.conf`;
+	copy("psad.conf", "/etc/psad/psad.conf");
 	perms_ownership("/etc/psad/psad.conf", 0600);
 }
 print "=-=-=  Installing psad(8) man page\n";
 if (-e "/etc/man.config") {
 	# prefer to install psad.8 in /usr/local/man/man8 if this directory is configured in /etc/man.config
 	if (open MPATH, "< /etc/man.config" and grep /MANPATH\s+\/usr\/local\/man/, <MPATH> and close MPATH) {
-		`$Cmds{'cp'} psad.8 /usr/local/man/man8/psad.8`;
+		copy("psad.8", "/usr/local/man/man8/psad.8");
 		perms_ownership("/usr/local/man/man8/psad.8", 0644);
 	} else {
 		my $mpath;
@@ -278,15 +274,15 @@ if (-e "/etc/man.config") {
 		close MPATH;
 		if ($mpath) {
 			my $path = $mpath . "/man8/psad.8";
-			`$Cmds{'cp'} psad.8 $path`;
+			copy("psad.8", $path);
 			perms_ownership($path, 0644);
 		} else {
-			`$Cmds{'cp'} psad.8 /usr/man/man8/psad.8`;
+			copy("psad.8", "/usr/man/man8/psad.8");
 			perms_ownership("/usr/man/man8/psad.8", 0644);
 		}
 	}
 } else {
-	`$Cmds{'cp'} psad.8 /usr/man/man8/psad.8`;
+	copy("psad.8", "/usr/man/man8/psad.8");
 	perms_ownership("/usr/man/man8/psad.8", 0644);
 }
 
@@ -296,16 +292,27 @@ my $kernel = get_kernel(\%Cmds);
 if ($distro eq "redhat61" || $distro eq "redhat62") {
 	# remove signature checking from psad process if we are not running an iptables-enabled kernel
 	print "=-=-=  Copying psad-init -> /etc/rc.d/init.d/psad-init\n";
-	`$Cmds{'cp'} psad-init /etc/rc.d/init.d/psad-init`;
+	copy("psad-init", "/etc/rc.d/init.d/psad-init");
+	perms_ownership("/etc/rc.d/init.d/psad-init", 0744);
 	system "$Cmds{'perl'} -p -i -e 's|\\-s\\s/etc/psad/psad_signatures||' /etc/rc.d/init.d/psad-init" if ($kernel !~ /^2.3/ && $kernel !~ /^2.4/);
 } 
 # need to put checks in here for redhat vs. other systems.
 unless($fwcheck) {
 	if(check_firewall_rules(\%Cmds)) {
-		my $pidstatement = `$Cmds{'ps'} -auxw |$Cmds{'grep'} psad |$Cmds{'grep'} -v grep`;
+		my $running;
+		my $pid;
+		if (-e "/var/log/psad/pid.psad") {
+			open PID, "< /var/log/psad/pid.psad";
+			$pid = <PID>;
+			close PID;
+			chomp $pid;
+			$running = kill 0, $pid;
+		} else {
+			$running = 0;
+		}
 		if ($execute_psad) {
 			if ($distro eq "redhat61" || $distro eq "redhat62") {
-				if ($pidstatement) {
+				if ($running) {
 					print "=-=-=  Restarting the psad daemons...\n";
 					system "/etc/rc.d/init.d/psad-init restart";
 				} else {
@@ -313,49 +320,38 @@ unless($fwcheck) {
 					system "/etc/rc.d/init.d/psad-init start";
 				}
 			} else {
-				if ($pidstatement) {
+				if ($running) {
 					print "=-=-=  Restarting the psad daemons...\n";
-					my $pid = (split /\s+/, $pidstatement)[1];
-					system "$Cmds{'kill'} $pid";
+					system "$Cmds{'psad'} --kill";
 					if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/) {
-						system "/usr/local/bin/kmsgsd";
-                                                system "/usr/local/bin/psad -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips";
-						system "/usr/local/bin/diskmond";
-						system "/usr/local/bin/psadwatchd";
+                                                system "$Cmds{'psad'} -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips";
                                         } elsif ($kernel =~ /^2.2/) {
-						system "/usr/local/bin/kmsgsd";
-                                                system "/usr/local/bin/psad -a /etc/psad/psad_auto_ips";
-						system "/usr/local/bin/diskmond";
-						system "/usr/local/bin/psadwatchd";
+                                                system "$Cmds{'psad'} -a /etc/psad/psad_auto_ips";
                                         } else {
                                                 print "=-=-=  You are running kernel $kernel.  Assuming ipchains support.\n";
-						system "/usr/local/bin/kmsgsd";
-                                                system "/usr/local/bin/psad -a /etc/psad/psad_auto_ips";
-						system "/usr/local/bin/diskmond";
-						system "/usr/local/bin/psadwatchd";
+                                                system "$Cmds{'psad'} -a /etc/psad/psad_auto_ips";
                                         }
 				} else {
 					print "=-=-=  Starting the psad daemons...\n";
 					if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/) {	
-                                        	system "/usr/local/bin/psad -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips";
+                                        	system "$Cmds{'psad'} -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips";
 					} elsif ($kernel =~ /^2.2/) {
-						system "/usr/local/bin/psad -a /etc/psad/psad_auto_ips";
+						system "$Cmds{'psad'} -a /etc/psad/psad_auto_ips";
 					} else {
 						print "=-=-=  You are running kernel $kernel.  Assuming ipchains support.\n";
-						system "/usr/local/bin/psad -a /etc/psad/psad_auto_ips";
+						system "$Cmds{'psad'} -a /etc/psad/psad_auto_ips";
 					}
 				}
 			}
 		} else {
 			if ($distro eq "redhat61" || $distro eq "redhat62") {
-				if ($pidstatement) {
+				if ($running) {
 					print "=-=-=  An older version of psad is already running.  To execute, run \"/etc/rc.d/init.d/psad-init restart\"\n";
 				} else {
 					print "=-=-=  To execute psad, run \"/etc/rc.d/init.d/psad-init start\"\n";
 				}
 			} else {
-				if ($pidstatement) {
-					my $pid = (split /\s+/, $pidstatement)[1];
+				if ($running) {
 					print "=-=-=  An older version of psad is already running.  kill pid $pid, and then execute:\n";
 					if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/) {
                                        		print "/usr/local/bin/psad -s /etc/psad/psad_signatures, /usr/local/bin/psadwatchd,\n";
@@ -526,6 +522,8 @@ sub get_kernel() {
 sub check_commands() {
 	my $Cmds_href = shift;
 	CMD: foreach my $cmd (keys %$Cmds_href) {
+		### the daemons may not yet be installed, so skip check_commands() for each of them
+		next CMD if ($cmd eq "psad" || $cmd eq "psadwatchd" || $cmd eq "kmsgsd" || $cmd eq "diskmond");
 		unless (-e $Cmds_href->{$cmd}) {
 			$real_location = `which $cmd 2> /dev/null`;
 			chomp $real_location;
@@ -678,7 +676,8 @@ sub preserve_config() {
 	}
 	close SRC;
 	close TMP;
-	`$Cmds_href->{'mv'} $prod_tmp $productionfile`;
+	move($prod_tmp, $productionfile);
+#	`$Cmds_href->{'mv'} $prod_tmp $productionfile`;
 	return;
 }
 sub striphashsyntax() {
@@ -713,7 +712,7 @@ sub perms_ownership() {
 sub rm_perl_options() {
 	my ($file, $Cmds_href) = @_;
 	my $tmp = $file . ".tmp";
-	system "$Cmds_href->{'mv'} $file $tmp";
+	move($file, $tmp);
 	open TMP, "< $tmp";
 	my @lines = <TMP>;
 	close TMP;
@@ -729,7 +728,7 @@ sub usage_and_exit() {
         my $exitcode = shift;
         print <<_HELP_;
 
-Usage: psad [-f] [-n] [-e] [-u] [-v] [-h]
+Usage: install.pl [-f] [-n] [-e] [-u] [-v] [-h]
 	
 	-n  --no_preserve	- disable preservation of old configs.
 	-e  --exec_psad		- execute psad after installing.

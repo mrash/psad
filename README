@@ -127,6 +127,19 @@ USAGE:
 		  Psad is being executed on a syslog server.  This requires
 		  that check_firewall_rules() and auto_psad_response() not be
 		  executed since the firewall is probably not being run locally.
+	-K  --Kill
+                  Kill the current psad process along with psadwatchd, kmsgsd, 
+		  and diskmond. This provides a quick and easy way to kill all  
+		  psad processes without having to look in the process table or 
+		  appeal to the psad-init script.
+
+	-R  --Restart
+              	  Restart the currently running psad processes. This option will 
+		  preserve the command line options that were supplied to the 
+		  original psad process.
+
+	-V  --Version
+		  Print the psad version and exit.
 
 	-s  --signatures <sig file>
 		  The firewalling code included within the linux 2.4.x kernel

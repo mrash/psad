@@ -54,7 +54,7 @@
 #   DINDOW=32304 RES=0x00 SYN URGP=0
 #
 #
-#==================== config =======================
+#==================== config ======================= ## do not remove this line (used by install.pl to preserve configs) ##
 # Initialize config variables.  Some can be overriden with command line args
 my $PSAD_LOGFILE = "/var/log/psad/scanlog";
 my $FW_DATA = "/var/log/psad/fwdata";
@@ -95,7 +95,7 @@ my $netstatCmd = "/bin/netstat";
 my $unameCmd = "/bin/uname";
 my $hostnameCmd = "/bin/hostname";
 my $whoisCmd = "/usr/local/bin/whois.psad";
-#================== end config ====================
+#================== end config ==================== ## do not remove this line (used by install.pl to preserve configs) ##
 #===================== main =======================
 
 $USE_IPCHAINS = 0;      # these three are global variables

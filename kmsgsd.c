@@ -112,10 +112,6 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);  /* could not open fwdata file */
     }
 
-#ifdef DEBUG
-    printf("\n");
-#endif
-
     /* MAIN LOOP:
      * Read data from the pipe indefinitely (we opened it _without_
      * O_NONBLOCK) and write it to the fwdata file if it is a firewall message

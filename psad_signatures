@@ -7,7 +7,12 @@
 # NOTE:  New signatures may be constructed using the format shown below but
 # tcp flags MUST appear in the order in which they are reported by iptables log
 # messages.  This order is: "URG, ACK, PSH, RST, SYN, FIN"
-
+#
+# Also, as of psad 0.9.0 the only supported transport header fields are the
+# port number and the tcp flags.  Later versions will support other header that
+# ip tables can report such as with the --log-tcp-option, --log-tcp-sequence, 
+# --log-ip-options, etc...
+#
 ############# tcp signatures #############
 # Backdoor signatures
 tcp any -> 1524 msg: "default Backdoor access!"; flags: S;
@@ -24,7 +29,7 @@ tcp any -> 1243 msg:"Possible SubSeven access"; flags: S;
 tcp any -> 6776 msg:"Possible SubSeven access"; flags: S;
 
 # DDoS signatures
-tcp any -> any 15104 msg: "IDS111 - DDoS - mstream client to handler"; flags: S; 
+tcp any -> 15104 msg: "IDS111 - DDoS - mstream client to handler"; flags: S; 
 tcp any -> 20432 msg:"IDS254 - DDoS shaft client to handler"; flags: AP; 
 # tcp :1024 -> any msg:"IDS253 - DDoS shaft synflood outgoing"; flags: S; seq: 674711609; 
 # tcp :1024 -> any msg:"IDS252 - DDoS shaft synflood incoming"; flags: S; seq: 674711609; 

@@ -40,6 +40,19 @@
 #	- support for more packet fields (ttl, udp len, etc.) for better
 #	  signature recognition.	
 #	- re-write significant components (kmsgsd, diskmond, psadwatchd) in C.
+#	- possibly add a daemon to take into account ACK PSH and ACK FIN, etc.
+#	  packets that the client may generate after the ip_conntrack module
+#	  is reloaded.  Without anticipating such packets psad will interpret
+# 	  them as a belonging to a port scan.
+#	- improve check_firewall_rules() to check for a state rule since having
+#	  such a rule greatly improves the quality of the data stream provided
+#	  to psad by kmsgsd since more packet types will be denied without 
+#	  requiring overly complicated firewall rules to detect odd tcp flag
+#	  combinations.
+#	- sometimes packets (particularly ACK and RST packets) seem to not
+#	  recognized by ipt_state/ip_conntrack, so such packets get denied and
+#	  hence are picked up by psad.  Solution: parse /proc/net/ip_conntrack
+#	  for existing sessions and don't alert on these packets, etc...
 #
 # Sample packet (rejected by ipchains)
 # Dec 19 11:54:07 orthanc kernel: Packet log: input REJECT lo PROTO=1
@@ -103,6 +116,7 @@ $USE_IPCHAINS = 0;      # these three are global variables
 $USE_IPTABLES = 0;
 $DEBUG = 0;
 
+### initialize some default values (command line args can override some default values)
 my $Scan_href;  # contains ips, port ranges, tcp flags, and danger levels
 my $daemon = 0;
 my $output = 0;
@@ -154,7 +168,7 @@ usage_and_exit(1) unless (GetOptions (
 	'signatures=s'	=> \$signatures,	# scan signatures
 	'localport'	=> \$netstat_lookup,	# listening on localport that has been scanned?
 	'errors'	=> \$errors,		# do not write malformed packet messages to error log
-	'whois'		=> \$whoislookups
+	'whois'		=> \$whoislookups	# do not issue whois lookups against the scanning ip
 ));
 usage_and_exit(0) if ($help);
 
@@ -619,7 +633,8 @@ sub assign_danger_level() {
 					$Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} = 5;
 				}
 			}
-			if ($alert_all eq "Y") {  # we will always send an alert email for any new "bad" packet if $alert_all eq "Y"
+			# we will always send an alert email for any new "bad" packet if $alert_all eq "Y".  Else email sent only if the scan increments its D.L.
+			if ($alert_all eq "Y") {  
 				$Scan_href->{$srcip}->{$dstip}->{'ALERTED'} = "N";
 			}
 			print "assign_danger_level(): CURRENT_DANGER_LEVEL (after assignment) = $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'}\n" if $DEBUG;

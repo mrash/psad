@@ -11,7 +11,7 @@
 #
 # Credits:  (see the CREDITS file)
 #
-# Version: 1.2.3
+# Version: 1.2.4
 #
 # Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.org)
 #
@@ -114,13 +114,11 @@ unless ($found) {
 my $SUB_TAB = '    ';
 my $noarchive    = 0;
 my $uninstall    = 0;
-my $verbose      = 0;
 my $help         = 0;
 
 &usage(1) unless (GetOptions(
     'no-preserve' => \$noarchive,    # don't preserve existing configs
     'uninstall'   => \$uninstall,
-    'verbose'     => \$verbose,
     'help'        => \$help           # display help
 ));
 &usage(0) if ($help);
@@ -140,13 +138,11 @@ my %Cmds = (
 
 my $distro = &get_distro();
 
-### add chkconfig only if we are runing on a redhat distro
 if ($distro eq 'redhat') {
+    ### add chkconfig only if we are runing on a redhat distro
     $Cmds{'chkconfig'} = $chkconfigCmd;
-}
-
-### add rc-update if we are running on a gentoo distro
-if ($distro eq 'gentoo') {
+} elsif ($distro eq 'gentoo') {
+    ### add rc-update if we are running on a gentoo distro
     $Cmds{'rcupdate'} = $rcupdateCmd;
 }
 
@@ -453,10 +449,6 @@ sub install() {
         &logr(" .. Creating $PSAD_CONFDIR\n");
         mkdir $PSAD_CONFDIR,0500;
     }
-    unless (-d $CONF_ARCHIVE) {
-        &logr(" .. Creating $CONF_ARCHIVE\n");
-        mkdir $CONF_ARCHIVE, 0500;
-    }
     my $preserve_rv = 0;
     if (-e "${PSAD_CONFDIR}/psad.conf") {
         $preserve_rv = &query_preserve_config();
@@ -478,6 +470,12 @@ sub install() {
             &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
         }
     }
+    ### deal with any legacy diskmond.conf file
+    if (-e "${PSAD_CONFDIR}/diskmond.conf") {
+        &archive("${PSAD_CONFDIR}/diskmond.conf") unless $noarchive;
+        unlink "${PSAD_CONFDIR}/diskmond.conf";
+    }
+
     ### deal with psad_auto_ips, psad_signatures, and psad_posf
     for my $file qw(psad_signatures psad_posf psad_auto_ips) {
         if (-e "${PSAD_CONFDIR}/$file") {
@@ -1414,11 +1412,10 @@ sub usage() {
         my $exitcode = shift;
         print <<_HELP_;
 
-Usage: install.pl [-n] [-u] [-v] [-h]
+Usage: install.pl [-n] [-u] [-h]
 
     -n  --no-preserve   - disable preservation of old configs.
     -u  --uninstall     - uninstall psad.
-    -v  --verbose       - verbose mode.
     -h  --help          - prints this help message.
 
 _HELP_

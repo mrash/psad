@@ -55,7 +55,7 @@ dropped/rejected packets out of the pipe and writes them to a separate file
 (/var/log/psad/fwdata).  psad is then responsible for reading messages as 
 they are generated from this file and applying the danger threshold and 
 signature logic in order to determine whether or not a port scan has taken
-place, send appropriate alerts to /var/log/psad/scalog, send alert emails,
+place, send appropriate alerts to /var/log/psad/scanlog, send alert emails,
 and (optionally) block offending ip addresses.  psad includes a signal
 handler such that if a SIGUSR1 signal is received, psad will dump the
 contents of the current scan hash data structure to /var/log/psad/scan_hash.$$

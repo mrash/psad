@@ -37,10 +37,10 @@ my $fw_file    = '';
 
 &usage(1) unless (GetOptions(
     'config=s'    => \$config_file, # Specify path to configuration file.
+    'fw-search=s' => \$fw_search_file,  # Specify path to fw_search.conf.
     'fw-file=s'   => \$fw_file,     # Analyze ruleset contained within
                                     # $fw_file instead of a running
                                     # policy.
-    'fw-search=s' => \$fw_search_file,  # Specify path to fw_search.conf.
     'fw-analyze'  => \$fw_analyze,  # Analyze the local iptables ruleset
                                     # and exit.
     'help'        => \$help,        # Display help.
@@ -142,11 +142,11 @@ sub print_fw_help() {
     my $chain = shift;
     print FWCHECK
 " ** The $chain chain in the iptables ruleset on $config{'HOSTNAME'} does not\n",
-"    include default rules that will log and drop unwanted packets. You need\n",
-"    to include two default rules; one that logs packets that have not been\n",
-"    accepted by previous rules (this rule should have a logging prefix of one\n",
-"    of the search string mentioned above), and a final rule that drops any\n",
-"    unwanted packets.\n\n",
+"    appear to include default rules that will log and drop unwanted packets.\n",
+"    You need to include two default rules; one that logs packets that have\n",
+"    not been accepted by previous rules (this rule should have a logging\n",
+"    prefix of one of the search string mentioned above), and a final rule\n",
+"    that drops any unwanted packets.\n\n",
 "    FOR EXAMPLE:  Assuming you have already setup iptables rules to accept\n",
 "    traffic you want to allow, you can probably execute the following two\n",
 "    commandsto have iptables log and drop unwanted packets in the $chain\n",

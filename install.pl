@@ -805,9 +805,17 @@ sub stop_psad() {
         chomp $pid;
         if (kill 0, $pid) {
             print "[+] Stopping running psad daemons.\n";
-            ### psad may have been started from the command line
-            ### without using the init script, so stop with -K
-            system "$USRSBIN_DIR/psad -K";
+            if (-x "$init_dir/psad") {
+                system "$init_dir/psad stop";
+                ### if psad is still running then use -K
+                if (kill 0, $pid) {
+                    system "$USRSBIN_DIR/psad -K";
+                }
+            } else {
+                ### psad may have been started from the command line
+                ### without using the init script, so stop with -K
+                system "$USRSBIN_DIR/psad -K";
+            }
         }
     }
     return;

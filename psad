@@ -467,7 +467,7 @@ $< == 0 && $> == 0 or
 
 ### Import all psad configuration and signatures files
 ### (psad.conf, posf, signatures, psad_icmp_types,
-### and auto_dl).
+### and auto_dl), and call setup().
 &psad_init();
 
 ### check to make sure another psad process is not already running.
@@ -526,7 +526,7 @@ unless ($no_daemon or $debug or $benchmark) {
 
 ### write the command line args used to start psad to $cmdline_file
 &Psad::writecmdline(\@args_cp, $cmdline_file)
-    unless $benchmark or $fw_analyze;
+    unless $benchmark;
 
 ### psad _requires_ that kmsgsd is running to receive any data, so let's
 ### start it here for good measure (as of 0.9.2 it makes use of the pid
@@ -545,11 +545,6 @@ unless ($benchmark or $fw_analyze) {
 ### auto-block rules for IPs after a reboot or after restarting
 ### psad.
 &renew_auto_blocked_ips() if $config{'ENABLE_AUTO_IDS'} eq 'Y';
-
-unless ($config{'IMPORT_OLD_SCANS'} eq 'Y' or $benchmark) {
-    ### archive old firewall and scan data
-    &archive_data();
-}
 
 ### Install signal handlers for debugging %scan with Data::Dumper,
 ### and for reaping zombie whois processes.  Only install signal
@@ -589,9 +584,15 @@ if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
 ### Initialize current time for disk space checking.
 my $last_disk_check = time();
 
-if ($config{'IMPORT_OLD_SCANS'} eq 'Y') {
-    ### import old scans and counters from /var/log/psad/
-    &import_old_scans();
+unless ($benchmark) {
+    if ($config{'IMPORT_OLD_SCANS'} eq 'Y') {
+        ### import old scans and counters from /var/log/psad/
+        &import_old_scans();
+    } elsif ($config{'ENABLE_SCAN_ARCHIVE'} eq 'Y') {
+        &archive_data();
+    } else {
+        &remove_old_scans();
+    }
 }
 
 unless ($fw_analyze or $benchmark) {
@@ -639,7 +640,8 @@ for (;;) {
             close FWDATA;
             ### zero out the new fwdata file just in case (the path
             ### has changed).
-            open FWDATA, "> $config{'FW_DATA_FILE'}" or die $!;
+            open FWDATA, "> $config{'FW_DATA_FILE'}" or die
+                "[*] Could not open $config{'FW_DATA_FILE'}:$!";
             close FWDATA;
 
             ### re-open the fwdata file
@@ -737,12 +739,13 @@ for (;;) {
             close FWDATA;
 
             ### truncate fwdata file
-            open FWDATA, "> $config{'FW_DATA_FILE'}" or die $!;
+            open FWDATA, "> $config{'FW_DATA_FILE'}" or die
+                "[*] Could not open $config{'FW_DATA_FILE'}: $!";
             close FWDATA;
 
             ### re-open the fwdata file
             open FWDATA, $config{'FW_DATA_FILE'} or die
-                "[*] Could not open $config{'FW_DATA_FILE'}: $!"
+                "[*] Could not open $config{'FW_DATA_FILE'}: $!";
         }
         $last_disk_check = time();
     }
@@ -1699,12 +1702,31 @@ sub check_misc_fields() {
 
 sub psad_init() {
 
+    ### set umask to -rw-------
+    umask 0077;
+
+    ### turn off buffering
+    $| = 1;
+
     ### import psad.conf
     &Psad::buildconf(\%config, \%cmds, $config_file);
 
     ### make sure all necessary configuration variables
     ### are defined
     &required_vars();
+
+    ### store the psad command line.
+    $cmdline_file = $config{'PSAD_CMDLINE_FILE'};
+
+    ### import FW_MSG_SEARCH strings
+    &import_fw_search();
+
+    ### pid file hash
+    %pidfiles = (
+        'psadwatchd' => $config{'PSADWATCHD_PID_FILE'},
+        'psad'       => $config{'PSAD_PID_FILE'},
+        'kmsgsd'     => $config{'KMSGSD_PID_FILE'},
+    );
 
     ### make sure the values in the config file make sense
     &validate_config();
@@ -1715,38 +1737,6 @@ sub psad_init() {
 
     ### set some config variables based on command line input
     &handle_cmdline();
-
-    ### import FW_MSG_SEARCH strings
-    &import_fw_search();
-
-    ### make sure PSAD_DIR, FW_DATA_FILE, and /var/lib/psad/psadfifo, etc.
-    ### actually exist
-    &setup();
-
-    &dump_conf() if $debug;
-
-    ### dump configuration to STDOUT
-    exit &dump_conf() if $dump_conf;
-
-    ### The --Kill command line switch was given.
-    exit &stop_psad() if $kill;
-
-    ### The --Flush command line switch was given.
-    exit &flush_auto_blocked_ips() if $flush_fw;
-
-    ### The --USR1 command line switch was given.
-    exit &usr1() if $usr1;
-
-    ### The --HUP command line switch was given.
-    exit &hup() if $hup;
-
-    ### the --Status command line switch was given
-    exit &status() if $status;
-
-    ### the --Restart command line switch was given
-    exit &restart() if $restart;
-
-    &Psad::psyslog('psad', 'starting psad');
 
     ### import psad signatures (FIXME:: these should be taken directly
     ### from the snort signatures instead)
@@ -1777,8 +1767,42 @@ sub psad_init() {
     ### there is a set of ports that should be ignored
     &parse_ignore_ports() if $config{'IGNORE_PORTS'} ne 'NONE';
 
+    ### don't continue with init if we are running in firewall
+    ### analysis mode or benchmarking mode
+    return if $fw_analyze or $benchmark;
+
     ### enter iptables analysis mode.
-    &analysis_mode() if $analyze_msgs;
+    exit &analysis_mode() if $analyze_msgs;
+
+    ### The --Kill command line switch was given.
+    exit &stop_psad() if $kill;
+
+    ### The --HUP command line switch was given.
+    exit &hup() if $hup;
+
+    ### The --USR1 command line switch was given.
+    exit &usr1() if $usr1;
+
+    ### dump configuration to STDOUT
+    exit &dump_conf() if $dump_conf;
+
+    ### The --Flush command line switch was given.
+    exit &flush_auto_blocked_ips() if $flush_fw;
+
+    ### the --Status command line switch was given
+    exit &status() if $status;
+
+    ### the --Restart command line switch was given
+    exit &restart() if $restart;
+
+    ### make sure PSAD_DIR, FW_DATA_FILE, and /var/lib/psad/psadfifo, etc.
+    ### actually exist
+    &setup();
+
+    ### dump config
+    &dump_conf() if $debug;
+
+    &Psad::psyslog('psad', 'starting psad');
 
     return;
 }
@@ -3976,7 +4000,10 @@ sub restart() {
         close CMD;
         chomp $cmdline;
     }
+
+    ### stop any running psad daemons.
     &stop_psad();
+
     print "[+] Restarting psad daemons on $config{'HOSTNAME'}\n";
     if ($cmdline) {
         system "$cmds{'psad'} $cmdline";
@@ -3987,6 +4014,11 @@ sub restart() {
 }
 
 sub analysis_mode() {
+
+    unless (-d $config{'PSAD_DIR'}) {
+        mkdir $config{'PSAD_DIR'} or die "[*] Could not mkdir ",
+            "$config{'PSAD_DIR'}: $!";
+    }
 
     if (-d $config{'ANALYSIS_MODE_DIR'}) {
         print "[+] Removing old $config{'ANALYSIS_MODE_DIR'} directory.\n";
@@ -4031,7 +4063,7 @@ sub analysis_mode() {
     print "[+] Displaying status output.\n";
     &status_psad_daemon();
     print "\n.. Finished --Analyze cycle.\n";
-    exit 0;
+    return 0;
 }
 
 ### display the status of all four psad daemons
@@ -4595,13 +4627,26 @@ sub import_old_scans() {
         }
     }
 
-    ### zero out $FW_DATA_FILE
-    open FD, "> $config{'FW_DATA_FILE'}" or die '[*] Could not open ',
-        "$config{'FW_DATA_FILE'}: $!";
-    close FD;
     if ($import_ctr) {
         &Psad::psyslog('psad',
             "imported $import_ctr scanning IP addresses from previous psad run");
+    }
+    return;
+}
+
+sub remove_old_scans() {
+    opendir D, $config{'PSAD_DIR'} or
+        die "[*] Could not open dir: $config{'PSAD_DIR'}: $!";
+    my @files = readdir D;
+    closedir D;
+    shift @files; shift @files;
+    chdir $config{'PSAD_DIR'} or die $!;
+    SRCIP: for my $src (@files) {
+print "src: $src\n";
+        next SRCIP unless ($src =~ /$ip_re/ and -d $src);
+print "rm: $src\n";
+        rmtree $src or die
+            "[*] Could not remove $config{'PSAD_DIR'}/$src: $!";
     }
     return;
 }
@@ -4631,7 +4676,7 @@ sub usr1() {
                             and return $rv;
                         print while(<U>);
                         close U;
-                        print "[+] Results available here: ",
+                        print "[+] Results available in: ",
                             "$config{'PSAD_DIR'}/scan_hash.${pid}\n";
                         last;
                     }
@@ -4829,22 +4874,6 @@ sub handle_cmdline() {
 
 sub setup() {
 
-    ### set umask to -rw-------
-    umask 0077;
-
-    ### turn off buffering
-    $| = 1;
-
-    ### store the psad command line.
-    $cmdline_file = $config{'PSAD_CMDLINE_FILE'};
-
-    ### pid file hash
-    %pidfiles = (
-        'psadwatchd' => $config{'PSADWATCHD_PID_FILE'},
-        'psad'       => $config{'PSAD_PID_FILE'},
-        'kmsgsd'     => $config{'KMSGSD_PID_FILE'},
-    );
-
     ### initialize dshield alerting interval
     $dshield_alert_interval = 3600 * $config{'DSHIELD_ALERT_INTERVAL'};
 
@@ -4854,21 +4883,14 @@ sub setup() {
         if $config{'DSHIELD_ALERT_INTERVAL'} == 24;
 
     unless (-d $config{'PSAD_DIR'}) {
-        mkdir $config{'PSAD_DIR'}, 0500;
+        mkdir $config{'PSAD_DIR'}, 0500 or
+            die "[*] Could not mkdir $config{'PSAD_DIR'}: $!";
     }
     unless (-d $config{'PSAD_ERROR_DIR'}) {
-        mkdir $config{'PSAD_ERROR_DIR'}, 0500;
+        mkdir $config{'PSAD_ERROR_DIR'}, 0500 or
+            die "[*] Could not mkdir $config{'PSAD_ERROR_DIR'}: $!";
     }
-    unless (-e $config{'FW_DATA_FILE'}) {
-        open F, "> $config{'FW_DATA_FILE'}" or die '[*] Could not open ',
-            "$config{'FW_DATA_FILE'}: $!";
-        close F;
-    }
-    unless (-e $config{'FW_ERROR_LOG'}) {
-        open E, "> $config{'FW_ERROR_LOG'}" or die '[*] Could not open ',
-            "$config{'FW_ERROR_LOG'}: $!";
-        close E;
-    }
+
     unless (-e $config{'PSAD_FIFO'}) {
         system "$cmds{'mknod'} -m 600 $config{'PSAD_FIFO'} p";
     }
@@ -4878,6 +4900,11 @@ sub setup() {
         move '/usr/bin/whois.psad', $cmds{'whois'} or die "[*] Could not ",
             "move /usr/bin/whois.psad -> $cmds{'whois'}";
     }
+
+    ### set the /var/log/messages file as the default file to
+    ### analyze if we are in --Analyze mode.
+    $messages_file = '/var/log/messages'
+        if ($analyze_msgs and not $messages_file);
 
     die '[*] No system logger config file could be found.'
         unless (-e $config{'ETC_SYSLOG_CONF'}
@@ -5024,7 +5051,7 @@ sub setup() {
                 die '[*] All files written. You have to manually restart metalog! ',
                     'When done, start psad again.';
 #          system "$cmds{'killall'} -HUP metalog";
-           }
+            }
         } else {
             &Psad::sendmail("[psad-error] $config{'ETC_METALOG_CONF'} does not " .
                 "exist, check SYSLOG_DAEMON setting on $config{'HOSTNAME'}",
@@ -5034,19 +5061,10 @@ sub setup() {
 
     ### make sure the permissions on these files is 0600
     for my $file ($config{'FW_DATA_FILE'}, $config{'FW_ERROR_LOG'}) {
-        unless (-e $config{'FW_DATA_FILE'}) {
-            open F, "> $config{'FW_DATA_FILE'}" or die "[*] Could not open ",
-                "$config{'FW_DATA_FILE'}: $!";
-            close F;
-        }
-        chmod 0600, $config{'FW_DATA_FILE'};
+        open F, "> $file" or die "[*] Could not open $file: $!";
+        close F;
+        chmod 0600, $file;
     }
-
-    ### set the /var/log/messages file as the default file to
-    ### analyze if we are in --Analyze mode.
-    $messages_file = '/var/log/messages'
-        if ($analyze_msgs and not $messages_file);
-
     return;
 }
 
@@ -5197,6 +5215,7 @@ sub required_vars() {
         ETC_SYSLOG_CONF ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL
         ANALYSIS_MODE_DIR IMPORT_OLD_SCANS PSAD_ICMP_TYPES_FILE
         SHOW_ALL_SIGNATURES IPT_PREFIX_COUNTER_FILE IGNORE_PORTS
+        ENABLE_SCAN_ARCHIVE
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

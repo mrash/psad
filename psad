@@ -93,6 +93,7 @@ my $FW_DATA                   = "${PSAD_DIR}/fwdata";
 my $ERROR_LOG                 = "${PSAD_DIR}/fwerrorlog";
 my $EMAIL_ALERTFILE           = "${PSAD_DIR}/email_alert";
 my $PRINT_SCAN_HASH           = "${PSAD_DIR}/scan_hash";
+my $WHOIS_DATAFILE            = "${PSAD_DIR}/whois.txt";
 my $CHECK_INTERVAL            = 15;                       ### (seconds).
 my $PORT_RANGE_SCAN_THRESHOLD = 1;
 my $ENABLE_PERSISTENCE        = "Y";    ### If "Y", means that scans will never timeout.
@@ -111,7 +112,7 @@ my @EMAIL_ADDRESSES           = qw(root@localhost); ### Supports multiple email 
 my $ALERT_ALL                 = "Y";                ### If "Y", send email for all new bad packets instead of just when a danger level increases
 my $ENABLE_AUTO_IDS           = "N";                ### If "Y", enable automated IDS response (auto manages firewall rulesets). 
 my $AUTO_IDS_DANGER_LEVEL     = 5;                  ### Block all traffic from offending IP if danger level >= to this value 
-my $WHOIS_TIMEOUT             = 60;                 ### (seconds)
+my $WHOIS_TIMEOUT             = 10;                 ### (seconds)
 
 ### The following variable can be modified to look for logging messages
 ### that are specific to iptables firewalls (specified by the "--log-prefix"
@@ -139,6 +140,7 @@ my $diskmondCmd   = "/usr/sbin/diskmond";
 my $psadCmd       = "/usr/sbin/psad";
 #================== end config ==================== ## do not remove this line (used by install.pl to preserve configs) ##
 #===================== main =======================
+
 
 ### A few more configuration variables that should not really be in the config section.
 my $VERSION = "0.9.6";
@@ -172,25 +174,25 @@ my @args_cp = @ARGV;
 Getopt::Long::Configure("no_ignore_case");  # make Getopts case sensitive
 
 &usage_and_exit(1) unless (GetOptions (
-    'help'           => \$help,          # display help
-    'auto_ips=s'     => \$auto_ips,      # enable automatic ip danger level assignment
-    'output'         => \$output,        # write scanlog messages to STDOUT
-    'Daemon'         => \$daemon,        # do not run as a daemon
-    'debug'          => \$DEBUG,         # run in debug mode
-    'interval=s'     => \$CHECK_INTERVAL,# set $CHECK_INTERVAL from the command line
-    'firewallcheck'  => \$fwcheck,       # do not check firewall rules
-    'config=s'       => \$config,        # specify configuration file
-    'reversedns'     => \$dnslookups,    # do not issue dns lookups against scanning ip address
-    'signatures=s'   => \$signatures,    # scan signatures
-    'localport'      => \$netstat_lookup,# do not check to see if the firewall is listening on localport that has been scanned
-    'errors'         => \$errors,        # do not write malformed packet messages to error log
-    'Logging_server' => \$Syslog_server, # we are running psad on a syslog logging server
-    'Kill'           => \$kill,          # kill all running psad processes (psadwatchd, psad, kmsgsd, diskmond)
-    'Restart'        => \$restart,       # restart psad with all options of the currently running psad process
-    'Status'         => \$status,        # display status of any currently running psad processes
-    'USR1'           => \$usr1,          # send an existing psad process a USR1 signal (useful for debugging)
-    'Version'        => \$print_version, # print the psad version and exit
-    'whois'          => \$whoislookups   # do not issue whois lookups against the scanning ip
+    'help'           => \$help,           # display help
+    'auto_ips=s'     => \$auto_ips,       # enable automatic ip danger level assignment
+    'output'         => \$output,         # write scanlog messages to STDOUT
+    'Daemon'         => \$daemon,         # do not run as a daemon
+    'debug'          => \$DEBUG,          # run in debug mode
+    'interval=s'     => \$CHECK_INTERVAL, # set $CHECK_INTERVAL from the command line
+    'firewallcheck'  => \$fwcheck,        # do not check firewall rules
+    'config=s'       => \$config,         # specify configuration file
+    'reversedns'     => \$dnslookups,     # do not issue dns lookups against scanning ip address
+    'signatures=s'   => \$signatures,     # scan signatures
+    'localport'      => \$netstat_lookup, # do not check to see if the firewall is listening on localport that has been scanned
+    'errors'         => \$errors,         # do not write malformed packet messages to error log
+    'Logging_server' => \$Syslog_server,  # we are running psad on a syslog logging server
+    'Kill'           => \$kill,           # kill all running psad processes (psadwatchd, psad, kmsgsd, diskmond)
+    'Restart'        => \$restart,        # restart psad with all options of the currently running psad process
+    'Status'         => \$status,         # display status of any currently running psad processes
+    'USR1'           => \$usr1,           # send an existing psad process a USR1 signal (useful for debugging)
+    'Version'        => \$print_version,  # print the psad version and exit
+    'whois'          => \$whoislookups    # do not issue whois lookups against the scanning ip
 ));
 &usage_and_exit(0) if ($help);
 
@@ -248,7 +250,7 @@ if ($status) {
 }
 
 ### make sure $PSAD_DIR, $FW_DATA, and /var/log/psadfifo, etc. actually exist
-&psad_setup($PSAD_DIR, $FW_DATA, $PSAD_LOGFILE, $ERROR_LOG, \%Cmds);
+&psad_setup($PSAD_DIR, $FW_DATA, $ERROR_LOG, \%Cmds);
 
 ### the --Restart command line switch was given
 if ($restart) {
@@ -333,11 +335,11 @@ if ($auto_ips) {  ### support automatic ip danger level increases/decreases.
 
 ### install signal handlers for debugging %Scan with Data::Dumper,
 ### and for reaping zombie whois processes
-$SIG{'USR1'} = \&print_scan;
-$SIG{'SEGV'} = \&print_scan_and_exit;
-$SIG{'CHLD'} = \&REAPER;
+#$SIG{'SEGV'} = \&print_scan_and_exit;
 $SIG{'__WARN__'} = \&Psad::warn_handler;
 $SIG{'__DIE__'} = \&Psad::die_handler;
+$SIG{'CHLD'} = \&REAPER;
+$SIG{'USR1'} = \&print_scan;
 
 ### initialize fwdata_start_lines
 my $fwdata_start_lines = (split /\s+/, `$Cmds{'wc'} -l $FW_DATA`)[1];
@@ -382,7 +384,7 @@ for (;;) {
             ### Assign a danger level to the scan.
             &assign_danger_level(\%Scan, $Auto_ips_href, $PORT_RANGE_SCAN_THRESHOLD, $ALERT_ALL, \%DANGER_LEVELS);
             ### Log and send an email alert about the scan.
-            &scan_logr(\%Scan, $PSAD_LOGFILE, $output, $dnslookups,
+            &scan_logr(\%Scan, $PSAD_LOGFILE, $WHOIS_DATAFILE, $output, $dnslookups,
                             $whoislookups, $WHOIS_TIMEOUT, $ENABLE_EMAIL_ALERTS, $EMAIL_ALERT_DANGER_LEVEL,
                                 $EMAIL_ALERTFILE, $EMAIL_LIMIT, \@EMAIL_ADDRESSES, $SHOW_ALL_SIGNATURES, \%Cmds);
 
@@ -967,7 +969,7 @@ sub collect_errors() {
     close ERRORS;
 }
 sub scan_logr() {
-    my ($Scan_href, $logfile, $output, $dnslookups, $whoislookups, $whois_timeout,
+    my ($Scan_href, $logfile, $whois_datafile, $output, $dnslookups, $whoislookups, $whois_timeout,
                     $enable_email_alerts, $email_alert_danger_level, $email_alertfile,
                         $email_limit, $email_addresses_aref, $show_all_signatures, $Cmds_href) = @_;
     my $flags_msg;
@@ -1037,7 +1039,8 @@ sub scan_logr() {
                     }
                 }
                 unless ($whoislookups) {
-                    $whois_info_aref = &get_whois_data($whois_timeout, $src, $Cmds_href);
+#                    $whois_info_aref = &get_whois_data($whois_datafile, $whois_timeout, $src, $Cmds_href);
+                    $whois_info_aref = &get_whois_data($src, $Cmds_href);
                 }
                 if ($tcp || $udp) {
                     $abs_start_range = $Scan_href->{$src}->{$dst}->{'START_PORT'};
@@ -1286,22 +1289,25 @@ sub get_listening_ports() {
     return \%listening_ports;
 }
 sub get_whois_data() {
-    my ($whois_timeout, $ip, $Cmds_href) = @_;
+    my ($ip, $Cmds_href) = @_;
     my @whois_data;
-    $whois_timeout = 1;
     eval {
         local $SIG{'ALRM'} = sub {die "alarm\n"};
-        alarm $whois_timeout;
-        @whois_data = `$Cmds_href->{'whois'} $ip`;
+        alarm $WHOIS_TIMEOUT;
+        system "$Cmds_href->{'whois'} $ip > $WHOIS_DATAFILE";
         alarm 0;
     };
     if ($@) {
 #         die unless $@ eq "alarm\n";
-        warn "$@: $?";  ### let the warning handler save the error.
+#        warn "$@: $?";  ### let the warning handler save the error.
+        warn $@;
         $#whois_data = 0;
         @whois_data = ("Whois data not available!\n");
         return \@whois_data;
     } else {
+        open W, "< $WHOIS_DATAFILE";
+        @whois_data = <W>;
+        close W;
         return \@whois_data;
     }
 }
@@ -1462,7 +1468,7 @@ sub psad_usr1() {
     return $rv;
 }
 sub psad_setup() {
-    my ($psad_dir, $fw_data, $psad_logfile, $error_log, $Cmds_href) = @_;
+    my ($psad_dir, $fw_data, $error_log, $Cmds_href) = @_;
     unless (-d $psad_dir) {
         mkdir $psad_dir, 400;
     }
@@ -1470,8 +1476,8 @@ sub psad_setup() {
         open F, "> $fw_data";
         close F;
     }
-    unless (-e $psad_logfile) {
-        open L, "> $psad_logfile";
+    unless (-e $PSAD_LOGFILE) {
+        open L, "> $PSAD_LOGFILE";
         close L;
     }
     unless (-e $error_log) {

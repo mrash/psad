@@ -34,6 +34,8 @@
 # TODO:
 #   - More verbose --Status output to include scan start time, end time,
 #     whether or not each ip has an auto-assigned danger level, etc.
+#   - Send psad alerts to network abuse alerting services such as
+#     abuse.net and dshield.org.
 #   - Make use of other logging options available in iptables to detect
 #     more tcp signatures.  (E.g. --log-tcp-options, --log-ip-options,
 #     --log-tcp-sequence, etc.) for better signature recognition.
@@ -600,10 +602,15 @@ sub check_scan() {
                     }
 
                     if ($config{'IGNORE_CONNTRACK_BUG_PKTS'} eq 'Y' &&
-                        $dstport > 1024 && $flags =~ /ACK/) {
-                        ### XXX ignore TCP packet that have the ACK bit set
-                        ### since _usually_ we see these packets as a result
-                        ### of the iptables connection tracking bug.
+                        $dstport > 1024 && ($flags =~ /ACK/ ||
+                        $flags =~ /RST/)) {
+                        ### XXX ignore TCP packets that have the ACK or RST
+                        ### bits set ### since _usually_ we see these packets
+                        ### as a result of the iptables connection tracking
+                        ### bug.  Also, note that there are no signatures
+                        ### make use of the RST flag and very few that use
+                        ### the ACK flag (need to add code back in for these
+                        ### signatures).
                         next PKT;
                     }
                     ### per page 595 of the Camel book, "if /blah1|blah2/"

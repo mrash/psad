@@ -267,6 +267,7 @@ sub install() {
 
     ### make sure all of the psad daemons compile (validates
     ### the source distribution)
+    print " ... Verifying compilation of psad daemons:\n";
     unless ((system "$Cmds{'perl'} -c psad") == 0) {
         die " ... @@@ psad does not compile with \"perl -c\".  Download the" .
             " latest sources from:\n\nhttp://www.cipherdyne.com\n";

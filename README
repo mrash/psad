@@ -75,10 +75,11 @@ compatible with psad.
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 USAGE:
 
-	-n  --noDaemon   
+	-D  --Daemon   
 		  Do not run psad as a daemon.  This option is most useful
 		  if used in conjunction with -o so that scan warning messages
-		  are written to STDOUT instead of the scanlog file.
+		  can be viewed on STDOUT instead of being written to 
+		  /var/log/psad/scanlog.
 	
 	-e  --error    
 		  Occasionally messages that are written by to the psadfifo 
@@ -121,6 +122,11 @@ USAGE:
 		  Psad normally attempts to find the name associated with a
 		  scanning ip address, but this feature can be disabled with 
 		  the -n command line argument.
+	
+	-S  --Syslog_server
+		  Psad is being executed on a syslog server.  This requires
+		  that check_firewall_rules() and auto_psad_response() not be
+		  executed since the firewall is probably not being run locally.
 
 	-s  --signatures <sig file>
 		  The firewalling code included within the linux 2.4.x kernel
@@ -161,7 +167,7 @@ USAGE:
 Usage: psad [-n] [-d] [-o] [-e] [-f] [-r] [-w] [-l] [-i <interval>] [-h]
 		[-c <config file>] [-s <signature file>] [-a <auto ips file>]
 
-        -n   --noDaemon                 - do not run as a daemon.
+        -D   --Daemon                   - do not run as a daemon.
         -e   --errors                   - do not write errors to the error 
 					  log.
         -d   --debug                    - run psad in debugging mode.
@@ -180,7 +186,9 @@ Usage: psad [-n] [-d] [-o] [-e] [-f] [-r] [-w] [-l] [-i <interval>] [-h]
                                           scanning ips.
         -s   --signatures <sig file>    - import scan signatures.
         -a   --auto_ips <ips file>      - import auto ips file for automatic
-                                          ip danger level increases/decreses.
+                                          ip danger level increases/decreases.
+	-S   --Syslog_server		- psad is being run on a syslog
+					  server.
         -l   --local_port_lookup        - disable local port lookups for scan
                                           signatures.
         -h   --help                     - prints this help message.

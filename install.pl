@@ -64,7 +64,7 @@ $< == 0 && $> == 0 or die "You need to be root (or equivalent UID 0 account) to 
 if ($uninstall) {
 	my $ans = "";
 	while ($ans ne "y" && $ans ne "n") {
-		print "=-=-=  This will completely psad from your system.  Are you sure (y/n)?  ";
+		print "=-=-=  This will completely remove psad from your system.  Are you sure (y/n)?  ";
 		$ans = <STDIN>;
 		chomp $ans;
 	}
@@ -103,7 +103,7 @@ if ($uninstall) {
 	if (-e "/etc/syslog.conf.orig") {
 		`$Cmds{'mv'} /etc/syslog.conf.orig /etc/syslog.conf`;
 	} else {
-		print "=-=-= /etc/syslog.conf.orig does not exist.  Editing /etc/syslog.conf directly\n";
+		print "=-=-= /etc/syslog.conf.orig does not exist.  Editing /etc/syslog.conf directly.\n";
 		open ESYS, "< /etc/syslog.conf" or die "=-=-= Unable to open /etc/syslog.conf: $!\n";
 		my @sys = <ESYS>;
 		close ESYS;
@@ -120,7 +120,7 @@ if ($uninstall) {
 	print "=-=-=  Psad has been uninstalled =-=-=\n";
 	exit 0;
 }
-### Start the install code...
+### Start the installation code...
 unless (-e "/var/log/psadfifo") {
 	print "=-=-=  Creating named pipe /var/log/psadfifo\n";
 	# create the named pipe
@@ -234,6 +234,37 @@ if (-e "/etc/psad/psad.conf") {
 	print "=-=-=  Copying psad.conf -> /etc/psad/psad.conf\n";
 	`$Cmds{'cp'} psad.conf /etc/psad/psad.conf`;
 	perms_ownership("/etc/psad/psad.conf", 0600);
+}
+print "=-=-=  Installing psad(8) man page\n";
+if (-e "/etc/man.config") {
+	# prefer to install psad.8 in /usr/local/man/man8 if this directory is configured in /etc/man.config
+	if (open MPATH, "< /etc/man.config" and grep /MANPATH\s+\/usr\/local\/man/, <MPATH> and close MPATH) {
+		`$Cmds{'cp'} psad.8 /usr/local/man/man8/psad.8`;
+		perms_ownership("/usr/local/man/man8/psad.8", 0644);
+	} else {
+		my $mpath;
+		open MPATH, "< /etc/man.config";
+		while(<MPATH>) {
+			my $line = $_;
+			chomp $line;
+			if ($line =~ /^MANPATH\s+(\S+)/) {
+				$mpath = $1;
+				last;
+			}
+		}
+		close MPATH;
+		if ($mpath) {
+			my $path = $mpath . "/man8/psad.8";
+			`$Cmds{'cp'} psad.8 $path`;
+			perms_ownership($path, 0644);
+		} else {
+			`$Cmds{'cp'} psad.8 /usr/man/man8/psad.8`;
+			perms_ownership("/usr/man/man8/psad.8", 0644);
+		}
+	}
+} else {
+	`$Cmds{'cp'} psad.8 /usr/man/man8/psad.8`;
+	perms_ownership("/usr/man/man8/psad.8", 0644);
 }
 
 my $distro = get_distro();

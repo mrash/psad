@@ -24,10 +24,13 @@
 #	  --log-tcp-sequence, etc.) for better signature recognition.
 #	- Allow ipchains to use udp signatures as well as tcp signatures that
 #	  only require a syn packet to a port.
+#	- Deal with the possibility that psad could eat lots of memory over
+#	  time if $ENABLE_PERSISTENCE="Y". This should involve periodically
+#	  undef'ing entries in %Scan (or maybe the entire hash), but this 
+#	  should be done in a way that allows some scan data to persist.
 #	- Put source and destination ip addresses back into psad_signatures.
 #	- Ipfilter support on *BSD platforms.
 #	- Icmp support.
-#	- Man page.
 #	- Re-write significant components (kmsgsd, diskmond, psadwatchd) in C.
 #	- Add a new "minimal execution mode" to psad in which several of the 
 #	  "use <blah>" statements are taken out (not eval'ed or something).
@@ -40,6 +43,8 @@
 # 	  stream provided to psad by kmsgsd since more packet types will be 
 #	  denied without requiring overly complicated firewall rules to detect 
 #	  odd tcp flag combinations.
+#	- Investigate the possibility of passive OS fingerprinting by looking
+#	  at TTL and other fields in the headers.
 #	- Sometimes packets (particularly ACK and RST packets) seem to not
 #	  recognized by ipt_state/ip_conntrack, so such packets get denied and
 #	  hence are picked up by psad.  Solution: parse /proc/net/ip_conntrack
@@ -127,12 +132,15 @@ my $signatures = 0;
 my $auto_ips = 0;
 my $netstat_lookup = 0;
 my $fwcheck = 0;
-my $dnsstring;
+my $Syslog_server = 0;
+# my $dnsstring;
 
 use File::stat;
 use Getopt::Long;
 use Data::Dumper;
 use Socket;
+
+Getopt::Long::Configure("no_ignore_case");  # make Getopts case sensitive
 
 my %Cmds = (
         "ipchains"      => $ipchainsCmd,
@@ -162,7 +170,7 @@ usage_and_exit(1) unless (GetOptions (
         'help'          => \$help,		# display help
 	'auto_ips=s'	=> \$auto_ips,		# enable automatic ip danger level assignment
 	'output'	=> \$output,		# write scanlog messages to STDOUT
-	'noDaemon'	=> \$daemon,		# do not run as a daemon
+	'Daemon'	=> \$daemon,		# do not run as a daemon
 	'debug'		=> \$DEBUG, 		# run in debug mode
 	'interval=s'	=> \$CHECK_INTERVAL,	# set $CHECK_INTERVAL from the command line
 	'firewallcheck'	=> \$fwcheck,		# do not check firewall rules
@@ -171,11 +179,14 @@ usage_and_exit(1) unless (GetOptions (
 	'signatures=s'	=> \$signatures,	# scan signatures
 	'localport'	=> \$netstat_lookup,	# do not check to see if the firewall is listening on localport that has been scanned
 	'errors'	=> \$errors,		# do not write malformed packet messages to error log
+	'Syslog_server'	=> \$Syslog_server,	# we are running psad on a syslog logging server
 	'whois'		=> \$whoislookups	# do not issue whois lookups against the scanning ip
 ));
 usage_and_exit(0) if ($help);
 
-unless ($fwcheck) {
+$< == 0 && $> == 0 or die "You must be root (or equivalent UID 0 account) to execute psad!\n";
+
+unless ($fwcheck || $Syslog_server) { # if psad is running on a syslog server, don't check the firewall rules since they may not be local...
 	unless (check_firewall_rules(\%Cmds)) {
         	die "*** After setting up your firewall per the above note, execute \"/etc/rc.d/init.d/psad-init start\" to start psad\n";
 	}
@@ -218,7 +229,7 @@ for (;;) {
 	my $fwdata_end_lines = (split /\s+/, `$Cmds{'wc'} -l $FW_DATA`)[1];
 	if ($signatures) {  # scan $signatures for any signature updates
 		my $sigs_mtime_end = stat($signatures)->mtime;
-		if ($sigs_mtime_start != $sigs_mtime_end) {  # the signatures were updated... import the new signatures
+		if ($sigs_mtime_start != $sigs_mtime_end) {  # the signatures were updated... import the new signatures.
 			$Sigs_href = import_signatures($signatures);
 			my $hostname = `$Cmds{'hostname'}`;
                 	chomp $hostname;
@@ -250,11 +261,11 @@ for (;;) {
 		print "MAIN: calling logr()\n" if $DEBUG;
 		$Scan_href = logr($Scan_href, $PSAD_LOGFILE, $output, $dnslookups, $whoislookups, $WHOIS_TIMEOUT, $ENABLE_EMAIL_ALERTS,
 					$EMAIL_ALERT_DANGER_LEVEL, $EMAIL_ALERTFILE, \@EMAIL_ADDRESSES, $SHOW_ALL_SIGNATURES, \%Cmds);
-		if ($ENABLE_AUTO_IDS eq "Y") {
+		if ($ENABLE_AUTO_IDS eq "Y" && ! $Syslog_server) {  # don't manage the firewall rules if psad is running on a syslog server.
 			$Scan_href = auto_psad_response($Scan_href, $AUTO_IDS_DANGER_LEVEL, \%Cmds, \@EMAIL_ADDRESSES);
 		}
 	}
-	print "Number of lines in $FW_DATA: $fwdata_end_lines\n" if $DEBUG;
+	print "MAIN: number of lines in $FW_DATA: $fwdata_end_lines\n" if $DEBUG;
 	$fwdata_start_lines = $fwdata_end_lines; # reset fwdata_start_lines to where we just left off so that we don't miss any packets
 }
 
@@ -1152,10 +1163,10 @@ sub usage_and_exit() {
         my $exitcode = shift;
         print <<_HELP_;
 
-Usage: psad [-n] [-d] [-o] [-e] [-f] [-r] [-w] [-l] [-i <interval>] [-h]
+Usage: psad [-D] [-d] [-o] [-e] [-S] [-f] [-r] [-w] [-l] [-i <interval>] [-h]
                 [-c <config file>] [-s <signature file>] [-a <auto ips file>]
 
-        -n   --noDaemon                 - do not run as a daemon.
+        -D   --Daemon                   - do not run as a daemon.
         -e   --errors                   - do not write errors to the error
                                           log.
         -d   --debug                    - run psad in debugging mode.
@@ -1170,6 +1181,8 @@ Usage: psad [-n] [-d] [-o] [-e] [-f] [-r] [-w] [-l] [-i <interval>] [-h]
         -c   --config <config file>     - use config file instead of the
                                           values contained within the psad
                                           script.
+	-S   --Syslog_server		- psad is being run on a syslog
+					  server.
         -r   --reversedns               - disable name resolution against
                                           scanning ips.
         -s   --signatures <sig file>    - import scan signatures.

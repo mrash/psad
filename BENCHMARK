@@ -1,17 +1,18 @@
 Kmsgsd Benchmarks:
 
 The basic strategy in benchmarking kmsgsd is to get syslogd to write kern.info
-messages (which include ipchains and iptables log messages) to the /var/log/psadfifo
-named pipe.  Kmsgsd will then read the messages out of the pipe as quickly as
-possible and write them to /var/log/psad/fwdata.  To calculate how fast kmsgsd is
-we then compare the number of newly written firewall messages to /var/log/messages
-with the number of messages kmsgsd was able to write to /var/log/psad/fwdata in the
-same time frame.  To generate lots of firewall "deny" messages we first make sure we
-have the firewall "default log and deny" policy loaded, and then proceed to scan the
-firewall first from a machine that is linked via a 100MB ethernet segment connected 
-directly to the firewall with a crossover cable, and second with a scan against the 
-loopback address from the firewall itself.  The second scan will eliminate any 
-network latency from slowing the scan down.
+messages (which include ipchains and iptables log messages) to the 
+/var/log/psadfifo named pipe.  Kmsgsd will then read the messages out of the 
+pipe as quickly as possible and write them to /var/log/psad/fwdata.  To 
+calculate how fast kmsgsd is we then compare the number of newly written 
+firewall messages to /var/log/messages with the number of messages kmsgsd was 
+able to write to /var/log/psad/fwdata in the same time frame.  To generate lots
+of firewall "deny" messages we first make sure we have the firewall "default 
+log and deny" policy loaded, and then proceed to scan the firewall first from a 
+machine that is linked via a 100MB ethernet segment connected directly to the 
+firewall with a crossover cable, and second with a scan against the loopback 
+address from the firewall itself.  The second scan will eliminate any network 
+latency from slowing the scan down.
 
 TEST 1:
 - Scanning machine: PIII 700mhz, kernel 2.2.18
@@ -49,17 +50,16 @@ Results:  These results are a bit surprising since kmsgsd caught more
   had a maximum CPU utilization of 5.6% and a maximum memory utilization of
   0.8%
 
-
-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 Psad Benchmarks:
 
-To benchmark psad we need to generate lots of messages in the fwdata file.  Normally
-this is the responsibility of kmsgsd, but to perform an effective test of just how fast
-psad is able to parse lots of firewall "deny" messages, we first create a large file
-that contains 10,000 lines of the firewall messages, then we execute "cat /dev/null > 
-/var/log/psad/fwdata", and lastly we copy the large file to /var/log/psad/fwdata. 
-Psad then detects that 10,000 packets were just denied by the firewall and starts to 
-process the lines one by one.
+To benchmark psad we need to generate lots of messages in the fwdata file.  
+Normally this is the responsibility of kmsgsd, but to perform an effective test 
+of just how fast psad is able to parse lots of firewall "deny" messages, we 
+first create a large file that contains 10,000 lines of the firewall messages,
+then we execute "cat /dev/null > /var/log/psad/fwdata", and lastly we copy the 
+large file to /var/log/psad/fwdata.  Psad then detects that 10,000 packets were 
+just denied by the firewall and starts to process the lines one by one.
 
 - PIII 500mhz, 128MB ram, kernel 2.4.0
 - Perl 5.005_03

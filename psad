@@ -2491,7 +2491,7 @@ sub scan_logr() {
             my $curr_dl = $scan_dl{$src};
 
             unless (defined $scan{$src}{$dst}{'email_ctr'}) {
-                $scan{$src}{$dst}{'email_ctr'} = 0;
+                $scan{$src}{$dst}{'email_ctr'} = 1;
             } elsif ($config{'PSAD_EMAIL_LIMIT'} > 0
                     and $scan{$src}{$dst}{'email_ctr'}
                     > $config{'PSAD_EMAIL_LIMIT'}) {
@@ -2728,6 +2728,8 @@ sub scan_logr() {
             ### print the overall stats since the scan began
             printf $fh "%${log_len}s%s\n\n", 'Overall stats since: ',
                 $abs_s_time;
+            printf $fh "%${log_len}s%s\n", 'Total email alerts: ',
+                $scan{$src}{$dst}{'email_ctr'};
             if ($tcp_absrange) {
                 printf $fh "%${log_len}s%s\n", 'Complete tcp range: ',
                     "[$tcp_absrange]";
@@ -4102,12 +4104,19 @@ sub import_old_scans() {
         next SRCIP unless ($src =~ /$ip_re/ and -d $src);
         ### define as many hash keys as we can (older versions
         ### of psad don't include several of these files).
+        my $num_emails = 0;
         if (-e "${src}/danger_level") {
             open DL, "< ${src}/danger_level" or next SRCIP;
             my $dl = <DL>;
             close DL;
             chomp $dl;
             $scan_dl{$src} = $dl;  ### set the dl for $src
+        }
+        if (-e "${src}/email_count") {
+            open E, "< ${src}/email_count" or next SRCIP;
+            $num_emails = <E>;
+            close E;
+            chomp $num_emails;
         }
         if (-e "${src}/os_guess") {
             open OS, "< ${src}/os_guess" or next SRCIP;
@@ -4136,6 +4145,9 @@ sub import_old_scans() {
                 open PKTS, "< ${src}/${dst}_packet_ctr" or next SRCIP;
                 my @lines = <PKTS>;
                 close PKTS;
+                if ($num_emails) {
+                    $scan{$src}{$dst}{'email_ctr'} = $num_emails;
+                }
                 for my $line (@lines) {
                     my $chain;
                     my $intf;

@@ -24,35 +24,44 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 # TODO: 
-#	- add a danger level field to psad_signatures so that signatures
-#	  will automatically be assigned the danger level in this field.
-#	- make use of other logging options available in iptables to detect
+#	- Make use of other logging options available in iptables to detect
 #	  more tcp signatures.  (E.g. --log-tcp-options, --log-ip-options,
 #	  --log-tcp-sequence, etc.).
-#	- put source and destination ip addresses back into psad_signatures.
-#	- make line counts of fwdata file take high-rate scans into
+#	- Allow ipchains to use udp signatures as well as tcp signatures that
+#	  only require a syn packet to a port.
+#	- Put source and destination ip addresses back into psad_signatures.
+#	- Make line counts of fwdata file take high-rate scans into
 #	  account.
-#	- ipfilter support on *BSD platforms.
-#	- icmp support.
-#	- use umask for newly created files.
-#	- make CHECK_INTERVAL configurable from the command line.
-#	- man page.
-#	- support for more packet fields (ttl, udp len, etc.) for better
+#	- Ipfilter support on *BSD platforms.
+#	- Icmp support.
+#	- Use umask for newly created files.
+#	- Make CHECK_INTERVAL configurable from the command line.
+#	- Man page.
+#	- Support for more packet fields (ttl, udp len, etc.) for better
 #	  signature recognition.	
-#	- re-write significant components (kmsgsd, diskmond, psadwatchd) in C.
-#	- possibly add a daemon to take into account ACK PSH and ACK FIN, etc.
-#	  packets that the client may generate after the ip_conntrack module
+#	- Re-write significant components (kmsgsd, diskmond, psadwatchd) in C.
+#	- Add a new "minimal execution mode" to psad in which several of the 
+#	  "use <blah>" statements are taken out (not eval'ed or something).
+#	- Possibly add a daemon to take into account ACK PSH and ACK FIN, etc.
+#	  Packets that the client may generate after the ip_conntrack module
 #	  is reloaded.  Without anticipating such packets psad will interpret
 # 	  them as a belonging to a port scan.
-#	- improve check_firewall_rules() to check for a state rule since having
+#	- Improve check_firewall_rules() to check for a state rule since having
 #	  such a rule greatly improves the quality of the data stream provided
 #	  to psad by kmsgsd since more packet types will be denied without 
 #	  requiring overly complicated firewall rules to detect odd tcp flag
 #	  combinations.
-#	- sometimes packets (particularly ACK and RST packets) seem to not
+#	- Sometimes packets (particularly ACK and RST packets) seem to not
 #	  recognized by ipt_state/ip_conntrack, so such packets get denied and
 #	  hence are picked up by psad.  Solution: parse /proc/net/ip_conntrack
-#	  for existing sessions and don't alert on these packets, etc...
+#	  for existing sessions and don't alert on these packets, etc.
+#	- Enhance the check_firewall_rules() routine to correct any problems
+#	  with the firewall ruleset.  This is part of the integration of psad 
+#	  with Bastille Linux.
+#	- Include an installation log.
+#	- Make sure autovivication does not mess up the Scan hash
+#	- Better formatting of print statements throughout (maybe use 'here'
+#	  docs.)
 #
 # Sample packet (rejected by ipchains)
 # Dec 19 11:54:07 orthanc kernel: Packet log: input REJECT lo PROTO=1
@@ -83,7 +92,7 @@ my $ENABLE_PERSISTENCE = "Y";	# if "Y", means that scans will never timeout
 my $SCAN_TIMEOUT = 3600;	# this is used only if $ENABLE_PERSISTENCE = "N";
 my $SHOW_ALL_SIGNATURES = "N";	# if "Y", means that all tcp signatures will be shown since the scan started instead of just the current ones.
 my %DANGER_LEVELS;
-$DANGER_LEVELS{'1'} = 10;
+$DANGER_LEVELS{'1'} = 5;
 $DANGER_LEVELS{'2'} = 50;
 $DANGER_LEVELS{'3'} = 1000;
 $DANGER_LEVELS{'4'} = 5000;
@@ -360,7 +369,7 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 			print "     Scan{srcip}{dstip}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'} = $Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'}\n";
 		}
 		if ($signatures && $USE_IPTABLES) {  # might try use ipchains also, but then cannot use tcp flags except for -y -l rules
-			foreach my $msg (keys %{$sigs_href->{$proto}}) {
+			foreach my $msg (keys %{$sigs_href->{$proto}}) {   # need to iterate through all signatures since a packet may match several
 				my $dstport_criteria = 0;
 				my $srcport_criteria = 0;
 				my $rv = 0;
@@ -368,11 +377,13 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 					if (check_port($sigs_href, $msg, $dstport, "DSTPORT", $proto)
 						&& check_port($sigs_href, $msg, $srcport, "SRCPORT", $proto)
 							&& check_flags($sigs_href, $msg, $flags, $proto)) {     # tripped a tcp signature
+						$Scan{$srcip}{$dstip}{'TCP'}{'SIGMATCH'}{'SIGDL'} = $sigs_href->{'TCP'}->{$msg}->{'DANGERLEVEL'};
 						$rv = 1;
 					}
 				} elsif ($proto eq "UDP") {
                                         if (check_port($sigs_href, $msg, $dstport, "DSTPORT", $proto)
                                                 && check_port($sigs_href, $msg, $srcport, "SRCPORT", $proto)) {     # tripped a udp signature
+						$Scan{$srcip}{$dstip}{'UDP'}{'SIGMATCH'}{'SIGDL'} = $sigs_href->{'UDP'}->{$msg}->{'DANGERLEVEL'};
 						$rv = 1;
 					}
 				}
@@ -461,9 +472,10 @@ sub import_signatures() {
 		chomp $s;
 		next if ($s =~ /^#/);
 		if ($s =~ /^tcp/) {
-			if ($s =~ /^(\w{3,4})\s+(\S+)\s+\-\>\s+(\S+)\s+msg:(\".*?\")\;\s+flags:\s?(\w+)\;/) {
-				($proto, $srcport, $dstport, $msg, $flags) = ($1,$2,$3,$4,$5);
+			if ($s =~ /^(\w{3,4})\s+(\S+)\s+\-\>\s+(\S+)\s+msg:(\".*?\")\;\s+flags:\s?(\w+)\;.*?dlevel:\s?(\d{1})\;/) {
+				($proto, $srcport, $dstport, $msg, $flags, $dangerlevel) = ($1,$2,$3,$4,$5,$6);
 				$Sigs{'TCP'}{$msg}{'FLAGS'} = $flags;
+				$Sigs{'TCP'}{$msg}{'DANGERLEVEL'} = $dangerlevel;
 				if ($srcport =~ /\:/ && $srcport !~ /\!/) {
 					($start, $end) = split /:/, $srcport;
 					$start = 1 if ($start eq '');
@@ -503,8 +515,9 @@ sub import_signatures() {
 			}
 		} elsif ($s =~ /^udp/) {
 			# udp any -> 31337 msg:"Back Orifice";
-			if ($s =~ /^(\w{3,4})\s+(\S+)\s+\-\>\s+(\S+)\s+msg:(\".*?\")\;/) {
-				($proto, $srcport, $dstport, $msg) = ($1,$2,$3,$4);	
+			if ($s =~ /^(\w{3,4})\s+(\S+)\s+\-\>\s+(\S+)\s+msg:(\".*?\")\;.*?dlevel:\s?(\d{1})\;/) {
+				($proto, $srcport, $dstport, $msg, $dangerlevel) = ($1,$2,$3,$4,$5);	
+				$Sigs{'UDP'}{$msg}{'DANGERLEVEL'} = $dangerlevel;
                                 if ($srcport =~ /\:/ && $srcport !~ /\!/) {
                                         ($start, $end) = split /:/, $srcport;
                                         $start = 1 if ($start eq '');
@@ -593,13 +606,20 @@ sub assign_danger_level() {
 			# level of 1.  (This should really look at the danger level field for each signature to assign a real
 			# danger level that is based on the type of signature... see the TODO)
 			my $sigmatch = 0;
-			if (defined $Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'SIGMATCH'} || defined $Scan_href->{$srcip}->{$dstip}->{'UDP'}->{'SIGMATCH'}) {
-				print "assign_danger_level(): sigmatch = $sigmatch (definitely 1 here)\n" if $DEBUG;
+			my $sigproto = "";
+			if (defined $Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'SIGMATCH'}) {
 				$sigmatch = 1;
+				$sigproto = "TCP";
+				print "assign_danger_level(): sigmatch = $sigmatch (definitely 1 here)\n" if $DEBUG;
 			}
-			print "assign_danger_level(): sigmatch = $sigmatch (should be 1 if a signature has been matched)\n" if $DEBUG;
-			if ($Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} == 0 && $sigmatch) {
-				$Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} = 1;
+                        if (defined $Scan_href->{$srcip}->{$dstip}->{'UDP'}->{'SIGMATCH'}) {
+                                $sigmatch = 1;
+				$sigproto = "UDP";
+                                print "assign_danger_level(): sigmatch = $sigmatch (definitely 1 here)\n" if $DEBUG;
+                        }
+			if ($sigmatch && $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} < $Scan_href->{$srcip}->{$dstip}->{$sigproto}->{'SIGMATCH'}->{'SIGDL'}) {
+#				$Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} = 1;
+				$Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} = $Scan_href->{$srcip}->{$dstip}->{$sigproto}->{'SIGMATCH'}->{'SIGDL'};
 				print "assign_danger_level(): danger level: $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'}\n" if $DEBUG;
 			}
 			# if $port_range_scan_threshold is >= 1, then psad will not assign a danger level to repeated packets to the same tcp port

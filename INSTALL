@@ -1,64 +1,70 @@
 Installation notes:
 
+Quick and easy install instructions:
+
+# ./install
+
+'nuf said.  :)
+
+For more information, read on:
+
 IMPORTANT:
     psad makes use of drop/deny/reject messages that are generated
 by ipchains or iptables, and appear in /var/log/messages.  Hence if
 your firewall is not configured to drop/deny/reject packets (and log
 them), then psad will NOT detect port scans.  Usually the best and most
-secure way to configure your firewall is to first put the minimal rules 
-needed to allow only necessary traffic to and from your machine, and 
-then have a default drop/deny/reject-and-log rule toward the end of the 
+secure way to configure your firewall is to first put the minimal rules
+needed to allow only necessary traffic to and from your machine, and
+then have a default drop/deny/reject-and-log rule toward the end of the
 firewall ruleset.  Some example firewall rulesets that are compatible
 with psad are contained within the file FW.EXAMPLES.
 
-
-    The functionality of psad is affected by the version of the 
-Linux kernel on which the software is deployed.  For kernel versions 
+    The functionality of psad is affected by the version of the
+Linux kernel on which the software is deployed.  For kernel versions
 2.2.x (and 2.0.x?) the built-in ipchains firewalling code does not have
-any capability to log or distinguish any tcp flags other than syn, or ack.  
-Hence, most of the tcp signatures included in psad_signatures cannot be 
-detected by psad running on these kernel versions.  By contrast, the 
-iptables firewalling code (see http://netfilter.gnumonks.org) 
-integrated within the 2.4.x kernels can distinguish all tcp flags and 
+any capability to log or distinguish any tcp flags other than syn, or ack.
+Hence, most of the tcp signatures included in psad_signatures cannot be
+detected by psad running on these kernel versions.  By contrast, the
+iptables firewalling code (see http://netfilter.gnumonks.org)
+integrated within the 2.4.x kernels can distinguish all tcp flags and
 hence make the signature logic possible within psad.
 
 A note on iptables:  As of kernel version 2.4.13, there is a bug in the
 connection tracking code that denies packets that are part of legitimate
-tcp sessions.  Since these packets are denied, psad interprets them as 
-potentially belonging to a scan.  The source of the problem is an 
-inappropriately low timeout value, and fortunately this problem is easily 
-fixed by the trivial kernel patch "conntrack_patch" included with the 
+tcp sessions.  Since these packets are denied, psad interprets them as
+potentially belonging to a scan.  The source of the problem is an
+inappropriately low timeout value, and fortunately this problem is easily
+fixed by the trivial kernel patch "conntrack_patch" included with the
 psad source code.  If you start noticing lots of ACK/FIN, ACK, and even
 RST packets being denied by iptables from ips that are part of legtimate
-sessions, then you may want to apply the patch.  This will of course 
+sessions, then you may want to apply the patch.  This will of course
 require that the patch be applied and then the kernel to be recompiled.
 For more information on how to do this, see the Kernel-HOWTO available
 at: http://www.linuxdoc.org/HOWTO/Kernel-HOWTO.html.
- 
 
     Before executing the install.pl script, edit the config sections
 at the beginning of the psad, diskmond, kmsgsd, and install.pl scripts.
-Sensible defaults are provided for each of the scripts so hopefully 
+Sensible defaults are provided for each of the scripts so hopefully
 there will be a minimal number of things to change to get psad to work
 on your system, but if system binaries are in places the scripts don't
 know about then you will need to provide the correct paths.  After the
-config sections are the way you want them, just run 'install.pl', and 
-then run '/etc/rc.d/init.d/psad-init start' to start psad, kmsgsd, 
+config sections are the way you want them, just run 'install.pl', and
+then run '/etc/rc.d/init.d/psad-init start' to start psad, kmsgsd,
 and diskmond, or just run them from the command line.  The install.pl
-script installs psad, kmsgsd, and diskmond in /usr/local/bin/ by 
-default.  
+script installs psad, kmsgsd, and diskmond in /usr/local/bin/ by
+default.
 
-    You can install a new version of psad over an existing one; just 
-run install.pl.  The installation script will preserve any old 
-configuration parameters when installing the new versions of psad, 
-psadwatchd, kmsgsd, and diskmond.  If you don't need or want any old 
+    You can install a new version of psad over an existing one; just
+run install.pl.  The installation script will preserve any old
+configuration parameters when installing the new versions of psad,
+psadwatchd, kmsgsd, and diskmond.  If you don't need or want any old
 configurations to be preserved, just execute "./install.pl -n".
-    
+
     Even though it is a good idea to edit the config sections
 of each of the programs included with psad, both install.pl and psad
 attempt to use the correct system binaries even if an incorrect path
 is given.  This is accomplished by simply using the path provided by
-'which <system binary>' if the binary is not found in the place 
+'which <system binary>' if the binary is not found in the place
 specified in the config section.
 
     psad can be completely removed from the system by executing
@@ -72,6 +78,6 @@ Usage: install.pl [-f] [-n] [-e] [-u] [-v] [-h]
         -e  --exec_psad              - execute psad after installing.
         -u  --uninstall              - completely remove psad from the
                                        system.
-        -v  --verbose                - verbose mode.        
+        -v  --verbose                - verbose mode.
         -h  --help                   - prints this help message.
 

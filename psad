@@ -697,8 +697,8 @@ sub check_scan() {
     my $len;
     my $ttl;
     my $proto;
-    my $srcport;
-    my $dstport;
+    my $sp;
+    my $dp;
     my $type;
     my $code;
     my $id;
@@ -731,7 +731,7 @@ sub check_scan() {
             if ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+
                          LEN=(\d+).*TTL=(\d+).*PROTO=(\S+)\s+
                          SPT=(\d+)\s+DPT=(\d+)/x) {
-                ($src, $dst, $len, $ttl, $proto, $srcport, $dstport) =
+                ($src, $dst, $len, $ttl, $proto, $sp, $dp) =
                     ($1,$2,$3,$4,$5,$6,$7,$8);
                 if ($proto ne 'TCP' && $proto ne 'UDP') {
                     ### it was some weird non-tcp/udp packet
@@ -746,7 +746,7 @@ sub check_scan() {
                     }
 
                     if (!$sid && $config{'IGNORE_CONNTRACK_BUG_PKTS'} eq 'Y' &&
-#                        $dstport > 1024 && ($flags =~ /ACK/ ||
+#                        $dp > 1024 && ($flags =~ /ACK/ ||
                             ($flags =~ /ACK/ || $flags =~ /RST/)) {
                         ### XXX ignore TCP packets that have the ACK or RST
                         ### bits set (unless we matched a snort sid) since
@@ -794,7 +794,7 @@ sub check_scan() {
         } elsif ($use_ipchains) {
             ### could implement source port checking here
             if ($pkt =~ /PROTO\=(\d+)\s($ip_re):(\d+)\s($ip_re):(\d+)/) {
-                ($proto, $src, $srcport, $dst, $dstport) = ($1,$2,$3,$4,$5);
+                ($proto, $src, $sp, $dst, $dp) = ($1,$2,$3,$4,$5);
                 ### should implement protocol mapping
                 ### with /etc/protocols here
                 if ($proto == 1) {
@@ -878,12 +878,12 @@ sub check_scan() {
         ### and change if needed
         unless ($proto eq 'ICMP') {
             ($scan{$src}{$dst}{$proto}{'ABS_SP'},
-                $scan{$src}{$dst}{$proto}{'ABS_EP'}) = &check_range($dstport,
+                $scan{$src}{$dst}{$proto}{'ABS_EP'}) = &check_range($dp,
                     $scan{$src}{$dst}{$proto}{'ABS_SP'},
                     $scan{$src}{$dst}{$proto}{'ABS_EP'});
             ($scan{$src}{$dst}{$proto}{'C_INT'}{'SP'},
                 $scan{$src}{$dst}{$proto}{'C_INT'}{'EP'}) =
-                &check_range($dstport,
+                &check_range($dp,
                     $scan{$src}{$dst}{$proto}{'C_INT'}{'SP'},
                     $scan{$src}{$dst}{$proto}{'C_INT'}{'EP'});
         }
@@ -901,12 +901,12 @@ sub check_scan() {
         } else {
             ### attempt to match any tcp/udp/icmp signatures in the
             ### %sigs_fast hash
-            &match_fastsigs($src, $dst, $srcport, $dstport, $proto,
+            &match_fastsigs($src, $dst, $sp, $dp, $proto,
                 $flags, $len, $ttl);
 
             ### attempt to match any tcp/udp/icmp signatures in the
             ### main signatures hash
-            &match_sigs($src, $dst, $srcport, $dstport, $proto,
+            &match_sigs($src, $dst, $sp, $dp, $proto,
                 $flags, $len, $ttl, $type, $code, $id, $seq);
         }
     }
@@ -915,46 +915,46 @@ sub check_scan() {
 }
 
 sub match_fastsigs() {
-    my ($src, $dst, $srcport, $dstport, $proto,
+    my ($src, $dst, $sp, $dp, $proto,
         $flags, $len, $ttl) = @_;
     if ($proto eq 'TCP') {
-        if (defined $sigs_fast{'TCP'}{$dstport}{$srcport}{$flags}) {
+        if (defined $sigs_fast{'TCP'}{$dp}{$sp}{$flags}) {
             for my $sig_id (keys
-                    %{$sigs_fast{'TCP'}{$dstport}{$srcport}{$flags}}) {
-                print "matched: $dstport,$srcport,$flags, ",
+                    %{$sigs_fast{'TCP'}{$dp}{$sp}{$flags}}) {
+                print "matched: $dp,$sp,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
 #                $scan{$src}{$dst}{$proto}{'CURR_SIG'}{$sig_id}{'PKTS'}++;
-                &chk_local_port($src, $dst, 'TCP', $dstport, $flags, $sig_id)
+                &chk_local_port($src, $dst, 'TCP', $dp, $flags, $sig_id)
                     unless $no_netstat;
             }
         }
-        if (defined $sigs_fast{'TCP'}{$dstport}{'any_sp'}{$flags}) {
+        if (defined $sigs_fast{'TCP'}{$dp}{'any_sp'}{$flags}) {
             for my $sig_id (keys
-                    %{$sigs_fast{'TCP'}{$dstport}{'any_sp'}{$flags}}) {
-                print "matched $dstport,any_sp,$flags, ",
+                    %{$sigs_fast{'TCP'}{$dp}{'any_sp'}{$flags}}) {
+                print "matched $dp,any_sp,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
-                &chk_local_port($src, $dst, 'TCP', $dstport, $flags, $sig_id)
+                &chk_local_port($src, $dst, 'TCP', $dp, $flags, $sig_id)
                     unless $no_netstat;
             }
         }
-        if (defined $sigs_fast{'TCP'}{'any_dp'}{$srcport}{$flags}) {
+        if (defined $sigs_fast{'TCP'}{'any_dp'}{$sp}{$flags}) {
             for my $sig_id (keys
-                    %{$sigs_fast{'TCP'}{'any_dp'}{$srcport}{$flags}}) {
-                print "matched any_dp,$srcport,$flags, ",
+                    %{$sigs_fast{'TCP'}{'any_dp'}{$sp}{$flags}}) {
+                print "matched any_dp,$sp,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
-                &chk_local_port($src, $dst, 'TCP', $dstport, $flags, $sig_id)
+                &chk_local_port($src, $dst, 'TCP', $dp, $flags, $sig_id)
                     unless $no_netstat;
             }
         }
@@ -967,18 +967,18 @@ sub match_fastsigs() {
                     $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
-                &chk_local_port($src, $dst, 'TCP', $dstport, $flags, $sig_id)
+                &chk_local_port($src, $dst, 'TCP', $dp, $flags, $sig_id)
                     unless $no_netstat;
             }
         }
     } elsif ($proto eq 'UDP') {
-        if (defined $sigs_fast{'UDP'}{$dstport}{$srcport}) {
-            for my $sig_id (keys %{$sigs_fast{'UDP'}{$dstport}{$srcport}}) {
+        if (defined $sigs_fast{'UDP'}{$dp}{$sp}) {
+            for my $sig_id (keys %{$sigs_fast{'UDP'}{$dp}{$sp}}) {
                 unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
-                &chk_local_port($src, $dst, 'UDP', $dstport, '', $sig_id)
+                &chk_local_port($src, $dst, 'UDP', $dp, '', $sig_id)
                     unless $no_netstat;
             }
         }
@@ -987,21 +987,21 @@ sub match_fastsigs() {
 }
 
 sub match_sigs() {
-    my ($src, $dst, $srcport, $dstport, $proto,
+    my ($src, $dst, $sp, $dp, $proto,
         $flags, $len, $ttl, $type, $code, $id, $seq) = @_;
     for my $sig_id (keys %{$sigs{$proto}}) {
         ### need to iterate through all signatures
         ### since a packet may match several
-        my $dstport_criteria = 0;
-        my $srcport_criteria = 0;
+        my $dp_criteria = 0;
+        my $sp_criteria = 0;
         my $matched_sig      = 0;
         if ($proto eq 'TCP') {
             if ($flags eq $sigs{'TCP'}{$sig_id}{'flags'}
-                    && &check_port_range($sig_id, $srcport,
-                $dstport, $proto)) {  ### tripped a tcp signature
+                    && &check_port_range($sig_id, $sp,
+                $dp, $proto)) {  ### tripped a tcp signature
                 ### future
 #               && &check_misc_fields($sig_id, $proto, $len, $ttl)) {
-                print "main sigs matched $dstport,$srcport,$flags, ",
+                print "main sigs matched $dp,$sp,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
@@ -1010,7 +1010,7 @@ sub match_sigs() {
                 $matched_sig = 1;
             }
         } elsif ($proto eq 'UDP') {
-            if (&check_port_range($sig_id, $srcport, $dstport, $proto)) {
+            if (&check_port_range($sig_id, $sp, $dp, $proto)) {
 #               && &check_misc_fields($sig_id, $proto, $len, $ttl)) {
                 ### tripped a udp signature
                 unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
@@ -1030,7 +1030,7 @@ sub match_sigs() {
             }
         }
         if ($matched_sig && !$no_netstat) {
-            &chk_local_port($src, $dst, $proto, $dstport, $flags, $sig_id);
+            &chk_local_port($src, $dst, $proto, $dp, $flags, $sig_id);
         }
     }
     return;
@@ -1051,7 +1051,7 @@ sub add_snort_sid() {
 }
 
 sub chk_local_port() {
-    my ($src, $dst, $proto, $dstport, $flags, $sig_id) = @_;
+    my ($src, $dst, $proto, $dp, $flags, $sig_id) = @_;
     ### check to see if the scan destination ip is directed
     ### at the firewall.  If yes, then check to see if a
     ### server is listening on the DSTPORT by parsing
@@ -1059,20 +1059,20 @@ sub chk_local_port() {
     ### to the destination port on the remote machine, but
     ### it should not do this so it is not implemented. :)
     if (defined $local_ips_href->{$dst}) {
-        if (defined $local_ports{$proto}{$dstport}) {
+        if (defined $local_ports{$proto}{$dp}) {
             $scan{$src}{$dst}{$proto}{'CURR_SIG'}
-            {$sig_id}{'LISTEN'}{$dstport}{'PKTS'}++;
+            {$sig_id}{'LISTEN'}{$dp}{'PKTS'}++;
             if ($flags) {
                 $scan{$src}{$dst}{$proto}{'CURR_SIG'}
-                {$sig_id}{'LISTEN'}{$dstport}{'FLAGS'}
+                {$sig_id}{'LISTEN'}{$dp}{'FLAGS'}
                     = $flags;
             }
         } else {
             $scan{$src}{$dst}{$proto}{'CURR_SIG'}
-            {$sig_id}{'NO_LISTEN'}{$dstport}{'PKTS'}++;
+            {$sig_id}{'NO_LISTEN'}{$dp}{'PKTS'}++;
             if ($flags) {
                 $scan{$src}{$dst}{$proto}{'CURR_SIG'}
-                {$sig_id}{'NO_LISTEN'}{$dstport}{'FLAGS'}
+                {$sig_id}{'NO_LISTEN'}{$dp}{'FLAGS'}
                     = $flags;
             }
         }
@@ -1081,11 +1081,11 @@ sub chk_local_port() {
 }
 
 sub check_port_range() {
-    my ($sig_id, $srcport, $dstport, $proto) = @_;
+    my ($sig_id, $sp, $dp, $proto) = @_;
     ### check dst port first
     if (defined $sigs{$proto}{$sig_id}{'dp'}{'uniq_or_any'}) {
         unless ($sigs{$proto}{$sig_id}{'dp'}{'uniq_or_any'} eq 'any') {
-            if ($dstport != $sigs{$proto}{$sig_id}{'dp'}{'uniq_or_any'}) {
+            if ($dp != $sigs{$proto}{$sig_id}{'dp'}{'uniq_or_any'}) {
                 return 0;
             }
         }
@@ -1093,21 +1093,21 @@ sub check_port_range() {
     if (defined $sigs{$proto}{$sig_id}{'dp'}{'start'}) {
         my $start = $sigs{$proto}{$sig_id}{'dp'}{'start'};
         my $end = $sigs{$proto}{$sig_id}{'dp'}{'end'};
-        return 0 if ($dstport < $start || $dstport > $end);
+        return 0 if ($dp < $start || $dp > $end);
     }
     if (defined $sigs{$proto}{$sig_id}{'dp'}{'not'}) {
-        return 0 if ($dstport == $sigs{$proto}{$sig_id}{'dp'}{'not'});
+        return 0 if ($dp == $sigs{$proto}{$sig_id}{'dp'}{'not'});
     }
     if (defined $sigs{$proto}{$sig_id}{'dp'}{'negstart'}) {
         my $start = $sigs{$proto}{$sig_id}{'dp'}{'negstart'};
         my $end = $sigs{$proto}{$sig_id}{'dp'}{'negend'};
-        return 0 if ($dstport > $start || $dstport < $end);
+        return 0 if ($dp > $start || $dp < $end);
     }
 
     ### check src port
     if (defined $sigs{$proto}{$sig_id}{'sp'}{'uniq_or_any'}) {
         unless ($sigs{$proto}{$sig_id}{'sp'}{'uniq_or_any'} eq 'any') {
-            if ($dstport != $sigs{$proto}{$sig_id}{'sp'}{'uniq_or_any'}) {
+            if ($dp != $sigs{$proto}{$sig_id}{'sp'}{'uniq_or_any'}) {
                 return 0;
             }
         }
@@ -1115,15 +1115,15 @@ sub check_port_range() {
     if (defined $sigs{$proto}{$sig_id}{'sp'}{'start'}) {
         my $start = $sigs{$proto}{$sig_id}{'sp'}{'start'};
         my $end = $sigs{$proto}{$sig_id}{'sp'}{'end'};
-        return 0 if ($srcport < $start || $srcport > $end);
+        return 0 if ($sp < $start || $sp > $end);
     }
     if (defined $sigs{$proto}{$sig_id}{'sp'}{'not'}) {
-        return 0 if ($srcport == $sigs{$proto}{$sig_id}{'sp'}{'not'});
+        return 0 if ($sp == $sigs{$proto}{$sig_id}{'sp'}{'not'});
     }
     if (defined $sigs{$proto}{$sig_id}{'sp'}{'negstart'}) {
         my $start = $sigs{$proto}{$sig_id}{'sp'}{'negstart'};
         my $end   = $sigs{$proto}{$sig_id}{'sp'}{'negend'};
-        return 0 if ($srcport > $start || $srcport < $end);
+        return 0 if ($sp > $start || $sp < $end);
     }
     return 1;   ### if we made it to here, then we matched both
                 ### the src and dst port criteria
@@ -1273,13 +1273,13 @@ sub import_signatures() {
         next SIG if $line =~ /^\s*#/;
         if ($line =~ /^psad:(\d+);\s*(tcp|udp);\s*(\S+)\s*\-\>\s*(\S+);\s*
                        msg:\s*\"(.*)\";\s*(.*)\s*dlevel:\s*(\d);$/x) {
-            my $sig_id   = $1;
-            my $proto    = $2;
-            my $src_port = $3;
-            my $dst_port = $4;
-            my $msg_str  = $5;
-            my $options  = $6;
-            my $dlevel   = $7;
+            my $sig_id  = $1;
+            my $proto   = $2;
+            my $sp      = $3;
+            my $dp      = $4;
+            my $msg_str = $5;
+            my $options = $6;
+            my $dlevel  = $7;
 
             ### change protocol to uppercase to match firewall log messages
             $proto = uc $proto;
@@ -1316,7 +1316,7 @@ sub import_signatures() {
 
             ### assign the source and destination port ranges
             &build_tcp_udp_sigs($sig_id, $proto,
-                $src_port, $dst_port, $flags);
+                $sp, $dp, $flags);
 
         } elsif ($line =~ /^psad:(\d+);\s*icmp;\s*
                             msg:\s*\"(.*)\";\s*(.*)\s*dlevel:\s*(\d);$/x) {
@@ -1361,85 +1361,84 @@ sub import_signatures() {
 }
 
 sub build_tcp_udp_sigs() {
-    my ($sig_id, $proto, $src_port, $dst_port, $flags) = @_;
+    my ($sig_id, $proto, $sp, $dp, $flags) = @_;
 
-    if (&is_range($dst_port) || &is_range($src_port)) {
+    if (&is_range($dp) || &is_range($sp)) {
         ### if we make it here then we have a range of ports so insert
         ### the signature into the %sigs hash
         if ($proto eq 'TCP' && $flags) {
             $sigs{$proto}{$sig_id}{'flags'} = $flags;
         }
         ### deal with source port ranges
-        if ($src_port =~ /:/ && $src_port !~ /!/) {
-            my ($start, $end) = split /:/, $src_port;
+        if ($sp =~ /:/ && $sp !~ /!/) {
+            my ($start, $end) = split /:/, $sp;
             $start = 1 unless $start;
             $end = 65535 unless $end;
             $sigs{$proto}{$sig_id}{'sp'}{'start'} = $start;
             $sigs{$proto}{$sig_id}{'sp'}{'end'}   = $end;
-        } elsif ($src_port =~ /!/ && $src_port !~ /:/) {
-            $src_port =~ s/!//;
-            $sigs{$proto}{$sig_id}{'sp'}{'not'} = $src_port;
-        } elsif ($src_port =~ /:/ && $src_port =~ /!/) {
-            my ($start, $end) = split /:/, $src_port;
+        } elsif ($sp =~ /!/ && $sp !~ /:/) {
+            $sp =~ s/!//;
+            $sigs{$proto}{$sig_id}{'sp'}{'not'} = $sp;
+        } elsif ($sp =~ /:/ && $sp =~ /!/) {
+            my ($start, $end) = split /:/, $sp;
             $start = 1 unless $start;
             $end = 65535 unless $end;
             $sigs{$proto}{$sig_id}{'sp'}{'negstart'} = $start;
             $sigs{$proto}{$sig_id}{'sp'}{'negend'}   = $end;
         } else {
             $sigs{$proto}{$sig_id}{'sp'}{'uniq_or_any'}
-                = $src_port;
+                = $sp;
         }
 
         ### deal with destination port ranges
-        if ($dst_port =~ /:/ && $dst_port !~ /!/) {
-            my ($start, $end) = split /:/, $dst_port;
+        if ($dp =~ /:/ && $dp !~ /!/) {
+            my ($start, $end) = split /:/, $dp;
             $start = 1 unless $start;
             $end = 65535 unless $end;
             $sigs{$proto}{$sig_id}{'dp'}{'start'} = $start;
             $sigs{$proto}{$sig_id}{'dp'}{'end'}   = $end;
-        } elsif ($dst_port =~ /!/ && $dst_port !~ /:/) {
-            $dst_port =~ s/!//;
-            $sigs{$proto}{$sig_id}{'dp'}{'not'} = $dst_port;
-        } elsif ($dst_port =~ /:/ && $dst_port =~ /!/) {
-            my ($start, $end) = split /:/, $dst_port;
+        } elsif ($dp =~ /!/ && $dp !~ /:/) {
+            $dp =~ s/!//;
+            $sigs{$proto}{$sig_id}{'dp'}{'not'} = $dp;
+        } elsif ($dp =~ /:/ && $dp =~ /!/) {
+            my ($start, $end) = split /:/, $dp;
             $start = 1 unless $start;
             $end = 65535 unless $end;
             $sigs{$proto}{$sig_id}{'dp'}{'negstart'} = $start;
             $sigs{$proto}{$sig_id}{'dp'}{'negend'}   = $end;
         } else {
-            $sigs{$proto}{$sig_id}{'dp'}{'uniq_or_any'}
-                = $dst_port;
+            $sigs{$proto}{$sig_id}{'dp'}{'uniq_or_any'} = $dp;
         }
     } else {
         ### build up the %sigs_fast lookup cache
-        if ($dst_port !~ /\D/) {
-            if ($src_port !~ /\D/) {
+        if ($dp !~ /\D/) {
+            if ($sp !~ /\D/) {
                 if ($proto eq 'TCP') {
-                    $sigs_fast{$proto}{$dst_port}
-                        {$src_port}{$flags}{$sig_id} = '';
+                    $sigs_fast{$proto}{$dp}
+                        {$sp}{$flags}{$sig_id} = '';
                 } elsif ($proto eq 'UDP') {
-                    $sigs_fast{$proto}{$dst_port}
-                        {$src_port}{$sig_id} = '';
+                    $sigs_fast{$proto}{$dp}
+                        {$sp}{$sig_id} = '';
                 }
-            } elsif ($src_port =~ /any/i) {
+            } elsif ($sp =~ /any/i) {
                 if ($proto eq 'TCP') {
-                    $sigs_fast{$proto}{$dst_port}
+                    $sigs_fast{$proto}{$dp}
                         {'any_sp'}{$flags}{$sig_id} = '';
                 } elsif ($proto eq 'UDP') {
-                    $sigs_fast{$proto}{$dst_port}
+                    $sigs_fast{$proto}{$dp}
                         {'any_sp'}{$sig_id} = '';
                 }
             }
-        } elsif ($dst_port =~ /any/i) {
-            if ($src_port !~ /\D/) {
+        } elsif ($dp =~ /any/i) {
+            if ($sp !~ /\D/) {
                 if ($proto eq 'TCP') {
                     $sigs_fast{$proto}{'any_dp'}
-                        {$src_port}{$flags}{$sig_id} = '';
+                        {$sp}{$flags}{$sig_id} = '';
                 } elsif ($proto eq 'UDP') {
                     $sigs_fast{$proto}{'any_dp'}
-                        {$src_port}{$sig_id} = '';
+                        {$sp}{$sig_id} = '';
                 }
-            } elsif ($src_port =~ /any/i) {
+            } elsif ($sp =~ /any/i) {
                 if ($proto eq 'TCP') {
                     $sigs_fast{$proto}{'any_dp'}
                         {'any_sp'}{$flags}{$sig_id} = '';

@@ -37,7 +37,6 @@
 use Cwd;
 use File::Path;
 use File::Copy;
-use Text::Wrap;
 use Sys::Hostname;
 use IO::Socket;
 use Getopt::Long;
@@ -537,7 +536,7 @@ sub install() {
         unlink "${PSAD_CONFDIR}/diskmond.conf";
     }
 
-    ### deal with auto_dl, signatures,icmp_types, and posf files
+    ### deal with auto_dl, signatures, icmp_types, and posf files
     for my $file qw(signatures icmp_types posf auto_dl) {
         if (-e "${PSAD_CONFDIR}/$file") {
             &archive("${PSAD_CONFDIR}/$file") unless $noarchive;
@@ -564,6 +563,8 @@ sub install() {
     }
 
     unless ($preserve_rv) {  ### we want to preserve the existing config
+
+        ### get email address(es)
         my $email_str = &query_email();
         if ($email_str) {
             for my $file qw(psad.conf psadwatchd.conf
@@ -572,6 +573,7 @@ sub install() {
                     "${PSAD_CONFDIR}/$file");
             }
         }
+
         ### Give the admin the opportunity to set the strings that are
         ### parsed out of iptables messages.  This is useful since the
         ### admin may have configured the firewall to use a logging prefix
@@ -603,12 +605,21 @@ sub install() {
         }
         ### Give the admin the opportunity to set the HOME_NET variable.
         &set_home_net("${PSAD_CONFDIR}/psad.conf");
-    }
-    for my $file ("${PSAD_CONFDIR}/psad.conf",
-            "${PSAD_CONFDIR}/kmsgsd.conf",
-            "${PSAD_CONFDIR}/psadwatchd.conf") {
-        &logr(" .. Setting hostname to \"$HOSTNAME\" in $file\n");
-        &set_hostname($file);
+
+        ### see if the admin would like to have psad send info to
+        ### DShield
+        if (&query_dshield()) {
+            &put_string('ENABLE_DSHIELD_ALERTS', 'Y',
+                "${PSAD_CONFDIR}/psad.conf");
+        }
+
+        ### Set the hostname
+        for my $file ("${PSAD_CONFDIR}/psad.conf",
+                "${PSAD_CONFDIR}/kmsgsd.conf",
+                "${PSAD_CONFDIR}/psadwatchd.conf") {
+            &logr(" .. Setting hostname to \"$HOSTNAME\" in $file\n");
+            &set_hostname($file);
+        }
     }
 
     ### see if there are any "_CHANGEME_" strings left and give the
@@ -640,7 +651,7 @@ sub install() {
     }
 
     ### make sure the PSAD_DIR and PSAD_FIFO variables are correctly defined
-    ### in the config file.
+    ### in psad.conf and kmsgsd.conf
     &put_string('PSAD_DIR', $PSAD_DIR, "${PSAD_CONFDIR}/psad.conf");
     &put_string('PSAD_FIFO', $PSAD_FIFO, "${PSAD_CONFDIR}/kmsgsd.conf");
 
@@ -685,7 +696,8 @@ sub install() {
     if ($running) {
         &logr("\n");
         &logr(" .. An older version of psad is already running.  To ".
-            "start the new version, run \"${USRSBIN_DIR}/psad --Restart\"\n");
+            "start the new\n");
+        &logr("    version, run \"${USRSBIN_DIR}/psad --Restart\"\n");
     } else {
         if ($init_dir) {
             &logr("\n .. To execute psad, run \"${init_dir}/psad start.\"\n");
@@ -845,16 +857,18 @@ sub set_home_net() {
             &logr("      $intf -> $connected_subnets{$intf}\n");
         }
         &logr("\n");
-        &logr("    Specify which subnets are part of your internal network.\n");
-        &logr("    Note that you can correct anything you enter here by " .
-            "editing\n");
-        &logr("    the HOME_NET variable in: $file.\n");
+        &logr("    Specify which subnets are part of your internal network.  " .
+            "Note that\n");
+        &logr("    you can correct anything you enter here by editing the " .
+            "HOME_NET\n");
+        &logr("    variable in: $file.\n\n");
         &logr("    Enter each of the subnets (except for the external " .
             "subnet)\n");
-        &logr("    on a line by itself.\n");
-        &logr("    Each of the subnets should be in the form <net>/<mask.\n");
-        &logr("    E.g. in CIDR notation: 192.168.10.0/24 (preferrable), or\n");
-        &logr("    regularly: 192.168.10.0/255.255.255.0\n\n");
+        &logr("    on a line by itself.  Each of the subnets should be in the " .
+            "    form\n");
+        &logr("    <net>/<mask>.  E.g. in CIDR notation: 192.168.10.0/24 " .
+            "(preferrable),\n");
+        &logr("    or regularly: 192.168.10.0/255.255.255.0\n\n");
         &logr("    End with a \".\" on a line by itself.\n\n");
         my $ans = '';
         while ($ans ne '.') {
@@ -912,7 +926,8 @@ sub set_hostname() {
 
 sub append_fifo_syslog_ng() {
     &logr(' .. Modifying /etc/syslog-ng/syslog-ng.conf to write kern.info ' .
-        "messages to $PSAD_FIFO\n");
+        "messages to\n");
+    &logr("    $PSAD_FIFO\n");
     unless (-e '/etc/syslog-ng/syslog-ng.conf.orig') {
         copy '/etc/syslog-ng/syslog-ng.conf',
             '/etc/syslog-ng/syslog-ng.conf.orig';
@@ -992,7 +1007,8 @@ sub query_preserve_config() {
     my $ans = '';
     while ($ans ne 'y' && $ans ne 'n') {
         &logr(' .. Would you like to preserve the config from the ' .
-            'existing psad installation ([y]/n)?  ');
+            "existing\n");
+        &logr("    psad installation ([y]/n)?  ");
         $ans = <STDIN>;
         $ans = 'y' if $ans eq "\n";
         chomp $ans;
@@ -1010,7 +1026,8 @@ sub query_preserve_sigs_autodl() {
         &logr("\n");
         &logr(" .. Preserve the existing $file file?\n");
         &logr('    (NOTE: This is only recommended if you have manually ' .
-            "edited $file)  (y/[n])?  ");
+            "edited\n");
+        &logr("    $file)  (y/[n])?  ");
         $ans = <STDIN>;
         $ans = 'n' if $ans eq "\n";
         chomp $ans;
@@ -1110,7 +1127,8 @@ sub preserve_config() {
 
 sub append_fifo_syslog() {
     &logr(' .. Modifying /etc/syslog.conf to write kern.info ' .
-        "messages to $PSAD_FIFO\n");
+        "messages to\n");
+    &logr("    $PSAD_FIFO\n");
     unless (-e '/etc/syslog.conf.orig') {
         copy '/etc/syslog.conf', '/etc/syslog.conf.orig';
     }
@@ -1349,7 +1367,7 @@ sub perms_ownership() {
     my ($file, $perm_value) = @_;
     chmod $perm_value, $file or die " ** Could not ",
         "chmod($perm_value, $file): $!";
-    ### chown uid, gid, $file  (root :)
+    ### root (maybe should take the group assignment out)
     chown 0, 0, $file or die " ** Could not chown 0,0,$file: $!";
     return;
 }
@@ -1425,6 +1443,34 @@ sub get_fw_search_strings() {
             "in the file: $PSAD_CONFDIR/fw_search.conf\n");
     }
     return \@fw_search_strings;
+}
+
+sub query_dshield() {
+    my $ans = '';
+    &logr("\n");
+    &logr(" .. Psad has the capability of sending scan data via email alerts " .
+        "to the\n");
+    &logr("    DShield distributed intrusion detection system (www.dshield.org)." .
+        "  By\n");
+    &logr("    default this feature is not enabled since firewall log data is " .
+        "sensitive,\n");
+    &logr("    but submitting logs to DShield provides a valuable service and " .
+        "assists in\n");
+    &logr("    generally enhancing internet security.  As an optional step, if " .
+        "you\n");
+    &logr("    have a DShield user id you can edit the \"DSHIELD_USER_ID\" " .
+        "variable\n");
+    &logr("    in $PSAD_CONFDIR/psad.conf\n\n");
+    while ($ans ne 'y' && $ans ne 'n') {
+        &logr('    Would you like to enable DShield alerts (y/[n])?  ');
+        $ans = <STDIN>;
+        $ans = 'y' if $ans eq "\n";
+        chomp $ans;
+    }
+    if ($ans eq 'y') {
+        return 1;
+    }
+    return 0;
 }
 
 sub query_email() {
@@ -1675,25 +1721,13 @@ sub logr() {
     my $msg = shift;
     for my $file (@LOGR_FILES) {
         if ($file eq *STDOUT) {
-            if (length($msg) > 72) {
-                print STDOUT wrap('', $SUB_TAB, $msg);
-            } else {
-                print STDOUT $msg;
-            }
+            print STDOUT $msg;
         } elsif ($file eq *STDERR) {
-            if (length($msg) > 72) {
-                print STDERR wrap('', $SUB_TAB, $msg);
-            } else {
-                print STDERR $msg;
-            }
+            print STDERR $msg;
         } else {
             open F, ">> $file" or die " ** Could not open ",
                 "$file: $!";
-            if (length($msg) > 72) {
-                print F wrap('', $SUB_TAB, $msg);
-            } else {
-                print F $msg;
-            }
+            print F $msg;
             close F;
         }
     }

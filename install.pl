@@ -411,7 +411,7 @@ sub install() {
     print "\n\n";
     ### make sure the psad (perl) daemon compiles.  The other three
     ### daemons have all been re-written in C.
-    &logr(" .. Verifying compilation of psad (perl) daemons:\n");
+    &logr(" .. Verifying compilation of psad perl daemon:\n");
     unless (((system "$Cmds{'perl'} -c psad")>>8) == 0) {
         die " ** psad does not compile with \"perl -c\".  Download the" .
             " latest sources from:\n\nhttp://www.cipherdyne.com\n";

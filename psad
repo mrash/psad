@@ -1738,6 +1738,27 @@ sub psad_init() {
     ### set some config variables based on command line input
     &handle_cmdline();
 
+    ### The --Kill command line switch was given.
+    exit &stop_psad() if $kill;
+
+    ### The --HUP command line switch was given.
+    exit &hup() if $hup;
+
+    ### The --USR1 command line switch was given.
+    exit &usr1() if $usr1;
+
+    ### dump configuration to STDOUT
+    exit &dump_conf() if $dump_conf;
+
+    ### The --Flush command line switch was given.
+    exit &flush_auto_blocked_ips() if $flush_fw;
+
+    ### the --Status command line switch was given
+    exit &status() if $status;
+
+    ### the --Restart command line switch was given
+    exit &restart() if $restart;
+
     ### import psad signatures (FIXME:: these should be taken directly
     ### from the snort signatures instead)
     &import_signatures() unless $no_signatures;
@@ -1773,27 +1794,6 @@ sub psad_init() {
 
     ### enter iptables analysis mode.
     exit &analysis_mode() if $analyze_msgs;
-
-    ### The --Kill command line switch was given.
-    exit &stop_psad() if $kill;
-
-    ### The --HUP command line switch was given.
-    exit &hup() if $hup;
-
-    ### The --USR1 command line switch was given.
-    exit &usr1() if $usr1;
-
-    ### dump configuration to STDOUT
-    exit &dump_conf() if $dump_conf;
-
-    ### The --Flush command line switch was given.
-    exit &flush_auto_blocked_ips() if $flush_fw;
-
-    ### the --Status command line switch was given
-    exit &status() if $status;
-
-    ### the --Restart command line switch was given
-    exit &restart() if $restart;
 
     ### make sure PSAD_DIR, FW_DATA_FILE, and /var/lib/psad/psadfifo, etc.
     ### actually exist
@@ -2577,7 +2577,6 @@ sub assign_auto_danger_level() {
     if (defined $auto_dl{'ip'} and defined $auto_dl{'ip'}{$src}) {
         if (defined $auto_dl{'ip'}{$src}{'allproto'}) {
             if ($auto_dl{'ip'}{$src}{'allproto'} == 0) {
-                $auto_assigned_msg{$src} = '';
                 return 0;
             }
             if ($scan_dl{$src} < $auto_dl{'ip'}{$src}{'allproto'}) {
@@ -2589,7 +2588,6 @@ sub assign_auto_danger_level() {
             }
         } elsif (defined $auto_dl{'ip'}{$src}{$scan_proto}) {
             if ($auto_dl{'ip'}{$src}{$scan_proto} == 0) {
-                $auto_assigned_msg{$src} = '';
                 return 0;
             }
             if ($scan_dl{$src} < $auto_dl{'ip'}{$src}{$scan_proto}) {
@@ -2605,7 +2603,6 @@ sub assign_auto_danger_level() {
             next NET unless ipv4_in_network($net, $src);
             if (defined $auto_dl{'net'}{$net}{'allproto'}) {
                 if ($auto_dl{'net'}{$net}{'allproto'} == 0) {
-                    $auto_assigned_msg{$src} = '';
                     return 0;
                 }
                 if ($scan_dl{$src} < $auto_dl{'net'}{$net}{'allproto'}) {
@@ -2617,7 +2614,6 @@ sub assign_auto_danger_level() {
                 }
             } elsif (defined $auto_dl{'net'}{$net}{$scan_proto}) {
                 if ($auto_dl{'net'}{$net}{$scan_proto} == 0) {
-                    $auto_assigned_msg{$src} = '';
                     return 0;
                 }
                 if ($scan_dl{$src} < $auto_dl{'net'}{$net}{$scan_proto}) {

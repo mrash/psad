@@ -94,6 +94,8 @@ for (;;) {
         ### clear the HUP flag and re-import the config
         $hup_flag = 0;
         &import_config();
+        &Psad::psyslog('psad(diskmond)', 'Received HUP signal, ' .
+            're-importing diskmond.conf');
     }
 
     $usage = &get_disk_usage();

@@ -108,7 +108,11 @@ for (;;) {
         ### clear the HUP flag and re-import the config
         $hup_flag = 0;
         &import_config();
-        ### XXX close filehandles?
+        close FIFO;
+        open FIFO, "< $config{'PSAD_FIFO'}" or
+            die "Can't open file : $!\n";
+        &Psad::psyslog('psad(kmsgsd)', 'Received HUP signal, ' .
+            're-importing kmsgsd.conf');
     }
 }
 ### These statements don't get executed, but for completeness...

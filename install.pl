@@ -632,6 +632,7 @@ sub check_commands() {
                         if ($real_location) {
                                 $Cmds_href->{$cmd} = $real_location;
                         } else {
+				next CMD if ($cmd eq "ipchains" || $cmd eq "iptables");
                                 die "\n@@@@@  ($caller): Could not find $cmd anywhere!!!  Please edit the config section to include the path to $cmd.\n";
                         }
                 }

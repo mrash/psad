@@ -1258,7 +1258,7 @@ sub auto_psad_response(){
 sub email_limit_reached() {
 	my ($email_addresses_aref, $srcip, $Cmds_href) = @_;
 	for my $email_address (@$email_addresses_aref) {
-		system "$Cmds_href->{'mail'} $email_address -s \"psad: Email message limit for $srcip has been reached!!!\" < /dev/null";
+		system "$Cmds_href->{'mail'} $email_address -s \"psad: Email message limit for $srcip has been reached on $HOSTNAME!!!\" < /dev/null";
 	}
 	return;
 }

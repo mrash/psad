@@ -79,7 +79,7 @@ use Getopt::Long "GetOptions";
 use autouse 'Data::Dumper' => "Dumper";  ### this one is not used very much so don't load immediately
 use autouse 'Socket';       ### not used until a scan is detected so don't load until it is needed
 use Sys::Hostname "hostname";
-use POSIX qw(setsid);
+use POSIX;
 
 # use Sys::Syslog qw(openlog syslog closelog);   ### this does not seem to play nice with perl-5.005_03
 # use POSIX qw(:signal_h :errno_h :sys_wait_h setsid);
@@ -130,6 +130,7 @@ my $IPTABLES_MSG_SEARCH = "DROP|DENY|REJECT";
 ### system binaries ###
 my $ipchainsCmd = "/sbin/ipchains";
 my $iptablesCmd = "/usr/local/bin/iptables";
+my $mknodCmd = "/bin/mknod";
 my $psCmd = "/bin/ps";
 my $wcCmd = "/usr/bin/wc";
 my $tailCmd = "/usr/bin/tail";
@@ -190,25 +191,25 @@ my @args_cp = @ARGV;
 Getopt::Long::Configure("no_ignore_case");  # make Getopts case sensitive
 
 &usage_and_exit(1) unless (GetOptions (
-        'help'           => \$help,             # display help
-        'auto_ips=s'     => \$auto_ips,         # enable automatic ip danger level assignment
-        'output'         => \$output,           # write scanlog messages to STDOUT
-        'Daemon'         => \$daemon,           # do not run as a daemon
-        'debug'          => \$DEBUG,            # run in debug mode
-        'interval=s'     => \$CHECK_INTERVAL,   # set $CHECK_INTERVAL from the command line
-        'firewallcheck'  => \$fwcheck,          # do not check firewall rules
-        'config=s'       => \$config,           # specify configuration file
-        'reversedns'     => \$dnslookups,       # do not issue dns lookups against scanning ip address
-        'signatures=s'   => \$signatures,       # scan signatures
-        'localport'      => \$netstat_lookup,   # do not check to see if the firewall is listening on localport that has been scanned
-        'errors'         => \$errors,           # do not write malformed packet messages to error log
-        'Logging_server' => \$Syslog_server,    # we are running psad on a syslog logging server
-        'Kill'           => \$kill,             # kill all running psad processes (psadwatchd, psad, kmsgsd, diskmond)
-	'Restart'	 => \$restart,		# restart psad with all options of the currently running psad process
-	'Status'	 => \$status,		# display status of any currently running psad processes
-	'USR1'		 => \$usr1, 		# send an existing psad process a USR1 signal (useful for debugging)
-        'Version'        => \$print_version,    # print the psad version and exit
-        'whois'          => \$whoislookups      # do not issue whois lookups against the scanning ip
+	'help'		=> \$help,		# display help
+	'auto_ips=s'	=> \$auto_ips,		# enable automatic ip danger level assignment
+	'output'	=> \$output,		# write scanlog messages to STDOUT
+	'Daemon'	=> \$daemon,		# do not run as a daemon
+	'debug'		=> \$DEBUG,		# run in debug mode
+	'interval=s'	=> \$CHECK_INTERVAL,	# set $CHECK_INTERVAL from the command line
+	'firewallcheck'	=> \$fwcheck,		# do not check firewall rules
+	'config=s'	=> \$config,		# specify configuration file
+	'reversedns'	=> \$dnslookups,	# do not issue dns lookups against scanning ip address
+	'signatures=s'	=> \$signatures,	# scan signatures
+	'localport'	=> \$netstat_lookup,	# do not check to see if the firewall is listening on localport that has been scanned
+	'errors'	=> \$errors,		# do not write malformed packet messages to error log
+	'Logging_server'=> \$Syslog_server,	# we are running psad on a syslog logging server
+	'Kill'		=> \$kill,		# kill all running psad processes (psadwatchd, psad, kmsgsd, diskmond)
+	'Restart'	=> \$restart,		# restart psad with all options of the currently running psad process
+	'Status'	=> \$status,		# display status of any currently running psad processes
+	'USR1'		=> \$usr1, 		# send an existing psad process a USR1 signal (useful for debugging)
+	'Version'=> \$print_version,		# print the psad version and exit
+	'whois'=> \$whoislookups		# do not issue whois lookups against the scanning ip
 ));
 &usage_and_exit(0) if ($help);
 
@@ -231,8 +232,9 @@ if ($usr1) {
 }
 
 my %Cmds = (
-        "ipchains"      => $ipchainsCmd,
-        "iptables"      => $iptablesCmd,
+	"ipchains"	=> $ipchainsCmd,
+	"iptables"	=> $iptablesCmd,
+	"mknod"		=> $mknodCmd,
 	"wc"		=> $wcCmd,
 	"ps"		=> $psCmd,
 	"tail"		=> $tailCmd,
@@ -256,6 +258,30 @@ my %Cmds = (
 if ($status) {
         my $rv = &psad_status(\@PIDFILES, $cmdline_file, \%Cmds);
         exit $rv;
+}
+
+### make sure $PSAD_DIR, $FW_DATA, and /var/log/psadfifo actually exist
+unless (-d $PSAD_DIR) {
+	mkdir $PSAD_DIR, 400;
+}
+unless (-e $FW_DATA) {
+	open F, "> $FW_DATA";
+	close F;
+}
+unless (-e $PSAD_LOGFILE) {
+	open L, "> $PSAD_LOGFILE";
+	close L;
+}
+unless (-e $ERROR_LOG) {
+	open E, "> $ERROR_LOG";
+	close E;
+}
+unless (-e $EMAIL_ALERTFILE) {
+	open E, "> $EMAIL_ALERTFILE";
+	close E;
+}
+unless (-e "/var/log/psadfifo") {
+	`$Cmds{'mknod'} -m 600 /var/log/psadfifo p`;
 }
 
 ### the --Restart command line switch was given
@@ -1027,7 +1053,8 @@ sub scan_logr() {
 				my $time = join ' ', @time;
 				unless ($dnslookups) {
 					my $ipaddr = gethostbyname($srcip);
-					my $rdns = gethostbyaddr($ipaddr, AF_INET);
+					# my $rdns = gethostbyaddr($ipaddr, AF_INET);
+					my $rdns = gethostbyaddr($ipaddr, 2);
 					$rdns = "No reverse dns info available" unless $rdns;
 					$dnsstring = "$srcip -> $rdns";
 				}

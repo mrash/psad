@@ -13,7 +13,7 @@
 #
 # Credits: (see the CREDITS file bundled with the psad sources.)
 #
-# Version: 1.3.1
+# Version: 1.3.2
 #
 # Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.org)
 #

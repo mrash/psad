@@ -453,7 +453,7 @@ sub install() {
     ### else other than the normal "DROP", "DENY", or "REJECT" strings.
     my $custom_fw_search_str = &get_fw_search_string();
     if ($custom_fw_search_str) {
-        &logr(" .. Setting \$FW_MSG_SEARCH1 to \"$custom_fw_search_str\" " .
+        &logr(" .. Setting \$FW_MSG_SEARCH to \"$custom_fw_search_str\" " .
             "in ${PSAD_CONFDIR}/psad.conf\n");
         &put_custom_fw_search_str("${PSAD_CONFDIR}/psad.conf",
             $custom_fw_search_str);
@@ -990,8 +990,8 @@ sub put_custom_fw_search_str() {
     close RF;
     open F, "> $file";
     for my $line (@lines) {
-        if ($line =~ /^\s*FW_MSG_SEARCH1\s/) {
-            print F "FW_MSG_SEARCH1              $custom_fw_search;\n";
+        if ($line =~ /^\s*FW_MSG_SEARCH\s/) {
+            print F "FW_MSG_SEARCH              $custom_fw_search;\n";
         } else {
             print F $line;
         }

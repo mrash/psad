@@ -242,8 +242,7 @@ my $year;
 ### %auto_dl holds all ip addresses that should automatically
 ### be assigned a danger level (or ignored).
 my %auto_dl = ();
-my %auto_assigned_dl     = ();
-my %auto_assigned_dl_msg = ();
+my %auto_assigned_msg = ();
 
 ### cache the source ips that we have automatically blocked
 ### (if ENABLE_AUTO_IDS == 'Y')
@@ -1035,11 +1034,10 @@ sub check_scan() {
         }
 
         ### see if we need to assign a danger level according to the auto_dl
-        ### file.  A return value of 2 means we ignore this $src
+        ### file.  The return value is the auto-assigned danger level (or
+        ### -1 if there is no auto-assigned danger level.
         unless ($no_auto_dl) {
-            if (not defined $auto_assigned_dl{$src} and
-                    &assign_auto_danger_level($src, $proto) == 2) {
-                &Psad::psyslog('psad', "auto-assigned $src to danger level 0");
+            if (&assign_auto_danger_level($src, $proto) == 0) {
                 next PKT;
             }
         }
@@ -2572,78 +2570,65 @@ sub assign_danger_level() {
 sub assign_auto_danger_level() {
     my ($src, $scan_proto) = @_;
 
-    ### this function has three possible return values:
-    ###    0 if there is no auto_dl definition for $src and $scan_proto
-    ###    1 if there is a matching auto_dl definition, but the dl is not 0
-    ###    2 if $src and $scan_proto should be ignored according to auto_dl
-
     ### see if the source should automatically be assigned a
     ### danger level
     if (defined $auto_dl{'ip'} and defined $auto_dl{'ip'}{$src}) {
         if (defined $auto_dl{'ip'}{$src}{'allproto'}) {
+            if ($auto_dl{'ip'}{$src}{'allproto'} == 0) {
+                $auto_assigned_msg{$src} = '';
+                return 0;
+            }
             if ($scan_dl{$src} < $auto_dl{'ip'}{$src}{'allproto'}) {
                 $scan_dl{$src} = $auto_dl{'ip'}{$src}{'allproto'};
-                $auto_assigned_dl{$src} = '';
-                $auto_assigned_dl_msg{$src} = '';
+                $auto_assigned_msg{$src} = '';
                 &Psad::psyslog('psad', "auto-assigned danger level: " .
                     "$scan_dl{$src} for IP: $src");
-                return 1;
-            }
-            if ($auto_dl{'ip'}{$src}{'allproto'} == 0) {
-                $auto_assigned_dl{$src} = '';
-                $auto_assigned_dl_msg{$src} = '';
-                return 2;
+                return $auto_dl{'ip'}{$src}{'allproto'};
             }
         } elsif (defined $auto_dl{'ip'}{$src}{$scan_proto}) {
+            if ($auto_dl{'ip'}{$src}{$scan_proto} == 0) {
+                $auto_assigned_msg{$src} = '';
+                return 0;
+            }
             if ($scan_dl{$src} < $auto_dl{'ip'}{$src}{$scan_proto}) {
                 $scan_dl{$src} = $auto_dl{'ip'}{$src}{$scan_proto};
-                $auto_assigned_dl{$src} = '';
-                $auto_assigned_dl_msg{$src} = '';
+                $auto_assigned_msg{$src} = '';
                 &Psad::psyslog('psad', "auto-assigned danger level: " .
                     "$scan_dl{$src} for IP: $src");
-                return 1;
-            }
-            if ($auto_dl{'ip'}{$src}{$scan_proto} == 0) {
-                return 2;
-                $auto_assigned_dl{$src} = '';
-                $auto_assigned_dl_msg{$src} = '';
+                return $auto_dl{'ip'}{$src}{$scan_proto};
             }
         }
     } elsif (defined $auto_dl{'net'}) {
         NET: for my $net (keys %{$auto_dl{'net'}}) {
             next NET unless ipv4_in_network($net, $src);
             if (defined $auto_dl{'net'}{$net}{'allproto'}) {
+                if ($auto_dl{'net'}{$net}{'allproto'} == 0) {
+                    $auto_assigned_msg{$src} = '';
+                    return 0;
+                }
                 if ($scan_dl{$src} < $auto_dl{'net'}{$net}{'allproto'}) {
                     $scan_dl{$src} = $auto_dl{'net'}{$net}{'allproto'};
-                    $auto_assigned_dl{$src} = '';
-                    $auto_assigned_dl_msg{$src} = '';
+                    $auto_assigned_msg{$src} = '';
                     &Psad::psyslog('psad', "auto-assigned danger level: " .
                         "$scan_dl{$src} for IP: $src");
-                    return 1;
-                }
-                if ($auto_dl{'net'}{$net}{'allproto'} == 0) {
-                    $auto_assigned_dl{$src} = '';
-                    $auto_assigned_dl_msg{$src} = '';
-                    return 2;
+                    return $auto_dl{'net'}{$net}{'allproto'};
                 }
             } elsif (defined $auto_dl{'net'}{$net}{$scan_proto}) {
+                if ($auto_dl{'net'}{$net}{$scan_proto} == 0) {
+                    $auto_assigned_msg{$src} = '';
+                    return 0;
+                }
                 if ($scan_dl{$src} < $auto_dl{'net'}{$net}{$scan_proto}) {
                     $scan_dl{$src} = $auto_dl{'net'}{$net}{$scan_proto};
-                    $auto_assigned_dl{$src} = '';
-                    $auto_assigned_dl_msg{$src} = '';
+                    $auto_assigned_msg{$src} = '';
                     &Psad::psyslog('psad', "auto-assigned danger level: " .
                         "$scan_dl{$src} for IP: $src");
-                    return 1;
-                }
-                if ($auto_dl{'net'}{$net}{$scan_proto} == 0) {
-                    $auto_assigned_dl{$src} = '';
-                    $auto_assigned_dl_msg{$src} = '';
-                    return 2;
+                    return $auto_dl{'net'}{$net}{$scan_proto};
                 }
             }
         }
     }
-    return 0;
+    return -1;
 }
 
 sub check_scan_proto() {
@@ -2938,9 +2923,9 @@ sub scan_logr() {
             if (defined $scan{$src}{$dst}{'multiproto'}) {
                 print $fh ' Multi-Protocol';
             }
-            if (defined $auto_assigned_dl_msg{$src}) {
+            if (defined $auto_assigned_msg{$src}) {
                 printf $fh ' Auto-assigned';
-                delete $auto_assigned_dl_msg{$src};
+                delete $auto_assigned_msg{$src};
             }
             print $fh "\n\n";
 

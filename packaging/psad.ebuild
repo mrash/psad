@@ -81,7 +81,7 @@ src_install() {
 	myhostname="$(< /etc/hostname)"
 	[ -e /etc/dnsdomainname ] && mydomain=".$(< /etc/dnsdomainname)"
 	cp psad.conf psad.conf.orig
-	sed "s:HOSTNAME\(.\+\)_CHANGEME_;:HOSTNAME\1${myhostname}${mydomain};:" psad.conf.orig > psad.conf
+	sed -i "s:HOSTNAME\(.\+\)\_CHANGEME\_;:HOSTNAME\1${myhostname}${mydomain};:" psad.conf || die "Sed failed."
 
 	insinto /etc/psad
 	doins *.conf
@@ -105,31 +105,6 @@ pkg_postinst() {
 		ebegin "Creating syslog FIFO for PSAD"
 		mknod -m 600 ${ROOT}/var/lib/psad/psadfifo p
 		eend $?
-	fi
-
-	if [ -e /etc/syslog.conf ]
-	then
-		if ! grep -v "#" /etc/syslog.conf | grep -q psadfifo;
-		then
-			cp /etc/syslog.conf /etc/syslog.conf.orig
-			echo " .. Adding psadfifo line to /etc/syslog.conf"
-			echo "# Send all kern.info messeges through the psad named pipe" >> /etc/syslog.conf
-			echo "kern.info |/var/lib/psad/psadfifo" >> /etc/syslog.conf
-			killall -HUP syslogd
-		fi
-	fi
-
-	if [ -e /etc/syslog-ng/syslog-ng.conf ]
-	then
-		if ! grep -v "#" /etc/syslog-ng/syslog-ng.conf | grep -q psadfifo;
-		then
-			cp /etc/syslog-ng/syslog-ng.conf /etc/syslog-ng/syslog-ng.conf.orig
-			echo " .. Adding psadfifo /etc/syslog-ng/syslog-ng.conf"
-			echo "destination psadpipe { pipe(\"/var/lib/psad/psadfifo\"); };" >> /etc/syslog-ng/syslog-ng.conf
-			echo "filter f_kerninfo { facility(kern) and level(info); };" >> /etc/syslog-ng/syslog-ng.conf
-			echo "log { source(src); filter(f_kerninfo); destination(psadpipe); };" >> /etc/syslog-ng/syslog-ng.conf
-			killall -HUP syslog-ng
-		fi
 	fi
 
 	echo

@@ -89,6 +89,9 @@ start)
 		echo -n "Starting the psad daemon: "
 		daemon /usr/local/bin/psad -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips 
 		echo
+                echo -n "Starting the psadwatchd monitoring daemon: "
+                daemon /usr/local/bin/psadwatchd
+                echo
 		echo -n "Starting the disk monitoring daemon: "
 		daemon /usr/local/bin/diskmond
 		echo
@@ -104,6 +107,9 @@ stop)
 	echo -n "Shutting down the psad daemon: "
 	psadkillproc psad 
 	echo
+        echo -n "Shutting down the psadwatchd monitoring daemon: "
+        psadkillproc psadwatchd
+        echo
 	echo -n "Shutting down the disk monitoring daemon: "
 	psadkillproc diskmond
 	echo
@@ -111,6 +117,7 @@ stop)
 status)
 	status kmsgsd
 	status psad 
+	status psadwatchd
 	status diskmond
 	;;
 restart|reload)

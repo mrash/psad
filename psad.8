@@ -21,9 +21,9 @@
 .I rules-directory
 .B ] [--passive-os-sigs
 .I posf-file
-.B ] [--ip-status
+.B ] [--status-ip
 .I ip
-.B ] [--no-fwcheck] [--no-daemon] [--no-rdns]
+.B ] [--status-sort-dl] [--no-fwcheck] [--no-daemon] [--no-rdns]
 .B [--no-whois] [--no-netstat] [--no-ipt-errors]
 .B [--no-passive-os]
 .SH DESCRIPTION
@@ -114,7 +114,7 @@ that were originally included within Snort.
 
 .BR \-\^\-snort-sids
 Enable snort sid processing mode.  This will instruct psad to import
-snort rules (from /etc/psad/snort-1.8.7_rules by default, see the
+snort rules (from /etc/psad/snort_rules by default, see the
 .B --snort-rdir
 option) and look for snort SID<nnn> messages logged by iptables.
 .B fwsnort
@@ -166,6 +166,19 @@ Display the status of any psad processes that may or not be running.
 The status output contains a listing of the number of packets that
 have been processed by psad, along with all ip addresses and
 corresponding danger levels that have scanned the network.
+.TP
+
+.BI \-\^\-status-ip "  ip"
+Display status information associated with
+.I ip
+such as the protocol packet counters as well as the last 10 packets
+logged by iptables.
+.TP
+
+.BR \-\^\-status-sort-dl
+Sort status output by danger level.  The default output is sorted
+by ip address to show scans that may be associated with the same
+network in an easily readable format.
 .TP
 
 .BR \-K ", " \-\^\-Kill

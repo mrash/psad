@@ -156,10 +156,13 @@ use strict;
 my $version = '1.0';
 
 ### establish some default paths
-my $config_dir      = '/etc/psad';
-my $config_file     = "${config_dir}/psad.conf";
-my $sigs_file       = "${config_dir}/psad_signatures";
-my $autoips_file    = "${config_dir}/psad_auto_ips";
+my $config_dir   = '/etc/psad';
+my $config_file  = "${config_dir}/psad.conf";
+my $sigs_file    = "${config_dir}/psad_signatures";
+my $autoips_file = "${config_dir}/psad_auto_ips";
+
+### snort rule directory; this path can be changed with
+### --snort-rdir
 my $snort_rules_dir = "${config_dir}/snort-1.8.7_rules";
 
 ### disable debugging by default
@@ -284,56 +287,58 @@ my @args_cp = @ARGV;
 Getopt::Long::Configure('no_ignore_case');
 
 &usage(1) unless (GetOptions(
-    'signatures=s'  => \$sigs_file,      # Path to psad signatures file.
-    'snort-sids'    => \$snort_sids,     # Enable search for snort SID's
-                                         # in iptables messages.
-    'snort-type=s'  => \$srules_type,    # Only process snort rules of
-                                         # this type (e.g. "ddos" or
-                                         # "backdoor").
-    'auto-ips=s'    => \$autoips_file,   # Path to psad auto ips file for
-                                         # auto-setting ip danger level.
-    'output'        => \$output,         # Write scanlog messages to STDOUT.
-    'debug'         => \$debug,          # Run in debug mode.
-    'Dump-conf'     => \$dump_conf,      # Dump config and exit.
-    'interval=i'    => \$chk_interval,   # Set $chk_interval from the
-                                         # command line.
-    'config=s'      => \$config_file,    # Specify configuration file.
-    'fw-check'      => \$fw_analyze,     # Analyze the firewall ruleset and
-                                         # exit.
-    'log-server'    => \$syslog_server,  # We are running psad on a syslog
-                                         # logging server.
-    'Kill'          => \$kill,           # Kill all running psad processes.
-                                         # (psadwatchd, psad, kmsgsd,
-                                         # diskmond).
-    'Restart'       => \$restart,        # Restart psad with all options of
-                                         # the currently running psad process.
-    'Flush'         => \$flush_fw,       # Flush any rules that psad previously
-                                         # added via the auto blocking code.
-    'Status'        => \$status,         # Display status of any currently
-                                         # running psad processes.
-    'Benchmark'     => \$benchmark,      # Run in benchmark mode.
-    'packets=i'     => \$b_packets,      # Specify number of packets to use
-                                         # in benchmark test.
-    'USR1'          => \$usr1,           # Send an existing psad process a
-                                         # USR1 signal (useful for debugging).
-    'no-whois'      => \$no_whois,       # Do not issue whois lookups against
-    'no-signatures' => \$no_signatures,  # Disable signature processing.
-    'no-auto-ips'   => \$no_auto_ips,    # Disable auto danger level
-                                         # assignment.
-    'no-daemon'     => \$no_daemon,      # Do not run as a daemon.
-    'no-fwcheck'    => \$no_fwcheck,     # Do not check firewall rules.
-    'no-rdns'       => \$no_rdns,        # Do not issue dns lookups against
-                                         # Scanning ip address.
-    'no-localport'  => \$no_netstat,     # Do not check to see if the
-                                         # firewall is listening on localport
-                                         # that has been scanned.
-    'no-errors'     => \$no_errors,      # Do not write malformed packet.
-                                         # messages to error log.
-    'Version'       => \$ver,            # Print the psad version and exit.
-    'help'          => \$help,           # Display help.
+    'signatures=s'  => \$sigs_file,       # Path to psad signatures file.
+    'snort-sids'    => \$snort_sids,      # Enable search for snort SID's
+                                          # in iptables messages.
+    'snort-type=s'  => \$srules_type,     # Only process snort rules of
+                                          # this type (e.g. "ddos" or
+                                          # "backdoor").
+    'snort-rdir=s'  => \$snort_rules_dir, # Specify a directory for snort
+                                          # rules.
+    'auto-ips=s'    => \$autoips_file,    # Path to psad auto ips file for
+                                          # auto-setting ip danger level.
+    'output'        => \$output,          # Write scanlog messages to STDOUT.
+    'debug'         => \$debug,           # Run in debug mode.
+    'Dump-conf'     => \$dump_conf,       # Dump config and exit.
+    'interval=i'    => \$chk_interval,    # Set $chk_interval from the
+                                          # command line.
+    'config=s'      => \$config_file,     # Specify configuration file.
+    'fw-check'      => \$fw_analyze,      # Analyze the firewall ruleset and
+                                          # exit.
+    'log-server'    => \$syslog_server,   # We are running psad on a syslog
+                                          # logging server.
+    'Kill'          => \$kill,            # Kill all running psad processes.
+                                          # (psadwatchd, psad, kmsgsd,
+                                          # diskmond).
+    'Restart'       => \$restart,         # Restart psad with all options of
+                                          # the currently running psad process.
+    'Flush'         => \$flush_fw,        # Flush any rules that psad previously
+                                          # added via the auto blocking code.
+    'Status'        => \$status,          # Display status of any currently
+                                          # running psad processes.
+    'Benchmark'     => \$benchmark,       # Run in benchmark mode.
+    'packets=i'     => \$b_packets,       # Specify number of packets to use
+                                          # in benchmark test.
+    'USR1'          => \$usr1,            # Send an existing psad process a
+                                          # USR1 signal (useful for debugging).
+    'no-whois'      => \$no_whois,        # Do not issue whois lookups against
+    'no-signatures' => \$no_signatures,   # Disable signature processing.
+    'no-auto-ips'   => \$no_auto_ips,     # Disable auto danger level
+                                          # assignment.
+    'no-daemon'     => \$no_daemon,       # Do not run as a daemon.
+    'no-fwcheck'    => \$no_fwcheck,      # Do not check firewall rules.
+    'no-rdns'       => \$no_rdns,         # Do not issue dns lookups against
+                                          # Scanning ip address.
+    'no-localport'  => \$no_netstat,      # Do not check to see if the
+                                          # firewall is listening on localport
+                                          # that has been scanned.
+    'no-errors'     => \$no_errors,       # Do not write malformed packet.
+                                          # messages to error log.
+    'Version'       => \$ver,             # Print the psad version and exit.
+    'help'          => \$help,            # Display help.
     ### old args
     'Logging_server' => \$oldarg_logserv, # old command line arg
-#    'Daemon'         => \$oldarg_daemon,  # old command line arg
+#    'Daemon'         => \$oldarg_daemon, # old command line arg
     'firewallcheck'  => \$oldarg_fwcheck, # old command line arg
     'no_fw_check'    => \$oldarg_nfwchk,  # old command line arg
     'reversedns'     => \$oldarg_rdns,    # old command line arg
@@ -568,7 +573,7 @@ open FWDATA, $config{'FW_DATA'} unless $benchmark;
 for (;;) {
 
     ### See if we need to import any changed config variables
-    &check_import_config(\$config_mtime, $config_file);
+    &check_import_config(\$config_mtime);
 
     ### See if we need to import any new signatures
     &check_import(\$sigs_mtime, $sigs_file, 1);
@@ -1157,11 +1162,11 @@ sub check_import() {
 }
 
 sub check_import_config() {
-    my ($mtime_ref, $file) = @_;
+    my $mtime_ref = shift;
     my $mtime_tmp = stat($file)->mtime;
     if ($mtime_tmp != $$mtime_ref) {  ### the file was modified, so import
 
-        ($config_href, $cmds_href) = &Psad::buildconf($file);
+        ($config_href, $cmds_href) = &Psad::buildconf($config_file);
 
         ### make sure the configuration is complete
         &check_config();
@@ -1215,12 +1220,18 @@ sub import_snort_rules() {
             my $msg;
             my $sid;
             my $classtype;
+            my $content;
             $msg = $1 if $line =~ /msg:\s*\"(.*?)\"\s*;/;
             $sid = $1 if $line =~ /[\s;]sid:\s*(\d+)\s*;/;
             $classtype = $1 if $line =~ /[\s;]classtype:\s*(.*?)\s*;/;
+            $content = $1 if $line =~ /[\s;]uricontent:\s*\"(.*?)\"\s*;/;
+            $content = $1 if $line =~ /[\s;]content:\s*\"(.*?)\"\s*;/;
             if ($msg && $sid && $classtype) {
                 $snort_msgs{$sid}{'classtype'} = $classtype;
                 $snort_msgs{$sid}{'msg'}       = $msg;
+                if ($content) {
+                    $snort_msgs{$sid}{'content'} = $content;
+                }
             }
         }
     }

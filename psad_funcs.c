@@ -145,12 +145,14 @@ void find_char_var(char *search_str, char *charvar, char *line)
             char_ctr++;
 
         if (index_tmp[char_ctr] != ';') {
-            printf(" ** find_char_var(): No ending semicolon found for: %s.\n", search_str);
+            printf(" ** find_char_var(): No ending semicolon found for: %s.\n",
+                search_str);
             exit(EXIT_FAILURE);
         }
 
         if (char_ctr > 48) {
-            printf(" ** find_char_var(): the config line for %s is too long.  Exiting.\n", search_str);
+            printf(" ** find_char_var(): the config line for %s is too long.  Exiting.\n",
+                search_str);
             exit(EXIT_FAILURE);
         }
 
@@ -200,11 +202,29 @@ void daemonize_process(const char *pid_file)
     /* reset the our umask (for completeness) */
     umask(0);
 
-
     /* close un-needed file handles */
     close(STDIN_FILENO);
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
+
+    return;
+}
+
+void send_alert_email(const char *shCmd, const char *mailCmd, const char *mail_str)
+{
+    char mail_line[MAX_MSG_LEN] = "";
+    pid_t child_pid;
+
+    strlcat(mail_line, mailCmd, MAX_MSG_LEN);
+    strlcat(mail_line, " ", MAX_MSG_LEN);
+    strlcat(mail_line, mail_str, MAX_MSG_LEN);
+    if ((child_pid = fork()) < 0)
+        /* could not fork */
+        exit(EXIT_FAILURE);
+    else if (child_pid > 0)
+        wait(NULL);  /* mail better work */
+    else
+        execle(shCmd, shCmd, "-c", mail_line, NULL, NULL);  /* don't use env */
 
     return;
 }

@@ -95,7 +95,7 @@
 #  Dec 19 11:54:07 orthanc kernel: Packet log: input REJECT lo PROTO=1
 #  10.0.0.4:3127.0.0.1:3 L=88 S=0xC0 I=49513 F=0x0000 T=255
 #
-#  Sample tcp packet (rejected by iptables... --log-prefix = "DROP")
+#  Sample tcp packet (rejected by iptables... --log-prefix = "DROP ")
 #  Mar 11 13:15:52 orthanc kernel: DROP IN=lo OUT= MAC=00:00:00:00:00:00:00:00:
 #  00:00:00:00:08:00 SRC=127.0.0.1 DST=127.0.0.1 LEN=60 TOS=0x00 PREC=0x00
 #  TTL=64 ID=0 DF PROTO=TCP SPT=44847
@@ -121,7 +121,6 @@
 
 ### modules used by psad
 use lib '/usr/lib/psad';
-use lib '/usr/lib/psad/i386-linux';  ### Syslog.pm is arch-dependent
 use Psad;
 use File::stat 'stat';
 use File::Copy;
@@ -594,6 +593,16 @@ sub check_scan() {
                         push @bad_packets, $line;
                         next READPKT;
                     }
+                    ### we don't need to keep the iptables flag format; make
+                    ### the flags consistent with the signatures for faster
+                    ### hash lookups
+                    $flags =~ s/\s*SYN\s*/S/;
+                    $flags =~ s/\s*FIN\s*/F/;
+                    $flags =~ s/\s*URG\s*/U/;
+                    $flags =~ s/\s*PSH\s*/P/;
+                    $flags =~ s/\s*ACK\s*/A/;
+                    $flags =~ s/\s*RST\s*/R/;
+                    $flags =~ s/\s*NULL\s*/N/;
                 } else {
                     ### it is UDP, but there are no more fields we need to
                     ### define since we already have the ports, etc.
@@ -706,7 +715,7 @@ sub check_scan() {
                     $scan{$src}{$dst}{$proto}{'CURR_INT'}->{'S_PORT'},
                     $scan{$src}{$dst}{$proto}{'CURR_INT'}{'E_PORT'}
                 );
-        } 
+        }
         if ($debug) {
             print STDOUT "check_scan():\n";
             print STDOUT Dumper $scan{$src}{$dst};
@@ -964,7 +973,7 @@ sub check_import_config() {
 sub import_signatures() {
     %sigs = ();  ### undef %sigs so don't leave old signatures around
     open SIGS, "< $sigs_file" or die
-            " ... @@@ Could not open the signatures file $sigs_file: $!";
+        " ... @@@ Could not open the signatures file $sigs_file: $!";
     my @sigs = <SIGS>;
     close SIGS;
     for my $sig (@sigs) {
@@ -1356,10 +1365,10 @@ sub scan_logr() {
                     $syslog_print_flags = 'flags=[';
                     for my $flags (keys %{$scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'FLAGS'}}) {
                         my $nmapOpts = '';
-                        $nmapOpts = '  Nmap: [-sT or -sS]' if ($flags eq 'SYN');
-                        $nmapOpts = '  Nmap: [-sF]' if ($flags eq 'FIN');
-                        $nmapOpts = '  Nmap: [-sX]' if ($flags eq 'URG PSH FIN');
-                        $nmapOpts = '  Nmap: [-O]'  if ($flags eq 'URG PSH SYN FIN');
+                        $nmapOpts = '  Nmap: [-sT or -sS]' if ($flags eq 'S');
+                        $nmapOpts = '  Nmap: [-sF]' if ($flags eq 'F');
+                        $nmapOpts = '  Nmap: [-sX]' if ($flags eq 'UPF');
+                        $nmapOpts = '  Nmap: [-O]'  if ($flags eq 'UPSF');
                         my $num_pkts
                             = $scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'FLAGS'}{$flags};
                         push @tcp_flags, "TCP flags:                   [$flags: " .

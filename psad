@@ -345,6 +345,7 @@ my $dump_conf        = 0;
 my $chk_interval     = 0;
 my $log_len          = 23;  ### used in scan_logr()
 my $fw_analyze       = 0;
+my $fw_file          = '';
 my $rm_data_ctr      = 0;
 my $netstat_lkup_ctr = 0;
 my $local_ips_lkup_ctr = 0;
@@ -410,6 +411,9 @@ Getopt::Long::Configure('no_ignore_case');
     'config=s'          => \$config_file,     # Specify configuration file.
     'fw-check'          => \$fw_analyze,      # Analyze the firewall ruleset and
                                               # exit.
+    'fw-file=s'         => \$fw_file,         # Analyze ruleset contained within
+                                              # $fw_file instead of a running
+                                              # policy.
     'logfile=s'         => \$psad_logfile,    # The psad logfile.
     'log-server'        => \$syslog_server,   # We are running psad on a syslog
                                               # logging server.
@@ -3631,53 +3635,85 @@ sub setup() {
 }
 
 sub fw_check() {
-    my $rv = 0;
-    if (defined $cmds{'iptables'} && -x $cmds{'iptables'}) {
-        unlink $config{'FW_CHECK_FILE'} if -e $config{'FW_CHECK_FILE'};
-        my $input_rv = &ipt_chk_chain('INPUT');
-        my $forward_rv = &ipt_chk_chain('FORWARD');
-        if ($input_rv && $forward_rv) {
-            &Psad::logr(" .. The iptables ruleset on $config{'HOSTNAME'} " .
-                "will log and block unwanted packets in both the INPUT and " .
-                "FORWARD chains.  Firewall config success!\n",
-                {$config{'FW_CHECK_FILE'} => 1});
-            $rv = 1;
-        } else {
-            &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
-            &Psad::logr(' .. NOTE: IPTables::Parse does not yet parse user ' .
-                'defined chains and so it is possible your firewall config ' .
-                "is compatible with psad anyway.\n",
-                {$config{'FW_CHECK_FILE'} => 1});
-            &Psad::sendmail(" ** psad: firewall setup warning on " .
-                "$config{'HOSTNAME'}!", $config{'FW_CHECK_FILE'},
-                $config{'EMAIL_ADDRESSES'},
-                $cmds{'mail'}
-            );
-        }
-    } else {
-        $rv = &Psad::check_firewall_rules(
-            $config{'FW_MSG_SEARCH'},  ### SNORT_SID_STR is normally used for
-                                       ### snort "sid" values so don't include
-                                       ### it within the firewall check
-            $config{'EMAIL_ADDRESSES'},
-            $config{'FW_CHECK_FILE'},
-            \%cmds
-        );
+    unlink $config{'FW_CHECK_FILE'} if -e $config{'FW_CHECK_FILE'};
+
+    ### we don't always have more than one interface or forwarding
+    ### turned on, so we only check the FORWARD iptables chain if we
+    ### do.
+    my $forward_chain_rv = 1;
+    my $input_chain_rv = &ipt_chk_chain('INPUT');
+
+    if (&check_forwarding()) {
+        $forward_chain_rv = &ipt_chk_chain('FORWARD');
     }
-    if ($fw_analyze) {
-        if ($rv) {
+
+    if ($input_chain_rv && $forward_chain_rv) {
+        &Psad::logr(" .. The iptables ruleset on $config{'HOSTNAME'} " .
+            "will log and block unwanted packets in both the INPUT and " .
+            "FORWARD chains.  Firewall config success!\n",
+            {$config{'FW_CHECK_FILE'} => 1});
+        if ($fw_analyze) {
             print scalar localtime(), " .. Firewall config looks good.\n";
             print scalar localtime(), " .. Completed check of firewall ruleset.\n";
-        } else {
+        }
+    } else {
+        &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
+        &Psad::logr(' .. NOTE: IPTables::Parse does not yet parse user ' .
+            'defined chains and so it is possible your firewall config ' .
+            "is compatible with psad anyway.\n",
+            {$config{'FW_CHECK_FILE'} => 1});
+        &Psad::sendmail(" ** psad: firewall setup warning on " .
+            "$config{'HOSTNAME'}!", $config{'FW_CHECK_FILE'},
+            $config{'EMAIL_ADDRESSES'},
+            $cmds{'mail'}
+        );
+        if ($fw_analyze) {
             print scalar localtime(), " ** Errors found in firewall config.\n";
             print scalar localtime(), " ** Results in " .
                 "$config{'FW_CHECK_FILE'}\n";
             print scalar localtime(), "    emailed to ",
                 "$config{'EMAIL_ADDRESSES'}\n";
         }
+    }
+    if ($fw_analyze) {
         print scalar localtime(), " .. Exiting.\n";
         exit 0;
     }
+}
+
+sub check_forwarding() {
+    ### check to see if there are multiple interfaces on the
+    ### machine and return false if no since the machine will
+    ### not be able to forward packets anyway (e.g. desktop
+    ### machines).  Also return false if forwarding is turned
+    ### off (we have to trust the machine config is as the
+    ### admin wants it).
+    my $forwarding;
+    if (-e $config{'PROC_FORWARD_FILE'}) {
+        open F, "< $config{'PROC_FORWARD_FILE'}"
+            or die " ** Could not open $config{'PROC_FORWARD_FILE'}: $!";
+        $forwarding = <F>;
+        close F;
+        chomp $forwarding;
+        print " .. forwarding value: $forwarding\n" if $debug;
+        return 0 if $forwarding == 0;
+    } else {
+        die " ** Make sure the path to the ip forwarding file correct.\n",
+            "    The PROC_FORWARD_FILE in $config_file points to\n",
+            "    $config{'PROC_FORWARD_FILE'}";
+    }
+    my @if_out = `$cmds{'ifconfig'} -a`;
+    my $num_intf = 0;
+    for my $line (@if_out) {
+        if ($line =~ /inet\s+addr/i && $line !~ /127\.0\.0\.1/) {
+            $num_intf++;
+        }
+    }
+    print " .. number of interfaces: $num_intf\n" if $debug;
+    if ($num_intf < 2) {
+        return 0;
+    }
+    return 1;
 }
 
 ### should probably make this into its own script
@@ -3686,45 +3722,11 @@ sub ipt_chk_chain() {
 
     my $rv = 1;
 
-    ### check to see if there are multiple interfaces on the
-    ### machine and return true by default for the FORWARD
-    ### chain if no since the machine will not be able to
-    ### forward packets anyway (e.g. desktop machines).  Also
-    ### return true by default if forwarding is turned off
-    ### we have to trust the machine config is as the admin
-    ### wants it).
-    if ($chain eq 'FORWARD') {
-        my $forwarding;
-        if (-e $config{'PROC_FORWARD_FILE'}) {
-            open F, "< $config{'PROC_FORWARD_FILE'}"
-                or die " ** Could not open $config{'PROC_FORWARD_FILE'}: $!";
-            $forwarding = <F>;
-            close F;
-            chomp $forwarding;
-            print " .. forwarding value: $forwarding\n" if $debug;
-            return $rv if $forwarding == 0;
-        } else {
-            die " ** Make sure the path to the ip forwarding file correct.\n",
-                "    The PROC_FORWARD_FILE in $config_file points to\n",
-                "    $config{'PROC_FORWARD_FILE'}";
-        }
-        my @if_out = `$cmds{'ifconfig'} -a`;
-        my $num_intf = 0;
-        for my $line (@if_out) {
-            if ($line =~ /inet\s+addr/i && $line !~ /127\.0\.0\.1/) {
-                $num_intf++;
-            }
-        }
-        print " .. number of interfaces: $num_intf\n" if $debug;
-        if ($num_intf < 2) {
-            return $rv;
-        }
-    }
-
     my $ipt = new IPTables::Parse 'iptables' => $cmds{'iptables'};
 
     if ($fw_analyze) {
-        print scalar localtime(), " .. Parsing iptables $chain chain rules.\n";
+        print scalar localtime(),
+            " .. Parsing iptables $chain chain rules.\n";
     }
     ### for now we are only looking at the filter table, so if
     ### the iptables ruleset includes the log and drop rules in
@@ -3797,7 +3799,7 @@ sub ipt_chk_chain() {
                 &Psad::logr("\n", {$fwc => 1});
                 $rv = 0;
             }
-            if ($found_all) {  ### avoid $ld_hr->{'all'} auto vivification
+            if ($found_all) {  ### avoid $ld_hr->{'all'} autovivification
                 return $rv;
             }
         }
@@ -3838,7 +3840,7 @@ sub ipt_chk_chain() {
             {$fwc => 1});
         &Psad::logr("\n", {$fwc => 1});
     }
-    return;
+    return $rv;
 }
 
 sub disk_space_exceeded() {
@@ -3972,12 +3974,12 @@ psad; the Port Scan Attack Detector
  .. By Michael Rash (mbr\@cipherdyne.org, http://www.cipherdyne.org)
 
 Usage: psad [-a <auto ips file>] [-c <config file>] [-l] [-i <interval>]
-       [-h] [-B] [-F] [-S] [-K] [-R] [-U] [-V] [-f] [-o] [-p] [-D] [-d]
+       [-h] [-B] [-F] [-S] [-K] [-R] [-U] [-V] [-o] [-p] [-D] [-d]
        [--signatures <sig file>] [--passive-os-sigs <posf file>]
-       [--snort-type <type>] [--snort-rdir <rules dir>]
-       [--interval <seconds>] [--status-ip <ip>] [--status-sort-dl]
-       [--no-fwcheck] [--no-daemon] [--no-rdns] [--no-whois]
-       [--no-netstat] [--no-ipt-errors] [--no-passiveos]
+       [--snort-type <type>] [--snort-rdir <rules dir>] [--fw-check]
+       [--fw-file <file>] [--interval <seconds>] [--status-ip <ip>]
+       [--status-sort-dl] [--no-fwcheck] [--no-daemon] [--no-rdns]
+       [--no-whois] [--no-netstat] [--no-ipt-errors] [--no-passiveos]
        [--no-snort-sids] [--no-kmsgsd]
 
 Options:
@@ -3996,8 +3998,11 @@ Options:
     -c   --config <config file>   - Use <config file> instead of the
                                     normal config file located at
                                     $config_file.
-    -f   --fw-check               - Analyze the local firewall ruleset
+    --fw-check                    - Analyze the local iptables ruleset
                                     and exit.
+    --fw-file  <rules file>       - Analyze the iptables ruleset
+                                    contained within <rules file>
+                                    instead of a running policy.
     -d   --debug                  - Run psad in debugging mode.
     -D   --Dump-conf              - Dump psad configuration on STDOUT
                                     and exit.

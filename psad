@@ -708,6 +708,7 @@ sub import_signatures() {
     for my $sig (@sigs) {
         chomp $sig;
         next if ($sig =~ /^\s*#/);
+        print "parsing: $sig\n";
         &get_signature_fields($sig);
     }
     print STDOUT Dumper %Sigs if $DEBUG;
@@ -769,37 +770,37 @@ sub get_signature_ports() {
     }
     if ($srcport =~ /\:/ && $srcport !~ /\!/) {
         ($start, $end) = split /:/, $srcport;
-        $start = 1 if ($start eq '');
-        $end = 65535 if ($end eq '');
+        $start = 1   if ($start eq '');
+        $end = 65535 if ($end   eq '');
         $Sigs{$proto}{$msg}{'SRCPORT'}{'START'} = $start;
-        $Sigs{$proto}{$msg}{'SRCPORT'}{'END'} = $end;
+        $Sigs{$proto}{$msg}{'SRCPORT'}{'END'}   = $end;
     } elsif ($srcport =~ /\!/ && $srcport !~ /\:/) {
         $tmpport = (split /\!/, $srcport)[1];
         $Sigs{$proto}{$msg}{'SRCPORT'}{'NOT'} = $tmpport;
     } elsif ($srcport =~ /\:/ && $srcport =~ /\!/) {
         ($start, $end) = split /:/, $srcport;
-        $start = 1 if ($start !~ /\d/);
-        $end = 65535 if ($end !~ /\d/);
+        $start = 1   if ($start !~ /\d/);
+        $end = 65535 if ($end   !~ /\d/);
         $Sigs{$proto}{$msg}{'SRCPORT'}{'NEGSTART'} = $start;
-        $Sigs{$proto}{$msg}{'SRCPORT'}{'NEGEND'} = $end;
+        $Sigs{$proto}{$msg}{'SRCPORT'}{'NEGEND'}   = $end;
     } else {
-
+        $Sigs{$proto}{$msg}{'SRCPORT'}{'UNIQUE_OR_ANY'} = $srcport;
     }
     if ($dstport =~ /\:/ && $dstport !~ /\!/) {
         ($start, $end) = split /:/, $dstport;
-        $start = 1 if ($start eq '');
-        $end = 65535 if ($end eq '');
+        $start = 1   if ($start eq '');
+        $end = 65535 if ($end   eq '');
         $Sigs{$proto}{$msg}{'DSTPORT'}{'START'} = $start;
-        $Sigs{$proto}{$msg}{'DSTPORT'}{'END'} = $end;
+        $Sigs{$proto}{$msg}{'DSTPORT'}{'END'}   = $end;
     } elsif ($dstport =~ /\!/ && $dstport !~ /\:/) {
         $tmpport = (split /\!/, $dstport)[1];
         $Sigs{$proto}{$msg}{'DSTPORT'}{'NOT'} = $tmpport;
     } elsif ($dstport =~ /\:/ && $dstport =~ /\!/) {
         ($start, $end) = split /:/, $dstport;
-        $start = 1 if ($start !~ /\d/);
-        $end = 65535 if ($end !~ /\d/);
+        $start = 1   if ($start !~ /\d/);
+        $end = 65535 if ($end   !~ /\d/);
         $Sigs{$proto}{$msg}{'DSTPORT'}{'NEGSTART'} = $start;
-        $Sigs{$proto}{$msg}{'DSTPORT'}{'NEGEND'} = $end;
+        $Sigs{$proto}{$msg}{'DSTPORT'}{'NEGEND'}   = $end;
     } else {
         $Sigs{$proto}{$msg}{'DSTPORT'}{'UNIQUE_OR_ANY'} = $dstport;
     }

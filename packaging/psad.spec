@@ -111,7 +111,7 @@ mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
 
 install -m 500 {psad,kmsgsd,psadwatchd} $RPM_BUILD_ROOT%_sbindir/
 install -m 755 whois/whois $RPM_BUILD_ROOT/usr/bin/whois_psad
-install -m 755 psad-init $RPM_BUILD_ROOT/etc/rc.d/init.d/psad
+install -m 755 psad-init.redhat $RPM_BUILD_ROOT/etc/rc.d/init.d/psad
 install -m 644 {psad.conf,kmsgsd.conf,psadwatchd.conf} $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 {psad_signatures,psad_auto_ips,psad_posf} $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 *.8 $RPM_BUILD_ROOT%{_mandir}/man8/
@@ -191,13 +191,13 @@ if grep -q "EMAIL.*root.*localhost" %psadetcdir/psad.conf;
 then
 echo " .. You can edit the EMAIL_ADDRESSES variable in"
 echo "    /etc/psad/psad.conf and /etc/psad/psadwatchd.conf"
-echo "    to have email alerts sent to an address other than
+echo "    to have email alerts sent to an address other than"
 echo "    root\@localhost"
 
 fi
 
 %preun
-%_preun_service psad
+#%_preun_service psad
 
 %files
 %defattr(-,root,root)

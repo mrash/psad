@@ -81,11 +81,11 @@
 
 ### modules used by psad
 use Psad;
-use File::stat "stat";
+use File::stat 'stat';
 use File::Copy;
-use Getopt::Long "GetOptions";
+use Getopt::Long 'GetOptions';
 use Socket;
-use Sys::Hostname "hostname";
+use Sys::Hostname 'hostname';
 use Unix::Syslog qw(:subs :macros);
 use POSIX;
 use IO::Handle;
@@ -93,7 +93,7 @@ use Data::Dumper;
 use strict;
 
 ### ====================== config defaults ==========================
-my $CONFIG_DIR        = "/etc/psad";
+my $CONFIG_DIR        = '/etc/psad';
 my $CONFIG_FILE       = "${CONFIG_DIR}/psad.conf";
 my $SIGS_FILE         = "${CONFIG_DIR}/psad_signatures";
 my $AUTOIPS_FILE      = "${CONFIG_DIR}/psad_auto_ips";
@@ -101,13 +101,13 @@ my $AUTO_BLOCKED_FILE = "${CONFIG_DIR}/psad_auto_blocked_ips";
 my $USE_IPCHAINS      = 0;
 my $USE_IPTABLES      = 0;
 my $DEBUG             = 0;
-my $HOSTNAME          = hostname;        ### Calculate hostname of the machine on which psad is running.
-my $VERSION           = "0.9.8";         ### psad version number
-my $CMDLINE_FILE = "/var/run/psad.cmd";  ### File used to store the psad command line.
-my @PIDFILES     = qw(/var/run/psadwatchd.pid
-                      /var/run/psad.pid
-                      /var/run/kmsgsd.pid
-                      /var/run/diskmond.pid);
+my $HOSTNAME          = hostname; ### Calculate hostname of the machine on which psad is running.
+my $VERSION           = '0.9.8';
+my $CMDLINE_FILE      = '/var/run/psad.cmd';  ### File used to store the psad command line.
+my @PIDFILES          = qw(/var/run/psadwatchd.pid
+                           /var/run/psad.pid
+                           /var/run/kmsgsd.pid
+                           /var/run/diskmond.pid);
 ### =================================================================
 
 ### ========================== main =================================
@@ -224,8 +224,8 @@ $whoislookups = 1 if ($Cmds{'whois.psad'} !~ /psad/);
 ### if psad is running on a syslog server, don't check the firewall 
 ### rules since they may not be local.
 unless ($fwcheck || $Syslog_server) {
-    unlink "/var/log/psad/fw_check.txt";
-    &Psad::check_firewall_rules($Config{'FW_MSG_SEARCH'}, $Emailaddrs_aref, ["/var/log/psad/fw_check.txt"], \%Cmds);
+    unlink '/var/log/psad/fw_check.txt';
+    &Psad::check_firewall_rules($Config{'FW_MSG_SEARCH'}, $Emailaddrs_aref, ['/var/log/psad/fw_check.txt'], \%Cmds);
 }
 
 ### daemonize psad unless running with --Daemon or --debug
@@ -248,7 +248,7 @@ unless ($daemon || $DEBUG) {
 ### duplicate copy).  While we're at it, start psadwatchd and diskmond too
 ### Note that this is the best place to start the other daemons since we
 ### just wrote the psad pid to $PIDFILES[1] above.
-if ($CONFIG_FILE eq "/etc/psad/psad.conf") {
+if ($CONFIG_FILE eq '/etc/psad/psad.conf') {
     system "$Cmds{'kmsgsd'}";
     system "$Cmds{'diskmond'}";
     system "$Cmds{'psadwatchd'}" unless ($DEBUG);
@@ -265,7 +265,7 @@ if ($CONFIG_FILE eq "/etc/psad/psad.conf") {
 ### Check to see if psad automatically blocked some ips from
 ### a previous run.  This feature is most useful for preserving
 ### automatically blocked ips after a reboot.
-if ($Config{'ENABLE_AUTO_IDS'} eq "Y") {
+if ($Config{'ENABLE_AUTO_IDS'} eq 'Y') {
     &check_auto_blocked();
 }
 
@@ -279,16 +279,15 @@ $SIG{'__DIE__'}  = \&Psad::die_handler;
 $SIG{'CHLD'}     = \&REAPER;
 $SIG{'USR1'}     = \&print_scan;
 
-### Get an open filehandle for the main firewall data file $FW_DATA.
-### All firewall drop/deny/reject log messages are written to $FW_DATA
-### by kmsgsd.
-open FWDATA, $Config{'FW_DATA'};
-
 ### Get the mtimes of the signatures and auto ips files.
 my $sigs_mtime     = stat($SIGS_FILE)->mtime;
 my $auto_ips_mtime = stat($AUTOIPS_FILE)->mtime;
 my $config_mtime   = stat($CONFIG_FILE)->mtime;
 
+### Get an open filehandle for the main firewall data file $FW_DATA.
+### All firewall drop/deny/reject log messages are written to $FW_DATA
+### by kmsgsd.
+open FWDATA, $Config{'FW_DATA'};
 
 ###=========================================================###
 ######                    MAIN LOOP                      ######
@@ -319,7 +318,7 @@ for (;;) {
 
             ### Don't manage the firewall rules if
             ### psad is running on a syslog server
-            if ($Config{'ENABLE_AUTO_IDS'} eq "Y" && ! $Syslog_server) {
+            if ($Config{'ENABLE_AUTO_IDS'} eq 'Y' && ! $Syslog_server) {
                 &auto_psad_response();
             }
         }
@@ -361,15 +360,15 @@ sub check_scan() {
             ### Sometimes the log entry is messed up by iptables so we write it to the error log.
             if ($l =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+).*TTL=(\d+).*PROTO=(\S+)\s+SPT=(\d+)\s+DPT=(\d+)/) {
                 ($src, $dst, $len, $ttl, $proto, $srcport, $dstport) = ($1,$2,$3,$4,$5,$6,$7,$8);
-                if ($proto ne "TCP" && $proto ne "UDP") {  ### it was some weird non-tcp/udp packet with source and destination ports
+                if ($proto ne 'TCP' && $proto ne 'UDP') {  ### it was some weird non-tcp/udp packet with source and destination ports
                     push @bad_packets, $l;
                     next READPKT;
                 }
-                if ($proto eq "TCP") {
+                if ($proto eq 'TCP') {
                     if ($l =~ /RES=\S+\s+(.*)\s+URGP=/) {
                         $flags = $1;
                     } else {
-                        $flags = "NULL";
+                        $flags = 'NULL';
                     }
                     ### per page 595 of the Camel book, "if /blah1|blah2/" can be slower than "if /blah1/ || /blah2/
                     unless (($flags =~ /SYN/ || $flags =~ /FIN/ || $flags =~ /URG/ || $flags =~ /PSH/ || $flags =~ /ACK/
@@ -380,7 +379,7 @@ sub check_scan() {
                 } ### else it is UDP, but there are no more fields we need to define since we already have the ports, etc.
             } elsif ($l =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+).*TTL=(\d+).*PROTO=ICMP\s+TYPE=(\d+)\s+CODE=(\d+)\s+ID=(\d+)\s+SEQ=(\d+)/) {
                 ($src, $dst, $len, $ttl, $type, $code, $id, $seq) = ($1,$2,$3,$4,$5,$6,$7,$8);
-                $proto = "ICMP";
+                $proto = 'ICMP';
             } else {
                 push @bad_packets, $l;
                 next READPKT;
@@ -389,13 +388,13 @@ sub check_scan() {
             ### could implement source port checking here
             if ($l =~ /PROTO\=(\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\:(\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\:(\d+)/) {
                 ($proto, $src, $srcport, $dst, $dstport) = ($1,$2,$3,$4,$5);
-                $flags = "NONE";
+                $flags = 'NONE';
             } else {
                 push @bad_packets, $l;
                 next READPKT;
             }
         }
-        if ($Config{'ENABLE_PERSISTENCE'} eq "N") {
+        if ($Config{'ENABLE_PERSISTENCE'} eq 'N') {
             my $currtime = time();
             if (defined $Scan{$src}{$dst}{'START_TIME'}{'EPOCH_SECONDS'}) {
                 my $tmp = $currtime - $Scan{$src}{$dst}{'START_TIME'}{'EPOCH_SECONDS'};
@@ -406,49 +405,49 @@ sub check_scan() {
         } 
         $matched_packet = 1;
         ### hash initialization
-        $Scan{$src}{$dst}{'LOGR'} = "Y";
-        $Scan{$src}{$dst}{'AUTO'} = "N" unless (defined $Scan{$src}{$dst}{'AUTO'});
+        $Scan{$src}{$dst}{'LOGR'} = 'Y';
+        $Scan{$src}{$dst}{'AUTO'} = 'N' unless (defined $Scan{$src}{$dst}{'AUTO'});
         $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} = 0 unless (defined $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'});
-        unless (defined $Scan{$src}{$dst}{'START_PORT'} || $proto eq "ICMP") { ### this is the absolute starting port since the first packet was detected
+        unless (defined $Scan{$src}{$dst}{'START_PORT'} || $proto eq 'ICMP') { ### this is the absolute starting port since the first packet was detected
             $Scan{$src}{$dst}{'START_PORT'} = 65535; ### make sure the initial start port is not too low
             $Scan{$src}{$dst}{'END_PORT'} = 0; ### make sure the initial end port is not too high
         }
-        my $epoch_seconds = time() if ($Config{'ENABLE_PERSISTENCE'} eq "N");
+        my $epoch_seconds = time() if ($Config{'ENABLE_PERSISTENCE'} eq 'N');
         my @time = split /\s+/, scalar localtime; ### Get the current time as a nice ASCII string.
         pop @time; shift @time; ### Get rid of the day and the year to make the time consistent with syslog
         my $time = join ' ', @time;
         unless (defined $Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}) {  ### initialize values for the current interval
             $Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}{'START_TIME'} = $time;
             $Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}{'PACKETS'} = 0;
-            unless ($proto eq "ICMP") {
+            unless ($proto eq 'ICMP') {
                 ### make sure the initial start port is not too low
                 $Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'} = 65535;
                 ### make sure the initial end port is not too high
                 $Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'} = 0;
             }
-            if ($proto eq "TCP") {
+            if ($proto eq 'TCP') {
                 $Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}{'FLAGS'}{$flags} = 0;
             }
         }
         unless (defined $Scan{$src}{$dst}{'START_TIME'}{'READABLE'}) {
             $Scan{$src}{$dst}{'START_TIME'}{'READABLE'} = $time;
-            if ($Config{'ENABLE_PERSISTENCE'} eq "N") {
+            if ($Config{'ENABLE_PERSISTENCE'} eq 'N') {
                 $Scan{$src}{$dst}{'START_TIME'}{'EPOCH_SECONDS'} = $epoch_seconds;
             }
         }
         $Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}{'PACKETS'}++;
         $Scan{$src}{$dst}{'END_TIME'}{'READABLE'}= $time;
-        if ($Config{'ENABLE_PERSISTENCE'} eq "N") {
+        if ($Config{'ENABLE_PERSISTENCE'} eq 'N') {
             $Scan{$src}{$dst}{'END_TIME'}{'EPOCH_SECONDS'} = $epoch_seconds;
         }
         ### increment hash values
         ### if $Scan{$src}{$dst}{'ABSNUM'} is not yet defined, incrementing it here will make it equal to 1 anyway
         $Scan{$src}{$dst}{'ABSNUM'}++;
-        if ($proto eq "TCP") {
+        if ($proto eq 'TCP') {
             $Scan{$src}{$dst}{'TCP'}{'CURRENT_INTERVAL'}{'FLAGS'}{$flags}++;
         }
         ### see if this port lies outside our current range
-        unless ($proto eq "ICMP") {
+        unless ($proto eq 'ICMP') {
             ($Scan{$src}{$dst}{'START_PORT'}, $Scan{$src}{$dst}{'END_PORT'}) =
                 &check_range($dstport, $Scan{$src}{$dst}{'START_PORT'}, $Scan{$src}{$dst}{'END_PORT'});
             ($Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'}, $Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'}) =
@@ -460,20 +459,20 @@ sub check_scan() {
             print STDOUT "     src: $src, dst: $dst\n";
             print STDOUT "     Scan{src}{dst}{'LOGR'} = $Scan{$src}{$dst}{'LOGR'}\n";
             print STDOUT "     Scan{src}{dst}{'ABSNUM'} = $Scan{$src}{$dst}{'ABSNUM'}\n";
-            print STDOUT "     flags: $flags\n" if ($proto eq "TCP");
+            print STDOUT "     flags: $flags\n" if ($proto eq 'TCP');
             print STDOUT "     Scan{src}{dst}{'AUTO'} $Scan{$src}{$dst}{'AUTO'}\n";
             print STDOUT "     Scan{src}{dst}{'CURRENT_DANGER_LEVEL'} = $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'}\n";
-            print STDOUT "     Scan{src}{dst}{'START_PORT'} = $Scan{$src}{$dst}{'START_PORT'}\n" unless ($proto eq "ICMP");
-            print STDOUT "     Scan{src}{dst}{'END_PORT'} = $Scan{$src}{$dst}{'END_PORT'}\n" unless ($proto eq "ICMP");
+            print STDOUT "     Scan{src}{dst}{'START_PORT'} = $Scan{$src}{$dst}{'START_PORT'}\n" unless ($proto eq 'ICMP');
+            print STDOUT "     Scan{src}{dst}{'END_PORT'} = $Scan{$src}{$dst}{'END_PORT'}\n" unless ($proto eq 'ICMP');
             print STDOUT "     Scan{src}{dst}{'START_TIME'}{'READABLE'} = $Scan{$src}{$dst}{'START_TIME'}{'READABLE'}\n";
-            print STDOUT "     Scan{src}{dst}{'START_TIME'}{'EPOCH_SECONDS'} = $Scan{$src}{$dst}{'START_TIME'}{'EPOCH_SECONDS'}\n" if ($Config{'ENABLE_PERSISTENCE'} eq "N");
+            print STDOUT "     Scan{src}{dst}{'START_TIME'}{'EPOCH_SECONDS'} = $Scan{$src}{$dst}{'START_TIME'}{'EPOCH_SECONDS'}\n" if ($Config{'ENABLE_PERSISTENCE'} eq 'N');
             print STDOUT "     Scan{src}{dst}{'END_TIME'}{'READABLE'} = $Scan{$src}{$dst}{'END_TIME'}{'READABLE'}\n";
-            print STDOUT "     Scan{src}{dst}{'END_TIME'}{'EPOCH_SECONDS'} = $Scan{$src}{$dst}{'END_TIME'}{'EPOCH_SECONDS'}\n" if ($Config{'ENABLE_PERSISTENCE'} eq "N");
-            unless ($proto eq "ICMP") {
-                print "     Scan{src}{dst}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'} = "
-                    . "$Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'}\n";
-                print "     Scan{src}{dst}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'} = "
-                    . "$Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'}\n";
+            print STDOUT "     Scan{src}{dst}{'END_TIME'}{'EPOCH_SECONDS'} = $Scan{$src}{$dst}{'END_TIME'}{'EPOCH_SECONDS'}\n" if ($Config{'ENABLE_PERSISTENCE'} eq 'N');
+            unless ($proto eq 'ICMP') {
+                print "     Scan{src}{dst}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'} = " .
+                      "$Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'}\n"    .
+                      "     Scan{src}{dst}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'} = "   .
+                      "$Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'}\n";
             }
         }
         if ($signatures && $USE_IPTABLES) { ### might try to use ipchains also, but then cannot use tcp flags except for -y -l rules
@@ -481,20 +480,20 @@ sub check_scan() {
                 my $dstport_criteria = 0;
                 my $srcport_criteria = 0;
                 my $rv = 0;
-                if ($proto eq "TCP") {
+                if ($proto eq 'TCP') {
                     if (&check_port($msg, $srcport, $dstport, $proto)
                         && &check_misc_fields($msg, $proto, $len, $ttl)
                             && &check_tcp_flags($msg, $flags, $proto)) {   ### tripped a tcp signature
                         $Scan{$src}{$dst}{'TCP'}{'SIGMATCH'}{'SIGDL'} = $Sigs{'TCP'}{$msg}{'DANGERLEVEL'};
                         $rv = 1;
                     }
-                } elsif ($proto eq "UDP") {
+                } elsif ($proto eq 'UDP') {
                     if (&check_port($msg, $srcport, $dstport, $proto)
                         && &check_misc_fields($msg, $proto, $len, $ttl)) { ### tripped a udp signature
                         $Scan{$src}{$dst}{'UDP'}{'SIGMATCH'}{'SIGDL'} = $Sigs{'UDP'}{$msg}{'DANGERLEVEL'};
                         $rv = 1;
                     }
-                } elsif ($proto eq "ICMP") {
+                } elsif ($proto eq 'ICMP') {
                     if (&check_icmp_sigs($msg, $ttl, $type, $code, $id, $seq)) {
                         $Scan{$src}{$dst}{'ICMP'}{'SIGMATCH'}{'SIGDL'} = $Sigs{'ICMP'}{$msg}{'DANGERLEVEL'};
                         $rv = 1;
@@ -502,17 +501,17 @@ sub check_scan() {
                 }
                 if ($rv) {   ### we matched some signature
                     if ($DEBUG) {
-                        unless ($proto eq "ICMP") {
+                        unless ($proto eq 'ICMP') {
                             print "     SIGMATCH on dstport: $dstport\n";
                         } else {
                             print "     ICMP SIGMATCH\n";
                         }
                     }
-                    my $listening_port = "";
-                    unless ($netstat_lookup || $proto eq "ICMP") {
+                    my $listening_port = '';
+                    unless ($netstat_lookup || $proto eq 'ICMP') {
                         my $lprot;
-                        $lprot = "tcp" if ($proto eq "TCP");
-                        $lprot = "udp" if ($proto eq "UDP");
+                        $lprot = 'tcp' if ($proto eq 'TCP');
+                        $lprot = 'udp' if ($proto eq 'UDP');
                         my $dst_is_local = 0;
                         ### check to see if the scan destination ip is directed at the firewall.  If yes,
                         ### then check to see if a server is listening on the DSTPORT by parsing netstat
@@ -531,12 +530,12 @@ sub check_scan() {
                     ### including sp almost always changes the hash key:
                     ### my $alert_string = "$msg  sp=$srcport, dp=$dstport, flags=$flags.  $listening_port";
                     my $alert_string;
-                    if ($proto eq "TCP") {
+                    if ($proto eq 'TCP') {
                         $alert_string = "$msg  dp=$dstport, flags=$flags. $listening_port";
-                    } elsif ($proto eq "UDP") {
+                    } elsif ($proto eq 'UDP') {
                         $alert_string = "$msg  dp=$dstport. $listening_port";
                     } else {
-                        $alert_string = "$msg";
+                        $alert_string = $msg;
                     }
                     if (defined $Scan{$src}{$dst}{$proto}{'SIGMATCH'}{$alert_string}) {
                         $Scan{$src}{$dst}{$proto}{'SIGMATCH'}{$alert_string}++;
@@ -556,21 +555,21 @@ sub check_scan() {
     &collect_errors(\@bad_packets) unless $errors;
     return $matched_packet;
 }
-# check_tcp_flags will eventually need to include all possible permutations of the six 
-# tcp flags so that any signature can be written, but for now this should be most 
+# check_tcp_flags will eventually need to include all possible permutations of the six
+# tcp flags so that any signature can be written, but for now this should be most
 # of the important ones.
 sub check_tcp_flags() {
     my ($msg, $flags_to_check, $proto) = @_;
-    return 0 if ($proto ne "TCP");
+    return 0 if ($proto ne 'TCP');
     my $msgflags = $Sigs{$proto}{$msg}{'FLAGS'};
-    return 1 if ($msgflags eq "S"    && $flags_to_check eq "SYN");     ### syn scan
-    return 1 if ($msgflags eq "F"    && $flags_to_check eq "FIN");     ### fin scan
-    return 1 if ($msgflags eq "SF"   && $flags_to_check eq "SYN FIN"); ### "syn/fin" scan
-    return 1 if ($msgflags eq "UPF"  && $flags_to_check eq "URG PSH FIN"); ### nmap Xmas scan
-    return 1 if ($msgflags eq "NULL" && $flags_to_check eq "NULL");        ### nmap NULL scan
-    return 1 if ($msgflags eq "UPSF" && $flags_to_check eq "URG PSH SYN FIN"); ### nmap fingerprint scan
-    return 1 if ($msgflags eq "AP"   && $flags_to_check eq "ACK PSH");         ### see the signatures for these
-    return 1 if ($msgflags eq "AS"   && $flags_to_check eq "ACK SYN");
+    return 1 if ($msgflags eq 'S'    && $flags_to_check eq 'SYN');             ### syn scan
+    return 1 if ($msgflags eq 'F'    && $flags_to_check eq 'FIN');             ### fin scan
+    return 1 if ($msgflags eq 'SF'   && $flags_to_check eq 'SYN FIN');         ### "syn/fin" scan
+    return 1 if ($msgflags eq 'UPF'  && $flags_to_check eq 'URG PSH FIN');     ### nmap Xmas scan
+    return 1 if ($msgflags eq 'NULL' && $flags_to_check eq 'NULL');            ### nmap NULL scan
+    return 1 if ($msgflags eq 'UPSF' && $flags_to_check eq 'URG PSH SYN FIN'); ### nmap fingerprint scan
+    return 1 if ($msgflags eq 'AP'   && $flags_to_check eq 'ACK PSH');         ### see the signatures for these
+    return 1 if ($msgflags eq 'AS'   && $flags_to_check eq 'ACK SYN');
     return 0;
 }
 sub check_port() {
@@ -578,7 +577,7 @@ sub check_port() {
     print "check_port(): msg: $msg, srcport: $srcport, dstport: $dstport, proto: $proto\n" if $DEBUG;
     ### check dst port first
     if (defined $Sigs{$proto}{$msg}{'DSTPORT'}{'UNIQUE_OR_ANY'}) {
-        unless ($Sigs{$proto}{$msg}{'DSTPORT'}{'UNIQUE_OR_ANY'} eq "any") {
+        unless ($Sigs{$proto}{$msg}{'DSTPORT'}{'UNIQUE_OR_ANY'} eq 'any') {
             return 0 if ($dstport != $Sigs{$proto}{$msg}{'DSTPORT'}{'UNIQUE_OR_ANY'});
         }
     }
@@ -597,7 +596,7 @@ sub check_port() {
     }
     ### check src port
     if (defined $Sigs{$proto}{$msg}{'SRCPORT'}{'UNIQUE_OR_ANY'}) {
-        unless ($Sigs{$proto}{$msg}{'SRCPORT'}{'UNIQUE_OR_ANY'} eq "any") {
+        unless ($Sigs{$proto}{$msg}{'SRCPORT'}{'UNIQUE_OR_ANY'} eq 'any') {
             return 0 if ($dstport != $Sigs{$proto}{$msg}{'SRCPORT'}{'UNIQUE_OR_ANY'});
         }
     }
@@ -692,7 +691,7 @@ sub check_import_config() {
         close K;
         if (kill 0, $pid) {
             kill 15, $pid;
-            if ($file eq "/etc/psad/psad.conf") {
+            if ($file eq '/etc/psad/psad.conf') {
                 system "$Cmds{'kmsgsd'}";
             } else {
                 system "$Cmds{'kmsgsd'} -c $file";
@@ -717,11 +716,11 @@ sub get_signature_fields() {
     my $sig = shift;
     my ($proto, $msg);
     if ($sig =~ /^tcp/) {
-        $proto = "TCP";
+        $proto = 'TCP';
     } elsif ($sig =~ /^udp/) {
-        $proto = "UDP";
+        $proto = 'UDP';
     } elsif ($sig =~ /^icmp/) {
-        $proto = "ICMP";
+        $proto = 'ICMP';
     } else {
         return;
     }
@@ -733,9 +732,9 @@ sub get_signature_fields() {
     }
     if ($msg) {
         if (defined $Sigs{$proto}{$msg}) {
-            $msg .= " ";   ### make sure we have a unique signature by appending whitespace if necessary
+            $msg .= ' ';   ### make sure we have a unique signature by appending whitespace if necessary
         }
-        if ($proto ne "ICMP") {   ### it is either tcp or udp
+        if ($proto ne 'ICMP') {   ### it is either tcp or udp
             &get_signature_ports($sig, $proto, $msg);
         }
         for my $f (@fields) {
@@ -820,7 +819,7 @@ sub import_auto_ips() {
 sub reset_auto_tags() {
     for my $src (keys %Scan) {
         for my $dst (keys %{$Scan{$src}}) {
-            $Scan{$src}{$dst}{'AUTO'} = "N";
+            $Scan{$src}{$dst}{'AUTO'} = 'N';
         }
     }
     return;
@@ -856,27 +855,27 @@ sub assign_danger_level() {
             ### If a scan signature packet has been detected but no other packets are detected, assign a danger
             ### level of SIGDL.
             my $sigmatch = 0;
-            my $sigproto = "";
+            my $sigproto = '';
             if (defined $Scan{$src}{$dst}{'TCP'}{'SIGMATCH'}) {
                 $sigmatch = 1;
-                $sigproto = "TCP";
+                $sigproto = 'TCP';
                 print "assign_danger_level(): sigmatch = $sigmatch\n" if $DEBUG;
             }
             if (defined $Scan{$src}{$dst}{'UDP'}{'SIGMATCH'}) {
                 $sigmatch = 1;
-                $sigproto = "UDP";
+                $sigproto = 'UDP';
                 print "assign_danger_level(): sigmatch = $sigmatch\n" if $DEBUG;
             }
             if (defined $Scan{$src}{$dst}{'ICMP'}{'SIGMATCH'}) {
                 $sigmatch = 1;
-                $sigproto = "ICMP";
+                $sigproto = 'ICMP';
                 print "assign_danger_level(): sigmatch = $sigmatch\n" if $DEBUG;
             }
             if ($sigmatch && $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} <
                             $Scan{$src}{$dst}{$sigproto}{'SIGMATCH'}{'SIGDL'}) {
                 $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} =
                                 $Scan{$src}{$dst}{$sigproto}{'SIGMATCH'}{'SIGDL'};
-                $Scan{$src}{$dst}{'ALERTED'} = "N";
+                $Scan{$src}{$dst}{'ALERTED'} = 'N';
                 print "assign_danger_level(): danger level: "
                     . "$Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'}\n" if $DEBUG;
             }
@@ -888,38 +887,38 @@ sub assign_danger_level() {
             } elsif ($absnum < $Config{'DANGER_LEVEL2'} && $range >= $Config{'PORT_RANGE_SCAN_THRESHOLD'}) {
                 if ($Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} < 1
                         && $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} != -1) {
-                    $Scan{$src}{$dst}{'ALERTED'} = "N";
+                    $Scan{$src}{$dst}{'ALERTED'} = 'N';
                     $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} = 1;
                 }
             } elsif ($absnum < $Config{'DANGER_LEVEL3'} && $range >= $Config{'PORT_RANGE_SCAN_THRESHOLD'}) {
                 if ($Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} < 2
                         && $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} != -1) {
-                    $Scan{$src}{$dst}{'ALERTED'} = "N";
+                    $Scan{$src}{$dst}{'ALERTED'} = 'N';
                     $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} = 2;
                 }
             } elsif ($absnum < $Config{'DANGER_LEVEL4'} && $range >= $Config{'PORT_RANGE_SCAN_THRESHOLD'}) {
                 if ($Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} < 3
                         && $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} != -1) {
-                    $Scan{$src}{$dst}{'ALERTED'} = "N";
+                    $Scan{$src}{$dst}{'ALERTED'} = 'N';
                     $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} = 3;
                 }
             } elsif ($absnum < $Config{'DANGER_LEVEL5'} && $range >= $Config{'PORT_RANGE_SCAN_THRESHOLD'}) {
                 if ($Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} < 4
                         && $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} != -1) {
-                    $Scan{$src}{$dst}{'ALERTED'} = "N";
+                    $Scan{$src}{$dst}{'ALERTED'} = 'N';
                     $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} = 4;
                 }
             } elsif ($range >= $Config{'PORT_RANGE_SCAN_THRESHOLD'}) {
                 if ($Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} < 5
                         && $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} != -1) {
-                    $Scan{$src}{$dst}{'ALERTED'} = "N";
+                    $Scan{$src}{$dst}{'ALERTED'} = 'N';
                     $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'} = 5;
                 }
             }
             ### we will always send an alert email for any new "bad" packet if $ALERT_ALL eq "Y"...
             ### Else email sent only if the scan increments its D.L.
-            if ($Config{'ALERT_ALL'} eq "Y") {
-                $Scan{$src}{$dst}{'ALERTED'} = "N";
+            if ($Config{'ALERT_ALL'} eq 'Y') {
+                $Scan{$src}{$dst}{'ALERTED'} = 'N';
             }
             print "assign_danger_level(): CURRENT_DANGER_LEVEL (after assignment) = "
                 . "$Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'}\n" if $DEBUG;
@@ -931,10 +930,10 @@ sub automatic_ip_danger_assignment() {
     for my $scan_ip (keys %Scan) {
         for my $dst (keys %{$Scan{$scan_ip}}) {
             for my $auto_ip (keys %Auto_ips) {
-                if ($scan_ip eq $auto_ip && $Scan{$scan_ip}{$dst}{'AUTO'} eq "N") {
+                if ($scan_ip eq $auto_ip && $Scan{$scan_ip}{$dst}{'AUTO'} eq 'N') {
                     $Scan{$scan_ip}{$dst}{'CURRENT_DANGER_LEVEL'} = $Auto_ips{$auto_ip};
-                    $Scan{$scan_ip}{$dst}{'ALERTED'} = "N";
-                    $Scan{$scan_ip}{$dst}{'AUTO'} = "Y";
+                    $Scan{$scan_ip}{$dst}{'ALERTED'} = 'N';
+                    $Scan{$scan_ip}{$dst}{'AUTO'} = 'Y';
                 }
             }
         }
@@ -953,7 +952,7 @@ sub scan_logr() {
     my ($output, $dnslookups, $whoislookups) = @_;
     my $range;
     my ($tcp_newrange, $udp_newrange);
-    my $dnsstring = "";
+    my $dnsstring = '';
     my $whois_info_aref;
     $Config{'PSAD_LOGFILE'} = *STDOUT if ($output || $DEBUG);
     my @print_array = ($Config{'PSAD_LOGFILE'}, $Config{'EMAIL_ALERTFILE'});
@@ -972,7 +971,7 @@ sub scan_logr() {
             print STDOUT "scan_logr(): dst ip: $dst\n" if $DEBUG;
             my ($tcp, $udp, $icmp) = (0,0,0);
             my $current_danger_level = $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'};
-            if ($current_danger_level >= 1 && $Scan{$src}{$dst}{'LOGR'} eq "Y") {
+            if ($current_danger_level >= 1 && $Scan{$src}{$dst}{'LOGR'} eq 'Y') {
                 my ($abs_start_range, $abs_end_range);
                 my ($tcp_new_start_range, $tcp_new_end_range, $tcp_new_start_time, $tcp_new_num_pkts);
                 my ($udp_new_start_range, $udp_new_end_range, $udp_new_start_time, $udp_new_num_pkts);
@@ -1027,21 +1026,21 @@ sub scan_logr() {
                     }
                 }
                 my @tcp_flags;
-                my $syslog_print_flags = "";
+                my $syslog_print_flags = '';
                 if ($tcp) {
                     if ($tcp_new_start_range == $tcp_new_end_range) {
                         $tcp_newrange = $tcp_new_start_range;
                     } else {
                         $tcp_newrange = "$tcp_new_start_range-$tcp_new_end_range";
                     }
-                    $syslog_print_flags = "flags=[";
+                    $syslog_print_flags = 'flags=[';
                     my %individual_flags_tmp;
                     for my $flags (keys %{$Scan{$src}{$dst}{'TCP'}{'CURRENT_INTERVAL'}{'FLAGS'}}) {
-                        my $nmapOpts = "";
-                        $nmapOpts = "-sT or -sS" if ($flags eq "SYN");
-                        $nmapOpts = "-sF" if ($flags eq "FIN");
-                        $nmapOpts = "-sX" if ($flags eq "URG PSH FIN");
-                        $nmapOpts = "-O" if ($flags eq "URG PSH SYN FIN");
+                        my $nmapOpts = '';
+                        $nmapOpts = '-sT or -sS' if ($flags eq 'SYN');
+                        $nmapOpts = '-sF' if ($flags eq 'FIN');
+                        $nmapOpts = '-sX' if ($flags eq 'URG PSH FIN');
+                        $nmapOpts = '-O' if ($flags eq 'URG PSH SYN FIN');
                         if ($nmapOpts) {
                             $nmapOpts = "  Nmap: [$nmapOpts]";
                         }
@@ -1049,14 +1048,14 @@ sub scan_logr() {
                         push @tcp_flags, "TCP flags:                   [$flags: $num_pkts packets]${nmapOpts}\n";
                         my @flags_tmp = split /\s+/, $flags;
                         for my $f (@flags_tmp) {
-                            $individual_flags_tmp{$f} = "";
+                            $individual_flags_tmp{$f} = '';
                         }
                     }
                     for my $f (keys %individual_flags_tmp) {
                         $syslog_print_flags .= "$f ";
                     }
                     $syslog_print_flags =~ s/\s+$//;
-                    $syslog_print_flags .= "]";
+                    $syslog_print_flags .= ']';
                     ### need to delete the current interval so it won't show up in the next alert
                     delete $Scan{$src}{$dst}{'TCP'}{'CURRENT_INTERVAL'};
                 }
@@ -1098,13 +1097,13 @@ sub scan_logr() {
 
 #                my $syslog_print_sig_title = "";
                 if ($USE_IPTABLES) {
-                    SIGS: for my $proto ("TCP", "UDP", "ICMP") {
+                    SIGS: for my $proto ('TCP', 'UDP', 'ICMP') {
                         if (defined $Scan{$src}{$dst}{$proto}{'CURRENT_SIGMATCH'}) {
                             my $sig_start_time = $tcp_new_start_time;
                             &Psad::logr("\n", \@print_array);
                             &Psad::logr("---- $proto alert signatures found since [$sig_start_time]\n", \@print_array);
                             for my $sigmatch (keys %{$Scan{$src}{$dst}{$proto}{'CURRENT_SIGMATCH'}}) {
-                                next if ($sigmatch eq "PACKETS" || $sigmatch eq "START_TIME");
+                                next if ($sigmatch eq 'PACKETS' || $sigmatch eq 'START_TIME');
                                 my $sig_num_packets = $Scan{$src}{$dst}{$proto}{'CURRENT_SIGMATCH'}{$sigmatch};
                                 &Psad::logr("$sigmatch  Packets=$sig_num_packets\n", \@print_array);
                                 ### signature logging with syslog is not yet supported
@@ -1116,7 +1115,7 @@ sub scan_logr() {
                             ### need to delete the current interval so it won't show up in the next alert
                             delete $Scan{$src}{$dst}{$proto}{'CURRENT_SIGMATCH'};
                         }
-                        if (defined $Scan{$src}{$dst}{$proto}{'SIGMATCH'} && $Config{'SHOW_ALL_SIGNATURES'} eq "Y") {
+                        if (defined $Scan{$src}{$dst}{$proto}{'SIGMATCH'} && $Config{'SHOW_ALL_SIGNATURES'} eq 'Y') {
                             &Psad::logr("\n", \@print_array);
                             &Psad::logr("---- ALL $proto alert signatures found since [$start_time]\n", \@print_array);
                             for my $sigmatch (keys %{$Scan{$src}{$dst}{$proto}{'SIGMATCH'}}) {
@@ -1127,8 +1126,8 @@ sub scan_logr() {
                     }
                 }
                 ### write a message to syslog
-                openlog("psad", LOG_DAEMON, LOG_LOCAL7);
-                my $syslog_print_range = "";
+                openlog('psad', LOG_DAEMON, LOG_LOCAL7);
+                my $syslog_print_range = '';
                 if ($tcp) {
                     $syslog_print_range .= "tcp=[$tcp_newrange] $syslog_print_flags";
                 }
@@ -1149,11 +1148,11 @@ sub scan_logr() {
                     &Psad::logr("\n", \@print_array);
                 }
                 &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=-=-=-=-=-=-=\n", \@print_array);
-                if ($Scan{$src}{$dst}{'ALERTED'} eq "N"
+                if ($Scan{$src}{$dst}{'ALERTED'} eq 'N'
                                         && $current_danger_level >= $Config{'EMAIL_ALERT_DANGER_LEVEL'}) {
                     &send_email_alert($src, $dst);
                 }
-                $Scan{$src}{$dst}{'LOGR'} = "N";
+                $Scan{$src}{$dst}{'LOGR'} = 'N';
                 $Scan{$src}{$dst}{'EMAIL_LIMIT'}++;
             }
         }
@@ -1232,23 +1231,23 @@ sub auto_psad_response(){
             if ($current_danger_level >= $Config{'AUTO_IDS_DANGER_LEVEL'} && !(defined $Scan{$src}{$dst}{'BLOCKED'})) {
                 if ($USE_IPCHAINS) {
                     my $chains_aref = &get_input_chains($Cmds{'ipchains'});
-                    my $blocked_str = "";
-                    if ($Config{'IPTABLES_BLOCK_METHOD'} eq "Y") {
+                    my $blocked_str = '';
+                    if ($Config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
                         for my $inchain (@$chains_aref) {
                             system "$Cmds{'ipchains'} -I $inchain 1 -s $src -j DENY 2> /dev/null 1>&2";
                         }
-                        $blocked_str = "via ipchains";
+                        $blocked_str = 'via ipchains';
                     }
-                    if ($Config{'TCPWRAPPERS_BLOCK_METHOD'} eq "Y") {
+                    if ($Config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
                         open H, ">> /etc/hosts.deny" or die "Could not open /etc/hosts.deny: $!";
                         print H "ALL: $src\n";
                         close H;
-                        $blocked_str = "via tcp wrappers";
+                        $blocked_str = 'via tcp wrappers';
                     }
                     for my $dst (keys %{$Scan{$src}}) {
-                        $Scan{$src}{$dst}{'BLOCKED'} = "Y";
+                        $Scan{$src}{$dst}{'BLOCKED'} = 'Y';
                     }
-                    if ($Config{'ALERT_AUTO_BLOCKED'} eq "Y" && $blocked_str) {
+                    if ($Config{'ALERT_AUTO_BLOCKED'} eq 'Y' && $blocked_str) {
                         for my $email_address (@$Emailaddrs_aref) {
                             system "$Cmds{'mail'} $email_address -s \"psad: All traffic from $src" .
                                    " has been BLOCKED $blocked_str on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
@@ -1259,23 +1258,23 @@ sub auto_psad_response(){
                     next SOURCE;
                 } elsif ($USE_IPTABLES) {
                     my $chains_aref = &get_input_chains($Cmds{'iptables'});
-                    my $blocked_str = "";
-                    if ($Config{'IPTABLES_BLOCK_METHOD'} eq "Y") {
+                    my $blocked_str = '';
+                    if ($Config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
                         for my $inchain (@$chains_aref) {
                             system "$Cmds{'iptables'} -I $inchain 1 -s $src -j DROP 2> /dev/null 1>&2";
                         }
-                        $blocked_str = "via iptables";
+                        $blocked_str = 'via iptables';
                     }
-                    if ($Config{'TCPWRAPPERS_BLOCK_METHOD'} eq "Y") {
-                        open H, ">> /etc/hosts.deny" or die "Could not open /etc/hosts.deny: $!";
+                    if ($Config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
+                        open H, '>> /etc/hosts.deny' or die "Could not open /etc/hosts.deny: $!";
                         print H "ALL: $src";
                         close H;
-                        $blocked_str = "via tcp wrappers";
+                        $blocked_str = 'via tcp wrappers';
                     }
                     for my $dst (keys %{$Scan{$src}}) {
-                        $Scan{$src}{$dst}{'BLOCKED'} = "Y";
+                        $Scan{$src}{$dst}{'BLOCKED'} = 'Y';
                     }
-                    if ($Config{'ALERT_AUTO_BLOCKED'} eq "Y" && $blocked_str) {
+                    if ($Config{'ALERT_AUTO_BLOCKED'} eq 'Y' && $blocked_str) {
                         for my $email_address (@$Emailaddrs_aref) {
                             system "$Cmds{'mail'} $email_address -s \"psad: All traffic from $src" .
                                    " has been BLOCKED $blocked_str on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
@@ -1333,7 +1332,7 @@ sub send_email_alert() {
         system "$Cmds{'mail'} $email_address -s \"psad WARNING: $HOSTNAME ($dst)" .
                        " has been scanned!\" < $Config{'EMAIL_ALERTFILE'} > /dev/null 2>&1";
     }
-    $Scan{$src}{$dst}{'ALERTED'} = "Y";
+    $Scan{$src}{$dst}{'ALERTED'} = 'Y';
     return;
 }
 sub print_scan() {  ### this should primarily be used for debugging
@@ -1357,7 +1356,7 @@ sub get_local_ips() {
     my @ips = `$Cmds{'ifconfig'} -a |$Cmds{'grep'} -w inet`;
     for my $ipline (@ips) {
         if ($ipline =~ /inet\s+addr:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s/) {
-            $Local_ips{$1} = "";
+            $Local_ips{$1} = '';
         }
     }
     return;
@@ -1369,7 +1368,7 @@ sub get_listening_ports() {
         my ($proto, $p_tmp) = (split /\s+/, $port_tmp)[0,3];
         my $port = (split /:/, $p_tmp)[1];
         my $key = $proto . $port;
-        $listening_ports{$key} = "";
+        $listening_ports{$key} = '';
     }
     return \%listening_ports;
 }
@@ -1472,19 +1471,19 @@ sub psad_status() {
             my @timevars = localtime($pid_mtime);
             $timevars[4] += 1;
             if ($timevars[4] =~ /^\d$/) {
-                $timevars[4] = "0" . $timevars[4];
+                $timevars[4] = '0' . $timevars[4];
             }
             if ($timevars[3] =~ /^\d$/) {
-                $timevars[3] = "0" . $timevars[3];
+                $timevars[3] = '0' . $timevars[3];
             }
             if ($timevars[0] =~ /^\d$/) {
-                $timevars[0] = "0" . $timevars[0];
+                $timevars[0] = '0' . $timevars[0];
             }
             if ($timevars[1] =~ /^\d$/) {
-                $timevars[1] = "0" . $timevars[1];
+                $timevars[1] = '0' . $timevars[1];
             }
             if ($timevars[2] =~ /^\d$/) {
-                $timevars[2] = "0" . $timevars[2];
+                $timevars[2] = '0' . $timevars[2];
             }
             $timevars[5] += 1900;
             open PIDFILE, "< $pidfile";
@@ -1497,9 +1496,9 @@ sub psad_status() {
                 GP: for my $g (@grep_output) {
                     if ($g =~ /^\S+\s+$pid\s+(\S+)\s+(\S+)/) {
                         print "     %CPU: $1  %MEM: $2\n";
-                        if ($pidname eq "psad" && $cmdline) {
+                        if ($pidname eq 'psad' && $cmdline) {
                             print "     Command line arguments: $cmdline\n";
-                        } elsif ($pidname eq "psad") {
+                        } elsif ($pidname eq 'psad') {
                             print "     Command line arguments: [none specified]\n";
                         }
                         last GP;
@@ -1526,7 +1525,7 @@ sub psad_usr1() {
         close PIDFILE;
         chomp $pid;
         if (kill 0, $pid) {  ### make sure psad is actually running
-            if (kill "USR1", $pid) {
+            if (kill 'USR1', $pid) {
                 $rv = 1;
                 sleep 1;  ### sleep to give time for the USR1 signal to be delivered and for the file to be created.
                 open U, "< /var/log/psad/scan_hash.${pid}" 
@@ -1577,11 +1576,11 @@ sub psad_setup() {
     unless (-e $Config{'PSAD_FIFO'}) {
         system "$Cmds{'mknod'} -m 600 $Config{'PSAD_FIFO'} p";
     }
-    copy("/etc/syslog.conf", "/etc/syslog.conf.orig") unless (-e "/etc/syslog.conf.orig");
-    open RS, "< /etc/syslog.conf" or die "@@@@@  Unable to open /etc/syslog.conf: $!";
+    copy('/etc/syslog.conf', '/etc/syslog.conf.orig') unless (-e '/etc/syslog.conf.orig');
+    open RS, '< /etc/syslog.conf' or die "@@@@@  Unable to open /etc/syslog.conf: $!";
     my @slines = <RS>;
     close RS;
-    open SYSLOG, "> /etc/syslog.conf" or die "@@@@@  Unable to open /etc/syslog.conf: $!";
+    open SYSLOG, '> /etc/syslog.conf' or die "@@@@@  Unable to open /etc/syslog.conf: $!";
     for my $l (@slines) {
         chomp $l;
         unless ($l =~ /psadfifo/) {

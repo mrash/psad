@@ -47,6 +47,12 @@ my $config_file  = '/etc/psad/psad.conf';
 ### psad.conf and kmsgsd.conf.
 my $fw_search_file = '/etc/psad/fw_search.conf';
 
+### default config file for ALERTING_METHODS keyword, which
+### is referenced by both psad and psadwatchd.  This keyword
+### allows email alerting or syslog alerting (or both) to be
+### disabled.
+my $alert_conf_file = '/etc/psad/alert.conf';
+
 ### config hash
 my %config = ();
 
@@ -64,6 +70,7 @@ my $no_fw_search_all = 0;
 
 &usage(1) unless (GetOptions(
     'config=s'    => \$config_file, # Specify path to configuration file.
+    'alert-conf=s'=> \$alert_conf_file, # Path to psad alert.conf file.
     'fw-search=s' => \$fw_search_file,  # Specify path to fw_search.conf.
     'fw-file=s'   => \$fw_file,     # Analyze ruleset contained within
                                     # $fw_file instead of a running
@@ -90,6 +97,9 @@ if ($fw_file) {
 
 ### import psad.conf
 &Psad::buildconf(\%config, \%cmds, $config_file);
+
+### import alerting config (psadwatchd also references this file
+&Psad::buildconf(\%config, \%cmds, $alert_conf_file);
 
 ### check to make sure the commands specified in the config section
 ### are in the right place, and attempt to correct automatically if not.
@@ -149,11 +159,13 @@ sub fw_check() {
 "    it is possible your firewall config is compatible with psad anyway.\n";
         }
 
-        &Psad::sendmail("[psad-status] firewall setup warning on " .
-            "$config{'HOSTNAME'}!", $config{'FW_CHECK_FILE'},
-            $config{'EMAIL_ADDRESSES'},
-            $cmds{'mail'}
-        );
+        unless ($config{'ALERTING_METHODS'} =~ /no.?e?mail/i) {
+            &Psad::sendmail("[psad-status] firewall setup warning on " .
+                "$config{'HOSTNAME'}!", $config{'FW_CHECK_FILE'},
+                $config{'EMAIL_ADDRESSES'},
+                $cmds{'mail'}
+            );
+        }
         if ($fw_analyze) {
             print "[-] Errors found in firewall config.\n";
             print "[-] Results in ",

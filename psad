@@ -164,7 +164,7 @@ my $fw_search_file = '/etc/psad/fw_search.conf';
 ### is referenced by both psad and psadwatchd.  This keyword
 ### allows email alerting or syslog alerting (or both) to be
 ### disabled.
-my $alerting_config_file = '/etc/psad/alert.conf';
+my $alert_conf_file = '/etc/psad/alert.conf';
 
 ### disable debugging by default
 my $debug = 0;
@@ -414,6 +414,7 @@ Getopt::Long::Configure('no_ignore_case');
                                               #   rules.
     'auto-dl=s'         => \$auto_dl_file,    # Path to psad auto IPs file for
                                               #   auto-setting IP danger level.
+    'alert-conf=s'      => \$alert_conf_file, # Path to psad alert.conf file.
     'Analyze-msgs'      => \$analyze_msgs,    # Analysis mode for old iptables
                                               #   messages in the psad fwdata file
                                               #   (or messages file; see
@@ -554,6 +555,7 @@ unless ($no_fwcheck or $syslog_server or $benchmark) {
     my $opts = "-c $config_file --fw-search $fw_search_file";
     $opts .= " --fw-analyze" if $fw_analyze;
     $opts .= " --fw-file $fw_file" if $fw_file;
+    $opts .= " -a $alert_conf_file";
     $opts .= " --no-fw-search-all" if $config{'FW_SEARCH_ALL'} eq 'N';
     my $es = (system "$cmds{'fwcheck_psad'} $opts") >> 8;
 
@@ -2007,7 +2009,7 @@ sub psad_init() {
     &Psad::buildconf(\%config, \%cmds, $config_file);
 
     ### import alerting config (psadwatchd also references this file
-    &Psad::buildconf(\%config, \%cmds, $alerting_config_file);
+    &Psad::buildconf(\%config, \%cmds, $alert_conf_file);
 
     ### make sure all necessary configuration variables
     ### are defined
@@ -2190,7 +2192,7 @@ sub check_mail_commands() {
         /usr/local/bin
         /usr/local/sbin
     );
-    unless ($config{'ALERTING_METHODS'} =~ /noe?mail/i) {
+    unless ($config{'ALERTING_METHODS'} =~ /no.?e?mail/i) {
         ### make sure the mailCmd is executable
         my $found = 0;
         if (defined $cmds{'mail'}) {
@@ -5673,8 +5675,8 @@ sub setup() {
             "move /usr/bin/whois.psad -> $cmds{'whois'}";
     }
 
-    $no_email_alerts = 1 if $config{'ALERTING_METHODS'} =~ /no?email/i;
-    $no_syslog_alerts = 1 if $config{'ALERTING_METHODS'} =~ /no?syslog/i;
+    $no_email_alerts = 1 if $config{'ALERTING_METHODS'} =~ /no.?e?mail/i;
+    $no_syslog_alerts = 1 if $config{'ALERTING_METHODS'} =~ /no.?syslog/i;
 
     die '[*] No system logger config file could be found.'
         unless (-e $config{'ETC_SYSLOG_CONF'}
@@ -6008,9 +6010,11 @@ Options:
     --interval                    - Configure the check interval from
                                     the command line to override the 15
                                     second default.
-    -a,  --auto-dl <dl file>      - Import auto-danger level file for
+    --auto-dl <dl file>           - Import auto-danger level file for
                                     automatic IP danger level
                                     increases/decreses.
+    --alert-conf <file>           - Manually specify path to alert.conf
+                                    file.
     -c,  --config <config file>   - Use <config file> instead of the
                                     normal config file located at
                                     $config_file.

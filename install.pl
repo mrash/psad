@@ -89,7 +89,7 @@ unless ($found) {
     $PERL_INSTALL_DIR = $INC[0];
 }
 
-### set the default execution
+### set the default execution flags
 my $SUB_TAB = '     ';
 my $execute_psad = 0;
 my $nopreserve   = 0;

@@ -73,3 +73,9 @@ Mike McCandless         Asked whether or not there is documentation for
                         the various psad configuration variables in
                         psad.conf.  The "PSAD CONFIGURATION VARIABLES"
                         section of the man page was the result.
+
+Jason Czerak            Found and submitted a fix for a bug in which an
+                        ip would not be ignored even if it was given a
+                        0 danger level in psad_auto_ips.  Also suggested
+                        using the PREROUTING iptables chain along with
+                        "-t mangle" for the auto-blocking code.

@@ -249,6 +249,8 @@ Michael S. Zick
     - Bugfix for O_RDONLY open flag when kmsgsd receives a HUP signal.
     - Bugfix for psad validation routine that did not accept "0" for a
       PORT_RANGE_SCAN_THRESHOLD value.
+    - Suggested the ability to maintain dedicated chains for the iptables
+      auto-blocking code.
 
 Nerijus Baliuna
     - Suggested ability to ignore entire protocols.  The IGNORE_PROTOCOLS
@@ -270,3 +272,8 @@ Blair Zajac
 Troy Swaine
     - Suggested a command line interface to block IP addresses.  The result
       is the --fw-block-ip argument.
+
+Najib Bakari
+    - Pointed out that sendmail is not usually required to run psad.  The
+      result is the alert.conf file with the ALERTING_METHODS keyword,
+      which also gets referenced by psadwatchd.

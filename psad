@@ -1531,6 +1531,11 @@ sub import_configs() {
     ### http://www.cipherdyne.org/fwsnort).
     &import_snort_rules() unless $no_snort_sids;
 
+    ### send a warning via syslog if the HOME_NET variable definition
+    ### appears to include a subnet that is not directly connected to
+    ### the local system.
+    &validate_home_net();
+
     return;
 }
 
@@ -1546,6 +1551,45 @@ sub validate_config() {
         unless (&is_digit($config{'DSHIELD_ALERT_INTERVAL'})
             && 0 < $config{'DSHIELD_ALERT_INTERVAL'}
             && $config{'DSHIELD_ALERT_INTERVAL'} < 24);
+    return;
+}
+
+sub validate_home_net() {
+    my @ifconfig_out = `$cmds{'ifconfig'} -a`;
+    my @connected_subnets;
+    my @connected_subnets_cidr;
+    my $intf_name    = '';
+    my $home_net_str = '';
+    for my $line (@ifconfig_out) {
+        if ($line =~ /^(\w+)\s+Link/) {
+            $intf_name = $1;
+            next;
+        }
+        next if $intf_name eq 'lo';
+        next if $intf_name =~ /dummy/i;
+        if ($line =~ /^\s+inet\s+addr:($ip_re).*Mask:($ip_re)/i) {
+            my $ip  = $1;
+            my $msk = $2;
+            my ($net_addr, $cidr_msk) = ipv4_network($ip, $msk);
+            push @connected_subnets, "$net_addr/$msk";
+            push @connected_subnets_cidr, "$net_addr/$cidr_msk";
+        }
+    }
+    my @home_nets = split /\s*\,\s*/, $config{'HOME_NET'};
+    for my $home_net (@home_nets) {
+        my $found = 0;
+        for my $net (@connected_subnets) {
+            $found = 1 if $home_net eq $net;
+        }
+        for my $net (@connected_subnets_cidr) {
+            $found = 1 if $home_net eq $net;
+        }
+        unless ($found) {
+            &Psad::psyslog('psad', " .. HOME_NET definition in psad.conf " .
+                "contains $home_net which does not appear to be directed " .
+                "connected to the local system.");
+        }
+    }
     return;
 }
 

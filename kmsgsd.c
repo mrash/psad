@@ -180,7 +180,7 @@ int main(int argc, char *argv[]) {
             close(fwdata_fd);
 
             /* re-open psadfifo and fwdata files */
-            if ((fifo_fd = open(psadfifo_file, O_RDONLY)) < 0) {
+            if ((fifo_fd = open(psadfifo_file, O_RDWR)) < 0) {
                 fprintf(stderr, "[*] Could not open %s for reading.\n",
                     psadfifo_file);
                 exit(EXIT_FAILURE);  /* could not open psadfifo named pipe */

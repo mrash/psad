@@ -23,7 +23,10 @@ case "$1" in
 start)
     if grep -q psadfifo /etc/syslog.conf; then
         echo -n "Starting the psad daemons: "
-        daemon /usr/sbin/psad -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips
+        ### psad enables signature matching and auto
+        ### danger level assignment by default, so
+        ### command line args are not necessary here.
+        daemon /usr/sbin/psad
         RETVAL=$?
         echo
         if [ $RETVAL -eq 0 ]; then

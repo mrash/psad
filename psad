@@ -1703,6 +1703,13 @@ sub validate_home_net() {
             my ($net_addr, $cidr_msk) = ipv4_network($ip, $msk);
             push @connected_subnets, "$net_addr/$msk";
             push @connected_subnets_cidr, "$net_addr/$cidr_msk";
+        } elsif ($line =~ /^\s+inet\s+adr:($ip_re).*Masque:($ip_re)/i) {
+            ### French spelling
+            my $ip  = $1;
+            my $msk = $2;
+            my ($net_addr, $cidr_msk) = ipv4_network($ip, $msk);
+            push @connected_subnets, "$net_addr/$msk";
+            push @connected_subnets_cidr, "$net_addr/$cidr_msk";
         }
     }
     if ($config{'HOME_NET'} =~ /CHANGEME/) {

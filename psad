@@ -253,9 +253,9 @@ my %Cmds = (
     "psad"       => $psadCmd
 );
 
-### check to make sure the commands specified in the config section 
+### check to make sure the commands specified in the config section
 ### are in the right place, and attempt to correct automatically if not.
-%Cmds = &Psad::check_commands(\%Cmds);
+&Psad::check_commands(\%Cmds);
 
 ### Now that we are sure the psad command is where it should be,
 ### assign $PSADCMD (used by the SEGV handler)
@@ -263,16 +263,16 @@ my $PSADCMD = $Cmds{'psad'};
 
 ### the --Status command line switch was given
 if ($status) {
-    my $rv = &psad_status(\@PIDFILES, $cmdline_file, \%Cmds);
+    my $rv = &psad_status(\@PIDFILES, $cmdline_file);
     exit $rv;
 }
 
 ### make sure $PSAD_DIR, $FW_DATA, and /var/log/psadfifo, etc. actually exist
-&psad_setup(\%Cmds);
+&psad_setup();
 
 ### the --Restart command line switch was given
 if ($restart) {
-    &restart_psad(\@PIDFILES, $cmdline_file, \%Cmds);
+    &restart_psad(\@PIDFILES, $cmdline_file);
     exit 0;
 }
 
@@ -283,7 +283,7 @@ if ($restart) {
 &check_permissions($PSAD_LOGFILE, $FW_DATA, $ERROR_LOG, $EMAIL_ALERTFILE);
 
 ### get the ip addresses that are local to this machine
-my $local_ips_href = &get_local_ips(\%Cmds);
+my $local_ips_href = &get_local_ips();
 
 ### disable whois lookups if for some reason the whois client that is 
 ### bundled with psad can't be found
@@ -347,7 +347,7 @@ if ($config) {
 ### a previous run.  This feature is most useful for preserving
 ### automatically blocked ips after a reboot.
 if ($ENABLE_AUTO_IDS eq "Y") {
-    &check_auto_blocked(\%Cmds);
+    &check_auto_blocked();
 }
 
 ### archive old firewall data
@@ -382,15 +382,15 @@ for (;;) {
 
     if (@new_packets) {
         my $found_potential_scan = &check_scan(\%Scan, \@new_packets, \%Sigs, $sigs_file,
-                                            $netstat_lookup, $local_ips_href, $errors, \%Cmds);
+                                            $netstat_lookup, $local_ips_href, $errors);
         if ($found_potential_scan) {
-            ### Assign a danger level to the scan.
+            ### Assign a danger level to the scan
             &assign_danger_level(\%Scan, \%Auto_ips);
-            ### Log and send an email alert about the scan.
-            &scan_logr(\%Scan, $output, $dnslookups, $whoislookups, \%Cmds);
-            ### Don't manage the firewall rules if psad is running on a syslog server.
+            ### Log and send an email alert about the scan
+            &scan_logr(\%Scan, $output, $dnslookups, $whoislookups);
+            ### Don't manage the firewall rules if psad is running on a syslog server
             if ($ENABLE_AUTO_IDS eq "Y" && ! $Syslog_server) {
-                &auto_psad_response(\%Scan, \%Cmds);
+                &auto_psad_response(\%Scan);
             }
         }
     }
@@ -407,7 +407,7 @@ exit 0;
 ### keep track of tcp flags for each scan (iptables only)
 sub check_scan() {
     my ($Scan_href, $process_lines_aref, $sigs_href,
-                    $signatures, $netstat_lookup, $local_ips_href, $errors, $Cmds_href) = @_;
+                    $signatures, $netstat_lookup, $local_ips_href, $errors) = @_;
     my @bad_packets;
     my $local_listening_ports_href;
     my ($src, $dst, $len, $ttl, $proto, $srcport, $dstport, $flags, $type, $code, $id, $seq);
@@ -417,7 +417,7 @@ sub check_scan() {
         &check_fw($process_lines_aref->[0]);
     }
     unless ($netstat_lookup) {
-        $local_listening_ports_href = &get_listening_ports($Cmds_href);
+        $local_listening_ports_href = &get_listening_ports();
     }
     READPKT: for my $l (@$process_lines_aref) {
         chomp $l;
@@ -984,7 +984,7 @@ sub collect_errors() {
     close ERRORS;
 }
 sub scan_logr() {
-    my ($Scan_href, $output, $dnslookups, $whoislookups, $Cmds_href) = @_;
+    my ($Scan_href, $output, $dnslookups, $whoislookups) = @_;
     my $range;
     my ($tcp_newrange, $udp_newrange);
     my $dnsstring = "";
@@ -998,7 +998,7 @@ sub scan_logr() {
                 $Scan_href->{$src}->{$dst}->{'EMAIL_LIMIT'} = 0;
             } elsif ($Scan_href->{$src}->{$dst}->{'EMAIL_LIMIT'} > $EMAIL_LIMIT) {
                 unless (defined $Scan_href->{$src}->{$dst}->{'EMAIL_STOPPED'}) {
-                    &email_limit_reached($src, $dst, $Cmds_href);
+                    &email_limit_reached($src, $dst);
                     $Scan_href->{$src}->{$dst}->{'EMAIL_STOPPED'} = 1;
                 }
                 next DST;
@@ -1049,7 +1049,7 @@ sub scan_logr() {
                     }
                 }
                 unless ($whoislookups) {
-                    $whois_info_aref = &get_whois_data($src, $Cmds_href);
+                    $whois_info_aref = &get_whois_data($src);
                 }
                 if ($tcp || $udp) {
                     $abs_start_range = $Scan_href->{$src}->{$dst}->{'START_PORT'};
@@ -1185,7 +1185,7 @@ sub scan_logr() {
                 &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=-=-=-=-=-=-=\n", \@print_array);
                 if ($Scan_href->{$src}->{$dst}->{'ALERTED'} eq "N"
                                         && $current_danger_level >= $EMAIL_ALERT_DANGER_LEVEL) {
-                    &send_email_alert($Scan_href, $src, $dst, $Cmds_href);
+                    &send_email_alert($Scan_href, $src, $dst);
                 }
                 $Scan_href->{$src}->{$dst}->{'LOGR'} = "N";
                 $Scan_href->{$src}->{$dst}->{'EMAIL_LIMIT'}++;
@@ -1195,7 +1195,6 @@ sub scan_logr() {
     return;
 }
 sub check_auto_blocked() {
-    my $Cmds_href = shift;
     if (-e $AUTO_BLOCKED_FILE) {
         open B, "< $AUTO_BLOCKED_FILE" or warn " @@@ Could not open $AUTO_BLOCKED_FILE\n" and return;
         my @blines = <B>;
@@ -1215,9 +1214,9 @@ sub check_auto_blocked() {
             }
         }
         if ($use_iptables) {
-            my $inchains_aref = &get_input_chains($Cmds_href->{'iptables'});
+            my $inchains_aref = &get_input_chains($Cmds{'iptables'});
             for my $inchain (@$inchains_aref) {
-                my @rules = `$Cmds_href->{'iptables'} -nL $inchain`;
+                my @rules = `$Cmds{'iptables'} -nL $inchain`;
                 for my $blockip (@block_ips) {
                     my $blocked = 0;
                     RULE: for my $rule (@rules) {
@@ -1229,14 +1228,14 @@ sub check_auto_blocked() {
                         }
                     }
                     unless ($blocked) {
-                        `$Cmds_href->{'iptables'} -I $inchain 1 -s $blockip -j DROP`;
+                        system "$Cmds{'iptables'} -I $inchain 1 -s $blockip -j DROP 2> /dev/null 1>&2";
                     }
                 }
             }
         } elsif ($use_ipchains) {
-            my $inchains_aref = &get_input_chains($Cmds_href->{'ipchains'});
+            my $inchains_aref = &get_input_chains($Cmds{'ipchains'});
             for my $inchain (@$inchains_aref) {
-                my @rules = `$Cmds_href->{'ipchains'} -nL $inchain`;
+                my @rules = `$Cmds{'ipchains'} -nL $inchain`;
                 for my $blockip (@block_ips) {
                     my $blocked = 0;
                     RULE: for my $rule (@rules) {
@@ -1248,7 +1247,7 @@ sub check_auto_blocked() {
                         }
                     }
                     unless ($blocked) {
-                        `$Cmds_href->{'ipchains'} -I $inchain 1 -s $blockip -j DENY`;
+                        system "$Cmds{'ipchains'} -I $inchain 1 -s $blockip -j DENY 2> /dev/null 1>&2";
                     }
                 }
             }
@@ -1257,7 +1256,7 @@ sub check_auto_blocked() {
     return;
 }
 sub auto_psad_response(){
-    my ($Scan_href, $Cmds_href) = @_;
+    my $Scan_href = shift;
     SOURCE: for my $src (keys %$Scan_href) {
         for my $dst (keys %{$Scan_href->{$src}}) {
             my $current_danger_level = $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'};
@@ -1267,30 +1266,30 @@ sub auto_psad_response(){
             ### _any_ destination.
             if ($current_danger_level >= $AUTO_IDS_DANGER_LEVEL && !(defined $Scan_href->{$src}->{$dst}->{'BLOCKED'})) {
                 if ($USE_IPCHAINS) {
-                    my $chains_aref = &get_input_chains($Cmds_href->{'ipchains'});
+                    my $chains_aref = &get_input_chains($Cmds{'ipchains'});
                     for my $inchain (@$chains_aref) {
-                        `$Cmds_href->{'ipchains'} -I $inchain 1 -s $src -j DENY`;
+                        system "$Cmds{'ipchains'} -I $inchain 1 -s $src -j DENY 2> /dev/null 1>&2";
                     }
                     for my $dst (keys %{$Scan_href->{$src}}) {
                         $Scan_href->{$src}->{$dst}->{'BLOCKED'} = "Y";
                     }
                     for my $email_address (@EMAIL_ADDRESSES) {
-                        system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $src" .
+                        system "$Cmds{'mail'} $email_address -s \"psad: All traffic from $src" .
                                " has been BLOCKED on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
                     }
                     ### write the $src ip to the $AUTO_BLOCKED_FILE
                     &write_blocked_ip($src);
                     next SOURCE;
                 } elsif ($USE_IPTABLES) {
-                    my $chains_aref = &get_input_chains($Cmds_href->{'iptables'});
+                    my $chains_aref = &get_input_chains($Cmds{'iptables'});
                     for my $inchain (@$chains_aref) {
-                        `$Cmds_href->{'iptables'} -I $inchain 1 -s $src -j DROP`;
+                        system "$Cmds{'iptables'} -I $inchain 1 -s $src -j DROP 2> /dev/null 1>&2";
                     }
                     for my $dst (keys %{$Scan_href->{$src}}) {
                         $Scan_href->{$src}->{$dst}->{'BLOCKED'} = "Y";
                     }
                     for my $email_address (@EMAIL_ADDRESSES) {
-                        system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $src" .
+                        system "$Cmds{'mail'} $email_address -s \"psad: All traffic from $src" .
                                " has been BLOCKED on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
                     }
                     ### write the $src ip to the $AUTO_BLOCKED_FILE
@@ -1318,9 +1317,10 @@ sub write_blocked_ip() {
     return;
 }
 sub email_limit_reached() {
-    my ($src, $dst, $Cmds_href) = @_;
+    my ($src, $dst) = @_;
     for my $email_address (@EMAIL_ADDRESSES) {
-        system "$Cmds_href->{'mail'} $email_address -s \"psad: Email message limit for $src has been reached on $HOSTNAME ($dst)!!!\" < /dev/null > /dev/null 2>&1";
+        system "$Cmds{'mail'} $email_address -s \"psad: Email message limit for $src has" .
+                    " been reached on $HOSTNAME ($dst)!!!\" < /dev/null > /dev/null 2>&1";
     }
     return;
 }
@@ -1338,10 +1338,11 @@ sub get_input_chains() {
     return \@chains;
 }
 sub send_email_alert() {
-    my ($Scan_href, $src, $dst, $Cmds_href) = @_;
+    my ($Scan_href, $src, $dst) = @_;
     for my $email_address (@EMAIL_ADDRESSES) {
         print "send_email_alert(): sending scan alert email to: $email_address\n" if $DEBUG;
-        system "$Cmds_href->{'mail'} $email_address -s \"psad WARNING: $HOSTNAME ($dst) has been scanned!\" < $EMAIL_ALERTFILE > /dev/null 2>&1";
+        system "$Cmds{'mail'} $email_address -s \"psad WARNING: $HOSTNAME ($dst)" .
+                       " has been scanned!\" < $EMAIL_ALERTFILE > /dev/null 2>&1";
     }
     $Scan_href->{$src}->{$dst}->{'ALERTED'} = "Y";
     return;
@@ -1364,9 +1365,8 @@ sub check_fw() {
     }
 }
 sub get_local_ips() {
-    my $Cmds_href = shift;
     my %localips;
-    my @ips = `$Cmds_href->{'ifconfig'} -a |$Cmds_href->{'grep'} -w inet`;
+    my @ips = `$Cmds{'ifconfig'} -a |$Cmds{'grep'} -w inet`;
     for my $iptmp (@ips) {
         my $ip = (split /:/, (split /\s+/, $iptmp)[2])[1];
         $localips{$ip} = "";
@@ -1374,9 +1374,8 @@ sub get_local_ips() {
     return \%localips;
 }
 sub get_listening_ports() {
-    my $Cmds_href = shift;
     my %listening_ports;
-    my @ports = `$Cmds_href->{'netstat'} -an |$Cmds_href->{'grep'} \"LISTEN\\b\"`;
+    my @ports = `$Cmds{'netstat'} -an |$Cmds{'grep'} \"LISTEN\\b\"`;
     for my $port_tmp (@ports) {
         my ($proto, $p_tmp) = (split /\s+/, $port_tmp)[0,3];
         my $port = (split /:/, $p_tmp)[1];
@@ -1386,12 +1385,12 @@ sub get_listening_ports() {
     return \%listening_ports;
 }
 sub get_whois_data() {
-    my ($ip, $Cmds_href) = @_;
+    my $ip = shift;
     my @whois_data;
     eval {
         local $SIG{'ALRM'} = sub {die "whois alarm\n"};
         alarm $WHOIS_TIMEOUT;
-        system "$Cmds_href->{'whois'} $ip > $WHOIS_DATAFILE";
+        system "$Cmds{'whois'} $ip > $WHOIS_DATAFILE";
         alarm 0;
     };
     if ($@) {
@@ -1456,7 +1455,7 @@ sub kill_psad() {
     return;
 }
 sub restart_psad() {
-    my ($pidfiles_aref, $cmdline_file, $Cmds_href) = @_;
+    my ($pidfiles_aref, $cmdline_file) = @_;
     my $cmdline;
     if (-e $cmdline_file) {
         open CMD, "< $cmdline_file";
@@ -1468,11 +1467,11 @@ sub restart_psad() {
     }
     &kill_psad($pidfiles_aref);
     print " ... Restarting the psad daemons on $HOSTNAME\n";
-    system "$Cmds_href->{'psad'} $cmdline";
+    system "$Cmds{'psad'} $cmdline";
     return;
 }
 sub psad_status() {
-    my ($pidfiles_aref, $cmdline_file, $Cmds_href) = @_;
+    my ($pidfiles_aref, $cmdline_file) = @_;
     my $cmdline;
     ### only the psad daemon runs with command line arguments
     if (-e $cmdline_file) {
@@ -1510,7 +1509,7 @@ sub psad_status() {
             chomp $pid;
             if (kill 0, $pid) {
                 print " ... $pidname is running on $HOSTNAME as pid: $pid\n";
-                my @grep_output = `$Cmds_href->{'ps'} -auxww |$Cmds_href->{'grep'} $pid`;
+                my @grep_output = `$Cmds{'ps'} -auxww |$Cmds{'grep'} $pid`;
                 GP: for my $g (@grep_output) {
                     if ($g =~ /^\S+\s+$pid\s+(\S+)\s+(\S+)/) {
                         print "     %CPU: $1  %MEM: $2\n";
@@ -1577,7 +1576,6 @@ sub archive_fwdata() {
     return;
 }
 sub psad_setup() {
-    my ($Cmds_href) = @_;
     unless (-d $PSAD_DIR) {
         mkdir $PSAD_DIR, 400;
     }
@@ -1594,14 +1592,14 @@ sub psad_setup() {
         close E;
     }
     unless (-e "/var/log/psadfifo") {
-        `$Cmds_href->{'mknod'} -m 600 /var/log/psadfifo p`;
+        system "$Cmds{'mknod'} -m 600 /var/log/psadfifo p";
     }
-    unless (`$Cmds_href->{'grep'} psadfifo /etc/syslog.conf`) {
+    unless (`$Cmds{'grep'} psadfifo /etc/syslog.conf`) {
         copy("/etc/syslog.conf", "/etc/syslog.conf.orig") unless (-e "/etc/syslog.conf.orig");
         open SYSLOG, ">> /etc/syslog.conf" or die "@@@@@  Unable to open /etc/syslog.conf: $!";
         print SYSLOG "kern.info		|/var/log/psadfifo\n\n";  #reinstate kernel logging to our named pipe
         close SYSLOG;
-        system "$Cmds_href->{'killall'} -HUP $Cmds_href->{'syslogd'}";
+        system "$Cmds{'killall'} -HUP $Cmds{'syslogd'}";
     }
     return;
 }

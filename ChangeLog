@@ -1,7 +1,7 @@
 psad-1.3.1 (12//2003):
     - Added the ability to import /var/log/psad/<ip> directories
       back into memory so scan data remains persistent across
-      psad restarts.
+      psad restarts or system reboots.
     - Added --Analyze-msgs to run psad in analysis mode against an
       iptables logfile (/var/log/psad/fwdata by default).  The logfile
       path can be changed with --messages-file.

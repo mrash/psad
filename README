@@ -1,5 +1,5 @@
 psad (Port Scan Attack Detector)
-Version:  1.3.4
+Version:  1.4.1
 Author:   Michael Rash (mbr@cipherdyne.org)
 Website:  http://www.cipherdyne.org
 
@@ -16,14 +16,15 @@ defaults provided), verbose alert messages that include the source,
 destination, scanned port range, begin and end times, tcp flags and
 corresponding nmap options, reverse DNS info, email and syslog alerting,
 automatic blocking of offending ip addresses via dynamic configuration of
-iptables rulesets, and passive operating system fingerprinting.  In addition,
-psad incorporates many of the tcp, udp, and icmp signatures included in the
-snort intrusion detection system (http://www.snort.org) to detect highly
-suspect scans for various backdoor programs (e.g. EvilFTP, GirlFriend,
-SubSeven), DDoS tools (mstream, shaft), and advanced port scans (syn, fin,
-xmas) which are easily leveraged against a machine via nmap.  psad can also
-alert on snort signatures that are logged via fwsnort, which makes use of the
-iptables string match module to detect application layer signatures.
+iptables rulesets, passive operating system fingerprinting, and DSheild
+reporting.  In addition, psad incorporates many of the tcp, udp, and icmp
+signatures included in the snort intrusion detection system
+(http://www.snort.org) to detect highly suspect scans for various backdoor
+programs (e.g. EvilFTP, GirlFriend, SubSeven), DDoS tools (mstream, shaft),
+and advanced port scans (syn, fin, xmas) which are easily leveraged against a
+machine via nmap.  psad can also alert on snort signatures that are logged
+via fwsnort, which makes use of the iptables string match module to detect
+application layer signatures.
 
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 CONFIGURATION INFORMATION:
@@ -73,11 +74,10 @@ FIREWALL SETUP:
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 PLATFORMS:
 
-    psad has been tested on RedHat 6.2 and 7.3 running kernels 2.2.14-5.0,
-2.2.18, 2.4.0, 2.4.17, and 2.4.20, although it should work on any Linux system
-that has a properly configured firewall.  The only program that specifically
-depends on the RedHat architecture is psad-init, which specifically depends on
-/etc/rc.d/init.d/functions.  For non-RedHat systems a more generic init
+    psad has been tested on RedHat 6.2 - 9.0, Fedora Core 1 and 2, and
+Gentoo Linux systems running various kernels.  The only program that
+specifically depends on the RedHat architecture is psad-init, which depends
+on /etc/rc.d/init.d/functions.  For non-RedHat systems a more generic init
 script is included called "psad-init.generic".  The psad init scripts are
 mostly included as a nicety; psad can be run from the command line like any
 other program.

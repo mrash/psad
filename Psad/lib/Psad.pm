@@ -8,7 +8,7 @@
 #
 # Author: Michael Rash (mbr@cipherdyne.org)
 #
-# Version: 1.3.4
+# Version: 1.4.1
 #
 ##################################################################
 #

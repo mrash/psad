@@ -1924,7 +1924,7 @@ sub scan_logr_signatures() {
             &Psad::logr("\"$msg\"\n", $print_hr);
             &Psad::logr("       classtype: $classtype\n", $print_hr);
             &Psad::logr("       sid:       $sid\n", $print_hr);
-            &Psad::logr("       content:   $content\n", $print_hr)
+            &Psad::logr(qq(       content:   "$content"\n), $print_hr)
                 if $content;
             &Psad::logr("       packets:   $pkts\n", $print_hr);
             &Psad::logr("\n", $print_hr);

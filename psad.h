@@ -3,7 +3,7 @@
 *
 *  File: psad.h
 *
-*  Author: Michael B. Rash (mbr@cipherdyne.com)
+*  Author: Michael Rash (mbr@cipherdyne.com)
 *
 *  Purpose: psad.h include appropriate system header files, and defines file
 *           paths, function prototypes, and constants that are needed by
@@ -13,7 +13,7 @@
 *
 *  Version: 1.0
 *
-*  Copyright (C) 1999-2002 Michael B. Rash (mbr@cipherdyne.com)
+*  Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.com)
 *
 *  License (GNU Public License):
 *
@@ -49,7 +49,7 @@
 #define CONFIG_FILE "/etc/psad/psad.conf" /* default config file */
 
 /* this will automatically be set by install.pl */
-#define HOSTNAME "HOSTNAME"
+#define HOSTNAME "orthanc"
 
 #define MAX_LINE_BUF 1024
 #define MAX_PID_SIZE 6

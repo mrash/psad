@@ -7,13 +7,13 @@
 *           lives and will remove the data if the disk utilization goes
 *           above a (configurable) threshold (95% by default).
 *
-*  Author: Michael B. Rash (mbr@cipherdyne.com)
+*  Author: Michael Rash (mbr@cipherdyne.com)
 *
 *  Credits:  (see the CREDITS file)
 *
 *  Version: 1.0
 *
-*  Copyright (C) 1999-2001 Michael B. Rash (mbr@cipherdyne.com)
+*  Copyright (C) 1999-2001 Michael Rash (mbr@cipherdyne.com)
 *
 *  License (GNU Public License):
 *

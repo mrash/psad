@@ -791,6 +791,10 @@ sub check_scan() {
                 $print_scale_factor -= $print_scale_factor % 1000;
             } elsif ($print_scale_factor < 100000) {
                 $print_scale_factor -= $print_scale_factor % 10000;
+            } elsif ($print_scale_factor < 1000000) {
+                $print_scale_factor -= $print_scale_factor % 100000;
+            } else {
+                $print_scale_factor = 50000;
             }
         }
         $print_scale_factor++ if $print_scale_factor == 0;
@@ -827,7 +831,8 @@ sub check_scan() {
         if ($analyze_msgs) {
             $pkt_ctr++;
             if ($pkt_ctr % $print_scale_factor == 0) {
-                print "    Processed $pkt_ctr packets.\n";
+                print "    ", scalar localtime(),
+                    " Processed $pkt_ctr packets.\n";
             }
         }
 
@@ -2901,13 +2906,11 @@ sub scan_logr() {
                 "icmp=$icmp_newpkts dangerlevel: $curr_dl");
 
             unless ($no_whois) {
-                unless ($analyze_msgs and not $analysis_emails) {
-                    print $fh  "\n ** Whois Information: **\n";
-                    for my $line (@$whois_info_aref) {
-                        print $fh $line;
-                    }
-                    print $fh "\n";
+                print $fh  "\n ** Whois Information: **\n";
+                for my $line (@$whois_info_aref) {
+                    print $fh $line;
                 }
+                print $fh "\n";
             }
             print $fh "=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=",
                 "-=-=-=-=\n";
@@ -3554,18 +3557,26 @@ sub timeout_auto_blocked_ips() {
 sub exclude_auto_ignore_ip() {
     my $ip = shift;
     if (defined $auto_dl{'ip'}{$ip}) {
-        PR: for my $proto qw(allproto tcp udp icmp) {
-            next PR unless defined $auto_dl{'ip'}{$ip}{$proto};
-            ### ignore $ip if the auto danger level is zero
-            return 1 if $auto_dl{'ip'}{$ip}{$proto} == 0;
+        if (defined $auto_dl{'ip'}{$ip}{'allproto'}) {
+            return 1 if $auto_dl{'ip'}{$ip}{'allproto'} == 0;
+        } else {
+            PR: for my $proto qw(tcp udp icmp) {
+                next PR unless defined $auto_dl{'ip'}{$ip}{$proto};
+                ### ignore $ip if the auto danger level is zero
+                return 1 if $auto_dl{'ip'}{$ip}{$proto} == 0;
+            }
         }
     } else {
         NET: for my $net (keys %{$auto_dl{'net'}}) {
             next NET unless ipv4_in_network($net, $ip);
-            PR: for my $proto qw(allproto tcp udp icmp) {
-                next PR unless defined $auto_dl{'net'}{$ip}{$proto};
-                ### ignore $ip if the auto danger level is zero
-                return 1 if $auto_dl{'net'}{$ip}{$proto} == 0;
+            if (defined $auto_dl{'net'}{$ip}{'allproto'}) {
+                return 1 if $auto_dl{'net'}{$ip}{'allproto'} == 0;
+            } else {
+                PR: for my $proto qw(allproto tcp udp icmp) {
+                    next PR unless defined $auto_dl{'net'}{$ip}{$proto};
+                    ### ignore $ip if the auto danger level is zero
+                    return 1 if $auto_dl{'net'}{$ip}{$proto} == 0;
+                }
             }
         }
     }

@@ -267,13 +267,13 @@ my @args_cp = @ARGV;
 ### make Getopts case sensitive
 Getopt::Long::Configure('no_ignore_case');
 
-&usage(1) unless (GetOptions (
+&usage(1) unless (GetOptions(
     'signatures=s'   => \$sigs_file,      # Path to psad signatures file.
     'auto-ips=s'     => \$autoips_file,   # Path to psad auto ips file for
                                           # auto-setting ip danger level.
     'output'         => \$output,         # Write scanlog messages to STDOUT.
     'debug'          => \$debug,          # Run in debug mode.
-    'interval=s'     => \$check_interval, # Set $check_interval from the
+    'interval=i'     => \$check_interval, # Set $check_interval from the
                                           # command line.
     'config=s'       => \$config_file,    # Specify configuration file.
     'fw-check'       => \$fw_analyze,     # Analyze the firewall ruleset and
@@ -290,7 +290,7 @@ Getopt::Long::Configure('no_ignore_case');
     'Status'         => \$status,         # Display status of any currently
                                           # running psad processes.
     'Benchmark'      => \$benchmark,      # Run in benchmark mode.
-    'packets=s'      => \$b_packets,      # Specify number of packets to use
+    'packets=i'      => \$b_packets,      # Specify number of packets to use
                                           # in benchmark test.
     'USR1'           => \$usr1,           # Send an existing psad process a
                                           # USR1 signal (useful for debugging).
@@ -682,9 +682,9 @@ sub check_scan() {
                     next PKT;
                 }
                 if ($proto eq 'TCP') {
+                    $flags = 'NULL';  ### default to NULL
                     if ($line =~ /RES=\S+\s+(.*)\s+URGP=/) {
                         $flags = $1;
-                        $flags = 'NULL' unless ($flags =~ /\S/);
                     }
 
                     if ($config{'IGNORE_CONNTRACK_BUG_PKTS'} eq 'Y' &&
@@ -706,7 +706,8 @@ sub check_scan() {
                             $flags =~ /PSH/ ||
                             $flags =~ /RST/ ||
                             $flags =~ /SYN/ ||
-                            $flags =~ /FIN/) {
+                            $flags =~ /FIN/ ||
+                            $flags eq 'NULL') {
                         push @bad_packets, $line;
                         next PKT;
                     }

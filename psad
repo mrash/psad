@@ -91,35 +91,35 @@ use strict;
 # use POSIX qw(:signal_h :errno_h :sys_wait_h setsid);
 
 ### globals
-use vars qw($VERSION %Scan $PRINT_SCAN_HASH $USE_IPCHAINS $USE_IPTABLES $DEBUG $HOSTNAME);
+use vars qw($VERSION %Scan $PRINT_SCAN_HASH $USE_IPCHAINS $USE_IPTABLES $DEBUG $HOSTNAME $PSADCMD);
 
 #==================== config ======================= ## do not remove this line (used by install.pl to preserve configs) ##
 ### Initialize config variables.  Some can be overriden with command line args
-my $PSAD_DIR                    = "/var/log/psad";
-my $PSAD_LOGFILE                = "${PSAD_DIR}/scanlog";
-my $FW_DATA                     = "${PSAD_DIR}/fwdata";
-my $ERROR_LOG                   = "${PSAD_DIR}/fwerrorlog";
-my $EMAIL_ALERTFILE             = "${PSAD_DIR}/email_alert";
-$PRINT_SCAN_HASH                = "${PSAD_DIR}/scan_hash";  ### Global for sub print_scan.
-my $CHECK_INTERVAL              = 15;                       ### (seconds).
-my $PORT_RANGE_SCAN_THRESHOLD   = 1;
-my $ENABLE_PERSISTENCE          = "Y";    ### If "Y", means that scans will never timeout.
-my $SCAN_TIMEOUT                = 3600;   ### This is used only if $ENABLE_PERSISTENCE = "N";
-my $SHOW_ALL_SIGNATURES         = "N";    ### If "Y", means all signatures will be shown since the scan started instead of just the current ones.
-my %DANGER_LEVELS;                        ### Scope the %DANGER_LEVELS hash.
-$DANGER_LEVELS{'1'}             = 5;      ### Number of packets.
-$DANGER_LEVELS{'2'}             = 50;
-$DANGER_LEVELS{'3'}             = 1000;
-$DANGER_LEVELS{'4'}             = 5000;
-$DANGER_LEVELS{'5'}             = 10000;
-my $ENABLE_EMAIL_ALERTS         = "Y";
-my $EMAIL_ALERT_DANGER_LEVEL    = 1;                  ### Send email alert if danger level >= to this value.
-my $EMAIL_LIMIT                 = 50;                 ### Send no more than this number of emails for a single scanning source ip.
-my @EMAIL_ADDRESSES             = qw(root@localhost); ### Supports multiple email addresses.
-my $ALERT_ALL                   = "Y";                ### If "Y", send email for all new bad packets instead of just when a danger level increases
-my $ENABLE_AUTO_IDS             = "N";                ### If "Y", enable automated IDS response (auto manages firewall rulesets). 
-my $AUTO_IDS_DANGER_LEVEL       = 5;                  ### Block all traffic from offending IP if danger level >= to this value 
-my $WHOIS_TIMEOUT               = 60;                 ### (seconds)
+my $PSAD_DIR                  = "/var/log/psad";
+my $PSAD_LOGFILE              = "${PSAD_DIR}/scanlog";
+my $FW_DATA                   = "${PSAD_DIR}/fwdata";
+my $ERROR_LOG                 = "${PSAD_DIR}/fwerrorlog";
+my $EMAIL_ALERTFILE           = "${PSAD_DIR}/email_alert";
+$PRINT_SCAN_HASH              = "${PSAD_DIR}/scan_hash";  ### Global for sub print_scan.
+my $CHECK_INTERVAL            = 15;                       ### (seconds).
+my $PORT_RANGE_SCAN_THRESHOLD = 1;
+my $ENABLE_PERSISTENCE        = "Y";    ### If "Y", means that scans will never timeout.
+my $SCAN_TIMEOUT              = 3600;   ### This is used only if $ENABLE_PERSISTENCE = "N";
+my $SHOW_ALL_SIGNATURES       = "N";    ### If "Y", means all signatures will be shown since the scan started instead of just the current ones.
+my %DANGER_LEVELS;                      ### Scope the %DANGER_LEVELS hash.
+$DANGER_LEVELS{'1'}           = 5;      ### Number of packets.
+$DANGER_LEVELS{'2'}           = 50;
+$DANGER_LEVELS{'3'}           = 1000;
+$DANGER_LEVELS{'4'}           = 5000;
+$DANGER_LEVELS{'5'}           = 10000;
+my $ENABLE_EMAIL_ALERTS       = "Y";
+my $EMAIL_ALERT_DANGER_LEVEL  = 1;                  ### Send email alert if danger level >= to this value.
+my $EMAIL_LIMIT               = 50;                 ### Send no more than this number of emails for a single scanning source ip.
+my @EMAIL_ADDRESSES           = qw(root@localhost); ### Supports multiple email addresses.
+my $ALERT_ALL                 = "Y";                ### If "Y", send email for all new bad packets instead of just when a danger level increases
+my $ENABLE_AUTO_IDS           = "N";                ### If "Y", enable automated IDS response (auto manages firewall rulesets). 
+my $AUTO_IDS_DANGER_LEVEL     = 5;                  ### Block all traffic from offending IP if danger level >= to this value 
+my $WHOIS_TIMEOUT             = 60;                 ### (seconds)
 
 ### The following variable can be modified to look for logging messages
 ### that are specific to iptables firewalls (specified by the "--log-prefix"
@@ -128,23 +128,23 @@ my $WHOIS_TIMEOUT               = 60;                 ### (seconds)
 my $IPTABLES_MSG_SEARCH = "DROP|DENY|REJECT";
 
 ### system binaries ###
-my $ipchainsCmd     = "/sbin/ipchains";
-my $iptablesCmd     = "/sbin/iptables";
-my $mknodCmd        = "/bin/mknod";
-my $psCmd           = "/bin/ps";
-my $wcCmd           = "/usr/bin/wc";
-my $tailCmd         = "/usr/bin/tail";
-my $mailCmd         = "/bin/mail";
-my $ifconfigCmd     = "/sbin/ifconfig";
-my $grepCmd         = "/bin/grep";
-my $sysloginitCmd   = "/etc/rc.d/init.d/syslog";
-my $netstatCmd      = "/bin/netstat";
-my $unameCmd        = "/bin/uname";
-my $whoisCmd        = "/usr/bin/whois.psad";
-my $psadwatchdCmd   = "/usr/sbin/psadwatchd";
-my $kmsgsdCmd       = "/usr/sbin/kmsgsd";
-my $diskmondCmd     = "/usr/sbin/diskmond";
-my $psadCmd         = "/usr/sbin/psad";
+my $ipchainsCmd   = "/sbin/ipchains";
+my $iptablesCmd   = "/sbin/iptables";
+my $mknodCmd      = "/bin/mknod";
+my $psCmd         = "/bin/ps";
+my $wcCmd         = "/usr/bin/wc";
+my $tailCmd       = "/usr/bin/tail";
+my $mailCmd       = "/bin/mail";
+my $ifconfigCmd   = "/sbin/ifconfig";
+my $grepCmd       = "/bin/grep";
+my $sysloginitCmd = "/etc/rc.d/init.d/syslog";
+my $netstatCmd    = "/bin/netstat";
+my $unameCmd      = "/bin/uname";
+my $whoisCmd      = "/usr/bin/whois.psad";
+my $psadwatchdCmd = "/usr/sbin/psadwatchd";
+my $kmsgsdCmd     = "/usr/sbin/kmsgsd";
+my $diskmondCmd   = "/usr/sbin/diskmond";
+my $psadCmd       = "/usr/sbin/psad";
 #================== end config ==================== ## do not remove this line (used by install.pl to preserve configs) ##
 #===================== main =======================
 
@@ -178,25 +178,25 @@ my @args_cp = @ARGV;
 Getopt::Long::Configure("no_ignore_case");  # make Getopts case sensitive
 
 &usage_and_exit(1) unless (GetOptions (
-    'help'          => \$help,          # display help
-    'auto_ips=s'    => \$auto_ips,      # enable automatic ip danger level assignment
-    'output'        => \$output,        # write scanlog messages to STDOUT
-    'Daemon'        => \$daemon,        # do not run as a daemon
-    'debug'         => \$DEBUG,         # run in debug mode
-    'interval=s'    => \$CHECK_INTERVAL,# set $CHECK_INTERVAL from the command line
-    'firewallcheck' => \$fwcheck,       # do not check firewall rules
-    'config=s'      => \$config,        # specify configuration file
-    'reversedns'    => \$dnslookups,    # do not issue dns lookups against scanning ip address
-    'signatures=s'  => \$signatures,    # scan signatures
-    'localport'     => \$netstat_lookup,# do not check to see if the firewall is listening on localport that has been scanned
-    'errors'        => \$errors,        # do not write malformed packet messages to error log
-    'Logging_server'=> \$Syslog_server, # we are running psad on a syslog logging server
-    'Kill'          => \$kill,          # kill all running psad processes (psadwatchd, psad, kmsgsd, diskmond)
-    'Restart'       => \$restart,       # restart psad with all options of the currently running psad process
-    'Status'        => \$status,        # display status of any currently running psad processes
-    'USR1'          => \$usr1,          # send an existing psad process a USR1 signal (useful for debugging)
-    'Version'       => \$print_version, # print the psad version and exit
-    'whois'         => \$whoislookups   # do not issue whois lookups against the scanning ip
+    'help'           => \$help,          # display help
+    'auto_ips=s'     => \$auto_ips,      # enable automatic ip danger level assignment
+    'output'         => \$output,        # write scanlog messages to STDOUT
+    'Daemon'         => \$daemon,        # do not run as a daemon
+    'debug'          => \$DEBUG,         # run in debug mode
+    'interval=s'     => \$CHECK_INTERVAL,# set $CHECK_INTERVAL from the command line
+    'firewallcheck'  => \$fwcheck,       # do not check firewall rules
+    'config=s'       => \$config,        # specify configuration file
+    'reversedns'     => \$dnslookups,    # do not issue dns lookups against scanning ip address
+    'signatures=s'   => \$signatures,    # scan signatures
+    'localport'      => \$netstat_lookup,# do not check to see if the firewall is listening on localport that has been scanned
+    'errors'         => \$errors,        # do not write malformed packet messages to error log
+    'Logging_server' => \$Syslog_server, # we are running psad on a syslog logging server
+    'Kill'           => \$kill,          # kill all running psad processes (psadwatchd, psad, kmsgsd, diskmond)
+    'Restart'        => \$restart,       # restart psad with all options of the currently running psad process
+    'Status'         => \$status,        # display status of any currently running psad processes
+    'USR1'           => \$usr1,          # send an existing psad process a USR1 signal (useful for debugging)
+    'Version'        => \$print_version, # print the psad version and exit
+    'whois'          => \$whoislookups   # do not issue whois lookups against the scanning ip
 ));
 &usage_and_exit(0) if ($help);
 
@@ -242,6 +242,10 @@ my %Cmds = (
 ### check to make sure the commands specified in the config section 
 ### are in the right place, and attempt to correct automatically if not.
 %Cmds = &Psad::check_commands(\%Cmds);
+
+### Now that we are sure the psad command is where it should be,
+### assign $PSADCMD (used by the SEGV handler)
+$PSADCMD = $Cmds{'psad'};
 
 ### the --Status command line switch was given
 if ($status) {
@@ -336,6 +340,7 @@ if ($auto_ips) {  ### support automatic ip danger level increases/decreases.
 ### install signal handlers for debugging %Scan with Data::Dumper,
 ### and for reaping zombie whois processes
 $SIG{'USR1'} = \&print_scan;
+$SIG{'SEGV'} = \&print_scan_and_exit;
 $SIG{'CHLD'} = \&REAPER;
 
 ### initialize fwdata_start_lines
@@ -1247,7 +1252,18 @@ sub print_scan() {  ### this should primarily be used for debugging
     print PSCAN Dumper $Scan_href;
     close PSCAN;
     chmod 0600, $scanfile;
+    print STDOUT "\n ... Printing scan data structures to $scanfile\n\n";
     return;
+}
+sub print_scan_and_exit() {  ### this should primarily be used for debugging
+    my $scanfile = $PRINT_SCAN_HASH . ".$$";
+    open PSCAN, "> $scanfile";
+    print PSCAN Dumper $Scan_href;
+    close PSCAN;
+    chmod 0600, $scanfile;
+    print STDOUT "\n ... Printing scan data structures to $scanfile\n\n";
+    system "$PSADCMD --Kill";
+    exit 0;
 }
 sub check_fw() {
     my $line = shift;

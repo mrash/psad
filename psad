@@ -2247,17 +2247,6 @@ sub scan_logr() {
                 "$config{'HOSTNAME'} ($dst).\n\n\n";
             printf E "%${log_len}s%s", 'Danger level: ',
                 "[$scan_dl{$src}] (out of 5)\n\n";
-            printf E "%${log_len}s%s", 'Source: ', "$src\n";
-            printf E "%${log_len}s%s", 'DNS: ', "$src_dns_str\n"
-                unless $no_rdns;
-            if (!$no_posf and defined $posf{$src}{'guess'}) {
-                printf E "%${log_len}s%s", 'OS guess: ',
-                    "$posf{$src}{'guess'}\n";
-            }
-            print E "\n";
-            printf E "%${log_len}s%s", 'Destination: ', "$dst\n";
-            printf E "%${log_len}s%s", 'DNS: ', "$dst_dns_str\n";
-            print E "\n";
             if ($tcp_f) {
                 printf E "%${log_len}s%s", 'Scanned tcp ports: ',
                     "[$tcp_newrange: $tcp_newpkts packets]\n";
@@ -2300,6 +2289,17 @@ sub scan_logr() {
                 printf E "%${log_len}s%s", 'icmp packets: ',
                     "[$icmp_newpkts]\n";
             }
+            print E "\n";
+            printf E "%${log_len}s%s", 'Source: ', "$src\n";
+            printf E "%${log_len}s%s", 'DNS: ', "$src_dns_str\n"
+                unless $no_rdns;
+            if (!$no_posf and defined $posf{$src}{'guess'}) {
+                printf E "%${log_len}s%s", 'OS guess: ',
+                    "$posf{$src}{'guess'}\n";
+            }
+            print E "\n";
+            printf E "%${log_len}s%s", 'Destination: ', "$dst\n";
+            printf E "%${log_len}s%s", 'DNS: ', "$dst_dns_str\n";
             print E "\n";
 
             printf E "%${log_len}s%s", 'Current interval: ',

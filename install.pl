@@ -95,6 +95,8 @@ my @old_fw_msg_search;
 ### get the hostname of the system
 my $HOSTNAME = hostname();
 
+my $src_dir = getcwd() or die "[*] Could not get current working directory.";
+
 if (-e $INSTALL_LOG) {
     open INSTALL, "> $INSTALL_LOG" or
         die "[*] Could not open $INSTALL_LOG: $!";
@@ -319,84 +321,12 @@ sub install() {
     &perms_ownership($WHOIS_PSAD, 0755);
     print "\n\n";
 
-    ### installing Unix::Syslog
-    &logr("[+] Installing the Unix::Syslog (0.100) perl module\n");
-    chdir 'Unix-Syslog' or die "[*] Could not chdir to ",
-        "Unix-Syslog: $!";
-    unless (-e 'Makefile.PL' && -e 'Syslog.pm') {
-        die "[*] Your source directory appears to be incomplete!  Syslog.pm ",
-            "is missing.\n    Download the latest sources from ",
-            "http://www.cipherdyne.org\n";
-    }
-    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
-    system $Cmds{'make'};
-#    system "$Cmds{'make'} test";
-    system "$Cmds{'make'} install";
-    chdir '..';
-    print "\n\n";
-
-    ### installing Date::Calc
-    &logr("[+] Installing the Date::Calc (5.3) perl module\n");
-    chdir 'Date-Calc' or die "[*] Could not chdir to ",
-        "Date-Calc: $!";
-    unless (-e 'Makefile.PL') {
-        die "[*] Your source directory appears to be incomplete!  Date::Calc ",
-            "is missing.\n    Download the latest sources from ",
-            "http://www.cipherdyne.org\n";
-    }
-    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
-    system $Cmds{'make'};
-#    system "$Cmds{'make'} test";
-    system "$Cmds{'make'} install";
-    chdir '..';
-    print "\n\n";
-
-    ### installing Net::IPv4Addr
-    &logr("[+] Installing the Net::IPv4Addr (0.10) perl module\n");
-    chdir 'Net-IPv4Addr' or die "[*] Could not chdir to ",
-        "Net-IPv4Addr: $!";
-    unless (-e 'Makefile.PL') {
-        die "[*] Your source directory appears to be incomplete!  ",
-            "Net::IPv4Addr is missing.\n    Download the latest sources " .
-            "from http://www.cipherdyne.org\n";
-    }
-    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
-    system $Cmds{'make'};
-#    system "$Cmds{'make'} test";
-    system "$Cmds{'make'} install";
-    chdir '..';
-    print "\n\n";
-
-    ### installing IPTables::Parse
-    &logr("[+] Installing the IPTables::Parse (0.10) perl module\n");
-    chdir 'IPTables/Parse' or die "[*] Could not chdir to ",
-        "IPTables/Parse: $!";
-    unless (-e 'Makefile.PL') {
-        die "[*] Your source directory appears to be incomplete!  ",
-            "IPTables::Parse is missing.\n    Download the latest sources " .
-            "from http://www.cipherdyne.org\n";
-    }
-    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
-    system $Cmds{'make'};
-#    system "$Cmds{'make'} test";
-    system "$Cmds{'make'} install";
-    chdir '../..';
-    print "\n\n";
-
-    ### installing Psad.pm
-    &logr("[+] Installing the Psad.pm perl module\n");
-
-    chdir 'Psad';
-    unless (-e 'Makefile.PL' && -e 'Psad.pm') {
-        die "[*] Your source distribution appears to be incomplete!  ",
-            "Psad.pm is missing.\n    Download the latest sources from ",
-            "http://www.cipherdyne.org\n";
-    }
-    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
-    system  $Cmds{'make'};
-    system "$Cmds{'make'} test";
-    system "$Cmds{'make'} install";
-    chdir '..';
+    ### install perl modules
+    &install_perl_module('Unix::Syslog', 'Unix-Syslog', '0.100');
+    &install_perl_module('Date::Calc', 'Date-Calc', '5.3');
+    &install_perl_module('Net::IPv4Addr', 'Net-IPv4Addr', '0.10');
+    &install_perl_module('IPTables::Parse', 'IPTables/Parse', '0.10');
+    &install_perl_module('Psad', 'Psad', '1.3.3');
 
     &logr("[+] Installing snort-2.1 signatures in $SNORT_DIR\n");
     unless (-d $SNORT_DIR) {
@@ -580,6 +510,13 @@ sub install() {
             }
         }
 
+        ### get syslog daemon (e.g. syslog, syslog-ng, or metalog)
+        my $syslog_str = &query_syslog();
+        if ($syslog_str) {
+            &put_string('SYSLOG_DAEMON', $syslog_str,
+                "${PSAD_CONFDIR}/psad.conf");
+        }
+
         ### Give the admin the opportunity to set the strings that are
         ### parsed out of iptables messages.  This is useful since the
         ### admin may have configured the firewall to use a logging prefix
@@ -648,11 +585,13 @@ sub install() {
                 ### default as of psad-1.3
                 if ($var eq 'HOME_NET') {
                     &logr("[-] HOME_NET is not defined in $file.\n");
-                    &set_home_net("${PSAD_CONFDIR}/psad.conf");
-                }
-                if ($var eq 'HOSTNAME') {
+                    &set_home_net($file);
+                } elsif ($var eq 'HOSTNAME') {
                     &logr("[-] set_hostname() failed.  Edit the HOSTNAME " .
                         " variable in $file\n");
+                } else {
+                    &logr("[-] Var $var is set to _CHANGEME_ in " .
+                        "$file, edit manually.\n");
                 }
             }
         }
@@ -785,11 +724,14 @@ sub uninstall() {
         print "[+] Removing $LIBDIR\n";
         rmtree $LIBDIR;
     }
+    my $running_syslogd = 0;
+    my $running_syslog_ng = 0;
     print "[+] Restoring /etc/syslog.conf.orig -> /etc/syslog.conf\n";
     if (-e '/etc/syslog.conf.orig') {
         move '/etc/syslog.conf.orig', '/etc/syslog.conf' or die "[*] Could not ",
             "move /etc/syslog.conf.orig -> /etc/syslog.conf: $!";
-    } else {
+        $running_syslogd = 1;
+    } elsif (-e '/etc/syslog.conf') {
         print "[+] /etc/syslog.conf.orig does not exist. ",
             " Editing /etc/syslog.conf directly.\n";
         open ESYS, '< /etc/syslog.conf' or
@@ -804,12 +746,22 @@ sub uninstall() {
             print CSYS "$line\n" if ($line !~ /psadfifo/);
         }
         close CSYS;
+        $running_syslogd = 1;
+    } elsif (-e '/etc/syslog-ng/syslog-ng.conf.orig') {
+        move '/etc/syslog-ng/syslog-ng.conf.orig', '/etc/syslog-ng/syslog-ng.conf'
+            or die "[*] Could not move /etc/syslog.conf.orig ",
+                "-> /etc/syslog.conf: $!";
+        $running_syslog_ng = 1;
     }
-    print "[+] Restarting syslog.\n";
-    system "$Cmds{'killall'} -HUP syslogd";
+    if ($running_syslogd) {
+        print "[+] Restarting syslog.\n";
+        system "$Cmds{'killall'} -HUP syslogd";
+    } elsif ($running_syslog_ng) {
+        print "[+] Restarting syslog.\n";
+        system "$Cmds{'killall'} -HUP syslog-ng";
+    }
     print "\n";
     print "[+] Psad has been uninstalled!\n";
-
     return;
 }
 
@@ -860,6 +812,26 @@ sub stop_psad() {
     return;
 }
 
+sub install_perl_module() {
+    my ($mod_name, $mod_dir, $version) = @_;
+    &logr("[+] Installing the $mod_name $version perl module\n");
+    chdir $mod_dir or die "[*] Could not chdir to ",
+        "$mod_dir: $!";
+    unless (-e 'Makefile.PL') {
+        die "[*] Your $mod_name source directory appears to be incomplete!\n",
+            "    Download the latest sources from ",
+            "http://www.cipherdyne.org\n";
+    }
+    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
+    system $Cmds{'make'};
+#    system "$Cmds{'make'} test";
+    system "$Cmds{'make'} install";
+    chdir $src_dir;
+
+    print "\n\n";
+    return;
+}
+
 sub set_home_net() {
     my $file = shift;
     my @ifconfig_out = `$Cmds{'ifconfig'} -a`;
@@ -898,12 +870,12 @@ sub set_home_net() {
         &logr("    Specify which subnets are part of your internal network.  " .
             "Note that\n");
         &logr("    you can correct anything you enter here by editing the " .
-            "HOME_NET\n");
+            "\"HOME_NET\"\n");
         &logr("    variable in: $file.\n\n");
         &logr("    Enter each of the subnets (except for the external " .
             "subnet)\n");
         &logr("    on a line by itself.  Each of the subnets should be in the " .
-            "    form\n");
+            "form\n");
         &logr("    <net>/<mask>.  E.g. in CIDR notation: 192.168.10.0/24 " .
             "(preferrable),\n");
         &logr("    or regularly: 192.168.10.0/255.255.255.0\n\n");
@@ -943,7 +915,7 @@ sub set_hostname() {
         open P, "< $file" or die "[*] Could not open $file: $!";
         my @lines = <P>;
         close P;
-        ### replace the "HOSTNAME           CHANGE_ME" line
+        ### replace the "HOSTNAME           _CHANGEME_" line
         open PH, "> $file" or die "[*] Could not open $file: $!";
         for my $line (@lines) {
             chomp $line;
@@ -986,10 +958,10 @@ sub append_fifo_syslog_ng() {
     unless ($found_fifo) {
         open SYSLOGNG, '>> /etc/syslog-ng/syslog-ng.conf' or
             die "[*] Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
-        print SYSLOGNG "\n";
-        print SYSLOGNG "destination psadpipe { pipe(\"/var/run/psadfifo\"); };\n";
-        print SYSLOGNG "filter f_kerninfo { facility(kern) and level(info); };\n";
-        print SYSLOGNG "log { source(src); filter(f_kerninfo); destination(psadpipe); };\n";
+        print SYSLOGNG "\n",
+            "destination psadpipe { pipe(\"/var/lib/psad/psadfifo\"); };\n",
+            "filter f_kerninfo { facility(kern) and level(info); };\n",
+            "log { source(src); filter(f_kerninfo); destination(psadpipe); };\n";
         close SYSLOGNG;
     }
     return;
@@ -1228,9 +1200,8 @@ sub test_syslog_config() {
     my @if_out = `$Cmds{'ifconfig'} lo`;
 
     unless (@if_out) {
-        &logr("[-] Could not see the loopback interface " .
-            "with ifconfig.\n         Hoping syslog reconfig " .
-            "will work anyway.\n");
+        &logr("[-] Could not see the loopback interface with ifconfig.  " .
+            "Hoping\n    syslog reconfig will work anyway.\n");
         return;
     }
 
@@ -1239,14 +1210,14 @@ sub test_syslog_config() {
     for my $line (@if_out) {
         if ($line =~ /inet\s+addr:($ip_re)\s/) {
             $lo_ip = $1;  ### this should always be 127.0.0.1
-            &logr("[-] loopback interface ip is not 127.0.0.1.  Continuing ".
+            &logr("[-] loopback interface IP is not 127.0.0.1.  Continuing ".
                 "anyway.\n") unless $lo_ip eq '127.0.0.1';
             $found_ip = 1;
         }
     }
 
     unless ($found_ip) {
-        &logr("[-] The loopback interface does not have an ip.\n" .
+        &logr("[-] The loopback interface does not have an IP.\n" .
             "    Hoping the syslog reconfig will work anyway.\n");
         return;
     }
@@ -1313,11 +1284,11 @@ sub test_syslog_config() {
     &scrub_fwdata();
 
     if ($found) {
-        &logr("[+] Successful syslog reconfiguration.\n");
+        &logr("[+] Successful syslog reconfiguration.\n\n");
     } else {
         &logr("[-] unsuccessful syslog reconfiguration.\n");
         &logr("    Consult the psad man page for the basic " .
-            "syslog requirement to get psad to work.\n");
+            "syslog requirement to get psad to work.\n\n");
     }
 
     if ($start_kmsgsd && -e "${RUNDIR}/kmsgsd.pid") {
@@ -1575,6 +1546,20 @@ sub query_email() {
         $email_str =~ s/\,\s*$//;
     }
     return $email_str;
+}
+
+sub query_syslog() {
+    &logr("[+] psad supports the syslogd, syslog-ng, and metalog logging " .
+        "daemons.\n\n");
+    my $ans = '';
+    while ($ans ne 'syslogd' and $ans ne 'syslog-ng' and $ans ne 'metalog') {
+        &logr("    Which system logger is running (syslogd, " .
+            "syslog-ng, metalog)?  ");
+        $ans = <STDIN>;
+        chomp $ans;
+    }
+    print "\n";
+    return $ans;
 }
 
 sub put_string() {

@@ -71,7 +71,7 @@ my $SNORT_DIR    = "${PSAD_CONFDIR}/snort_rules";
 
 ### system binaries ###
 my $chkconfigCmd = '/sbin/chkconfig';
-my $rcupdateCmd  = '/sbin/rc-update';
+my $rcupdateCmd  = '/sbin/rc-update';  ### Gentoo
 my $gzipCmd      = '/usr/bin/gzip';
 my $psCmd        = '/bin/ps';
 my $netstatCmd   = '/bin/netstat';
@@ -546,23 +546,39 @@ sub install() {
         my $email_str = &query_email();
         if ($email_str) {
             for my $file qw(psad.conf psadwatchd.conf
-                    kmsgsd.conf fw_search.conf) {
+                    kmsgsd.conf) {
                 &put_string('EMAIL_ADDRESSES', $email_str,
                     "${PSAD_CONFDIR}/$file");
             }
         }
-        ### Give the admin the opportunity to add to the strings that are
-        ### normally checked in iptables messages.  This is useful since the
+        ### Give the admin the opportunity to set the strings that are
+        ### parsed out of iptables messages.  This is useful since the
         ### admin may have configured the firewall to use a logging prefix
-        ### of "Audit" or something else other than "DROP".
-        my $custom_fw_search_str = &get_fw_search_string();
-        if ($custom_fw_search_str) {
-            for my $file qw(fw_search.conf) {
-                &logr(qq{ .. Setting \$FW_MSG_SEARCH to "$custom_fw_search_str" } .
-                    "in ${PSAD_CONFDIR}/$file\n");
-                &put_string('FW_MSG_SEARCH', $custom_fw_search_str,
-                    "${PSAD_CONFDIR}/$file");
+        ### of "Audit" or something else other than the default string
+        ### "DROP".
+        my $fw_search_aref = &get_fw_search_strings();
+        if ($fw_search_aref) {
+            open F, "< ${PSAD_CONFDIR}/fw_search.conf"
+                or die " ** Could not open ${PSAD_CONFDIR}/fw_search.conf: $!";
+            my @lines = <F>;
+            close F;
+            open T, "> ${PSAD_CONFDIR}/fw_search.conf.tmp"
+                or die " ** Could not open ${PSAD_CONFDIR}/fw_search.conf.tmp: $!";
+            for my $line (@lines) {
+                if ($line =~ /^\s*FW_MSG_SEARCH/) {
+                    last;
+                } else {
+                    print T $line;
+                }
             }
+            for my $fw_str (@$fw_search_aref) {
+                &logr(qq{ .. Setting FW_MSG_SEARCH to "$fw_str" } .
+                    "in ${PSAD_CONFDIR}/fw_search.conf\n");
+                printf T "%-28s%s;\n", 'FW_MSG_SEARCH', $fw_str;
+            }
+            close T;
+            move "${PSAD_CONFDIR}/fw_search.conf.tmp",
+                "${PSAD_CONFDIR}/fw_search.conf";
         }
         ### Give the admin the opportunity to set the HOME_NET variable.
         &set_home_net("${PSAD_CONFDIR}/psad.conf");
@@ -813,19 +829,19 @@ sub set_home_net() {
         &logr("    on a line by itself.\n");
         &logr("    Each of the subnets should be in the form <net>/<mask.\n");
         &logr("    E.g. in CIDR notation: 192.168.10.0/24 (preferrable), or\n");
-        &logr("    regularly: 192.168.10.0/255.255.255.0\n");
-        &logr("    End with a \".\" on a line by itself.\n");
+        &logr("    regularly: 192.168.10.0/255.255.255.0\n\n");
+        &logr("    End with a \".\" on a line by itself.\n\n");
         my $ans = '';
         while ($ans ne '.') {
-            &logr("Subnet: ");
+            &logr("    Subnet: ");
             $ans = <STDIN>;
             chomp $ans;
             if ($ans =~ m|^\s*($ip_re/\d+)\s*$|) {
                 ### hard to test this directly without ipv4_network()
                 ### and this module may not be installed, so just use it.
-                $home_net_str .= "$1,";
+                $home_net_str .= "$1, ";
             } elsif ($ans =~ m|^\s*($ip_re/$ip_re)\s*$|) {
-                $home_net_str .= "$1,";
+                $home_net_str .= "$1, ";
             } elsif ($ans ne '.') {
                 &logr(" ** Invalid subnet \"$ans\"\n");
             }
@@ -836,7 +852,7 @@ sub set_home_net() {
         $home_net_str = 'NOT_USED';
     }
     if ($home_net_str) {
-        $home_net_str =~ s/\,$//;
+        $home_net_str =~ s/\,\s*$//;
         &put_string('HOME_NET', $home_net_str, $file);
     } else {
         &put_string('HOME_NET', 'NOT_USED', $file);
@@ -1309,19 +1325,21 @@ sub perms_ownership() {
     return;
 }
 
-sub get_fw_search_string() {
-    print "\n";
-    print " .. psad checks the firewall configuration on the underlying machine\n",
-        "    to see if packets will be logged and dropped that have not\n",
-        "    explicitly allowed through.  By default psad looks for the\n",
-        "    string \"DROP\". However, if your particular firewall configuration\n",
-        "    logs blocked packets with the string \"Audit\" for example, psad\n",
-        "    can be configured here to look for this string.\n\n";
+sub get_fw_search_strings() {
+    my @fw_search_strings = ();
+
+        print
+"\n .. By default psad parses all iptables log messages for scan activity.\n",
+"    However, psad can be configured to only parse those iptables messages\n",
+"    that match particular strings (that are specified in your iptables\n",
+"    ruleset with the --log-prefix option).\n";
+
     my $ans = '';
-    while ($ans ne 'y' && $ans ne 'n') {
-        print "    Would you like to add a new string that will be used to analyze\n",
-            "    firewall log messages?  (Is it usually safe to say \"n\" here).\n",
-            "    (y/[n])?  ";
+    while ($ans ne 'y' and $ans ne 'n') {
+        print
+"\n    Would you like psad to only parse specific strings in iptables\n",
+"    messages?\n",
+"    (y/[n])?  ";
         $ans = <STDIN>;
         if ($ans eq "\n") {  ### allow the default answer to take over
             $ans = 'n';
@@ -1329,17 +1347,61 @@ sub get_fw_search_string() {
         chomp $ans;
     }
     print "\n";
-    my $fw_string = '';
+
     if ($ans eq 'y') {
-        &logr("     Enter a string (i.e. \"Audit\"):  ");
-        $fw_string = <STDIN>;
-        chomp $fw_string;
+        print
+"\n .. psad checks the firewall configuration on the underlying machine\n",
+"    to see if packets will be logged and dropped that have not\n",
+"    explicitly allowed through.  By default psad looks for the string\n",
+"    \"DROP\". However, if your particular firewall configuration logs\n",
+"    blocked packets with the string \"Audit\" for example, psad can be\n",
+"    configured here to look for this string.  In addition, psad can also\n",
+"    be configured here to look for multiple strings if needed.  Remember,\n",
+"    whatever string you configure psad to look for must be logged via the\n",
+"    --log-prefix option in iptables.\n\n";
+        $ans = '';
+        while ($ans ne 'y' and $ans ne 'n') {
+            print
+"    Would you like to add custom strings that will be used to analyze",
+"    firewall log messages?\n",
+"    (y/[n])?  ";
+            $ans = <STDIN>;
+            if ($ans eq "\n") {  ### allow the default answer to take over
+                $ans = 'n';
+            }
+            chomp $ans;
+        }
+        print "\n";
+        if ($ans eq 'y') {
+            print "\n";
+            &logr(" .. Add as many search strings as you like; " .
+                "each on its own line.\n\n");
+            &logr("    End with a \".\" on a line by itself.\n\n");
+            my $ans = '';
+            while ($ans ne '.') {
+                &logr("    String (i.e. \"Audit\"):  ");
+                $ans = <STDIN>;
+                chomp $ans;
+                if ($ans =~ /\"/) {
+                    &logr(" ** Quotes will be removed from FW search string: $ans\n");
+                    $ans =~ s/\"//g;
+                }
+                if ($ans =~ /\S/) {
+                    push @fw_search_strings, $ans;
+                } else {
+                    &logr(" ** Invalid string **\n");
+                }
+            }
+        }
+        &logr("    All firewall search strings used by psad are located " .
+            "in the file: $PSAD_CONFDIR/fw_search.conf\n");
     }
-    return $fw_string;
+    return \@fw_search_strings;
 }
 
 sub query_email() {
     my $filename = 'psad.conf';
+    my $email_str = '';
     open F, "< ${PSAD_CONFDIR}/psad.conf" or die " ** Could not open ",
         "${PSAD_CONFDIR}/psad.conf: $!";
     my @clines = <F>;
@@ -1372,28 +1434,23 @@ sub query_email() {
         print "\n";
         &logr(" .. To which email address(es) would you like " .
             "psad alerts to be sent?\n");
-        &logr(" .. You can enter as many email addresses as you like " .
-            "separated by spaces.\n");
-        my $emailstr = '';
-        my $correct = 0;
-        while (! $correct) {
-            print 'Email addresses: ';
-            $emailstr = <STDIN>;
-            $emailstr =~ s/\,//g;
-            chomp $emailstr;
-            my @emails = split /\s+/, $emailstr;
-            $correct = 1;
-            for my $email (@emails) {
-                ### could be user@localhost
-                unless ($email =~ /\S+\@\S+/) {
-                    $correct = 0;
-                }
+        &logr("    You can enter as many email addresses as you like; " .
+            "each on its own line.\n\n");
+        &logr("    End with a \".\" on a line by itself.\n\n");
+        my $ans = '';
+        while ($ans ne '.') {
+            &logr("    Email Address: ");
+            $ans = <STDIN>;
+            chomp $ans;
+            if ($ans =~ m|^\s*(\S+\@\S+)$|) {
+                $email_str .= "$1, ";
+            } elsif ($ans ne '.') {
+                &logr(" ** Invalid email address \"$ans\"\n");
             }
-            $correct = 0 unless @emails;
         }
-        return $emailstr;
+        $email_str =~ s/\,\s*$//;
     }
-    return '';
+    return $email_str;
 }
 
 sub put_string() {

@@ -34,13 +34,16 @@
 *  $Id$
 */
 
-/* INCLUDES *****************************************************************/
+/* includes */
 #include "psad.h"
 
-/* DEFINES *****************************************************************/
+/* defines */
 #define KMSGSD_CONF "/etc/psad/kmsgsd.conf"
 
-/* PROTOTYPES ***************************************************************/
+/* globals */
+static sig_atomic_t received_sighup = 0;
+
+/* prototypes */
 static void parse_config(
     char *config_file,
     char *psadfifo_file,
@@ -50,7 +53,9 @@ static void parse_config(
     char *kmsgsd_pid_file
 );
 
-/* MAIN *********************************************************************/
+static void sighup_handler(int sig);
+
+/* main */
 int main(int argc, char *argv[]) {
     char psadfifo_file[MAX_PATH_LEN];
     char fwdata_file[MAX_PATH_LEN];
@@ -81,7 +86,7 @@ int main(int argc, char *argv[]) {
          * supplied on the command line */
         strlcpy(config_file, argv[1], MAX_PATH_LEN);
     } else {
-        printf(" .. You may only specify the path to a single config file:  ");
+        printf(" .. You can only specify the path to a single config file:  ");
         printf("Usage:  kmsgsd <configfile>\n");
         exit(EXIT_FAILURE);
     }
@@ -100,6 +105,9 @@ int main(int argc, char *argv[]) {
     /* become a daemon */
     daemonize_process(kmsgsd_pid_file);
 #endif
+
+    /* install signal handler for HUP signals */
+    signal(SIGHUP, sighup_handler);
 
     /* start doing the real work now that the daemon is running and
      * the config file has been processed */
@@ -137,6 +145,30 @@ int main(int argc, char *argv[]) {
             if (fwlinectr % 50 == 0)
                 printf(" .. Processed %d firewall lines.\n", fwlinectr);
 #endif
+        }
+        if (received_sighup) {
+            /* clear the signal flag */
+            received_sighup = 0;
+
+            /* close file descriptors and re-open them after
+             * re-reading config file */
+            close(fifo_fd);
+            close(fwdata_fd);
+
+            /* re-parse the config file after receiving HUP signal */
+            parse_config(config_file, psadfifo_file,
+                fwdata_file, fw_msg_search, snort_sid_str, kmsgsd_pid_file);
+
+            if ((fifo_fd = open(psadfifo_file, O_RDONLY)) < 0) {
+                perror(" ** Could not open psadfifo");
+                exit(EXIT_FAILURE);  /* could not open psadfifo named pipe */
+            }
+
+            if ((fwdata_fd = open(fwdata_file, O_CREAT|O_WRONLY|O_APPEND,
+                    0600)) < 0) {
+                perror(" ** Could not open the fwdata_file");
+                exit(EXIT_FAILURE);  /* could not open fwdata file */
+            }
         }
     }
 
@@ -192,4 +224,9 @@ static void parse_config(char *config_file, char *psadfifo_file,
     printf(" .. KMSGSD_PID_FILE: %s\n", kmsgsd_pid_file);
 #endif
     return;
+}
+
+static void sighup_handler(int sig)
+{
+    received_sighup = 1;
 }

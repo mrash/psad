@@ -32,24 +32,25 @@
 *  $Id$
 */
 
-/* INCLUDES *****************************************************************/
+/* includes */
 #include "psad.h"
 #include <sys/vfs.h> /* statfs() */
 #include <dirent.h>
 #include <ctype.h>   /* isdigit() */
 
-/* DEFINES *****************************************************************/
+/* defines */
 #define DISKMOND_CONF "/etc/psad/diskmond.conf"
 
-/* GLOBALS ******************************************************************/
+/* globals */
 short int email_ctr = 0;
 const char mail_redr[] = " < /dev/null > /dev/null 2>&1";
 const char hostname[] = HOSTNAME;
 char mail_addrs[MAX_GEN_LEN];
 char shCmd[MAX_GEN_LEN];
 char mailCmd[MAX_GEN_LEN];
+static sig_atomic_t received_sighup = 0;
 
-/* PROTOTYPES ***************************************************************/
+/* prototypes */
 static void parse_config(
     char *config_file,
     char *psad_dir,
@@ -67,8 +68,9 @@ static void parse_config(
 void rm_data(char *fwdata_file, char *psad_dir, char *archive_dir);
 void rm_scanlog(char *dir);
 int check_ip_dir(char *file);
+static void sighup_handler(int sig);
 
-/* MAIN *********************************************************************/
+/* main */
 int main(int argc, char *argv[]) {
     char config_file[MAX_PATH_LEN];
     char psad_dir[MAX_PATH_LEN];
@@ -79,8 +81,6 @@ int main(int argc, char *argv[]) {
     unsigned short int max_disk_percentage = 95; /* default to 95% utilization */
     unsigned int diskmond_check_interval   = 5;  /* default to 5 seconds */
     unsigned int diskmond_max_retries      = 10; /* default to 10 tries */
-    time_t config_mtime;
-    struct stat statbuf;
     struct statfs statfsbuf;
 
 #ifdef DEBUG
@@ -100,15 +100,6 @@ int main(int argc, char *argv[]) {
         printf("Usage:  diskmond <configfile>\n");
         exit(EXIT_FAILURE);
     }
-
-    if (stat(config_file, &statbuf)) {
-        printf(" ** Could not get mtime for config file: %s\n",
-            config_file);
-        exit(EXIT_FAILURE);
-    }
-
-    /* initialize config_mtime */
-    config_mtime = statbuf.st_mtime;
 
 #ifdef DEBUG
     printf(" .. parsing config_file: %s\n", config_file);
@@ -137,8 +128,11 @@ int main(int argc, char *argv[]) {
     daemonize_process(diskmond_pid_file);
 #endif
 
+    /* install signal handler for HUP signals */
+    signal(SIGHUP, sighup_handler);
+
     /* start doing the real work now that the daemon is running and
-     * the config file has been processed */
+     * the config file has been parsed */
 
     if (chdir(psad_dir) < 0) {
 #ifdef DEBUG
@@ -150,18 +144,21 @@ int main(int argc, char *argv[]) {
     /* MAIN LOOP: */
     for (;;) {
         if (!statfs(psad_dir, &statfsbuf)) {
-            current_prct = (float) statfsbuf.f_bfree / statfsbuf.f_blocks * 100;
+            current_prct =
+                (float) statfsbuf.f_bfree / statfsbuf.f_blocks * 100;
             if (current_prct > max_disk_percentage) {
                 rm_data(fwdata_file, psad_dir, archive_dir);
             }
         }
 
-        /* check to see if we need to re-import the config file */
-        if (check_import_config(&config_mtime, config_file)) {
+        if (received_sighup) {
+            /* clear the HUP flag */
+            received_sighup = 0;
 #ifdef DEBUG
     printf(" .. re-parsing config file: %s\n", config_file);
 #endif
-            /* reparse the config file since it was updated */
+            /* reparse the config file since we received a
+             * HUP signal */
             parse_config(
                 config_file,
                 psad_dir,
@@ -343,4 +340,9 @@ int check_ip_dir(char *file) {
         }
     }
     return 0;
+}
+
+static void sighup_handler(int sig)
+{
+    received_sighup = 1;
 }

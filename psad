@@ -117,7 +117,7 @@ my @EMAIL_ADDRESSES           = qw(root@localhost); ### Supports multiple email 
 my $ALERT_ALL                 = "Y";                ### If "Y", send email for all new bad packets instead of just when a danger level increases
 my $ENABLE_AUTO_IDS           = "N";                ### If "Y", enable automated IDS response (auto manages firewall rulesets). 
 my $AUTO_IDS_DANGER_LEVEL     = 5;                  ### Block all traffic from offending IP if danger level >= to this value 
-my $WHOIS_TIMEOUT             = 10;                 ### (seconds)
+my $WHOIS_TIMEOUT             = 60;                 ### (seconds)
 
 ### The following variable can be modified to look for logging messages
 ### that are specific to your firewall configuration (specified by the

@@ -213,9 +213,9 @@ my ($Config_href, $Cmds_href) = &Psad::buildconf($CONFIG_FILE);
 ### make sure the configuration is complete
 &check_config();
 
-my %Config = %$Config_href;
-my %Cmds   = %$Cmds_href;
-my $Emailaddrs_aref = $Config{'EMAIL_ADDRESSES'};
+my %Config      = %$Config_href;
+my %Cmds        = %$Cmds_href;
+my $Emails_aref = $Config{'EMAIL_ADDRESSES'};
 
 ### store the psad command line.
 my $CMDLINE_FILE    = $Config{'PSAD_CMDLINE_FILE'};
@@ -288,7 +288,7 @@ unless ($fwcheck || $Syslog_server) {
     unlink "$Config{'PSAD_DIR'}/fw_check.txt";
     &Psad::check_firewall_rules(
         $Config{'FW_MSG_SEARCH'},
-        $Emailaddrs_aref,
+        $Emails_aref,
         ["$Config{'PSAD_DIR'}/fw_check.txt"],
         \%Cmds
     );
@@ -818,10 +818,8 @@ sub check_import() {
         } else {
             &import_auto_ips($file);
         }
-        for my $email_address (@$Emailaddrs_aref) {
-            system "$Cmds{'mail'} $email_address -s \"psad: re-read $file" .
-                   " file on $HOSTNAME\" < /dev/null > /dev/null 2>&1";
-        }
+        my $subject = "psad: re-read $file on $HOSTNAME";
+        &Psad::sendmail($subject, '', $Emails_aref, $Cmds{'mail'});
         $$mtime_ref = $mtime_tmp;
     }
     return;
@@ -839,11 +837,9 @@ sub check_import_config() {
 
         %Config = %$Config_href;
         %Cmds   = %$Cmds_href;
-        $Emailaddrs_aref = $Config{'EMAIL_ADDRESSES'};
-        for my $email_address (@$Emailaddrs_aref) {
-            system "$Cmds{'mail'} $email_address -s \"psad: re-read $file" .
-                   " file on $HOSTNAME\" < /dev/null > /dev/null 2>&1";
-        }
+        $Emails_aref = $Config{'EMAIL_ADDRESSES'};
+        my $subject = "psad: re-read $file on $HOSTNAME";
+        &Psad::sendmail($subject, '', $Emails_aref, $Cmds{'mail'});
         $$mtime_ref = $mtime_tmp;
 
         ### restart kmsgsd since it does not have the capability of
@@ -979,10 +975,17 @@ sub import_auto_ips() {
     open A, "< $AUTOIPS_FILE";
     my @lines = <A>;
     close A;
-    for my $l (@lines) {
-        next if ($l =~ /^#/);
-        if ($l =~ /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+([0-5]|\-1)/) {
+    my $i = 1;
+    for my $line (@lines) {
+        $i++;
+        next if ($line =~ /^\s*#/);
+        next unless ($line =~ /\S/);
+        if ($line =~ /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+([0-5])/) {
             $Auto_ips{$1} = $2;
+        } else {
+            my $subject = "psad import warning: $AUTOIPS_FILE " .
+                          "error on line: $i";
+            &Psad::sendmail($subject, '', $Emails_aref, $Cmds{'mail'});
         }
     }
     return;
@@ -1452,10 +1455,9 @@ sub auto_psad_response(){
                         $Scan{$src}{$dst}{'BLOCKED'} = 1;
                     }
                     if ($Config{'ALERT_AUTO_BLOCKED'} && $blocked_str) {
-                        for my $email_address (@$Emailaddrs_aref) {
-                            system "$Cmds{'mail'} $email_address -s \"psad: All traffic from $src" .
-                                   " has been BLOCKED $blocked_str on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
-                        }
+                        my $subject = "psad: All traffic from $src has been BLOCKED " .
+                                   "$blocked_str on $HOSTNAME ($dst)";
+                        &Psad::sendmail($subject, '', $Emails_aref, $Cmds{'mail'});
                     }
                     ### write the $src ip to the $AUTO_BLOCKED_FILE
                     &write_blocked_ip($src);
@@ -1479,10 +1481,9 @@ sub auto_psad_response(){
                         $Scan{$src}{$dst}{'BLOCKED'} = 1;
                     }
                     if ($Config{'ALERT_AUTO_BLOCKED'} && $blocked_str) {
-                        for my $email_address (@$Emailaddrs_aref) {
-                            system "$Cmds{'mail'} $email_address -s \"psad: All traffic from $src" .
-                                   " has been BLOCKED $blocked_str on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
-                        }
+                        my $subject = "psad: All traffic from $src has been BLOCKED ".
+                                      "$blocked_str on $HOSTNAME ($dst)";
+                        &Psad::sendmail($subject, '', $Emails_aref, $Cmds{'mail'});
                     }
                     ### write the $src ip to the $AUTO_BLOCKED_FILE
                     &write_blocked_ip($src);
@@ -1514,11 +1515,9 @@ sub write_blocked_ip() {
 
 sub email_limit_reached() {
     my ($src, $dst) = @_;
-    for my $email_address (@$Emailaddrs_aref) {
-        system "$Cmds{'mail'} $email_address -s \"psad: Email message " .
-                "limit for $src has been reached on $HOSTNAME ($dst)!!!" .
-                "\" < /dev/null > /dev/null 2>&1";
-    }
+    my $subject = "psad: Email message limit for $src has been reached on " . 
+                  "$HOSTNAME ($dst)!!!";
+    &Psad::sendmail($subject, '', $Emails_aref, $Cmds{'mail'});
     return;
 }
 
@@ -1538,11 +1537,9 @@ sub get_input_chains() {
 
 sub send_email_alert() {
     my ($src, $dst) = @_;
-    for my $email_address (@$Emailaddrs_aref) {
-        print "send_email_alert(): sending scan alert email to: $email_address\n" if $DEBUG;
-        system "$Cmds{'mail'} $email_address -s \"psad WARNING: $HOSTNAME ($dst)" .
-                       " has been scanned!\" < $Config{'EMAIL_ALERTFILE'} > /dev/null 2>&1";
-    }
+    my $subject = "psad WARNING: $HOSTNAME ($dst) has been scanned!";
+    &Psad::sendmail($subject, $Config{'EMAIL_ALERTFILE'},
+                                $Emails_aref, $Cmds{'mail'});
     $Scan{$src}{$dst}{'ALERTED'} = 1;
     return;
 }
@@ -1764,7 +1761,8 @@ sub psad_usr1() {
     my $rv = 0;
     my $psad_pidfile = $PIDFILES[1];
     if (-e $psad_pidfile) {
-        open PIDFILE, "< $psad_pidfile" or die " ... @@@  Could not open $psad_pidfile: $!";
+        open PIDFILE, "< $psad_pidfile" or
+                die " ... @@@  Could not open $psad_pidfile: $!";
         my $pid = <PIDFILE>;
         close PIDFILE;
         chomp $pid;
@@ -1846,7 +1844,8 @@ sub psad_setup() {
             print SYSLOG "$l\n";
         }
     }
-    print SYSLOG "kern.info		|$Config{'PSAD_FIFO'}\n\n";  ### reinstate kernel logging to our named pipe
+    ### reinstate kernel logging to our named pipe
+    print SYSLOG "kern.info		|$Config{'PSAD_FIFO'}\n\n";
     close SYSLOG;
     system "$Cmds{'killall'} -HUP $Cmds{'syslogd'}";
     return;

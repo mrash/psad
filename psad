@@ -1653,9 +1653,9 @@ sub import_auto_ips() {
         $i++;
         next if ($line =~ /^\s*#/);
         next unless ($line =~ /\S/);
-        if ($line =~ m|^\s*($ip_re)\s+([0-5])|) {
+        if ($line =~ m|^\s*($ip_re)\s+([0-5]);|) {
             $auto_ips{'ip'}{$1} = $2;
-        } elsif ($line =~ m|^\s*($ip_re/\d+)\s+([0-5])|) {
+        } elsif ($line =~ m|^\s*($ip_re/\d+)\s+([0-5]);|) {
             $auto_ips{'net'}{$1} = $2;
         } else {
             my $subject = " ** psad import warning: " .
@@ -3053,7 +3053,7 @@ sub status_ip() {
     exit $rv;
 }
 
-sub usr1_handler() {
+sub usr1() {
     my $rv = 0;
     my $psad_pidfile = $pidfiles{'psad'};
     if (-e $psad_pidfile) {
@@ -3093,7 +3093,7 @@ sub usr1_handler() {
     return $rv;
 }
 
-sub usr1_sig() {
+sub usr1_handler() {
     $usr1_flag = 1;
     return;
 }

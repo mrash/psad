@@ -1567,17 +1567,28 @@ sub psad_usr1() {
     exit $rv;
 }
 sub archive_fwdata() {
-    unless (-e $Config{'FW_DATA'}) {
+    my $fwdata    = $Config{'FW_DATA'};
+    my $fwarchive = $Config{'FW_DATA_ARCHIVE'};
+    ### first see how big the archive file is and zero out if
+    ### it is larger than about 10,000 lines
+    if (-e $fwarchive) {
+        my $size = -s $fwarchive) {
+        if ($size > 2367766) {  ### about 10,000 lines
+            open F, "> $fwarchive";
+            close F;
+        }
+    }
+    unless (-e $fwdata) {
         return;
     }
-    open FW, "< $Config{'FW_DATA'}" or die "$Config{'FW_DATA'} exists but couldn't open it: $!";
+    open FW, "< $fwdata" or die "$fwdata exists but couldn't open it: $!";
     my @fwlines = <FW>;
     close FW;
-    open AR, ">> $Config{'FW_DATA_ARCHIVE'}" or die "Could not open $Config{'FW_DATA_ARCHIVE'}: $!";
+    open AR, ">> $fwarchive" or die "Could not open $fwarchive: $!";
     print AR $_ for @fwlines;
     close AR;
     ### zero out $FW_DATA
-    open F, "> $Config{'FW_DATA'}";
+    open F, "> $fwdata";
     close F;
     return;
 }

@@ -81,6 +81,34 @@ my $iptablesCmd  = '/sbin/iptables';
 my $psadCmd      = "${USRSBIN_DIR}/psad";
 #============ end config ============
 
+### map perl modules to versions
+my %required_perl_modules = (
+    'Unix::Syslog' => {
+        'version' => '0.100',
+        'force-lib-install' => 0,
+    },
+    'Bit::Vector' => {
+        'version' => '6.3',
+        'force-lib-install' => 0,
+    },
+    'Date::Calc', => {
+        'version' => '5.3',
+        'force-lib-install' => 0,
+    },
+    'Net::IPv4Addr' => {
+        'version' => '0.10',
+        'force-lib-install' => 0,
+    },
+    'IPTables::Parse' => {
+        'version' => '0.2',
+        'force-lib-install' => 0,
+    },
+    'Psad' => {
+        'version' => '1.3.3',
+        'force-lib-install' => 1,
+    }
+);
+
 ### IP regex
 my $ip_re = '(?:\d{1,3}\.){3}\d{1,3}';
 
@@ -213,10 +241,6 @@ sub install() {
         &logr("[+] Creating $VARLIBDIR\n");
         mkdir $VARLIBDIR, 0500;
     }
-    unless (-d $LIBDIR) {
-        &logr("[+] Creating $LIBDIR\n");
-        mkdir $LIBDIR, 0755;
-    }
 
     ### deal with old psad_auto_ips path
     if (-e "${PSAD_CONFDIR}/psad_auto_ips") {
@@ -300,12 +324,9 @@ sub install() {
     print "\n\n";
 
     ### install perl modules
-    &install_perl_module('Unix::Syslog', 'Unix-Syslog', '0.100');
-    &install_perl_module('Bit::Vector', 'Bit-Vector', '6.3');
-    &install_perl_module('Date::Calc', 'Date-Calc', '5.3');
-    &install_perl_module('Net::IPv4Addr', 'Net-IPv4Addr', '0.10');
-    &install_perl_module('IPTables::Parse', 'IPTables-Parse', '0.2');
-    &install_perl_module('Psad', 'Psad', '1.3.3');
+    for my $module (keys %required_perl_modules) {
+        &install_perl_module($module);
+    }
 
     &logr("[+] Installing Snort-2.3 signatures in $SNORT_DIR\n");
     unless (-d $SNORT_DIR) {
@@ -831,23 +852,51 @@ sub stop_psad() {
 }
 
 sub install_perl_module() {
-    my ($mod_name, $mod_dir, $version) = @_;
-    &logr("[+] Installing the $mod_name $version perl module\n");
-    chdir $mod_dir or die "[*] Could not chdir to ",
-        "$mod_dir: $!";
-    unless (-e 'Makefile.PL') {
-        die "[*] Your $mod_name source directory appears to be incomplete!\n",
-            "    Download the latest sources from ",
-            "http://www.cipherdyne.org\n";
-    }
-    system "$Cmds{'make'} clean" if -e 'Makefile';
-    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
-    system $Cmds{'make'};
-#    system "$Cmds{'make'} test";
-    system "$Cmds{'make'} install";
-    chdir $src_dir;
+    my $mod_name = shift;
 
-    print "\n\n";
+    die '[*] Missing version key in required_perl_modules hash.'
+        unless defined $required_perl_modules{$mod_name}{'version'};
+    die '[*] Missing force-lib-install key in required_perl_modules hash.'
+        unless defined $required_perl_modules{$mod_name}{'force-lib-install'};
+
+    my $version = $required_perl_modules{$mod_name}{'version'};
+
+    my $install_module = 0;
+
+    if ($required_perl_modules{$mod_name}{'force-lib-install'}) {
+        ### install regardless of whether the module may already be
+        ### installed
+        $install_module = 1;
+    } elsif (not has_perl_module($mod_name)) {
+        ### install the module in the /usr/lib/psad directory because
+        ### it is not already installed.
+        $install_module = 1;
+    }
+
+    if ($install_module) {
+        unless (-d $LIBDIR) {
+            &logr("[+] Creating $LIBDIR\n");
+            mkdir $LIBDIR, 0755 or die "[*] Could not mkdir $LIBDIR: $!";
+        }
+        &logr("[+] Installing the $mod_name $version perl module\n");
+        my $mod_dir = $mod_name;
+        $mod_dir =~ s/::/-/g;
+        chdir $mod_dir or die "[*] Could not chdir to ",
+            "$mod_dir: $!";
+        unless (-e 'Makefile.PL') {
+            die "[*] Your $mod_name source directory appears to be incomplete!\n",
+                "    Download the latest sources from ",
+                "http://www.cipherdyne.org\n";
+        }
+        system "$Cmds{'make'} clean" if -e 'Makefile';
+        system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
+        system $Cmds{'make'};
+#        system "$Cmds{'make'} test";
+        system "$Cmds{'make'} install";
+        chdir $src_dir;
+
+        print "\n\n";
+    }
     return;
 }
 
@@ -1820,6 +1869,18 @@ sub install_manpage() {
     unlink "${mfile}.gz" if -e "${mfile}.gz";
     system "$Cmds{'gzip'} $mfile";
     return;
+}
+
+sub has_perl_module() {
+    my $module = shift;
+
+    # 5.8.0 has a bug with require Foo::Bar alone in an eval, so an
+    # extra statement is a workaround.
+    my $file = "$module.pm";
+    $file =~ s{::}{/}g;
+    eval { require $file };
+
+    return $@ ? 0 : 1;
 }
 
 ### logging subroutine that handles multiple filehandles

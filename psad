@@ -266,6 +266,9 @@ my @dshield_data;
 ### track the last time we sent an alert to dshield.org
 my $last_dshield_alert;
 
+### calculate how often a dshield alert will be sent
+my $dshield_alert_interval;
+
 ### get the current timezone for dshield (this is calculated
 ### and re-calculated since the timezone may change).
 my $timezone;
@@ -1307,10 +1310,10 @@ sub dshield_email_log() {
     ### than 10,000 lines of log data (and if the last alert was sent more than
     ### two hours later than the previous alert), and if yes send the alert
     ### email.
-    if (@dshield_data && ((time() - $last_dshield_alert)
-            >= 3600*$config{'DSHIELD_ALERT_INTERVAL'})
-            || (($#dshield_data > 10000)
-            && ((time() - $last_dshield_alert) >= 2*3600))) {
+    if (@dshield_data and ((time() - $last_dshield_alert)
+            >= $dshield_alert_interval)
+            or (($#dshield_data > 10000)
+            and ((time() - $last_dshield_alert) >= 2*3600))) {
         my $subject = "FORMAT DSHIELD USERID $config{'DSHIELD_USER_ID'} " .
             "TZ $timezone psad Version 1.3";
         if ($config{'DSHIELD_USER_EMAIL'} eq 'NONE') {
@@ -1692,7 +1695,7 @@ sub validate_config() {
     die ' ** DSHIELD_ALERT_INTERVAL must be between 1 and 24 '
         unless (&is_digit($config{'DSHIELD_ALERT_INTERVAL'})
             and 0 < $config{'DSHIELD_ALERT_INTERVAL'}
-            and $config{'DSHIELD_ALERT_INTERVAL'} < 24);
+            and $config{'DSHIELD_ALERT_INTERVAL'} < 25);
     if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
             and $config{'IPTABLES_BLOCK_METHOD'} eq 'N'
             and $config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'N') {
@@ -1708,7 +1711,6 @@ sub validate_config() {
         die ' ** The --no-kmsgsd option can only be used with ',
             '--debug.  Exiting.';
     }
-
     return;
 }
 
@@ -4270,6 +4272,14 @@ sub setup() {
         'psad'       => $config{'PSAD_PID_FILE'},
         'kmsgsd'     => $config{'KMSGSD_PID_FILE'},
     );
+
+    ### initialize dshield alerting interval
+    $dshield_alert_interval = 3600 * $config{'DSHIELD_ALERT_INTERVAL'};
+
+    ### scale back the alerting interval from 24 hours by just enough
+    ### to make sure that an alert will be sent each day.
+    $dshield_alert_interval -= 1 + $config{'PSAD_CHECK_INTERVAL'}
+        if $config{'DSHIELD_ALERT_INTERVAL'} == 24;
 
     unless (-d $config{'PSAD_DIR'}) {
         mkdir $config{'PSAD_DIR'}, 0500;

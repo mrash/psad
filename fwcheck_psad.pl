@@ -41,6 +41,8 @@ my $fw_file    = '';
                                     # $fw_file instead of a running
                                     # policy.
     'fw-search=s' => \$fw_search_file,  # Specify path to fw_search.conf.
+    'fw-analyze'  => \$fw_analyze,  # Analyze the local iptables ruleset
+                                    # and exit.
     'help'        => \$help,        # Display help.
 ));
 &usage(0) if $help;

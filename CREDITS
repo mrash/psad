@@ -184,3 +184,7 @@ Dennis Freise           Submitted a patch to add metalog support to psad.
                         bug where kmsgsd would spike the cpu if the system
                         logger did not keep the psadfifo open.  Found and
                         submitted patch for buffer overflow in kmsgsd.
+
+Richard K. Szabo        Discovered and helped test a bug where psad was not
+                        honoring IP's/net auto danger level assignments of
+                        0 (ignore).

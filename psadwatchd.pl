@@ -128,12 +128,7 @@ exit 0;
 sub check_process() {
     my ($pidname, $pidcmdline, $pidfile, $email_count_ref) = @_;
     if (-e $pidfile) {
-        open PID, "< $pidfile" or
-            print "Could not open $pidfile for $pidname\n" and return;
-        my $pid = <PID>;
-        close PID;
-        chomp $pid;
-        unless (kill 0, $pid) {
+        unless (&Psad::pidrunning($pidfile)) {
             ### the daemon is not running so start it with $pidcmdline
             ### args (which may be empty)
             if ($$email_count_ref > $config{'PSADWATCHD_MAX_RETRIES'}) {

@@ -118,7 +118,6 @@ unless ($found) {
 }
 
 ### set the default execution flags
-my $SUB_TAB = '    ';
 my $noarchive    = 0;
 my $uninstall    = 0;
 my $help         = 0;
@@ -661,11 +660,11 @@ sub install() {
 
     my $init_file = '';
     if ($distro eq 'redhat') {
-        $init_file = 'psad-init.redhat';
+        $init_file = 'init-scripts/psad-init.redhat';
     } elsif ($distro eq 'gentoo') {
-        $init_file = 'psad-init.gentoo';
+        $init_file = 'init-scripts/psad-init.gentoo';
     } else {
-        $init_file = 'psad-init.generic';
+        $init_file = 'init-scripts/psad-init.generic';
     }
 
     if ($init_dir) {
@@ -713,8 +712,8 @@ sub uninstall() {
 
     my $ans = '';
     while ($ans ne 'y' && $ans ne 'n') {
-        print wrap('', $SUB_TAB, ' .. This will completely remove psad ' .
-            "from your system.\n    Are you sure (y/n)? ");
+        print ' .. This will completely remove psad ',
+            "from your system.\n    Are you sure (y/n)? ";
         $ans = <STDIN>;
         chomp $ans;
     }
@@ -745,8 +744,8 @@ sub uninstall() {
         unlink "${USRSBIN_DIR}/fwcheck_psad";
     }
     if (-e "${USRSBIN_DIR}/psad") {
-        print wrap('', $SUB_TAB, " .. Removing psad daemons: ${USRSBIN_DIR}/" .
-            "(psad, psadwatchd, kmsgsd)\n");
+        print " .. Removing psad daemons: ${USRSBIN_DIR}/",
+            "(psad, psadwatchd, kmsgsd)\n";
         unlink "${USRSBIN_DIR}/psad" or
             warn " **  Could not remove ${USRSBIN_DIR}/psad!!!\n";
         unlink "${USRSBIN_DIR}/psadwatchd" or
@@ -799,8 +798,8 @@ sub uninstall() {
     if (-e '/etc/syslog.conf.orig') {
         move('/etc/syslog.conf.orig', '/etc/syslog.conf');
     } else {
-        print wrap('', $SUB_TAB, " .. /etc/syslog.conf.orig does not exist. " .
-            " Editing /etc/syslog.conf directly.\n");
+        print " .. /etc/syslog.conf.orig does not exist. ",
+            " Editing /etc/syslog.conf directly.\n";
         open ESYS, '< /etc/syslog.conf' or
             die " **  Unable to open /etc/syslog.conf: $!\n";
         my @sys = <ESYS>;
@@ -1152,17 +1151,6 @@ sub append_fifo_syslog() {
     return;
 }
 
-sub hup_syslog() {
-    my @ps_out = `$Cmds{'ps'} -auxww`;
-    for my $line (@ps_out) {
-        ### root  416  0.0  0.3  1476  624 ?  S  10:11   0:00 syslogd -m 0
-        if ($line =~ /^\S+\s+(\d+)(?:\s+\S+){8}\s+syslog/) {
-            kill 1, $1;  ### "kill -l" => signal 1 = HUP
-        }
-    }
-    return;
-}
-
 sub test_syslog_config() {
     my %used_ports;
 
@@ -1259,8 +1247,9 @@ sub test_syslog_config() {
         'PeerAddr' => $lo_ip,
         'PeerPort' => $test_port,
         'Proto'    => 'tcp',
-        'Timeout'  => 5
+        'Timeout'  => 1
     );
+    undef $sock if defined $sock;
 
     ### sleep to give kmsgsd a chance to pick up the packet
     ### log message from syslog

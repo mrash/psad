@@ -285,7 +285,10 @@ my %auto_ips = ();
 ### (if ENABLE_AUTO_IDS == 'Y')
 my %auto_blocked_ips = ();
 
-### cache the addresses we have executed whois lookups for
+### cache the addresses we have issued dns lookups against.
+my %dns_cache = ();
+
+### cache the addresses we have executed whois lookups against.
 my %whois_cache = ();
 
 ### cache ports the local machine is listening on (periodically
@@ -962,19 +965,10 @@ sub check_scan() {
             }
         }
 
-        if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
-            if (not defined $auto_blocked_ips{$src}) {
-                ### $auto_block_ips{$src} may be zero if $src has been
-                ### timed out
-                $auto_blocked_ips{$src} = 0;
-            } elsif ($auto_blocked_ips{$src} != 0 and
-                    (time() - $auto_blocked_ips{$src})
-                    > $config{'AUTO_BLOCK_TIMEOUT'}) {
-                ### the timeout for $src has expired, but we have seen
-                ### new packets from the ip so setup to renew the
-                ### block
-                $auto_blocked_ips{$src} = 0;
-            }
+        if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
+                and not defined $auto_blocked_ips{$src}) {
+            $auto_blocked_ips{$src}{'time'}    = time();
+            $auto_blocked_ips{$src}{'blocked'} = 0;
         }
 
         ### record the absolute starting time of the scan
@@ -2210,44 +2204,25 @@ sub scan_logr() {
 
             ### get reverse dns info
             unless ($no_rdns) {
-                if ($src =~ /$ip_re/) {
-                    my $ipaddr = gethostbyname $src;
-                    ### my $rdns = gethostbyaddr($ipaddr, AF_INET);
-                    if ($rdns = gethostbyaddr $ipaddr, 2) {
-                        $src_dns_str = $rdns;
-                        $src_subj    = $rdns;
-                    } else {
-                        $src_dns_str = '[No reverse dns info available]';
-                        $src_subj    = $src;
-                    }
+                $src_dns_str = &get_dns_info($src);
+                if ($src_dns_str) {
+                    $src_subj = $src_dns_str;
                 } else {
-                    ### $ipaddr was already reported as
-                    ### a host name by iptables (does this actually
-                    ### happen?)
-                    $src_dns_str = $src;
+                    $src_dns_str = '[No reverse dns info available]';
                     $src_subj    = $src;
                 }
-                if ($dst =~ /$ip_re/) {
-                    my $ipaddr = gethostbyname $dst;
-                    ### my $rdns = gethostbyaddr($ipaddr, AF_INET);
-                    if ($rdns = gethostbyaddr $ipaddr, 2) {
-                        $dst_dns_str = $rdns;
-                    } else {
-                        $dst_dns_str = '[No reverse dns info available]';
-                    }
-                } else {
-                    ### $ipaddr was already reported as
-                    ### a host name by iptables (does this actually
-                    ### happen?)
-                    $dst_dns_str = $dst;
+                $dst_dns_str = &get_dns_info($dst);
+                unless ($dst_dns_str) {
+                    $dst_dns_str = '[No reverse dns info available]';
                 }
             }
 
             ### get whois info
             unless ($no_whois) {
-                $whois_info_aref = &get_whois_data($src, $whois_file);
+                $whois_info_aref = &get_whois_info($src, $whois_file);
             }
-            print STDOUT "scan_logr():  generating email.....\n" if $debug;
+            print STDOUT " .. scan_logr():  generating email.....\n"
+                if $debug;
 
             ### get the absolute starting time for the scan and the
             ### current time
@@ -2270,19 +2245,19 @@ sub scan_logr() {
                 "-=-=-=-=\n";
             print E " ** psad: Suspicious traffic detected against ",
                 "$config{'HOSTNAME'} ($dst).\n\n\n";
+            printf E "%${log_len}s%s", 'Danger level: ',
+                "[$scan_dl{$src}] (out of 5)\n\n";
             printf E "%${log_len}s%s", 'Source: ', "$src\n";
-            printf E "%${log_len}s%s", 'Source DNS: ', "$src_dns_str\n"
+            printf E "%${log_len}s%s", 'DNS: ', "$src_dns_str\n"
                 unless $no_rdns;
-            if (!$no_posf && defined $posf{$src}{'guess'}) {
-                printf E "%${log_len}s%s", 'Source OS guess: ',
+            if (!$no_posf and defined $posf{$src}{'guess'}) {
+                printf E "%${log_len}s%s", 'OS guess: ',
                     "$posf{$src}{'guess'}\n";
             }
             print E "\n";
             printf E "%${log_len}s%s", 'Destination: ', "$dst\n";
-            printf E "%${log_len}s%s", 'Destination DNS: ', "$dst_dns_str\n";
+            printf E "%${log_len}s%s", 'DNS: ', "$dst_dns_str\n";
             print E "\n";
-            printf E "%${log_len}s%s", 'Danger level: ',
-                "[$scan_dl{$src}] (out of 5)\n\n";
             if ($tcp_f) {
                 printf E "%${log_len}s%s", 'Scanned tcp ports: ',
                     "[$tcp_newrange: $tcp_newpkts packets]\n";
@@ -2423,10 +2398,8 @@ sub scan_logr_signatures() {
     for my $proto qw(tcp udp icmp) {
         next unless (defined $scan{$src}{$dst}{$proto}{'curr_sig'}
             || defined $scan{$src}{$dst}{$proto}{'snort_sid'});
-        print $email_fh "\n";
-        print LS "\n";
-        print $email_fh " ** $proto scan signatures **\n";
-        print LS " ** $proto scan signatures **\n";
+        print $email_fh "\n\n ** $proto scan signatures **\n\n";
+        print LS "\n\n ** $proto scan signatures **\n\n";
         print "scan_logr_signatures(): src: $src dst: $dst proto: $proto\n"
             if $debug;
         for my $sid (keys %{$scan{$src}{$dst}{$proto}{'snort_sid'}}) {
@@ -2574,7 +2547,7 @@ sub renew_auto_blocked_ips() {
         $timeout_str = " for $config{'AUTO_BLOCK_TIMEOUT'} seconds.";
     }
     if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y'
-            && -e $config{'AUTO_BLOCK_IPT_FILE'}) {
+            and -e $config{'AUTO_BLOCK_IPT_FILE'}) {
         open B, "< $config{'AUTO_BLOCK_IPT_FILE'}" or
             die " ** Could not open $config{'AUTO_BLOCK_IPT_FILE'}: $!";
         my @lines = <B>;
@@ -2592,7 +2565,8 @@ sub renew_auto_blocked_ips() {
                 ### set the auto-block start time here since
                 ### renew_auto_blocked_ips() is only called
                 ### at startup.
-                $auto_blocked_ips{$ip} = time();
+                $auto_blocked_ips{$ip}{'time'}    = time();
+                $auto_blocked_ips{$ip}{'blocked'} = 1;
             }
         }
     }
@@ -2611,7 +2585,8 @@ sub renew_auto_blocked_ips() {
                         $timeout_str, '', $config{'EMAIL_ADDRESSES'},
                         $cmds{'mail'});
                 }
-                $auto_blocked_ips{$ip} = time();
+                $auto_blocked_ips{$ip}{'time'}    = time();
+                $auto_blocked_ips{$ip}{'blocked'} = 1;
             }
         }
     }
@@ -2752,14 +2727,17 @@ sub ipt_remove_block() {
         }
     }
     if ($rm_block) {
+        &Psad::sendmail(" ** psad: removed iptables block " .
+            "against $src (timeout expired).", '',
+            $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         &rm_blocked_ip($src, $config{'AUTO_BLOCK_IPT_FILE'});
     } else {
         &Psad::psyslog('psad', "** could not locate iptables " .
             "block rule for $src.") if $flush_fw;
-        print " ** Could not locate iptables block rule for $src."
+        print " ** Could not locate iptables block rule for $src.\n"
             if $debug;
     }
-    return $rm_block;
+    return;
 }
 
 sub tcpwr_test_block() {
@@ -2786,7 +2764,6 @@ sub tcpwr_block() {
 
 sub tcpwr_remove_block() {
     my $ip = shift;
-    my $removed = 0;
     open T, "< $config{'ETC_HOSTS_DENY'}" or die ' ** Could not open ',
         "$config{'ETC_HOSTS_DENY'}: $!";
     my @lines = <T>;
@@ -2796,15 +2773,17 @@ sub tcpwr_remove_block() {
     for my $line (@lines) {
         chomp $line;
         if ($line =~ /ALL:\s+$ip$/) {
-            $removed = 1;
             &rm_blocked_ip($ip, $config{'AUTO_BLOCK_TCPWR_FILE'});
+            &Psad::sendmail(" ** psad: removed tcpwrappers block " .
+                "against $ip (timeout expired).", '',
+                $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         } else {
             print T "$line\n";
         }
     }
     close T;
     move "$config{'ETC_HOSTS_DENY'}.tmp", $config{'ETC_HOSTS_DENY'};
-    return $removed;
+    return;
 }
 
 sub auto_psad_response() {
@@ -2829,7 +2808,7 @@ sub auto_psad_response() {
         ### protected by the firewall if the ip trips the $auto_psad_level
         ### threshold for _any_ destination.
         if ($dl >= $config{'AUTO_IDS_DANGER_LEVEL'}
-                and $auto_blocked_ips{$src} == 0) {
+                and $auto_blocked_ips{$src}{'blocked'} == 0) {
             my $timeout_str = '.';
             if ($config{'AUTO_BLOCK_TIMEOUT'} > 0) {
                 $timeout_str = " for $config{'AUTO_BLOCK_TIMEOUT'} seconds.";
@@ -2864,8 +2843,12 @@ sub auto_psad_response() {
                     &write_blocked_ip($src, $config{'AUTO_BLOCK_TCPWR_FILE'});
                 }
             }
-            ### keep track of when we blocked the ip
-            $auto_blocked_ips{$src} = time();
+            print " .. setting blocked = 1 for $src\n" if $debug;
+            ### don't try to block again
+            $auto_blocked_ips{$src}{'blocked'} = 1;
+        } elsif ($debug) {
+            print " .. blocked value for $src: ",
+                "$auto_blocked_ips{$src}{'blocked'}\n";
         }
     }
     return;
@@ -2885,23 +2868,17 @@ sub timeout_auto_blocked_ips() {
     print " .. timeout_auto_block_ips()\n" if $debug;
     return if $config{'AUTO_BLOCK_TIMEOUT'} == 0;
     for my $ip (keys %auto_blocked_ips) {
-        next unless $auto_blocked_ips{$ip} > 0;  ### might just be zero
-        if ((time() - $auto_blocked_ips{$ip})
+#        next unless $auto_blocked_ips{$ip} > 0;  ### might just be zero
+        if ((time() - $auto_blocked_ips{$ip}{'time'})
                 > $config{'AUTO_BLOCK_TIMEOUT'}) {
-            if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
-                if (&ipt_remove_block($ip)) {
-                    &Psad::sendmail(" ** psad: removed iptables block " .
-                        "against $ip (timeout expired).", '',
-                        $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
-                }
-            }
-            if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
-                if (&tcpwr_remove_block($ip)) {
-                    &Psad::sendmail(" ** psad: removed tcpwrappers block " .
-                        "against $ip (timeout expired).", '',
-                        $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
-                }
-            }
+            &ipt_remove_block($ip)
+                if $config{'IPTABLES_BLOCK_METHOD'} eq 'Y';
+            &tcpwr_remove_block($ip)
+                if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y');
+            ### delete the ip from the hash (if new packets are seen
+            ### from the same ip, then the hash will be updated again
+            ### in check_scan()).
+            delete $auto_blocked_ips{$ip};
         }
     }
     return;
@@ -3054,7 +3031,37 @@ sub get_listening_ports() {
     return;
 }
 
-sub get_whois_data() {
+sub get_dns_info() {
+    my $ip = shift;
+    my $dns_str;
+    my $rdns;
+    if ($ip =~ /$ip_re/) {
+        if (defined $dns_cache{$ip}
+                and $dns_cache{$ip}{'ctr'}
+                < $config{'DNS_LOOKUP_THRESHOLD'}) {
+            $dns_str = $dns_cache{$ip}{'hostname'};
+            $dns_cache{$ip}{'ctr'}++;
+        } else {
+            my $ipaddr = gethostbyname $ip;
+            ### my $rdns = gethostbyaddr($ipaddr, AF_INET);
+            if ($rdns = gethostbyaddr $ipaddr, 2) {
+                $dns_str = $rdns;
+            } else {
+                $dns_str = '';
+            }
+            $dns_cache{$ip}{'ctr'}      = 0;
+            $dns_cache{$ip}{'hostname'} = $dns_str;
+        }
+    } else {
+        ### $ipaddr was already reported as
+        ### a host name by iptables (does this actually
+        ### happen?)
+        $dns_str  = $ip;
+    }
+    return $dns_str;
+}
+
+sub get_whois_info() {
     my ($ip, $whois_datafile) = @_;
     my @whois_data;
     if (defined $whois_cache{$ip}
@@ -3157,7 +3164,7 @@ sub restart() {
             "running on $config{'HOSTNAME'}!";
     }
     &stop_psad();
-    print " .. Restarting the psad daemons on $config{'HOSTNAME'}\n";
+    print " .. Restarting psad daemons on $config{'HOSTNAME'}\n";
     system "$cmds{'psad'} $cmdline";
     return 0;
 }
@@ -4141,8 +4148,9 @@ sub required_vars() {
         DANGER_LEVEL2 DANGER_LEVEL3 DANGER_LEVEL4 DANGER_LEVEL5
         PORT_RANGE_SCAN_THRESHOLD ALERT_ALL PSAD_EMAIL_LIMIT
         IPTABLES_BLOCK_METHOD TCPWRAPPERS_BLOCK_METHOD
-        EMAIL_ALERT_DANGER_LEVEL PSAD_FIFO WHOIS_THRESHOLD WHOIS_TIMEOUT
-        SNORT_RULES_DIR PACKET_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR HOSTNAME
+        EMAIL_ALERT_DANGER_LEVEL PSAD_FIFO WHOIS_LOOKUP_THRESHOLD
+        DNS_LOOKUP_THRESHOLD WHOIS_TIMEOUT SNORT_RULES_DIR
+        PACKET_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR HOSTNAME
         PROC_FORWARD_FILE ENABLE_PERSISTENCE AUTO_BLOCK_IPT_FILE
         AUTO_BLOCK_TCPWR_FILE PSAD_SIGS_FILE PSAD_AUTO_IPS_FILE
         AUTO_BLOCK_TIMEOUT EXTERNAL_SCRIPT ENABLE_EXT_SCRIPT_EXEC

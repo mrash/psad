@@ -41,8 +41,10 @@
 #   - Extract default behavior into psad.conf.
 #   - Remove dependency on DROP tag in iptables messages.
 #   - Custom logging line upon auto-blocking an ip.
+#   - Add difference notification (via syslog) for changed variables
+#     after receiving a HUP signal.
 #   - Customizable subject line that includes the danger level.
-#   - Signature based auto block rules.  (Peter Abraham)
+#   - Signature based auto block rules.
 #   - Include the ability to specify a network in CIDR notation with
 #     --Status output.
 #   - Drop root privileges if not running in auto-blocking mode.
@@ -344,9 +346,10 @@ my $ver              = 0;
 my $help             = 0;
 my $dump_conf        = 0;
 my $chk_interval     = 0;
-my $netstat_lkup_ctr = 0;
 my $log_len          = 23;  ### used in scan_logr()
 my $fw_analyze       = 0;
+my $netstat_lkup_ctr = 0;
+my $local_ips_lkup_ctr = 0;
 
 ### these flags are used to disable several features
 ### in psad if specified from the command line
@@ -763,10 +766,17 @@ sub check_scan() {
         if ($netstat_lkup_ctr == 10) {
             &get_listening_ports();
             $netstat_lkup_ctr = 0;
-        } else {
-            $netstat_lkup_ctr++;
         }
+        $netstat_lkup_ctr++;
     }
+    ### the local machine ip addresses could change (dhcp, etc.)
+    ### but not that often.
+    if ($local_ips_lkup_ctr == 30) {
+        &get_local_ips();
+        $local_ips_lkup_ctr = 0;
+    }
+    $local_ips_lkup_ctr++;
+
     if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
         ### calculate the timezone offset
         $timezone = sprintf("%.2d", (Timezone())[3]) . ':00';
@@ -813,11 +823,11 @@ sub check_scan() {
                 ### per page 595 of the Camel book, "if /blah1|blah2/"
                 ### can be slower than "if /blah1/ || /blah2/
                 unless ($flags !~ /WIN/ &&
-                        $flags =~ /URG/ ||
                         $flags =~ /ACK/ ||
-                        $flags =~ /PSH/ ||
-                        $flags =~ /RST/ ||
                         $flags =~ /SYN/ ||
+                        $flags =~ /RST/ ||
+                        $flags =~ /URG/ ||
+                        $flags =~ /PSH/ ||
                         $flags =~ /FIN/ ||
                         $flags eq 'NULL') {
                     push @bad_packets, $pkt;
@@ -2716,12 +2726,20 @@ sub tcpwr_remove_block() {
 }
 
 sub auto_psad_response() {
-    if ($use_iptables && ! $chk_ipt_chains) {
+    if (! $chk_ipt_chains and $use_iptables) {
         ### determine whether or not the NAT or mangle code has
         ### been compiled into iptables
         &get_iptables_chains();
     }
     for my $src (keys %scan) {
+
+        ### make sure we are not attempting to block 0.0.0.0
+        ### or 127.0.0.1 or any of the interface ips.
+        if (&auto_block_ignore_ip($src)) {
+            &Psad::psyslog('psad', "Ignoring $src ip for auto block");
+            next;
+        }
+
         my $dl = $scan_dl{$src};
         ### We only want to block the IP once.  Currently this will block
         ### all traffic from the host to _all_ destinations that are
@@ -2774,6 +2792,16 @@ sub auto_psad_response() {
         }
     }
     return;
+}
+
+sub auto_block_ignore_ip() {
+    my $ip = shift;
+    return 1 if $ip eq '127.0.0.1';
+    return 1 if $ip eq '0.0.0.0';
+    for my $local_ip (keys %local_ips) {
+        return 1 if $ip eq $local_ip;
+    }
+    return 0;
 }
 
 sub timeout_auto_blocked_ips() {

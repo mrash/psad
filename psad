@@ -94,6 +94,7 @@
 use Psad;
 use File::stat 'stat';
 use File::Copy;
+use File::Path;
 use Getopt::Long 'GetOptions';
 use Socket;
 use Sys::Hostname 'hostname';
@@ -1083,7 +1084,7 @@ sub assign_danger_level() {
             ### we will always send an alert email for any new "bad" packet
             ### if $ALERT_ALL eq "Y"... Else email sent only if the scan
             ### increments its D.L.
-            if ($Config{'ALERT_ALL'} == 1) {
+            if ($Config{'ALERT_ALL'} eq 'Y') {
                 $Scan{$src}{$dst}{'ALERTED'} = 0;
             }
             print 'assign_danger_level(): CURR_DL (after assignment) = '
@@ -1346,7 +1347,7 @@ sub scan_logr() {
                             delete $Scan{$src}{$dst}{$proto}{'CURR_SIG'};
                         }
                         if (defined $Scan{$src}{$dst}{$proto}{'SIGMATCH'} &&
-                                        $Config{'SHOW_ALL_SIGNATURES'} == 1) {
+                                        $Config{'SHOW_ALL_SIGNATURES'} eq 'Y') {
                             &Psad::logr("\n", \%print_hsh);
                             &Psad::logr("---- ALL $proto alert signatures " .
                                         "found since [$start_time]\n", \%print_hsh);
@@ -1886,6 +1887,9 @@ sub archive_data() {
 sub psad_setup() {
     unless (-d $Config{'PSAD_DIR'}) {
         mkdir $Config{'PSAD_DIR'}, 400;
+    }
+    unless (-d $Config{'PSAD_ERROR_DIR'}) {
+        mkdir $Config{'PSAD_ERROR_DIR'}, 400;
     }
     unless (-e $Config{'FW_DATA'}) {
         open F, "> $Config{'FW_DATA'}";

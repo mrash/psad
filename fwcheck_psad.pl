@@ -183,7 +183,7 @@ sub print_fw_help() {
 "[-] You may just need to add a default logging rule to the $chain chain on\n",
 "    $config{'HOSTNAME'}.  For more information, see the file \"FW_HELP\" in\n",
 "    the psad sources directory or visit:\n\n",
-"    http://www.cipherdyne.org/psad/fw_help.html\n\n";
+"    http://www.cipherdyne.org/psad/fw_config.html\n\n";
     return;
 }
 

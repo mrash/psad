@@ -43,6 +43,7 @@
 #   - Send psad alerts to network abuse alerting services such as
 #     abuse.net and dshield.org.
 #   - Packet grapher mode with annotated scan alerts.
+#   - Database support?
 #   - Make use of other logging options available in iptables to detect
 #     more tcp signatures.  (E.g. --log-tcp-options, --log-ip-options,
 #     --log-tcp-sequence, etc.) for better signature recognition.
@@ -821,24 +822,24 @@ sub check_scan() {
         }
 
         ### initialize values for the current interval
-        unless (defined $scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_INT'}) {
+        unless (defined $scan{$src}{$dst}{$proto}{'CURR_INT'}) {
             unless ($proto eq 'ICMP') {
                 ### make sure the initial start port is not too low
-                $scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_INT'}{'S_PORT'}
+                $scan{$src}{$dst}{$proto}{'CURR_INT'}{'S_PORT'}
                     = 65535;
                 ### make sure the initial end port is not too high
-                $scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_INT'}{'E_PORT'}
+                $scan{$src}{$dst}{$proto}{'CURR_INT'}{'E_PORT'}
                     = 0;
             }
         }
 
         ### increment hash values
         $scan{$src}{$dst}{'ABSNUM'}++;
-        $scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_INT'}{'PKTS'}++;
+        $scan{$src}{$dst}{$proto}{'CURR_INT'}{'PKTS'}++;
 
         ### keep track of tcp flags
         if ($proto eq 'TCP') {
-            $scan{$src}{$dst}{'PROTO'}{'TCP'}{'CURR_INT'}{'FLAGS'}{$flags}++;
+            $scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'FLAGS'}{$flags}++;
         }
 
         ### see if the destination port lies outside our current range
@@ -848,11 +849,11 @@ sub check_scan() {
                 &check_range($dstport,
                     $scan{$src}{$dst}{'S_PORT'},
                     $scan{$src}{$dst}{'E_PORT'});
-            ($scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_INT'}{'S_PORT'},
-                $scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_INT'}{'E_PORT'}) =
+            ($scan{$src}{$dst}{$proto}{'CURR_INT'}{'S_PORT'},
+                $scan{$src}{$dst}{$proto}{'CURR_INT'}{'E_PORT'}) =
                 &check_range($dstport,
-                    $scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_INT'}{'S_PORT'},
-                    $scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_INT'}{'E_PORT'});
+                    $scan{$src}{$dst}{$proto}{'CURR_INT'}{'S_PORT'},
+                    $scan{$src}{$dst}{$proto}{'CURR_INT'}{'E_PORT'});
         }
         if ($debug) {
             print STDOUT "check_scan(): src: $src, dst: $dst\n";
@@ -1008,7 +1009,7 @@ sub match_sigs() {
                         $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
-                $scan{$src}{$dst}{'PROTO'}{'ICMP'}{'CURR_SIG'}
+                $scan{$src}{$dst}{'ICMP'}{'CURR_SIG'}
                 {$sig_id}{'PKTS'}++;
             }
         }
@@ -1028,7 +1029,7 @@ sub add_snort_sid() {
             $scan{$src}{$dst}{'DL'} = 2;
             $scan{$src}{$dst}{'ALERTED'} = 0;
         }
-        $scan{$src}{$dst}{'PROTO'}{$proto}{'SNORT_SID'}{$sid}++;
+        $scan{$src}{$dst}{$proto}{'SNORT_SID'}{$sid}++;
     }
     return;
 }
@@ -1043,18 +1044,18 @@ sub chk_local_port() {
     ### it should not do this so it is not implemented. :)
     if (defined $local_ips_href->{$dst}) {
         if (defined $local_ports{$proto}{$dstport}) {
-            $scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_SIG'}
+            $scan{$src}{$dst}{$proto}{'CURR_SIG'}
             {$sig_id}{'LISTEN'}{$dstport}{'PKTS'}++;
             if ($flags) {
-                $scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_SIG'}
+                $scan{$src}{$dst}{$proto}{'CURR_SIG'}
                 {$sig_id}{'LISTEN'}{$dstport}{'FLAGS'}
                     = $flags;
             }
         } else {
-            $scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_SIG'}
+            $scan{$src}{$dst}{$proto}{'CURR_SIG'}
             {$sig_id}{'NO_LISTEN'}{$dstport}{'PKTS'}++;
             if ($flags) {
-                $scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_SIG'}
+                $scan{$src}{$dst}{$proto}{'CURR_SIG'}
                 {$sig_id}{'NO_LISTEN'}{$dstport}{'FLAGS'}
                     = $flags;
             }
@@ -1643,24 +1644,24 @@ sub scan_logr() {
             ### file => append?  e.g.  filename => 0  means don't append
             my %print_hsh = ($scanlog => 1, $email_alert => 1);
 
-            if (defined $scan{$src}{$dst}{'PROTO'}{'TCP'}{'CURR_INT'}) {
+            if (defined $scan{$src}{$dst}{'TCP'}{'CURR_INT'}) {
                 $tcp = 1;
                 $tcp_s_port
-                    = $scan{$src}{$dst}{'PROTO'}{'TCP'}{'CURR_INT'}{'S_PORT'};
+                    = $scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'S_PORT'};
                 $tcp_e_port
-                    = $scan{$src}{$dst}{'PROTO'}{'TCP'}{'CURR_INT'}{'E_PORT'};
+                    = $scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'E_PORT'};
                 if ($tcp_s_port == $tcp_e_port) {
                     $tcp_newrange = $tcp_s_port;
                 } else {
                     $tcp_newrange = "$tcp_s_port-$tcp_e_port";
                 }
             }
-            if (defined $scan{$src}{$dst}{'PROTO'}{'UDP'}{'CURR_INT'}) {
+            if (defined $scan{$src}{$dst}{'UDP'}{'CURR_INT'}) {
                 $udp = 1;
                 $udp_s_port
-                    = $scan{$src}{$dst}{'PROTO'}{'UDP'}{'CURR_INT'}{'S_PORT'};
+                    = $scan{$src}{$dst}{'UDP'}{'CURR_INT'}{'S_PORT'};
                 $udp_e_port
-                    = $scan{$src}{$dst}{'PROTO'}{'UDP'}{'CURR_INT'}{'E_PORT'};
+                    = $scan{$src}{$dst}{'UDP'}{'CURR_INT'}{'E_PORT'};
                 if ($udp_s_port == $udp_e_port) {
                     $udp_newrange = $udp_s_port;
                 } else {
@@ -1676,7 +1677,7 @@ sub scan_logr() {
                     $range = "$abs_s_port-$abs_e_port";
                 }
             }
-            if (defined $scan{$src}{$dst}{'PROTO'}{'ICMP'}{'CURR_INT'}) {
+            if (defined $scan{$src}{$dst}{'ICMP'}{'CURR_INT'}) {
                 $icmp = 1;
             }
 
@@ -1734,21 +1735,21 @@ sub scan_logr() {
             &Psad::logr(sprintf("%${log_len}s%s", '',
                 "$time (end)\n"), \%print_hsh);
             if ($tcp) {
-                my $n_pkts = $scan{$src}{$dst}{'PROTO'}{'TCP'}
+                my $n_pkts = $scan{$src}{$dst}{'TCP'}
                     {'CURR_INT'}{'PKTS'};
                 &Psad::logr(sprintf("%${log_len}s%s", 'Scanned TCP ports: ',
                     "[$tcp_newrange: $n_pkts packets]\n"), \%print_hsh);
 #                &Psad::logr(sprintf("%${log_len}s%s",
 #                    'Newly Blocked TCP packets: ',
-#                    "[$scan{$src}{$dst}{'PROTO'}{'TCP'}{'CURR_INT'}{'PKTS'}]\n"),
+#                    "[$scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'PKTS'}]\n"),
 #                    \%print_hsh);
                 my $nmap_opts  = '';
                 my $print_nmap = 0;
                 my $p_fh = 0;
                 for my $flags (keys
-                    %{$scan{$src}{$dst}{'PROTO'}{'TCP'}{'CURR_INT'}{'FLAGS'}}) {
+                    %{$scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'FLAGS'}}) {
                     $syslog_flags .= "$flags ";
-                    my $n_pkts = $scan{$src}{$dst}{'PROTO'}{'TCP'}
+                    my $n_pkts = $scan{$src}{$dst}{'TCP'}
                         {'CURR_INT'}{'FLAGS'}{$flags};
                     if (! $p_fh) {
                         &Psad::logr(sprintf("%${log_len}s%s", 'TCP flags: ',
@@ -1781,12 +1782,12 @@ sub scan_logr() {
                 &Psad::logr(sprintf("%${log_len}s%s", 'Newly scanned UDP ports: ',
                     "[$udp_newrange]\n"), \%print_hsh);
                 &Psad::logr(sprintf("%${log_len}s%s", 'Newly blocked UDP packets: ',
-                    "[$scan{$src}{$dst}{'PROTO'}{'UDP'}{'CURR_INT'}{'PKTS'}]\n"),
+                    "[$scan{$src}{$dst}{'UDP'}{'CURR_INT'}{'PKTS'}]\n"),
                     \%print_hsh);
             }
             if ($icmp) {
                 &Psad::logr(sprintf("%${log_len}s%s", 'Newly blocked ICMP packets: ',
-                    "[$scan{$src}{$dst}{'PROTO'}{'ICMP'}{'CURR_INT'}{'PKTS'}]\n"),
+                    "[$scan{$src}{$dst}{'ICMP'}{'CURR_INT'}{'PKTS'}]\n"),
                     \%print_hsh);
             }
             &Psad::logr("\n", \%print_hsh);
@@ -1847,9 +1848,9 @@ sub scan_logr() {
             }
             ### delete all current intervals so they won't show up
             ### in the next alert
-            delete $scan{$src}{$dst}{'PROTO'}{'TCP'}{'CURR_INT'};
-            delete $scan{$src}{$dst}{'PROTO'}{'UDP'}{'CURR_INT'};
-            delete $scan{$src}{$dst}{'PROTO'}{'ICMP'}{'CURR_INT'};
+            delete $scan{$src}{$dst}{'TCP'}{'CURR_INT'};
+            delete $scan{$src}{$dst}{'UDP'}{'CURR_INT'};
+            delete $scan{$src}{$dst}{'ICMP'}{'CURR_INT'};
 
             ### we have sent an alert for $dst
             $scan{$src}{$dst}{'ALERTED'} = 1;
@@ -1861,31 +1862,31 @@ sub scan_logr() {
 sub scan_logr_signatures() {
     my ($src, $dst, $print_hsh_href) = @_;
     ### ok, these hash keys are too much
-    for my $proto (keys %{$scan{$src}{$dst}{'PROTO'}}) {
-        next unless (defined $scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_SIG'}
-            || defined $scan{$src}{$dst}{'PROTO'}{$proto}{'SNORT_SID'});
+    for my $proto qw(TCP UDP ICMP) {
+        next unless (defined $scan{$src}{$dst}{$proto}{'CURR_SIG'}
+            || defined $scan{$src}{$dst}{$proto}{'SNORT_SID'});
         &Psad::logr("\n", $print_hsh_href);
         &Psad::logr("---- $proto scan signatures ----\n", $print_hsh_href);
         print "scan_logr_signatures(): src: $src dst: $dst proto: $proto\n"
             if $debug;
-        for my $sid (keys %{$scan{$src}{$dst}{'PROTO'}{$proto}{'SNORT_SID'}}) {
+        for my $sid (keys %{$scan{$src}{$dst}{$proto}{'SNORT_SID'}}) {
             my $msg = $snort_msgs{$sid}{'msg'};
             my $classtype = $snort_msgs{$sid}{'classtype'};
-            my $pkts = $scan{$src}{$dst}{'PROTO'}{$proto}{'SNORT_SID'}{$sid};
+            my $pkts = $scan{$src}{$dst}{$proto}{'SNORT_SID'}{$sid};
             &Psad::logr("\"$msg\" sid=$sid classtype=$classtype packets=$pkts\n",
                 $print_hsh_href);
         }
-        for my $sig_id (keys %{$scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_SIG'}}) {
+        for my $sig_id (keys %{$scan{$src}{$dst}{$proto}{'CURR_SIG'}}) {
             my $msg = $sigs_attr{$sig_id}{'msg'};
             if ($proto eq 'TCP') {
                 for my $dp (keys
-                    %{$scan{$src}{$dst}{'PROTO'}{'TCP'}{'CURR_SIG'}
+                    %{$scan{$src}{$dst}{'TCP'}{'CURR_SIG'}
                     {$sig_id}{'LISTEN'}}) {
                     my $flags =
-                        $scan{$src}{$dst}{'PROTO'}{'TCP'}
+                        $scan{$src}{$dst}{'TCP'}
                         {'CURR_SIG'}{$sig_id}{'LISTEN'}{$dp}{'FLAGS'};
                     my $pkts =
-                        $scan{$src}{$dst}{'PROTO'}{'TCP'}
+                        $scan{$src}{$dst}{'TCP'}
                         {'CURR_SIG'}{$sig_id}{'LISTEN'}{$dp}{'PKTS'};
                     my $l_str = "** Your machine is listening on TCP port: $dp!\n";
                     ### avoid "." operator
@@ -1893,13 +1894,13 @@ sub scan_logr_signatures() {
                         $print_hsh_href);
                 }
                 for my $dp (keys
-                    %{$scan{$src}{$dst}{'PROTO'}{'TCP'}
+                    %{$scan{$src}{$dst}{'TCP'}
                     {'CURR_SIG'}{$sig_id}{'NO_LISTEN'}}) {
                     my $flags =
-                        $scan{$src}{$dst}{'PROTO'}{'TCP'}{'CURR_SIG'}
+                        $scan{$src}{$dst}{'TCP'}{'CURR_SIG'}
                         {$sig_id}{'NO_LISTEN'}{$dp}{'FLAGS'};
                     my $pkts =
-                        $scan{$src}{$dst}{'PROTO'}{'TCP'}{'CURR_SIG'}
+                        $scan{$src}{$dst}{'TCP'}{'CURR_SIG'}
                         {$sig_id}{'NO_LISTEN'}{$dp}{'PKTS'};
                     my $l_str = "No server on TCP port: $dp\n";
                     &Psad::logr("\"$msg\" dp=$dp flags=[$flags] packets=$pkts $l_str",
@@ -1907,27 +1908,27 @@ sub scan_logr_signatures() {
                 }
             } elsif ($proto eq 'UDP') {
                 for my $dp (keys
-                    %{$scan{$src}{$dst}{'PROTO'}{'UDP'}{'CURR_SIG'}
+                    %{$scan{$src}{$dst}{'UDP'}{'CURR_SIG'}
                     {$sig_id}{'LISTEN'}}) {
                     my $pkts =
-                        $scan{$src}{$dst}{'PROTO'}{'UDP'}{'CURR_SIG'}
+                        $scan{$src}{$dst}{'UDP'}{'CURR_SIG'}
                         {$sig_id}{'LISTEN'}{$dp}{'PKTS'};
                     my $l_str = "** Your machine is listening on UDP port: $dp!\n";
                     &Psad::logr("\"$msg\" dp=$dp packets=$pkts $l_str",
                         $print_hsh_href);
                 }
                 for my $dp (keys
-                    %{$scan{$src}{$dst}{'PROTO'}{'UDP'}{'CURR_SIG'}
+                    %{$scan{$src}{$dst}{'UDP'}{'CURR_SIG'}
                     {$sig_id}{'NO_LISTEN'}}) {
                     my $pkts =
-                        $scan{$src}{$dst}{'PROTO'}{'UDP'}{'CURR_SIG'}
+                        $scan{$src}{$dst}{'UDP'}{'CURR_SIG'}
                         {$sig_id}{'NO_LISTEN'}{$dp}{'PKTS'};
                     my $l_str = "No server on UDP port: $dp\n";
                     &Psad::logr("\"$msg\" dp=$dp packets=$pkts $l_str",
                         $print_hsh_href);
                 }
             } else {
-                my $pkts = $scan{$src}{$dst}{'PROTO'}{'ICMP'}
+                my $pkts = $scan{$src}{$dst}{'ICMP'}
                     {'CURR_SIG'}{$sig_id}{'PKTS'};
                 &Psad::logr("\"$msg\" packets=$pkts\n", $print_hsh_href);
             }
@@ -1940,9 +1941,9 @@ sub scan_logr_signatures() {
         }
         ### need to delete the current signature so it
         ### won't show up in the next alert
-        delete $scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_SIG'}
+        delete $scan{$src}{$dst}{$proto}{'CURR_SIG'}
             unless $config{'SHOW_ALL_SIGNATURES'} eq 'Y';
-        delete $scan{$src}{$dst}{'PROTO'}{$proto}{'SNORT_SID'}
+        delete $scan{$src}{$dst}{$proto}{'SNORT_SID'}
             unless $config{'SHOW_ALL_SIGNATURES'} eq 'Y';
     }
     return;

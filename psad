@@ -3845,7 +3845,7 @@ sub ipt_block() {
         }
 
         if ($src and $dst) {
-            if ($ipt->find_ip_rule($src, $dst,
+            unless ($ipt->find_ip_rule($src, $dst,
                     $table, $to_chain, $target)) {
                 ($rv, $status_msg) = $ipt->add_ip_rule($src, $dst,
                     $config{'IPTABLES_AUTO_RULENUM'}, $table,

@@ -91,13 +91,13 @@ void write_pid(const char *pid_file, const pid_t pid)
 
     if ((pidfile_ptr = fopen(pid_file, "w")) == NULL) {
         /* could not open the pid file */
-        perror(" ** Could not open the pid file");
+        fprintf(stderr, " ** Could not open the pid file: %s", pid_file);
         exit(EXIT_FAILURE);
     }
 
     /* write the pid to the pid file */
     if (fprintf(pidfile_ptr, "%d\n", pid) == 0) {
-        printf(" ** pid: %d could not be written to pid file: %s",
+        fprintf(stderr, " ** pid: %d could not be written to pid file: %s",
                 pid, pid_file);
         exit(EXIT_FAILURE);
     }
@@ -167,7 +167,7 @@ void daemonize_process(const char *pid_file)
     pid_t child_pid, sid;
 
     if ((child_pid = fork()) < 0) {
-        perror(" ** Could not fork()");
+        fprintf(stderr, " ** Could not fork()");
         exit(EXIT_FAILURE);
     }
 
@@ -186,13 +186,13 @@ void daemonize_process(const char *pid_file)
 
     /* start a new session */
     if ((sid = setsid()) < 0) {
-        perror(" ** setsid() Could not start a new session");
+        fprintf(stderr, " ** setsid() Could not start a new session");
         exit(EXIT_FAILURE);
     }
 
     /* make "/" the current directory */
     if ((chdir("/")) < 0) {
-        perror(" ** Could not chdir() to /");
+        fprintf(stderr, " ** Could not chdir() to /");
         exit(EXIT_FAILURE);
     }
 

@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
      * Read data from the pipe indefinitely (we opened it _without_
      * O_NONBLOCK) and write it to the fwdata file if it is a firewall message
      */
-    while ((numbytes = read(fifo_fd, buf, MAX_LINE_BUF)) >= 0) {
+    while ((numbytes = read(fifo_fd, buf, MAX_LINE_BUF-1)) >= 0) {
 
 #ifdef DEBUG
         printf("read %d bytes from %s fifo.\n", numbytes, psadfifo_file);

@@ -1,10 +1,9 @@
-#!/usr/bin/perl -w -I .
+#!/usr/bin/perl -w
 
 # TODO: 
 #	- make install.pl preserve psad_signatures and psad_auto_ips
 #	  with "diff" and "patch" from the old to the new.
 
-use Psad;
 use File::Path; # used for the 'rmtree' function for removing directories
 use File::Copy; # used for copying/moving files
 use Getopt::Long;
@@ -617,6 +616,53 @@ sub rm_perl_options() {
 	print F $_ for (@lines);
 	close F;
 	return;
+}
+### check paths to commands and attempt to correct if any are wrong.
+sub check_commands() {
+        my $Cmds_href = shift;
+        my $caller = $0;
+        CMD: foreach my $cmd (keys %$Cmds_href) {
+                unless (-e $Cmds_href->{$cmd}) {
+                        my $cmd_name = (split /\//, $Cmds_href->{$cmd})[$#_];
+                        my $real_location = `which $cmd_name 2> /dev/null`;
+                        chomp $real_location;
+                        if ($real_location) {
+                                $Cmds_href->{$cmd} = $real_location;
+                        } else {
+                                die "\n@@@@@  ($caller): Could not find $cmd anywhere!!!  Please edit the config section to include the path to $cmd.\n";
+                        }
+                }
+        }
+        return %$Cmds_href;
+}
+### logging subroutine that handles multiple filehandles
+sub logr() {
+        my ($msg, $files_aref) = @_;
+        for my $f (@$files_aref) {
+                if ($f eq "STDOUT") {
+                        if (length($msg) > 72) {
+                                print STDOUT wrap("", $SUB_TAB, $msg);
+                        } else {
+                                print STDOUT $msg;
+                        }
+                } elsif ($f eq "STDERR") {
+                        if (length($msg) > 72) {
+                                print STDERR wrap("", $SUB_TAB, $msg);
+                        } else {
+                                print STDERR $msg;
+                        }
+
+                } else {
+                        open F, ">> $f";
+                        if (length($msg) > 72) {
+                                print F wrap("", $SUB_TAB, $msg);
+                        } else {
+                                print F $msg;
+                        }
+                        close F;
+                }
+        }
+        return;
 }
 sub usage_and_exit() {
         my $exitcode = shift;

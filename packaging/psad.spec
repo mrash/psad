@@ -5,7 +5,7 @@
 %define psadlogdir /var/log/psad
 %define psadrundir /var/run/psad
 %define psadvarlibdir /var/lib/psad
-%define psadetcdir /etc/psad
+#%define psadetcdir /etc/psad
 
 ### get the first @INC directory that includes the string "linux".
 ### This may be 'i386-linux', or 'i686-linux-thread-multi', etc.
@@ -78,7 +78,7 @@ make OPTS="$RPM_OPT_FLAGS" -C Date-Calc
 
 %install
 ### config directory
-mkdir -p $RPM_BUILD_ROOT%psadetcdir
+#mkdir -p $RPM_BUILD_ROOT%psadetcdir
 ### log directory
 mkdir -p $RPM_BUILD_ROOT%psadlogdir
 ### dir for psadfifo
@@ -146,7 +146,7 @@ install -m 444 IPTables/Parse/Parse.pm $RPM_BUILD_ROOT%psadlibdir/IPTables/Parse
 install -m 444 Psad/Psad.pm $RPM_BUILD_ROOT%psadlibdir/Psad.pm
 
 ### install snort rules files
-cp -r snort_rules $RPM_BUILD_ROOT%psadetcdir
+cp -r snort_rules $RPM_BUILD_ROOT%_sysconfdir/%name
 
 %clean
 [ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
@@ -162,8 +162,8 @@ cp -r snort_rules $RPM_BUILD_ROOT%psadetcdir
 %post
 ### put the current hostname into the psad C binaries
 ### (kmsgsd and psadwatchd).
-perl -p -i -e 'use Sys::Hostname; my $hostname = hostname(); s/HOSTNAME(\s+)_?CHANGE.?ME_?/HOSTNAME${1}$hostname/' /etc/psad/psad.conf
-perl -p -i -e 'use Sys::Hostname; my $hostname = hostname(); s/HOSTNAME(\s+)_?CHANGE.?ME_?/HOSTNAME${1}$hostname/' /etc/psad/psadwatchd.conf
+perl -p -i -e 'use Sys::Hostname; my $hostname = hostname(); s/HOSTNAME(\s+)_?CHANGE.?ME_?/HOSTNAME${1}$hostname/' %_sysconfdir/%name/psad.conf
+perl -p -i -e 'use Sys::Hostname; my $hostname = hostname(); s/HOSTNAME(\s+)_?CHANGE.?ME_?/HOSTNAME${1}$hostname/' %_sysconfdir/%name/psadwatchd.conf
 
 /bin/touch %psadlogdir/fwdata
 chown root.root %psadlogdir/fwdata
@@ -189,7 +189,7 @@ then
 echo " .. Restarting syslogd "
 kill -HUP `cat /var/run/syslogd.pid`
 fi
-if grep -q "EMAIL.*root.*localhost" %psadetcdir/psad.conf;
+if grep -q "EMAIL.*root.*localhost" /etc/psad/psad.conf;
 then
 echo " .. You can edit the EMAIL_ADDRESSES variable in"
 echo "    /etc/psad/psad.conf and /etc/psad/psadwatchd.conf"
@@ -203,11 +203,9 @@ fi
 
 %files
 %defattr(-,root,root)
-%psadlogdir
-%psadvarlibdir
-%psadrundir
-%psadetcdir
-%psadlibdir
+%dir %psadlogdir
+%dir %psadvarlibdir
+%dir %psadrundir
 /etc/rc.d/init.d/psad
 %_sbindir/*
 %_bindir/*

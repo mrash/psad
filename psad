@@ -291,7 +291,9 @@ sub check_kmsgsd() {
 	my $Cmds_href = shift;
 	unless (`$Cmds_href->{'ps'} -auxw |$Cmds_href->{'grep'} kmsgsd |$Cmds_href->{'grep'} -v grep`) {
 		system "$Cmds_href->{'kmsgsd'}";   # restart kmsgsd
-		system "$Cmds_href->{'mail'} $email_address -s \"psad: restarted kmsgsd on $Cmds_href->{'hostname'}\" < /dev/null";
+		my $hostname = `$Cmds_href->{'hostname'}`;
+        	chomp $hostname;
+		system "$Cmds_href->{'mail'} $email_address -s \"psad: restarted kmsgsd on $hostname\" < /dev/null";
 	}
 	return;
 }
@@ -526,7 +528,9 @@ sub email_alert() {
 		}
 	}
        	close EMAILALERT;
-       	system("$Cmds_href->{'mail'} $email_address -s \"psad WARNING: $Cmds_href->{'hostname'} has been scanned!\" < $email_alertfile");
+	my $hostname = `$Cmds_href->{'hostname'}`;
+	chomp $hostname;
+       	system("$Cmds_href->{'mail'} $email_address -s \"psad WARNING: $hostname has been scanned!\" < $email_alertfile");
 	$Scan_href->{$ip}->{'ALERTED'} = "Y";
 	return $Scan_href;
 }

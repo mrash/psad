@@ -138,7 +138,7 @@ int main(int argc, char *argv[]) {
      * system logger dies (and hence closes its file descriptor for the
      * psadfifo). */
     if ((fifo_fd = open(psadfifo_file, O_RDWR)) < 0) {
-        fprintf(stderr, " ** Could not open %s for reading.\n",
+        fprintf(stderr, "[*] Could not open %s for reading.\n",
             psadfifo_file);
         exit(EXIT_FAILURE);  /* could not open psadfifo named pipe */
     }
@@ -147,7 +147,7 @@ int main(int argc, char *argv[]) {
      * the pipe into this file. */
     if ((fwdata_fd = open(fwdata_file,
             O_CREAT|O_WRONLY|O_APPEND, 0600)) < 0) {
-        fprintf(stderr, " ** Could not open %s for writing.\n", fwdata_file);
+        fprintf(stderr, "[*] Could not open %s for writing.\n", fwdata_file);
         exit(EXIT_FAILURE);  /* could not open fwdata file */
     }
 
@@ -183,7 +183,7 @@ int main(int argc, char *argv[]) {
 
             /* re-open psadfifo and fwdata files */
             if ((fifo_fd = open(psadfifo_file, O_RDONLY)) < 0) {
-                fprintf(stderr, " ** Could not open %s for reading.\n",
+                fprintf(stderr, "[*] Could not open %s for reading.\n",
                     psadfifo_file);
                 exit(EXIT_FAILURE);  /* could not open psadfifo named pipe */
             }
@@ -221,7 +221,7 @@ int main(int argc, char *argv[]) {
 #ifdef DEBUG
         if (matched_ipt_log_msg) {
             puts(buf);
-            fprintf(stderr, " ** Line matched search strings.\n");
+            fprintf(stderr, "[+] Line matched search strings.\n");
             fwlinectr++;
             if (fwlinectr % 50 == 0)
                 fprintf(stderr,
@@ -229,7 +229,7 @@ int main(int argc, char *argv[]) {
             matched_ipt_log_msg = 0;
         } else {
             puts(buf);
-            printf(" ** Line did not match search strings.\n");
+            printf("[-] Line did not match search strings.\n");
 #endif
         }
     }
@@ -261,7 +261,7 @@ static void parse_config(char *config_file, char *psadfifo_file,
     char *index;
 
     if ((config_ptr = fopen(config_file, "r")) == NULL) {
-        fprintf(stderr, " ** Could not open %s for reading.\n",
+        fprintf(stderr, "[*] Could not open %s for reading.\n",
             config_file);
         exit(EXIT_FAILURE);
     }
@@ -309,7 +309,7 @@ static void parse_fw_search_file(char *fw_search_file)
     fw_msg_search[num_fw_search_strings] = NULL;
 
     if ((fw_search_ptr = fopen(fw_search_file, "r")) == NULL) {
-        fprintf(stderr, " ** Could not open %s for reading.\n",
+        fprintf(stderr, "[*] Could not open %s for reading.\n",
             fw_search_file);
         exit(EXIT_FAILURE);
     }

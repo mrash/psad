@@ -459,7 +459,7 @@ if ($ver) {
 ### only needs root if run in auto-blocking mode; should take
 ### this into account and drop privileges).
 $< == 0 && $> == 0 or
-    die ' ** psad: You must be root (or equivalent ',
+    die '[*] psad: You must be root (or equivalent ',
         "UID 0 account) to execute psad!  Exiting.\n";
 
 ### Import all psad configuration and signatures files
@@ -479,7 +479,7 @@ $< == 0 && $> == 0 or
 unless ($no_whois) {
     unless (defined $cmds{'whois'}
             and -x $cmds{'whois'}) {  ### we couldn't find whois_psad
-        warn ' ** Could not locate whois_psad binary.  ',
+        warn '[-] Could not locate whois_psad binary.  ',
             "Disabling whois lookups.\n";
         $no_whois = 1;
     }
@@ -513,8 +513,8 @@ if ($benchmark) {
 unless ($no_daemon or $debug or $benchmark) {
     my $pid = fork();
     exit 0 if $pid;
-    die " ** $0: Couldn't fork: $!" unless defined $pid;
-    POSIX::setsid() or die " ** $0: Can't start a new session: $!";
+    die "[*] $0: Couldn't fork: $!" unless defined $pid;
+    POSIX::setsid() or die "[*] $0: Can't start a new session: $!";
 }
 
 ### write the current pid associated with psad to the psad pid file
@@ -609,7 +609,7 @@ unless ($fw_analyze or $benchmark) {
 ### Get an open filehandle for the main firewall data file FW_DATA_FILE.
 ### All firewall drop/reject log messages are written to FW_DATA_FILE
 ### by kmsgsd.
-open FWDATA, $config{'FW_DATA_FILE'} or die ' ** Could not open ',
+open FWDATA, $config{'FW_DATA_FILE'} or die '[*] Could not open ',
     "$config{'FW_DATA_FILE'}: $!" unless $benchmark;
 
 ###=========================================================###
@@ -641,7 +641,7 @@ for (;;) {
 
             ### re-open the fwdata file
             open FWDATA, $config{'FW_DATA_FILE'} or die
-                " ** Could not open $config{'FW_DATA_FILE'}: $!"
+                "[*] Could not open $config{'FW_DATA_FILE'}: $!"
         }
     }
 
@@ -737,7 +737,7 @@ for (;;) {
 
             ### re-open the fwdata file
             open FWDATA, $config{'FW_DATA_FILE'} or die
-                " ** Could not open $config{'FW_DATA_FILE'}: $!"
+                "[*] Could not open $config{'FW_DATA_FILE'}: $!"
         }
         $last_disk_check = time();
     }
@@ -853,7 +853,7 @@ sub check_scan() {
         }
 
         unless ($intf and $chain) {
-            print STDERR " ** err packet: could not determine ",
+            print STDERR "[-] err packet: could not determine ",
                 "interface and chain.\n" if $debug;
             push @err_pkts, $pkt;
             next PKT;
@@ -914,7 +914,7 @@ sub check_scan() {
                 ### no signatures make use of the RST flag and very
                 ### few that use the ACK flag (need to add code back
                 ### in for these signatures).
-                print STDERR " ** err packet: matched ACK or RST flag.\n"
+                print STDERR "[-] err packet: matched ACK or RST flag.\n"
                     if $debug;
                 next PKT;
             }
@@ -928,7 +928,7 @@ sub check_scan() {
                     $flags =~ /PSH/ ||
                     $flags =~ /FIN/ ||
                     $flags eq 'NULL') {
-                print STDERR " ** err packet: bad tcp flags.\n" if $debug;
+                print STDERR "[-] err packet: bad tcp flags.\n" if $debug;
                 push @err_pkts, $pkt;
                 next PKT;
             }
@@ -995,7 +995,7 @@ sub check_scan() {
         } else {
             ### Sometimes the iptables log entry gets messed up due to
             ### buffering issues so we write it to the error log.
-            print STDERR " ** err packet: no regex match.\n" if $debug;
+            print STDERR "[-] err packet: no regex match.\n" if $debug;
             push @err_pkts, $pkt;
             next PKT;
         }
@@ -1050,8 +1050,8 @@ sub check_scan() {
                 if ($pkt =~ /^(.*?)\s+\S+\s+kernel:/) {
                     $scan{$src}{$dst}{'s_time'} = $1;
                 } else {
-                    die " ** Could not extract time from packet: $pkt\n",
-                        " ** Please send a bug report to: ",
+                    die "[*] Could not extract time from packet: $pkt\n",
+                        "    Please send a bug report to: ",
                         "mbr\@cipherdyne.org\n";
                 }
             } else {
@@ -1338,7 +1338,7 @@ sub dshield_email_log() {
             "TZ $timezone psad Version 1.3";
         if ($config{'DSHIELD_USER_EMAIL'} eq 'NONE') {
             open MAIL, qq(| $cmds{'mail'} -s "$subject" ) .
-                $config{'DSHIELD_ALERT_EMAIL'} or die ' ** Could not send ',
+                $config{'DSHIELD_ALERT_EMAIL'} or die '[*] Could not send ',
                 'dshield alert email.';
             if ($config{'DSHIELD_DL_THRESHOLD'} > 0) {
                 for my $line (@dshield_data) {
@@ -1353,7 +1353,7 @@ sub dshield_email_log() {
             }
             close MAIL;
         } else {
-            open MAIL, "| $cmds{'sendmail'} -oi -t" or die ' ** Could not ',
+            open MAIL, "| $cmds{'sendmail'} -oi -t" or die '[*] Could not ',
                 'send dshield alert email.';
             print MAIL "From: $config{'DSHIELD_USER_EMAIL'}\n",
                 "To: $config{'DSHIELD_ALERT_EMAIL'}\n",
@@ -1491,7 +1491,7 @@ sub check_dst() {
 sub check_ip_in_network() {
     my ($ip, $net) = @_;
     unless (defined $net and $net =~ /$ip_re/) {
-        print STDERR " ** check_ip_in_network(): bad network \"$net\".\n",
+        print STDERR "[-] check_ip_in_network(): bad network \"$net\".\n",
             if $debug;
         return 0;
     }
@@ -1735,14 +1735,14 @@ sub psad_init() {
 }
 
 sub validate_config() {
-    die ' ** PORT_RANGE_SCAN_THRESHOLD must be between 1 and 65535 '
+    die '[*] PORT_RANGE_SCAN_THRESHOLD must be between 1 and 65535 '
         unless (($config{'PORT_RANGE_SCAN_THRESHOLD'} =~ m|^\d+$|)
             and 0 < $config{'PORT_RANGE_SCAN_THRESHOLD'}
             and $config{'PORT_RANGE_SCAN_THRESHOLD'} < 65535);
 
-    die qq( ** Invalid EMAIL_ADDRESSES value: "$config{'EMAIL_ADDRESSES'}")
+    die qq([*] Invalid EMAIL_ADDRESSES value: "$config{'EMAIL_ADDRESSES'}")
         unless $config{'EMAIL_ADDRESSES'} =~ /\S+\@\S+/;
-    die ' ** DSHIELD_ALERT_INTERVAL must be between 1 and 24 '
+    die '[*] DSHIELD_ALERT_INTERVAL must be between 1 and 24 '
         unless (($config{'DSHIELD_ALERT_INTERVAL'} =~ m|^\d+$|)
             and 0 < $config{'DSHIELD_ALERT_INTERVAL'}
             and $config{'DSHIELD_ALERT_INTERVAL'} < 25);
@@ -1754,18 +1754,18 @@ sub validate_config() {
             'set to N.');
     }
     if ($status_dl and $status_dl > 5) {
-        die ' ** The --status-dl must be between 1 and 5.  Exiting.';
+        die '[*] The --status-dl must be between 1 and 5.  Exiting.';
     }
 
     if ($no_kmsgsd and not $debug) {
-        die ' ** The --no-kmsgsd option can only be used with ',
+        die '[*] The --no-kmsgsd option can only be used with ',
             '--debug.  Exiting.';
     }
     return;
 }
 
 sub validate_home_net() {
-    open IFC, "$cmds{'ifconfig'} -a |" or die " ** Could not execute ",
+    open IFC, "$cmds{'ifconfig'} -a |" or die "[*] Could not execute ",
         "$cmds{'ifconfig'} -a: $!";
     my @ifconfig_out = <IFC>;
     close IFC;
@@ -1826,7 +1826,7 @@ sub validate_home_net() {
 }
 
 sub import_fw_search() {
-    open F, "< $fw_search_file" or die " ** Could not open fw search ",
+    open F, "< $fw_search_file" or die "[*] Could not open fw search ",
         "string file $fw_search_file: $!";
     my @lines = <F>;
     close F;
@@ -1858,7 +1858,7 @@ sub import_fw_search() {
 
 sub import_snort_rules() {
     opendir D, $config{'SNORT_RULES_DIR'}
-        or die " ** Could not open $config{'SNORT_RULES_DIR'}";
+        or die "[*] Could not open $config{'SNORT_RULES_DIR'}";
     my @rfiles = readdir D;
     closedir D;
     shift @rfiles; shift @rfiles;
@@ -1872,7 +1872,7 @@ sub import_snort_rules() {
 #        printf("%-30s", " .. $rfile");
 #        &logr(" .. Parsing $rfile\n", $logfile);
         open R, "< ${config{'SNORT_RULES_DIR'}}/${rfile}" or
-            die " ** Could not open: ${srules_type}/${rfile}";
+            die "[*] Could not open: ${srules_type}/${rfile}";
         my @lines = <R>;
         close R;
         RULE: for my $line (@lines) {
@@ -1919,7 +1919,7 @@ sub import_signatures() {
     ### we execute this code after receiving a HUP signal.
     %sigs = ();
     open SIGS, "< $config{'PSAD_SIGS_FILE'}" or die
-        " ** Could not open the signatures file $config{'PSAD_SIGS_FILE'}: $!";
+        "[*] Could not open the signatures file $config{'PSAD_SIGS_FILE'}: $!";
     my @lines = <SIGS>;
     close SIGS;
     SIG: for my $line (@lines) {
@@ -1948,7 +1948,7 @@ sub import_signatures() {
             $rule_hdr     = $1;
             $rule_options = $2;
         } else {
-            print STDERR " ** import_signatures(): bad signature: $line\n"
+            print STDERR "[-] import_signatures(): bad signature: $line\n"
                 if $debug;
             next SIG;
         }
@@ -1975,7 +1975,7 @@ sub import_signatures() {
                 $dp    = $6;
             }
         } else {
-            print STDERR " ** import_signatures(): bad rule ",
+            print STDERR "[-] import_signatures(): bad rule ",
                 "header: $line\n" if $debug;
             next SIG;
         }
@@ -1984,21 +1984,21 @@ sub import_signatures() {
         if ($rule_options =~ /[\s;]sid:\s*(\d+)\s*;/) {
             $sid = $1;
         } else {
-            print STDERR " ** import_signatures(): could not find ",
+            print STDERR "[-] import_signatures(): could not find ",
                 "sid: $line\n" if $debug;
             next SIG;
         }
         if ($rule_options =~ /msg:\s*\"(.*?)\"\s*;/) {
             $msg = $1;
         } else {
-            print STDERR " ** import_signatures(): could not find ",
+            print STDERR "[-] import_signatures(): could not find ",
                 "msg: $line\n" if $debug;
             next SIG;
         }
         if ($rule_options =~ /psad_dlevel:\s*(\d+)/) {
             $dlevel = $1;
         } else {
-            print STDERR " ** import_signatures(): could not find ",
+            print STDERR "[-] import_signatures(): could not find ",
                 "dlevel: $line\n" if $debug;
             next SIG;
         }
@@ -2097,7 +2097,7 @@ sub import_signatures() {
                 $sigs{'icmp'}{$sid}{'icmp_id'} = $1;
             }
         } else {
-            print STDERR " ** import_signatures(): bad protocol: $line\n"
+            print STDERR "[-] import_signatures(): bad protocol: $line\n"
                 if $debug;
             delete $sigs_attr{$sid} if defined $sigs_attr{$sid};
             delete $sigs{$proto}{$sid} if defined $sigs{$proto}{$sid};
@@ -2105,9 +2105,9 @@ sub import_signatures() {
         }
     }
     if ($debug) {
-        print STDERR " ** main signatures hash:\n";
+        print STDERR "[-] main signatures hash:\n";
         print STDERR Dumper %sigs;
-        print STDERR Dumper " ** signature attributes hash:\n";
+        print STDERR Dumper "[-] signature attributes hash:\n";
         print STDERR Dumper %sigs_attr;
     }
     &Psad::psyslog('psad', '.. imported psad-1.3 signatures');
@@ -2117,7 +2117,7 @@ sub import_signatures() {
 sub import_icmp_types() {
     %valid_icmp_types = ();
     open TYPES, "< $config{'PSAD_ICMP_TYPES_FILE'}" or die
-        " ** Could not open $config{'PSAD_ICMP_TYPES_FILE'}: $!";
+        "[*] Could not open $config{'PSAD_ICMP_TYPES_FILE'}: $!";
     my @lines = <TYPES>;
     close TYPES;
     my $icmp_type = -1;
@@ -2207,7 +2207,7 @@ sub build_sig_ports() {
 
 sub import_auto_dl() {
     %auto_dl = ();  ### undef so we don't leave old ips in %auto_dl
-    open A, "< $config{'PSAD_AUTO_DL_FILE'}" or die ' ** Could not open ',
+    open A, "< $config{'PSAD_AUTO_DL_FILE'}" or die '[*] Could not open ',
         "$config{'PSAD_AUTO_DL_FILE'}: $!";
     my @lines = <A>;
     close A;
@@ -2279,7 +2279,7 @@ sub import_auto_dl() {
 sub import_posf_sigs() {
     %posf_sigs = ();
     my $posf_file = $config{'PSAD_POSF_FILE'};
-    open P, "< $posf_file" or die ' ** Could not open ',
+    open P, "< $posf_file" or die '[*] Could not open ',
         "$posf_file: $!";
     my @lines = <P>;
     close P;
@@ -2532,7 +2532,7 @@ sub check_scan_proto() {
 
 sub write_global_packet_counters() {
     open P, "> $config{'PACKET_COUNTER_FILE'}" or
-        die " ** Could not open $config{'PACKET_COUNTER_FILE'}: $!";
+        die "[*] Could not open $config{'PACKET_COUNTER_FILE'}: $!";
     print P "tcp:  $tcp_ctr\n",
         "udp:  $udp_ctr\n",
         "icmp: $icmp_ctr\n";
@@ -2542,7 +2542,7 @@ sub write_global_packet_counters() {
 
 sub write_prefix_counters() {
     open P, "> $config{'IPT_PREFIX_COUNTER_FILE'}" or
-        die " ** Could not open $config{'IPT_PREFIX_COUNTER_FILE'}: $!";
+        die "[*] Could not open $config{'IPT_PREFIX_COUNTER_FILE'}: $!";
     for my $prefix (keys %ipt_prefixes) {
         my $count = $ipt_prefixes{$prefix};
         print P "$prefix: $count\n";
@@ -2553,7 +2553,7 @@ sub write_prefix_counters() {
 
 sub write_dshield_stats() {
     open D, "> $config{'DSHIELD_COUNTER_FILE'}" or
-        die " ** Could not open $config{'DSHIELD_COUNTER_FILE'}: $!";
+        die "[*] Could not open $config{'DSHIELD_COUNTER_FILE'}: $!";
     print D "total emails: $dshield_email_ctr\n",
         "total packets: $dshield_lines_ctr\n";
     close D;
@@ -2563,7 +2563,7 @@ sub write_dshield_stats() {
 sub write_src_packet_counters() {
     my ($hr, $tcp_absrange, $udp_absrange, $file) = @_;
     open P, "> $file" or
-        die " ** Could not open $file: $!";
+        die "[*] Could not open $file: $!";
     for my $chain (keys %$hr) {
         for my $intf (keys %{$hr->{$chain}}) {
             for my $proto qw(tcp udp icmp) {
@@ -2587,7 +2587,7 @@ sub write_src_packet_counters() {
 
 sub collect_errors() {
     my $bad_packets_aref = shift;
-    open ERR, ">> $config{'FW_ERROR_LOG'}" or die ' ** Could not open ',
+    open ERR, ">> $config{'FW_ERROR_LOG'}" or die '[*] Could not open ',
         "$config{'FW_ERROR_LOG'}: $!";
     for my $line (@$bad_packets_aref) {
         print ERR $line;
@@ -2663,21 +2663,21 @@ sub scan_logr() {
             my $pkt_ctr_file = "${src_dir}/${dst}_packet_ctr";
 
             ### print the current danger level to the danger_level file.
-            open DL, "> $dl_file" or die " ** Could not open $dl_file: $!";
+            open DL, "> $dl_file" or die "[*] Could not open $dl_file: $!";
             print DL $curr_dl, "\n";
             close DL;
 
             ### write out the os guess (if there is one).
             if (defined $posf{$src} and defined $posf{$src}{'guess'}) {
                 open P, "> $posf_file" or
-                    die " ** Could not open $posf_file: $!";
+                    die "[*] Could not open $posf_file: $!";
                 print P $posf{$src}{'guess'}, "\n";
                 close P;
             }
 
             ### write out the start time.
             open T, "> $s_time_file" or
-                die " ** Could not open $s_time_file: $!";
+                die "[*] Could not open $s_time_file: $!";
             print T $scan{$src}{$dst}{'s_time'}, "\n";
             close T;
 
@@ -2797,7 +2797,7 @@ sub scan_logr() {
                 $fh = *STDOUT;
             } else {
                 open E, "> $email_file" or
-                    die " ** Could not open $email_file: $!";
+                    die "[*] Could not open $email_file: $!";
                 $fh = *E;
             }
 
@@ -2974,7 +2974,7 @@ sub scan_logr() {
                     $scan{$src}{$dst}{'email_ctr'}++;
 
                     ### print the number of email alerts we have sent
-                    open E, "> $ecount_file" or die " ** Could not open ",
+                    open E, "> $ecount_file" or die "[*] Could not open ",
                         "$ecount_file: $!";
                     print E $scan{$src}{$dst}{'email_ctr'}, "\n";
                     close E;
@@ -3003,7 +3003,7 @@ sub scan_logr_signatures() {
     my ($src, $dst, $email_fh, $log_sigs) = @_;
     my $dst_ip_is_local = 0;
     $dst_ip_is_local = 1 if defined $local_ips{$dst};
-    open LS, ">> $log_sigs" or die " ** Could not open $log_sigs: $!";
+    open LS, ">> $log_sigs" or die "[*] Could not open $log_sigs: $!";
     for my $proto qw(tcp udp icmp) {
         next unless defined $scan{$src}{$dst}{$proto};
         next unless (defined $scan{$src}{$dst}{$proto}{'curr_sig'}
@@ -3191,7 +3191,7 @@ sub exec_external_script() {
     $cmd =~ s/SRCIP/$src/;
     my $pid;
     if ($pid = fork()) {
-        local $SIG{'ALRM'} = sub {die " ** External script timeout.\n"};
+        local $SIG{'ALRM'} = sub {die "[*] External script timeout.\n"};
         alarm 30;  ### the external script should be finished in 30 secs.
         eval {
             waitpid($pid, 0);
@@ -3201,7 +3201,7 @@ sub exec_external_script() {
             kill 9, $pid;
         }
     } else {
-        die " ** Could not fork for external script: $!" unless defined $pid;
+        die "[*] Could not fork for external script: $!" unless defined $pid;
         exec qq{$cmd};
     }
     return;
@@ -3215,7 +3215,7 @@ sub renew_auto_blocked_ips() {
     if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y'
             and -e $config{'AUTO_BLOCK_IPT_FILE'}) {
         open B, "< $config{'AUTO_BLOCK_IPT_FILE'}" or
-            die " ** Could not open $config{'AUTO_BLOCK_IPT_FILE'}: $!";
+            die "[*] Could not open $config{'AUTO_BLOCK_IPT_FILE'}: $!";
         my @lines = <B>;
         close B;
         for my $line (@lines) {
@@ -3239,7 +3239,7 @@ sub renew_auto_blocked_ips() {
     if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y'
             && -e $config{'ETC_HOSTS_DENY'}) {
         open B, "< $config{'ETC_HOSTS_DENY'}" or
-            die " ** Could not open $config{'ETC_HOSTS_DENY'}: $!";
+            die "[*] Could not open $config{'ETC_HOSTS_DENY'}: $!";
         my @lines = <B>;
         close B;
         for my $line (@lines) {
@@ -3264,7 +3264,7 @@ sub flush_auto_blocked_ips() {
     if (-e $config{'AUTO_BLOCK_IPT_FILE'}) {
         print " .. Removing iptables auto-generated block rules.\n";
         open B, "< $config{'AUTO_BLOCK_IPT_FILE'}" or
-            die " ** Could not open $config{'AUTO_BLOCK_IPT_FILE'}: $!";
+            die "[*] Could not open $config{'AUTO_BLOCK_IPT_FILE'}: $!";
         my @lines = <B>;
         close B;
         for my $line (@lines) {
@@ -3277,14 +3277,14 @@ sub flush_auto_blocked_ips() {
         ### we have removed the iptables block rules, so truncate
         ### the cache file.
         open T, "> $config{'AUTO_BLOCK_IPT_FILE'}" or
-            die " ** Could not truncate $config{'AUTO_BLOCK_IPT_FILE'}: $!";
+            die "[*] Could not truncate $config{'AUTO_BLOCK_IPT_FILE'}: $!";
         close T;
         $found_blocked = 1;
     }
     if (-e $config{'AUTO_BLOCK_TCPWR_FILE'}) {
         print " .. Removing tcpwrapper auto-generated block rules.\n";
         open B, "< $config{'AUTO_BLOCK_TCPWR_FILE'}" or
-            die " ** Could not open $config{'AUTO_BLOCK_TCPWR_FILE'}: $!";
+            die "[*] Could not open $config{'AUTO_BLOCK_TCPWR_FILE'}: $!";
         my @lines = <B>;
         close B;
         for my $line (@lines) {
@@ -3297,7 +3297,7 @@ sub flush_auto_blocked_ips() {
         ### we have removed the tcpwrapper block rules, so truncate
         ### the cache file.
         open T, "> $config{'AUTO_BLOCK_TCPWR_FILE'}" or
-            die " ** Could not truncate $config{'AUTO_BLOCK_TCPWR_FILE'}: $!";
+            die "[*] Could not truncate $config{'AUTO_BLOCK_TCPWR_FILE'}: $!";
         close T;
         $found_blocked = 1;
     }
@@ -3339,7 +3339,7 @@ sub ipt_test_block() {
             }
         }
     }
-    print STDERR " ** ipt_test_block($ip): did not find ip: $ip\n"
+    print STDERR "[-] ipt_test_block($ip): did not find ip: $ip\n"
         if $debug;
     ### did not find the ip
     return 0;
@@ -3374,7 +3374,7 @@ sub ipt_block() {
     } else {
         &Psad::psyslog('psad', "** could not add iptables " .
             "block rule for: $src");
-        print STDERR " ** Could not add iptables block rule for: $src\n"
+        print STDERR "[-] Could not add iptables block rule for: $src\n"
             if $debug;
     }
     return;
@@ -3445,7 +3445,7 @@ sub ipt_remove_block() {
     } else {
         &Psad::psyslog('psad', "** could not locate iptables " .
             "block rule for $src") if $flush_fw;
-        print STDERR " ** Could not locate iptables block rule for $src.\n"
+        print STDERR "[-] Could not locate iptables block rule for $src.\n"
             if $debug;
     }
     return;
@@ -3453,7 +3453,7 @@ sub ipt_remove_block() {
 
 sub tcpwr_test_block() {
     my $ip = shift;
-    open T, "< $config{'ETC_HOSTS_DENY'}" or die " ** Could not open ",
+    open T, "< $config{'ETC_HOSTS_DENY'}" or die "[*] Could not open ",
         "$config{'ETC_HOSTS_DENY'}: $!";
     my @lines = <T>;
     close T;
@@ -3466,7 +3466,7 @@ sub tcpwr_test_block() {
 
 sub tcpwr_block() {
     my $ip = shift;
-    open T, ">> $config{'ETC_HOSTS_DENY'}" or die " ** Could not open ",
+    open T, ">> $config{'ETC_HOSTS_DENY'}" or die "[*] Could not open ",
         "$config{'ETC_HOSTS_DENY'}: $!";
     print T "ALL: $ip\n";
     close T;
@@ -3475,11 +3475,11 @@ sub tcpwr_block() {
 
 sub tcpwr_remove_block() {
     my $ip = shift;
-    open T, "< $config{'ETC_HOSTS_DENY'}" or die ' ** Could not open ',
+    open T, "< $config{'ETC_HOSTS_DENY'}" or die '[*] Could not open ',
         "$config{'ETC_HOSTS_DENY'}: $!";
     my @lines = <T>;
     close T;
-    open T, "> $config{'ETC_HOSTS_DENY'}.tmp" or die ' ** Could not open ',
+    open T, "> $config{'ETC_HOSTS_DENY'}.tmp" or die '[*] Could not open ',
         "$config{'ETC_HOSTS_DENY'}.tmp: $!";
     for my $line (@lines) {
         chomp $line;
@@ -3538,7 +3538,7 @@ sub auto_psad_response() {
                     $cmds{'mail'});
                 my $found = 0;
                 open H, "< $config{'ETC_HOSTS_DENY'}" or die
-                    " ** Could not open $config{'ETC_HOSTS_DENY'}: $!";
+                    "[*] Could not open $config{'ETC_HOSTS_DENY'}: $!";
                 my @lines = <H>;
                 close H;
                 for my $line (@lines) {
@@ -3547,7 +3547,7 @@ sub auto_psad_response() {
                 }
                 unless ($found) {
                     open H, ">> $config{'ETC_HOSTS_DENY'}" or die
-                        " ** Could not open $config{'ETC_HOSTS_DENY'}: $!";
+                        "[*] Could not open $config{'ETC_HOSTS_DENY'}: $!";
                     print H "ALL: $src\n";
                     close H;
                     ### write the ip out to the auto blocked file
@@ -3682,7 +3682,7 @@ sub write_blocked_ip() {
     my ($src, $file) = @_;
     print STDERR " .. write_blocked_ip($src, $file)\n" if $debug;
     if (-e $file) {
-        open F, "< $file" or die " ** Could not open open ",
+        open F, "< $file" or die "[*] Could not open open ",
             "$file: $!";
         my @lines = <F>;
         close F;
@@ -3693,12 +3693,12 @@ sub write_blocked_ip() {
             return if $line eq $src;  ### already blocked $src
         }
         open B, ">> $file" or
-            die " ** Could not append to $file";
+            die "[*] Could not append to $file";
         print B "$src\n";
         close B;
     } else {
         open B, "> $file" or
-            die " ** Could not create $file";
+            die "[*] Could not create $file";
         print B "$src\n";
         close B;
     }
@@ -3710,11 +3710,11 @@ sub rm_blocked_ip() {
     print STDERR " .. rm_blocked_ip($src, $file)\n" if $debug;
     if (-e $file) {
         open B, "< $file" or
-            die " ** Could not open $file: $!";
+            die "[*] Could not open $file: $!";
         my @lines = <B>;
         close B;
         open W, "> ${file}.tmp" or
-            die " ** Could not open ${file}.tmp: $!";
+            die "[*] Could not open ${file}.tmp: $!";
         for my $line (@lines) {
             chomp $line;
             print W $line, "\n" unless $line eq $src;
@@ -3736,7 +3736,7 @@ sub email_limit_reached() {
 
 sub print_scan() {  ### this should primarily be used for debugging
     my $scanfile = "$config{'PRINT_SCAN_HASH'}.$$";
-    open PSCAN, "> $scanfile" or warn ' ** Could not open ',
+    open PSCAN, "> $scanfile" or warn '[-] Could not open ',
         "$scanfile: $!" and return;
     print PSCAN " ** Passive OS fingerprinting hash:\n";
     print PSCAN Dumper \%posf;
@@ -3751,7 +3751,7 @@ sub print_scan() {  ### this should primarily be used for debugging
 
 sub get_local_ips() {
     print STDERR " .. get_local_ips()\n" if $debug;
-    open IFC, "$cmds{'ifconfig'} -a |" or die " ** Could not execute ",
+    open IFC, "$cmds{'ifconfig'} -a |" or die "[*] Could not execute ",
         "$cmds{'ifconfig'} -a: $!";
     my @ips = <IFC>;
     close IFC;
@@ -3765,7 +3765,7 @@ sub get_local_ips() {
 
 sub get_listening_ports() {
     %local_ports = ();
-    open NETS, "$cmds{'netstat'} -an |" or die " ** Could not execute ",
+    open NETS, "$cmds{'netstat'} -an |" or die "[*] Could not execute ",
         "$cmds{'netstat'} -an: $!";
     my @lines = <NETS>;
     close NETS;
@@ -3836,7 +3836,7 @@ sub get_whois_info() {
         }
     }
     open W, "< $whois_datafile" or
-        die " ** Could not open $whois_datafile: $!";
+        die "[*] Could not open $whois_datafile: $!";
     @whois_data = <W>;
     close W;
     return \@whois_data;
@@ -3857,7 +3857,7 @@ sub file_permissions() {
     if (-e $file) {
         chmod 0600, $file;
     } else {
-        open T, "> $file" or die ' ** Could not open ',
+        open T, "> $file" or die '[*] Could not open ',
             "$file: $!";
         close T;
         chmod 0600, $file;
@@ -3874,7 +3874,7 @@ sub stop_psad() {
     for my $pidname qw(psadwatchd kmsgsd psad) {
         my $pidfile = $pidfiles{$pidname};
         if (-e $pidfile) {
-            open PIDFILE, "< $pidfile" or die ' ** Could not open ',
+            open PIDFILE, "< $pidfile" or die '[*] Could not open ',
                 "$pidfile: $!";
             my $pid = <PIDFILE>;
             close PIDFILE;
@@ -3903,7 +3903,7 @@ sub stop_psad() {
 sub restart() {
     my $cmdline = '';
     if (-e $cmdline_file) {
-        open CMD, "< $cmdline_file" or die ' ** Could not open ',
+        open CMD, "< $cmdline_file" or die '[*] Could not open ',
             "$cmdline_file: $!";
         $cmdline = <CMD>;
         close CMD;
@@ -3923,11 +3923,11 @@ sub analysis_mode() {
 
     if (-d $config{'ANALYSIS_MODE_DIR'}) {
         print " .. Removing old $config{'ANALYSIS_MODE_DIR'} directory.\n";
-        rmtree $config{'ANALYSIS_MODE_DIR'} or die " ** Could not ",
+        rmtree $config{'ANALYSIS_MODE_DIR'} or die "[*] Could not ",
             "remove $config{'ANALYSIS_MODE_DIR'}\n";
     }
 
-    mkdir $config{'ANALYSIS_MODE_DIR'} or die " ** Could not mkdir ",
+    mkdir $config{'ANALYSIS_MODE_DIR'} or die "[*] Could not mkdir ",
         $config{'ANALYSIS_MODE_DIR'};
 
     ### setup to put all <ip> files in the ANALYSIS_MODE_DIR
@@ -3936,7 +3936,7 @@ sub analysis_mode() {
     $config{'PSAD_DIR'} = $config{'ANALYSIS_MODE_DIR'};
 
     print " .. Entering analysis mode.  Parsing $messages_file\n";
-    open MSGS, "< $messages_file" or die " ** Could not open ",
+    open MSGS, "< $messages_file" or die "[*] Could not open ",
         "$messages_file: $!";
     my @lines = <MSGS>;
     close MSGS;
@@ -3977,7 +3977,7 @@ sub status() {
     for my $pidname qw(psadwatchd kmsgsd psad) {
         my $pidfile = $pidfiles{$pidname};
         if (-e $pidfile) {
-            open PIDFILE, "< $pidfile" or die ' ** Could not open ',
+            open PIDFILE, "< $pidfile" or die '[*] Could not open ',
                 "$pidfile: $!";
             my $pid = <PIDFILE>;
             close PIDFILE;
@@ -3986,7 +3986,7 @@ sub status() {
                 print " .. $pidname (pid: $pid)";
                 ### FIXME: should probably just parse /proc instead of
                 ### using ps
-                open PS, "$cmds{'ps'} auxww |" or die " ** Could not ",
+                open PS, "$cmds{'ps'} auxww |" or die "[*] Could not ",
                     "execute: $cmds{'ps'} auxww: $!";
                 my @ps_out = <PS>;
                 close PS;
@@ -4019,7 +4019,7 @@ sub status_psad_daemon() {
     if (not $analyze_msgs) {
         ### get any command line args
         if (-e $cmdline_file) {
-            open CMD, "< $cmdline_file" or die ' ** Could not open ',
+            open CMD, "< $cmdline_file" or die '[*] Could not open ',
                 "$cmdline_file: $!";
             $cmdline = <CMD>;
             chomp $cmdline;
@@ -4037,9 +4037,9 @@ sub status_psad_daemon() {
     my %scan_os;
     my %scan_alerts;
     chdir $config{'PSAD_DIR'} or
-        die " ** Could not chdir $config{'PSAD_DIR'}: $!";
+        die "[*] Could not chdir $config{'PSAD_DIR'}: $!";
     opendir D, $config{'PSAD_DIR'} or
-        die " ** Could not open dir: $config{'PSAD_DIR'}: $!";
+        die "[*] Could not open dir: $config{'PSAD_DIR'}: $!";
     my @files = readdir D;
     closedir D;
     if (@files and $#files > 1) {
@@ -4051,13 +4051,13 @@ sub status_psad_daemon() {
                 my $dl = 0;
                 if (-e "${src_ipdir}/danger_level") {
                     open F, "< ${src_ipdir}/danger_level" or
-                        die " ** Could not open ",
+                        die "[*] Could not open ",
                             "${src_ipdir}/danger_level: $!";
                     $dl = <F>;
                     close F;
                     chomp $dl;
                 }
-                opendir D, $src_ipdir or die " ** Could not open dir: ",
+                opendir D, $src_ipdir or die "[*] Could not open dir: ",
                     "$src_ipdir: $!";
                 my @ipdirfiles = readdir D;
                 closedir D;
@@ -4066,7 +4066,7 @@ sub status_psad_daemon() {
                     FILE: for my $file (@ipdirfiles) {
                         my $dst;
                         if ($file =~ /os_guess/ and -e "${src_ipdir}/os_guess") {
-                            open F, "< ${src_ipdir}/os_guess" or die " ** Could not ",
+                            open F, "< ${src_ipdir}/os_guess" or die "[*] Could not ",
                                 "open ${src_ipdir}/os_guess: $!";
                             my $os = <F>;
                             close F;
@@ -4075,7 +4075,7 @@ sub status_psad_daemon() {
                             next FILE;
                         }
                         if ($file =~ /email_count/ and -e "${src_ipdir}/email_count") {
-                            open F, "< ${src_ipdir}/email_count" or die " ** Could not ",
+                            open F, "< ${src_ipdir}/email_count" or die "[*] Could not ",
                                 "open ${src_ipdir}/email_count: $!";
                             my $email_count = <F>;
                             close F;
@@ -4090,7 +4090,7 @@ sub status_psad_daemon() {
                         }
                         if (-e "${src_ipdir}/${dst}_packet_ctr") {
                             open F, "< ${src_ipdir}/${dst}_packet_ctr" or
-                                die " ** Could not open ",
+                                die "[*] Could not open ",
                                     "${src_ipdir}/${dst}_packet_ctr: $!";
                             my @lines = <F>;
                             close F;
@@ -4262,7 +4262,7 @@ sub status_psad_daemon() {
         if (-e $config{'IPT_PREFIX_COUNTER_FILE'}) {
             print "\n    Iptables prefix counters:\n";
             open F, "< $config{'IPT_PREFIX_COUNTER_FILE'}" or
-                die " ** $config{'IPT_PREFIX_COUNTER_FILE'}: $!";
+                die "[*] $config{'IPT_PREFIX_COUNTER_FILE'}: $!";
             my @lines = <F>;
             close F;
             if (@lines) {
@@ -4283,7 +4283,7 @@ sub status_psad_daemon() {
                 and -e $config{'DSHIELD_COUNTER_FILE'}) {
             print "\n    DShield stats:\n";
             open F, "< $config{'DSHIELD_COUNTER_FILE'}" or
-                die " ** $config{'DSHIELD_COUNTER_FILE'}: $!";
+                die "[*] $config{'DSHIELD_COUNTER_FILE'}: $!";
             print STDOUT "        $_" while (<F>);
             close F;
         }
@@ -4297,7 +4297,7 @@ sub status_psad_daemon() {
         if (-e $config{'PACKET_COUNTER_FILE'}) {
             print "\n    Total packet counters:\n";
             open F, "< $config{'PACKET_COUNTER_FILE'}" or
-                die " ** $config{'PACKET_COUNTER_FILE'}: $!";
+                die "[*] $config{'PACKET_COUNTER_FILE'}: $!";
             print STDOUT "        $_" while (<F>);
             close F;
         }
@@ -4308,24 +4308,24 @@ sub status_psad_daemon() {
 sub status_ip() {
     my $rv = 0;
     my @match_ip;
-    die " ** $config{'FW_DATA_FILE'} does not exist yet.  Exiting."
+    die "[*] $config{'FW_DATA_FILE'} does not exist yet.  Exiting."
         unless -e $config{'FW_DATA_FILE'};
-    die " ** No data yet in $config{'FW_DATA_FILE'}.  Exiting."
+    die "[*] No data yet in $config{'FW_DATA_FILE'}.  Exiting."
         unless -s $config{'FW_DATA_FILE'} > 0;
-    die " ** No scans from $status_ip have been detected.\n",
+    die "[*] No scans from $status_ip have been detected.\n",
         "    See 'psad --Status' for a complete list."
         unless -d "$config{'PSAD_DIR'}/$status_ip";
-    open FW, "< $config{'FW_DATA_FILE'}" or die " ** Could not open ",
+    open FW, "< $config{'FW_DATA_FILE'}" or die "[*] Could not open ",
         "$config{'FW_DATA_FILE'}: $!";
     while (<FW>) {
         push @match_ip, $_ if $_ =~ /SRC=$status_ip\s/
             || $_ =~ /DST=$status_ip\s/;
     }
     close FW;
-    die " ** Could not match $status_ip to packets in ",
+    die "[*] Could not match $status_ip to packets in ",
         "$config{'FW_DATA_FILE'}.  Exiting." unless @match_ip;
     open D, "> $config{'PSAD_DIR'}/$status_ip/fwdata" or
-        die " ** Could not open $config{'PSAD_DIR'}/$status_ip/fwdata";
+        die "[*] Could not open $config{'PSAD_DIR'}/$status_ip/fwdata";
     for my $line (@match_ip) {
         print D $line;
     }
@@ -4339,7 +4339,7 @@ sub status_ip() {
         "$config{'PSAD_DIR'}/$status_ip/fwdata\n";
 
     opendir D, "$config{'PSAD_DIR'}/$status_ip" or
-        die " ** Could not open dir: $config{'PSAD_DIR'}/$status_ip: $!";
+        die "[*] Could not open dir: $config{'PSAD_DIR'}/$status_ip: $!";
     my @ipdirfiles = readdir D;
     closedir D;
     shift @ipdirfiles; shift @ipdirfiles;
@@ -4353,7 +4353,7 @@ sub status_ip() {
         if (-e "$config{'PSAD_DIR'}/$status_ip/${dst}_packet_ctr") {
             print STDOUT " .. Packet counters against dst: $dst:\n";
             open F, "< $config{'PSAD_DIR'}/$status_ip/${dst}_packet_ctr" or
-                die " ** Could not open $config{'PSAD_DIR'}/$status_ip/",
+                die "[*] Could not open $config{'PSAD_DIR'}/$status_ip/",
                     "${dst}_packet_ctr: $!";
             print STDOUT "        $_" for <F>;
             close F;
@@ -4361,7 +4361,7 @@ sub status_ip() {
     }
     if (-e "$config{'PSAD_DIR'}/$status_ip/email_count") {
         open F, "< $config{'PSAD_DIR'}/$status_ip/email_count" or
-            die " ** Could not open $config{'PSAD_DIR'}/$status_ip/",
+            die "[*] Could not open $config{'PSAD_DIR'}/$status_ip/",
                 "email_count: $!";
         my $ec = <F>;
         close F;
@@ -4370,7 +4370,7 @@ sub status_ip() {
     }
     if (-e "$config{'PSAD_DIR'}/$status_ip/danger_level") {
         open F, "< $config{'PSAD_DIR'}/$status_ip/danger_level" or
-            die " ** Could not open $config{'PSAD_DIR'}/$status_ip/",
+            die "[*] Could not open $config{'PSAD_DIR'}/$status_ip/",
                 "danger_level: $!";
         my $dl = <F>;
         close F;
@@ -4382,7 +4382,7 @@ sub status_ip() {
 
 sub import_old_scans() {
     opendir D, $config{'PSAD_DIR'} or
-        die " ** Could not open dir: $config{'PSAD_DIR'}: $!";
+        die "[*] Could not open dir: $config{'PSAD_DIR'}: $!";
     my @files = readdir D;
     closedir D;
     shift @files; shift @files;
@@ -4484,7 +4484,7 @@ sub import_old_scans() {
     }
     ### import global packet counters
     if (-e $config{'PACKET_COUNTER_FILE'}) {
-        open CF, "< $config{'PACKET_COUNTER_FILE'}" or die " ** Could not ",
+        open CF, "< $config{'PACKET_COUNTER_FILE'}" or die "[*] Could not ",
             "open $config{'PACKET_COUNTER_FILE'}: $!";
         my @lines = <CF>;
         close CF;
@@ -4501,7 +4501,7 @@ sub import_old_scans() {
     ### import dshield stats
     if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
             and -e $config{'DSHIELD_COUNTER_FILE'}) {
-        open DS, "< $config{'DSHIELD_COUNTER_FILE'}" or die " ** Could not ",
+        open DS, "< $config{'DSHIELD_COUNTER_FILE'}" or die "[*] Could not ",
             "open $config{'DSHIELD_COUNTER_FILE'}: $!";
         my @lines = <DS>;
         close DS;
@@ -4515,7 +4515,7 @@ sub import_old_scans() {
     }
     ### import iptables prefix stats
     if (-e $config{'IPT_PREFIX_COUNTER_FILE'}) {
-        open F, "< $config{'IPT_PREFIX_COUNTER_FILE'}" or die " ** Could not ",
+        open F, "< $config{'IPT_PREFIX_COUNTER_FILE'}" or die "[*] Could not ",
             "open $config{'IPT_PREFIX_COUNTER_FILE'}: $!";
         my @lines = <F>;
         close F;
@@ -4529,7 +4529,7 @@ sub import_old_scans() {
     }
 
     ### zero out $FW_DATA_FILE
-    open FD, "> $config{'FW_DATA_FILE'}" or die ' ** Could not open ',
+    open FD, "> $config{'FW_DATA_FILE'}" or die '[*] Could not open ',
         "$config{'FW_DATA_FILE'}: $!";
     close FD;
     if ($import_ctr) {
@@ -4544,7 +4544,7 @@ sub usr1() {
     my $psad_pidfile = $pidfiles{'psad'};
     if (-e $psad_pidfile) {
         open PIDFILE, "< $psad_pidfile" or
-            die " ** Could not open $psad_pidfile: $!";
+            die "[*] Could not open $psad_pidfile: $!";
         my $pid = <PIDFILE>;
         close PIDFILE;
         chomp $pid;
@@ -4589,7 +4589,7 @@ sub hup() {
     my $rv = 0;
     for my $pidname qw(psadwatchd psad kmsgsd) {
         my $pidfile = $pidfiles{$pidname};
-        open PID, "< $pidfile" or die " ** Could not open $pidfile: $!";
+        open PID, "< $pidfile" or die "[*] Could not open $pidfile: $!";
         my $pid = <PID>;
         close PID;
         chomp $pid;
@@ -4643,18 +4643,18 @@ sub warn_handler() {
 }
 
 sub archive_data() {
-    chdir $config{'PSAD_DIR'} or die " ** Could not chdir ",
+    chdir $config{'PSAD_DIR'} or die "[*] Could not chdir ",
         "$config{'PSAD_DIR'}: $!";
     unless (-d $config{'SCAN_DATA_ARCHIVE_DIR'}) {
         mkdir $config{'SCAN_DATA_ARCHIVE_DIR'}, 0500 or
-            die " ** Could not create dir: ",
+            die "[*] Could not create dir: ",
             "$config{'SCAN_DATA_ARCHIVE_DIR'}: $!";
     }
 
     ### archive all of the old ip address directories since
     ### we are restarting psad (should add a way to import
     ### these directories back into memory)
-    opendir D, $config{'PSAD_DIR'} or die " ** Could not open dir: ",
+    opendir D, $config{'PSAD_DIR'} or die "[*] Could not open dir: ",
         "$config{'PSAD_DIR'}: $!";
     my @files = readdir D;
     closedir D;
@@ -4689,7 +4689,7 @@ sub archive_data() {
     ### first see how big the archive file is and zero out if
     ### it is larger than about 10,000 lines
     if (-e $fwarchive && (-s $fwarchive) > 2367766) {  ### about 10,000 lines
-        open F, "> $fwarchive" or die ' ** Could not open ',
+        open F, "> $fwarchive" or die '[*] Could not open ',
             "$fwarchive: $!";
         close F;
     }
@@ -4703,7 +4703,7 @@ sub archive_data() {
     print AR $_ for @fwlines;
     close AR;
     ### zero out $FW_DATA_FILE
-    open F, "> $fwdata" or die ' ** Could not open ',
+    open F, "> $fwdata" or die '[*] Could not open ',
         "$fwdata: $!";
     close F;
     return;
@@ -4806,12 +4806,12 @@ sub setup() {
         mkdir $config{'PSAD_ERROR_DIR'}, 0500;
     }
     unless (-e $config{'FW_DATA_FILE'}) {
-        open F, "> $config{'FW_DATA_FILE'}" or die ' ** Could not open ',
+        open F, "> $config{'FW_DATA_FILE'}" or die '[*] Could not open ',
             "$config{'FW_DATA_FILE'}: $!";
         close F;
     }
     unless (-e $config{'FW_ERROR_LOG'}) {
-        open E, "> $config{'FW_ERROR_LOG'}" or die ' ** Could not open ',
+        open E, "> $config{'FW_ERROR_LOG'}" or die '[*] Could not open ',
             "$config{'FW_ERROR_LOG'}: $!";
         close E;
     }
@@ -4824,7 +4824,7 @@ sub setup() {
         move '/usr/bin/whois.psad', $cmds{'whois'};
     }
 
-    die ' ** No system logger config file could be found.'
+    die '[*] No system logger config file could be found.'
         unless (-e $config{'ETC_SYSLOG_CONF'}
                 or -e $config{'ETC_SYSLOGNG_CONF'}
                 or -e $config{'ETC_METALOG_CONF'});
@@ -4838,7 +4838,7 @@ sub setup() {
                 "$config{'ETC_SYSLOG_CONF'}.orig";
         }
         open RS, "< $config{'ETC_SYSLOG_CONF'}" or
-            die " ** Unable to open $config{'ETC_SYSLOG_CONF'}: $!";
+            die "[*] Unable to open $config{'ETC_SYSLOG_CONF'}: $!";
         my @lines = <RS>;
         close RS;
         my $found = 0;
@@ -4850,7 +4850,7 @@ sub setup() {
         }
         unless ($found) {
             open SYSLOG, "> $config{'ETC_SYSLOG_CONF'}" or
-                die " ** Unable to open $config{'ETC_SYSLOG_CONF'}: $!";
+                die "[*] Unable to open $config{'ETC_SYSLOG_CONF'}: $!";
             ### this loop removes any old location for psadfifo
             for my $line (@lines) {
                 unless ($line =~ /psadfifo/i) {
@@ -4873,7 +4873,7 @@ sub setup() {
                 "$config{'ETC_SYSLOGNG_CONF'}.orig";
         }
         open RS, "< $config{'ETC_SYSLOGNG_CONF'}" or
-            die " ** Unable to open $config{'ETC_SYSLOGNG_CONF'}: $!\n";
+            die "[*] Unable to open $config{'ETC_SYSLOGNG_CONF'}: $!\n";
         my @lines = <RS>;
         close RS;
 
@@ -4886,7 +4886,7 @@ sub setup() {
         }
         unless ($found) {
             open SYSLOGNG, "> $config{'ETC_SYSLOGNG_CONF'}" or
-                die " ** Unable to open $config{'ETC_SYSLOGNG_CONF'}: $!";
+                die "[*] Unable to open $config{'ETC_SYSLOGNG_CONF'}: $!";
             ### this loop removes any old location for psadfifo
             for my $line (@lines) {
                 unless ($line =~ /psadfifo/i) {
@@ -4913,7 +4913,7 @@ sub setup() {
                 "$config{'ETC_METALOG_CONF'}.orig";
         }
         open RS, "< $config{'ETC_METALOG_CONF'}" or
-            die " ** Unable to open $config{'ETC_METALOG_CONF'}: $!\n";
+            die "[*] Unable to open $config{'ETC_METALOG_CONF'}: $!\n";
         my @lines = <RS>;
         close RS;
 
@@ -4926,7 +4926,7 @@ sub setup() {
         }
         unless ($found) {
             open METALOG, "> $config{'ETC_METALOG_CONF'}" or
-                die " ** Unable to open $config{'ETC_METALOG_CONF'}: $!";
+                die "[*] Unable to open $config{'ETC_METALOG_CONF'}: $!";
 
             print METALOG "\n",
                 "\nPSAD :\n",
@@ -4938,7 +4938,7 @@ sub setup() {
                     "kern-facility messages to /usr/sbin/psadpipe.sh");
 
             open PIPESCRIPT, '> /usr/sbin/psadpipe.sh' or
-                die " ** Unable to open /usr/sbin/psadpipe.sh: $!";
+                die "[*] Unable to open /usr/sbin/psadpipe.sh: $!";
             print PIPESCRIPT "#!/bin/sh\n\n",
                 "echo \"\$3\" >> $config{'PSAD_FIFO'}\n";
             close PIPESCRIPT;
@@ -4948,7 +4948,7 @@ sub setup() {
 
             ### Metalog seems to simply die on SIGHUP and SIGALRM, and I
             ### found no signal or option to reload it's config... :-(
-            die ' ** All files written. You have to manually restart metalog! ',
+            die '[*] All files written. You have to manually restart metalog! ',
                 'When done, start psad again.';
 #          system "$cmds{'killall'} -HUP metalog";
        }
@@ -4967,7 +4967,7 @@ sub setup() {
 }
 
 sub disk_space_exceeded() {
-    open DF, "$cmds{'df'} $config{'PSAD_DIR'} |" or die " ** Could not ",
+    open DF, "$cmds{'df'} $config{'PSAD_DIR'} |" or die "[*] Could not ",
         "execute: $cmds{'df'} $config{'PSAD_DIR'}: $!";
     my @df_data = <DF>;
     close DF;
@@ -4995,7 +4995,7 @@ sub disk_space_exceeded() {
             mkdir $config{'SCAN_DATA_ARCHIVE_DIR'}, 0500;
         }
         opendir D, $config{'PSAD_DIR'} or
-            die " ** Could not open dir: $config{'PSAD_DIR'}: $!";
+            die "[*] Could not open dir: $config{'PSAD_DIR'}: $!";
         my @ipdirs = readdir D;
         closedir D;
         shift @ipdirs; shift @ipdirs;
@@ -5024,7 +5024,7 @@ sub disk_space_exceeded() {
                 '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
             for my $pidname qw(psadwatchd kmsgsd) {
                 my $pidfile = $pidfiles{$pidname};
-                open PIDFILE, "< $pidfile" or die ' ** Could not open ',
+                open PIDFILE, "< $pidfile" or die '[*] Could not open ',
                     "$pidfile: $!";
                 my $pid = <PIDFILE>;
                 close PIDFILE;
@@ -5048,7 +5048,7 @@ sub stop_legacy_diskmond() {
     my $diskmond_pidfile = '/var/run/psad/diskmond.pid';
     if (-e $diskmond_pidfile) {
         open PIDFILE, "< $diskmond_pidfile" or
-            die " ** Could not open $diskmond_pidfile: $!";
+            die "[*] Could not open $diskmond_pidfile: $!";
         my $pid = <PIDFILE>;
         close PIDFILE;
         chomp $pid;

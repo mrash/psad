@@ -308,7 +308,7 @@ static void give_up(const char *pid_name)
 {
     char mail_str[MAX_MSG_LEN] = "";
 #ifdef DEBUG
-    fprintf(stderr, " ** Could not restart %s process.  Exiting.\n", pid_name);
+    fprintf(stderr, "[*] Could not restart %s process.  Exiting.\n", pid_name);
 #endif
     strlcat(mail_str, " -s \"** psadwatchd: Could not restart ", MAX_MSG_LEN);
     strlcat(mail_str, pid_name, MAX_MSG_LEN);
@@ -424,7 +424,7 @@ static void parse_config(
     char *index;
 
     if ((config_ptr = fopen(config_file, "r")) == NULL) {
-        perror(" ** Could not open config file");
+        perror("[*] Could not open config file");
         exit(EXIT_FAILURE);
     }
 

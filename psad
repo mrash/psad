@@ -173,7 +173,7 @@ my $flush_fw = 0;
 
 ### build the iptables blocking configuration out of the
 ### IPT_AUTO_CHAIN variable
-my @ipt_block_config = ();
+my @ipt_config = ();
 
 ### configuration hash
 my %config = ();
@@ -2046,7 +2046,7 @@ sub psad_init() {
     ### build iptable block config hash out of IPT_AUTO_CHAIN keywords
     ### (we don't check ENABLE_AUTO_IDS here since someone may have turned
     ### it off but still want to run --Status checks or use --Flush).
-    &build_ipt_block_config() unless $syslog_server;
+    &build_ipt_config() unless $syslog_server;
 
     ### The --Kill command line switch was given.
     exit &stop_psad() if $kill;
@@ -3898,11 +3898,11 @@ sub flush_auto_blocked_ips() {
         print "    WARNING: psad is currently running, so flushing the ",
             "chains may\n    cause some warning syslog messages to appear.\n";
     }
-    if (@ipt_block_config) {
-        for my $block_hr (@ipt_block_config) {
-            my $table      = $block_hr->{'table'};
-            my $from_chain = $block_hr->{'from_chain'};
-            my $to_chain   = $block_hr->{'to_chain'};
+    if (@ipt_config) {
+        for my $hr (@ipt_config) {
+            my $table      = $hr->{'table'};
+            my $from_chain = $hr->{'from_chain'};
+            my $to_chain   = $hr->{'to_chain'};
 
             if ($ipt->chain_exists($table, $to_chain)) {
                 if ($fw_del_chains) {
@@ -3983,12 +3983,12 @@ sub ipt_block() {
     }
 
     ### add block rule for $ip unless it is already blocked
-    for my $block_hr (@ipt_block_config) {
-        my $target     = $block_hr->{'target'};
-        my $direction  = $block_hr->{'direction'};
-        my $table      = $block_hr->{'table'};
-        my $from_chain = $block_hr->{'from_chain'};
-        my $to_chain   = $block_hr->{'to_chain'};
+    for my $hr (@ipt_config) {
+        my $target     = $hr->{'target'};
+        my $direction  = $hr->{'direction'};
+        my $table      = $hr->{'table'};
+        my $from_chain = $hr->{'from_chain'};
+        my $to_chain   = $hr->{'to_chain'};
 
         ### make sure "to_chain" exists
         my ($rv, $status_msg) = $ipt->create_chain($table, $to_chain);
@@ -4103,11 +4103,11 @@ sub ipt_rm_block() {
 
     ### delete block rule for $ip
     my $rm_block = 0;
-    for my $block_hr (@ipt_block_config) {
-        my $target     = $block_hr->{'target'};
-        my $direction  = $block_hr->{'direction'};
-        my $table      = $block_hr->{'table'};
-        my $to_chain   = $block_hr->{'to_chain'};
+    for my $hr (@ipt_config) {
+        my $target    = $hr->{'target'};
+        my $direction = $hr->{'direction'};
+        my $table     = $hr->{'table'};
+        my $to_chain  = $hr->{'to_chain'};
 
         my $src = '';
         my $dst = '';
@@ -4190,9 +4190,9 @@ sub ipt_list_auto_chains() {
             "in $config_file\n";
     }
     print "\n";
-    for my $block_hr (@ipt_block_config) {
-        my $table      = $block_hr->{'table'};
-        my $to_chain   = $block_hr->{'to_chain'};
+    for my $hr (@ipt_config) {
+        my $table    = $hr->{'table'};
+        my $to_chain = $hr->{'to_chain'};
 
         if ($ipt->chain_exists($table, $to_chain)) {
             my ($rv, $output_aref) =
@@ -4448,7 +4448,7 @@ sub timeout_auto_blocked_ips() {
     return;
 }
 
-sub build_ipt_block_config() {
+sub build_ipt_config() {
 
     my $ipt = new IPTables::ChainMgr(
         'iptables' => $cmds{'iptables'}
@@ -4475,23 +4475,23 @@ sub build_ipt_block_config() {
                 my $msg = "invalid direction $hsh{'direction'} " .
                     "in IPT_AUTO_CHAIN$ctr keyword";
                 &Psad::psyslog('psad', $msg) unless $no_syslog_alerts;
-                print STDERR "[-] build_ipt_block_config(): $msg\n"
+                print STDERR "[-] build_ipt_config(): $msg\n"
                     if $debug;
                 next VAR;
             }
             if ($ipt->chain_exists($hsh{'table'}, $hsh{'from_chain'})) {
-                push @ipt_block_config, \%hsh;
+                push @ipt_config, \%hsh;
             } else {
                 my $msg = "invalid IPT_AUTO_CHAIN$ctr keyword, " .
                     "$hsh{'from_chain'} chain does not exist.";
                 &Psad::psyslog('psad', $msg) unless $no_syslog_alerts;
-                print STDERR "[-] build_ipt_block_config(): $msg\n"
+                print STDERR "[-] build_ipt_config(): $msg\n"
                     if $debug;
             }
         } else {
             my $msg = "invalid IPT_AUTO_CHAIN$ctr variable: $value";
             &Psad::psyslog('psad', $msg) unless $no_syslog_alerts;
-            print STDERR "[-] build_ipt_block_config(): $msg\n" if $debug;
+            print STDERR "[-] build_ipt_config(): $msg\n" if $debug;
         }
         $ctr++;
     }
@@ -5149,13 +5149,13 @@ sub print_blocked_ip_status() {
                 my $ip    = $1;
                 print "        $ip";
                 my $blocked = 0;
-                for my $block_hr (@ipt_block_config) {
+                for my $hr (@ipt_config) {
                     if ($ipt->find_ip_rule($ip, '0.0.0.0/0',
-                            $block_hr->{'table'},
-                            $block_hr->{'to_chain'},
-                            $block_hr->{'target'})) {
+                            $hr->{'table'},
+                            $hr->{'to_chain'},
+                            $hr->{'target'})) {
                         $blocked = 1;
-                        print " $block_hr->{'to_chain'}($block_hr->{'target'})";
+                        print " $hr->{'to_chain'}($hr->{'target'})";
                     }
                 }
                 $found_line = 1;

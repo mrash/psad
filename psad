@@ -368,41 +368,62 @@ open FWDATA, $FW_DATA;
 ### Get the mtimes of the signatures and auto ips files.
 my $sigs_mtime     = stat($sigs_file)->mtime if $sigs_file;
 my $auto_ips_mtime = stat($auto_ips_file)->mtime if $auto_ips_file;
-#================== #### main loop #### ======================
+
+
+###=========================================================###
+######                    MAIN LOOP                      ######
+###=========================================================###
 for (;;) {
+
+    ### See if we need to import any new signatures
     if ($sigs_file) {
         &check_import(\$sigs_mtime, $sigs_file, \%Scan, 1);
     }
+
+    ### See if we need to re-import the psad_auto_ips file
     if ($auto_ips_file) {
         &check_import(\$auto_ips_mtime, $auto_ips_file, \%Scan, 0);
     }
 
-    ### Get any new packets have been written to $FW_DATA by kmsgsd for psad analysis.
+    ### Get any new packets have been written to
+    ### $FW_DATA by kmsgsd for psad analysis.
     my @new_packets = <FWDATA>;
 
     if (@new_packets) {
         my $found_potential_scan = &check_scan(\%Scan, \@new_packets, \%Sigs, $sigs_file,
-                                            $netstat_lookup, $local_ips_href, $errors);
+                                               $netstat_lookup, $local_ips_href, $errors);
         if ($found_potential_scan) {
+
             ### Assign a danger level to the scan
             &assign_danger_level(\%Scan, \%Auto_ips);
-            ### Log and send an email alert about the scan
+
+            ### Log and send an email/syslog alert
             &scan_logr(\%Scan, $output, $dnslookups, $whoislookups);
+
             ### Don't manage the firewall rules if psad is running on a syslog server
             if ($ENABLE_AUTO_IDS eq "Y" && ! $Syslog_server) {
                 &auto_psad_response(\%Scan);
             }
         }
     }
+
+    ### Print how many new packets we got in $FW_DATA if we are
+    ### running in $DEBUG mode
     if ($DEBUG) {
         print "MAIN: number of new packets: $#new_packets\n";
     }
+
     sleep $CHECK_INTERVAL;
+
+    ### clearerr() on the FWDATA filehandle to be ready for new packets
     FWDATA->clearerr();
 }
 exit 0;
-#================== #### end main #### ======================
+###=========================================================###
+######                    END MAIN                       ######
+###=========================================================###
 
+#=================== BEGIN SUBROUTINES ========================
 ### Keeps track of scanning ip's, increments packet counters,
 ### keep track of tcp flags for each scan (iptables only)
 sub check_scan() {

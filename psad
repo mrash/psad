@@ -3796,15 +3796,26 @@ sub archive_data() {
     closedir D;
     shift @files; shift @files;
 
-    for my $file (@files) {
-        if ($file =~ /$ip_re/ && -d $file) {
-            ### $file is an old scaning ip from a previous psad execution
-            my $old_ipdir     = $file;
-            my $archive_ipdir = "$config{'SCAN_DATA_ARCHIVE_DIR'}/$old_ipdir";
-            if (-d $archive_ipdir) {
-                rmtree $archive_ipdir;
+    IPDIR: for my $file (@files) {
+        if ($file =~ /$ip_re/ and -d $file) {
+            ### check for the danger level associated with this dir
+            if (-e "$file/danger_level") {
+                open F, "< $file/danger_level" or next IPDIR;
+                my $dl = <F>;
+                close F;
+                chomp $dl;
+                if ($dl >= $config{'MIN_ARCHIVE_DANGER_LEVEL'}) {
+                    ### $file is an old scaning ip from
+                    ### a previous psad execution
+                    my $old_ipdir     = $file;
+                    my $archive_ipdir =
+                        "$config{'SCAN_DATA_ARCHIVE_DIR'}/$old_ipdir";
+                    if (-d $archive_ipdir) {
+                        rmtree $archive_ipdir;
+                    }
+                    move $old_ipdir, $archive_ipdir;
+                }
             }
-            move $old_ipdir, $archive_ipdir;
         }
     }
 
@@ -4302,11 +4313,14 @@ sub disk_space_exceeded() {
             "$config{'PSAD_DIR'} on $config{'HOSTNAME'}", '',
             $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         &Psad::psyslog('psad', ".. removing data in $config{'PSAD_DIR'}");
-        if (-e "$config{'SCAN_DATA_ARCHIVE_DIR'}/fwdata_archive") {
-            open F, "> $config{'SCAN_DATA_ARCHIVE_DIR'}/fwdata_archive"
-                or die " ** Could not truncate ",
-                    "$config{'SCAN_DATA_ARCHIVE_DIR'}: $!";
-            close F;
+        if (-d $config{'SCAN_DATA_ARCHIVE_DIR'}) {
+            ### remove the entire archive directory (we have run out of
+            ### disk so keeping old scan directories around is the least
+            ### of our worries).
+            &Psad::psyslog('psad',
+                "** removing $config{'SCAN_DATA_ARCHIVE_DIR'} directory");
+            rmtree $config{'SCAN_DATA_ARCHIVE_DIR'};
+            mkdir $config{'SCAN_DATA_ARCHIVE_DIR'}, 0500;
         }
         opendir D, $config{'PSAD_DIR'} or
             die " ** Could not open dir: $config{'PSAD_DIR'}: $!";
@@ -4319,6 +4333,7 @@ sub disk_space_exceeded() {
                 opendir IP, $ipdir or die $!;
                 my @scanfiles = readdir IP;
                 closedir IP;
+                shift @scanfiles; shift @scanfiles;
                 for my $file (@scanfiles) {
                     if (-e "${ipdir}/$file" and $file =~ /_signatures/) {
                         unlink "${ipdir}/$file";
@@ -4412,7 +4427,7 @@ sub required_vars() {
         DSHIELD_ALERT_INTERVAL DSHIELD_ALERT_EMAIL DSHIELD_USER_ID
         DSHIELD_USER_EMAIL DISK_CHECK_INTERVAL DISK_MAX_PERCENTAGE
         DISK_MAX_RM_RETRIES ETC_HOSTS_DENY ETC_SYSLOG_CONF
-        ETC_SYSLOGNG_CONF
+        ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

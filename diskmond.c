@@ -32,8 +32,11 @@
 *  $Id$
 */
 
+#define DEBUG 1
+
 /* INCLUDES *****************************************************************/
 #include "psad.h"
+#include <sys/vfs.h> /* statfs() */
 
 /* GLOBALS ******************************************************************/
 short int email_ctr = 0;
@@ -45,6 +48,9 @@ char mailCmd[MAX_GEN_LEN+1];
 /* PROTOTYPES ***************************************************************/
 static void parse_config(
     char *config_file,
+    char *psad_dir,
+    char *fwdata_file,
+    char *archive_dir,
     char *mailCmd,
     char *mail_addrs,
     char *diskmond_pid_file,
@@ -53,15 +59,22 @@ static void parse_config(
     unsigned int *diskmond_max_retries
 );
 
+void rm_data(char *fwdata_file);
+
 /* MAIN *********************************************************************/
 int main(int argc, char *argv[]) {
     char config_file[MAX_PATH_LEN+1];
+    char psad_dir[MAX_PATH_LEN+1];
+    char fwdata_file[MAX_PATH_LEN+1];
+    char archive_dir[MAX_PATH_LEN+1];
     char diskmond_pid_file[MAX_PATH_LEN+1];
+    float current_prct = 0;
     unsigned short int max_disk_percentage = 95; /* default to 95% utilization */
     unsigned int diskmond_check_interval   = 5;  /* default to 5 seconds */
     unsigned int diskmond_max_retries      = 10; /* default to 10 tries */
     time_t config_mtime;
     struct stat statbuf;
+    struct statfs statfsbuf;
 
 #ifdef DEBUG
     printf(" ... Entering DEBUG mode ...\n");
@@ -97,6 +110,9 @@ int main(int argc, char *argv[]) {
     /* parse the config file */
     parse_config(
         config_file,
+        psad_dir,
+        fwdata_file,
+        archive_dir,
         mailCmd,
         mail_addrs,
         diskmond_pid_file,
@@ -107,6 +123,11 @@ int main(int argc, char *argv[]) {
 
     /* first make sure there isn't another diskmond already running */
     check_unique_pid(diskmond_pid_file, "diskmond");
+
+    if (chdir(psad_dir)) {
+        printf(" ... @@@ Could not chdir() into: %s\n", psad_dir);
+        exit(EXIT_FAILURE);
+    }
 
 #ifndef DEBUG
     /* become a daemon */
@@ -122,7 +143,15 @@ int main(int argc, char *argv[]) {
 
     /* MAIN LOOP: */
     for (;;) {
-        sleep(diskmond_check_interval);
+        if (!statfs(psad_dir, &statfsbuf)) {
+            current_prct = (float) statfsbuf.f_bfree / statfsbuf.f_blocks * 100;
+            if (current_prct > max_disk_percentage) {
+                printf("calling rmstuff()\n");
+                rm_data(fwdata_file);
+            } else {
+                printf("current_prct: %f\n", current_prct);
+            }
+        }
 
         /* check to see if we need to re-import the config file */
         if (check_import_config(&config_mtime, config_file)) {
@@ -132,6 +161,9 @@ int main(int argc, char *argv[]) {
             /* reparse the config file since it was updated */
             parse_config(
                 config_file,
+                psad_dir,
+                fwdata_file,
+                archive_dir,
                 mailCmd,
                 mail_addrs,
                 diskmond_pid_file,
@@ -140,6 +172,8 @@ int main(int argc, char *argv[]) {
                 &diskmond_max_retries
             );
         }
+
+        sleep(diskmond_check_interval);
     }
 
     /* this statement doesn't get executed, but for completeness... */
@@ -149,6 +183,9 @@ int main(int argc, char *argv[]) {
 
 static void parse_config(
     char *config_file,
+    char *psad_dir,
+    char *fwdata_file,
+    char *archive_dir,
     char *mailCmd,
     char *mail_addrs,
     char *diskmond_pid_file,
@@ -183,6 +220,9 @@ static void parse_config(
         if ((*index != '#') && (*index != '\n')
                 && (*index != ';') && (index != NULL)) {
 
+            find_char_var("PSAD_DIR", psad_dir, index);
+            find_char_var("FW_DATA", fwdata_file, index);
+            find_char_var("SCAN_DATA_ARCHIVE_DIR", archive_dir, index);
             find_char_var("mailCmd ", mailCmd, index);
             find_char_var("EMAIL_ADDRESSES ", mail_addrs, index);
             find_char_var("DISKMOND_PID_FILE ", diskmond_pid_file, index);
@@ -199,5 +239,10 @@ static void parse_config(
     *diskmond_check_interval = atoi(char_diskmond_check_interval);
     *diskmond_max_retries    = atoi(char_diskmond_max_retries);
     fclose(config_ptr);
+    return;
+}
+
+void rm_data(char *fwdata_file) {
+    printf("removing: %s\n", fwdata_file);
     return;
 }

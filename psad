@@ -2893,7 +2893,9 @@ sub status() {
             chomp $pid;
             if (kill 0, $pid) {
                 print " .. $pidname (pid: $pid)";
-                my @ps_out = `$cmds{'ps'} -auxww`;
+                ### XXX should probably just parse /proc instead of
+                ### using ps
+                my @ps_out = `$cmds{'ps'} auxww`;
                 PS: for my $line (@ps_out) {
                     chomp $line;
                     if ($line =~ /^\S+\s+$pid\s+(\S+)\s+(\S+)/) {

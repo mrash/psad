@@ -37,10 +37,12 @@
 
 /* defines */
 #define PSADWATCHD_CONF "/etc/psad/psadwatchd.conf"
+#define ALERT_CONF "/etc/psad/alert.conf"
 
 /* globals */
-short int psad_syscalls_ctr     = 0;
-short int kmsgsd_syscalls_ctr   = 0;
+short int psad_syscalls_ctr   = 0;
+short int kmsgsd_syscalls_ctr = 0;
+unsigned short int no_email   = 0;
 const char mail_redr[] = " < /dev/null > /dev/null 2>&1";
 char hostname[MAX_GEN_LEN];
 char mail_addrs[MAX_GEN_LEN];
@@ -64,6 +66,10 @@ static void parse_config(
     unsigned int *psadwatchd_check_interval,
     unsigned int *psadwatchd_max_retries
 );
+static void parse_alert_config(
+    char *alert_config_file,
+    char *alerting_methods
+);
 static void check_process(
     const char *pid_name,
     const char *pid_file,
@@ -80,6 +86,8 @@ static void sighup_handler(int sig);
 /* main */
 int main(int argc, char *argv[]) {
     char config_file[MAX_PATH_LEN];
+    char alert_config_file[MAX_PATH_LEN];
+    char alerting_methods[MAX_GEN_LEN];
     char psadCmd[MAX_PATH_LEN];
     char psad_pid_file[MAX_PATH_LEN];
     char psad_cmdline_file[MAX_PATH_LEN];
@@ -88,23 +96,29 @@ int main(int argc, char *argv[]) {
     char psadwatchd_pid_file[MAX_PATH_LEN];
     unsigned int psadwatchd_check_interval = 5;  /* default to 5 seconds */
     unsigned int psadwatchd_max_retries = 10; /* default to 10 tries */
+    int cmdlopt;
 
 #ifdef DEBUG
     fprintf(stderr, "[+] Entering DEBUG mode\n");
     sleep(1);
 #endif
 
-    /* handle command line arguments */
-    if (argc == 1) {  /* nothing but the program name was
-                         specified on the command line */
-        strlcpy(config_file, PSADWATCHD_CONF, MAX_PATH_LEN);
-    } else if (argc == 2) {  /* the path to the config file was
-                                supplied on the command line */
-        strlcpy(config_file, argv[1], MAX_PATH_LEN);
-    } else {
-        printf("[*] You can only specify the path to a single config file:  ");
-        printf("Usage:  psadwatchd <configfile>\n");
-        exit(EXIT_FAILURE);
+    strlcpy(config_file, PSADWATCHD_CONF, MAX_PATH_LEN);
+    strlcpy(alert_config_file, ALERT_CONF, MAX_PATH_LEN);
+
+    while((cmdlopt = getopt(argc, argv, "c:k:")) != -1) {
+        switch(cmdlopt) {
+            case 'c':
+                strlcpy(config_file, optarg, MAX_PATH_LEN);
+                break;
+            case 'a':
+                strlcpy(alert_config_file, optarg, MAX_PATH_LEN);
+                break;
+            default:
+                printf("[+] Usage: psadwatchd [-c <config file>] ");
+                printf("[-a <alert config file>]\n");
+                exit(EXIT_FAILURE);
+        }
     }
 
 #ifdef DEBUG
@@ -127,6 +141,13 @@ int main(int argc, char *argv[]) {
         &psadwatchd_check_interval,
         &psadwatchd_max_retries
     );
+
+    parse_alert_config(alert_config_file, alerting_methods);
+
+    /* see if we are suppose to disable all email alerts */
+    if (strncmp("noemail", alerting_methods, MAX_GEN_LEN) == 0) {
+        no_email = 1;
+    }
 
     /* first make sure there isn't another psadwatchd already running */
     check_unique_pid(psadwatchd_pid_file, "psadwatchd");
@@ -249,8 +270,10 @@ static void check_process(
 #ifdef DEBUG
         fprintf(stderr, "sending mail:  %s\n", mail_str);
 #endif
-        /* send the email */
-        send_alert_email(shCmd, mailCmd, mail_str);
+        if (! no_email) {
+            /* send the email */
+            send_alert_email(shCmd, mailCmd, mail_str);
+        }
 
         /* execute the binary_path psad daemon */
         exec_binary(binary_path, cmdline_file);
@@ -270,7 +293,7 @@ static void check_process(
 
 static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries)
 {
-    if (strcmp("psad", pid_name) == 0) {
+    if (strncmp("psad", pid_name, MAX_PATH_LEN) == 0) {
         psad_syscalls_ctr++;
 #ifdef DEBUG
         fprintf(stderr,
@@ -279,7 +302,7 @@ static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries)
 #endif
         if (psad_syscalls_ctr >= max_retries)
             give_up(pid_name);
-    } else if (strcmp("kmsgsd", pid_name) == 0) {
+    } else if (strncmp("kmsgsd", pid_name, MAX_PATH_LEN) == 0) {
         kmsgsd_syscalls_ctr++;
 #ifdef DEBUG
         fprintf(stderr,
@@ -294,9 +317,9 @@ static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries)
 
 static void reset_syscall_ctr(const char *pid_name)
 {
-    if (strcmp("psad", pid_name) == 0) {
+    if (strncmp("psad", pid_name, MAX_PATH_LEN) == 0) {
         psad_syscalls_ctr = 0;
-    } else if (strcmp("kmsgsd", pid_name) == 0) {
+    } else if (strncmp("kmsgsd", pid_name, MAX_PATH_LEN) == 0) {
         kmsgsd_syscalls_ctr = 0;
     }
     return;
@@ -316,8 +339,10 @@ static void give_up(const char *pid_name)
     strlcat(mail_str, mail_addrs, MAX_MSG_LEN);
     strlcat(mail_str, mail_redr, MAX_MSG_LEN);
 
-    /* Send the email */
-    send_alert_email(shCmd, mailCmd, mail_str);
+    if (! no_email) {
+        /* Send the email */
+        send_alert_email(shCmd, mailCmd, mail_str);
+    }
     exit(EXIT_FAILURE);
 }
 
@@ -458,6 +483,41 @@ static void parse_config(
     }
     *psadwatchd_check_interval = atoi(char_psadwatchd_check_interval);
     *psadwatchd_max_retries    = atoi(char_psadwatchd_max_retries);
+    fclose(config_ptr);
+    return;
+}
+
+static void parse_alert_config(
+    char *alert_config_file,
+    char *alerting_methods)
+{
+    FILE *config_ptr;         /* FILE pointer to the config file */
+    int linectr = 0;
+    char config_buf[MAX_LINE_BUF];
+    char *index;
+
+    if ((config_ptr = fopen(alert_config_file, "r")) == NULL) {
+        perror("[*] Could not open config file");
+        exit(EXIT_FAILURE);
+    }
+
+    /* increment through each line of the config file */
+    while ((fgets(config_buf, MAX_LINE_BUF, config_ptr)) != NULL) {
+        linectr++;
+        index = config_buf;  /* set the index pointer to the
+                                beginning of the line */
+
+        /* advance the index pointer through any whitespace
+         * at the beginning of the line */
+        while (*index == ' ' || *index == '\t') index++;
+
+        /* skip comments and blank lines, etc. */
+        if ((*index != '#') && (*index != '\n') &&
+                (*index != ';') && (index != NULL)) {
+
+            find_char_var("ALERTING_METHODS ", alerting_methods, index);
+        }
+    }
     fclose(config_ptr);
     return;
 }

@@ -192,3 +192,8 @@ Richard K. Szabo        Discovered and helped test a bug where psad was not
 Stefan Rydberg          Discovered a perl internal pp_match bug with psad-
                         1.3.1 on SuSE 8.  Helped troubleshoot -pre
                         releases of psad-1.3.2.
+
+Joshua Jensen           Found bug with the manner in which fwcheck_psad.pl
+                        was being called from psad (improperly passing
+                        --no-fw-search-all option even if FW_SEARCH_ALL
+                        was set to "Y").

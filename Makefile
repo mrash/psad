@@ -5,7 +5,7 @@
 #
 #  Credits:  (see the CREDITS file)
 #
-#  Version: 1.0
+#  Version: 1.2.4
 #
 #  Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.org)
 #

@@ -54,8 +54,8 @@ sub chain_action_rules() {
         close F;
     } else {
         eval {
-            open IPT, "$iptables -t $table -nL $chain -v |"
-                or croak "[*] Could not execute $iptables -t $table -nL $chain -v";
+            open IPT, "$iptables -t $table -n -L $chain -v |"
+                or croak "[*] Could not execute $iptables -t $table -n -L $chain -v";
             @ipt_lines = <IPT>;
             close IPT;
         };
@@ -197,8 +197,8 @@ sub default_drop() {
         close F;
     } else {
         eval {
-            open IPT, "$iptables -t $table -nL $chain |"
-                or croak "[*] Could not execute $iptables -t $table -nL $chain";
+            open IPT, "$iptables -t $table -n -L $chain |"
+                or croak "[*] Could not execute $iptables -t $table -n -L $chain";
             @ipt_lines = <IPT>;
             close IPT;
         };
@@ -279,8 +279,8 @@ sub default_log() {
         close F;
     } else {
         eval {
-            open IPT, "$iptables -t $table -nL |"
-                or croak "[*] Could not execute $iptables -t $table -nL";
+            open IPT, "$iptables -t $table -n -L |"
+                or croak "[*] Could not execute $iptables -t $table -n -L";
             @ipt_lines = <IPT>;
             close IPT;
         };

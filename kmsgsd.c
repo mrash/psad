@@ -56,7 +56,8 @@ int main(int argc, char *argv[]) {
 
 #ifdef DEBUG
     printf(" ... Entering DEBUG mode ...\n");
-    printf(" ... Firewall messages will be written to both STDOUT _and_ to fwdata\n\n");
+    printf(" ... Firewall messages will be written to both ");
+    printf("STDOUT _and_ to fwdata\n\n");
     sleep(1);
     printf(" ... parsing config_file: %s\n", config_file);
 #endif
@@ -65,9 +66,11 @@ int main(int argc, char *argv[]) {
     check_unique_pid(KMSGSD_PID_FILE, prog_name);
 
     /* handle command line arguments */
-    if (argc == 1) {  /* nothing but the program name was specified on the command line */
+    if (argc == 1) {
+        /* nothing but the program name was specified on the command line */
         strcpy(config_file, CONFIG_FILE);
-    } else if (argc == 2) {  /* the path to the config file was supplied on the command line */
+    } else if (argc == 2) {
+        /* the path to the config file was supplied on the command line */
         strcpy(config_file, argv[1]);
     } else {
         printf(" ... You may only specify the path to a single config file:  ");
@@ -139,7 +142,8 @@ int main(int argc, char *argv[]) {
 }
 /******************** end main ********************/
 
-static void parse_config(char *config_file, char *psadfifo_file, char *fwdata_file, char *fw_msg_search)
+static void parse_config(char *config_file, char *psadfifo_file,
+    char *fwdata_file, char *fw_msg_search)
 {
     FILE *config_ptr;         /* FILE pointer to the config file */
     int linectr = 0;
@@ -147,7 +151,6 @@ static void parse_config(char *config_file, char *psadfifo_file, char *fwdata_fi
     char *index;
 
     if ((config_ptr = fopen(config_file, "r")) == NULL) {
-        /* fprintf(stderr, " ... @@@ Could not open the config file: %s\n", config_file);  */
         perror(" ... @@@ Could not open config file");
         exit(EXIT_FAILURE);
     }
@@ -155,13 +158,16 @@ static void parse_config(char *config_file, char *psadfifo_file, char *fwdata_fi
     /* increment through each line of the config file */
     while ((fgets(config_buf, MAX_LINE_BUF, config_ptr)) != NULL) {
         linectr++;
-        index = config_buf;  /* set the index pointer to the beginning of the line */
+        /* set the index pointer to the beginning of the line */
+        index = config_buf;
 
-        /* advance the index pointer through any whitespace at the beginning of the line */
+        /* advance the index pointer through any whitespace
+         * at the beginning of the line */
         while (*index == ' ' || *index == '\t') index++;
 
         /* skip comments and blank lines, etc. */
-        if ((*index != '#') && (*index != '\n') && (*index != ';') && (index != NULL)) {
+        if ((*index != '#') && (*index != '\n') &&
+                (*index != ';') && (index != NULL)) {
 
             find_char_var("PSAD_FIFO ", psadfifo_file, index);
             find_char_var("FW_DATA ", fwdata_file, index);

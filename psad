@@ -176,7 +176,6 @@ use File::Path;
 use Date::Calc qw(Timezone This_Year Decode_Month);
 use Getopt::Long 'GetOptions';
 use Socket;
-use Sys::Hostname 'hostname';
 use POSIX;
 use IO::Handle;
 use Data::Dumper;
@@ -373,9 +372,6 @@ my $oldarg_logserv;
 my $b_time;
 my $test_pkt;
 my $test_pktend;
-
-### get the hostname of the machine
-my $hostname = hostname;
 
 ### save a copy of the command line arguments
 my @args_cp = @ARGV;
@@ -2096,7 +2092,7 @@ sub scan_logr() {
             &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=" .
                 "-=-=-=-=\n", \%print_hsh);
             &Psad::logr(" ** psad: Suspicious traffic detected against " .
-                "$hostname ($dst).\n\n", \%print_hsh);
+                "$config{'HOSTNAME'} ($dst).\n\n", \%print_hsh);
             &Psad::logr("\n", \%print_hsh);
             &Psad::logr(sprintf("%${log_len}s%s", 'Source: ', "$src\n"),
                 \%print_hsh);
@@ -2836,7 +2832,7 @@ sub rm_blocked_ip() {
 sub email_limit_reached() {
     my ($src, $dst) = @_;
     my $subject = " ** psad: email message limit for $src has " .
-        "been reached on $hostname ($dst)!!!";
+        "been reached on $config{'HOSTNAME'} ($dst)!!!";
     &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
     return;
 }
@@ -2967,12 +2963,13 @@ sub stop_psad() {
                     $rv = 1;
                 }
             } else {
-                print " ** psad: $pidname is not running on $hostname.\n";
+                print " ** psad: $pidname is not running on ",
+                    "$config{'HOSTNAME'}.\n";
                 $rv = 1;
             }
         } else {
             print " ** psad: pid file $pidfile does not exist for ",
-                "$pidname on $hostname\n";
+                "$pidname on $config{'HOSTNAME'}\n";
             $rv = 1;
         }
     }
@@ -2989,10 +2986,10 @@ sub restart() {
         chomp $cmdline;
     } else {
         die " ** psad:  No other psad process is ",
-            "running on $hostname!";
+            "running on $config{'HOSTNAME'}!";
     }
     &stop_psad();
-    print " .. Restarting the psad daemons on $hostname\n";
+    print " .. Restarting the psad daemons on $config{'HOSTNAME'}\n";
     system "$cmds{'psad'} $cmdline";
     return 0;
 }
@@ -3031,11 +3028,12 @@ sub status() {
                 print "\n";
                 $rv = 1;
             } else {
-                print " ** psad: $pidname is not running on $hostname\n";
+                print " ** psad: $pidname is not running on ",
+                    "$config{'HOSTNAME'}\n";
             }
         } else {
             print " ** psad: pid file $pidfile does not exist for ",
-                "$pidname on $hostname\n";
+                "$pidname on $config{'HOSTNAME'}\n";
         }
     }
     return $rv;
@@ -3273,10 +3271,11 @@ sub usr1() {
                     }
                 }
             } else {
-                print " ** Could not send psad the USR1 signal on $hostname\n";
+                print " ** Could not send psad the USR1 signal on ",
+                    "$config{'HOSTNAME'}\n";
             }
         } else {
-            print " ** psad is not running on $hostname\n";
+            print " ** psad is not running on $config{'HOSTNAME'}\n";
         }
     }
     return $rv;
@@ -3538,9 +3537,9 @@ sub fw_check() {
         my $input_rv = &ipt_chk_chain('INPUT');
         my $forward_rv = &ipt_chk_chain('FORWARD');
         if ($input_rv && $forward_rv) {
-            &Psad::logr(" .. The iptables ruleset on $hostname will log and " .
-                "block unwanted packets in both the INPUT and FORWARD " .
-                "chains.  Firewall config success!\n",
+            &Psad::logr(" .. The iptables ruleset on $config{'HOSTNAME'} " .
+                "will log and block unwanted packets in both the INPUT and " .
+                "FORWARD chains.  Firewall config success!\n",
                 {$config{'FW_CHECK_FILE'} => 1});
             $rv = 1;
         } else {
@@ -3549,8 +3548,8 @@ sub fw_check() {
                 'defined chains and so it is possible your firewall config ' .
                 "is compatible with psad anyway.\n",
                 {$config{'FW_CHECK_FILE'} => 1});
-            &Psad::sendmail(" ** psad: firewall setup warning on $hostname!",
-                $config{'FW_CHECK_FILE'},
+            &Psad::sendmail(" ** psad: firewall setup warning on " .
+                "$config{'HOSTNAME'}!", $config{'FW_CHECK_FILE'},
                 $config{'EMAIL_ADDRESSES'},
                 $cmds{'mail'}
             );
@@ -3656,9 +3655,9 @@ sub ipt_chk_chain() {
                     $str2 = "$proto scans";
                 }
                 &Psad::logr(" ** The $chain chain in the iptables ruleset on " .
-                    "$hostname does not include a default LOG rule $str1.  " .
-                    "psad will not be able to detect $str2 without such a " .
-                    "rule.\n",
+                    "$config{'HOSTNAME'} does not include a default LOG rule " .
+                    "$str1.  psad will not be able to detect $str2 without " .
+                    "such a rule.\n",
                     {$fwc => 1});
                 &Psad::logr("\n", {$fwc => 1});
                 $rv = 0;
@@ -3668,13 +3667,13 @@ sub ipt_chk_chain() {
                     !~ /$config{'FW_MSG_SEARCH'}/) {
                 if ($proto eq 'all') {
                     $str1 = " ** The $chain chain in the iptables ruleset " .
-                    "on $hostname includes a default LOG rule for all " .
-                    "protocols,";
+                    "on $config{'HOSTNAME'} includes a default LOG rule for " .
+                    "all protocols,";
                     $str2 = 'scans';
                 } else {
                     $str1 = " ** The $chain chain in the iptables ruleset " .
-                    "on $hostname inclues a default LOG rule for the $proto " .
-                    "protocol,";
+                    "on $config{'HOSTNAME'} inclues a default LOG rule for " .
+                    "the $proto protocol,";
                     $str2 = "$proto scans";
                 }
                 &Psad::logr("$str1 but the rule does not have a log prefix " .
@@ -3693,8 +3692,8 @@ sub ipt_chk_chain() {
                     $str1 = "for the $proto protocol";
                 }
                 &Psad::logr(" ** The $chain chain in the iptables ruleset on " .
-                    "$hostname does not include a default DROP rule $str1.\n",
-                    {$fwc => 1});
+                    "$config{'HOSTNAME'} does not include a default DROP " .
+                    "rule $str1.\n", {$fwc => 1});
                 &Psad::logr("\n", {$fwc => 1});
                 $rv = 0;
             }
@@ -3714,10 +3713,10 @@ sub ipt_chk_chain() {
         }
     } else {
         &Psad::logr(" ** The $chain chain in the iptables ruleset on " .
-            "$hostname does not include default rules that will log and " .
-            'drop unwanted packets. You need to include two default rules; '.
-            'one that logs packets that have not been accepted by previous ' .
-            'rules (this rule should have a logging prefix of ' .
+            "$config{'HOSTNAME'} does not include default rules that will " .
+            "log and drop unwanted packets. You need to include two default " .
+            "rules; one that logs packets that have not been accepted by " .
+            "previous rules (this rule should have a logging prefix of " .
             "\"$config{'FW_MSG_SEARCH'}\"), and a final rule that drops any " .
             "unwanted packets.\n",
             {$fwc => 1});
@@ -3760,7 +3759,7 @@ sub required_vars() {
         IPTABLES_BLOCK_METHOD IPCHAINS_BLOCK_METHOD
         TCPWRAPPERS_BLOCK_METHOD EMAIL_ALERT_DANGER_LEVEL
         PSAD_FIFO WHOIS_THRESHOLD WHOIS_TIMEOUT SNORT_RULES_DIR
-        PACKET_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR
+        PACKET_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR HOSTNAME
         PROC_FORWARD_FILE ENABLE_PERSISTENCE AUTO_BLOCK_IPT_FILE
         AUTO_BLOCK_IPCH_FILE AUTO_BLOCK_TCPWR_FILE PSAD_SIGS_FILE
         PSAD_AUTO_IPS_FILE AUTO_BLOCK_TIMEOUT EXTERNAL_SCRIPT

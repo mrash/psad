@@ -1440,16 +1440,21 @@ sub scan_logr() {
             my $syslog_flags = '';
             my $dnsstring    = '';
             my $rdns         = '';
+            my $syslog_range = '';
+            my $tcp  = 0;
+            my $udp  = 0;
+            my $icmp = 0;
             my $abs_s_port;
             my $abs_e_port;
             my $tcp_s_port;
             my $tcp_e_port;
             my $udp_s_port;
             my $udp_e_port;
-            my $tcp  = 0;
-            my $udp  = 0;
-            my $icmp = 0;
+
+            ### get the current danger level and the absolute number
+            ### of packets used in the scan so far
             my $curr_dlevel = $scan{$src}{$dst}{'CURR_DL'};
+            my $abs_numpkts = $scan{$src}{$dst}{'ABSNUM'};
 
             unless (defined $scan{$src}{$dst}{'EMAIL_COUNT'}) {
                 $scan{$src}{$dst}{'EMAIL_COUNT'} = 0;
@@ -1494,18 +1499,36 @@ sub scan_logr() {
                 $tcp = 1;
                 $tcp_s_port = $scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'S_PORT'};
                 $tcp_e_port = $scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'E_PORT'};
+                if ($tcp_s_port == $tcp_e_port) {
+                    $tcp_newrange = $tcp_s_port;
+                } else {
+                    $tcp_newrange = "$tcp_s_port-$tcp_e_port";
+                }
             }
             if (defined $scan{$src}{$dst}{'UDP'}{'CURR_INT'}) {
                 $udp = 1;
                 $udp_s_port = $scan{$src}{$dst}{'UDP'}{'CURR_INT'}{'S_PORT'};
                 $udp_e_port = $scan{$src}{$dst}{'UDP'}{'CURR_INT'}{'E_PORT'};
+                if ($udp_s_port == $udp_e_port) {
+                    $udp_newrange = $udp_s_port;
+                } else {
+                    $udp_newrange = "$udp_s_port-$udp_e_port";
+                }
+            }
+            if ($tcp || $udp) {
+                $abs_s_port = $scan{$src}{$dst}{'S_PORT'};
+                $abs_e_port = $scan{$src}{$dst}{'E_PORT'};
+                if ($abs_s_port == $abs_e_port) {
+                    $range = $abs_s_port;
+                } else {
+                    $range = "$abs_s_port-$abs_e_port";
+                }
             }
             if (defined $scan{$src}{$dst}{'ICMP'}{'CURR_INT'}) {
                 $icmp = 1;
             }
-            my $s_time = scalar localtime $scan{$src}{$dst}{'S_TIME'};
-            my $time   = scalar localtime();
 
+            ### get reverse dns info
             unless ($no_rdns) {
                 if ($src =~ /^(?:\d{1,3}\.){3}\d{1,3}$/) {
                     my $ipaddr = gethostbyname $src;
@@ -1521,39 +1544,17 @@ sub scan_logr() {
                     $dnsstring = $src;
                 }
             }
+
+            ### get whois info
             unless ($no_whois) {
                 $whois_info_aref = &get_whois_data($src, $whois_file);
             }
-            if ($tcp || $udp) {
-                $abs_s_port = $scan{$src}{$dst}{'S_PORT'};
-                $abs_e_port = $scan{$src}{$dst}{'E_PORT'};
-                if ($abs_s_port == $abs_e_port) {
-                    $range = $abs_s_port;
-                } else {
-                    $range = "$abs_s_port-$abs_e_port";
-                }
-            }
-            if ($tcp) {
-                if ($tcp_s_port == $tcp_e_port) {
-                    $tcp_newrange = $tcp_s_port;
-                } else {
-                    $tcp_newrange = "$tcp_s_port-$tcp_e_port";
-                }
-            }
-            if ($udp) {
-                if ($udp_s_port == $udp_e_port) {
-                    $udp_newrange = $udp_s_port;
-                } else {
-                    $udp_newrange = "$udp_s_port-$udp_e_port";
-                }
-                ### need to delete the current interval so
-                ### it won't show up in the next alert
-                delete $scan{$src}{$dst}{'UDP'}{'CURR_INT'};
-            }
-            if ($icmp) {
-                delete $scan{$src}{$dst}{'ICMP'}{'CURR_INT'};
-            }
             print STDOUT "scan_logr():  generating email......\n" if $debug;
+
+            ### get the absolute starting time for the scan and the
+            ### current time
+            my $s_time = scalar localtime $scan{$src}{$dst}{'S_TIME'};
+            my $time   = scalar localtime();
 
             &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=" .
                 "-=-=-=-=\n", \%print_hsh);
@@ -1585,20 +1586,18 @@ sub scan_logr() {
                     &Psad::logr(sprintf("%${log_len}s%s", 'Nmap options: ',
                         "$nmap_opts\n"), \%print_hsh) if $nmap_opts;
                 }
-                $syslog_flags =~ s/\s$//;
-                ### delete the current interval so it won't show up in the
-                ### next alert
-                delete $scan{$src}{$dst}{'TCP'}{'CURR_INT'};
+                $syslog_range .= "tcp=[$tcp_newrange] $syslog_flags";
             }
             if ($udp) {
                 &Psad::logr(sprintf("%${log_len}s%s", 'Newly scanned UDP ports: ',
                     "[$udp_newrange]\n"), \%print_hsh);
-                &Psad::logr(sprintf("%${log_len}s%s", 'Newly Blocked UDP packets: ',
+                &Psad::logr(sprintf("%${log_len}s%s", 'Newly blocked UDP packets: ',
                     "[$scan{$src}{$dst}{'UDP'}{'CURR_INT'}{'PKTS'}]\n"), \%print_hsh);
             }
             if ($icmp) {
-                &Psad::logr(sprintf("%${log_len}s%s", 'Newly Blocked ICMP packets: ',
+                &Psad::logr(sprintf("%${log_len}s%s", 'Newly blocked ICMP packets: ',
                     "[$scan{$src}{$dst}{'ICMP'}{'CURR_INT'}{'PKTS'}]\n"), \%print_hsh);
+                $syslog_range .= "udp=[$udp_newrange] ";
             }
             unless ($icmp) {
                 &Psad::logr(sprintf("%${log_len}s%s", 'Complete TCP/UDP port range: ',
@@ -1615,7 +1614,7 @@ sub scan_logr() {
             &Psad::logr(sprintf("%${log_len}s%s", 'DNS info: ',
                 "$dnsstring\n"), \%print_hsh) unless $no_rdns;
 
-#                my $syslog_sig_title = '';
+#           my $syslog_sig_title = '';
             if ($use_iptables) {
                 SIGS: for my $proto ('TCP', 'UDP', 'ICMP') {
                     if (defined $scan{$src}{$dst}{$proto}{'CURR_SIG'}) {
@@ -1627,14 +1626,14 @@ sub scan_logr() {
                                 $scan{$src}{$dst}{$proto}{'CURR_SIG'}{$sig_id};
                             &Psad::logr("$sig_msg  Packets=$sig_num_packets\n",
                                 \%print_hsh);
-                                ### signature logging with syslog is not yet supported
-                                ### (requires a message for each matched signature).
-#                                if ($sigmatch =~ /^(\".*\")/) {
-#                                    $syslog_sig_title = "signature=$1";
-#                                }
+                            ### signature logging with syslog is not yet supported
+                            ### (requires a message for each matched signature).
+#                           if ($sigmatch =~ /^(\".*\")/) {
+#                               $syslog_sig_title = "signature=$1";
+#                           }
                         }
-                            ### need to delete the current signature so it
-                            ### won't show up in the next alert
+                        ### need to delete the current signature so it
+                        ### won't show up in the next alert
                         delete $scan{$src}{$dst}{$proto}{'CURR_SIG'};
                     }
                     if (defined $scan{$src}{$dst}{$proto}{'SIGMATCH'}) {
@@ -1659,20 +1658,11 @@ sub scan_logr() {
                     }
                 }
             }
-            my $syslog_range = '';
-            if ($tcp) {
-                $syslog_range .= "tcp=[$tcp_newrange] $syslog_flags";
-            }
-            if ($udp) {
-                $syslog_range .= "udp=[$udp_newrange] ";
-            }
-            my $syslog_num_pkts     = $scan{$src}{$dst}{'ABSNUM'};
-            my $syslog_danger_level = $scan{$src}{$dst}{'CURR_DL'};
 
             ### write a message to syslog
             openlog 'psad', LOG_DAEMON, LOG_LOCAL7;
             syslog LOG_INFO, "scan detected: $src -> $dst $syslog_range " .
-                "pkts=$syslog_num_pkts dangerlevel: $syslog_danger_level";
+                "pkts=$abs_numpkts dangerlevel: $curr_dlevel";
             closelog();
             unless ($no_whois) {
                 &Psad::logr("\n\n", \%print_hsh);
@@ -1701,6 +1691,11 @@ sub scan_logr() {
                 &Psad::logr("$scan{$src}{$dst}{'EMAIL_COUNT'}\n",
                     {$ecount_file => 0});
             }
+            ### delete all current intervals so they won't show up
+            ### in the next alert
+            delete $scan{$src}{$dst}{'TCP'}{'CURR_INT'};
+            delete $scan{$src}{$dst}{'UDP'}{'CURR_INT'};
+            delete $scan{$src}{$dst}{'ICMP'}{'CURR_INT'};
         }
     }
     return;

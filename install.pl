@@ -194,7 +194,7 @@ sub install() {
     &logr(" ... Modifying /etc/syslog.conf to write kern.info " .
         "messages to $PSAD_FIFO\n");
     unless (-e '/etc/syslog.conf.orig') {
-        copy('/etc/syslog.conf', '/etc/syslog.conf.orig');
+        copy '/etc/syslog.conf', '/etc/syslog.conf.orig';
     }
     &archive('/etc/syslog.conf');
     open RS, '< /etc/syslog.conf' or
@@ -236,7 +236,7 @@ sub install() {
         system "$Cmds{'make'} -C whois-4.5.31";
         if (-e 'whois-4.5.31/whois') {
             &logr(" ... Copying whois binary to $WHOIS_PSAD\n");
-            copy("whois-4.5.31/whois", $WHOIS_PSAD);
+            copy "whois-4.5.31/whois", $WHOIS_PSAD;
         } else {
             die " ... @@@ Could not compile whois-4.5.31";
         }
@@ -383,34 +383,34 @@ sub install() {
         &archive("${PSAD_CONFDIR}/psad_signatures") unless $nopreserve;
         &logr(" ... Copying psad_signatures -> " .
             "${PSAD_CONFDIR}/psad_signatures\n");
-        copy('psad_signatures', "${PSAD_CONFDIR}/psad_signatures");
+        copy 'psad_signatures', "${PSAD_CONFDIR}/psad_signatures";
         &perms_ownership("${PSAD_CONFDIR}/psad_signatures", 0600);
     } else {
         &logr(" ... Copying psad_signatures -> " .
             "${PSAD_CONFDIR}/psad_signatures\n");
-        copy('psad_signatures', "${PSAD_CONFDIR}/psad_signatures");
+        copy 'psad_signatures', "${PSAD_CONFDIR}/psad_signatures";
         &perms_ownership("${PSAD_CONFDIR}/psad_signatures", 0600);
     }
     if (-e "${PSAD_CONFDIR}/psad_auto_ips") {
         &archive("${PSAD_CONFDIR}/psad_auto_ips") unless $nopreserve;
         &logr(" ... Copying psad_auto_ips -> " .
             "${PSAD_CONFDIR}/psad_auto_ips\n");
-        copy('psad_auto_ips', "${PSAD_CONFDIR}/psad_auto_ips");
+        copy 'psad_auto_ips', "${PSAD_CONFDIR}/psad_auto_ips";
         &perms_ownership("${PSAD_CONFDIR}/psad_auto_ips", 0600);
     } else {
         &logr(" ... Copying psad_auto_ips -> " .
             "${PSAD_CONFDIR}/psad_auto_ips\n");
-        copy('psad_auto_ips', "${PSAD_CONFDIR}/psad_auto_ips");
+        copy 'psad_auto_ips', "${PSAD_CONFDIR}/psad_auto_ips";
         &perms_ownership("${PSAD_CONFDIR}/psad_auto_ips", 0600);
     }
     if (-e "${PSAD_CONFDIR}/psad.conf") {
         &archive("${PSAD_CONFDIR}/psad.conf") unless $nopreserve;
         &logr(" ... Copying psad.conf -> ${PSAD_CONFDIR}/psad.conf\n");
-        copy('psad.conf', "${PSAD_CONFDIR}/psad.conf");
+        copy 'psad.conf', "${PSAD_CONFDIR}/psad.conf";
         &perms_ownership("${PSAD_CONFDIR}/psad.conf", 0600);
     } else {
         &logr(" ... Copying psad.conf -> ${PSAD_CONFDIR}/psad.conf\n");
-        copy('psad.conf', "${PSAD_CONFDIR}/psad.conf");
+        copy 'psad.conf', "${PSAD_CONFDIR}/psad.conf";
         &perms_ownership("${PSAD_CONFDIR}/psad.conf", 0600);
     }
     my $email_str = &query_email();
@@ -440,7 +440,7 @@ sub install() {
     if ($distro =~ /redhat/i) {
         if (-d $INIT_DIR) {
             &logr(" ... Copying psad-init -> ${INIT_DIR}/psad\n");
-            copy('psad-init', "${INIT_DIR}/psad");
+            copy 'psad-init', "${INIT_DIR}/psad";
             &perms_ownership("${INIT_DIR}/psad", 0744);
             &enable_psad_at_boot($distro);
         } else {
@@ -452,7 +452,7 @@ sub install() {
     } else {  ### psad is being installed on a non-redhat distribution
         if (-d $INIT_DIR) {
             &logr(" ... Copying psad-init.generic -> ${INIT_DIR}/psad\n");
-            copy('psad-init.generic', "${INIT_DIR}/psad");
+            copy 'psad-init.generic', "${INIT_DIR}/psad";
             &perms_ownership("${INIT_DIR}/psad", 0744);
             &enable_psad_at_boot($distro);
         } else {
@@ -787,7 +787,7 @@ sub archive() {
         move $targetbase, $newfile;
     }
     &logr(" ... Archiving $file -> $targetbase\n");
-    copy($file, $targetbase);   ### move $file into the archive directory
+    copy $file, $targetbase;   ### move $file into the archive directory
     return;
 }
 sub enable_psad_at_boot() {
@@ -879,7 +879,7 @@ sub check_commands() {
 sub install_manpage() {
     my $manpage = shift;
     ### remove old man page
-    unlink '/usr/local/man/man8/${manpage}' if (-e '/usr/local/man/man8/${manpage}');
+    unlink "/usr/local/man/man8/${manpage}" if (-e "/usr/local/man/man8/${manpage}");
 
     ### default location to put the psad man page, but check with
     ### /etc/man.config
@@ -926,7 +926,7 @@ sub install_manpage() {
     mkdir $mpath, 0755 unless -d $mpath;
     my $mfile = "${mpath}/${manpage}";
     &logr(" ... Installing $manpage man page as $mfile\n");
-    copy($manpage, $mfile);
+    copy $manpage, $mfile;
     &perms_ownership($mfile, 0644);
     return;
 }
@@ -934,21 +934,21 @@ sub install_manpage() {
 ### logging subroutine that handles multiple filehandles
 sub logr() {
     my $msg = shift;
-    for my $f (@LOGR_FILES) {
-        if ($f eq *STDOUT) {
+    for my $file (@LOGR_FILES) {
+        if ($file eq *STDOUT) {
             if (length($msg) > 72) {
                 print STDOUT wrap('', $SUB_TAB, $msg);
             } else {
                 print STDOUT $msg;
             }
-        } elsif ($f eq *STDERR) {
+        } elsif ($file eq *STDERR) {
             if (length($msg) > 72) {
                 print STDERR wrap('', $SUB_TAB, $msg);
             } else {
                 print STDERR $msg;
             }
         } else {
-            open F, ">> $f";
+            open F, ">> $file";
             if (length($msg) > 72) {
                 print F wrap('', $SUB_TAB, $msg);
             } else {

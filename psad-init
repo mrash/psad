@@ -38,7 +38,7 @@ start)
     fi
     ;;
 stop)
-    echo -n "Shutting down the psadwatchd monitoring daemon: "
+    echo -n "Shutting down the psad psadwatchd daemon: "
         killproc psadwatchd
         echo
         echo -n "Shutting down the psad daemon: "
@@ -46,10 +46,10 @@ stop)
     RETVAL=$?
     [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/psad
     echo
-    echo -n "Shutting down the kmsgsd daemon: "
+    echo -n "Shutting down the psad kmsgsd daemon: "
     killproc kmsgsd
     echo
-    echo -n "Shutting down the diskmond monitoring daemon: "
+    echo -n "Shutting down the psad diskmond daemon: "
     killproc diskmond
     echo
     ;;

@@ -433,7 +433,6 @@ if (-e "/var/run/psad.pid") {
     $running = 0;
 }
 if ($execute_psad) {
-#    if ($distro eq "redhat61" || "redhat62" || "redhat70" || "redhat71" || "redhat72") {
     if ($distro =~ /redhat/) {
         if ($running) {
             &logr(" ... Restarting the psad daemons...\n", \@LOGR_FILES);
@@ -452,7 +451,6 @@ if ($execute_psad) {
         }
     }
 } else {
-#    if ($distro eq "redhat61" || "redhat62" || "redhat70" || "redhat71" || "redhat72") {
     if ($distro =~ /redhat/) {
         if ($running) {
             &logr(" ... An older version of psad is already running.  To execute, run \"${INIT_DIR}/psad restart\"\n", \@LOGR_FILES);
@@ -488,11 +486,6 @@ sub get_distro() {
         while(<ISSUE>) {
             my $l = $_;
             chomp $l;
-            return "redhat61" if ($l =~ /Red\sHat.*?6\.2/);
-            return "redhat62" if ($l =~ /Red\sHat.*?6\.1/);
-            return "redhat70" if ($l =~ /Red\sHat.*?7\.0/);
-            return "redhat71" if ($l =~ /Red\sHat.*?7\.1/);
-            return "redhat72" if ($l =~ /Red\sHat.*?7\.2/);
             return "redhat"   if ($l =~ /Red\sHat/);
         }
         close ISSUE;
@@ -675,11 +668,12 @@ sub get_fw_search_string() {
     print "     string.  (Note that ipchains firewalls are unaffected by this.)\n\n";
     my $ans = "";
     while ($ans ne "y" && $ans ne "n") {
-        print "     Would you like to add a string that will be used to analyze firewall\n";
+        print " ... Would you like to add a string that will be used to analyze firewall\n";
         print "     log messages (y/n)?\n";
         $ans = <STDIN>;
         chomp $ans;
     }
+    print "\n";
     my $fw_string = "";
     if ($ans eq "y") {
         print "     Enter a string (i.e. \"Audit\"):  ";
@@ -710,10 +704,11 @@ sub query_email() {
     print "       $email_address\n\n";
     my $ans = "";
     while ($ans ne "y" && $ans ne "n") {
-        print "     Would you like alerts sent to a different address (y/n)?  ";
+        print " ... Would you like alerts sent to a different address (y/n)?  ";
         $ans = <STDIN>;
         chomp $ans;
     }
+    print "\n";
     if ($ans eq "y") {
         print "\n";
         print " ... To which email address(es) would you like $filename alerts to be sent?\n";

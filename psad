@@ -2051,9 +2051,9 @@ sub psad_init() {
 }
 
 sub validate_config() {
-    die '[*] PORT_RANGE_SCAN_THRESHOLD must be between 1 and 65535 '
+    die '[*] PORT_RANGE_SCAN_THRESHOLD must be between 0 and 65535 '
         unless (($config{'PORT_RANGE_SCAN_THRESHOLD'} =~ m|^\d+$|)
-            and 0 < $config{'PORT_RANGE_SCAN_THRESHOLD'}
+            and 0 <= $config{'PORT_RANGE_SCAN_THRESHOLD'}
             and $config{'PORT_RANGE_SCAN_THRESHOLD'} < 65535);
 
     die qq([*] Invalid EMAIL_ADDRESSES value: "$config{'EMAIL_ADDRESSES'}")

@@ -33,75 +33,105 @@ sub new() {
 
     my $self = {
         _iptables => $args{'iptables'} || '/sbin/iptables',
+        _table    => $args{'table'}    || '',
+        _chain    => $args{'chain'}    || '',
         _debug    => $args{'debug'}    || 0
     };
     croak "[*] $self->{'_iptables'} incorrect path.\n"
         unless -e $self->{'_iptables'};
     croak "[*] $self->{'_iptables'} not executable.\n"
         unless -x $self->{'_iptables'};
+    croak "[*] Must specify a table to which to add/delete rules.\n"
+        unless $self->{'_table'};
+    croak "[*] Must specify a chain to which to add/delete rules.\n"
+        unless $self->{'_chain'};
     bless $self, $class;
 }
 
-sub get_iptables_chains() {
+sub create_chain() {
     my $self = shift;
+    my $iptables = $self->{'iptables'};
+    my $table    = $self->{'_table'};
+    my $chain    = $self->{'_chain'};
 
-    print STDERR "[+] get_iptables_chains()\n" if $self->{'_debug'};
-
-    my $iptables = $self->{'_iptables'};
-
-    my %ipt_chains = ();
-
-    my $nat_rv    = 1;
-    my $mangle_rv = 1;
-    my $filter_input_rv   = 1;
-    my $filter_forward_rv = 1;
-
-    my %ipt_chain_test = (
-        'filter' => {
-            'INPUT'   => '',
-            'OUTPUT'  => '',
-            'FORWARD' => ''
-        },
-        'nat' => {
-            'PREROUTING' => ''
-        },
-        'mangle' => {
-            'PREROUTING' => ''
-        }
-    );
-
-    for my $table (keys %ipt_chain_test) {
-        for my $chain (keys %{$ipt_chain_test{$table}}) {
-            my $rv = 1;
-            eval {
-                $rv = (system "$cmds{'iptables'} -nL -t $table " .
-                    "> /dev/null 2>&1") >> 8;
-            };
-            if ($rv == 0) {
-                eval {
-                    $rv = (system "$cmds{'iptables'} -t $table -I " .
-                        "$chain 1 -s 127.0.0.2 -j DROP > /dev/null " .
-                        "2>&1") >> 8;
-                };
-                if ($rv == 0) {
-                    eval {
-                        $rv = (system "$cmds{'iptables'} -t $table -D " .
-                            "$chain 1 > /dev/null 2>&1") >> 8;
-                    };
-                }
-                if ($rv == 0) {
-                    $ipt_chains{$table}{$chain} = '';
-                }
-            }
-            print STDERR "[+] get_iptables_chains(): $table $chain rv: $rv\n"
-                if $debug;
+    if (&run_ipt_cmd($iptables, "-t $table -nL $chain") == 0) {
+        ### the chain already exists
+        return 1, "[+] $chain already exists.";
+    } else {
+        ### create the chain
+        if (&run_ipt_cmd($iptables, "-t $table -N $chain") == 0) {
+            return 1, "[+] $chain chain created.";
+        } else {
+            ### could not create the chain
+            return 0, "[-] Could not create $chain chain.";
         }
     }
-    return \%ipt_chains;
 }
 
+sub delete_chain() {
+    my $self = shift;
+    my $iptables = $self->{'_iptables'};
+    my $table    = $self->{'_table'};
+    my $chain    = $self->{'_chain'};
+
+    if(&run_ipt_cmd($iptables, "-t $table -nL $chain") == 0) {
+        if (&run_ipt_cmd($iptables, "-t $table -X $chain") == 0) {
+            return 1, "[+] $chain chain deleted.";
+        } else {
+            return 0, "[-] Could not delete $chain chain.";
+        }
+    } else {
+        return 1, "[+] $chain chain does not exist";
+    }
+}
+
+sub add_rule() {
+    my $self = shift;
+    my $src = shift || croak '[-] Must specify a src address/network.';
+    my $target = shift ||
+        croak '[-] Must specify a Netfilter target, e.g. "DROP"';
+    my $iptables = $self->{'_iptables'};
+    my $table    = $self->{'_table'};
+    my $chain    = $self->{'_chain'};
+
+    ### first check to see if this rule already exists
+    my ($rv, $chain_lines_aref) =
+        &run_ipt_cmd_output($iptables, "-t $table -nL $chain");
+
+    if (&find_rule($chain_lines_aref)) {
+        return 1, '[-] Rule already exists.';
+    } else {
+        ### we need to add the rule
+        if (&run_ipt_cmd($iptables,
+            "-t $table -I $chain 1 -s $src -j $target") == 0) {
+        }
+    }
+}
+
+sub run_ipt_cmd() {
+    my ($iptables, $cmd) = @_;
+    croak "[*] Must specify an iptables command to run unless $cmd"
+        unless $cmd;
+    open IPT, "$iptables $cmd |"
+        or croak "[*] Could not execute $iptables $cmd: $!";
+    close IPT;
+    return $?;
+}
+
+sub run_ipt_cmd_output() {
+    my ($iptables, $cmd) = @_;
+    croak "[*] Must specify an iptables command to run unless $cmd"
+        unless $cmd;
+    my @output = ();
+    open IPT, "$iptables $cmd |"
+        or croak "[*] Could not execute $iptables $cmd: $!";
+    @output = <IPT>;
+    close IPT;
+    return $?, \@output;
+}
 
 1;
+
 __END__
 # Below is stub documentation for your module. You'd better edit it!
 

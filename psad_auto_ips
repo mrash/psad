@@ -1,6 +1,3 @@
-#
-# $Id$
-#
 # This file is used by psad to elevate/decrease the danger levels of ip 
 # addresses so that psad does not have to apply the normal signature logic.  
 # This is useful if certain ip addresses are known trouble makers and 
@@ -8,8 +5,12 @@
 # be assigned.  Also, if psad can be made to ignore certain ip addresses
 # if a danger level of "0" is specified in this file.
 #
+# $Id$
+#
+#
+
 #  <ip address>  <danger level>
-# 
+#
 # Example:
 #
 #  10.111.21.23		5	# very bad ip

@@ -1,6 +1,3 @@
-#
-# $Id$
-#
 # This is the signatures file used by psad to look for suspect network traffic
 # that is readily identifiable through attributes in single packets rather than
 # setting thresholds on several packets in order to determine whether some ip
@@ -16,6 +13,11 @@
 # fields that ip tables can report such as with --log-tcp-option, 
 # --log-tcp-sequence, --log-ip-options, etc...
 #
+###############################################################################
+#
+# $Id$
+#
+
 ############# tcp signatures #############
 # Backdoor signatures
 tcp any -> 1524 msg: "default Backdoor access!"; flags: S: dlevel: 1;

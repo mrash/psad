@@ -276,7 +276,6 @@ if ( -e "${INSTALL_DIR}/psad" && (! $nopreserve)) {  # need to grab the old conf
         ### the second input is the variable name that will be altered
 #       &put_fw_search_str("${INSTALL_DIR}/psad", "IPTABLES_MSG_SEARCH");
 #   }
-    &rm_perl_options("${INSTALL_DIR}/psad", \%Cmds);
     &perms_ownership("${INSTALL_DIR}/psad", 0500)
 } else {
     &logr(" ... Copying psad -> ${INSTALL_DIR}/\n", \@LOGR_FILES);
@@ -285,7 +284,6 @@ if ( -e "${INSTALL_DIR}/psad" && (! $nopreserve)) {  # need to grab the old conf
     if ($email_str) {
         &put_email("${INSTALL_DIR}/psad", $email_str);
     }
-    &rm_perl_options("${INSTALL_DIR}/psad", \%Cmds);
     &perms_ownership("${INSTALL_DIR}/psad", 0500);
 }
 if ( -e "${INSTALL_DIR}/psadwatchd" && (! $nopreserve)) {  # need to grab the old config
@@ -295,7 +293,6 @@ if ( -e "${INSTALL_DIR}/psadwatchd" && (! $nopreserve)) {  # need to grab the ol
     if ($email_str) {
         &put_email("${INSTALL_DIR}/psadwatchd", $email_str);
     }
-    &rm_perl_options("${INSTALL_DIR}/psadwatchd", \%Cmds);
     &perms_ownership("${INSTALL_DIR}/psadwatchd", 0500);
 } else {
     &logr(" ... Copying psadwatchd -> ${INSTALL_DIR}/\n", \@LOGR_FILES);
@@ -303,14 +300,12 @@ if ( -e "${INSTALL_DIR}/psadwatchd" && (! $nopreserve)) {  # need to grab the ol
     if ($email_str) {
         &put_email("${INSTALL_DIR}/psadwatchd", $email_str);
     }
-    &rm_perl_options("${INSTALL_DIR}/psadwatchd", \%Cmds);
     &perms_ownership("${INSTALL_DIR}/psadwatchd", 0500);
 }
 if (-e "${INSTALL_DIR}/kmsgsd" && (! $nopreserve)) { 
     &logr(" ... Copying kmsgsd -> ${INSTALL_DIR}/kmsgsd\n", \@LOGR_FILES);
     &logr("     Preserving old config within ${INSTALL_DIR}/kmsgsd\n", \@LOGR_FILES);
     &preserve_config("kmsgsd", "${INSTALL_DIR}/kmsgsd", \%Cmds);
-    &rm_perl_options("${INSTALL_DIR}/kmsgsd", \%Cmds);
     &perms_ownership("${INSTALL_DIR}/kmsgsd", 0500);
 } else {
     &logr(" ... Copying kmsgsd -> ${INSTALL_DIR}/kmsgsd\n", \@LOGR_FILES);
@@ -319,19 +314,16 @@ if (-e "${INSTALL_DIR}/kmsgsd" && (! $nopreserve)) {
                 ### the second input is the variable name that will be altered
 #                &put_fw_search_str("${INSTALL_DIR}/psad", "IPTABLES_MSG_SEARCH");
 #        }
-    &rm_perl_options("${INSTALL_DIR}/kmsgsd", \%Cmds);
     &perms_ownership("${INSTALL_DIR}/kmsgsd", 0500);
 }
 if (-e "${INSTALL_DIR}/diskmond" && (! $nopreserve)) {
     &logr(" ... Copying diskmond -> ${INSTALL_DIR}/diskmond\n", \@LOGR_FILES);
     &logr("     Preserving old config within ${INSTALL_DIR}/diskmond\n", \@LOGR_FILES);
     &preserve_config("diskmond", "${INSTALL_DIR}/diskmond", \%Cmds);
-    &rm_perl_options("${INSTALL_DIR}/diskmond", \%Cmds);
     &perms_ownership("${INSTALL_DIR}/diskmond", 0500);
 } else {
     &logr(" ... Copying diskmond -> ${INSTALL_DIR}/diskmond\n", \@LOGR_FILES);
     copy("diskmond", "${INSTALL_DIR}/diskmond");
-    &rm_perl_options("${INSTALL_DIR}/diskmond", \%Cmds);
     &perms_ownership("${INSTALL_DIR}/diskmond", 0500);
 }
 unless (-d "/etc/psad") {
@@ -671,21 +663,6 @@ sub create_varlogpsad() {
     unless (-d "/var/log/psad") {
         mkdir "/var/log/psad", 400;
     }
-    return;
-}
-sub rm_perl_options() {
-    my ($file, $Cmds_href) = @_;
-    my $tmp = $file . ".tmp";
-    move($file, $tmp);
-    open TMP, "< $tmp";
-    my @lines = <TMP>;
-    close TMP;
-    unlink $tmp;
-    shift @lines;  ### get rid of the "#!/usr/bin/perl -w" line
-    open F, "> $file";
-    print F "#!$Cmds_href->{'perl'}\n";  ### put "#!/path/to/perl" line in with no perl options.
-    print F $_ for (@lines);
-    close F;
     return;
 }
 sub get_fw_search_string() {

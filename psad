@@ -37,6 +37,8 @@
 #     --log-tcp-sequence, etc.) for better signature recognition.
 #   - Make use of string matching support to look for application level
 #     signatures.  See http://www.stearns.org/snort2iptables.
+#   - Include a verbose message in the body of certain emails that as
+#     of psad-1.0.0-pre2 only contain a subject line.
 #   - Allow ipchains to use tcp signatures that only require a syn packet
 #     to a port as well as udp signatures.
 #   - Deal with the possibility that psad could eat lots of memory over
@@ -135,12 +137,18 @@ my %Auto_ips;
 ### cache the addresses we have executed whois lookups for
 my %whois_cache;
 
-### initialize and scope some default variables (command
-### line args can override some default values)
-my $found_new_packets = 0;
+### packet counters
 my $tcp_ctr           = 0;
 my $udp_ctr           = 0;
 my $icmp_ctr          = 0;
+
+### firewall flags (only used if $Config{'ENABLE_AUTO_IDS'} eq 'Y')
+
+
+
+### initialize and scope some default variables (command
+### line args can override some default values)
+my $found_new_packets = 0;
 my $daemon            = 0;
 my $output            = 0;
 my $errors            = 0;
@@ -330,7 +338,7 @@ if ($CONFIG_FILE eq '/etc/psad/psad.conf') {
 ### Check to see if psad automatically blocked some ips from
 ### a previous run.  This feature is most useful for preserving
 ### automatically blocked ips after a reboot.
-if ($Config{'ENABLE_AUTO_IDS'}) {
+if ($Config{'ENABLE_AUTO_IDS'} eq 'Y') {
     &check_auto_blocked();
 }
 
@@ -391,7 +399,7 @@ for (;;) {
 
             ### Don't manage the firewall rules if
             ### psad is running on a syslog server
-            if ($Config{'ENABLE_AUTO_IDS'} && ! $Syslog_server) {
+            if ($Config{'ENABLE_AUTO_IDS'} eq 'Y' && ! $Syslog_server) {
                 &auto_psad_response();
             }
         }
@@ -510,7 +518,7 @@ sub check_scan() {
                 next READPKT;
             }
         }
-        unless ($Config{'ENABLE_PERSISTENCE'}) {
+        if ($Config{'ENABLE_PERSISTENCE'} eq 'Y') {
             my $currtime = time();
             if (defined $Scan{$src}{$dst}{'S_TIME'}{'EPOCH_SECONDS'}) {
                 my $tmp = $currtime -
@@ -536,7 +544,7 @@ sub check_scan() {
             ### make sure the initial end port is not too high
             $Scan{$src}{$dst}{'E_PORT'} = 0;
         }
-        my $epoch_seconds = time() unless ($Config{'ENABLE_PERSISTENCE'});
+        my $epoch_seconds = time() if ($Config{'ENABLE_PERSISTENCE'} eq 'N');
         ### Get the current time as a nice ASCII string.
         my @time = split /\s+/, scalar localtime;
         pop @time; shift @time; ### Get rid of the day and the year to make
@@ -558,13 +566,13 @@ sub check_scan() {
         }
         unless (defined $Scan{$src}{$dst}{'S_TIME'}{'READABLE'}) {
             $Scan{$src}{$dst}{'S_TIME'}{'READABLE'} = $time;
-            unless ($Config{'ENABLE_PERSISTENCE'}) {
+            if ($Config{'ENABLE_PERSISTENCE'} eq 'N') {
                 $Scan{$src}{$dst}{'S_TIME'}{'EPOCH_SECONDS'} = $epoch_seconds;
             }
         }
         $Scan{$src}{$dst}{$proto}{'CURR_INT'}{'PKTS'}++;
         $Scan{$src}{$dst}{'E_TIME'}{'READABLE'}= $time;
-        unless ($Config{'ENABLE_PERSISTENCE'}) {
+        if ($Config{'ENABLE_PERSISTENCE'} eq 'N') {
             $Scan{$src}{$dst}{'E_TIME'}{'EPOCH_SECONDS'} = $epoch_seconds;
         }
         ### increment hash values
@@ -1385,10 +1393,10 @@ sub scan_logr() {
                 if ($Scan{$src}{$dst}{'ALERTED'} == 0
                     && $current_danger_level >= $Config{'EMAIL_ALERT_DANGER_LEVEL'}) {
                     my $subject;
-                    if ($rdns) {
-                        $subject = "psad: SCAN DETECTED from: $rdns";
-                    } else {
+                    if ($rdns eq 'No reverse dns info available') {
                         $subject = "psad: SCAN DETECTED from: $src";
+                    } else {
+                        $subject = "psad: SCAN DETECTED from: $rdns";
                     }
                     &Psad::sendmail($subject, $email_alert, $Emails_aref, $Cmds{'mail'});
                     $Scan{$src}{$dst}{'ALERTED'} = 1;
@@ -1512,6 +1520,8 @@ sub auto_psad_response(){
                     my $blocked_str = '';
                     if ($Config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
                         for my $inchain (@$chains_aref) {
+                            system "$Cmds{'iptables'} -t nat -I PREROUTING 1 " .
+                                "-p tcp -s $src -j DROP";
                             system "$Cmds{'iptables'} -I $inchain 1 -s $src " .
                                 "-j DROP 2> /dev/null 1>&2";
                         }
@@ -1520,8 +1530,8 @@ sub auto_psad_response(){
                         ### NOTE the elsif here since we only really want
                         ### to block the ip in one way, and we prefer
                         ### the firewall.
-                        open H, '>> /etc/hosts.deny' or die
-                            "Could not open /etc/hosts.deny: $!";
+                        open H, '>> /etc/hosts.deny' or
+                            die "Could not open /etc/hosts.deny: $!";
                         print H "ALL: $src\n";
                         close H;
                         $blocked_str = 'via tcp wrappers';
@@ -1651,8 +1661,8 @@ sub get_whois_data() {
             return \@whois_data;
         }
     }
-    open W, "< $whois_datafile" or die
-        " ... @@@ Could not open $whois_datafile: $!";
+    open W, "< $whois_datafile" or
+        die " ... @@@ Could not open $whois_datafile: $!";
     @whois_data = <W>;
     close W;
     return \@whois_data;
@@ -1784,17 +1794,17 @@ sub status_psad() {
                             if (-e $Config{'PACKET_COUNTER_FILE'}) {
                                 print "     Packets Counters (packets blocked by " .
                                     "the firewall and processed by psad):\n";
-                                open F, "< $Config{'PACKET_COUNTER_FILE'}" or die
-                                    " ... $Config{'PACKET_COUNTER_FILE'}: $!";
+                                open F, "< $Config{'PACKET_COUNTER_FILE'}" or
+                                    die " ... $Config{'PACKET_COUNTER_FILE'}: $!";
                                 print STDOUT "        $_" while (<F>);
                                 close F;
                             }
                             ### sort and print the scan source ips
                             my %scan_source_ips;
-                            chdir $Config{'PSAD_DIR'} or die " ... @@@ Could not chdir " .
-                                "$Config{'PSAD_DIR'}: $!";
-                            opendir D, $Config{'PSAD_DIR'} or die
-                                " ... @@@ Could not open dir: $Config{'PSAD_DIR'}: $!";
+                            chdir $Config{'PSAD_DIR'} or
+                                die " ... @@@ Could not chdir $Config{'PSAD_DIR'}: $!";
+                            opendir D, $Config{'PSAD_DIR'} or
+                                die " ... @@@ Could not open dir: $Config{'PSAD_DIR'}: $!";
                             my @files = readdir D;
                             closedir D;
                             shift @files; shift @files;

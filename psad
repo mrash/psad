@@ -39,6 +39,8 @@
 #   - Custom logging line upon auto-blocking an ip.
 #   - Customizable subject line that include the danger level.
 #   - RPM package.
+#   - Drop root privileges if not running in auto-blocking mode.
+#   - tcpwrapper auto-block multiple times bug (Albert Whale).
 #   - Extend install.pl to provide an option to dowload the latest perl
 #     modules (Date:Calc, Unix::Syslog, etc.) from CPAN.
 #   - Extend passive OS fingerprinting to make use of more types of
@@ -137,6 +139,22 @@
 #   Iptables reports tcp flags in the following order:
 #
 #       URG ACK PSH RST SYN FIN
+#
+# Files specification for /var/log/psad/<srcip> directories:
+#
+#   psad creates a new directory "/var/log/psad/<srcip>" for each new <srcip>
+#   from which a scan is detected.  Under this directory several files are
+#   created:
+#
+#       danger_level          - Overall danger level aggregated for all scans.
+#       whois                 - Whois information for <srcip>.
+#       email_count           - Total email alerts sent for <srcip>.
+#       <destip>_email_alert  - The most recent email alert for <destip>.
+#       <destip>_packet_ctr   - Packet counters for <destip>.
+#       <destip>_signatures   - Signatures detected against <destip>.
+#
+#   Note that some of the files above contain the destination address since a
+#   single source address may scan several destination addresses.
 #
 ###############################################################################
 #
@@ -1951,13 +1969,12 @@ sub scan_logr() {
             ### unless it already exists
             mkdir "$config{'PSAD_DIR'}/${src}", 0500 unless
                 -d "$config{'PSAD_DIR'}/${src}";
-            my $scanlog       = "$config{'PSAD_DIR'}/${src}/scanlog";
-            my $email_alert   = "$config{'PSAD_DIR'}/${src}/email_alert";
-            my $ecount_file   = "$config{'PSAD_DIR'}/${src}/email_count";
-            my $whois_file    = "$config{'PSAD_DIR'}/${src}/whois";
-            my $dl_file       = "$config{'PSAD_DIR'}/${src}/danger_level";
-            my $log_sigs      = "$config{'PSAD_DIR'}/${src}/signatures";
-            my $pkt_ctr_file  = "$config{'PSAD_DIR'}/${src}/packet_ctr";
+            my $email_alert  = "$config{'PSAD_DIR'}/${src}/${dst}_email_alert";
+            my $ecount_file  = "$config{'PSAD_DIR'}/${src}/email_count";
+            my $whois_file   = "$config{'PSAD_DIR'}/${src}/whois";
+            my $dl_file      = "$config{'PSAD_DIR'}/${src}/danger_level";
+            my $log_sigs     = "$config{'PSAD_DIR'}/${src}/${dst}_signatures";
+            my $pkt_ctr_file = "$config{'PSAD_DIR'}/${src}/${dst}_packet_ctr";
 
             ### unlink $email_alert here since we print to this
             ### file multiple times
@@ -1966,11 +1983,8 @@ sub scan_logr() {
             ### print the current danger level to the danger_level file
             &Psad::logr("$curr_dlevel\n", {$dl_file => 0});
 
-            ### log everything to stdout if $output of $debug is set
-            $scanlog = *STDOUT if ($output || $debug);
-
             ### filename => 0 (overwrite),  filename => 1 (append)
-            my %print_hsh = ($scanlog => 1, $email_alert => 1);
+            my %print_hsh = ($email_alert => 1);
 
             ### set the overall packet counters for $src
             $tot_tcp  = $scan{$src}{$dst}{'TCP'}{'PKTS'}
@@ -2164,7 +2178,7 @@ sub scan_logr() {
             if ($use_iptables) {
                 ### print any matched signatures to the alert
                 &scan_logr_signatures($src, $dst,
-                    {$scanlog=>1, $email_alert=>1, $log_sigs=>1});
+                    {$email_alert=>1, $log_sigs=>1});
             }
 
             ### write a message to syslog
@@ -2976,58 +2990,75 @@ sub status_psad_ips() {
                 close F;
                 chomp $dl;
             }
-            if (-e "${src_ipdir}/packet_ctr") {
-                open F, "< ${src_ipdir}/packet_ctr" or
-                    die " ** Could not open ",
-                        "${src_ipdir}/packet_ctr: $!";
-                my @lines = <F>;
-                close F;
-                for my $line (@lines) {
-                    $tcp_ctr = $1 if $line =~ /tcp:\s+(\d+)/;
-                    $udp_ctr = $1 if $line =~ /udp:\s+(\d+)/;
-                    $icmp_ctr = $1 if $line =~ /icmp:\s+(\d+)/;
+            opendir D, $src_ipdir or die " ** Could not open dir: ",
+                "$src_ipdir: $!";
+            my @ipdirfiles = readdir D;
+            closedir D;
+            shift @ipdirfiles; shift @ipdirfiles;
+            for my $file (@ipdirfiles) {
+                my $dst;
+                if ($file =~ /($ip_re)_packet_ctr/) {
+                    $dst = $1;
+                } else {
+                    next;
                 }
-            }
-            if ($status_sort_dl) {
-                $scan_source_ips{$dl}{$src_ipdir}{'tcp'}
-                    = $tcp_ctr;
-                $scan_source_ips{$dl}{$src_ipdir}{'udp'}
-                    = $udp_ctr;
-                $scan_source_ips{$dl}{$src_ipdir}{'icmp'}
-                    = $icmp_ctr;
-            } else {
-                $scan_source_ips{$src_ipdir}{'dl'} = $dl;
-                $scan_source_ips{$src_ipdir}{'tcp'}
-                    = $tcp_ctr;
-                $scan_source_ips{$src_ipdir}{'udp'}
-                    = $udp_ctr;
-                $scan_source_ips{$src_ipdir}{'icmp'}
-                    = $icmp_ctr;
+                if (-e "${src_ipdir}/${dst}_packet_ctr") {
+                    open F, "< ${src_ipdir}/${dst}_packet_ctr" or
+                        die " ** Could not open ",
+                            "${src_ipdir}/${dst}_packet_ctr: $!";
+                    my @lines = <F>;
+                    close F;
+                    for my $line (@lines) {
+                        $tcp_ctr = $1 if $line =~ /tcp:\s+(\d+)/;
+                        $udp_ctr = $1 if $line =~ /udp:\s+(\d+)/;
+                        $icmp_ctr = $1 if $line =~ /icmp:\s+(\d+)/;
+                    }
+                }
+                if ($status_sort_dl) {
+                    $scan_source_ips{$dl}{$src_ipdir}{$dst}{'tcp'}
+                        = $tcp_ctr;
+                    $scan_source_ips{$dl}{$src_ipdir}{$dst}{'udp'}
+                        = $udp_ctr;
+                    $scan_source_ips{$dl}{$src_ipdir}{$dst}{'icmp'}
+                        = $icmp_ctr;
+                } else {
+                    $scan_source_ips{$src_ipdir}{$dst}{'dl'} = $dl;
+                    $scan_source_ips{$src_ipdir}{$dst}{'tcp'}
+                        = $tcp_ctr;
+                    $scan_source_ips{$src_ipdir}{$dst}{'udp'}
+                        = $udp_ctr;
+                    $scan_source_ips{$src_ipdir}{$dst}{'icmp'}
+                        = $icmp_ctr;
+                }
             }
         }
     }
     print STDOUT "\n";
-    printf("     %-18s%-9s%-9s%-9s%-9s\n", 'IP', 'TCP',
-        'UDP', 'ICMP', 'Danger Level');
+    printf("     %-18s%-18s%-9s%-9s%-9s%-9s\n", 'SRC', 'DST', 'TCP',
+        'UDP', 'ICMP', 'D_Level');
     if (%scan_source_ips) {
         if ($status_sort_dl) {
             for my $dl (sort {$b <=> $a} keys %scan_source_ips) {
                 for my $src (keys %{$scan_source_ips{$dl}}) {
-                    my $tcp  = $scan_source_ips{$dl}{$src}{'tcp'};
-                    my $udp  = $scan_source_ips{$dl}{$src}{'udp'};
-                    my $icmp = $scan_source_ips{$dl}{$src}{'icmp'};
-                    printf("     %-18s%-9s%-9s%-9s%-9s\n",
-                        $src, $tcp, $udp, $icmp, $dl);
+                    for my $dst (keys %{$scan_source_ips{$dl}{$src}}) {
+                        my $tcp  = $scan_source_ips{$dl}{$src}{$dst}{'tcp'};
+                        my $udp  = $scan_source_ips{$dl}{$src}{$dst}{'udp'};
+                        my $icmp = $scan_source_ips{$dl}{$src}{$dst}{'icmp'};
+                        printf("     %-18s%-18s%-9s%-9s%-9s%-9s\n",
+                            $src, $dst, $tcp, $udp, $icmp, $dl);
+                    }
                 }
             }
         } else {
             for my $src (sort keys %scan_source_ips) {
-                my $dl   = $scan_source_ips{$src}{'dl'};
-                my $tcp  = $scan_source_ips{$src}{'tcp'};
-                my $udp  = $scan_source_ips{$src}{'udp'};
-                my $icmp = $scan_source_ips{$src}{'icmp'};
-                printf("     %-18s%-9s%-9s%-9s%-9s\n",
-                    $src, $tcp, $udp, $icmp, $dl);
+                for my $dst (keys %{$scan_source_ips{$src}}) {
+                    my $dl   = $scan_source_ips{$src}{$dst}{'dl'};
+                    my $tcp  = $scan_source_ips{$src}{$dst}{'tcp'};
+                    my $udp  = $scan_source_ips{$src}{$dst}{'udp'};
+                    my $icmp = $scan_source_ips{$src}{$dst}{'icmp'};
+                    printf("     %-18s%-18s%-9s%-9s%-9s%-9s\n",
+                        $src, $dst, $tcp, $udp, $icmp, $dl);
+                }
             }
         }
     } else {
@@ -3067,13 +3098,27 @@ sub status_ip() {
         "most recently\n    logged packets for $status_ip.\n";
     print STDOUT " .. All packets logged by iptables specifically for $status_ip\n",
         "    can be viewed here: $config{'PSAD_DIR'}/$status_ip/fwdata\n";
-    if (-e "$config{'PSAD_DIR'}/$status_ip/packet_ctr") {
-        print STDOUT " .. Packet counters:\n";
-        open F, "< $config{'PSAD_DIR'}/$status_ip/packet_ctr" or
-            die " ** Could not open $config{'PSAD_DIR'}/$status_ip/",
-                "packet_ctr: $!";
-        print STDOUT "        $_" for <F>;
-        close F;
+
+    opendir D, "$config{'PSAD_DIR'}/$status_ip" or die " ** Could not open dir: ",
+        "$config{'PSAD_DIR'}/$status_ip: $!";
+    my @ipdirfiles = readdir D;
+    closedir D;
+    shift @ipdirfiles; shift @ipdirfiles;
+    for my $file (@ipdirfiles) {
+        my $dst;
+        if ($file =~ /($ip_re)_packet_ctr/) {
+            $dst = $1;
+        } else {
+            next;
+        }
+        if (-e "$config{'PSAD_DIR'}/$status_ip/${dst}_packet_ctr") {
+            print STDOUT " .. Packet counters against dst: $dst:\n";
+            open F, "< $config{'PSAD_DIR'}/$status_ip/${dst}_packet_ctr" or
+                die " ** Could not open $config{'PSAD_DIR'}/$status_ip/",
+                    "${dst}_packet_ctr: $!";
+            print STDOUT "        $_" for <F>;
+            close F;
+        }
     }
     if (-e "$config{'PSAD_DIR'}/$status_ip/email_count") {
         open F, "< $config{'PSAD_DIR'}/$status_ip/email_count" or

@@ -1697,14 +1697,7 @@ sub validate_home_net() {
         }
         next if $intf_name eq 'lo';
         next if $intf_name =~ /dummy/i;
-        if ($line =~ /^\s+inet\s+addr:($ip_re).*Mask:($ip_re)/i) {
-            my $ip  = $1;
-            my $msk = $2;
-            my ($net_addr, $cidr_msk) = ipv4_network($ip, $msk);
-            push @connected_subnets, "$net_addr/$msk";
-            push @connected_subnets_cidr, "$net_addr/$cidr_msk";
-        } elsif ($line =~ /^\s+inet\s+adr:($ip_re).*Masque:($ip_re)/i) {
-            ### French spelling
+        if ($line =~ /^\s+inet.*?:($ip_re).*:($ip_re)/i) {
             my $ip  = $1;
             my $msk = $2;
             my ($net_addr, $cidr_msk) = ipv4_network($ip, $msk);
@@ -3530,7 +3523,7 @@ sub get_local_ips() {
     my @ips = <IFC>;
     close IFC;
     for my $line (@ips) {
-        if ($line =~ /inet\s+addr:($ip_re)\s/) {
+        if ($line =~ /inet\s+.*?:($ip_re)\s/) {
             $local_ips{$1} = '';
         }
     }
@@ -4714,7 +4707,7 @@ sub check_forwarding() {
     close IFC;
     my $num_intf = 0;
     for my $line (@if_out) {
-        if ($line =~ /inet\s+addr/i && $line !~ /127\.0\.0\.1/) {
+        if ($line =~ /inet\s+/i && $line !~ /127\.0\.0\.1/) {
             $num_intf++;
         }
     }

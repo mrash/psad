@@ -777,7 +777,7 @@ sub set_home_net() {
             next;
         }
         if ($intf_name and
-                $line =~ /^\s+inet\s+addr:($ip_re).*Mask:($ip_re)/) {
+                $line =~ /^\s+inet\s+.*?:($ip_re).*:($ip_re)/) {
             $connected_subnets{$intf_name} = "$1/$2";
             $net_ctr++;
         }

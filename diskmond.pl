@@ -133,8 +133,8 @@ sub rm_data() {
     &rm_scanlog($Config{'PSAD_DIR'});
     &rm_scanlog($Config{'SCAN_DATA_ARCHIVE_DIR'});
 
-    if (-e $Config{'FW_DATA'}) {
-        open F, "> $Config{'FW_DATA'}";
+    if (-e $Config{'FW_DATA_FILE'}) {
+        open F, "> $Config{'FW_DATA_FILE'}";
         close F;
     }
     if (-e "$Config{'SCAN_DATA_ARCHIVE_DIR'}/fwdata_archive") {

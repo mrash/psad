@@ -61,7 +61,7 @@ my ($Config_href, $Cmds_href) = &Psad::buildconf($CONFIG_FILE);
 ### make sure the configuration is complete
 &check_config();
 
-my $FW_DATA        = $Config_href->{'FW_DATA'};
+my $FW_DATA        = $Config_href->{'FW_DATA_FILE'};
 my $FW_MSG_SEARCH = $Config_href->{'FW_MSG_SEARCH'};
 my $SNORT_SID_STR = $Config_href->{'SNORT_SID_STR'};
 my $PSAD_FIFO     = $Config_href->{'PSAD_FIFO'};
@@ -132,7 +132,7 @@ sub check_facility() {
     return 1;
 }
 sub check_config() {
-    my @required_vars = qw(KMSGSD_PID_FILE PSAD_FIFO FW_DATA
+    my @required_vars = qw(KMSGSD_PID_FILE PSAD_FIFO FW_DATA_FILE
     FW_MSG_SEARCH SNORT_SID_STR);
     &Psad::defined_vars($CONFIG_FILE, \@required_vars, $Config_href);
     return;

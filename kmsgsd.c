@@ -172,7 +172,7 @@ static void parse_config(char *config_file, char *psadfifo_file,
                 (*index != ';') && (index != NULL)) {
 
             find_char_var("PSAD_FIFO ", psadfifo_file, index);
-            find_char_var("FW_DATA ", fwdata_file, index);
+            find_char_var("FW_DATA_FILE ", fwdata_file, index);
             find_char_var("FW_MSG_SEARCH ", fw_msg_search, index);
             find_char_var("SNORT_SID_STR ", snort_sid_str, index);
             find_char_var("KMSGSD_PID_FILE ", kmsgsd_pid_file, index);
@@ -181,7 +181,7 @@ static void parse_config(char *config_file, char *psadfifo_file,
     fclose(config_ptr);
 #ifdef DEBUG
     printf(" .. PSAD_FIFO: %s\n", psadfifo_file);
-    printf(" .. FW_DATA: %s\n", fwdata_file);
+    printf(" .. FW_DATA_FILE: %s\n", fwdata_file);
     printf(" .. FW_MSG_SEARCH: %s\n", fw_msg_search);
     printf(" .. SNORT_SID_STR: %s\n", snort_sid_str);
     printf(" .. KMSGSD_PID_FILE: %s\n", kmsgsd_pid_file);

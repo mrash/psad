@@ -223,7 +223,7 @@ static void parse_config(
                 && (*index != ';') && (index != NULL)) {
 
             find_char_var("PSAD_DIR", psad_dir, index);
-            find_char_var("FW_DATA", fwdata_file, index);
+            find_char_var("FW_DATA_FILE", fwdata_file, index);
             find_char_var("SCAN_DATA_ARCHIVE_DIR", archive_dir, index);
             find_char_var("shCmd ", shCmd, index);
             find_char_var("mailCmd ", mailCmd, index);

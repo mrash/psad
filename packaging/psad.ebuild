@@ -91,7 +91,7 @@ src_install() {
 	doins icmp_types
 
 	insinto /etc/init.d
-	newins psad-init.gentoo psad
+	newins init-scripts/psad-init.gentoo psad
 
 	cd ${S}/snort_rules
 	dodir /etc/psad/snort_rules
@@ -113,8 +113,8 @@ pkg_postinst() {
 	echo
 	einfo "Please be sure to edit /etc/psad/psad.conf to reflect your system's"
 	einfo "configuration or it may not work correctly or start up. Specifically, check"
-	einfo "the validity of the HOSTNAME setting and replace the EMAIL_ADDRESSES and"
-	einfo "HOME_NET settings at the least."
+	einfo "the validity of the HOSTNAME, EMAIL_ADDRESSES, HOME_NET, and SYSLOG_DAEMON"
+	einfo "settings at the least."
 	echo
 	ewarn "If you're using metalog as your system logger, please be aware that PSAD does"
 	ewarn "not officially support it, and it probably won't work. Syslog-ng and sysklogd"

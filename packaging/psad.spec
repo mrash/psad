@@ -1,5 +1,5 @@
 %define name psad
-%define version 1.3.2
+%define version 1.3.3
 %define release 1
 %define psadlibdir /usr/lib/psad
 %define psadlogdir /var/log/psad
@@ -110,7 +110,7 @@ mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
 install -m 500 {psad,kmsgsd,psadwatchd} $RPM_BUILD_ROOT%_sbindir/
 install -m 500 fwcheck_psad.pl $RPM_BUILD_ROOT%_sbindir/fwcheck_psad
 install -m 755 whois/whois $RPM_BUILD_ROOT/usr/bin/whois_psad
-install -m 755 psad-init.redhat $RPM_BUILD_ROOT/etc/rc.d/init.d/psad
+install -m 755 init-scripts/psad-init.redhat $RPM_BUILD_ROOT/etc/rc.d/init.d/psad
 install -m 644 {psad.conf,kmsgsd.conf,psadwatchd.conf,fw_search.conf} $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 {signatures,icmp_types,auto_dl,posf} $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 *.8 $RPM_BUILD_ROOT%{_mandir}/man8/
@@ -222,6 +222,10 @@ fi
 %_libdir/%name
 
 %changelog
+* Mon Sep 06 2004 Michael Rash <mbr@cipherydne.org>
+- Updated to psad-1.3.3.
+- Fixed path to psad-init.redhat (Mate Wierdl)
+
 * Thu Jun 24 2004 Michael Rash <mbr@cipherydne.org>
 - Updated to psad-1.3.2 (added fwcheck_psad.pl and fw_search.conf
   installation).

@@ -770,20 +770,21 @@ sub query_preserve_config() {
 }
 
 sub preserve_config() {
-    open C, "< psad.conf" or die " ** Could not open psad.conf: $!";
+    my $file = shift;
+    open C, "< $file" or die " ** Could not open $file: $!";
     my @new_lines = <C>;
     close C;
 
-    open CO, "< ${PSAD_CONFDIR}/psad.conf" or die " ** Could not open ",
-        "${PSAD_CONFDIR}/psad.conf: $!";
+    open CO, "< ${PSAD_CONFDIR}/$file" or die " ** Could not open ",
+        "${PSAD_CONFDIR}/$file: $!";
     my @orig_lines = <CO>;
     close CO;
 
-    &logr(" .. Preserving existing config: /etc/psad/psad.conf\n");
+    &logr(" .. Preserving existing config: ${PSAD_CONFDIR}/$file\n");
     ### write to a tmp file and then move so any running psad daemon will
     ### re-import a full config file
-    open CONF, "> ${PSAD_CONFDIR}/psad.conf.new" or die " ** Could not open ",
-        "${PSAD_CONFDIR}/psad.conf.new: $!";
+    open CONF, "> ${PSAD_CONFDIR}/${file}.new" or die " ** Could not open ",
+        "${PSAD_CONFDIR}/${file}.new: $!";
     for my $new_line (@new_lines) {
         if ($new_line =~ /^\s*(\w+)/) {
             my $var = $1;
@@ -802,7 +803,7 @@ sub preserve_config() {
         }
     }
     close CONF;
-    move "${PSAD_CONFDIR}/psad.conf.new", "${PSAD_CONFDIR}/psad.conf";
+    move "${PSAD_CONFDIR}/${file}.new", "${PSAD_CONFDIR}/$file";
     return;
 }
 

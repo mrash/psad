@@ -579,48 +579,22 @@ sub check_scan() {
         ### see if this port lies outside our current range
         unless ($proto eq 'ICMP') {
             ($Scan{$src}{$dst}{'S_PORT'}, $Scan{$src}{$dst}{'E_PORT'}) =
-                &check_range($dstport, $Scan{$src}{$dst}{'S_PORT'},
-                                                $Scan{$src}{$dst}{'E_PORT'});
+                &check_range(
+                    $dstport,
+                    $Scan{$src}{$dst}{'S_PORT'},
+                    $Scan{$src}{$dst}{'E_PORT'}
+                );
             ($Scan{$src}{$dst}{$proto}{'CURR_INT'}{'S_PORT'},
                     $Scan{$src}{$dst}{$proto}{'CURR_INT'}{'E_PORT'}) =
-                &check_range($dstport, $Scan{$src}{$dst}{$proto}{'CURR_INT'}->{'S_PORT'},
-                                $Scan{$src}{$dst}{$proto}{'CURR_INT'}{'E_PORT'});
+                &check_range(
+                    $dstport,
+                    $Scan{$src}{$dst}{$proto}{'CURR_INT'}->{'S_PORT'},
+                    $Scan{$src}{$dst}{$proto}{'CURR_INT'}{'E_PORT'}
+                );
         } 
         if ($DEBUG) {
             print STDOUT "check_scan():\n";
-            print STDOUT "     src: $src, dst: $dst\n";
-            print STDOUT "     Scan{src}{dst}{'LOGR'} = " .
-                         "$Scan{$src}{$dst}{'LOGR'}\n";
-            print STDOUT "     Scan{src}{dst}{'ABSNUM'} = " .
-                         "$Scan{$src}{$dst}{'ABSNUM'}\n";
-            print STDOUT "     flags: $flags\n" if ($proto eq 'TCP');
-            print STDOUT "     Scan{src}{dst}{'AUTO'} " .
-                         "$Scan{$src}{$dst}{'AUTO'}\n";
-            print STDOUT "     Scan{src}{dst}{'CURR_DL'} = "
-                         "$Scan{$src}{$dst}{'CURR_DL'}\n";
-            unless ($proto eq 'ICMP') {
-                print STDOUT "     Scan{src}{dst}{'S_PORT'} = " .
-                             "$Scan{$src}{$dst}{'S_PORT'}\n";
-                print STDOUT "     Scan{src}{dst}{'E_PORT'} = " .
-                             "$Scan{$src}{$dst}{'E_PORT'}\n";
-            print STDOUT "     Scan{src}{dst}{'S_TIME'}{'READABLE'} = " .
-                         "$Scan{$src}{$dst}{'S_TIME'}{'READABLE'}\n";
-            unless ($Config{'ENABLE_PERSISTENCE'}) {
-                print STDOUT "     Scan{src}{dst}{'S_TIME'}{'EPOCH_SECONDS'} = " .
-                             "$Scan{$src}{$dst}{'S_TIME'}{'EPOCH_SECONDS'}\n";
-            }
-            print STDOUT "     Scan{src}{dst}{'E_TIME'}{'READABLE'} = " .
-                         "$Scan{$src}{$dst}{'E_TIME'}{'READABLE'}\n";
-            unless ($Config{'ENABLE_PERSISTENCE'}) {
-                print STDOUT "     Scan{src}{dst}{'E_TIME'}{'EPOCH_SECONDS'} = " .
-                             "$Scan{$src}{$dst}{'E_TIME'}{'EPOCH_SECONDS'}\n";
-            }
-            unless ($proto eq 'ICMP') {
-                print "     Scan{src}{dst}{$proto}{'CURR_INT'}{'S_PORT'} = " .
-                      "$Scan{$src}{$dst}{$proto}{'CURR_INT'}{'S_PORT'}\n"    .
-                      "     Scan{src}{dst}{$proto}{'CURR_INT'}{'E_PORT'} = "   .
-                      "$Scan{$src}{$dst}{$proto}{'CURR_INT'}{'E_PORT'}\n";
-            }
+            print STDOUT Dumper $Scan{$src}{$dst};
         }
         ### might try to use ipchains also, but then
         ### cannot use tcp flags except for -y -l rules

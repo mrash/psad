@@ -1176,6 +1176,7 @@ sub scan_logr() {
                 my $udp_new_num_pkts;
                 my $icmp_new_start_time;
                 my $icmp_new_num_pkts;
+                my $rdns;
                 if (defined $Scan{$src}{$dst}{'TCP'}{'CURR_INT'}) {
                     $tcp = 1;
                     $tcp_new_start_range = $Scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'S_PORT'};
@@ -1211,7 +1212,7 @@ sub scan_logr() {
                     } else {
                         my $ipaddr = gethostbyname($src);
                         ### my $rdns = gethostbyaddr($ipaddr, AF_INET);
-                        my $rdns = gethostbyaddr($ipaddr, 2);
+                        $rdns = gethostbyaddr($ipaddr, 2);
                         $rdns = 'No reverse dns info available' unless $rdns;
                         $dnsstring = "$src -> $rdns";
                     }
@@ -1373,7 +1374,7 @@ sub scan_logr() {
 
                 ### write a message to syslog
                 openlog 'psad', LOG_DAEMON, LOG_LOCAL7;
-                syslog LOG_INFO, "port scan detected: $src -> $dst $syslog_print_range " .
+                syslog LOG_INFO, "psad: scan detected: $src -> $dst $syslog_print_range " .
                         "pkts=$syslog_num_pkts dangerlevel: $syslog_danger_level";
                 closelog();
                 unless ($whoislookups) {
@@ -1388,7 +1389,12 @@ sub scan_logr() {
                             "=-=-=-=-=-=\n", \%print_hsh);
                 if ($Scan{$src}{$dst}{'ALERTED'} == 0
                     && $current_danger_level >= $Config{'EMAIL_ALERT_DANGER_LEVEL'}) {
-                    my $subject = "psad WARNING: $HOSTNAME ($dst) has been scanned!";
+                    my $subject;
+                    if ($rdns) {
+                        $subject = "psad: SCAN DETECTED: $rdns ($src) -> $HOSTNAME ($dst)";
+                    } else {
+                        $subject = "psad: SCAN DETECTED: $src -> $HOSTNAME ($dst)";
+                    }
                     &Psad::sendmail($subject, $email_alert, $Emails_aref, $Cmds{'mail'});
                     $Scan{$src}{$dst}{'ALERTED'} = 1;
                 }

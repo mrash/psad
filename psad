@@ -44,6 +44,8 @@
 #     abuse.net and dshield.org.
 #   - Packet grapher mode with annotated scan alerts.
 #   - Database support?
+#   - Get rid of the psad_signatures file in favor of just parsing the
+#     snort rules files directly.
 #   - Make use of other logging options available in iptables to detect
 #     more tcp signatures.  (E.g. --log-tcp-options, --log-ip-options,
 #     --log-tcp-sequence, etc.) for better signature recognition.

@@ -85,9 +85,9 @@ my $PERL_INSTALL_DIR;  ### This is used to find pre-0.9.2 installations of psad
 
 ### set the install directory for the Psad.pm module
 my $found = 0;
-for my $d (@INC) {
-    if ($d =~ /site_perl\/\d\S+/) {
-        $PERL_INSTALL_DIR = $d;
+for my $dir (@INC) {
+    if ($dir =~ /site_perl\/\d\S+/) {
+        $PERL_INSTALL_DIR = $dir;
         $found = 1;
         last;
     }
@@ -103,13 +103,13 @@ my $uninstall    = 0;
 my $verbose      = 0;
 my $help         = 0;
 
-&usage_and_exit(1) unless (GetOptions (
+&usage(1) unless (GetOptions (
     'no_preserve' => \$nopreserve,    # don't preserve existing configs
     'uninstall'   => \$uninstall,
     'verbose'     => \$verbose,
     'help'        => \$help           # display help
 ));
-&usage_and_exit(0) if ($help);
+&usage(0) if ($help);
 
 my %Cmds = (
     'mknod'    => $mknodCmd,
@@ -156,9 +156,8 @@ sub install() {
         die "\n ... @@@  install.pl can only be executed from the directory" .
                        " that contains the psad sources!  Exiting.\n\n";
     }
-    my $t = localtime();
     &logr("\n ... Installing psad on $HOSTNAME\n");
-    &logr(" ... $t\n");
+    &logr(" ... " . localtime() . "\n");
 
     unless (-d $RUNDIR) {
         &logr(" ... Creating $RUNDIR\n");
@@ -254,7 +253,7 @@ sub install() {
             "http://www.cipherdyne.com\n";
     }
     system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
-    system "$Cmds{'make'}";
+    system $Cmds{'make'};
     system "$Cmds{'make'} test";
     system "$Cmds{'make'} install";
     chdir '..';
@@ -484,9 +483,7 @@ sub install() {
 }
 
 sub uninstall() {
-    my $t = localtime();
-    my $time = " ... Uninstalling psad from $HOSTNAME: $t\n";
-    &logr("\n$time\n");
+    &logr("\n ... Uninstalling psad from $HOSTNAME: " . localtime() . "\n");
 
     my $ans = '';
     while ($ans ne 'y' && $ans ne 'n') {
@@ -964,7 +961,7 @@ sub logr() {
 }
 
 
-sub usage_and_exit() {
+sub usage() {
         my $exitcode = shift;
         print <<_HELP_;
 

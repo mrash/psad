@@ -1388,13 +1388,13 @@ sub get_whois_data() {
     my ($ip, $Cmds_href) = @_;
     my @whois_data;
     eval {
-        local $SIG{'ALRM'} = sub {die "alarm\n"};
+        local $SIG{'ALRM'} = sub {die "whois alarm\n"};
         alarm $WHOIS_TIMEOUT;
         system "$Cmds_href->{'whois'} $ip > $WHOIS_DATAFILE";
         alarm 0;
     };
     if ($@) {
-#         die unless $@ eq "alarm\n";
+#         die unless $@ eq "whois alarm\n";
 #        warn "$@: $?";  ### let the warning handler save the error.
         warn $@;
         $#whois_data = 0;

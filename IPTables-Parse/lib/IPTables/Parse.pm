@@ -62,11 +62,10 @@ sub chain_action_rules() {
     }
 
     my $found_chain = 0;
-    my $rule_ctr = 0;
+    my $rule_ctr = 1;
     my %chain = ();
 
     LINE: for my $line (@ipt_lines) {
-        $rule_ctr++;
         chomp $line;
 
         last LINE if ($found_chain and $line =~ /^\s*Chain\s+/);
@@ -108,6 +107,7 @@ sub chain_action_rules() {
                 $chain{$target}{$proto}{$src}{$dst} = $rule_ctr;
             }
         }
+        $rule_ctr++;
     }
     return \%chain;
 }
@@ -140,13 +140,12 @@ sub default_drop() {
 
     my %protocols = ();
     my $found_chain = 0;
-    my $rule_ctr = 0;
+    my $rule_ctr = 1;
     my $prefix;
     my $policy = 'ACCEPT';
     my $any_ip_re = '(?:0\.){3}0/0';
 
-    for my $line (@ipt_lines) {
-        $rule_ctr++;
+    LINE: for my $line (@ipt_lines) {
         chomp $line;
 
         last if ($found_chain and $line =~ /^\s*Chain\s+/);
@@ -157,7 +156,8 @@ sub default_drop() {
             $policy = $1;
             $found_chain = 1;
         }
-        next unless $found_chain;
+        next LINE if $line =~ /^\s*target\s/i;
+        next LINE unless $found_chain;
         if ($line =~ m|^\s*LOG\s+(\w+)\s+\-\-\s+
             $any_ip_re\s+$any_ip_re\s+(.*)|x) {
             my $proto  = $1;
@@ -176,6 +176,7 @@ sub default_drop() {
             ### DROP    all  --  0.0.0.0/0     0.0.0.0/0
             $protocols{$1}{'DROP'} = $rule_ctr;
         }
+        $rule_ctr++;
     }
     ### if the policy in the chain is DROP, then we don't
     ### necessarily need to find a default DROP rule.

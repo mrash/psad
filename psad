@@ -89,7 +89,7 @@ my $psCmd = "/bin/ps";
 my $netstatCmd = "/bin/netstat";
 my $unameCmd = "/bin/uname";
 my $hostnameCmd = "/bin/hostname";
-my $whoisCmd = "/home/mbr/psad/whois";
+# my $whoisCmd = "/home/mbr/psad/whois";
 #================== end config ====================
 #===================== main =======================
 
@@ -101,7 +101,7 @@ my $daemon = 0;
 my $output = 0;
 my $errors = 0;
 my $dnslookups = 0;
-my $whoislookups = 0;
+my $whoislookups = 1;
 my $signatures = 0;
 my $auto_ips = 0;
 my $netstat_lookup = 0;
@@ -126,8 +126,8 @@ my %Cmds = (
 	"ps"		=> $psCmd,
 	"netstat"	=> $netstatCmd,
 	"uname"		=> $unameCmd,
-	"hostname"	=> $hostnameCmd,
-	"whois"		=> $whoisCmd
+	"hostname"	=> $hostnameCmd
+#	"whois"		=> $whoisCmd
 );
 
 %Cmds = check_commands(\%Cmds);
@@ -144,8 +144,8 @@ usage_and_exit(1) unless (GetOptions (
 	'namelookups'	=> \$dnslookups,	# dns lookup against scanning ip address
 	'signatures=s'	=> \$signatures,	# scan signatures
 	'localport'	=> \$netstat_lookup,	# listening on localport that has been scanned?
-	'errors'	=> \$errors,		# do not write malformed packet messages to error log
-	'whois'		=> \$whoislookups
+	'errors'	=> \$errors		# do not write malformed packet messages to error log
+#	'whois'		=> \$whoislookups
 ));
 usage_and_exit(0) if ($help);
 

@@ -223,6 +223,5 @@ void send_alert_email(const char *shCmd, const char *mailCmd,
         wait(NULL);  /* mail better work */
     else
         execle(shCmd, shCmd, "-c", mail_line, NULL, NULL);  /* don't use env */
-
     return;
 }

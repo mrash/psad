@@ -1204,8 +1204,8 @@ sub scan_logr() {
             my $current_danger_level =
                 $scan{$src}{$dst}{'CURR_DL'};
             if ($current_danger_level >= 1 && $scan{$src}{$dst}{'LOGR'} == 1) {
-                ### make $src directory here in /var/log/psad if it
-                ### already exists
+                ### make $src directory here in /var/log/psad
+                ### unless it already exists
                 mkdir "$config{'PSAD_DIR'}/${src}" unless
                     -d "$config{'PSAD_DIR'}/${src}";
                 my $scanlog     = "$config{'PSAD_DIR'}/${src}/scanlog";
@@ -1262,23 +1262,21 @@ sub scan_logr() {
                 }
                 my $start_time = $scan{$src}{$dst}{'S_TIME'}{'READABLE'};
                 my $end_time   = $scan{$src}{$dst}{'E_TIME'}{'READABLE'};
-                ### Get the current time as a nice ASCII string.
-                my @time = split /\s+/, scalar localtime;
-                pop @time; shift @time;    ### Get rid of the day and the year to make
-                                           ### the time consistent with syslog
-                my $time = join ' ', @time;
+
+                ### get rid of the day and the year to make the time
+                ### consistent with syslog
+                my ($time) = ((scalar localtime()) =~ /^\S+\s+(.*)\s+\d+/);
                 unless ($no_rdns) {
-                    my $src_tmp = $src;
-                    $src_tmp =~ s/\.//g;
-                    if ($src_tmp =~ /\D/) {
-                        ### $ipaddr was reported as a host name by iptables
-                        $dnsstring = $src;
-                    } else {
+                    if ($src =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/) {
                         my $ipaddr = gethostbyname($src);
                         ### my $rdns = gethostbyaddr($ipaddr, AF_INET);
                         $rdns = gethostbyaddr($ipaddr, 2);
                         $rdns = 'No reverse dns info available' unless $rdns;
                         $dnsstring = "$src -> $rdns";
+                    } else {
+                        ### $ipaddr was already reported as
+                        ### a host name by iptables
+                        $dnsstring = $src;
                     }
                 }
                 unless ($no_whois) {

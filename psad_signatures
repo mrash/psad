@@ -85,3 +85,24 @@ udp 53 -> 138:1023 msg:"MISC-Source Port Traffic 138-1023"; dlevel: 1;
 udp 53 -> 54:136 msg:"MISC-Source Port Traffic 54-136"; dlevel: 1;
 udp 53 -> 0:52 msg:"MISC-Source Port Traffic 0-52"; dlevel: 1;
 
+############ icmp signatures #############
+# icmp 3.3.3.3/32 any -> $EXTERNAL_NET any (msg:"IDS193 - DDoS - Stacheldraht server-spoof"; itype: 0; icmp_id: 666;
+icmp msg:"IDS183 - DDoS - TFN client command LE"; itype: 0; icmp_id: 51201; icmp_seq: 0; dlevel: 1;
+icmp msg:"IDS184 - DDoS - TFN client command BE"; itype: 0; icmp_id: 456; icmp_seq: 0; dlevel: 1;
+icmp msg:"MISC-IRDP-Router-Selection(l0phtattack)";itype:10; dlevel: 1;
+icmp msg:"IDS174 - MISC-IRDPRouterSelection";itype:10; dlevel: 1;
+icmp msg:"IDS173 - MISC-IRDPRouterAdvertisement";itype:9; dlevel: 1;
+icmp msg:"IDS199 - CVE-1999-0265 - MISC-ICMPRedirectNet";itype:5;icode:0; dlevel: 1;
+icmp msg:"IDS135 - CVE-1999-0265 - MISC-ICMPRedirectHost";itype:5;icode:1; dlevel: 1;
+icmp msg:"IDS118 - MISC-Traceroute ICMP";ttl:1;itype:8; dlevel: 1;
+icmp msg:"ICMP Message"; itype:18; dlevel: 1;
+icmp msg:"ICMP Destination Unreachable"; itype:3; dlevel: 1;
+icmp msg:"ICMP Source Quench"; itype:4; dlevel: 1;
+icmp msg:"ICMP Time Exceeded"; itype:11; dlevel: 1;
+icmp msg:"ICMP Parameter Problem"; itype:12; dlevel: 1;
+icmp msg:"ICMP Timestamp"; itype:13; dlevel: 1;
+icmp msg:"ICMP Information Request"; itype:15; dlevel: 1;
+icmp msg:"ICMP Information Reply"; itype:16; dlevel: 1;
+icmp msg:"IDS216 - ICMP Subnet Mask Request"; itype:17; dlevel: 1;
+icmp msg:"Windows Traceroute"; TTL: 1; itype: 8; dlevel: 1;
+# icmp msg:"echo request"; TTL: 64; itype: 8; dlevel: 1;

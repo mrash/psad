@@ -485,14 +485,15 @@ unless ($no_whois) {
 ### if psad is running on a syslog server, do not check the firewall
 ### rules since they may not be local.  Also, do not check the
 ### firewall if psad is configured to parse all iptables messages.
-unless ($config{'FW_SEARCH_ALL'} eq 'Y' or $no_fwcheck
-        or $syslog_server or $benchmark) {
+#unless ($no_fwcheck or $syslog_server or $benchmark) {
+if (0) {
     my $opts = "-c $config_file --fw-search $fw_search_file";
     $opts .= " --fw-analyze" if $fw_analyze;
     $opts .= " --fw-file $fw_file" if $fw_file;
-    system "$cmds{'fwcheck_psad'} $opts";
+    $opts .= " --no-fw-search-all" if $config{'FW_SEARCH_ALL'} eq 'Y';
+    my $es = (system "$cmds{'fwcheck_psad'} $opts") >> 8;
 
-    exit 0 if $fw_analyze;
+    exit $es if $fw_analyze;  ### finished analyzing ruleset so exit.
 }
 
 ### initialize benchmarking test packets if we are running
@@ -785,6 +786,11 @@ sub check_scan() {
         }
     }
     $print_scale_factor++ if $print_scale_factor == 0;
+
+    #  Mar 11 13:15:52 orthanc kernel: DROP IN=lo OUT= MAC=00:00:00:00:00:00:00:00:
+    #  00:00:00:00:08:00 SRC=127.0.0.1 DST=127.0.0.1 LEN=60 TOS=0x00 PREC=0x00
+    #  TTL=64 ID=0 DF PROTO=TCP SPT=44847 DPT=35 WINDOW=32304 RES=0x00 SYN URGP=0
+
     PKT: for my $pkt (@$fw_packets_aref) {
         my $src = '';
         my $dst = '';
@@ -805,6 +811,7 @@ sub check_scan() {
         my $intf     = '';
         my $dshield_str = '';
         my $syslog_host = '';
+        my $log_prefix  = '';
 
         print STDERR $pkt, "\n" if $debug;
 
@@ -857,6 +864,12 @@ sub check_scan() {
             next PKT unless $matched;
         }
 
+        ### see if there is a logging prefix (used for scan email alert even
+        ### if we are running with FW_SEARCH_ALL = Y).
+        if ($pkt =~ /kernel:\s+(\S+?.*?)\s*IN=/) {
+            $log_prefix = $1;
+        }
+
         ### May 18 22:21:26 orthanc kernel: DROP IN=eth2 OUT=
         ### MAC=00:60:1d:23:d0:01:00:60:1d:23:d3:0e:08:00 SRC=192.168.20.25
         ### DST=192.168.20.1 LEN=60 TOS=0x10 PREC=0x00 TTL=64 ID=47300 DF
@@ -901,7 +914,9 @@ sub check_scan() {
                 next PKT;
             }
             if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
-                    and not $analyze_msgs) {
+                    and not $benchmark
+                    and not $analyze_msgs
+                    and not &exclude_auto_ignore_ip($src)) {
                 my $dflags = $flags;
                 $dflags =~ s/\s/,/g;
                 $dshield_str = "$src\t$sp\t$dst\t$dp\t$proto\t$dflags";
@@ -926,7 +941,9 @@ sub check_scan() {
                 ($1,$2,$3,$4,$5,$6,$7,$8);
             $proto = 'udp';
             if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
-                    and not $analyze_msgs) {
+                    and not $benchmark
+                    and not $analyze_msgs
+                    and not &exclude_auto_ignore_ip($src)) {
                 $dshield_str = "$src\t$sp\t$dst\t$dp\t$proto";
             }
             ### make sure we have a "reasonable" packet (note that nmap
@@ -951,7 +968,9 @@ sub check_scan() {
             }
             $icmp_ctr++;
             if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
-                    and not $analyze_msgs) {
+                    and not $benchmark
+                    and not $analyze_msgs
+                    and not &exclude_auto_ignore_ip($src)) {
                 $dshield_str = "$src\t$type\t$dst\t$code\t$proto";
             }
         } else {
@@ -978,7 +997,8 @@ sub check_scan() {
 
         if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
                 and not $benchmark
-                and not $analyze_msgs) {
+                and not $analyze_msgs
+                and $dshield_str) {
             if ($pkt =~ /^\s*(\w+)\s+(\d+)\s+(\S+)/) {
                 my $month   = Decode_Month($1);
                 my $day     = sprintf("%.2d", $2);
@@ -1030,6 +1050,12 @@ sub check_scan() {
         ### keep track of which syslog daemon reported the message.
         $current_scan{$src}{$dst}{'syslog_host'}{$syslog_host} = ''
             if $syslog_host;
+
+        ### keep track of iptables chain and logging prefix (if there
+        ### was one)
+        $log_prefix = '*noprfx*' unless $log_prefix;
+        $current_scan{$src}{$dst}{$proto}{'chain'}
+                {$chain}{$log_prefix}++;
 
         unless ($proto eq 'icmp') {
             ### initialize the start and end port for the scanned port range
@@ -2707,16 +2733,16 @@ sub scan_logr() {
                 " ** psad: Suspicious traffic detected against ",
                 "$dst\n\n\n";
             if (defined $assigned_auto_dl{$src}) {
-                printf $fh "%${log_len}s%s", 'Danger level: ',
-                    "[$scan_dl{$src} auto-assigned] (out of 5)\n\n";
+                printf $fh "%${log_len}s%s\n\n", 'Danger level: ',
+                    "[$scan_dl{$src} auto-assigned] (out of 5)";
                 delete $assigned_auto_dl{$src};
             } else {
-                printf $fh "%${log_len}s%s", 'Danger level: ',
-                    "[$scan_dl{$src}] (out of 5)\n\n";
+                printf $fh "%${log_len}s%s\n\n", 'Danger level: ',
+                    "[$scan_dl{$src}] (out of 5)";
             }
             if ($tcp_f) {
-                printf $fh "%${log_len}s%s", 'Scanned tcp ports: ',
-                    "[$tcp_newrange: $tcp_newpkts packets]\n";
+                printf $fh "%${log_len}s%s\n", 'Scanned tcp ports: ',
+                    "[$tcp_newrange: $tcp_newpkts packets]";
                 my $prefix = 'tcp flags: ';
                 for my $flags (keys %{$current_scan_href->{$src}->
                         {$dst}->{'tcp'}->{'flags'}}) {
@@ -2737,34 +2763,53 @@ sub scan_logr() {
                         $nmap_opts = '-O';
                     }
                     if ($nmap_opts) {
-                        printf $fh "%${log_len}s%s", $prefix,
-                            "[$flags: $n_pkts pkts, Nmap: $nmap_opts]\n";
+                        printf $fh "%${log_len}s%s\n", $prefix,
+                            "[$flags: $n_pkts packets, Nmap: $nmap_opts]";
                     } else {
-                        printf $fh "%${log_len}s%s", $prefix,
-                            "[$flags: $n_pkts pkts]\n";
+                        printf $fh "%${log_len}s%s\n", $prefix,
+                            "[$flags: $n_pkts pkts]";
                     }
                     $prefix = '';
+                }
+                if (defined $current_scan_href->{$src}->{$dst}->{'tcp'}->{'chain'}) {
+                    &print_chains_and_prefixes(
+                        $current_scan_href->{$src}->{$dst}->{'tcp'}->{'chain'},
+                        $fh
+                    );
                 }
                 $syslog_flags =~ s/\s*$//;
                 $syslog_range .= "tcp=[$tcp_newrange] $syslog_flags";
             }
             if ($udp_f) {
-                printf $fh "%${log_len}s%s", 'Scanned udp ports: ',
-                    "[$udp_newrange: $udp_newpkts pkts, Nmap: -sU]\n";
+                printf $fh "%${log_len}s%s\n", 'Scanned udp ports: ',
+                    "[$udp_newrange: $udp_newpkts pkts, Nmap: -sU]";
+                if (defined $current_scan_href->{$src}->{$dst}->{'udp'}->{'chain'}) {
+                    &print_chains_and_prefixes(
+                        $current_scan_href->{$src}->{$dst}->{'udp'}->{'chain'},
+                        $fh
+                    );
+                }
+
             }
             if ($icmp_f) {
-                printf $fh "%${log_len}s%s", 'icmp packets: ',
-                    "[$icmp_newpkts]\n";
+                printf $fh "%${log_len}s%s\n", 'icmp packets: ',
+                    "[$icmp_newpkts]";
+                if (defined $current_scan_href->{$src}->{$dst}->{'icmp'}->{'chain'}) {
+                    &print_chains_and_prefixes(
+                        $current_scan_href->{$src}->{$dst}->{'icmp'}->{'chain'},
+                        $fh
+                    );
+                }
             }
-            printf $fh "\n%${log_len}s%s", 'Source: ', "$src\n";
-            printf $fh "%${log_len}s%s", 'DNS: ', "$src_dns_str\n"
+            printf $fh "\n%${log_len}s%s\n", 'Source: ', $src;
+            printf $fh "%${log_len}s%s\n", 'DNS: ', $src_dns_str
                 unless $no_rdns;
             if (!$no_posf and defined $posf{$src}{'guess'}) {
-                printf $fh "%${log_len}s%s", 'OS guess: ',
-                    "$posf{$src}{'guess'}\n";
+                printf $fh "%${log_len}s%s\n", 'OS guess: ',
+                    $posf{$src}{'guess'};
             }
-            printf $fh "\n%${log_len}s%s", 'Destination: ', "$dst\n",
-                "%${log_len}s%s", 'DNS: ', "$dst_dns_str\n\n";
+            printf $fh "\n%${log_len}s%s\n", 'Destination: ', $dst;
+            printf $fh "%${log_len}s%s\n\n", 'DNS: ', $dst_dns_str;
 
             if (defined $current_scan_href->{$src}->{$dst}->{'syslog_host'}) {
                 my $syslog_hosts = '';
@@ -2782,11 +2827,11 @@ sub scan_logr() {
             print $fh "\n";
             unless ($analyze_msgs) {
                 printf $fh "%${log_len}s%s\n", 'Current interval: ',
-                    "$s_time (start)",
-                    "%${log_len}s%s\n", '', "$time (end)\n";
+                    "$s_time (start)";
+                printf $fh "%${log_len}s%s\n\n", '', "$time (end)";
             }
             ### print the overall stats since the scan began
-            printf $fh "%${log_len}s%s\n\n", 'Overall stats since: ',
+            printf $fh "%${log_len}s%s\n", 'Overall scan start: ',
                 $abs_s_time;
             printf $fh "%${log_len}s%s\n", 'Total email alerts: ',
                 $scan{$src}{$dst}{'email_ctr'};
@@ -3042,6 +3087,23 @@ sub scan_logr_signatures() {
         }
     }
     close LS;
+    return;
+}
+
+sub print_chains_and_prefixes() {
+    my ($chain_hr, $fh) = @_;
+    for my $chain (keys %$chain_hr) {
+        for my $prefix (keys %{$chain_hr->{$chain}}) {
+            my $count = $chain_hr->{$chain}->{$prefix};
+            if ($prefix eq '*noprfx*') {
+                printf $fh "%${log_len}s%s\n", 'Iptables chain: ',
+                    "$chain, $count packets";
+            } else {
+                printf $fh "%${log_len}s%s\n", 'Iptables chain: ',
+                    qq/$chain (prefix "$prefix"), $count packets/;
+            }
+        }
+    }
     return;
 }
 
@@ -3456,6 +3518,27 @@ sub timeout_auto_blocked_ips() {
         }
     }
     return;
+}
+
+sub exclude_auto_ignore_ip() {
+    my $ip = shift;
+    if (defined $auto_ips{'ip'}{$ip}) {
+        PR: for my $proto qw(allproto tcp udp icmp) {
+            next PR unless defined $auto_ips{'ip'}{$ip}{$proto};
+            ### ignore $ip if the auto danger level is zero
+            return 1 if $auto_ips{'ip'}{$ip}{$proto} == 0;
+        }
+    } else {
+        NET: for my $net (keys %{$auto_ips{'net'}}) {
+            next NET unless ipv4_in_network($net, $ip);
+            PR: for my $proto qw(allproto tcp udp icmp) {
+                next PR unless defined $auto_ips{'net'}{$ip}{$proto};
+                ### ignore $ip if the auto danger level is zero
+                return 1 if $auto_ips{'net'}{$ip}{$proto} == 0;
+            }
+        }
+    }
+    return 0;
 }
 
 sub get_iptables_chains() {
@@ -4934,9 +5017,6 @@ Options:
     -d   --debug                  - Run psad in debugging mode.
     -D   --Dump-conf              - Dump psad configuration on STDOUT
                                     and exit.
-    -o   --output                 - Print all messages to STDOUT (this
-                                    does not include bad packet messages
-                                    that are printed to the error log).
     -l   --log-server             - Psad is being run on a syslog
                                     logging server.
     -F   --Flush                  - Remove any auto-generated firewall

@@ -85,6 +85,21 @@ sub create_chain() {
     }
 }
 
+sub flush_chain() {
+    my $self = shift;
+    my $table = shift || croak '[*] Must specify a table, e.g. "filter".';
+    my $chain = shift || croak '[*] Must specify a chain.';
+    my $iptables = $self->{'_iptables'};
+
+    return &modinternal_flush_chain($table, $chain, $iptables);
+}
+
+sub modinternal_flush_chain() {
+    my ($table, $chain, $iptables) = @_;
+
+    return &run_ipt_cmd("$iptables -t $table -F $chain");
+}
+
 sub delete_chain() {
     my $self = shift;
     my $table = shift || croak '[*] Must specify a table, e.g. "filter".';
@@ -97,7 +112,7 @@ sub delete_chain() {
     ### see if the chain exists first
     if (&run_ipt_cmd("$iptables -t $table -n -L $del_chain") == 0) {
         ### flush the chain
-        if (&run_ipt_cmd("$iptables -t $table -F $del_chain") == 0) {
+        if (&modinternal_flush_chain($table, $del_chain, $iptables) == 0) {
             ### find and delete jump rules to this chain (we can't delete
             ### the chain until there are no references to it)
             my $rulenum = &modinternal_find_ip_rule('0.0.0.0/0',
@@ -125,9 +140,11 @@ sub delete_chain() {
 sub add_ip_rule() {
     my $self = shift;
     my $src = shift || croak '[-] Must specify a src address/network.';
-    my $table  = shift || croak '[-] Must specify a table, e.g. "filter".';
-    my $chain  = shift || croak '[-] Must specify a chain.';
-    my $target = shift ||
+    my $dst = shift || croak '[-] Must specify a dst address/network.';
+    my $rulenum = shift || croak '[-] Must specify an insert rule number.';
+    my $table   = shift || croak '[-] Must specify a table, e.g. "filter".';
+    my $chain   = shift || croak '[-] Must specify a chain.';
+    my $target  = shift ||
         croak '[-] Must specify a Netfilter target, e.g. "DROP"';
     my $iptables = $self->{'_iptables'};
 
@@ -148,17 +165,32 @@ sub add_ip_rule() {
         $normalized_src = $src;
     }
 
+    ### normalize dst network if necessary; this is because Netfilter
+    ### always reports network address for subnets
+    my $normalized_dst = '';
+    if ($dst =~ m|($ip_re)/($ip_re)|) {
+        my ($net_addr, $cidr) = ipv4_network($1, $2);
+        $normalized_dst = "$net_addr/$cidr";
+    } elsif ($dst =~ m|($ip_re)/(\d+)|) {
+        my ($net_addr, $cidr) = ipv4_network($1, $2);
+        $normalized_dst = "$net_addr/$cidr";
+    } else {
+        ### it is a hostname or an individual IP
+        $normalized_dst = $dst;
+    }
+
     ### first check to see if this rule already exists
-    if (&modinternal_find_ip_rule($normalized_src, '0.0.0.0/0', $table,
+    if (&modinternal_find_ip_rule($normalized_src, $normalized_dst, $table,
             $chain, $target, $iptables)) {
         return 1, '[-] Rule already exists.';
     } else {
         ### we need to add the rule
-        if (&run_ipt_cmd("$iptables " .
-            "-t $table -I $chain 1 -s $normalized_src -j $target") == 0) {
+        if (&run_ipt_cmd("$iptables -t $table -I $chain $rulenum " .
+                "-s $normalized_src -d $normalized_dst -j $target") == 0) {
             return 1, '[+] Added rule.';
         } else {
-            return 0, "[+] Could not add $target rule for $normalized_src.";
+            return 0, "[+] Could not add $target rule for " .
+                "$normalized_src -> $normalized_dst";
         }
     }
 }
@@ -166,6 +198,7 @@ sub add_ip_rule() {
 sub delete_ip_rule() {
     my $self = shift;
     my $src = shift || croak '[-] Must specify a src address/network.';
+    my $dst = shift || croak '[-] Must specify a dst address/network.';
     my $table  = shift || croak '[-] Must specify a table, e.g. "filter".';
     my $chain  = shift || croak '[-] Must specify a chain.';
     my $target = shift ||
@@ -189,9 +222,23 @@ sub delete_ip_rule() {
         $normalized_src = $src;
     }
 
+    ### normalize dst network if necessary; this is because Netfilter
+    ### always reports network address for subnets
+    my $normalized_dst = '';
+    if ($dst =~ m|($ip_re)/($ip_re)|) {
+        my ($net_addr, $cidr) = ipv4_network($1, $2);
+        $normalized_dst = "$net_addr/$cidr";
+    } elsif ($dst =~ m|($ip_re)/(\d+)|) {
+        my ($net_addr, $cidr) = ipv4_network($1, $2);
+        $normalized_dst = "$net_addr/$cidr";
+    } else {
+        ### it is a hostname or an individual IP
+        $normalized_dst = $dst;
+    }
+
     ### first check to see if this rule already exists
-    my $rulenum = &modinternal_find_ip_rule($normalized_src, '0.0.0.0/0',
-        $table, $chain, $target, $iptables);
+    my $rulenum = &modinternal_find_ip_rule($normalized_src,
+        $normalized_dst, $table, $chain, $target, $iptables);
     if ($rulenum) {
         ### we need to delete the rule
         if (&run_ipt_cmd("$iptables " .
@@ -199,7 +246,7 @@ sub delete_ip_rule() {
             return 1, "[+] Deleted rule #$rulenum";
         } else {
             return 0, "[+] Could not delete $target rule " .
-                "#$rulenum for $normalized_src.";
+                "#$rulenum for $normalized_src -> $normalized_dst.";
         }
     } else {
         return 0, "[-] Rule does not exist in $chain chain.";

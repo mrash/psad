@@ -108,7 +108,7 @@ my %required_perl_modules = (
         'force-lib-install' => 1,
     },
     'Psad' => {
-        'version' => '1.4.0',
+        'version' => '1.4.1',
         'force-lib-install' => 1,
     }
 );

@@ -238,7 +238,7 @@ sub install() {
         &perms_ownership("${PSAD_DIR}/fwdata", 0600);
     }
 
-    if ($Cmds{'iptables'}) {
+    if ($Cmds{'iptables'} && -x $Cmds{'iptables'}) {
         &logr(" ... Testing syslog configuration.\n");
         ### make sure we actually see packets being logged by
         ### the firewall.

@@ -42,19 +42,21 @@ use strict;
 ### Note that Psad.pm is not included within the above list (installation
 ### over existing psad should not make use of an old Psad.pm).
 
-### These two variables should not really be changed unless
+### These three variables should not really be changed unless
 ### you're really sure.
 my $PSAD_DIR     = "/var/log/psad";
 my $PSAD_CONFDIR = "/etc/psad";
+my $RUNDIR       = "/var/run";
 
 #============== config ===============
-my $INSTALL_LOG = "${PSAD_DIR}/install.log";
-my $PSAD_FIFO   = "/var/run/psadfifo";
-my $INIT_DIR    = "/etc/rc.d/init.d";
-my $SBIN_DIR    = "/usr/sbin";  ### consistent with FHS (Filesystem Hierarchy Standard)
-my @LOGR_FILES  = (*STDOUT, $INSTALL_LOG);
-my $RUNLEVEL;   ### This should only be set if install.pl cannot determine the correct runlevel
-my $WHOIS_PSAD  = "/usr/bin/whois.psad";
+my $INSTALL_LOG  = "${PSAD_DIR}/install.log";
+my $PSAD_FIFO    = "${RUNDIR}/psadfifo";
+my $INIT_DIR     = "/etc/rc.d/init.d";
+my $SBIN_DIR     = "/usr/sbin";  ### consistent with FHS (Filesystem Hierarchy Standard)
+my $CONF_ARCHIVE = "${PSAD_CONFDIR}/archive";
+my @LOGR_FILES   = (*STDOUT, $INSTALL_LOG);
+my $RUNLEVEL;    ### This should only be set if install.pl cannot determine the correct runlevel
+my $WHOIS_PSAD   = "/usr/bin/whois.psad";
 
 ### system binaries ###
 my $chkconfigCmd = "/sbin/chkconfig";
@@ -123,7 +125,9 @@ if ($distro =~ /redhat/) {
 
 ### need to make sure this exists before attempting to
 ### write anything to the install log.
-&create_psaddir();
+unless (-d $PSAD_DIR) {
+    mkdir $PSAD_DIR, 0400;
+}
 
 &check_commands(\%Cmds);
 $Cmds{'psad'} = $psadCmd;
@@ -315,81 +319,51 @@ copy("kmsgsd", "${SBIN_DIR}/kmsgsd");
 copy("diskmond", "${SBIN_DIR}/diskmond");
 &perms_ownership("${SBIN_DIR}/diskmond", 0500);
 
-### Give the admin the opportunity to add to the strings that are normally
-### checked in iptables messages.  This is useful since the admin may have
-### configured the firewall to use a logging prefix of "Audit" or something
-### else other than the normal "DROP", "DENY", or "REJECT" strings.
-my $append_fw_search_str = &get_fw_search_string();
-
-#my $email_str = "";
-#if ( -e "${SBIN_DIR}/psad" && (! $nopreserve)) {  # need to grab the old config
-#    &logr(" ... Copying psad -> ${SBIN_DIR}/psad\n");
-#    &logr("     Preserving old config within ${SBIN_DIR}/psad\n");
-#    &preserve_config("psad", "${SBIN_DIR}/psad");
-#    $email_str = &query_email("${SBIN_DIR}/psad");
-#    copy("psad", "${SBIN_DIR}/psad");
-#    if ($email_str) {
-#        &put_email("${SBIN_DIR}/psad", $email_str);
-#    }
-#    if ($append_fw_search_str) {
-#        &logr(" ... Appending \"$append_fw_search_str\" to \$FW_MSG_SEARCH in ${SBIN_DIR}/psad\n");
-#        &put_fw_search_str("${SBIN_DIR}/psad", $append_fw_search_str);
-#    }
-#    &perms_ownership("${SBIN_DIR}/psad", 0500)
-#} else {
-#    &logr(" ... Copying psad -> ${SBIN_DIR}/\n");
-#    copy("psad", "${SBIN_DIR}/psad");
-#    $email_str = &query_email("${SBIN_DIR}/psad");
-#    if ($email_str) {
-#        &put_email("${SBIN_DIR}/psad", $email_str);
-#    }
-#    if ($append_fw_search_str) {
-#        &logr(" ... Appending \"$append_fw_search_str\" to \$FW_MSG_SEARCH in ${SBIN_DIR}/psad\n");
-#        &put_fw_search_str("${SBIN_DIR}/psad", $append_fw_search_str);
-#    }
-#    &perms_ownership("${SBIN_DIR}/psad", 0500);
-#}
 unless (-d $PSAD_CONFDIR) {
     &logr(" ... Creating $PSAD_CONFDIR\n");
     mkdir $PSAD_CONFDIR,0400;
 }
+unless (-d "${PSAD_CONFDIR}/archive") {
+    &logr(" ... Creating ${PSAD_CONFDIR}/archive\n");
+    mkdir "${PSAD_CONFDIR}/archive", 0400;
+}
 if (-e "${PSAD_CONFDIR}/psad_signatures") {
-    &logr(" ... Copying psad_signatures -> ${PSAD_CONFDIR}/psad_signatures\n");
-    &logr("     Preserving old signatures file as ${PSAD_CONFDIR}/psad_signatures.old\n");
-    move("${PSAD_CONFDIR}/psad_signatures", "${PSAD_CONFDIR}/psad_signatures.old");
-    copy("psad_signatures", "${PSAD_CONFDIR}/psad_signatures");
-    &perms_ownership("${PSAD_CONFDIR}/psad_signatures", 0600);
+    &archive("${PSAD_CONFDIR}/psad_signatures") unless $nopreserve;
 } else {
     &logr(" ... Copying psad_signatures -> ${PSAD_CONFDIR}/psad_signatures\n");
     copy("psad_signatures", "${PSAD_CONFDIR}/psad_signatures");
     &perms_ownership("${PSAD_CONFDIR}/psad_signatures", 0600);
 }
 if (-e "${PSAD_CONFDIR}/psad_auto_ips") {
-    &logr(" ... Copying psad_auto_ips -> ${PSAD_CONFDIR}/psad_auto_ips\n");
-    &logr("     Preserving old auto_ips file as ${PSAD_CONFDIR}/psad_auto_ips.old\n");
-    move("${PSAD_CONFDIR}/psad/psad_auto_ips", "${PSAD_CONFDIR}/psad_auto_ips.old");
-    copy("psad_auto_ips", "${PSAD_CONFDIR}/psad_auto_ips");
-    &perms_ownership("${PSAD_CONFDIR}/psad_auto_ips", 0600);
+    &archive("${PSAD_CONFDIR}/psad_auto_ips") unless $nopreserve;
 } else {
     &logr(" ... Copying psad_auto_ips -> ${PSAD_CONFDIR}/psad_auto_ips\n");
     copy("psad_auto_ips", "${PSAD_CONFDIR}/psad_auto_ips");
     &perms_ownership("${PSAD_CONFDIR}/psad_auto_ips", 0600);
 }
 if (-e "${PSAD_CONFDIR}/psad.conf") {
-    ### deal with preserving existing config here
-
-    &preserve_psad_config() unless $nopreserve;
-
-    &logr(" ... Copying psad.conf -> ${PSAD_CONFDIR}/psad.conf\n");
-    &logr("     Preserving old psad.conf file as ${PSAD_CONFDIR}/psad.conf\n");
-    move("${PSAD_CONFDIR}/psad.conf", "${PSAD_CONFDIR}/psad.conf.old");
-    copy("psad.conf", "${PSAD_CONFDIR}/psad.conf");
-    &perms_ownership("${PSAD_CONFDIR}/psad.conf", 0600);
+    &archive("${PSAD_CONFDIR}/psad.conf") unless $nopreserve;
 } else {
     &logr(" ... Copying psad.conf -> ${PSAD_CONFDIR}/psad.conf\n");
     copy("psad.conf", "${PSAD_CONFDIR}/psad.conf");
     &perms_ownership("${PSAD_CONFDIR}/psad.conf", 0600);
 }
+my $email_str = &query_email();
+if ($email_str) {
+    &put_email($email_str);
+}
+### Give the admin the opportunity to add to the strings that are normally
+### checked in iptables messages.  This is useful since the admin may have
+### configured the firewall to use a logging prefix of "Audit" or something
+### else other than the normal "DROP", "DENY", or "REJECT" strings.
+my $append_fw_search_str = &get_fw_search_string();
+
+if ($append_fw_search_str) {
+    &logr(" ... Appending \"$append_fw_search_str\" to \$FW_MSG_SEARCH in ${PSAD_CONFDIR}/psad.conf\n");
+    &put_fw_search_str("${PSAD_CONFDIR}/psad.conf", $append_fw_search_str);
+}
+
+
 if (-e "/etc/man.config") {
     ### prefer to install psad.8 in /usr/local/man/man8 if this directory is configured in /etc/man.config
     if (open MPATH, "< /etc/man.config" and grep /MANPATH\s+\/usr\/local\/man/, <MPATH> and close MPATH) {
@@ -451,8 +425,8 @@ if ($distro =~ /redhat/) {
 }
 my $running;
 my $pid;
-if (-e "/var/run/psad.pid") {
-    open PID, "< /var/run/psad.pid";
+if (-e "${RUNDIR}/psad.pid") {
+    open PID, "< ${RUNDIR}/psad.pid";
     $pid = <PID>;
     close PID;
     chomp $pid;
@@ -500,10 +474,13 @@ exit 0;
 #==================== end main =====================
 sub check_old_psad_installation() {
     my $old_install_dir = "/usr/local/bin";
-    move("${old_install_dir}/psad", "${SBIN_DIR}/psad") if (-e "${old_install_dir}/psad");
+    move("${old_install_dir}/psad", "${SBIN_DIR}/psad")             if (-e "${old_install_dir}/psad");
     move("${old_install_dir}/psadwatchd", "${SBIN_DIR}/psadwatchd") if (-e "${old_install_dir}/psadwatchd");
-    move("${old_install_dir}/diskmond", "${SBIN_DIR}/diskmond") if (-e "${old_install_dir}/diskmond");
-    move("${old_install_dir}/kmsgsd", "${SBIN_DIR}/kmsgsd") if (-e "${old_install_dir}/kmsgsd");
+    move("${old_install_dir}/diskmond", "${SBIN_DIR}/diskmond")     if (-e "${old_install_dir}/diskmond");
+    move("${old_install_dir}/kmsgsd", "${SBIN_DIR}/kmsgsd")         if (-e "${old_install_dir}/kmsgsd");
+    unlink "${PSAD_CONFDIR}/psad_signatures.old" if (-e "${PSAD_CONFDIR}/psad_signatures.old");
+    unlink "${PSAD_CONFDIR}/psad_auto_ips.old"   if (-e "${PSAD_CONFDIR}/psad_auto_ips.old");
+    unlink "${PSAD_CONFDIR}/psad_conf.old"       if (-e "${PSAD_CONFDIR}/psad.conf.old");
     ### Psad.pm will be installed The Right Way using make
     unlink "${PERL_INSTALL_DIR}/Psad.pm" if (-e "${PERL_INSTALL_DIR}/Psad.pm");
     return;
@@ -523,170 +500,10 @@ sub get_distro() {
         return "NA";
     }
 }
-#sub build_psad_config() {
-#sub preserve_psad_config() {
-    
-sub preserve_config() {
-    my ($srcfile, $productionfile) = @_;
-    my $start = 0;
-    my @config = ();
-    my @defconfig = ();
-    open PROD, "< $productionfile" or die "Could not open production file: $!\n";
-    GETCONFIG: while(<PROD>) {
-        my $l = $_;
-        chomp $l;
-        if ($l =~ /\=\=\=\=\=\s+config\s+\=\=\=\=\=/) {
-            $start = 1;
-        }
-        push @config, $l if ($start);
-        if ($l =~ /\=\=\=\=\=\s+end\s+config\s+\=\=\=\=\=/) {
-            last GETCONFIG;
-        }
-    }
-    close PROD;
-    if ($config[0] !~ /\=\=\=\=\=\s+config\s+\=\=\=\=\=/ || $config[$#config] !~ /\=\=\=\=\=\s+end\s+config\s+\=\=\=\=\=/) {
-        die "Could not get config info from $productionfile!!!  Try running \"install.pl -n\" and\nedit the configuration sections of $productionfile directly.\n"
-    }
-    $start = 0;
-    open DEFCONFIG, "< $srcfile" or die "Could not open source file: $!\n";
-    GETDEFCONFIG: while(<DEFCONFIG>) {
-        my $l = $_;
-        chomp $l;
-                if ($l =~ /\=\=\=\=\=\s+config\s+\=\=\=\=\=/) {
-                        $start = 1;
-                }
-        push @defconfig, $l if ($start);
-        if ($l =~ /\=\=\=\=\=\s+end\s+config\s+\=\=\=\=\=/) {
-                        last GETDEFCONFIG;
-                }
-    }
-    close DEFCONFIG;
-    # We only want to preserve the variables from the $productionfile.  Any commented lines will be discarded
-    # and replaced with the commented lines from the $srcfile.
-    #
-    # First get the variables into a hash from the $productionfile
-    my %prodvars;
-    my %srcvars;
-    undef %prodvars;
-    undef %srcvars;
-    for my $p (@config) {
-        if ($p =~ /(\S+)\s+=\s+(.*?)\;/) {
-            my ($varname, $value) = ($1, $2);
-            my $type;
-            ($varname, $type) = &assign_var_type($varname);
-            $prodvars{$type}{$varname}{'VALUE'} = $value;
-            $prodvars{$type}{$varname}{'LINE'} = $p;
-            $prodvars{$type}{$varname}{'FOUND'} = "N";
-            if ($p =~ /^my/) {
-                $prodvars{$type}{$varname}{'MY'} = "Y";
-            } else {
-                $prodvars{$type}{$varname}{'MY'} = "N";
-            }
-        }
-    }
-    open SRC, "< $srcfile" or die "Could not open source file: $!\n";
-    $start = 0;
-    my $print = 1;
-    my $prod_tmp = $productionfile . "_tmp";
-    open TMP, "> $prod_tmp";
-    while(<SRC>) {
-        my $l = $_;
-        chomp $l;
-        $start = 1 if ($l =~ /\=\=\=\=\=\s+config\s+\=\=\=\=\=/);
-        print TMP "$l\n" unless $start;   # print the "======= config =======" line
-        if ($start && $print) {
-            PDEF: for my $defc (@defconfig) {
-                if ($defc =~ /^\s*#/) {   ### found a comment
-                    print TMP "$defc\n";
-                    next PDEF;
-                }
-                if ($defc =~ /(\S+)\s+=\s+(.*?)\;/) {  # found a variable
-                    my ($varname, $value) = ($1, $2);
-                    my $type;
-                    ($varname, $type) = &assign_var_type($varname);
-                    if ($varname eq "EMAIL_ADDRESSES" && defined $prodvars{'STRING'}{'EMAIL_ADDRESS'}{'VALUE'}) {  # old email format in production psad
-                        if ($prodvars{'STRING'}{'EMAIL_ADDRESS'}{'VALUE'} =~ /\"(\S+).\@(\S+)\"/) {
-                            my $mailbox = $1;
-                            my $host = $2;
-                            if ($mailbox ne "root" && $host ne "localhost") {
-                                $defc =~ s/root/$mailbox/;
-                                $defc =~ s/localhost/$host/;
-                                &logr(" ... Removing depreciated email format.  Preserving email address in production installation.\n");
-                                $prodvars{'STRING'}{'EMAIL_ADDRESS'}{'FOUND'} = "Y";
-                                print TMP "$defc\n";
-                                next PDEF;
-                            }
-                        }
-                    }
-                    if (defined $prodvars{$type}{$varname}{'VALUE'}) {
-                        if ($prodvars{$type}{$varname}{'MY'} eq "N" && $defc =~ /^my/) {
-                            $prodvars{$type}{$varname}{'LINE'} = "my " . $prodvars{$type}{$varname}{'LINE'};
-                        }
-                        $defc = $prodvars{$type}{$varname}{'LINE'};
-                        $prodvars{$type}{$varname}{'FOUND'} = "Y";
-                        if ($verbose) {
-                            &logr("*****  Using configuration value from production installation of $srcfile for $type variable: $varname\n");
-                        }
-                        print TMP "$defc\n";
-                    } else {
-                        $prodvars{$type}{$varname}{'FOUND'} = "Y";
-                        &logr("++++ Adding new configuration $type variable \"$varname\" introduced in this version of $srcfile.\n");
-                        print TMP "$defc\n";
-                    }
-                } else {
-                    print TMP "$defc\n";  # it is some other non-variable-assignment line so print it from the $srcfile
-                }
-            }
-            for my $type (keys %prodvars) {
-                for my $varname (keys %{$prodvars{$type}}) {
-                    next if ($varname =~ /EMAIL_ADDRESS/);
-                    unless ($prodvars{$type}{$varname}{'FOUND'} eq "Y") {
-                        &logr("---- Removing depreciated $type variable: \"$varname\" not needed in this version of $srcfile.\n");
-                    }
-                }
-            }
-            $print = 0;
-        }
-        $start = 0 if ($l =~ /\=\=\=\=\=\s+end\s+config\s+\=\=\=\=\=/);
-    }
-    close SRC;
-    close TMP;
-    move($prod_tmp, $productionfile);
-    return;
-}
-sub striphashsyntax() {
-    my $varname = shift;
-    $varname =~ s/\{//;
-    $varname =~ s/\}//;
-    $varname =~ s/\'//g;
-    return $varname;
-}
-sub assign_var_type() {
-    my $varname = shift;;
-    my $type;
-    if ($varname =~ /\$/ && $varname =~ /\{/) {
-        $type = "HSH_ELEM";
-        $varname = &striphashsyntax($varname);   # $DANGER_LEVELS{'1'}, etc...
-    } elsif ($varname =~ /\$/) { 
-        $type = "STRING";
-    } elsif ($varname =~ /\@/) {
-        $type = "ARRAY";
-    } elsif ($varname =~ /\%/) {  # this will probably never get used since psad will just scope a hash in the config section with "my"
-        $type = "HASH";
-    }
-    $varname =~ s/^.//;  # get rid of variable type since we have it in $type
-    return $varname, $type;
-}
 sub perms_ownership() {
     my ($file, $perm_value) = @_;
     chmod $perm_value, $file;
-    chown 0, 0, $file;  # chown uid, gid, $file
-    return;
-}
-sub create_psaddir() {
-    unless (-d $PSAD_DIR) {
-        mkdir $PSAD_DIR, 0400;
-    }
+    chown 0, 0, $file;  ### chown uid, gid, $file  (root :)
     return;
 }
 sub get_fw_search_string() {
@@ -715,25 +532,23 @@ sub get_fw_search_string() {
     return $fw_string;
 }
 sub query_email() {
-    my $file = shift;
-    open F, "< $file";
-    my @lines = <F>;
+    my $filename = "psad.conf";
+    open F, "< ${PSAD_CONFDIR}/psad.conf";
+    my @clines = <F>;
     close F;
-    my $email_address;
-    for my $l (@lines) {
+    my $email_addresses;
+    for my $l (@clines) {
         chomp $l;
-        if ($l =~ /my\s*\@EMAIL_ADDRESSES\s*=\s*qw\s*\((.+)\)/) {
-            $email_address = $1;
+        if ($l =~ /^\s*EMAIL_ADDRESSES\s+\((.+)\)/) {
+            $email_addresses = $1;
             last;
         }
     }
-    unless ($email_address) {
-        return 0;
+    unless ($email_addresses) {
+        return "";
     }
-    my @ftmp = split /\//, $file;
-    my $filename = $ftmp[$#ftmp];
-    print " ... $filename alerts will be sent to:\n\n";
-    print "       $email_address\n\n";
+    print " ... psad alerts will be sent to:\n\n";
+    print "       $email_addresses\n\n";
     my $ans = "";
     while ($ans ne "y" && $ans ne "n") {
         print " ... Would you like alerts sent to a different address (y/n)?  ";
@@ -743,7 +558,7 @@ sub query_email() {
     print "\n";
     if ($ans eq "y") {
         print "\n";
-        print " ... To which email address(es) would you like $filename alerts to be sent?\n";
+        print " ... To which email address(es) would you like psad alerts to be sent?\n";
         print " ... You can enter as many email addresses as you like separated by spaces.\n";
         my $emailstr = "";
         my $correct = 0;
@@ -768,20 +583,15 @@ sub query_email() {
     return "";
 }
 sub put_email() {
-    my ($file, $emailstr) = @_;
-    my $tmp = $file . ".tmp";
-    move($file, $tmp);
-    open TMP, "< $tmp";
-    my @lines = <TMP>;
-    close TMP;
-    unlink $tmp;
-    my @ftmp = split /\//, $file;
-    my $filename = $ftmp[$#ftmp];
+    my ($file, $emailstr) = shift;
+    open RF, "< $file";
+    my @lines = <RF>;
+    close RF;
 
     open F, "> $file";
     for my $l (@lines) {
-        if ($l =~ /my\s*\@EMAIL_ADDRESSES\s*=\s*qw\(\s*(\S+)/) {
-            print F "my \@EMAIL_ADDRESSES = qw($emailstr);\n";
+        if ($l =~ /EMAIL_ADDRESSES\s*\(/) {
+            print F "EMAIL_ADDRESSES            ($emailstr);\n";
         } else {
             print F $l;
         }
@@ -791,26 +601,42 @@ sub put_email() {
 }
 sub put_fw_search_str() {
     my ($file, $append_fw_search) = @_;
-    my $tmp = $file . ".tmp";
-    move($file, $tmp);
-    open TMP, "< $tmp";
-    my @lines = <TMP>;
-    close TMP;
-    unlink $tmp;
-    my @ftmp = split /\//, $file;
-    my $filename = $ftmp[$#ftmp];
+    open RF, "< $file";
+    my @lines = <RF>;
+    close RF;
 
+    my ($filename) = ($file =~ m|.*/(.*)|);
     open F, "> $file";
     for my $l (@lines) {
-        if ($l =~ /my\s*\$FW_MSG_SEARCH\s*=\s*\"(.*)\"\;/) {
+        if ($l =~ /\s*FW_MSG_SEARCH\s*.*;/) {
             my $fw_string = $1;
             $fw_string .= "|$append_fw_search";
-            print F "my \$FW_MSG_SEARCH = \"$fw_string\";\n";
+            print F "FW_MSG_SEARCH              $fw_string;\n";
         } else {
             print F $l;
         }
     }
     close F;
+    return;
+}
+sub archive() {
+    my $file = shift;
+    my ($filename) = ($file =~ m|.*/(.*)|);
+    my $targetbase = "${CONF_ARCHIVE}/${filename}.old";
+    my $target = $targetbase;
+    if (-e $targetbase) {
+        my $i = 2;
+        $target = $targetbase . $i;
+        while (-e $target) {
+            $i++;
+            $target = $targetbase . $i;
+        }
+    }
+    &logr(" ... Copying $filename -> $file\n");
+    &logr("     Preserving old $file file as $target\n");
+    move($file, $target);   ### move $file into the archive directory
+    copy($filename, $file); ### copy local $filename (in the src directory) to the $file location
+    &perms_ownership($file, 0600);
     return;
 }
 sub enable_psad_at_boot() {

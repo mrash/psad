@@ -49,6 +49,7 @@ unless (-e "/var/log/psad") {
 unless (-e "/var/log/psad/fwdata") {
 	print "*** Creating /var/log/psad/fwdata file\n";
 	`$Cmds{'touch'} /var/log/psad/fwdata`;
+	chmod 0600, "/var/log/psad/fwdata";
 }
 unless (-e "/etc/psad") {
 	print "*** Creating /etc/psad/\n";
@@ -56,13 +57,18 @@ unless (-e "/etc/psad") {
 }
 print "*** Copying psad,kmsgsd,diskmond -> /usr/local/bin/\n";
 `$Cmds{'cp'} psad /usr/local/bin/psad`;
+chmod 0500, "/usr/local/bin/psad";
 `$Cmds{'cp'} kmsgsd /usr/local/bin/kmsgsd`;
+chmod 0500, "/usr/local/bin/kmsgsd";
 `$Cmds{'cp'} diskmond /usr/local/bin/diskmond`;
+chmod 0500, "/usr/local/bin/diskmond";
 print "*** Copying psad-init -> /etc/rc.d/init.d/psad-init\n";
 `$Cmds{'cp'} psad-init /etc/rc.d/init.d/psad-init`;
 print "*** Copying psad.conf,psad_signatures -> /etc/psad/\n";
 `$Cmds{'cp'} psad.conf /etc/psad/psad.conf`;
+chmod 0600, "/etc/psad/psad.conf";
 `$Cmds{'cp'} psad_signatures /etc/psad/psad_signatures`;
+chmod 0600, "/etc/psad/psad_signatures";
 
 if(check_firewall_rules(\%Cmds)) {
 	print "*** To execute psad, run \"/etc/rc.d/init.d/psad-init start\"\n";

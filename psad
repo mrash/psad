@@ -1901,7 +1901,7 @@ sub status_psad() {
                             }
                             ### print the packet counters
                             if (-e $config{'PACKET_COUNTER_FILE'}) {
-                                print "     Packets Counters:\n"
+                                print "     Packets Counters:\n";
                                 open F, "< $config{'PACKET_COUNTER_FILE'}" or
                                     die " ... $config{'PACKET_COUNTER_FILE'}: $!";
                                 print STDOUT "        $_" while (<F>);

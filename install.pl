@@ -433,58 +433,12 @@ sub install() {
     &put_string("${PSAD_CONFDIR}/psad.conf", 'PSAD_DIR', $PSAD_DIR);
     &put_string("${PSAD_CONFDIR}/psad.conf", 'PSAD_FIFO', $PSAD_FIFO);
 
-    ### remove old man page
-    unlink '/usr/local/man/man8/psad.8' if (-e '/usr/local/man/man8/psad.8');
+    &install_manpage('psad.8');
+    &install_manpage('psadwatchd.8');
+    &install_manpage('kmsgsd.8');
+    &install_manpage('diskmond.8');
 
-    ### default location to put the psad man page, but check with
-    ### /etc/man.config
-    my $mpath = '/usr/share/man/man8';
-    if (-e '/etc/man.config') {
-        ### prefer to install psad.8 in /usr/local/man/man8 if
-        ### this directory is configured in /etc/man.config
-        open M, '< /etc/man.config' or
-            die " ... @@@ Could not open /etc/man.config: $!";
-        my @lines = <M>;
-        close M;
-        ### prefer the path "/usr/share/man"
-        my $found = 0;
-        for my $line (@lines) {
-            chomp $line;
-            if ($line =~ m|^MANPATH\s+/usr/share/man|) {
-                $found = 1;
-                last;
-            }
-        }
-        ### try to find "/usr/local/man" if we didn't find /usr/share/man
-        unless ($found) {
-            for my $line (@lines) {
-                chomp $line;
-                if ($line =~ m|^MANPATH\s+/usr/local/man|) {
-                    $mpath = '/usr/local/man/man8';
-                    $found = 1;
-                    last;
-                }
-            }
-        }
-        ### if we still have not found one of the above man paths,
-        ### just select the first one out of /etc/man.config
-        unless ($found) {
-            for my $line (@lines) {
-                chomp $line;
-                if ($line =~ m|^MANPATH\s+(\S+)|) {
-                    $mpath = $1;
-                    last;
-                }
-            }
-        }
-    }
-    mkdir $mpath, 0755 unless -d $mpath;
-    my $mfile = "${mpath}/psad.8";
-    &logr(" ... Installing psad(8) man page as $mfile\n");
-    copy('psad.8', $mfile);
-    &perms_ownership($mfile, 0644);
-
-    if ($distro =~ /redhat/) {
+    if ($distro =~ /redhat/i) {
         if (-d $INIT_DIR) {
             &logr(" ... Copying psad-init -> ${INIT_DIR}/psad\n");
             copy('psad-init', "${INIT_DIR}/psad");
@@ -893,6 +847,7 @@ sub enable_psad_at_boot() {
     }
     return;
 }
+
 ### check paths to commands and attempt to correct if any are wrong.
 sub check_commands() {
     my $Cmds_href = shift;
@@ -923,6 +878,62 @@ sub check_commands() {
     }
     return;
 }
+
+sub install_manpage() {
+    my $manpage = shift;
+    ### remove old man page
+    unlink '/usr/local/man/man8/${manpage}' if (-e '/usr/local/man/man8/${manpage}');
+
+    ### default location to put the psad man page, but check with
+    ### /etc/man.config
+    my $mpath = '/usr/share/man/man8';
+    if (-e '/etc/man.config') {
+        ### prefer to install $manpage in /usr/local/man/man8 if
+        ### this directory is configured in /etc/man.config
+        open M, '< /etc/man.config' or
+            die " ... @@@ Could not open /etc/man.config: $!";
+        my @lines = <M>;
+        close M;
+        ### prefer the path "/usr/share/man"
+        my $found = 0;
+        for my $line (@lines) {
+            chomp $line;
+            if ($line =~ m|^MANPATH\s+/usr/share/man|) {
+                $found = 1;
+                last;
+            }
+        }
+        ### try to find "/usr/local/man" if we didn't find /usr/share/man
+        unless ($found) {
+            for my $line (@lines) {
+                chomp $line;
+                if ($line =~ m|^MANPATH\s+/usr/local/man|) {
+                    $mpath = '/usr/local/man/man8';
+                    $found = 1;
+                    last;
+                }
+            }
+        }
+        ### if we still have not found one of the above man paths,
+        ### just select the first one out of /etc/man.config
+        unless ($found) {
+            for my $line (@lines) {
+                chomp $line;
+                if ($line =~ m|^MANPATH\s+(\S+)|) {
+                    $mpath = $1;
+                    last;
+                }
+            }
+        }
+    }
+    mkdir $mpath, 0755 unless -d $mpath;
+    my $mfile = "${mpath}/${manpage}";
+    &logr(" ... Installing $manpage man page as $mfile\n");
+    copy($manpage, $mfile);
+    &perms_ownership($mfile, 0644);
+    return;
+}
+
 ### logging subroutine that handles multiple filehandles
 sub logr() {
     my $msg = shift;
@@ -951,6 +962,8 @@ sub logr() {
     }
     return;
 }
+
+
 sub usage_and_exit() {
         my $exitcode = shift;
         print <<_HELP_;

@@ -7,6 +7,11 @@ psad-1.3.3 (08/21/2003):
     - Removed extraneous ".." and "**" chars from syslog messages, and
       updated to use [+] prefix strings.
     - Moved init scripts into init-scripts directory within source tree.
+    - Removed dependency on Bit::Vector (psad does not seem to make use
+      of any Date::Calc functions that require it).
+    - Wrapped copy() and move() calls with "or die()" to make them
+      safer in install.pl.
+    - Added check for existing psad process in install.pl.
 
 psad-1.3.2 (06/25/2003):
     - Removed FW_MSG_SEARCH from psad.conf, and created a new config

@@ -154,10 +154,10 @@ would normally be assigned.  Additionally, some IP addresses
 can always be ignored depending on your network configuration
 (the loopback interface 127.0.0.1 might be a good candidate
 for example).
-.B /etc/psad/psad_auto_ips
+.B /etc/psad/psad_auto_dl
 provides an interface for psad to automatically
 increase/decrease/ignore scanning IP danger levels.  Modifications
-can be made to psad_auto_ips (installed by default in /etc/psad)
+can be made to psad_auto_dl (installed by default in /etc/psad)
 and psad will import them without having to restart the psad process.
 .TP
 
@@ -424,7 +424,7 @@ Snort rules files that are consulted by default unless the --no-snort-sids
 commmand line argument is given.
 .RE
 
-.B /etc/psad/psad_auto_ips
+.B /etc/psad/psad_auto_dl
 .RS
 Contains a listing of any IP addresses that should be assigned
 a danger level based on any traffic that is logged by the
@@ -542,11 +542,11 @@ calculated: whether or not a scan matches a signature listed in
 .B psad_signatures,
 the value of PORT_RANGE_SCAN_THRESHOLD (see below), whether or not a scan comes
 from an IP that is listed in the
-.B psad_auto_ips
+.B psad_auto_dl
 file, and finally whether or not scans are allowed to timeout
 as determined by SCAN_TIMEOUT above.  If a signature is matched or the scanning
 IP is listed in
-.B psad_auto_ips,
+.B psad_auto_dl,
 then the corresponding danger level is automatically assigned to the scan.
 .TP
 
@@ -645,11 +645,18 @@ command line arguments (best for most situations):
 
 .B # psad
 
+Use psad as a forensics tool to analyze an old iptables logfile (psad defaults
+to analyzing the
+.B /var/log/messages
+file if the -m option is not specified):
+
+.B # psad -A -m <iptables logfile>
+
 The
 .B psad.conf,
 .B psad_signatures,
 and
-.B psad_auto_ips
+.B psad_auto_dl
 files are normally
 located within the /etc/psad/ directory, but the paths to each of these
 files can be changed:

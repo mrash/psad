@@ -15,7 +15,7 @@
 #
 # Credits:  (see the CREDITS file)
 #
-# Version: 1.0.0-pre2
+# Version: 1.0.0-pre3
 #
 # Copyright (C) 1999-2002 Michael B. Rash (mbr@cipherdyne.com)
 #
@@ -118,6 +118,7 @@
 
 ### modules used by psad
 use lib '/usr/lib/psad';
+use lib '/usr/lib/psad/i386-linux';  ### Syslog.pm is arch-dependent
 use Psad;
 use File::stat 'stat';
 use File::Copy;
@@ -134,7 +135,7 @@ use strict;
 ### ========================== main =================================
 
 ### set current the psad version number
-my $version = '1.0.0-pre2';
+my $version = '1.0.0-pre3';
 
 ### establish some default paths
 my $config_dir        = '/etc/psad';

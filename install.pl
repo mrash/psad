@@ -280,7 +280,6 @@ sub install() {
 
     ### installing Unix::Syslog
     &logr(" .. Installing the Unix::Syslog perl module\n");
-
     chdir 'Unix-Syslog-0.100' or die " ** Could not chdir to ",
         "Unix-Syslog-0.100: $!";
     unless (-e 'Makefile.PL' && -e 'Syslog.pm') {
@@ -288,8 +287,22 @@ sub install() {
             "is missing.\n    Download the latest sources from " .
             "http://www.cipherdyne.com\n";
     }
-#    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR INST_ARCHLIB=$LIBDIR LIB=$LIBDIR";
-#    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
+    system "$Cmds{'perl'} Makefile.PL";
+    system "$Cmds{'make'}";
+#    system "$Cmds{'make'} test";
+    system "$Cmds{'make'} install";
+    chdir '..';
+    print "\n\n";
+
+    ### installing Net::IPv4Addr
+    &logr(" .. Installing the Net::IPv4Addr perl module\n");
+    chdir 'Net-IPv4Addr-0.10' or die " ** Could not chdir to ",
+        "Net-IPv4Addr-0.10: $!";
+    unless (-e 'Makefile.PL') {
+        die " ** Your source directory appears to be incomplete!  Net::IPv4Addr " .
+            "is missing.\n    Download the latest sources from " .
+            "http://www.cipherdyne.com\n";
+    }
     system "$Cmds{'perl'} Makefile.PL";
     system "$Cmds{'make'}";
 #    system "$Cmds{'make'} test";

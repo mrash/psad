@@ -567,6 +567,8 @@ represents the pid of the psad process.
 .SH "SEE ALSO"
 .BR iptables (8),
 .BR ipchains (8),
+.BR kmsgsd (8),
+.BR psadwatchd (8),
 .BR snort (8),
 .BR nmap (1)
 
@@ -594,7 +596,8 @@ linux/net/ipv4/netfilter/ip_conntrack_proto_tcp.c from 60 seconds to 2 minutes,
 and a kernel patch "conntrack_patch" is included with the psad sources to
 change this.  (Requires a kernel recompile of course, see the Kernel-HOWTO.)
 Also, by default the IGNORE_CONNTRACK_BUG_PKTS variable is set in psad.conf
-which causes psad to ignore all logged 
+which causes psad to ignore all tcp packets that have the ACK bit set unless
+the packets match a specific signature.
 
 .SH DISTRIBUTION
 .B psad

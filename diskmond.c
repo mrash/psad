@@ -152,6 +152,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (received_sighup) {
+
             /* clear the HUP flag */
             received_sighup = 0;
 #ifdef DEBUG

@@ -1,0 +1,70 @@
+Kmsgsd Benchmarks:
+
+The basic strategy in benchmarking kmsgsd is to get syslogd to write kern.info
+messages (which include ipchains and iptables log messages) to the /var/log/psadfifo
+named pipe.  Kmsgsd will then read the messages out of the pipe as quickly as
+possible and write them to /var/log/psad/fwdata.  To calculate how fast kmsgsd is
+we then compare the number of newly written firewall messages to /var/log/messages
+with the number of messages kmsgsd was able to write to /var/log/psad/fwdata in the
+same time frame.  To generate lots of firewall "deny" messages we first make sure we
+have the firewall "default log and deny" policy loaded, and then proceed to scan the
+firewall first from a machine that is linked via a 100MB ethernet segment connected 
+directly to the firewall with a crossover cable, and second with a scan against the 
+loopback address from the firewall itself.  The second scan will eliminate any 
+network latency from slowing the scan down.
+
+TEST 1:
+- Scanning machine: PIII 700mhz, kernel 2.2.18
+- Target machine: PIII 700mhz, kernel 2.4.0
+- Ethernet: 100MB connection between the two machines.
+- Perl: 5.005_03
+- Scan command line: nmap -sX -p 5000-60000 <target_machine>
+- Approximate average number of iptables "DENY" messages printed to
+  /var/log/messages: 4400
+- Approximate average number of iptables messages caught by kmsgsd and
+  printed to /var/log/psad/fwdata: 4325
+
+Results:  kmsgsd catches over 98% of all firewall messages that are
+  written by klogd to /var/log/messages.  The remaining two percent that
+  are missed is probably due to context switching overhead and/or slowness
+  of Perl itself, and not much can be done about that (except re-writing it
+  in C of course).
+
+TEST 2:
+- We scan the loopback interface on the firewall.
+- PIII 500mhz, 128 MB ram, kernel 2.4.0
+- Perl 5.005_03
+- Scan command line: nmap -sX -p 5000-60000 127.0.0.1
+- Number of iptables "DENY" messages printed to /var/log/messages: 14810
+- Number of iptables messages caught by kmsgsd and written to 
+  /var/log/psad/fwdata: 14847
+
+Results:  These results are a bit surprising since kmsgsd caught more
+  messages in /var/log/psad/fwdata than syslog could write to 
+  /var/log/messages, but perhaps syslog can write more quickly to a named pipe 
+  (in this case to /var/log/psadfifo) than it can to a file (/var/log/messages) 
+  since probably would not have seek() to the end of the file to know where to 
+  write each message.  Hence it would appear that kmsgsd can keep up with just 
+  about anything thrown at it (for home users anyway).  During this test kmsgsd
+  had a maximum CPU utilization of 5.6% and a maximum memory utilization of
+  0.8%
+
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+Psad Benchmarks:
+
+To benchmark psad we need to generate lots of messages in the fwdata file.  Normally
+this is the responsibility of kmsgsd, but to perform an effective test of just how fast
+psad is able to parse lots of firewall "deny" messages, we first create a large file
+that contains 10,000 lines of the firewall messages, then we execute "cat /dev/null > 
+/var/log/psad/fwdata", and lastly we copy the large file to /var/log/psad/fwdata. 
+Psad then detects that 10,000 packets were just denied by the firewall and starts to 
+process the lines one by one.
+
+- PIII 500mhz, 128MB ram, kernel 2.4.0
+- Perl 5.005_03
+
+Results:  Psad was able to process all 10,000 lines of firewall messages in
+  approximately 16 seconds with a peak CPU and memory utilization of 99.7% and 
+  3.8% respectively.
+

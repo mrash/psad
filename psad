@@ -463,8 +463,8 @@ $< == 0 && $> == 0 or
         "UID 0 account) to execute psad!  Exiting.\n";
 
 ### Import all psad configuration and signatures files
-### (psad.conf, psad_posf, psad_signatures, psad_icmp_types,
-### and psad_auto_dl).
+### (psad.conf, posf, signatures, psad_icmp_types,
+### and auto_dl).
 &psad_init();
 
 ### check to make sure another psad process is not already running.
@@ -628,8 +628,8 @@ for (;;) {
 
         my $orig_fwdata = $config{'FW_DATA_FILE'};
 
-        ### Re-import all used config files (psad.conf, psad_auto_dl,
-        ### psad_posf, psad_signatures) if we received a HUP signal.
+        ### Re-import all used config files (psad.conf, auto_dl,
+        ### posf, signatures) if we received a HUP signal.
         &psad_init();
 
         if ($orig_fwdata ne $config{'FW_DATA_FILE'}) {
@@ -1014,7 +1014,7 @@ sub check_scan() {
                 if $config{'ALERT_ALL'} eq 'N';
         }
 
-            if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
+        if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
                 and not $benchmark
                 and not $analyze_msgs
                 and $dshield_str) {
@@ -1279,7 +1279,7 @@ sub posf() {
         if ($posf{$src}{'ctr'} >= $posf_sigs{$os}{'numpkts'}) {
             ($min_ttl, $max_ttl) = &ttl_range($posf{$src}{'ttl'});
             if (defined $posf{$src}{'win'}{$posf_sigs{$os}{'win'}}
-                    and defined $posf{$src}{'tos'}{$posf_sigs{$os}{'tos'}}
+#                    and defined $posf{$src}{'tos'}{$posf_sigs{$os}{'tos'}}
                     and defined $posf{$src}{'len'}{$posf_sigs{$os}{'len'}}
                     and ($min_ttl > ($posf_sigs{$os}{'ttl'}-$max_hops))  ### ttl's only decrease
                     and ($max_ttl <= $posf_sigs{$os}{'ttl'})
@@ -1714,7 +1714,7 @@ sub psad_init() {
     ### import passive OS fingerprinting signatures
     &import_posf_sigs() unless $no_posf;
 
-    ### import psad_auto_dl file for automatic ip/network danger
+    ### import auto_dl file for automatic ip/network danger
     ### level assignment
     &import_auto_dl() unless $no_auto_dl;
 
@@ -2271,7 +2271,7 @@ sub import_auto_dl() {
         $ip_ctr++ for keys %{$auto_dl{'ip'}};
         $net_ctr++ for keys %{$auto_dl{'net'}};
         &Psad::psyslog('psad',
-            ".. imported psad_auto_dl, got $ip_ctr IPs and $net_ctr networks");
+            ".. imported auto_dl, got $ip_ctr IPs and $net_ctr networks");
     }
     return;
 }
@@ -3769,6 +3769,7 @@ sub get_listening_ports() {
         "$cmds{'netstat'} -an: $!";
     my @lines = <NETS>;
     close NETS;
+    return unless @lines;
     for my $line (@lines) {
         chomp $line;
         if ($line =~ m/^\s*(tcp|udp)\s+\d+\s+\d+\s+\S+:(\d+)\s/) {

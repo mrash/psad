@@ -257,7 +257,7 @@ my $PSADCMD = $Cmds{'psad'};
 
 ### make sure $PSAD_DIR, $FW_DATA, and /var/lib/psad/psadfifo, etc. actually
 ### exist
-&psad_setup();
+&setup_psad();
 
 ### the --Restart command line switch was given
 if ($restart) {
@@ -1430,7 +1430,7 @@ sub check_auto_blocked() {
                     RULE: for my $rule (@rules) {
                         ### DROP       all  --  1.1.1.1        0.0.0.0/0
                         if ($rule =~ /^DROP\s+all.*?$blockip\s+0\.0\.0\.0\/0/) {
-                            ### all traffic from $blockup is being blocked
+                            ### all traffic from $blockip is being blocked
                             $blocked = 1;
                             last RULE;
                         }
@@ -1486,8 +1486,10 @@ sub auto_psad_response(){
                                 "-j DENY 2> /dev/null 1>&2";
                         }
                         $blocked_str = 'via ipchains';
-                    }
-                    if ($Config{'TCPWRAPPERS_BLOCK_METHOD'} == 1) {
+                    } elsif ($Config{'TCPWRAPPERS_BLOCK_METHOD'} == 1) {
+                        ### NOTE the elsif here since we only really want
+                        ### to block the ip in one way, and we prefer
+                        ### the firewall.
                         open H, ">> /etc/hosts.deny" or die
                             "Could not open /etc/hosts.deny: $!";
                         print H "ALL: $src\n";
@@ -1514,8 +1516,10 @@ sub auto_psad_response(){
                                 "-j DROP 2> /dev/null 1>&2";
                         }
                         $blocked_str = 'via iptables';
-                    }
-                    if ($Config{'TCPWRAPPERS_BLOCK_METHOD'}) {
+                    } elsif ($Config{'TCPWRAPPERS_BLOCK_METHOD'}) {
+                        ### NOTE the elsif here since we only really want
+                        ### to block the ip in one way, and we prefer
+                        ### the firewall.
                         open H, '>> /etc/hosts.deny' or die
                             "Could not open /etc/hosts.deny: $!";
                         print H "ALL: $src\n";
@@ -1925,7 +1929,7 @@ sub archive_data() {
     return;
 }
 
-sub psad_setup() {
+sub setup_psad() {
     unless (-d $Config{'PSAD_DIR'}) {
         mkdir $Config{'PSAD_DIR'}, 400;
     }
@@ -1952,13 +1956,15 @@ sub psad_setup() {
     close RS;
     open SYSLOG, '> /etc/syslog.conf' or
         die " ... @@@  Unable to open /etc/syslog.conf: $!";
-    for my $l (@slines) {
-        chomp $l;
-        unless ($l =~ /psadfifo/) {
-            print SYSLOG "$l\n";
+    for my $line (@slines) {
+        chomp $line;
+        unless ($line =~ /psadfifo/) {
+            print SYSLOG "$line\n";
         }
     }
     ### reinstate kernel logging to our named pipe
+    print SYSLOG "# Send kern.info messages to psadfifo for " .
+        "analysis by kmsgsd\n";
     print SYSLOG "kern.info		|$Config{'PSAD_FIFO'}\n\n";
     close SYSLOG;
     system "$Cmds{'killall'} -HUP $Cmds{'syslogd'}";

@@ -1,0 +1,369 @@
+                     ====================================
+                       Package "Date::Calc" Version 5.3
+                     ====================================
+
+
+                  Copyright (c) 1995 - 2002 by Steffen Beyer.
+                             All rights reserved.
+
+
+Credits:
+--------
+
+Many thanks to Andreas Koenig for his efforts as upload-manager for the
+CPAN, his patience, and lots of very good advice and suggestions! Thank
+you for doing such a tremendous (and very time-consuming) job!!
+
+Also many thanks to David Jenkins for reviewing the first version of this
+README file and the english man page.
+
+Thanks to Jarkko Hietaniemi for suggesting the "days_in_month()" function.
+
+Many thanks to Christian <chrisi@vm.akh-wien.ac.at> for reporting the bug
+fixed in version 1.4, which showed up on an HP E55 running HP-UX 10.01 and
+Perl 5.001m with the c89 Ansi 89 compiler from HP.
+
+Also many thanks to David Thompson <dlt@dewey.csun.edu> for reporting a
+problem he encountered concerning the inclusion of the Perl distribution
+("Unable to find include file ...") and for suggesting a solution for this
+problem. (That's the most pleasant kind of problem report, of course! ;-) )
+
+Many thanks to Tom Limoncelli <tal@plts.org> for raising the question of
+how to calculate the 2nd Thursday of a given month and year!
+
+Many thanks to Bart Robinson <lomew@cs.utah.edu> for suggesting the "all"
+export option and the "decode_day()" and "decode_month()" functions.
+
+Also many thanks to Ron Savage <Ron.Savage@datacraft.com.au> for suggesting
+the incorporation of time calculations into this module. (Sorry that I
+didn't include the handling of time zones, which can be taken care of
+more easily by adding/subtracting the appropriate time value in an extra,
+preliminary step!)
+
+Many thanks to Jonathan Lemon <jlemon@americantv.com> for reporting
+the bug (and how to fix it!) concerning arrays as parameters, fixed
+in version 2.2!
+
+Many thanks to Tim Zingelman <zingelman@fnal.gov> for reporting the problem
+fixed in version 2.3 and for testing an intermediate new version of this
+module on his machine!
+
+Many thanks to Jonas Liljegren <jonas@cultcom.se> for posting a subroutine
+for calculating easter monday in news:comp.lang.perl.modules and thereby
+triggering my writing of the new "Date::CalcLib" module which has been
+added in version 3.0 of the "Date::Calc" distribution.
+
+Also many thanks to Claus Tondering <claus@tondering.dk> for his excellent
+web pages and FAQ in news:news.answers about calendars and how to calcu-
+late easter sunday.
+
+Thanks to Reinhold Stansich <dynaconsult@netway.at> for posting a list
+of christian feast days and their offsets from easter sunday in news:
+comp.databases.ms-access and to Tammo Schnieder <schniede@hh.sdm.de>
+for sending me his posting.
+
+Many thanks to Max Ruffert <mor@mpa-garching.mpg.de> at the Max Planck
+Institute for Astrophysics in Garching for looking up Gauss' Rule for
+calculating easter sunday (the algorithm which is implemented in the
+"Date::CalcLib" module) for me and dictating it to me over the
+phone!
+
+Many thanks to Chris Halverson <cdh@CompleteIS.com> for asking me
+"is there a "standard" way to create a calendar similar to the output
+of cal(1)?", which gave me the idea to write the function "calendar"
+which has been added to the module "DateCalcLib" in version 3.1, and
+also for the C code demonstrating how to use the C library "lib_date.c"
+stand-alone, because that was what he needed to do as well.
+
+Many thanks to Gunardi Wu <gunardi@starindo.net> for notifying me about
+the bug in the "Add_Delta_YMD()" function which was fixed in version 4.1.
+
+Thanks to the several people who notified me about two compiler warnings
+concerning incompatible character types in Calc.xs line 857 (added two
+casts in version 4.2 to fix this flaw).
+
+Many thanks to Alessio Bragadini <alessio@sevenseas.org> for the patch he
+sent in to add Italian as one of the supported languages (version 4.3).
+
+Many thanks to Roland Titze <Roland.Titze@ks.sel.alcatel.de> and
+to Andrew Brown <alloneword@dial.pipex.com> for pointing out the
+misspelling of "whether" (was: wether) throughout my documentation,
+corrected in version 5.0.
+
+Special thanks go to Tim Mueller-Seydlitz <Tim.MuellerSeydlitz@blb.de>
+for notifying me about the inability of all string decoding routines
+to parse special ISO-Latin-1 characters correctly.
+
+Many thanks to Gisle Aas <gisle@aas.no> for many good suggestions
+and his patch for adding support for Norwegian.
+
+Many thanks to Jerker Nilsson <jnn@annons.dn.se> for his patch for
+adding Swedish.
+
+Also many thanks to Masanao Izumo <mo@goice.co.jp> for raising the
+question of a "Delta_YMD()" function and for sending in patches.
+
+And last but not least many thanks to Slaven Rezic <eserte@cs.tu-berlin.de>,
+Tobias Brox <tobiasb@odin.funcom.com> and Matthew Persico <persicom@acedsl.com>
+for suggesting date objects with overloaded operators, which were added in
+version 5.0.
+
+Many thanks to Tobias Brox <tobiasb@odin.funcom.com> again for the idea
+of supplying one set of comparison operators which compare only the date
+part, and another set of operators which compare date and time (or fall
+back to comparing only the date if both operands lack the time part).
+
+Many thanks to Jens Coldewey <jens_coldewey@acm.org>, Michael Niebler
+<mniebler@generali.de> and Charles Lane <lane@duphy4.physics.drexel.edu>
+for notifying me about the missing "#include <stdio.h>" statement in
+DateCalc.c.
+
+Also many thanks to Frank Dabelstein <frankd@imf.au.dk> for his patch for
+adding Danish.
+
+Thanks also go to Steve Tolkin <steve.tolkin@fmr.com> for suggesting that
+I should emphasize in the README.txt file that the reading of the INSTALL.txt
+file is important, especially if running Perl under Windows. :-)
+
+Many thanks to Martin Vorlaender <martin@radiogaga.harz.de> for notifying
+me about the problem with the linker on VMS with identifiers longer than
+30 characters, and to Charles Lane <lane@duphy4.physics.drexel.edu> for
+sending me a patch!
+
+Many thanks to Jarkko Hietaniemi <jhi@iki.fi> for providing me with the
+necessary information to add Finnish (suomi).
+
+Many thanks to Graham Barr <gbarr@pobox.com> for his many good suggestions
+regarding how to generalize my original, very limited module (based on
+Carp.pm) which skips all packages belonging to the "Date::*" hierarchy
+(in order to generate an error message from the perspective of the caller),
+into a module that can be given a pattern (i.e., a regular expression) of
+package names to be skipped. Also many thanks for his suggestions of a
+name for this module and for lots of great code he sent!
+
+Also many many thanks to the innumerable contributors of the lists of
+American states and abbreviations and many countries' national holidays:
+
+List of U.S. American states and abbreviations courtesy of:
+
+    Jack Applin <neutron@fc.hp.com>
+    Troy Arnold <fryman@sonic.net>
+    Larry Rosler <lr@hpl.hp.com>
+    Mark-Jason Dominus <mjd@plover.com>
+    Charles Ford <cford@eudoramail.com>
+
+URLs concerning U.S. American states and abbreviations
+thereof sent by:
+
+    Edward Cerruti <ecerruti@teknowledge.com>
+    Mark Badolato <mbadolato@cybernox.com>
+
+List of Canadian states and abbreviations courtesy of:
+
+    Larry Rosler <lr@hpl.hp.com>
+    Geoff Baskwill <glb@nortel.ca>
+
+List of U.S. American holidays courtesy of:
+
+    David Cassell <cassell@mercury.cor.epa.gov>
+    Larry Rosler <lr@hpl.hp.com>
+    Anthony Argyriou <anthony@alphageo.com>
+
+List of Canadian holidays courtesy of:
+
+    M Lyons <lyonsm@bob.globalmediacorp.com>
+
+List of Norwegian holidays courtesy of:
+
+    Gisle Aas <gisle@aas.no>
+
+(From his module "No::Dato" on CPAN)
+
+List of Swedish holidays courtesy of:
+
+    Erland Sommarskog <sommar@algonet.se>
+
+List of British holidays courtesy of:
+
+    Jonathan Stowe <gellyfish@gellyfish.com>
+
+Lists, hints, suggestions and URLs concerning different countries'
+holidays were sent to me by:
+
+    Jihad Battikha <jbattikha@highsynth.com> <jihad.battikha@sharewire.com>
+    Tim Rueger <rueger@io.com>
+    Mark-Jason Dominus <mjd@plover.com>
+    Abe Timmerman <abe@ztreet.demon.nl>
+    Troy Arnold <fryman@sonic.net>
+    Mattias Engdegård <f91-men@nada.kth.se>
+    Lincoln Yeoh <lyeoh@pop.jaring.my>
+    Bart Lateur <bart.lateur@skynet.be>
+    David Chapman <david@dapc.globalnet.co.uk>
+    Russ Allbery <rra@stanford.edu>
+    Ben Coleman <oloryn@mindspring.com>
+    Wolfgang Franzki <franzki@sdm.de>
+    Rainer Gratias <rainer.gratias@sdm.de>
+
+Thanks to Nelson Ferrari <nferrari@ccsc.com> for suggesting an alternative
+"Calendar()" function which starts on Sunday instead of Monday.
+
+Many thanks again to Martin Vorlaender <martin@radiogaga.harz.de> for
+testing my modifications in order to satisfy the VMS linker (which was
+complaining about identifiers which were longer than 30 characters) and
+for his confirmation that now everything works (not counting some
+innocuous warnings from xsubpp)!
+
+Thanks a lot to Ramiro Morales <morales@siscard.com.ar> for correcting
+my errors in Spanish (and for sending a patch)!
+
+And last but not least, many very special thanks for his tremendous
+work to J. David Eisenberg <david@catcode.com> for writing a plain
+Perl version of Date::Calc 4.3, available from his home page at
+http://catcode.com/date/pcalc.html! (And also from my web site at
+http://www.engelschall.com/u/sb/download/ and my CPAN directory at
+http://www.perl.com/CPAN/authors/id/S/ST/STBEY/.)
+
+Many extra thanks to Bianca Taylor <bianca@unisolve.com.au> for exploring
+the mysteries of (and phoning up a lot of astounded state officials!) the
+australian holidays for me, as well as for sending me a list with the
+holidays of New Zealand; and many thanks also to her friend John Bolland
+<jbolland@mainzeal.co.nz> for compiling this list for New Zealand in the
+first place!
+
+Many thanks to ??? ??? <digitaproc@netscape.net> for sending me excellent
+feedback and suggestions. He for instance suggested the possibility to
+have individual formatting for different date objects, and the ability
+to import/export Unix "time" values.
+
+Many special thanks (k) to my girlfriend Ana Maria Lopes Monteiro
+<anamaria_l@hotmail.com> for investigating the brazilian holidays
+and commemorative days for me!
+
+Very special thanks to the following people for helping in compiling
+and verifying the calendar profiles in Date::Calendar::Profiles:
+
+Abe Timmerman <abe@ztreet.demon.nl>
+Abigail <abigail@foad.org>
+Aldo Calpini <dada@perl.it>
+Andie Posey <andie@posey.org>
+Arnaud Calvo <arnaud@calvo-france.com>
+Arturo Valdes <arturovaldes@usa.net>
+Bart Lateur <bart.lateur@skynet.be>
+Brian Graham <brian.graham@nec.com.au>
+Bruno Tavares <bat@ip.pt> <bat@dustpuppy.ip.pt>
+Cas Tuyn <Cas.Tuyn@asml.nl>
+Cedric Bouvier <Cedric.Bouvier@ctp.com>
+David Landgren <dlandgre@bpinet.com>
+Dietmar Rietsch <d.rietsch@prokom.com>
+Don Simonetta <don.simonetta@tequinox.com>
+Elizabeth Mattijsen <liz@dijkmat.nl>
+Erland Sommarskog <sommar@algonet.se>
+Flemming Mahler Larsen <mahler@dk.net>
+Francois Desarmenien <francois@fdesar.net>
+Gordon Fletcher <G.Fletcher@mailbox.gu.edu.au>
+H. Merijn Brand <h.m.brand@hccnet.nl>
+Hendrik Van Belleghem <beatnik@quickndirty.org>
+Herbert Liechti <herbert.liechti@thinx.ch>
+Jean Forget <ponder.stibbons@wanadoo.fr>
+Jigal van Hemert <jigal.van.hemert@iquip.nl>
+Johan Vromans <jvromans@squirrel.nl>
+Julien Quint <julien.quint@imag.fr>
+Lars Ole <ma-karl2@online.no>
+Magnus Bodin <magnus@bodin.org>
+Marco Hunn <m_hunn@blue-design.ch>
+Mark Keehn <mark.keehn@bigpond.com.au>
+Michele Beltrame <mb@io.com>
+Pat Waters <pat.waters@dir.qld.gov.au>
+Paul Fenwick <pjf@cpan.org> <pjf@mukc.org.au>
+Peter G. Martin <pmartin1@bigpond.net.au> <peterm@zeta.org.au>
+Remco B. Brink <remco@solbors.no>
+Robert McArthur <mcarthur@dstc.edu.au>
+Stefaan Colson <stefaan.colson@sitel.com>
+Stephane Rondal <rondal@usa.net>
+Wim Verhaegen <wim.verhaegen@esat.kuleuven.ac.be>
+Jabu Virginia Duma, Giant's Castle Lodge, Drakensberg,
+3310 Estcourt, KwaZulu-Natal, South Africa
+Dirk Swart <dirk@clickshare.com> <dirk@tristar.co.za>
+Hilda de Jager <Hildadj@gcis.pwv.gov.za>
+Hennie Meyer <Henniem@dbs1.pwv.gov.za>
+Pe. Amancio <catedral@lkn.com.br>
+Inez Hiltrop <inez@hiltrop.de>
+Stephen Riehm <Stephen.Riehm@gmx.net>
+Graham Crookham <graham.crookham2@sbs.siemens.co.uk>
+Philip Newton <pne@writeme.com>
+
+Many thanks to Sunny Paris <sun@weborama.fr> for correcting the french
+date format in function "Date_to_Text_Long()"!
+
+Many grateful thanks to Nathaniel Irons <ndi@bumppo.net> for reporting a
+problem and for testing a possible solution on his machine regarding the
+inclusion of the file "patchlevel.h"!
+
+Many thanks to Daniel Crown <daniel@mailgratis.com.ar> for providing me
+with a list of argentinian holidays!
+
+Many thanks to Morten Sickel <Morten.Sickel@nrpa.no> for reporting why
+Excel (erroneously) regards 1900 as a leap year, and why therefore one
+should use 31-Dec-1899 as the epoch for converting Excel date values.
+
+Many thanks to Georg Mavridis <GM@mavridis.net> for providing me with
+the list of greek holidays.
+
+Many thanks also to Guenther Degenfelder <guenther.degenfelder@datev.de>
+for showing me his "Karl" calendar display program, which inspired me
+to write the example script "anniversaries.pl" (in the "examples"
+subdirectory of this distribution).
+
+Many special thanks to Thomas Wegner <toms_email@gmx.de> for
+porting version 5.0 of this module to MacOS and MacPerl. His
+port (plus some additions - see below) is now version 5.1.
+
+Thanks to Ken Clarke <perlprogrammer@shaw.ca> for his addition to
+the documentation concerning the function "Monday_of_Week()".
+
+Many thanks to Nora Elia Castillo <nec@leia.sunmexico.Sun.COM> for
+sending me the list of holidays for Mexico!
+
+Thanks to dLux (Balázs Tibor Szabó) <dlux@dlux.hu> for his much
+simpler formula in recipe #4 in the "Date::Calc" documentation.
+
+Thanks to Daniel Berger <djberge@qwest.com> for suggesting a
+normalization method for delta vectors in Date::Calc::Object,
+which has been added in version 5.1.
+
+Thanks to Danny Rathjens <dkr@rathjens.org> for suggesting the
+improvement in the documentation of Date::Calc concerning the
+paragraph which says that ALL ranges start with 1 - except,
+of course, hours, minutes and seconds.
+
+Many thanks to Dr. John Stockton <jrs@merlyn.demon.co.uk> for notifying
+me about some spelling, naming and historical errors in the documentation
+of Date::Calc, which have been corrected in version 5.1.
+
+Many thanks to Slawomir Szmyd <slawek@msstudio.com.pl> for sending me
+the patch to add Polish and the profile of polish holidays.
+
+Many thanks to Robert Kovacs <robi@datanet.hu> for sending me the
+patch for adding Hungarian.
+
+Many thanks to Simon Perreault <nomis80@linuxquebec.com> for sending
+me corrections for the Quebec/Canada profile in Date::Calendar.
+
+Thanks to Sercan Uslu <sercanuslu@su.sabanciuniv.edu> for sending me
+the dates of the turkish holidays in 2002.
+
+Thanks to Ivor Blockley <ufo555@iinet.net.au> for asking for a way to
+compare dates which have a time part, and how to test whether two such
+dates are more or less than a given time interval apart - the solution
+to this problem is now recipe #3 in the Date::Calc documentation.
+
+Many thanks to Ian Zapczynski <ianz@quarterleaf.com> and to Felix
+Geerinckx <felix_geerinckx@hotmail.com> for notifying me about a bug
+in the method "add_delta_workdays()" (Date::Calendar), which sometimes
+causes an incorrect result when adding a negative number of workdays.
+
+The bug hasn't been fixed yet, but there is a workaround which seems
+to remedy the problem: First add one workday to the date in question,
+and then subtract one workday more than you initially intended.
+
+

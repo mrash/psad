@@ -1,0 +1,555 @@
+
+=head1 NAME
+
+Date::Calendar::Profiles - Some sample profiles for Date::Calendar
+and Date::Calendar::Year
+
+=head1 SYNOPSIS
+
+  use Date::Calendar::Profiles qw( $Profiles );
+  use Date::Calendar;
+
+  $cal_US_AK = Date::Calendar->new( $Profiles->{'US-AK'} [,LANG] );
+  $cal_DE_BY = Date::Calendar->new( $Profiles->{'DE-BY'} [,LANG] );
+
+ or
+
+  use Date::Calendar::Profiles qw( $Profiles );
+  use Date::Calendar::Year;
+
+  $year_2000_US_FL = Date::Calendar::Year->new( 2000, $Profiles->{'US-FL'} [,LANG] );
+  $year_2001_DE_NW = Date::Calendar::Year->new( 2001, $Profiles->{'DE-NW'} [,LANG] );
+
+ and also
+
+  use Date::Calendar::Profiles
+  qw(
+      &Previous_Friday
+      &Next_Monday
+      &Next_Monday_or_Tuesday
+      &Nearest_Workday
+      &Sunday_to_Monday
+      &Advent1
+      &Advent2
+      &Advent3
+      &Advent4
+      &Advent
+  );
+
+=head1 PREFACE
+
+This module provides some sample profiles (i.e., holiday schemes)
+for use with the Date::Calendar(3) and Date::Calendar::Year(3)
+module.
+
+You are not required to use these, you can always roll your own
+(this is very easy). See the section "HOW TO ROLL YOUR OWN" below
+for more instructions on how to do this, and take the profiles
+from this module as examples.
+
+Please let me know of any errors in these profiles, and please
+send me your own profiles if you'd like to see them included in
+the next release of this module! Thank you!
+
+(But please, only use the ISO-Latin-1 character set whenever
+possible, since my module doesn't support any other character
+sets yet, or at least tell me which character set you used
+so I can document this in this manual page. Thank you!)
+
+=head1 DESCRIPTION
+
+The method "init()" in module Date::Calendar::Year(3) is
+responsible for parsing the calendar schemes contained
+here in the Date::Calendar::Profiles module.
+
+This method offers a "mini-language" which allows to
+specify common date formulas, like for instance a simple
+fixed date (in various different formats, e.g. american
+or european), or things like "the second Sunday of May"
+(Mother's Day), or "Easter Sunday minus 46 days" (Ash
+Wednesday), to cite just a few.
+
+See the section "DATE FORMULA SYNTAX" below for more
+details.
+
+There are some more complicated formulas, however, which
+cannot be expressed in such simple terms.
+
+The rule that if a holiday falls on a weekend, it will
+be substituted by either the adjacent Friday or Monday
+(whichever lies closer), is an example of this.
+
+In order to be able to deal with such formulas, and in
+order to be as flexible as possible, the "init()" method
+offers the possibility of using callback functions to
+deal with such dates and formulas.
+
+See the section "CALLBACK INTERFACE" below for more
+details on this topic.
+
+In order to assist you with more common cases of odd
+formulas, the module Date::Calendar::Profiles exports
+the following utility subroutines (which are meant to
+be used as "filters" in callback functions of your own):
+
+=over 2
+
+=item *
+
+C<($year,$month,$day[,ANYTHING]) = Previous_Friday($year,$month,$day[,ANYTHING]);>
+
+If the given date falls on a Saturday or Sunday, this
+function changes the date to the adjacent Friday before
+that, and returns this new date.
+
+Otherwise the given date is returned unchanged.
+
+The rest of the input parameters, if any, are simply
+copied to the output.
+
+=item *
+
+C<($year,$month,$day[,ANYTHING]) = Next_Monday($year,$month,$day[,ANYTHING]);>
+
+If the given date falls on a Saturday or Sunday, this
+function changes the date to the adjacent Monday after
+that, and returns this new date.
+
+Otherwise the given date is returned unchanged.
+
+The rest of the input parameters, if any, are simply
+copied to the output.
+
+=item *
+
+C<($year,$month,$day[,ANYTHING]) = Next_Monday_or_Tuesday($year,$month,$day[,ANYTHING]);>
+
+If the given date falls on a Saturday, the date of the next
+Monday (after that weekend) is returned.
+
+If the given date falls on a Sunday, the date of the next
+Tuesday (after that weekend) is returned.
+
+If the given date falls on a Monday, the date of the next
+Tuesday (the day after the Monday) is returned.
+
+Otherwise the given date is returned unchanged.
+
+The rest of the input parameters, if any, are simply
+copied to the output.
+
+This function is used for the second of two adjacent
+holidays, where the first holiday obeys the "Next
+Monday" rule (see the description of the function
+immediately above).
+
+Examples of this are Christmas and Boxing Day, among
+others.
+
+When the first holiday falls on Friday, the second one
+falls on Saturday and is substituted by Monday.
+
+When the first holiday falls on a Saturday, the second
+one falls on Sunday, so the first holiday is substituted
+by Monday and the second one by Tuesday.
+
+When the first holiday falls on a Sunday, the second
+one falls on a Monday. Therefore the first holiday is
+substituted by Monday, and consequently the second
+holiday must be substituted by Tuesday.
+
+Or, in other terms:
+
+    Fri Sat => Fri Mon
+    Sat Sun => Mon Tue
+    Sun Mon => Mon Tue
+
+Note that there is no filter subroutine yet for the
+second of two adjacent holidays when the first holiday
+obeys the "Nearest Workday" rule (see the function
+described immediately below), i.e.,
+
+    Fri Sat => Fri Mon
+    Sat Sun => Fri Mon
+    Sun Mon => Mon Tue
+
+This is left as an excercise to the inclined reader. C<:-)>
+
+=item *
+
+C<($year,$month,$day[,ANYTHING]) = Nearest_Workday($year,$month,$day[,ANYTHING]);>
+
+If the given date falls on a Saturday, this function
+returns the date of the Friday on the day before.
+
+If the given date falls on a Sunday, this function
+returns the date of the Monday on the day after.
+
+Otherwise the given date is returned unchanged.
+
+The rest of the input parameters, if any, are simply
+copied to the output.
+
+=item *
+
+C<($year,$month,$day[,ANYTHING]) = Sunday_to_Monday($year,$month,$day[,ANYTHING]);>
+
+If the given date falls on a Sunday, this function
+returns the date of the Monday on the day after.
+
+Otherwise the given date is returned unchanged.
+
+The rest of the input parameters, if any, are simply
+copied to the output.
+
+=back
+
+The typical use of these filter subroutines is in a "return"
+statement at the end of callback functions of your own, when
+you already have calculated the holiday in question and only
+need to adjust it according to the rule implemented by the
+filter subroutine in question.
+
+See also the implementation of the Date::Calendar::Profiles
+module for examples of how to use these functions.
+
+=head1 DATE FORMULA SYNTAX
+
+ -  Fixed dates:
+
+    "Christmas"  =>  "24.12",   # European format (day, month)
+    "Christmas"  =>  "24.12.",
+
+    "Christmas"  =>  "24Dec",
+    "Christmas"  =>  "24.Dec",
+    "Christmas"  =>  "24Dec.",
+    "Christmas"  =>  "24.Dec.",
+
+    "Christmas"  =>  "24-12",
+    "Christmas"  =>  "24-12-",
+
+    "Christmas"  =>  "24-Dec",
+    "Christmas"  =>  "24-Dec-",
+
+    "Christmas"  =>  "12/25",   # American format (month, day)
+    "Christmas"  =>  "Dec25",
+    "Christmas"  =>  "Dec/25",
+
+ -  Dates relative to Easter Sunday:
+
+    "Ladies' Carnival"  =>  "-52",
+    "Carnival Monday"   =>  "-48",
+    "Mardi Gras"        =>  "-47",
+    "Ash Wednesday"     =>  "-46",
+    "Palm Sunday"       =>   "-7",
+    "Maundy Thursday"   =>   "-3",
+    "Good Friday"       =>   "-2",
+    "Easter Sunday"     =>   "+0",
+    "Easter Monday"     =>   "+1",
+    "Ascension"         =>  "+39",
+    "Whitsunday"        =>  "+49",
+    "Whitmonday"        =>  "+50",
+    "Corpus Christi"    =>  "+60",
+
+ -  The 1st, 2nd, 3rd, 4th or last day of week:
+
+    "Thanksgiving"      =>  "4Thu11",
+    "Thanksgiving"      =>  "4/Thu/Nov",
+    "Columbus Day"      =>  "2/Mon/Oct",
+    "Columbus Day"      =>  "2/Mon/10",
+    "Columbus Day"      =>  "2/1/Oct",
+    "Columbus Day"      =>  "2/1/10",
+    "Memorial Day"      =>  "5/Mon/May", # LAST Monday of May
+
+ -  Half holidays, commemorative days:
+
+    "Christmas"         =>  ":24.12.", # only half a day off
+    "Valentine's Day"   =>  "#Feb/14", # not an official holiday
+
+=head1 CALLBACK INTERFACE
+
+The interface of the callback functions to use with the
+"init()" method of the Date::Calendar::Year(3) module is
+very simple:
+
+The callback function receives two arguments when called,
+first the year number for which the holiday is to be
+calculated, and second the name (the "label") of the
+holiday in question (which serves as key in the hash
+of a holiday scheme).
+
+This second parameter allows you to use the same callback
+function for different holidays, which might be more practical
+(than separate callback functions) if for instance you have
+a set of similar holidays to calculate, like for instance
+the four Sundays before Christmas ("Advent").
+
+The callback function "Advent()" (exported by the
+Date::Calendar::Profiles module) exemplifies this
+technique.
+
+The callback function is expected to return a list
+"C<($year,$month,$day)>" with the exact date of the
+holiday (the year number in the output must of course
+match the year number passed as parameter).
+
+A fatal error occurs if the returned list does not
+constitute a valid date, in the requested year.
+
+Optionally, the callback function may return a fourth
+value (after the date) containing a string, which may
+be either "#" or ":".
+
+The string "#" signifies that the date in question is
+a purely commemorative date, i.e., that you don't get
+a day off from work on that day.
+
+The string ":" means that the date in question is a
+"half" holiday, i.e., a day on which you get half a
+day off from work.
+
+In case the holiday in question was not observed or did
+not exist in the requested year, the callback function
+may also return an empty list. This will cause the "init()"
+method to simply drop this holiday for that year.
+
+The module Date::Calendar::Profiles exports the sample
+callback functions "Advent1()", "Advent2()", "Advent3()",
+"Advent4()" and "Advent()", which might assist you in
+rolling your own profiles.
+
+=head1 HOW TO ROLL YOUR OWN
+
+Every calendar profile (holiday scheme) is a hash.
+
+The name of the holiday (like "Christmas", for instance)
+serves as the key in this hash and must therefore be
+unique (unless you want to override a default which was
+set previously, but see below for more on this).
+
+The value for each key is either a string, which specifies
+a simple date formula, or the reference of a callback function.
+
+See the section "CALLBACK INTERFACE" above for a description
+of the interface (in and out) of these callback functions.
+
+See the section "DATE FORMULA SYNTAX" above and the description
+of the "init()" method in L<Date::Calendar::Year(3)> for the
+exact syntax of date formula strings.
+
+B<BEWARE> that if keys are not unique in the source code,
+later entries will overwrite previous ones! I.e.,
+
+    ...
+    "My special holiday" => "01-11",
+    "My special holiday" => "02-11",
+    ...
+
+will B<NOT> set two holidays of the same name, one on November
+first, the other on November second, but only one, on November
+second!
+
+Therefore, in order to use sets of defaults and to be able
+to override some of them, you must B<FIRST> include any hash
+containing the default definitions, and B<THEN> write down
+your own definitions (see also the Date::Calendar::Profiles
+module for examples of this!), like this:
+
+    $defaults =
+    {
+        "Holiday #1" => "01-01",
+        "Holiday #2" => "02-02",
+        "Holiday #3" => "03-03"
+    };
+
+    $variant1 =
+    {
+        %$defaults,
+        "Holiday #2" => "09-02",
+        "Holiday #4" => "04-04"
+    };
+
+This is because of the way hashes work in Perl.
+
+Now let's suppose that you want to write a profile containing
+all your relatives' and friends' birthdays or anniversaries.
+
+Simply go ahead and list them in your program, in any order
+you like, as follows (for example):
+
+  $Birthdays =
+  {
+      "Spouse 1971"             =>  "30.12.",
+      "Wedding Day 1992"        =>  "01.09.",
+      "Valentine's Day"         =>  "14.02.",
+      "Son Richard 1996"        =>  "11.05.",
+      "Daughter Irene 1994"     =>  "17.01.",
+      "Mom 1939"                =>  "19.08.",
+      "Dad 1937"                =>  "23.04.",
+      "Brother Timothy 1969"    =>  "24.04.",
+      "Sister Catherine 1973"   =>  "21.10.",
+      "Cousin Paul 1970"        =>  "16.10.",
+      "Aunt Marjorie 1944"      =>  "09.06.",
+      "Uncle George 1941"       =>  "02.08.",
+      "Friend Alexander 1968"   =>  "12.06.",
+  };
+
+The year numbers after the names are not really necessary,
+but they allow us to display the person's current age. If
+this year number is omitted, we simply don't display the age.
+
+Now in order to query this birthday database, we can use the
+following little program:
+
+  #!perl -w
+
+  use strict;
+  no strict "vars";
+  use Date::Calc qw(:all);
+  use Date::Calendar;
+
+  $Birthdays =
+  {
+      ... # (see above)
+  };
+
+  @today = Today();
+  $calendar = Date::Calendar->new( $Birthdays );
+  $calendar->year( $today[0] );
+
+  foreach $key (@ARGV)
+  {
+      if (@list = $calendar->search( $key ))
+      {
+          foreach $date (@list)
+          {
+              @labels = $calendar->labels( $date );
+              $dow = shift(@labels);
+              # More than one person might have birthday on the same date:
+              $name = $key;
+              foreach $person (@labels)
+              {
+                  if (index(lc($person),lc($key)) >= 0)
+                  {
+                      $name = $person;
+                      last;
+                  }
+              }
+              $delta = Delta_Days(@today, $date->date());
+              $age = '';
+              if ($name =~ s!\s*(\d+)\s*$!!)
+              {
+                  $age = $today[0] - $1;
+                  $age-- if ($delta > 0);
+                  $age = sprintf(" (%2d years old)", $age);
+              }
+              printf
+              (
+                  "%-20.20s: %+5d days => %3.3s %2d-%3.3s-%4d%s\n",
+                  $name,
+                  $delta,
+                  $dow,
+                  $date->day(),
+                  Month_to_Text($date->month()),
+                  $date->year(),
+                  $age
+              );
+          }
+      }
+      else { print "No entry found in birthday list for '$key'!\n" }
+  }
+
+  __END__
+
+Let us save this program as, say, "birthday.pl".
+
+Then we can query this birthday database by providing search strings
+on the command line, like this (note that this is a (case-insensitive)
+substring search, B<NOT> a regular expression match!):
+
+  > date
+  Wed Oct  3 18:05:45 CEST 2001
+
+  > perl birthday.pl wed spo
+  Wedding Day         :   -32 days => Sat  1-Sep-2001 ( 9 years old)
+  Spouse              :   +88 days => Sun 30-Dec-2001 (29 years old)
+
+  > perl birthday.pl son daug
+  Son Richard         :  -145 days => Fri 11-May-2001 ( 5 years old)
+  Daughter Irene      :  -259 days => Wed 17-Jan-2001 ( 7 years old)
+
+  > perl birthday.pl broth sist
+  Brother Timothy     :  -162 days => Tue 24-Apr-2001 (32 years old)
+  Sister Catherine    :   +18 days => Sun 21-Oct-2001 (27 years old)
+
+  > perl birthday.pl mom dad
+  Mom                 :   -45 days => Sun 19-Aug-2001 (62 years old)
+  Dad                 :  -163 days => Mon 23-Apr-2001 (64 years old)
+
+  > perl birthday.pl uncl aunt
+  Uncle George        :   -62 days => Thu  2-Aug-2001 (60 years old)
+  Aunt Marjorie       :  -116 days => Sat  9-Jun-2001 (57 years old)
+
+  > perl birthday.pl alex
+  Friend Alexander    :  -113 days => Tue 12-Jun-2001 (33 years old)
+
+In order to get the whole list, we can supply a substring which is
+contained in every name, which happens to be a blank (S<C<" ">>):
+
+  > perl birthday.pl ' '
+  Daughter Irene      :  -259 days => Wed 17-Jan-2001 ( 7 years old)
+  Valentine's Day     :  -231 days => Wed 14-Feb-2001
+  Dad                 :  -163 days => Mon 23-Apr-2001 (64 years old)
+  Brother Timothy     :  -162 days => Tue 24-Apr-2001 (32 years old)
+  Son Richard         :  -145 days => Fri 11-May-2001 ( 5 years old)
+  Aunt Marjorie       :  -116 days => Sat  9-Jun-2001 (57 years old)
+  Friend Alexander    :  -113 days => Tue 12-Jun-2001 (33 years old)
+  Uncle George        :   -62 days => Thu  2-Aug-2001 (60 years old)
+  Mom                 :   -45 days => Sun 19-Aug-2001 (62 years old)
+  Wedding Day         :   -32 days => Sat  1-Sep-2001 ( 9 years old)
+  Cousin Paul         :   +13 days => Tue 16-Oct-2001 (30 years old)
+  Sister Catherine    :   +18 days => Sun 21-Oct-2001 (27 years old)
+  Spouse              :   +88 days => Sun 30-Dec-2001 (29 years old)
+
+By the way, a similar program is included in the "examples"
+subdirectory of the Date::Calc distribution, called "anniversaries.pl".
+
+See also the file "EXAMPLES.txt" in the distribution's main directory
+for a short description of that little script.
+
+=head1 SEE ALSO
+
+Date::Calendar(3), Date::Calendar::Year(3),
+Date::Calc::Object(3), Date::Calc(3).
+
+=head1 VERSION
+
+This man page documents "Date::Calendar::Profiles" version 5.3.
+
+=head1 AUTHOR
+
+  Steffen Beyer
+  mailto:sb@engelschall.com
+  http://www.engelschall.com/u/sb/download/
+
+=head1 COPYRIGHT
+
+Copyright (c) 2000 - 2002 by Steffen Beyer. All rights reserved.
+
+=head1 LICENSE
+
+This package is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself, i.e., under the
+terms of the "Artistic License" or the "GNU General Public License".
+
+Please refer to the files "Artistic.txt" and "GNU_GPL.txt"
+in this distribution for details!
+
+=head1 DISCLAIMER
+
+This package is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+See the "GNU General Public License" for more details.
+

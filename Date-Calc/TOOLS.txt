@@ -1,0 +1,134 @@
+                     ====================================
+                       Package "Date::Calc" Version 5.3
+                     ====================================
+
+
+                  Copyright (c) 1995 - 2002 by Steffen Beyer.
+                             All rights reserved.
+
+
+Tools:
+------
+
+You will find various tools in the "tools" subdirectory of this
+distribution:
+
+                            tools/compile.bat
+                            tools/compile.pl
+                            tools/compile.sh
+
+                            tools/iso2pc.c
+                            tools/pc2iso.c
+
+
+compile.bat, compile.pl, compile.sh:
+------------------------------------
+
+These tools are simple shortcuts to reduce the amount of typing required
+to compile one or more C sources where the use of a "Makefile" would be
+an overkill.
+
+They are an ideal place to lay down often-used compiler options, in order
+to make manual compiles a little less cumbersome.
+
+The first parameter of these tools is always the name of the source file
+to be compiled, which will also be the name of the resulting output file.
+
+This is usually the C source containing the "main()" function.
+
+In the case of "compile.pl" and "compile.sh", the filename extension ".c"
+is optional for this first parameter.
+
+In the case of "compile.bat", the filename extension ".c" must NOT be
+specified for this first parameter.
+
+All other parameters are optional and are simply passed through to the
+compiler, exactly as they are.
+
+Usually, these parameters will be additional C sources to be compiled
+and linked with the resulting output file, or additional compiler
+options.
+
+(The proper filename extension (".c", ".o" etc.) is mandatory for these
+additional file names!)
+
+When invoked without parameters, all three tools print a usage and exit.
+
+Note that "compile.bat" assumes "cl" to be your (ANSI) C compiler,
+"compile.pl" will use the same compiler as the one Perl itself has
+been compiled with (or which Perl has been configured to use), and
+"compile.sh" assumes "gcc".
+
+If this is not what you have, adapt these little scripts accordingly!
+
+You will most probably want to use these tools in order to compile the
+program "cal.c" from the "examples" subdirectory of this distribution
+(see the file "EXAMPLES.txt" in this distribution for details) or to
+compile the "iso2pc.c" and "pc2iso.c" pair of filters (see the section
+immediately below for more details).
+
+
+iso2pc.c, pc2iso.c:
+-------------------
+
+This pair of tools is a complementary set of filters designed to convert
+special characters (with ASCII codes ranging from 0x80 to 0xFF) from the
+"ISO-Latin-1" (= "ISO-8859-1") character set to one of the "CP 850" PC
+character sets (and vice-versa) in a REVERSIBLE way and WITHOUT LOSSES
+of information.
+
+This is useful on systems (such as MS-DOS or the FreeBSD console,
+to name just two) which cannot display the ISO-Latin-1 character set.
+
+Please look into these two files themselves for a more complete
+documentation and a description of their various command line options.
+
+In order to compile these two programs, you can use the "compile.*"
+scripts from the "tools" subdirectory of this distribution (for a
+description of these tools, see the first section in this document
+above).
+
+Simply change directory to the "tools" subdirectory and enter one
+pair of the following commands:
+
+                    % perl compile.pl iso2pc     (UNIX or Win32)
+                    % perl compile.pl pc2iso     (UNIX or Win32)
+
+                    % ./compile.sh iso2pc        (UNIX only)
+                    % ./compile.sh pc2iso        (UNIX only)
+
+                    % compile iso2pc             (MS-DOS/Windows only)
+                    % compile pc2iso             (MS-DOS/Windows only)
+
+Note that these two filters are not confined to UNIX or Windows NT/95
+platforms, they also compile and run perfectly well on pure MS-DOS or
+other Windows systems (or wherever a standard ANSI C compiler and
+redirection of standard input and output are available)!
+
+In order to be able to use these filters later more easily, you should
+copy the resulting executables ("iso2pc" and "pc2iso" or "iso2pc.exe"
+and "pc2iso.exe") to some directory in your search path; for example
+to "/usr/local/bin" (UNIX) or "C:\DOS" (MS-DOS/Windows).
+
+These two filters are included in this package in case you want to display
+this module's output on a terminal which cannot display the ISO-Latin-1
+character set, but uses the CP850 character set (MS-DOS, SCO console under
+FreeBSD) or the Microsoft Windows character set instead.
+
+For this, simply pipe this module's output through the "iso2pc" filter:
+
+                    % perl myscript | iso2pc       #  for MS-DOS/SCO console
+                    % perl myscript | iso2pc -win  #  for Windows
+
+Note that the option "-rev" reverses this transformation:
+
+                    % perl myscript | iso2pc      | iso2pc -rev
+                    % perl myscript | iso2pc -win | iso2pc -win -rev
+
+yields the original text!
+
+Note also that "iso2pc -rev" is the same as "pc2iso" and vice-versa, i.e.,
+"pc2iso -rev" is exactly the same as "iso2pc" - provided that you always
+use the identical "-dos" (default) or "-win" flag setting, as shown above!
+
+

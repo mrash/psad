@@ -1,0 +1,821 @@
+
+=head1 NAME
+
+Date::Calendar::Year - Implements embedded "year" objects for Date::Calendar
+
+=head1 MOTTO
+
+There is more than one way to do it - this is just one of them!
+
+=head1 PREFACE
+
+Note that Date::Calendar::Year (and Date::Calendar) can only deal
+with years lying within the range [1583..2299].
+
+=head1 SYNOPSIS
+
+  use Date::Calendar::Year qw( check_year empty_period );
+  use Date::Calendar::Year qw( :all ); # same as above
+
+  check_year(YEAR|DATE); # dies if year < 1583 or year > 2299
+  empty_period();        # warns about empty interval if $^W is set
+
+  $index = $year->date2index(YEAR,MONTH,DAY|DATE);
+  $date  = $year->index2date(INDEX);
+
+  use Date::Calendar::Profiles qw( $Profiles );
+  $year_2000_US_FL = Date::Calendar::Year->new( 2000, $Profiles->{'US-FL'} [,LANG] );
+  $year_2001_DE_NW = Date::Calendar::Year->new( 2001, $Profiles->{'DE-NW'} [,LANG] );
+
+  $year = Date::Calendar::Year->new( 2001, {} );
+  $year->init( 2002, $Profiles->{'DE-SN'} [,LANG] );
+
+  $vector = $year->vec_full(); # vector of full holidays
+  $vector = $year->vec_half(); # vector of half holidays
+  $vector = $year->vec_work(); # NOT a vector of workdays but a workspace!
+  $size   = $year->val_days(); # number of days in that year, size of vectors
+  $base   = $year->val_base(); # number of days for [year,1,1] since [1,1,1]
+  $number = $year->val_year(); # the year's number itself
+  $number = $year->year();     # alias for val_year()
+
+  @names    = $year->labels(YEAR,MONTH,DAY|DATE);
+  @holidays = $year->labels();
+  $holidays = $year->labels();
+
+  @dates    = $year->search(PATTERN);
+  $dates    = $year->search(PATTERN);
+
+  $days     = $year->delta_workdays(YEAR,MONTH1,DAY1|DATE1
+                                   ,YEAR,MONTH2,DAY2|DATE2
+                                   ,FLAG1,FLAG2);
+
+  ($date,$rest,$sign) = $year->add_delta_workdays(YEAR,MONTH,DAY|DATE
+                                                 ,DELTA,SIGN);
+
+  $flag     = $year->is_full(YEAR,MONTH,DAY|DATE);
+  $flag     = $year->is_half(YEAR,MONTH,DAY|DATE);
+  $flag     = $year->is_work(YEAR,MONTH,DAY|DATE);
+
+=head1 INTERFACE
+
+Note that whenever a year number, a date, a time or a combined
+date and time are expected as input parameters by one of the
+methods of this class, you can always pass a Date::Calc[::Object]
+date object or an array reference (of an array of appropriate
+length) instead!
+
+See L<Date::Calc::Object(3)> for more details.
+
+So instead of calling a given method like this:
+
+  $object->method1( $year,$month,$day );
+  $object->method2( $year1,$month1,$day1, $year2,$month2,$day2 );
+  $object->method3( $year1, $year2, $year3 );
+
+You can also call it like so:
+
+  $object->method1( $date );
+  $object->method1( [1964,1,3] );
+
+  $object->method2( $year1,$month1,$day1, $date2 );
+  $object->method2( $date1, $year2,$month2,$day2 );
+  $object->method2( $date1, $date2 );
+  $object->method2( $year1,$month1,$day1, [2001,3,17] );
+  $object->method2( [1964,1,3], $year2,$month2,$day2 );
+  $object->method2( [1964,1,3], [2001,3,17] );
+  $object->method2( $date1, [2001,3,17] );
+  $object->method2( [1964,1,3], $date2 );
+
+  $object->method3( $year1, $date2, [2001,3,17] );
+
+And similarly if a time or a combined date and time are expected.
+
+If you substitute an expected year number by an anonymous array
+(this is the recommended way of writing date constants, for
+increased readability of your programs), it must contain three
+values, nevertheless (otherwise the use of an anonymous array
+would be pointless).
+
+Don't confuse year numbers and their substitutes (a date object
+or an array reference) with Date::Calendar::Year objects, which
+are a totally different thing!
+
+But incidentally C<:-)>, you may also pass a Date::Calendar::Year
+object whenever a year number is expected. However, and perhaps
+against your expectations at times, only the year number from
+that object will be used, not the year object itself (the year
+object in question might be using the wrong profile!).
+
+Moreover, whenever a method of this class returns a date, it
+does so by returning a Date::Calc[::Object] date object.
+
+=head1 IMPLEMENTATION
+
+Each Date::Calendar::Year object consists mainly of three bit
+vectors, plus some administrative attributes, all stored in a
+(blessed) hash.
+
+All three bit vectors contain as many bits as there are days
+in the corresponding year, i.e., either 365 or 366.
+
+The first bit vector, called "FULL", contains set bits for
+Saturdays, Sundays and all "full" legal holidays (i.e.,
+days off, on which you usually do not work).
+
+The second bit vector, called "HALF", contains set bits for
+all "half" holidays, i.e., holidays where you get only half
+a day off from work.
+
+The third and last bit vector, called "WORK", is used as a
+workspace, in which various calculations are performed
+throughout this module.
+
+Its name does B<NOT> come from "working days" (as you might
+think), but from "workspace".
+
+It only so happens that it is used to calculate the working
+days sometimes, at some places in this module.
+
+But you are free to use it yourself, for whatever calculation
+you would like to carry out yourself.
+
+The two other bit vectors, "FULL" and "HALF", should never be
+changed, unless you know B<EXACTLY> what you're doing!
+
+=head1 DESCRIPTION
+
+Functions
+
+=over 2
+
+=item *
+
+C<check_year(YEAR);>
+
+This function checks that the given year lies in the permitted
+range [1583..2299]. It returns nothing in case of success, and
+throws an exception ("given year out of range [1583..2299]")
+otherwise.
+
+=item *
+
+C<empty_period();>
+
+This function issues a warning (from the perspective of the
+caller of a Date::* module) that the given range of dates is
+empty ("dates interval is empty"), provided that warnings are
+enabled (i.e., "C<$^W>" is true).
+
+This function is currently used by the method "delta_workdays()"
+in this class, and by its equivalent from the Date::Calendar
+module.
+
+It is called whenever the range of dates of which the difference
+in working days is to be calculated is empty. This can happen for
+instance if you specify two adjacent dates both of which are not
+to be included in the difference.
+
+=back
+
+Methods
+
+=over 2
+
+=item *
+
+C<$index = $year-E<gt>date2index(YEAR,MONTH,DAY|DATE);>
+
+This method converts a given date into the number of the day in
+that year (this is sometimes also referred to as the "julian"
+date), i.e., a number between 0 (for January 1st) and the number
+of days in the given year minus one, i.e., 364 or 365 (for
+December 31st).
+
+You may need this in order to access the bit vectors returned
+by the methods "vec_full()", "vec_half()" and "vec_work()".
+
+Note that there are shorthand methods in this module called
+"is_full()", "is_half()" and "is_work()", which serve to test
+individual bits of the three bit vectors which are a part of
+each Date::Calendar::Year object.
+
+An exception ("given year != object's year") is thrown if the
+year associated with the year object itself and the year from
+the given date do not match.
+
+An exception ("invalid date") is also thrown if the given
+arguments do not constitute a valid date, or ("given year
+out of range [1583..2299]") if the given year lies outside
+of the permitted range.
+
+=item *
+
+C<$date = $year-E<gt>index2date(INDEX);>
+
+This method converts an index (or "julian date") for the
+given year back into a date.
+
+An exception ("invalid index") is thrown if the given index
+is outside of the permitted range for the given year, i.e.,
+C<[0..364]> or C<[0..365]>.
+
+Note that this method returns a Date::Calc B<OBJECT>!
+
+=item *
+
+C<$year_2000_US_FL = Date::Calendar::Year-E<gt>new( 2000, $Profiles-E<gt>{'US-FL'} [,LANG] );>
+
+C<$year_2001_DE_NW = Date::Calendar::Year-E<gt>new( 2001, $Profiles-E<gt>{'DE-NW'} [,LANG] );>
+
+C<$year = Date::Calendar::Year-E<gt>new( 2001, {} );>
+
+This is the constructor method. Call it to create a new
+Date::Calendar::Year object.
+
+The first argument must be a year number in the range
+[1583..2299].
+
+The second argument must be the reference of a hash,
+which usually contains names of holidays and commemorative
+days as keys and strings containing the date or formula
+for each holiday as values.
+
+Reading this hash and initializing the object's internal
+data is performed by an extra method, called "init()",
+which is called internally by the constructor method,
+and which is described immediately below, after this
+method.
+
+In case you call the "init()" method yourself, explicitly,
+after creating the object, you can pass an empty profile
+(e.g., just an empty anonymous hash) to the "new()" method
+in order to improve performance.
+
+The third argument is optional, and must consist of
+the valid name or number of a language as provided by
+the Date::Calc(3) module if given.
+
+This argument determines which language shall be used
+when reading the profile, since the profile may contain
+names of months and weekdays in its formulas in that
+language.
+
+The default is English if none is specified.
+
+=item *
+
+C<$year-E<gt>init( 2002, $Profiles-E<gt>{'DE-SN'} [,LANG] );>
+
+This method is called by the "new()" constructor method,
+internally, and has the same arguments as the latter.
+
+See immediately above for a description of these arguments.
+
+Note that you can also call this method explicitly yourself,
+if needed, and you can of course subclass the Date::Calendar::Year
+class and override the "init()" method with an method of your own.
+
+The holiday scheme or "profile" (i.e., the reference of
+a hash passed as the second argument to this method) must
+obey the following semantics and syntax:
+
+The keys are the names of the holiday or commemorative day
+in question. Keys must be unique (but see further below).
+
+The difference between a holiday and a commemorative day is
+that you (usually) get a day off on a holiday, whereas on a
+purely commemorative day, you don't.
+
+A commemorative day is just a date with a name, nothing more.
+
+The values belonging to these keys can either be the code
+reference of a callback function (see L<Date::Calendar::Profiles(3)>
+for more details and examples), or a string.
+
+All other values cause a fatal error with program abortion.
+
+The strings can specify three types of dates:
+
+  -  fixed dates
+     (like New Year, or first of January),
+
+  -  dates relative to Easter Sunday
+     (like Ascension = Easter Sunday + 39 days), and
+
+  -  the 1st, 2nd, 3rd, 4th or last
+     of a given day of week in a given month
+     (like "the 4th Thursday of November", or Thanksgiving).
+
+All other types of dates must be specified via callback
+functions.
+
+Note that the "last" of a given day of week is written as
+the "5th", because the last is always either the 5th or the
+4th of the given day of week. So the "init()" module first
+calculates the 5th of the requested day of week, and if that
+doesn't exist, takes the 4th instead.
+
+There are also two modifier characters which may prefix the
+string with the date formula, "#" and ":".
+
+The character "#" (mnemonic: it's only a comment) signals
+that the date in question is a purely commemorative day,
+i.e., it will not enter into any date calculations, but
+can be queried with the "labels()" and "search()" methods,
+and appears when printing a calendar, for instance.
+
+The character ":" (mnemonic: divided into two halfs) specifies
+that the date in question is only a "half" holiday, i.e., you
+only get half a day off instead of a full day. Some companies
+have this sort of thing. C<:-)>
+
+The exact syntax for the date formula strings is the following
+(by example):
+
+ -  Fixed dates:
+
+    "Christmas"  =>  "24.12",   # European format (day, month)
+    "Christmas"  =>  "24.12.",
+
+    "Christmas"  =>  "24Dec",
+    "Christmas"  =>  "24.Dec",
+    "Christmas"  =>  "24Dec.",
+    "Christmas"  =>  "24.Dec.",
+
+    "Christmas"  =>  "24-12",
+    "Christmas"  =>  "24-12-",
+
+    "Christmas"  =>  "24-Dec",
+    "Christmas"  =>  "24-Dec-",
+
+    "Christmas"  =>  "12/25",   # American format (month, day)
+    "Christmas"  =>  "Dec25",
+    "Christmas"  =>  "Dec/25",
+
+ -  Dates relative to Easter Sunday:
+
+    "Ladies' Carnival"  =>  "-52",
+    "Carnival Monday"   =>  "-48",
+    "Mardi Gras"        =>  "-47",
+    "Ash Wednesday"     =>  "-46",
+    "Palm Sunday"       =>   "-7",
+    "Maundy Thursday"   =>   "-3",
+    "Good Friday"       =>   "-2",
+    "Easter Sunday"     =>   "+0",
+    "Easter Monday"     =>   "+1",
+    "Ascension"         =>  "+39",
+    "Whitsunday"        =>  "+49",
+    "Whitmonday"        =>  "+50",
+    "Corpus Christi"    =>  "+60",
+
+ -  The 1st, 2nd, 3rd, 4th or last day of week:
+
+    "Thanksgiving"      =>  "4Thu11",
+    "Thanksgiving"      =>  "4/Thu/Nov",
+    "Columbus Day"      =>  "2/Mon/Oct",
+    "Columbus Day"      =>  "2/Mon/10",
+    "Columbus Day"      =>  "2/1/Oct",
+    "Columbus Day"      =>  "2/1/10",
+    "Memorial Day"      =>  "5/Mon/May", # LAST Monday of May
+
+Remember that each of these date formula strings may
+also be prefixed with either "#" or ":":
+
+    "Christmas"         =>  ":24.12.", # only half a day off
+    "Valentine's Day"   =>  "#Feb/14", # not an official holiday
+
+Note that the name of the month or day of week may have any
+length you like, it just must specify the intended month or
+day of week unambiguously. So "D", "De", "Dec", "Dece",
+"Decem", "Decemb", "Decembe" and "December" would all
+be valid, for example. Note also that case is ignored.
+
+When specifying day and month numbers, or offsets relative
+to Easter Sunday, leading zeros are permitted (for nicely
+indented formatting, for instance) but ignored.
+
+Leading zeros are not permitted in front of the ordinal
+number [1..5] or the number of the day of week [1..7]
+when specifying the nth day of week in a month.
+
+B<BEWARE> that if keys are not unique in the source code,
+later entries will overwrite previous ones! I.e.,
+
+    ...
+    "My special holiday" => "01-11",
+    "My special holiday" => "02-11",
+    ...
+
+will B<NOT> set two holidays of the same name, one on November
+first, the other on November second, but only one, on November
+second!
+
+Therefore, in order to use sets of defaults and to be able
+to override some of them, you must B<FIRST> include any hash
+containing the default definitions, and B<THEN> write down
+your own definitions (see also the Date::Calendar::Profiles
+module for examples of this!), like this:
+
+    $defaults =
+    {
+        "Holiday #1" => "01-01",
+        "Holiday #2" => "02-02",
+        "Holiday #3" => "03-03"
+    };
+
+    $variant1 =
+    {
+        %$defaults,
+        "Holiday #2" => "09-02",
+        "Holiday #4" => "04-04"
+    };
+
+This is because of the way hashes work in Perl.
+
+The "init()" method proceeds as follows:
+
+First it checks whether the given year number lies in
+the range [1583..2299]. A fatal error occurs if not.
+
+Then it determines the number of days in the requested
+year, and stores it in the given Date::Calendar::Year
+object.
+
+It then calls the Bit::Vector(3) module to allocate three
+bit vectors with a number of bits equal to the number of
+days in the requested year, and stores the three object
+references (of the bit vectors) in the Date::Calendar::Year
+object.
+
+(See also the description of the three methods "vec_full()",
+"vec_half()" and "vec_full()" immediately below.)
+
+It then sets the bits which correspond to Saturdays and
+Sundays in the "full holidays" bit vector.
+
+At last, it iterates over the keys of the given holiday
+scheme (of the hash referred to by the hash reference
+passed to the "init()" method as the second argument),
+evaluates the formula (or calls the given callback
+function), and sets the corresponding bit in the "full"
+or "half" holidays bit vector if the calculated date
+is valid.
+
+A fatal error occurs if the date formula cannot be parsed
+or if the date returned by a formula or callback function
+is invalid (e.g. 30-Feb-2001 or the like) or lies outside
+the given year (e.g. Easter+365).
+
+Finally, the "init()" method makes sure that days marked
+as "full" holidays do not appear as "half" holidays as
+well.
+
+Then the "init()" method returns.
+
+Note that when deciphering the date formulas, the "init()"
+method uses the functions "Decode_Day_of_Week()" and
+"Decode_Month()" from the Date::Calc(3) module, which
+are language-dependent.
+
+Therefore the "init()" method allows you to pass it an optional
+third argument, which must consist of the valid name or number
+of a language as provided by the Date::Calc(3) module.
+
+For the time of scanning the given holiday scheme, the "init()"
+method will temporarily set the language to the value specified,
+and it will restore the original value before returning.
+
+The default is English if none is specified.
+
+This means that you can provide the names of months and days of
+week in your holiday profile in any of the languages supported
+by the Date::Calc(3) module, provided you give the "init()"
+method a clue (the third parameter) which language to expect.
+
+=item *
+
+C<$vector = $year-E<gt>vec_full();>
+
+This method returns a reference to the bit vector in the
+given year object which contains all "full" holidays.
+
+B<BEWARE> that you should B<NEVER> change the contents of this
+bit vector unless you know B<EXACTLY> what you're doing!
+
+You should usually only read from this bit vector, or use it
+as an operand in bit vector operations - but never as an
+lvalue.
+
+=item *
+
+C<$vector = $year-E<gt>vec_half();>
+
+This method returns a reference to the bit vector in the
+given year object which contains all "half" holidays.
+
+B<BEWARE> that you should B<NEVER> change the contents of this
+bit vector unless you know B<EXACTLY> what you're doing!
+
+You should usually only read from this bit vector, or use it
+as an operand in bit vector operations - but never as an
+lvalue.
+
+=item *
+
+C<$vector = $year-E<gt>vec_work();>
+
+This method returns a reference to the "workspace" bit vector
+in the given year object.
+
+Note that you cannot rely on the contents of this bit vector.
+
+You have to set it up yourself before performing any calculations
+with it.
+
+Currently the contents of this bit vector are modified by the
+two methods "delta_workdays()" and "add_delta_workdays()", in
+ways which are hard to predict.
+
+The size of this bit vector can be determined through either
+"C<$days = $vector-E<gt>Size();>" or
+"C<$days = $year-E<gt>val_days();>".
+
+=item *
+
+C<$size = $year-E<gt>val_days();>
+
+This method returns the number of days in the given year object,
+i.e., either 365 or 366. This is also the size (number of bits)
+of the three bit vectors contained in the given year object.
+
+=item *
+
+C<$base = $year-E<gt>val_base();>
+
+This method returns the value of the expression
+"C<Date_to_Days($year-E<gt>val_year(),1,1)>", or in other words,
+the number of days between January 1st of the year 1 and January
+1st of the given year, plus one.
+
+This value is used internally by the method "date2index()" in order
+to calculate the "julian" date or day of the year for a given date.
+
+The expression above is computed only once in method "init()" and
+then stored in one of the year object's attributes, of which this
+method just returns the value.
+
+=item *
+
+C<$number = $year-E<gt>val_year();>
+
+C<$number = $year-E<gt>year();>
+
+These two methods are identical, the latter being a shortcut of
+the former.
+
+They return the number of the year for which a calendar has been
+stored in the given year object.
+
+The method name "val_year()" is used here in order to be consistent
+with the other attribute accessor methods of this class, and the
+method "year()" is necessary in order to be able to pass
+Date::Calendar::Year objects as parameters instead of a year number
+in the methods of the Date::Calendar and Date::Calendar::Year
+modules.
+
+=item *
+
+C<@names = $year-E<gt>labels(YEAR,MONTH,DAY|DATE);>
+
+C<@holidays = $year-E<gt>labels();>
+
+C<$holidays = $year-E<gt>labels();>
+
+If any arguments are given, they are supposed to represent a
+date. In that case, a list of all labels (= names of holidays)
+associated with that date are returned. The first item returned
+is always the name of the day of week for that date.
+
+If no arguments are given, the list of all available labels in
+the given year is returned. This list does B<NOT> include any
+names of the days of week (which would be pointless in this case).
+
+In list context, the resulting list itself is returned. In scalar
+context, the number of items in the resulting list is returned.
+
+=item *
+
+C<@dates = $year-E<gt>search(PATTERN);>
+
+C<$dates = $year-E<gt>search(PATTERN);>
+
+This method searches through all the labels of the given year
+and returns a list of date objects with all dates whose labels
+match the given pattern.
+
+Note that this is a simple, case-insensitive substring search,
+B<NOT> a full-fledged regular expression search!
+
+The result is guaranteed to be sorted chronologically.
+
+In scalar context, only the number of items in the resulting list
+is returned, instead of the resulting list itself (as in list context).
+
+=item *
+
+C<$days = $year-E<gt>delta_workdays(YEAR,MONTH1,DAY1, YEAR,MONTH2,DAY2, FLAG1,FLAG2);>
+
+C<$days = $year-E<gt>delta_workdays(DATE1,DATE2,FLAG1,FLAG2);>
+
+This method calculates the number of work days (i.e., the number
+of days, but excluding all holidays) between two dates.
+
+In other words, this method is equivalent to the "Delta_Days()"
+function of the Date::Calc module, except that it disregards
+holidays in its counting.
+
+The two flags indicate whether the start and end dates should be
+included in the counting (that is, of course, only in case they
+aren't holidays), or not.
+
+It is common, for example, that you want to know how many work
+days are left between the current date and a given deadline.
+
+Typically, you will want to count the current date but not the
+deadline's date. So you would specify "true" ("1") for FLAG1
+and "false" ("0") for FLAG2 in order to achieve that.
+
+In other words, a value of "true" means "including this date",
+a value of "false" means "excluding this date".
+
+As with the "Delta_Days()" function from the Date::Calc module,
+the dates have to be given in chronological order to yield a
+positive result. If the dates are reversed, the result will
+be negative.
+
+The parameter FLAG1 is associated with the first given date,
+the parameter FLAG2 with the second given date (regardless
+of whether the dates are in chronological order or not).
+
+An exception ("given year != object's year") is thrown if the
+year number of either of the two given dates does not match the
+year number associated with the given year object.
+
+An exception ("invalid date") is also raised if either of the
+two date arguments does not constitute a valid date.
+
+=item *
+
+C<($date,$rest,$sign) = $year-E<gt>add_delta_workdays(YEAR,MONTH,DAY, DELTA, SIGN);>
+
+C<($date,$rest,$sign) = $year-E<gt>add_delta_workdays(DATE,DELTA,SIGN);>
+
+This method is the equivalent of the "Add_Delta_Days()" function
+from the Date::Calc module, except that it adds work days and
+skips holidays.
+
+In other words, you can add or subtract a number of work days
+"DELTA" to/from a given date and get a new date as the result
+(as a Date::Calc object).
+
+You add days (i.e., you go forward in time) with a positive
+offset "DELTA", and you subtract days (i.e., you go backwards
+in time) with a negative offset.
+
+Note that an exception ("invalid date") is raised if the
+given date argument (the "start" date) does not constitute
+a valid date.
+
+Beware that this method is limited to date calculations within
+a single year (in contrast to the method with the same name
+from the Date::Calendar module).
+
+Therefore, the method does not only return a date (object),
+but also a "rest" and a "sign".
+
+The "rest" indicates how many days are still left from your
+original DELTA after going in the desired direction and
+reaching a year boundary.
+
+The "sign" indicates in which direction (future or past) one
+needs to go in order to "eat up" the "rest" (by subtracting
+a day from the "rest" for each work day passed), or to adjust
+the resulting date (in order to skip any holidays directly
+after a year boundary), if at all.
+
+The "sign" is -1 for going backwards in time, +1 for going
+forward, and 0 if the result doesn't need any more fixing
+(for instance because the result lies in the same year as
+the starting date).
+
+The method "add_delta_workdays()" from the Date::Calendar
+module uses the "rest" and "sign" return values from this
+method in order to perform calculations which may cross
+year boundaries.
+
+Therefore, it is not recommended to use this method here
+directly, as it is rather clumsy to use, but to use the
+method with the same name from the Date::Calendar module
+instead, which does the same but is much easier to use
+and moreover allows calculations which cross an arbitrary
+number of year boundaries.
+
+=item *
+
+C<$flag = $year-E<gt>is_full(YEAR,MONTH,DAY|DATE);>
+
+This method returns "true" ("1") if the bit corresponding to
+the given date is set in the bit vector representing "full"
+holidays, and "false" ("0") otherwise.
+
+I.e., the method returns "true" if the given date is a (full)
+holiday (according to the calendar profile associated with the
+given year object).
+
+=item *
+
+C<$flag = $year-E<gt>is_half(YEAR,MONTH,DAY|DATE);>
+
+This method returns "true" ("1") if the bit corresponding to
+the given date is set in the bit vector representing "half"
+holidays, and "false" ("0") otherwise.
+
+I.e., the method returns "true" if the given date is a half
+holiday (according to the calendar profile associated with the
+given year object).
+
+Note that if a date is a "full" holiday, the "half" bit is
+never set, even if you try to do so in your calendar profile,
+on purpose or by accident.
+
+=item *
+
+C<$flag = $year-E<gt>is_work(YEAR,MONTH,DAY|DATE);>
+
+This method returns "true" ("1") if the bit corresponding to
+the given date is set in the bit vector used to perform all
+sorts of calculations, and "false" ("0") otherwise.
+
+B<BEWARE> that the "work" in this method's name does B<NOT>
+come from "work days"!
+
+It comes from the fact that the corresponding bit vector can
+be used for any "work" that you need to do. In other words,
+it's a "work space".
+
+Therefore, this bit vector might contain about everything you
+could imagine - including a bit pattern which marks all "work
+days" with set bits, if it so happens!
+
+But you better don't rely on it, unless you put the bit pattern
+there yourself in the first place.
+
+Note that you can get a reference to this bit vector (in order
+to fill it with any bit pattern you like) using the method
+"vec_work()", described further above in this document.
+
+The number of bits in this bit vector is the same as the number
+of days in the given year "C<$year>", which you can retrieve
+through either "C<$days = $year-E<gt>vec_work-E<gt>Size();>"
+or "C<$days = $year-E<gt>val_days();>".
+
+See also L<Bit::Vector(3)> for more details.
+
+=back
+
+=head1 SEE ALSO
+
+Bit::Vector(3), Date::Calendar(3), Date::Calendar::Profiles(3),
+Date::Calc::Object(3), Date::Calc(3).
+
+=head1 VERSION
+
+This man page documents "Date::Calendar::Year" version 5.3.
+
+=head1 AUTHOR
+
+  Steffen Beyer
+  mailto:sb@engelschall.com
+  http://www.engelschall.com/u/sb/download/
+
+=head1 COPYRIGHT
+
+Copyright (c) 2000 - 2002 by Steffen Beyer. All rights reserved.
+
+=head1 LICENSE
+
+This package is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself, i.e., under the
+terms of the "Artistic License" or the "GNU General Public License".
+
+Please refer to the files "Artistic.txt" and "GNU_GPL.txt"
+in this distribution for details!
+
+=head1 DISCLAIMER
+
+This package is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+See the "GNU General Public License" for more details.
+

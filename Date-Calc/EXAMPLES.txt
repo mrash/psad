@@ -1,0 +1,628 @@
+                     ====================================
+                       Package "Date::Calc" Version 5.3
+                     ====================================
+
+
+                  Copyright (c) 1995 - 2002 by Steffen Beyer.
+                             All rights reserved.
+
+
+Example applications:
+---------------------
+
+You will find some example programs (several in Perl, one in C)
+in the "examples" subdirectory of this distribution:
+
+                        examples/age_in_days_eu.pl
+                        examples/age_in_days_us.pl
+                        examples/anniversaries.pl
+                        examples/cal.c
+                        examples/calendar.cgi
+                        examples/delta.pl
+                        examples/holidays.pl
+                        examples/income.pl
+                        examples/linearcal.pl
+                        examples/nth_weekday.pl
+                        examples/time.pl
+                        examples/vacation.pl
+                        examples/weiberfastnacht.pl
+
+
+age_in_days_eu.pl, age_in_days_us.pl:
+-------------------------------------
+
+"age_in_days_eu.pl" and "age_in_days_us.pl" are a demonstration of the
+multi-language capabilities of this package, as well as of its scanning
+capabilities for dates.
+
+First build and install this package (for instructions, see the file
+"INSTALL.txt" in this distribution), then change directory to the
+"examples" subdirectory, and finally start these two demo programs
+with
+                        % perl age_in_days_eu.pl
+and
+                        % perl age_in_days_us.pl
+respectively.
+
+They first ask you to choose a language; any uniquely identifying
+abbreviation for one of the first six languages supported by this
+package (English, French, German, Spanish, Portuguese, Dutch) will
+suffice, like "en" for "English", "es" for "Español" (Spanish),
+"f" for "Français" (French), and so on.
+
+These applications then ask you to enter the date of your birthday.
+
+The two applications only differ in the expected format for dates:
+In "age_in_days_eu.pl", the order day-month-year is assumed, whereas
+"age_in_days_us.pl" assumes the order month-day-year.
+
+For the month you can (at your option) either enter the corresponding
+number, or any uniquely identifying abbreviation of the month's name
+(or the name of the month in full length) IN THE CHOSEN LANGUAGE.
+
+Moreover, virtually any format for dates is supported:
+
+Examples include "03/01/64", "3.1.1964", "January 3rd, 1964", "030164",
+and so on.
+
+Experiment!
+
+Note that the scanning itself is actually performed by two powerful
+routines written in C, and not using the regular expressions from Perl
+(which would make this task rather trivial in Perl, but which wouldn't
+be easily accessible to C programmers).
+
+After confirming your entry, the program will print out your age in days.
+
+If the system call "time()" (and hence, "localtime()") is not available
+on your system, the program will also ask you to enter today's date.
+
+Otherwise the program will automatically use the system-supplied current
+date.
+
+
+anniversaries.pl:
+-----------------
+
+This script demonstrates how one can use the Date::Calendar module to
+get a list of anniversaries for the next couple of weeks.
+
+If you run this program from the login script of your shell, you will
+always get this list when you log in, and you will never ever forget
+a birthday or anniversary again! (At least you won't have an excuse
+anymore. :-) )
+
+Your dear loving wife or husband will appreciate it! ;-)
+
+Example output (on October 3rd, 2001):
+
+  +13 days :  Tue 16-Oct-2001  (31)  Cousin Paul
+  +18 days :  Sun 21-Oct-2001  (28)  Sister Catherine
+  +88 days :  Sun 30-Dec-2001  (30)  Spouse
+
+
+cal.c:
+------
+
+This little program is a substitute for the UNIX "cal" command.
+
+In contrast to the UNIX "cal" command, however, this program allows you
+to choose a language which will be used for generating the calendar for
+the chosen month and year.
+
+(Also in contrast to the UNIX "cal" command, this program will NOT
+generate a tiled overview of ALL the months for a given year, however.)
+
+Moreover, you can (at your option) either enter the number of the desired
+language, or any uniquely identifying abbreviation of its name (or the name
+in full length).
+
+For the month you can also (at your option) either enter the corresponding
+number, or any uniquely identifying abbreviation of the month's name (or
+the name of the month in full length) *IN THE CHOSEN LANGUAGE*.
+
+In order to compile this little program, first copy the file "cal.c" from
+the "examples" subdirectory to the main directory of this distribution.
+
+BEWARE that you should REMOVE this file ("cal.c") from the MAIN directory
+of this distribution BEFORE building this package (i.e., before issuing
+the command "perl Makefile.PL"), because you may get compiler or runtime
+errors (like "duplicate main() function") otherwise. At the very least,
+this will inflate your shared library ("Calc.so") unnecessarily if you
+don't.
+
+In order to successfully compile the "cal.c" program, you do NOT need
+to build the Date::Calc package first, however.
+
+Then change directory to the main directory of this distribution,
+if you haven't done so already.
+
+Finally, if you have Perl available on your system (no matter whether
+UNIX or Win32), you can compile this program with the following command:
+
+            % perl tools/compile.pl cal.c DateCalc.c
+or
+            % perl tools\compile.pl cal.c DateCalc.c
+
+Otherwise, if you have the GNU C compiler ("gcc") available on your system,
+you can also do so (UNIX only) using the command
+
+            % ./tools/compile.sh cal.c DateCalc.c
+
+On a MSDOS/Windows system, if your ANSI C compiler can be called with "cl",
+you can also compile the program using the command
+
+            % tools\compile cal DateCalc.c
+
+(Note the missing ".c" at the end of the filename "cal" in this case!)
+
+Otherwise, compile the program with your favourite ANSI C compiler in a
+similar fashion.
+
+In case you have already built the Date::Calc package, you can simply
+say
+            % perl tools/compile.pl cal.c DateCalc.o
+
+(note the "o" at the end of the line instead of a "c") or
+
+            % perl tools\compile.pl cal.c DateCalc.obj
+
+under Windows.
+
+Now start the program with the command "./cal" (UNIX) or simply "cal"
+(MSDOS/Windows).
+
+(Note that this program is not confined to Win32 systems, it also compiles
+and runs perfectly well on pure MS-DOS or other Windows systems!)
+
+The first parameter is the desired language (currently 1..11 or "English",
+"Français", "Deutsch", "Español", "Português", "Nederlands", "Italiano",
+"Norsk", "Svenska", "Dansk" and "suomi"), the second the month and the
+third the year.
+
+Example:
+                        % cal en apr 1998
+
+This will print:
+
+                            April 1998
+                    Mon Tue Wed Thu Fri Sat Sun
+                              1   2   3   4   5
+                      6   7   8   9  10  11  12
+                     13  14  15  16  17  18  19
+                     20  21  22  23  24  25  26
+                     27  28  29  30
+
+If you start the "cal" program without parameters, it will print a usage
+and exit.
+
+Experiment!
+
+If you like this program, you might want to copy it to some directory in
+your search path, like "/usr/local/bin" (UNIX) or "C:\DOS" or "C:\WinNT"
+(MSDOS/Windows).
+
+If you are running this program on a PC (e.g. MS-DOS, Windows DOS box,
+GNU/Linux or FreeBSD console), you might want to pipe its output through
+the "iso2pc" filter from the "tools" subdirectory (see the file "TOOLS.txt"
+in this distribution for instructions on how to compile and install this
+filter), in order to convert the special international characters from
+the ISO-Latin-1 character set (used throughout this package) to one of
+the (two) character sets commonly used on PC's, as follows:
+
+                    % cal Portug Mar 1998 | iso2pc [-dos]
+
+(for older versions of MS-DOS and the PC-UNIX console) or
+
+                    % cal Portug Mar 1998 | iso2pc -win
+
+(for newer versions of MS-DOS and the Win32 DOS box).
+
+
+calendar.cgi:
+-------------
+
+This CGI script demonstrates the capabilities of the new "Calendar::*"
+modules.
+
+See http://www.engelschall.com/u/sb/calendar/ for a "live" example of
+this script and play around with it at leisure!
+
+The script allows you to select a language, a calendar profile, a start
+"Year and Month" or start "Week and Year" and displays a calendar for the
+chosen month, or for 4 consecutive weeks starting with the chosen week,
+for the chosen location (calendar profile) and in the chosen language.
+
+(The language setting only affects the names of months and days of week,
+though! The language of the names of the holidays and commemorative days
+is determined by the calendar profiles themselves.)
+
+Alternately, you can choose to display a whole year, either only the
+true holidays (i.e., the days on which you get a day off, that is, all
+official holidays which do not fall on a Saturday or Sunday), or all
+the days for which the corresponding profile has names stored in it
+(official holidays as well as commemorative days).
+
+Choosing one of these two options (radio buttons) overrides the "Year
+and Month" or "Week and Year" mode of operation, but nevertheless takes
+its year argument from the selected entry field (and simply drops the
+"Month" or "Week" value).
+
+(Since the two year numbers in either mode might not be the same, be
+careful which mode you choose and which input field you type into!)
+
+Saturdays, Sundays and official holidays will be marked in red, "half"
+holidays will be marked in purple. Workdays are printed in black.
+
+All the names associated with each day (the names of official holidays
+as well as purely commemorative days) are displayed to the right of
+each day.
+
+Please report any errors you find in the calendar profiles (or in this
+script) back to me!
+
+There is a "mailto:" hyperlink at the bottom of the generated page for
+this purpose.
+
+Thank you very much in advance!
+
+
+delta.pl:
+---------
+
+This is a little program which contains a routine to determine the
+number of business days between two dates. It is not of much practical
+value, because it doesn't take legal holidays into account (use the
+method "delta_weekdays()" in the module Date::Calendar[::Year] if you
+want to do that, or see the examples "income.pl" and "vacation.pl"
+below).
+
+Moreover, it assumes that counting includes the earlier of the two
+dates, but not the later one. I.e., if you determine the number of
+business days between, for example, two consecutive days, like for
+instance a Friday and a Saturday, the routine will return a difference
+of one business day as the result. If you take a Sunday and Monday, on
+the other hand, however, it will give you a difference of zero business
+days.
+
+The program expects six parameters on the command line, i.e., two dates
+in the order year, month, day, in chronological order (the result will
+be negative if you swap the two dates, but the routine won't go backwards
+in time, i.e., it still counts the earlier date if it is a business day,
+but not the later one). If the number of command line parameters is not
+six, the program prints a usage and exits.
+
+Here's an example of how it can be used:
+
+                    % perl delta.pl 1999 12 24 2000 1 8
+
+                    Fri 24-Dec-1999
+                    Sat 8-Jan-2000
+
+                           December 1999
+                    Mon Tue Wed Thu Fri Sat Sun
+                              1   2   3   4   5
+                      6   7   8   9  10  11  12
+                     13  14  15  16  17  18  19
+                     20  21  22  23  24  25  26
+                     27  28  29  30  31
+
+
+                           January 2000
+                    Mon Tue Wed Thu Fri Sat Sun
+                                          1   2
+                      3   4   5   6   7   8   9
+                     10  11  12  13  14  15  16
+                     17  18  19  20  21  22  23
+                     24  25  26  27  28  29  30
+                     31
+
+                    Difference: 11 Business Days.
+
+(The program prints the calendars of the respective months so that you
+can verify its results.)
+
+
+holidays.pl:
+------------
+
+This utility generates a list of all holidays and commemorative
+days for a given year and location.
+
+It also shows how to temporarily change the language and date
+string format, produce some output, and restore the old values.
+
+Given a year number, the name of a language and the name of one
+of the predefined calendar profiles, this subroutine prints a list
+of all holidays in the given year, such as in the following example:
+
+:> perl holidays.pl 2001 de sdm-MUC
+
+Mon 01-Jan-2001 + Neujahr
+Sam 06-Jan-2001 + Dreikönigstag
+Don 22-Feb-2001 - Fettdonnerstag, Weiberfastnacht
+Mon 26-Feb-2001 - Rosenmontag
+Die 27-Feb-2001 - Karnevalsdienstag
+Mit 28-Feb-2001 - Aschermittwoch
+Son 08-Apr-2001 + Palmsonntag
+Don 12-Apr-2001 - Gründonnerstag
+Fre 13-Apr-2001 + Karfreitag
+Son 15-Apr-2001 + Ostersonntag
+Mon 16-Apr-2001 + Ostermontag
+Die 01-Mai-2001 + Tag der Arbeit
+Don 24-Mai-2001 + Christi Himmelfahrt
+Son 03-Jun-2001 + Pfingstsonntag
+Mon 04-Jun-2001 + Pfingstmontag
+Don 14-Jun-2001 + Fronleichnam
+Mit 15-Aug-2001 + Mariä Himmelfahrt
+Mit 03-Okt-2001 + Tag der deutschen Einheit
+Mit 31-Okt-2001 - Reformationstag
+Don 01-Nov-2001 + Allerheiligen
+Mit 21-Nov-2001 - Buß- und Bettag
+Son 02-Dez-2001 + 1. Advent
+Son 09-Dez-2001 + 2. Advent
+Son 16-Dez-2001 + 3. Advent
+Son 23-Dez-2001 + 4. Advent
+Mon 24-Dez-2001 # Heiligabend
+Die 25-Dez-2001 + 1. Weihnachtsfeiertag
+Mit 26-Dez-2001 + 2. Weihnachtsfeiertag
+Mon 31-Dez-2001 # Sylvester
+
+Holidays and weekends are marked with "+", "half" holidays are
+marked with "#", and commemorative days (days which aren't legal
+holidays but which have a special name) or normal weekdays are
+marked with "-".
+
+
+income.pl:
+----------
+
+This little program demonstrates what you can do using the Date::Calendar,
+Date::Calendar::Year and Date::Calendar::Profiles modules, which allow you
+to perform calculations which take (legal and any other you want) holidays
+into account.
+
+It expects four parameters on the command line: Your year of birth, the
+number of days of (paid) vacation your employer concedes you (per year),
+the number of hours per week that you work, and your brut annual income.
+
+If called without or with a wrong number of parameters, the program prints
+a usage and stops.
+
+Otherwise, it prints a summary of your input, a list of years, followed
+by the number of workdays in that year, some statistics, and your average
+net wage per hour (assuming 50% taxes on income and an age of 65 for
+retirement).
+
+Note that you may have to adjust the holidays profile used in this script
+before you can get any meaningful results for your location. The currently
+used profile is for the federal state of Nordrhein-Westfalen in Germany.
+See the manual page (and code) of the Date::Calendar::Profiles module
+for more information.
+
+Sample run:
+
+:> perl income.pl 1964 30 40 100000
+
+Year of birth      = 1964
+Current year       = 2001
+Year of retirement = 2029
+Vacation days/year = 30
+Hours per week     = 40
+Brut annual income = 100000
+
+2001 : 220
+2002 : 220
+2003 : 221
+2004 : 225
+2005 : 222
+2006 : 220
+2007 : 220
+2008 : 223
+2009 : 223
+2010 : 224
+2011 : 222
+2012 : 221
+2013 : 220
+2014 : 221
+2015 : 223
+2016 : 222
+2017 : 220
+2018 : 220
+2019 : 220
+2020 : 224
+2021 : 224
+2022 : 222
+2023 : 220
+2024 : 221
+2025 : 221
+2026 : 223
+2027 : 224
+2028 : 220
+2029 : 220
+
+Total workdays = 6426
+Average workdays per year = 221.586206896552
+
+Total days = 10592
+Average year length in days = 365.241379310345
+
+Quotient = 0.606684290030212
+
+Net hourly wages (assuming 50% taxes on income) = 28.2057267351385
+
+
+linearcal.pl:
+-------------
+
+This program illustrates how to use the various new methods
+available through the new object-oriented date and calendar modules
+(Date::Calc::Object, Date::Calendar, Date::Calendar::Profiles).
+
+It also shows how to temporarily change the language and date
+string format, produce some output, and restore the old values.
+
+Given two dates (start and stop date), the name of a language
+and the name of one of the predefined calendar profiles, this
+little subroutine prints a linear calendar, such as in the
+following two examples:
+
+:> perl linearcal.pl 1999 12 18 2000 1 9 de DE-BY
+
+Sam 18-Dez-1999 +
+Son 19-Dez-1999 + 4. Advent
+Mon 20-Dez-1999 -
+Die 21-Dez-1999 -
+Mit 22-Dez-1999 -
+Don 23-Dez-1999 -
+Fre 24-Dez-1999 - Heiligabend
+Sam 25-Dez-1999 + 1. Weihnachtsfeiertag
+Son 26-Dez-1999 + 2. Weihnachtsfeiertag
+Mon 27-Dez-1999 -
+Die 28-Dez-1999 -
+Mit 29-Dez-1999 -
+Don 30-Dez-1999 -
+Fre 31-Dez-1999 - Sylvester
+Sam 01-Jan-2000 + Neujahr
+Son 02-Jan-2000 +
+Mon 03-Jan-2000 -
+Die 04-Jan-2000 -
+Mit 05-Jan-2000 -
+Don 06-Jan-2000 + Dreikönigstag
+Fre 07-Jan-2000 -
+Sam 08-Jan-2000 +
+Son 09-Jan-2000 +
+
+:> perl linearcal.pl 1999 12 18 2000 1 9 en GB
+
+Sat 18-Dec-1999 +
+Sun 19-Dec-1999 +
+Mon 20-Dec-1999 -
+Tue 21-Dec-1999 -
+Wed 22-Dec-1999 -
+Thu 23-Dec-1999 -
+Fri 24-Dec-1999 -
+Sat 25-Dec-1999 +
+Sun 26-Dec-1999 +
+Mon 27-Dec-1999 + Christmas Day
+Tue 28-Dec-1999 + Boxing Day
+Wed 29-Dec-1999 -
+Thu 30-Dec-1999 -
+Fri 31-Dec-1999 -
+Sat 01-Jan-2000 +
+Sun 02-Jan-2000 +
+Mon 03-Jan-2000 + New Year's Day
+Tue 04-Jan-2000 -
+Wed 05-Jan-2000 -
+Thu 06-Jan-2000 -
+Fri 07-Jan-2000 -
+Sat 08-Jan-2000 +
+Sun 09-Jan-2000 +
+
+Holidays and weekends are marked with "+", "half" holidays are
+marked with "#", and commemorative days (days which aren't legal
+holidays but which have a special name) or normal weekdays are
+marked with "-".
+
+
+nth_weekday.pl:
+---------------
+
+This program is a demonstration of the function "Nth_Weekday_of_Month_Year()"
+and the scanning capabilities of this package (in particular the day of week
+and month, in this case).
+
+It calculates the date of the "n"th occurrence of the given day of week
+in the chosen month and year -- such as, for example, the 3rd Thursday
+of a given month and year.
+
+First build and install this package (for instructions, see the file
+"INSTALL.txt" in this distribution), then change directory to the
+"examples" subdirectory, and finally start this program with the
+following command (example):
+
+            % perl nth_weekday.pl 3rd Thursday April 1998
+
+This will print:
+
+        The 3rd Thursday in April 1998 is Thursday, April 16th 1998.
+
+If you start this program without parameters, it will print a usage
+and exit.
+
+Note that you can enter the factor ("3rd" in the above example) either
+using plain numeric digits ("1", "2", "3", "4" and "5"), or in the usual
+abbreviated (English) form as "1st", "2nd", "3rd", "4th" and "5th".
+
+You can also enter the day of week either numerically ("1" through "7"),
+or as any uniquely identifying abbreviation of the name of the desired
+day of week (or its name in full length) in English.
+
+For the month you can similarly either enter the corresponding number
+("1" through "12"), or any uniquely identifying abbreviation of the
+month's name (or the name of the month in full length) in English.
+
+Experiment!
+
+
+time.pl:
+--------
+
+This code snippet shows you different ways of how to access the current
+date and time, both as Greenwich Mean Time as well as local time.
+
+Just run this example with "perl time.pl":
+
+:> perl time.pl
+Today_and_Now(0)          = Fri 16-Mar-2001 16:07:15
+Today_and_Now(1)          = Fri 16-Mar-2001 15:07:15
+Add_Delta_DHMS(984755235) = Fri 16-Mar-2001 15:07:15
+gmtime(984755235)         = Fri 16-Mar-2001 15:07:15
+localtime(984755235)      = Fri 16-Mar-2001 16:07:15
+
+
+vacation.pl:
+------------
+
+This program shows how to calculate the number of holidays you have
+to debit from your account of (paid) vacation days whenever you
+apply for some vacation.
+
+The program does not take any command-line parameters, because you
+will have to adjust the holidays profile used anyway, and therefore,
+the start and end date of your vacation are hard-coded, in this
+example.
+
+Just start this program with "perl vacation.pl" and it will print
+the number of workdays covered by your vacation (including both
+the start and end date, if applicable):
+
+:> perl vacation.pl
+23
+
+
+weiberfastnacht.pl:
+-------------------
+
+This little script demonstrates how you can search for dates by name,
+and how you can poll all the names associated with any particular date.
+
+Moreover, it shows how the cache of Date::Calendar objects works, and
+how it can be manipulated.
+
+Please see the script's code for more details.
+
+Sample run:
+
+:> perl weiberfastnacht.pl
+Donnerstag, den 2. März 2000 (Donnerstag Fettdonnerstag Weiberfastnacht)
+Donnerstag, den 22. Februar 2001 (Donnerstag Fettdonnerstag Weiberfastnacht)
+Donnerstag, den 7. Februar 2002 (Donnerstag Fettdonnerstag Weiberfastnacht)
+Donnerstag, den 27. Februar 2003 (Donnerstag Fettdonnerstag Weiberfastnacht)
+
+Donnerstag, den 19. Februar 2004 (Donnerstag Fettdonnerstag Weiberfastnacht)
+
+(The script searches for the dates of the Thursday before Carnival in the
+years 2000 through 2004, and prints the results.)
+
+

@@ -1,0 +1,1256 @@
+
+=head1 NAME
+
+Date::Calc::Object - Object-oriented add-on for Date::Calc with overloaded operators
+
+=head1 MOTTO
+
+Make frequent things easy and infrequent or hard things possible
+
+=head1 PREFACE
+
+Note that you do B<NOT> need to "C<use Date::Calc qw(...);>" in
+addition to this module.
+
+Simply
+
+  use Date::Calc::Object qw(...);
+
+B<INSTEAD OF>
+
+  use Date::Calc qw(...);
+
+with the same "C<qw(...)>" as you would with the "Date::Calc"
+module, and then forget about "Date::Calc::Object" altogether.
+
+The rest of your existing code doesn't change at all.
+
+Note also that in order to create a new date object, you do not
+need to use
+
+  $date_object = Date::Calc::Object->new(...);
+
+(but you may), and should use
+
+  $date_object = Date::Calc->new(...);
+
+instead (saves you some typing and is a trifle faster).
+
+=head1 SYNOPSIS
+
+=head2 Export tags
+
+  :all  -  all functions from Date::Calc
+  :aux  -  auxiliary functions shift_*
+  :ALL  -  both :all and :aux
+
+=head2 Functions
+
+See L<Date::Calc(3)> for a list of available functions.
+
+  $year                          = shift_year(\@_);
+  ($year,$mm,$dd)                = shift_date(\@_);
+  ($hrs,$min,$sec)               = shift_time(\@_);
+  ($year,$mm,$dd,$hrs,$min,$sec) = shift_datetime(\@_);
+
+=head2 Methods
+
+  $old = Date::Calc->accurate_mode([FLAG]);
+  $old = Date::Calc->number_format([NUMBER|CODEREF]);
+  $old = Date::Calc->delta_format([NUMBER|CODEREF]);  # global default
+  $old = Date::Calc->date_format([NUMBER|CODEREF]);   # global default
+  $old = Date::Calc->language([LANGUAGE]);            # global default
+
+  $old = $date->accurate_mode([FLAG]);           # is global nevertheless!
+  $old = $date->number_format([NUMBER|CODEREF]); # is global nevertheless!
+  $old = $date->delta_format([NUMBER|CODEREF]);  # individual override
+  $old = $date->date_format([NUMBER|CODEREF]);   # individual override
+  $old = $date->language([LANGUAGE]);            # individual override
+
+  $flag = $date->is_delta();
+  $flag = $date->is_date();
+  $flag = $date->is_short(); # i.e., has no time part
+  $flag = $date->is_long();  # i.e., has time part
+  $flag = $date->is_valid();
+
+  $date = Date::Calc->new([TYPE]);
+  $date = Date::Calc->new([TYPE,]YEAR,MONTH,DAY[,HRS,MIN,SEC]);
+  $date = Date::Calc->new($arrayref);
+  $newdate = $somedate->new([TYPE]);
+  $newdate = $somedate->new([TYPE,]YEAR,MONTH,DAY[,HRS,MIN,SEC]);
+  $newdate = $somedate->new($arrayref);
+
+  $datecopy = $date->clone();
+  $targetdate->copy($sourcedate);
+  $targetdate->copy($arrayref);
+  $targetdate->copy(@list);
+
+  ($year,$month,$day) = $date->date([TYPE]);
+  ($year,$month,$day) = $date->date([TYPE,]YEAR,MONTH,DAY[,HRS,MIN,SEC]);
+  ($year,$month,$day) = $date->date($arrayref);
+  ([$hrs,$min,$sec])  = $date->time([TYPE]);
+  ($hrs,$min,$sec)    = $date->time([TYPE,]HRS,MIN,SEC);
+  ([$hrs,$min,$sec])  = $date->time($arrayref);
+
+  ($year,$month,$day,$hrs,$min,$sec) =
+      $date->datetime([TYPE]);
+  ($year,$month,$day,$hrs,$min,$sec) =
+      $date->datetime([TYPE,]YEAR,MONTH,DAY[,HRS,MIN,SEC]);
+
+  $date  = Date::Calc->today([FLAG]);
+  $date  = Date::Calc->now([FLAG]); # shorthand for --+
+  $date  = Date::Calc->today_and_now([FLAG]); # <-----+
+  $date  = Date::Calc->gmtime([time]);    # UTC/GMT
+  $date  = Date::Calc->localtime([time]); # local time
+  $delta = Date::Calc->tzoffset([time]);
+  $date  = Date::Calc->time2date([time]); # UTC/GMT
+
+  $date->today([FLAG]);         # updates the date part only
+  $date->now([FLAG]);           # updates the time part only
+  $date->today_and_now([FLAG]); # updates both date and time
+  $date->gmtime([time]);        # updates both date and time (UTC/GMT)
+  $date->localtime([time]);     # updates both date and time (local time)
+  $delta->tzoffset([time]);     # updates both date and time
+  $date->time2date([time]);     # updates both date and time (UTC/GMT)
+
+  $time = Date::Calc->mktime();    # same as "$time = CORE::time();"
+  $time = Date::Calc->date2time(); # same as "$time = CORE::time();"
+
+  $time = $date->mktime();      # converts into Unix time (local time)
+  $time = $date->date2time();   # converts into Unix time (UTC/GMT)
+
+  $year    = $date->year([YEAR]);
+  $month   = $date->month([MONTH]);
+  $day     = $date->day([DAY]);
+  $hours   = $date->hours([HRS]);
+  $minutes = $date->minutes([MIN]);
+  $seconds = $date->seconds([SEC]);
+
+  $number = $date->number([NUMBER|CODEREF]);
+  $string = $date->string([NUMBER|CODEREF][,LANGUAGE]);
+
+  $delta->normalize(); # renormalizes a delta vector
+
+=head2 Overloaded Operators
+
+  #####################################################
+  # Scalar operands are always converted into a delta #
+  # vector with that many days, i.e., [1,0,0,SCALAR]  #
+  #####################################################
+
+=head2 Comparison Operators:
+
+  if ($date1 <  $date2) { # compares date part only
+  if ($date1 <= $date2) { # compares date part only
+  if ($date1 >  $date2) { # compares date part only
+  if ($date1 >= $date2) { # compares date part only
+  if ($date1 == $date2) { # compares date part only
+  if ($date1 != $date2) { # compares date part only
+
+  $comp = $date1 <=> $date2; # compares date part only
+
+  if ($date1 lt $date2) { # compares both date and time
+  if ($date1 le $date2) { # compares both date and time
+  if ($date1 gt $date2) { # compares both date and time
+  if ($date1 ge $date2) { # compares both date and time
+  if ($date1 eq $date2) { # compares both date and time
+  if ($date1 ne $date2) { # compares both date and time
+
+  $comp = $date1 cmp $date2; # compares both date and time
+
+Note that you can of course also compare two deltas,
+but not a date and a delta!
+
+  ##################################################
+  # Default TYPE for array refs in comparisons is: #
+  # Same as other operand                          #
+  ##################################################
+
+  if ([2000,4,1] == $date) {
+  if ($today > [2000,4,1]) {
+
+  if ($now ge [2000,3,26,2,0,0]) {
+
+  if ($delta == [18,0,0]) {
+  if ($delta == -1) {
+
+=head2 Plus:
+
+  $date2 = $date1 + $delta;
+  $date2 = $delta + $date1;
+  $date += $delta;
+  $this = $date++;
+  $next = ++$date;
+
+  $delta3 = $delta1 + $delta2;
+  $delta1 += $delta2;
+  $delta += $date; # beware of implicit type change!
+  $delta++;
+  ++$delta;
+
+  #####################################################
+  # Default TYPE for array refs in '+' operations is: #
+  # Opposite of other operand                         #
+  #####################################################
+
+  $date2 = [2000,3,26] + $delta;
+  $date2 = $date1 + [+1,0,0];
+  $date2 = [0,0,-1] + $date1;
+  $date2 = $date1 + 1;
+  $date += [0,0,+1];
+  $date += 2;
+
+  $delta3 = [1,+1,0,-1] + $delta2;
+  $delta3 = $delta1 + [1,0,0,+1];
+  $delta3 = $delta1 + 1;
+  $delta += [1,0,+1,0];
+  $delta += [2000,3,26]; # beware of implicit type change!
+  $delta += 7;
+
+=head2 Unary Minus:
+
+  $delta2 = -$delta1;
+
+=head2 Minus:
+
+  $delta = $date2 - $date1;
+  $date2 = $date1 - $delta;
+  $date -= $delta;
+  $date2 -= $date1; # beware of implicit type change!
+  $this = $date--;
+  $prev = --$date;
+
+  $delta3 = $delta2 - $delta1;
+  $delta2 -= $delta1;
+  $delta--;
+  --$delta;
+
+  #####################################################
+  # Default TYPE for array refs in '-' operations is: #
+  # Always a date                                     #
+  #####################################################
+
+  $delta = $today - [2000,3,26];
+  $delta = [2000,4,1] - $date;
+  $date2 = [2000,3,26] - $delta;
+  $date2 = $date1 - [1,0,0,+7];
+  $date2 = $date1 - 7;
+  $date -= [1,0,0,+1]; # better add [0,0,-1] instead!
+  $date2 -= [2000,3,26]; # beware of implicit type change!
+  $date2 -= 1;
+
+  $delta3 = [1,0,+1,0] - $delta1;
+  $delta3 = $delta2 - [1,0,0,-1];
+  $delta -= [1,0,0,+1];
+  $delta -= 7;
+
+=head2 Miscellaneous Operators:
+
+  $string = "$date";
+  $string = "$delta";
+
+  print "$date\n";
+  print "$delta\n";
+
+  if ($date) { # date is valid
+  if ($delta) { # delta is valid
+
+  $days = abs($date);
+  $diff = abs($delta); # can be negative!
+
+  $diff = abs(abs($delta)); # always positive
+
+=head1 DESCRIPTION
+
+=over 2
+
+=item *
+
+FLAG
+
+"FLAG" is either 0 (for "false") or 1 (for "true").
+
+In the case of "C<accurate_mode()>", this switches "accurate mode"
+on and off (see further below for an explanation of what that is).
+
+In the case of "C<today()>", "C<now()>" and "C<today_and_now()>",
+a "true" value indicates "GMT" (Greenwich Mean Time), as opposed
+to local time, which is the default.
+
+=item *
+
+NUMBER
+
+"NUMBER" is a number between 0 and 2 (for "number_format()" and "number()")
+or between 0 and 3 (for "delta_format()", "date_format()" and "string()"),
+indicating which of the three/four predefined formats, respectively,
+should be used for converting a date into numeric representation
+(needed for comparing dates, for instance) or string representation.
+
+Format #0 is the default at startup and the simplest of all (and
+should be fastest to calculate, too).
+
+The string representation of dates in format #0 also has the advantage of
+being sortable in chronological order (and of complying with S<ISO 8601>).
+
+(The numeric formats are (trivially) always sortable in chronological
+order of course.)
+
+The other formats are increasingly more sophisticated (in terms of
+esthetics and computation time) with increasing number:
+
+  Delta number formats (short):
+
+      0    13603
+      1    13603
+      2    13603
+
+  Delta string formats (short):
+
+      0    '+0+0+13603'
+      1    '+0 +0 +13603'
+      2    '+0Y +0M +13603D'
+      3    '+0 Y +0 M +13603 D'
+
+  Date number formats (short):
+
+      0    20010401
+      1    730576
+      2    730576
+
+  Date string formats (short):
+
+      0    '20010401'
+      1    '01-Apr-2001'
+      2    'Sun 1-Apr-2001'
+      3    'Sunday, April 1st 2001'
+
+  Delta number formats (long):
+
+      0    13603.012959
+      1    13603.012959
+      2    13603.0624884259
+
+  Delta string formats (long):
+
+      0    '+0+0+13603+1+29+59'
+      1    '+0 +0 +13603 +1 +29 +59'
+      2    '+0Y +0M +13603D +1h +29m +59s'
+      3    '+0 Y +0 M +13603 D +1 h +29 m +59 s'
+
+  Date number formats (long):
+
+      0    20010401.082959
+      1    730576.082959
+      2    730576.354155093
+
+  Date string formats (long):
+
+      0    '20010401082959'
+      1    '01-Apr-2001 08:29:59'
+      2    'Sun 1-Apr-2001 08:29:59'
+      3    'Sunday, April 1st 2001 08:29:59'
+
+If a number outside of the permitted range is specified, or if the value
+is not a code reference (see also the next section below for more details),
+the default format #0 is used instead.
+
+=item *
+
+CODEREF
+
+"CODEREF" is the reference of a subroutine which can be passed to the
+methods "number_format()", "delta_format()" and "date_format()" in order
+to install a callback function which will be called subsequently whenever
+a date (or delta) object needs to be (implicitly) converted into a number
+or string.
+
+This happens for instance when you compare two date objects, or when you
+put a date object reference in a string between double quotes.
+
+Such a "CODEREF" can also be passed to the methods "number()" and
+"string()" for explicitly converting a date object as desired.
+
+=item *
+
+LANGUAGE
+
+"LANGUAGE" is either a number in the range C<[1..Languages()]>,
+or one of the strings "C<Language_to_Text(1..Languages())>"
+(see also L<Date::Calc(3)>).
+
+=item *
+
+TYPE
+
+"TYPE" is 0 for a regular date and 1 for a delta vector (a list of
+year, month, day and optionally hours, minutes and seconds offsets).
+
+=item *
+
+Storage
+
+"Date::Calc" objects are implemented as two nested arrays.
+
+The "blessed" array (whose reference is the object reference
+you receive when calling the "new()" method) contains an
+anonymous array at position zero and the object's data in
+its remaining fields.
+
+The embedded anonymous array is used for storing the object's
+attributes (flags).
+
+Dates and delta vectors always comprise either 3 or 6 data values:
+Year, month, day plus (optionally) hours, minutes and seconds.
+
+These values are stored in the "blessed" array at positions 1..3
+or 1..6, respectively.
+
+An object without the time values is therefore called "short",
+and an object having time values is called "long" throughout
+this manual.
+
+Hint: Whenever possible, if you do not need the time values, omit
+them, i.e., always use the "short" form of the object if possible,
+this will speed up calculations a little (the short form uses
+different (faster) functions for all calculations internally).
+
+The embedded anonymous array contains various flags:
+
+At position zero, it contains the "TYPE" indicator which determines
+whether the object is a date or a delta vector.
+
+At position 1, the object stores the "NUMBER" of one of the delta
+vector formats, or the reference of a callback function which converts
+the contents of the object into string representation if it's a delta
+vector, or "undef" if the global settings apply.
+
+At position 2, the object stores the "NUMBER" of one of the date formats,
+or the reference of a callback function which converts the contents of
+the object into string representation if it's a date, or "undef" if the
+global settings apply.
+
+At position 3, the object stores the "LANGUAGE" to be used for all
+conversions into strings (where applicable), or "undef" if the global
+language setting applies.
+
+Note that your callback functions (see the section "Callback Functions"
+further below for more details) do not need to pay attention to the
+value at position 3, the language (of the "Date::Calc" module)
+will automatically be set to this value whenever the callback
+functions are called, and automatically reset to its former value
+after the callback.
+
+So if your callback functions use the "*_to_Text*" functions from
+the "Date::Calc" module, they will automatically use the correct
+language.
+
+Be reminded though that you should B<NEVER> access the object's
+internal data directly, i.e., through their positional numbers,
+but B<ALWAYS> through their respective accessor methods, e.g.:
+
+        year()
+        month()
+        day()
+        hours()
+        minutes()
+        seconds()
+        date()
+        time()
+        datetime()
+        is_delta()
+        is_date()
+        is_short()
+        is_long()
+        delta_format()
+        date_format()
+        language()
+
+And although position 4 and onward in the embedded anonymous array is
+currently unused, it might not stay so in future releases of this module.
+
+Therefore, in case you need more attributes in a subclass of the
+"Date::Calc[::Object]" class, I suggest using values starting at
+positions a bit further up, e.g. 6, 8 or 10.
+
+=item *
+
+Invalid Dates
+
+Only "new()" allows to create objects containing possibly invalid
+dates (needed for reading in and evaluating user input, for example).
+
+=item *
+
+Usage
+
+The methods
+
+        accurate_mode()
+        number_format()
+        delta_format()
+        date_format()
+        language()
+        date()
+        time()
+        datetime()
+        year()
+        month()
+        day()
+        hours()
+        minutes()
+        seconds()
+
+are used for reading as well as for setting attributes. They simply
+return the values in question if they are called without parameters.
+
+The methods
+
+        accurate_mode()
+        number_format()
+        delta_format()
+        date_format()
+        language()
+
+always return the previous value if a new value is set. This allows
+you to change these values temporarily and to restore their old value
+afterwards more easily (but you can also override the "format" and
+"language" settings directly when calling the "number()" or "string()"
+method).
+
+The methods
+
+        date()
+        time()
+        datetime()
+        year()
+        month()
+        day()
+        hours()
+        minutes()
+        seconds()
+
+always return the new values when the corresponding values have
+been changed.
+
+The method "date()" NEVER returns the time values (hours, minutes,
+seconds) even if they have just been set using this method (which
+the method optionally allows). Otherwise it would be very hard to
+predict the exact number of values it returns, which might lead
+to errors (wrong number of parameters) elsewhere in your program.
+
+The method "datetime()" ALWAYS returns the time values (hours,
+minutes, seconds) even if the object in question lacks a time
+part. In that case, zeros are returned for hours, minutes and
+seconds instead (but the stored time part is left unchanged,
+whether it exists or not).
+
+If you do not provide values for hours, minutes and seconds when
+using the method "date()" to set the values for year, month and
+day, the time part will not be changed (whether it exists or not).
+
+If you do not provide values for hours, minutes and seconds when
+using the method "datetime()" to set the values for year, month
+and day, the time part will be filled with zeros (the time part
+will be created if necessary).
+
+If the object is short, i.e., if it does not have any time values,
+the method "time()" returns an empty list.
+
+If the object is short and the methods "hours()", "minutes()" or
+"seconds()" are used to set any of these time values, the object
+is automatically promoted to the "long" form, and the other two
+time values are filled with zeros.
+
+The following methods can also return "undef" under certain
+circumstances:
+
+        delta_format()
+        date_format()
+        language()
+        is_delta()
+        is_date()
+        is_short()
+        is_long()
+        is_valid()
+        hours()
+        minutes()
+        seconds()
+        number()
+        string()
+
+The methods "delta_format()", "date_format()" and "language()"
+return "undef" when they are called as object methods and no
+individual override has been defined for the object in question.
+
+The "is_*()" predicate methods return "undef" if the object in
+question does not have the expected internal structure. This can
+happen for instance when you create an empty object with "new()".
+
+When called without parameters, the methods "hours()", "minutes()"
+and "seconds()" return "undef" if the object in question does not
+have a time part.
+
+The methods "number()" and "string()" return "undef" if the object
+in question is not valid (i.e., if "is_valid()" returns "undef" or
+false).
+
+And finally, the methods
+
+        copy()
+        today()
+        now()
+        today_and_now()
+        gmtime()
+        localtime()
+        tzoffset()
+        time2date()
+        normalize()
+
+return the object reference of the (target) object in question
+for convenience.
+
+=item *
+
+Import/Export
+
+Note that you can import and export Unix "time" values using the
+methods "gmtime()", "localtime()", "mktime()", "date2time()" and
+"time2date()", both as local time or as UTC/GMT.
+
+=item *
+
+Accurate Mode
+
+The method "accurate_mode()" controls the internal flag which
+determines which of two modes of operation is used.
+
+When set to true (the default at startup), delta vectors are
+calculated to give the exact difference in days between two
+dates. The "year" and "month" entries in the resulting delta
+vector are always zero in that case.
+
+If "accurate mode" is switched off (when the corresponding
+flag is set to false), delta vectors are calculated with
+year and month differences.
+
+E.g., the difference between C<[1999,12,6]> and C<[2000,6,24]>
+is C<[+0 +0 +201]> (plus 201 days) in accurate mode and
+C<[+1 -6 +18]> (plus one year, minus 6 months, plus 18 days)
+when accurate mode is switched off.
+
+(The delta vector is calculated by simply taking the difference
+in years, the difference in months and the difference in days.)
+
+Because years and months have varying lengths in terms of days,
+the latter is less accurate than the former because it depends
+on the context of the two dates of which it represents the
+difference. Added to a different date, the latter delta vector
+may yield a different offset in terms of days.
+
+Beware also that - for the same reason - the absolute value
+("C<abs()>") of a delta vector returns a fictitious number
+of days if the delta vector contains non-zero values for
+"year" and/or "month" (see also next section below for
+more details).
+
+Example:
+
+The difference between C<[2000,1,1]> and C<[2000,3,1]> is
+C<[+0 +0 +60]> in accurate mode and C<[+0 +2 +0]> else (one
+could also call this "year-month-day mode" or "YMD mode" for
+short).
+
+When added to the date C<[2000,4,1]>, the "accurate" delta
+vector yields the date C<[2000,5,31]>, whereas the other delta
+vector yields the date C<[2000,6,1]>.
+
+Moreover, when added to the date C<[1999,1,1]>, the "accurate"
+delta vector yields the date C<[1999,3,2]>, whereas the "inaccurate"
+delta vector yields the date C<[1999,3,1]>.
+
+Depending on what you want, the one or the other mode may suit
+you better.
+
+=item *
+
+Absolute Value
+
+Note that "C<abs($date)>" and "C<abs($delta)>" are just shorthands
+for "C<$date-E<gt>number()>" and "C<$delta-E<gt>number()>".
+
+The operator "C<abs()>", when applied to a date or delta vector,
+returns the corresponding number of days (see below for an exception
+to this), with the time part (if available) represented by a fraction
+after the decimal point.
+
+In the case of dates, the absolute value (to the left of the
+decimal point) is the number of days since the 1st of January
+S<1 A.D.> (by extrapolating the Gregorian calendar back beyond
+its "natural" limit of 1582 A.D.) B<PLUS ONE>.
+
+(I.e., the absolute value of the 1st of January 1 A.D. is 1.)
+
+Exception:
+
+If the "NUMBER" or "number_format()" is set to 0 (the default
+setting), the absolute value of a date to the left of the decimal
+point is "yyyymmdd", i.e., the number in which the uppermost four
+digits correspond to the year, the next lower two digits to the
+month and the lowermost two digits to the day.
+
+In the case of delta vectors, the absolute value (to the left
+of the decimal point) is simply the difference in days (but
+see also below).
+
+Note that the absolute value of a delta vector can be negative!
+
+If you want a positive value in all cases, apply the "C<abs()>"
+operator again, i.e., "C<$posdiff = abs(abs($delta));>".
+
+If the delta vector contains non-zero values for "year" and/or
+"month" (see also the discussion of "Accurate Mode" in the section
+above), an exact representation in days cannot be calculated,
+because years and months do not have fixed equivalents in days.
+
+If nevertheless you attempt to calculate the absolute value of
+such a delta vector, a fictitious value is returned, which is
+calculated by simply multiplying the year difference with 12,
+adding the month difference, multiplying this sum with 31 and
+finally adding the day difference.
+
+Beware that because of this, the absolute values of delta
+vectors are not necessarily contiguous.
+
+Moreover, since there is more than one way to express the
+difference between two dates, comparisons of delta vectors
+may not always yield the expected result.
+
+Example:
+
+The difference between the two dates C<[2000,4,30]> and
+C<[2001,5,1]> can be expressed as C<[+1 +1 -29]>, or as
+C<[+1 +0 +1]>.
+
+The first delta vector has an absolute value of 374,
+whereas the latter delta vector has an absolute value
+of only 373 (while the true difference in days between
+the two dates is 366).
+
+If the date or delta vector has a time part, the time is returned
+as a fraction of a full day after the decimal point as follows:
+
+If the "NUMBER" or "number_format()" is set to 0 (the default
+setting) or 1, this fraction is simply ".hhmmss", i.e., the
+two digits after the decimal point represent the hours, the
+next two digits the minutes and the last two digits the seconds.
+
+Note that you cannot simply add and subtract these values to
+yield meaningful dates or deltas again, you can only use them
+for comparisons (equal, not equal, less than, greater than,
+etc.). If you want to add/subtract, read on:
+
+Only when the "NUMBER" or "number_format()" is set to 2, this
+fraction will be the equivalent number of seconds (i.e.,
+C<(((hours * 60) + minutes) * 60) + seconds>) divided by the
+number of seconds in a full day (i.e., C<24*60*60 = 86400>),
+or C<0/86400>, C<1/86400>, ... , C<86399/86400>.
+
+In other words, the (mathematically correct) fraction of a day.
+
+You can safely perform arithmetics with these values as far
+as the internal precision of your vendor's implementation
+of the C run-time library (on which Perl depends) will permit.
+
+=item *
+
+Renormalizing Delta Vectors
+
+When adding or subtracting delta vectors to/from one another,
+the addition or subtraction takes place component by component.
+
+Example:
+
+  [+0 +0 +0 +3 +29 +50] + [+0 +0 +0 +0 +55 +5] = [+0 +0 +0 +3 +84 +55]
+  [+0 +0 +0 +3 +29 +50] - [+0 +0 +0 +0 +55 +5] = [+0 +0 +0 +3 -26 +45]
+
+This may result in time values outside the usual ranges (C<[-23..+23]>
+for hours and C<[-59..+59]> for minutes and seconds).
+
+Note that even though the delta value for days will often become quite large,
+it is impossible to renormalize this value because there is no constant
+conversion factor from days to months (should it be 28, 29, 30 or 31?).
+
+If accurate mode (see further above for what that is) is switched off,
+delta vectors can also contain non-zero values for years and months. If
+you add or subtract these, the value for months can lie outside the
+range C<[-11..11]>, which isn't wrong, but may seem funny.
+
+Therefore, the "normalize()" method will also renormalize the "months"
+value, if and only if accurate mode has been switched off. (!)
+
+(Hence, switch accurate mode B<ON> temporarily if you B<DON'T> want
+the renormalization of the "months" value to happen.)
+
+If you want to force the time values from the example above back into
+their proper ranges, use the "normalize()" method as follows:
+
+  print "[$delta]\n";
+  $delta->normalize();
+  print "[$delta]\n";
+
+This will print
+
+  [+0 +0 +0 +3 +84 +55]
+  [+0 +0 +0 +4 +24 +55]
+
+for the first and
+
+  [+0 +0 +0 +3 -26 +45]
+  [+0 +0 +0 +2 +34 +45]
+
+for the second delta vector from the example further above.
+
+Note that the values for days, hours, minutes and seconds are
+guaranteed to have the same sign after the renormalization.
+
+Under "normal" circumstances, i.e., when accurate mode is on (the
+default), this method only has an effect on the time part of the
+delta vector.
+
+If the delta vector in question does not have a time part, nothing
+is done.
+
+If accurate mode is off, the "months" value is also normalized,
+i.e., if it lies outside of the range C<[-11..11]>, integer
+multiples of 12 are added to the "years" value and subtracted
+from the "months" value. Moreover, the "months" value is
+guaranteed to have the same sign as the values for days,
+hours, minutes and seconds, unless the "months" value is zero
+or the values for days, hours, minutes and seconds are all zero.
+
+If the object in question is a date and if warnings are enabled,
+the message "normalizing a date is a no-op" will be printed to
+STDERR.
+
+If the object in question is not a valid "Date::Calc" object,
+nothing is done.
+
+The method returns its object's reference, which allows chaining
+of method calls, as in the following example:
+
+  @time = $delta->normalize()->time();
+
+=item *
+
+Callback Functions
+
+Note that you are not restricted to the built-in formats
+(numbered from 0 to 2 for "number_format()" and "number()"
+and from 0 to 3 for "delta_format()", "date_format()" and
+"string()") for converting a date or delta object into a
+number or string.
+
+You can also provide your own function(s) for doing so, in
+order to suit your own taste or needs, by passing a subroutine
+reference to the appropriate method, i.e., "number_format()",
+"number()", "delta_format()", "date_format()" and "string()".
+
+You can pass a handler to only one or more of these methods,
+or to all of them, as you like. You can use different callback
+functions, or the same for all.
+
+In order to facilitate the latter, and in order to make the
+decoding of the various cases easier for you, the callback
+function receives a uniquely identifying function code as
+its second parameter:
+
+  0  =  TO_NUMBER | IS_DATE  | IS_SHORT  (number[_format])
+  1  =  TO_NUMBER | IS_DATE  | IS_LONG   (number[_format])
+  2  =  TO_NUMBER | IS_DELTA | IS_SHORT  (number[_format])
+  3  =  TO_NUMBER | IS_DELTA | IS_LONG   (number[_format])
+  4  =  TO_STRING | IS_DATE  | IS_SHORT  (string|date_format)
+  5  =  TO_STRING | IS_DATE  | IS_LONG   (string|date_format)
+  6  =  TO_STRING | IS_DELTA | IS_SHORT  (string|delta_format)
+  7  =  TO_STRING | IS_DELTA | IS_LONG   (string|delta_format)
+
+The first parameter of the callback function is of course the
+handle of the object in question itself (therefore, the callback
+function can actually be an object method - but not a class method,
+for obvious reasons).
+
+The handler should return the resulting number or string, as
+requested.
+
+BEWARE that you should NEVER rely upon any knowledge of the
+object's internal structure, as this may be subject to change!
+
+ALWAYS use the test and access methods provided by this module!
+
+Example:
+
+  sub handler
+  {
+      my($self,$code) = @_;
+
+      if    ($code == 0) # TO_NUMBER | IS_DATE  | IS_SHORT
+      {
+          return Date_to_Days( $self->date() );
+      }
+      elsif ($code == 1) # TO_NUMBER | IS_DATE  | IS_LONG
+      {
+          return Date_to_Days( $self->date() ) +
+                           ( ( $self->hours() * 60 +
+                               $self->minutes() ) * 60 +
+                               $self->seconds() ) / 86400;
+      }
+      elsif ($code == 2) # TO_NUMBER | IS_DELTA | IS_SHORT
+      {
+          return ( $self->year() * 12 +
+                   $self->month() ) * 31 +
+                   $self->day();
+      }
+      elsif ($code == 3) # TO_NUMBER | IS_DELTA | IS_LONG
+      {
+          return ( $self->year() * 12 +
+                   $self->month() ) * 31 +
+                   $self->day() +
+               ( ( $self->hours() * 60 +
+                   $self->minutes() ) * 60 +
+                   $self->seconds() ) / 86400;
+      }
+      elsif ($code == 4) # TO_STRING | IS_DATE  | IS_SHORT
+      {
+          return join( "/", $self->date() );
+      }
+      elsif ($code == 5) # TO_STRING | IS_DATE  | IS_LONG
+      {
+          return join( "/", $self->date() ) . " " .
+                 join( ":", $self->time() );
+      }
+      elsif ($code == 6) # TO_STRING | IS_DELTA | IS_SHORT
+      {
+          return join( "|", $self->date() );
+      }
+      elsif ($code == 7) # TO_STRING | IS_DELTA | IS_LONG
+      {
+          return join( "|", $self->datetime() );
+      }
+      else
+      {
+          die "internal error";
+      }
+  }
+
+  Date::Calc->number_format(\&handler);
+  Date::Calc->delta_format(\&handler);
+  Date::Calc->date_format(\&handler);
+
+This sets our handler to take care of all automatic conversions,
+such as needed when comparing dates or when interpolating a string
+in double quotes which contains a date object.
+
+To deactivate a handler, simply pass a valid format number to the
+method in question, e.g.:
+
+  Date::Calc->number_format(0);
+  Date::Calc->delta_format(2);
+  Date::Calc->date_format(3);
+
+When calling the "number()" or "string()" method explicitly, you can
+pass a different format number (than the global setting), like this:
+
+  $number = $date->number(2);
+  $string = $date->string(1);
+
+You can also pass a handler's reference, like so:
+
+  $number = $date->number(\&handler);
+  $string = $date->string(\&handler);
+
+This overrides the global setting for the duration of the call of
+"number()" or "string()" (but doesn't change the global setting
+itself).
+
+Moreover, you can also define individual overrides for the date and
+the delta vector formats (but not the number format) for individual
+objects, e.g.:
+
+  $date->delta_format(1);
+  $date->date_format(2);
+
+  $date->delta_format(\&handler);
+  $date->date_format(\&handler);
+
+In order to deactivate an individual handler for an object, and/or
+in order to deactivate any override altogether (so that the global
+settings apply again), you have to pass "undef" explicitly to the
+method in question:
+
+  $date->delta_format(undef);
+  $date->date_format(undef);
+
+You can also define a language for individual objects (see the
+next section immediately below for more details).
+
+If such an individual language override has been set, and if your
+callback handlers only use the "*_to_Text*" functions from the
+"Date::Calc" module to produce any text, the text produced will
+automatically be in the desired language.
+
+This is because the language is set to the value determined by
+the individual override before the callback handler is executed,
+and reset to its previous value afterwards.
+
+=item *
+
+Languages
+
+Note that this module is completely transparent to the setting
+of a language in "Date::Calc". This means that you can choose a
+language in "Date::Calc" (with the "Language()" function) and all
+dates subsequently printed by this module will automatically be
+in that language - provided that you use the built-in formats of
+this module, or that you use the "*to_Text*" functions from the
+"Date::Calc" module in your formatting handler (callback function).
+
+However, this global language setting can be overridden for
+individual date (or delta) objects by using the B<OBJECT> method
+
+    $oldlang = $date->language($newlang);
+
+(The global setting is not altered by this in any way.)
+
+In order to deactivate such an individual language setting
+(so that the global setting applies again), simply pass the
+value "undef" explicitly to the "language()" object method:
+
+  $date->language(undef);
+
+The B<CLASS> method
+
+    $oldlang = Date::Calc->language($newlang);
+
+is just a convenient wrapper around the "Language()" function,
+which allows you to enter language numbers (as returned by the
+"Decode_Language()" function) or strings (as returned by the
+"Language_to_Text()" function), at your option.
+
+The "language()" method (both class and object) always returns
+the B<NAME> (one of "C<Language_to_Text(1..Languages())>") of
+the current setting (and never its number).
+
+=item *
+
+Exported Functions
+
+The "Date::Calc::Object" package imports ":all" functions exported
+by the "Date::Calc" module and re-exports them, for conveniency.
+
+This allows you to write
+
+  use Date::Calc::Object qw(...);
+
+instead of
+
+  use Date::Calc qw(...);
+
+but with exactly the same semantics. The difference is that
+the object-oriented frontend is loaded additionally in the
+first case.
+
+As with "Date::Calc" you can use the ":all" tag to import all
+of "Date::Calc"'s functions:
+
+  use Date::Calc::Object qw(:all);
+
+In addition to the functions exported by "Date::Calc", the
+"Date::Calc::Object" package offers some utility functions
+of its own for export:
+
+    $year                          = shift_year(\@_);
+    ($year,$mm,$dd)                = shift_date(\@_);
+    ($hrs,$min,$sec)               = shift_time(\@_);
+    ($year,$mm,$dd,$hrs,$min,$sec) = shift_datetime(\@_);
+
+These functions enable your subroutines or methods to accept
+a "Date::Calc" (or subclass) date object, an (anonymous) array
+or a list (containing the necessary values) as parameters
+B<INTERCHANGEABLY>.
+
+You can import all of these auxiliary functions by using an
+":aux" tag:
+
+  use Date::Calc::Object qw(:aux);
+
+If you want to import both all of the "Date::Calc" functions
+as well as all these auxiliary functions, use the ":ALL" tag:
+
+  use Date::Calc::Object qw(:ALL);
+
+=item *
+
+Subclassing
+
+In case you want to subclass "Date::Calc" objects and to add
+new attributes of your own, it is recommended that you proceed
+as follows (the following will be considered as a part of the
+module's "contract of use" - which might be subject to change
+in the future, however):
+
+Define a constant for the index of each attribute you want to
+add, currently starting no lower than "4", at the top of your
+subclass:
+
+    use constant ATTRIB1 => 4;
+    use constant ATTRIB2 => 5;
+    use constant ATTRIB3 => 6;
+    ...
+
+It is recommended that you use constants (which are easy to
+change), because I someday might want to require the element
+with index "4" for a new attribute of my own... C<:-)>
+
+Then access your attributes like so (e.g. after calling
+"C<$self = SUPER-E<gt>new();>" in your constructor method):
+
+    $self->[0][ATTRIB1] = 'value1';
+    $self->[0][ATTRIB2] = 'value2';
+    $self->[0][ATTRIB3] = 'value3';
+    ...
+
+Beware that if you put anything other than numbers or strings
+into your attributes, the methods "clone()" and "copy()" might
+not work as expected anymore!
+
+Especially if your attributes contain references to other data
+structures, only the references will be copied, but not the data
+structures themselves.
+
+This may not be what you want.
+
+(You will have to override these two methods and write some
+of your own if not.)
+
+In order for the overloaded operators and the "shift_*()"
+auxiliary functions from the "Date::Calc::Object" package
+to work properly (the latter of which are heavily used in
+the "Date::Calendar[::Year]" modules, for instance), the
+package name of your subclass (= the one your objects will
+be blessed into) is B<REQUIRED> to contain a "::".
+
+Note that you should B<ONLY> subclass "Date::Calc", B<NEVER>
+"Date::Calc::Object", since subclassing the latter is less
+efficient (because "Date::Calc::Object" is just an empty class
+which inherits from "Date::Calc" - subclassing "Date::Calc::Object"
+would thus just introduce an additional name space layer to search
+during Perl's runtime method binding process).
+
+If you give your subclass a package name below/inside the
+"Date::" namespace, you will also benefit from the fact that
+all error messages produced by the "Date::Calc[::Object]" module
+(and also the "Date::Calendar[::Year]" modules, by the way)
+will appear to have originated from the place outside of all
+"C</^Date::/>" modules (including yours) where one of the "Date::"
+modules was first called - i.e., all errors are always blamed
+on the user, no matter how deeply nested inside the "Date::"
+modules they occur, and do not usually refer to places inside
+any of the "Date::" modules (this assumes that there are no
+bugs in the "Date::" modules, and that all errors are always
+the user's fault C<:-)>).
+
+Moreover, your module's own error messages will behave in the
+same way if you "C<use Carp::Clan qw(^Date::);>" at the top of
+your module and if you produce all error messages using "carp()"
+and "croak()" (instead of "warn()" and "die()", respectively).
+
+=back
+
+=head1 EXAMPLES
+
+=over 3
+
+=item 1)
+
+  # Switch to summer time:
+  $now = Date::Calc->now();
+  if (($now ge [2000,3,26,2,0,0]) and
+      ($now lt [2000,3,26,3,0,0]))
+  {
+      $now += [0,0,0,1,0,0];
+  }
+
+=item 2)
+
+  use Date::Calc::Object qw(:all);
+
+  Date::Calc->date_format(3);
+
+  $date = 0;
+  while (!$date)
+  {
+      print "Please enter the date of your birthday (day-month-year): ";
+      $date = Date::Calc->new( Decode_Date_EU( scalar(<STDIN>) ) );
+      if ($date)
+      {
+          $resp = 0;
+          while ($resp !~ /^\s*[YyNn]/)
+          {
+              print "Your birthday is: $date\n";
+              print "Is that correct? (yes/no) ";
+              $resp = <STDIN>;
+          }
+          $date = 0 unless ($resp =~ /^\s*[Yy]/)
+      }
+      else
+      {
+          print "Unable to parse your birthday. Please try again.\n";
+      }
+  }
+
+  if ($date + [18,0,0] <= [Today()])
+      { print "Ok, you are over 18.\n"; }
+  else
+      { print "Sorry, you are under 18!\n"; }
+
+=back
+
+For more examples, see the "examples" subdirectory in this distribution,
+and their descriptions in the file "EXAMPLES.txt".
+
+=head1 SEE ALSO
+
+Date::Calc(3), Date::Calendar(3),
+Date::Calendar::Year(3), Date::Calendar::Profiles(3).
+
+=head1 VERSION
+
+This man page documents "Date::Calc::Object" version 5.3.
+
+=head1 AUTHOR
+
+  Steffen Beyer
+  mailto:sb@engelschall.com
+  http://www.engelschall.com/u/sb/download/
+
+=head1 COPYRIGHT
+
+Copyright (c) 2000 - 2002 by Steffen Beyer. All rights reserved.
+
+=head1 LICENSE
+
+This package is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself, i.e., under the
+terms of the "Artistic License" or the "GNU General Public License".
+
+Please refer to the files "Artistic.txt" and "GNU_GPL.txt"
+in this distribution for details!
+
+=head1 DISCLAIMER
+
+This package is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+See the "GNU General Public License" for more details.
+

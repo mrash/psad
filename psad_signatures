@@ -64,8 +64,8 @@ psad:0022; tcp; any -> 53; msg: "DNS tcp probe"; flags: SF; dlevel: 2;
 ### oddball scans OS fingerprinting, SYN-FIN, etc...
 psad:0023; tcp; any -> any; msg: "Possible NMAP Fingerprint attempt"; flags: UPSF; dlevel: 2;
 psad:0024; tcp; any -> any; msg: "IDS005 - SCAN-Possible NMAP Fingerprint attempt"; flags: UPSF; dlevel: 2;
-psad:0025; tcp; any -> any; msg: "SCAN-SYN FIN"; flags:SF; dlevel: 2;
-psad:0026; tcp; any -> any; msg: "SCAN-NULL"; flags:N; dlevel: 2;
+psad:0025; tcp; any -> any; msg: "SCAN-SYN FIN"; flags: SF; dlevel: 2;
+psad:0026; tcp; any -> any; msg: "SCAN-NULL"; flags: N; dlevel: 2;
 psad:0027; tcp; any -> any; msg: "NMAP XMAS scan"; flags: UPF; dlevel: 2;
 psad:0028; tcp; any -> any; msg: "IDS027 - SCAN-FIN"; flags: F; dlevel: 2;
 # tcp any -> any msg:"IDS236 - SCAN-IP Eye SYN Scan"; flags: S; seq: 1958810375; dlevel: 1; 

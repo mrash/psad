@@ -624,7 +624,7 @@ for (;;) {
     if ($hup_flag) {
         $hup_flag = 0;  ### clear the HUP flag
 
-        &Psad::psyslog('psad', '.. Received HUP signal, ' .
+        &Psad::psyslog('psad', '.. received HUP signal, ' .
             're-importing psad.conf');
 
         my $orig_fwdata = $config{'FW_DATA_FILE'};
@@ -650,7 +650,7 @@ for (;;) {
     if ($usr1_flag) {
         $usr1_flag = 0;  ### clear the USR1 flag
 
-        &Psad::psyslog('psad', '.. Received USR1 signal, printing scan hashes ' .
+        &Psad::psyslog('psad', '.. received USR1 signal, printing scan hashes ' .
             "to $config{'PSAD_DIR'}/scan_hash.$$");
         &print_scan();
     }
@@ -1282,7 +1282,7 @@ sub dshield_email_log() {
             close MAIL;
         }
 
-        &Psad::psyslog('psad', ".. Sent $#dshield_data lines of log data to " .
+        &Psad::psyslog('psad', ".. sent $#dshield_data lines of log data to " .
             $config{'DSHIELD_ALERT_EMAIL'});
 
         ### store the current time
@@ -1540,7 +1540,7 @@ sub import_snort_rules() {
         }
     }
     print Dumper %snort_msgs if $debug;
-    &Psad::psyslog('psad', '.. Imported Snort-2.0 signatures');
+    &Psad::psyslog('psad', '.. imported Snort-2.0 signatures');
     return;
 }
 
@@ -1636,7 +1636,7 @@ sub import_signatures() {
         print STDOUT Dumper " ** signature attributes hash:\n";
         print STDOUT Dumper %sigs_attr;
     }
-    &Psad::psyslog('psad', '.. Imported psad-1.2 signatures');
+    &Psad::psyslog('psad', '.. imported psad-1.2 signatures');
     return;
 }
 
@@ -1761,7 +1761,7 @@ sub import_auto_ips() {
                 $cmds{'mail'});
         }
     }
-    &Psad::psyslog('psad', '.. Imported psad_auto_ips');
+    &Psad::psyslog('psad', '.. imported psad_auto_ips');
     return;
 }
 
@@ -1842,7 +1842,7 @@ sub import_posf_sigs() {
     }
     print Dumper %posf_sigs if $debug;
     &Psad::psyslog('psad',
-        '.. Imported passive OS fingerprinting signatures');
+        '.. imported passive OS fingerprinting signatures');
     return;
 }
 
@@ -2655,7 +2655,7 @@ sub ipt_remove_block() {
     if ($rm_block) {
         &rm_blocked_ip($src, $config{'AUTO_BLOCK_IPT_FILE'});
     } else {
-        &Psad::psyslog('psad', "** Could not locate iptables block rule for $src.")
+        &Psad::psyslog('psad', "** could not locate iptables block rule for $src.")
             if $flush_fw;
     }
     return $rm_block;
@@ -2712,7 +2712,7 @@ sub ipch_remove_block() {
     if ($rm_block) {
         &rm_blocked_ip($src, $config{'AUTO_BLOCK_IPCH_FILE'});
     } else {
-        &Psad::psyslog('psad', "** Could not locate ipchains block rule for $src.")
+        &Psad::psyslog('psad', "** could not locate ipchains block rule for $src.")
             if $flush_fw;
     }
     return $rm_block;
@@ -2774,7 +2774,7 @@ sub auto_psad_response() {
         ### make sure we are not attempting to block 0.0.0.0
         ### or 127.0.0.1 or any of the interface ips.
         if (&auto_block_ignore_ip($src)) {
-            &Psad::psyslog('psad', "Ignoring $src ip for auto block");
+            &Psad::psyslog('psad', ".. ignoring $src ip for auto block");
             next;
         }
 
@@ -3047,7 +3047,7 @@ sub file_permissions() {
 sub stop_psad() {
     my $rv = 0;
 
-    &Psad::psyslog('psad', '.. Shutting down psad daemons.');
+    &Psad::psyslog('psad', '.. shutting down psad daemons.');
     ### must kill psadwatchd first since if not, it might try to restart
     ### any of the other three daemons.
     for my $pidname qw(psadwatchd kmsgsd psad) {
@@ -3613,29 +3613,34 @@ sub setup() {
             && '/usr/bin/whois.psad' ne $cmds{'whois'}) {
         move '/usr/bin/whois.psad', $cmds{'whois'};
     }
-    unless (-e '/etc/syslog.conf.orig') {
-        copy('/etc/syslog.conf', '/etc/syslog.conf.orig');
-    }
+
+    die ' ** No system logger config file could be found.'
+        unless (-e '/etc/syslog.conf' or -e '/etc/syslog-ng/syslog-ng.conf');
+
     ### look for psadfifo in some system logger config file
-    ### (syslog, syslog-ng, etc.).
-    my $found_logger = 0;
+    ### (syslog, syslog-ng, etc.) and attempt to correct if not
+    ### found.
     if (-e '/etc/syslog.conf') {
+        unless (-e '/etc/syslog.conf.orig') {
+            copy '/etc/syslog.conf', '/etc/syslog.conf.orig';
+        }
         open RS, '< /etc/syslog.conf' or
             die " ** Unable to open /etc/syslog.conf: $!";
         my @lines = <RS>;
         close RS;
         my $found = 0;
         for my $line (@lines) {
-            if ($line =~ m/|\s*$config{'PSAD_FIFO'}/) {
+            if ($line =~ m/\|\s*$config{'PSAD_FIFO'}/) {
                 $found = 1;
-                $found_logger = 1;
+                last;
             }
         }
         unless ($found) {
             open SYSLOG, '> /etc/syslog.conf' or
                 die " ** Unable to open /etc/syslog.conf: $!";
+            ### this loop removes any old location for psadfifo
             for my $line (@lines) {
-                unless ($line =~ /psadfifo/) {
+                unless ($line =~ /psadfifo/i) {
                     print SYSLOG $line;
                 }
             }
@@ -3644,10 +3649,16 @@ sub setup() {
                 "analysis by kmsgsd\n";
             print SYSLOG "kern.info\t\t|$config{'PSAD_FIFO'}\n";
             close SYSLOG;
+            &Psad::psyslog('psad', '.. reconfiguring syslogd to write ' .
+                "kern.info messages to $config{'PSAD_FIFO'}");
             system "$cmds{'killall'} -HUP $cmds{'syslogd'}";
         }
     }
     if (-e '/etc/syslog-ng/syslog-ng.conf') {
+        unless (-e '/etc/syslog-ng/syslog-ng.conf.orig') {
+            copy '/etc/syslog-ng/syslog-ng.conf',
+                '/etc/syslog-ng/syslog-ng.conf.orig';
+        }
         open RS, '< /etc/syslog-ng/syslog-ng.conf' or
             die " ** Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
         my @lines = <RS>;
@@ -3655,14 +3666,20 @@ sub setup() {
 
         my $found = 0;
         for my $line (@lines) {
-            if ($line =~ m/|\s*$config{'PSAD_FIFO'}/) {
+            if ($line =~ m/$config{'PSAD_FIFO'}/) {
                 $found = 1;
-                $found_logger = 1;
+                last;
             }
         }
         unless ($found) {
-            open SYSLOGNG, '>> /etc/syslog-ng/syslog-ng.conf' or
-                die " ** Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
+            open SYSLOGNG, '> /etc/syslog-ng/syslog-ng.conf' or
+                die " ** Unable to open /etc/syslog-ng/syslog-ng.conf: $!";
+            ### this loop removes any old location for psadfifo
+            for my $line (@lines) {
+                unless ($line =~ /psadfifo/i) {
+                    print SYSLOGNG $line;
+                }
+            }
             print SYSLOGNG "\n";
             print SYSLOGNG 'destination psadpipe { pipe(',
                 "\"$config{'PSAD_FIFO'}\"); };\n";
@@ -3671,13 +3688,12 @@ sub setup() {
             print SYSLOGNG 'log { source(src); ',
                 "filter(f_kerninfo); destination(psadpipe); };\n";
             close SYSLOGNG;
+            &Psad::psyslog('psad', '.. reconfiguring syslog-ng to write ' .
+                "kern.info messages to $config{'PSAD_FIFO'}");
             system "$cmds{'killall'} -HUP syslog-ng";
         }
     }
-    unless ($found_logger) {
-        die " ** Could not find $config{'PSAD_FIFO'} in any system logger ",
-            "config file.  Exiting.";
-    }
+
     ### make sure the permissions on these files is 0600
     &file_permissions($config{'FW_DATA_FILE'});
     &file_permissions($config{'FW_ERROR_LOG'});
@@ -3903,13 +3919,13 @@ sub disk_space_exceeded() {
             $prcnt > $config{'DISK_MAX_PERCENTAGE'}) {  ### need to remove data
         $rv = 1;
         $rm_data_ctr++;
-        &Psad::psyslog('psad', ".. Disk partition associated with " .
+        &Psad::psyslog('psad', ".. disk partition associated with " .
             "$config{'PSAD_DIR'} exceeded " .
             "$config{'DISK_MAX_PERCENTAGE'} prct utilization.");
         &Psad::sendmail(" ** psad: Exceeded max disk utilization for " .
             "$config{'PSAD_DIR'} on $config{'HOSTNAME'}", '',
             $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
-        &Psad::psyslog('psad', ".. Removing data in $config{'PSAD_DIR'}");
+        &Psad::psyslog('psad', ".. removing data in $config{'PSAD_DIR'}");
         if (-e "$config{'SCAN_DATA_ARCHIVE_DIR'}/fwdata_archive") {
             open F, "> $config{'SCAN_DATA_ARCHIVE_DIR'}/fwdata_archive"
                 or die " ** Could not truncate ",
@@ -3935,7 +3951,7 @@ sub disk_space_exceeded() {
             }
         }
         if ($rm_data_ctr > $config{'DISK_MAX_RM_RETRIES'}) {
-            &Psad::psyslog('psad', "** Could not sufficiently reduce disk " .
+            &Psad::psyslog('psad', "** could not sufficiently reduce disk " .
                 "utilization in $config{'PSAD_DIR'} partition.  " .
                 "Stopping psad!");
             &Psad::sendmail(" ** psad: Could not reduce disk utilization on " .

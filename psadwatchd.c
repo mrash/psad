@@ -308,7 +308,7 @@ static void give_up(const char *pid_name)
 #ifdef DEBUG
     fprintf(stderr, "[*] Could not restart %s process.  Exiting.\n", pid_name);
 #endif
-    strlcat(mail_str, " -s \"** psadwatchd: Could not restart ", MAX_MSG_LEN);
+    strlcat(mail_str, " -s \"[*] psadwatchd: Could not restart ", MAX_MSG_LEN);
     strlcat(mail_str, pid_name, MAX_MSG_LEN);
     strlcat(mail_str, " on ", MAX_MSG_LEN);
     strlcat(mail_str, hostname, MAX_MSG_LEN);

@@ -69,7 +69,7 @@ sub chain_action_rules() {
         $rule_ctr++;
         chomp $line;
 
-        last if ($found_chain and $line =~ /^\s*Chain\s+/);
+        last LINE if ($found_chain and $line =~ /^\s*Chain\s+/);
         ### ACCEPT tcp  -- 164.109.8.0/24  0.0.0.0/0  tcp dpt:22 flags:0x16/0x02
         ### ACCEPT tcp  -- 216.109.125.67  0.0.0.0/0  tcp dpts:7000:7500
         ### ACCEPT udp  -- 0.0.0.0/0       0.0.0.0/0  udp dpts:7000:7500
@@ -81,12 +81,12 @@ sub chain_action_rules() {
         ### LOG  all  --  0.0.0.0/0  0.0.0.0/0  LOG flags 0 level 4 prefix `DROP '
         ### LOG  all  --  127.0.0.2  0.0.0.0/0  LOG flags 0 level 4
 
-        if ($line =~ /^\s*Chain\s+$chain\s+\(policy\s+(\w+)\)/i) {
+        if ($line =~ /^\s*Chain\s+$chain\s+\(/i) {
             $found_chain = 1;
             next LINE;
         }
         next LINE if $line =~ /^\s*target\s/i;
-        next unless $found_chain;
+        next LINE unless $found_chain;
         if ($line =~ m|^\s*(\S+)\s+(\S+)\s+\-\-\s+(\S+)\s+(\S+)\s*(.*)|) {
             my $target = $1;
             my $proto  = $2;
@@ -158,7 +158,7 @@ sub default_drop() {
             $found_chain = 1;
         }
         next unless $found_chain;
-        if ($line =~ m|^LOG\s+(\w+)\s+\-\-\s+
+        if ($line =~ m|^\s*LOG\s+(\w+)\s+\-\-\s+
             $any_ip_re\s+$any_ip_re\s+(.*)|x) {
             my $proto  = $1;
             my $p_tmp  = $2;

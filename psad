@@ -1577,13 +1577,20 @@ sub psad_setup() {
     unless (-e $Config{'PSAD_FIFO'}) {
         system "$Cmds{'mknod'} -m 600 $Config{'PSAD_FIFO'} p";
     }
-    unless (`$Cmds{'grep'} psadfifo /etc/syslog.conf`) {
-        copy("/etc/syslog.conf", "/etc/syslog.conf.orig") unless (-e "/etc/syslog.conf.orig");
-        open SYSLOG, ">> /etc/syslog.conf" or die "@@@@@  Unable to open /etc/syslog.conf: $!";
-        print SYSLOG "kern.info		|/var/log/psadfifo\n\n";  #reinstate kernel logging to our named pipe
-        close SYSLOG;
-        system "$Cmds{'killall'} -HUP $Cmds{'syslogd'}";
+    copy("/etc/syslog.conf", "/etc/syslog.conf.orig") unless (-e "/etc/syslog.conf.orig");
+    open RS, "< /etc/syslog.conf" or die "@@@@@  Unable to open /etc/syslog.conf: $!";
+    my @slines = <RS>;
+    close RS;
+    open SYSLOG, "> /etc/syslog.conf" or die "@@@@@  Unable to open /etc/syslog.conf: $!";
+    for my $l (@slines) {
+        chomp $l;
+        unless ($l =~ /psadfifo/) {
+            print SYSLOG "$l\n";
+        }
     }
+    print SYSLOG "kern.info		|$Config{'PSAD_FIFO'}\n\n";  ### reinstate kernel logging to our named pipe
+    close SYSLOG;
+    system "$Cmds{'killall'} -HUP $Cmds{'syslogd'}";
     return;
 }
 sub check_config() {

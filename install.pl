@@ -406,7 +406,7 @@ if (-e "/var/run/psad.pid") {
 	$running = 0;
 }
 if ($execute_psad) {
-	if ($distro eq "redhat61" || "redhat62" || "redhat70" || "redhat71") {
+	if ($distro eq "redhat61" || "redhat62" || "redhat70" || "redhat71" || "redhat72") {
 		if ($running) {
 			&logr(" ----  Restarting the psad daemons...  ----\n", \@LOGR_FILES);
 			system "${INIT_DIR}/psad restart";
@@ -424,7 +424,7 @@ if ($execute_psad) {
 		}
 	}
 } else {
-	if ($distro eq "redhat61" || "redhat62" || "redhat70" || "redhat71") {
+	if ($distro eq "redhat61" || "redhat62" || "redhat70" || "redhat71" || "redhat72") {
 		if ($running) {
 			&logr(" ----  An older version of psad is already running.  To execute, run \"${INIT_DIR}/psad restart\"  ----\n", \@LOGR_FILES);
 		} else {
@@ -463,6 +463,7 @@ sub get_distro() {
 			return "redhat62" if ($l =~ /Red\sHat.*?6\.1/);
 			return "redhat70" if ($l =~ /Red\sHat.*?7\.0/);
 			return "redhat71" if ($l =~ /Red\sHat.*?7\.1/);
+			return "redhat72" if ($l =~ /Red\sHat.*?7\.2/);
 		}
 		close ISSUE;
 		return "NA";

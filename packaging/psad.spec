@@ -77,12 +77,14 @@ make OPTS="$RPM_OPT_FLAGS" -C Unix-Syslog
 make OPTS="$RPM_OPT_FLAGS" -C Date-Calc
 
 %install
+### config directory
+mkdir -p $RPM_BUILD_ROOT%psadetcdir
 ### log directory
-mkdir -p $RPM_BUILD_ROOT/var/log/psad
+mkdir -p $RPM_BUILD_ROOT%psadlogdir
 ### dir for psadfifo
-mkdir -p $RPM_BUILD_ROOT/var/lib/psad
+mkdir -p $RPM_BUILD_ROOT%psadvarlibdir
 ### dir for pidfiles
-mkdir -p $RPM_BUILD_ROOT/var/run/psad
+mkdir -p $RPM_BUILD_ROOT%psadrundir
 
 ### psad module dirs
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Bit/Vector
@@ -204,6 +206,8 @@ fi
 %psadlogdir
 %psadvarlibdir
 %psadrundir
+%psadetcdir
+%psadlibdir
 /etc/rc.d/init.d/psad
 %_sbindir/*
 %_bindir/*

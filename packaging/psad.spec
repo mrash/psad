@@ -230,6 +230,9 @@ fi
 %_libdir/%name
 
 %changelog
+* Sun Oct 17 2004 Michael Rash <mbr@cipherydne.org>
+- psad-1.3.4 release.
+
 * Sat Sep 25 2004 Michael Rash <mbr@cipherydne.org>
 - Added Bit::Vector back since not having it causes dependency
   problems with Date::Calc even though psad does not require any

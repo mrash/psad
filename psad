@@ -36,11 +36,11 @@
 #	- Possibly add a daemon to take into account ACK PSH, ACK FIN, RST etc.
 #	  packets that the client may generate after the ip_conntrack module
 #	  is reloaded.  Without anticipating such packets psad will interpret
-# 	  them as a belonging to a port scan.  NOTE: This problem is mostly
+#	  them as a belonging to a port scan.  NOTE: This problem is mostly
 #	  corrected by the conntrack patch to the kernel.
 #	- Improve check_firewall_rules() to check for a state rule (iptables) 
 #	  since having such a rule greatly improves the quality of the data 
-# 	  stream provided to psad by kmsgsd since more packet types will be 
+#	  stream provided to psad by kmsgsd since more packet types will be 
 #	  denied without requiring overly complicated firewall rules to detect 
 #	  odd tcp flag combinations.
 #	- Investigate the possibility of passive OS fingerprinting by looking
@@ -422,7 +422,7 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 						$flags = $1;
 						chop $flags;
 						$flags = "NULL" if ($flags eq ""); 
-						# per page 595 of the Camel book, if /blah1|blah2/ can be slower than if /blah1/ || /blah2/
+						# per page 595 of the Camel book, "if /blah1|blah2/" can be slower than "if /blah1/ || /blah2/
 					        unless (($flags =~ /SYN/ || $flags =~ /FIN/ || $flags =~ /URG/ || $flags =~ /PSH/ || $flags =~ /ACK/ 
 							  		 || $flags =~ /RST/ || $flags =~ /NULL/) && ($flags !~ /LEN/ || $flags !~ /TOS/
 									 || $flags !~ /PREC/ || $flags !~ /PROTO/ || $flags !~ /WINDOW/ ||
@@ -514,7 +514,7 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 			print "     Scan{srcip}{dstip}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'} = $Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'}\n";
 			print "     Scan{srcip}{dstip}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'} = $Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'}\n";
 		}
-		if ($signatures && $USE_IPTABLES) {  # might try use ipchains also, but then cannot use tcp flags except for -y -l rules
+		if ($signatures && $USE_IPTABLES) {  # might try to use ipchains also, but then cannot use tcp flags except for -y -l rules
 			for my $msg (keys %{$sigs_href->{$proto}}) {   # need to iterate through all signatures since a packet may match several
 				my $dstport_criteria = 0;
 				my $srcport_criteria = 0;

@@ -780,17 +780,17 @@ sub test_syslog_config() {
     }
 
     my $lo_ip = '127.0.0.1';
-    my $found = 0;
+    my $found_ip = 0;
     for my $line (@if_out) {
         if ($line =~ /inet\s+addr:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s/) {
             $lo_ip = $1;  ### this should always be 127.0.0.1
             &logr(" ** loopback interface ip is not 127.0.0.1.  Continuing ".
                 "anyway.\n") unless $lo_ip eq '127.0.0.1';
-            $found = 1;
+            $found_ip = 1;
         }
     }
 
-    unless ($found) {
+    unless ($found_ip) {
         &logr(" ** The loopback interface does not have an ip.\n" .
             "    Hoping the syslog reconfig will work anyway.\n");
         return;

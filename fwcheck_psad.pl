@@ -34,6 +34,7 @@ my @fw_search = ();
 my $help = 0;
 my $fw_analyze = 0;
 my $fw_file    = '';
+my $no_fw_search_all = 0;
 
 &usage(1) unless (GetOptions(
     'config=s'    => \$config_file, # Specify path to configuration file.
@@ -43,6 +44,8 @@ my $fw_file    = '';
                                     # policy.
     'fw-analyze'  => \$fw_analyze,  # Analyze the local iptables ruleset
                                     # and exit.
+    'no-fw-search-all' => \$no_fw_search_all, # looking for specific log
+                                              # prefixes
     'help'        => \$help,        # Display help.
 ));
 &usage(0) if $help;
@@ -62,14 +65,15 @@ $< == 0 && $> == 0 or
 ### import FW_MSG_SEARCH strings
 &import_fw_search();
 
-open FWCHECK, "> $config{'FW_CHECK_FILE'}" or die " ** Could not ",
-    "open $config{'FW_CHECK_FILE'}: $!";
-
-print FWCHECK " .. Available search strings in $fw_search_file:\n\n";
-print FWCHECK "        $_\n" for @fw_search;
-print FWCHECK
-"\n .. Additional search strings can be added be specifying more FW_MSG_SEARCH\n",
-"    lines in $fw_search_file\n\n";
+unless ($no_fw_search_all) {
+    open FWCHECK, "> $config{'FW_CHECK_FILE'}" or die " ** Could not ",
+        "open $config{'FW_CHECK_FILE'}: $!";
+    print FWCHECK " .. Available search strings in $fw_search_file:\n\n";
+    print FWCHECK "        $_\n" for @fw_search;
+    print FWCHECK
+"\n .. Additional search strings can be added be specifying more\n",
+    "    FW_MSG_SEARCH lines in $fw_search_file\n\n";
+}
 
 ### check the iptables policy
 &fw_check();
@@ -194,10 +198,9 @@ sub check_forwarding() {
     return 1;
 }
 
-
-### should probably make this into its own script
 sub ipt_chk_chain() {
     my $chain = shift;
+    my $rv = 1;
 
     my $ipt = new IPTables::Parse 'iptables' => $cmds{'iptables'};
 
@@ -205,88 +208,102 @@ sub ipt_chk_chain() {
         print scalar localtime(),
             " .. Parsing iptables $chain chain rules.\n";
     }
-    ### for now we are only looking at the filter table, so if
-    ### the iptables ruleset includes the log and drop rules in
-    ### a user defined chain then psad will not see this.
-    my $ld_hr;
-    if ($fw_file) {
-        $ld_hr = $ipt->default_drop('filter', $chain, $fw_file);
-    } else {
-        $ld_hr = $ipt->default_drop('filter', $chain);
-    }
 
-    my $rv = 1;
-    my $num_keys = 0;
-    if (defined $ld_hr and keys %$ld_hr) {
-        $num_keys++;
-        my @protos;
-        if (defined $ld_hr->{'all'}) {
-            @protos = qw(all);
+    if ($no_fw_search_all) {  ### we are not looking for specific log
+                              ### prefixes, but we need _some_ logging rule
+        my $ipt_log = $ipt->chain_action_rules('filter', $chain, 'LOG');
+        return 0 unless $ipt_log;
+        if (defined $ipt_log->{'all'}
+                and defined $ipt_log->{'all'}->{'0.0.0.0/0'}
+                and defined $ipt_log->{'all'}->{'0.0.0.0/0'}->{'0.0.0.0/0'}) {
+            ### found real default logging rule (assuming it is above a default
+            ### drop rule, which we are not actually checking here).
+            return 1;
         } else {
-            @protos = qw(tcp udp icmp);
         }
-        for my $proto (@protos) {
-            my $str1;
-            my $str2;
-            if (! defined $ld_hr->{$proto}->{'LOG'}) {
-                if ($proto eq 'all') {
-                    $str1 = 'for all protocols';
-                    $str2 = 'scans';
-                } else {
-                    $str1 = "for the $proto protocol";
-                    $str2 = "$proto scans";
-                }
-                print FWCHECK
-" ** The $chain chain in the iptables ruleset on $config{'HOSTNAME'} does not\n",
-"    include a default LOG rule $str1.  psad will not be able to\n",
-"    detect $str2 without such a rule.\n\n";
+    } else {  ### we are looking for specific log prefixes.
+        ### for now we are only looking at the filter table, so if
+        ### the iptables ruleset includes the log and drop rules in
+        ### a user defined chain then psad will not see this.
+        my $ld_hr;
+        if ($fw_file) {
+            $ld_hr = $ipt->default_drop('filter', $chain, $fw_file);
+        } else {
+            $ld_hr = $ipt->default_drop('filter', $chain);
+        }
 
-                $rv = 0;
+        my $num_keys = 0;
+        if (defined $ld_hr and keys %$ld_hr) {
+            $num_keys++;
+            my @protos;
+            if (defined $ld_hr->{'all'}) {
+                @protos = qw(all);
+            } else {
+                @protos = qw(tcp udp icmp);
             }
-            if (defined $ld_hr->{$proto}->{'LOG'}->{'prefix'}) {
-                my $found = 0;
-                for my $fwstr (@fw_search) {
-                    $found = 1
-                        if $ld_hr->{$proto}->{'LOG'}->{'prefix'} =~ /$fwstr/;
-                }
-                unless ($found) {
+            for my $proto (@protos) {
+                my $str1;
+                my $str2;
+                if (! defined $ld_hr->{$proto}->{'LOG'}) {
                     if ($proto eq 'all') {
-                        $str1 = " ** The $chain chain in the iptables ruleset " .
-                        "on $config{'HOSTNAME'} includes a default\n    LOG rule for " .
-                        "all protocols,";
+                        $str1 = 'for all protocols';
                         $str2 = 'scans';
                     } else {
-                        $str1 = " ** The $chain chain in the iptables ruleset " .
-                        "on $config{'HOSTNAME'} inclues a default\n    LOG rule for " .
-                        "the $proto protocol,";
+                        $str1 = "for the $proto protocol";
                         $str2 = "$proto scans";
                     }
                     print FWCHECK
+" ** The $chain chain in the iptables ruleset on $config{'HOSTNAME'} does not\n",
+"    appear to include a default LOG rule $str1.  psad will not be able to\n",
+"    detect $str2 without such a rule.\n\n";
+
+                    $rv = 0;
+                }
+                if (defined $ld_hr->{$proto}->{'LOG'}->{'prefix'}) {
+                    my $found = 0;
+                    for my $fwstr (@fw_search) {
+                        $found = 1
+                            if $ld_hr->{$proto}->{'LOG'}->{'prefix'} =~ /$fwstr/;
+                    }
+                    unless ($found) {
+                        if ($proto eq 'all') {
+                            $str1 = " ** The $chain chain in the iptables ruleset " .
+                            "on $config{'HOSTNAME'} includes a default\n    LOG rule for " .
+                            "all protocols,";
+                            $str2 = 'scans';
+                        } else {
+                            $str1 = " ** The $chain chain in the iptables ruleset " .
+                            "on $config{'HOSTNAME'} inclues a default\n    LOG rule for " .
+                            "the $proto protocol,";
+                            $str2 = "$proto scans";
+                        }
+                        print FWCHECK
 "$str1\n",
 "    but the rule does not include one of the log prefixes mentioned above.\n",
 "    It appears as though the log prefix is set to \"$ld_hr->{$proto}->{'LOG'}->{'prefix'}\"\n",
 "    psad will not be able to detect $str2 without adding one of the above\n",
 "    logging prefixes to the rule.\n\n";
+                        $rv = 0;
+                    }
+                }
+                if (! defined $ld_hr->{$proto}->{'DROP'}) {
+                    if ($proto eq 'all') {
+                        $str1 = "for all protocols";
+                    } else {
+                        $str1 = "for the $proto protocol";
+                    }
+                    print FWCHECK
+" ** The $chain chain in the iptables ruleset on $config{'HOSTNAME'} does not\n",
+"    appear to include a default DROP rule $str1.\n\n";
+
                     $rv = 0;
                 }
             }
-            if (! defined $ld_hr->{$proto}->{'DROP'}) {
-                if ($proto eq 'all') {
-                    $str1 = "for all protocols";
-                } else {
-                    $str1 = "for the $proto protocol";
-                }
-                print FWCHECK
-" ** The $chain chain in the iptables ruleset on $config{'HOSTNAME'} does not\n",
-"    include a default DROP rule $str1.\n\n";
-
-                $rv = 0;
-            }
         }
+        ### make sure there was _something_ returned from the IPTables::Parse
+        ### module.
+        return 0 unless $num_keys > 0;
     }
-    ### make sure there was _something_ returned from the IPTables::Parse
-    ### module.
-    return 0 unless $num_keys > 0;
     return $rv;
 }
 

@@ -268,14 +268,14 @@ lowest and five the highest.  Note there are several factors that can
 influence how danger levels are calculated: whether or not a scan matches a
 signature listed in
 .B psad_signatures,
-the value of PORT_RANGE_SCAN_THREHOLD (see below), whether or not a scan comes
+the value of PORT_RANGE_SCAN_THRESHOLD (see below), whether or not a scan comes
 from an ip that is listed in the
 .B psad_auto_ips
 file, and finally whether or not scans are allowed to timeout
 as determined by SCAN_TIMEOUT above.  If a signature is matched or the scanning
 ip is listed in
 .B psad_auto_ips,
-then the corrsponding danger level is automatically assigned to the scan.
+then the corresponding danger level is automatically assigned to the scan.
 .TP
 
 .BR PORT_RANGE_SCAN_THRESHOLD
@@ -309,7 +309,7 @@ level increases (this is the default).
 Defines the maximum number of emails that will be sent for a single scanning
 ip (default is 50).  This variable gives you some protection from psad
 sending countless alerts if an ip scans your machine constantly.  psad
-will send a special alert if an ip has exceedes the email limit.
+will send a special alert if an ip has exceeds the email limit.
 .TP
 
 .BR EMAIL_ALERT_DANGER_LEVEL
@@ -318,7 +318,7 @@ Defines the danger level a scan must reach before any alert is sent.
 
 .BR ENABLE_AUTO_IDS
 .B psad
-has the capability of dynmaically blockng all traffic from an ip that
+has the capability of dynamically blocking all traffic from an ip that
 has reached a (configurable) danger level through modification of tcpwrapper,
 ipchains, or iptables rulesets.
 .B NOTE:

@@ -31,7 +31,7 @@ start)
         fi
     else
         echo "Syslog has not been configured to send kern.info messages to"
-        echo "/var/log/psadfifo.  Do you need to run the psad installer?"
+        echo "/var/lib/psad/psadfifo.  Do you need to run the psad installer?"
     fi
     ;;
 stop)

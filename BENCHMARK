@@ -2,7 +2,7 @@ Kmsgsd Benchmarks:
 
 The basic strategy in benchmarking kmsgsd is to get syslogd to write kern.info
 messages (which include ipchains and iptables log messages) to the 
-/var/log/psadfifo named pipe.  Kmsgsd will then read the messages out of the 
+/var/lib/psad/psadfifo named pipe.  Kmsgsd will then read the messages out of the 
 pipe as quickly as possible and write them to /var/log/psad/fwdata.  To 
 calculate how fast kmsgsd is we then compare the number of newly written 
 firewall messages to /var/log/messages with the number of messages kmsgsd was 
@@ -43,7 +43,7 @@ TEST 2:
 Results:  These results are a bit surprising since kmsgsd caught more
   messages in /var/log/psad/fwdata than syslog could write to 
   /var/log/messages, but perhaps syslog can write more quickly to a named pipe 
-  (in this case to /var/log/psadfifo) than it can to a file (/var/log/messages) 
+  (in this case to /var/lib/psad/psadfifo) than it can to a file (/var/log/messages) 
   since probably would not have seek() to the end of the file to know where to 
   write each message.  Hence it would appear that kmsgsd can keep up with just 
   about anything thrown at it (for home users anyway).  During this test kmsgsd

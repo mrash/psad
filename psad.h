@@ -52,11 +52,11 @@
 #define HOSTNAME "HOSTNAME"
 
 #define MAX_LINE_BUF 1024
-#define MAX_PID_SIZE 5
-#define MAX_PATH_LEN 50
+#define MAX_PID_SIZE 6
+#define MAX_PATH_LEN 100
 #define MAX_MSG_LEN 120
 #define MAX_GEN_LEN 80
-#define MAX_NUM_LEN 5
+#define MAX_NUM_LEN 6
 
 /* PROTOTYPES *****************************************************************/
 void check_unique_pid(const char *, const char *);
@@ -64,5 +64,9 @@ void write_pid(const char *, pid_t);
 void daemonize_process(const char *);
 void find_char_var(char *, char *, char *);
 int check_import_config(time_t *config_mtime, char *config_file);
+
+/* From OpenBSD */
+size_t strlcpy(char *, const char *, size_t);
+size_t strlcat(char *, const char *, size_t);
 
 #endif  /* __PSAD_H__ */

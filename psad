@@ -4041,73 +4041,77 @@ sub status_psad_daemon() {
         die " ** Could not open dir: $config{'PSAD_DIR'}: $!";
     my @files = readdir D;
     closedir D;
-    shift @files; shift @files;
-    for my $file (@files) {
-        if ($file =~ /$ip_re/ and -d $file) {
-            ### $file is a current scan source ip
-            my $src_ipdir = $file;
-            my $dl = 0;
-            if (-e "${src_ipdir}/danger_level") {
-                open F, "< ${src_ipdir}/danger_level" or
-                    die " ** Could not open ",
-                        "${src_ipdir}/danger_level: $!";
-                $dl = <F>;
-                close F;
-                chomp $dl;
-            }
-            opendir D, $src_ipdir or die " ** Could not open dir: ",
-                "$src_ipdir: $!";
-            my @ipdirfiles = readdir D;
-            closedir D;
-            shift @ipdirfiles; shift @ipdirfiles;
-            FILE: for my $file (@ipdirfiles) {
-                my $dst;
-                if ($file =~ /os_guess/ and -e "${src_ipdir}/os_guess") {
-                    open F, "< ${src_ipdir}/os_guess" or die " ** Could not ",
-                        "open ${src_ipdir}/os_guess: $!";
-                    my $os = <F>;
-                    close F;
-                    chomp $os;
-                    $scan_os{$src_ipdir} = $os;
-                    next FILE;
-                }
-                if ($file =~ /email_count/ and -e "${src_ipdir}/email_count") {
-                    open F, "< ${src_ipdir}/email_count" or die " ** Could not ",
-                        "open ${src_ipdir}/email_count: $!";
-                    my $email_count = <F>;
-                    close F;
-                    chomp $email_count;
-                    $scan_alerts{$src_ipdir} = $email_count;
-                    next FILE;
-                }
-                if ($file =~ /($ip_re)_packet_ctr/) {
-                    $dst = $1;
-                } else {
-                    next FILE;
-                }
-                if (-e "${src_ipdir}/${dst}_packet_ctr") {
-                    open F, "< ${src_ipdir}/${dst}_packet_ctr" or
+    if (@files and $#files > 1) {
+        shift @files; shift @files;
+        for my $file (@files) {
+            if ($file =~ /$ip_re/ and -d $file) {
+                ### $file is a current scan source ip
+                my $src_ipdir = $file;
+                my $dl = 0;
+                if (-e "${src_ipdir}/danger_level") {
+                    open F, "< ${src_ipdir}/danger_level" or
                         die " ** Could not open ",
-                            "${src_ipdir}/${dst}_packet_ctr: $!";
-                    my @lines = <F>;
+                            "${src_ipdir}/danger_level: $!";
+                    $dl = <F>;
                     close F;
-                    for my $line (@lines) {
-                        if ($line =~ /^(\w+)_(\w+)_(\w+):\s+(\d+)/) {
-                            my $chain = $1;
-                            my $intf  = $2;
-                            my $proto = $3;
-                            my $ctr   = $4;
-                            $chain = uc $chain if $chain eq 'input'
-                                    or $chain eq 'forward'
-                                    or $chain eq 'output';
-                            if ($status_sort_dl) {
-                                $scan_srcs{$dl}{$src_ipdir}{$dst}
-                                    {$chain}{$intf}{$proto} = $ctr;
-                            } else {
-                                $scan_srcs{$src_ipdir}{$dst}{'dl'}
-                                    = $dl;
-                                $scan_srcs{$src_ipdir}{$dst}
-                                    {$chain}{$intf}{$proto} = $ctr;
+                    chomp $dl;
+                }
+                opendir D, $src_ipdir or die " ** Could not open dir: ",
+                    "$src_ipdir: $!";
+                my @ipdirfiles = readdir D;
+                closedir D;
+                if (@ipdirfiles and $#ipdirfiles > 1) {
+                    shift @ipdirfiles; shift @ipdirfiles;
+                    FILE: for my $file (@ipdirfiles) {
+                        my $dst;
+                        if ($file =~ /os_guess/ and -e "${src_ipdir}/os_guess") {
+                            open F, "< ${src_ipdir}/os_guess" or die " ** Could not ",
+                                "open ${src_ipdir}/os_guess: $!";
+                            my $os = <F>;
+                            close F;
+                            chomp $os;
+                            $scan_os{$src_ipdir} = $os;
+                            next FILE;
+                        }
+                        if ($file =~ /email_count/ and -e "${src_ipdir}/email_count") {
+                            open F, "< ${src_ipdir}/email_count" or die " ** Could not ",
+                                "open ${src_ipdir}/email_count: $!";
+                            my $email_count = <F>;
+                            close F;
+                            chomp $email_count;
+                            $scan_alerts{$src_ipdir} = $email_count;
+                            next FILE;
+                        }
+                        if ($file =~ /($ip_re)_packet_ctr/) {
+                            $dst = $1;
+                        } else {
+                            next FILE;
+                        }
+                        if (-e "${src_ipdir}/${dst}_packet_ctr") {
+                            open F, "< ${src_ipdir}/${dst}_packet_ctr" or
+                                die " ** Could not open ",
+                                    "${src_ipdir}/${dst}_packet_ctr: $!";
+                            my @lines = <F>;
+                            close F;
+                            for my $line (@lines) {
+                                if ($line =~ /^(\w+)_(\w+)_(\w+):\s+(\d+)/) {
+                                    my $chain = $1;
+                                    my $intf  = $2;
+                                    my $proto = $3;
+                                    my $ctr   = $4;
+                                    $chain = uc $chain if $chain eq 'input'
+                                            or $chain eq 'forward'
+                                            or $chain eq 'output';
+                                    if ($status_sort_dl) {
+                                        $scan_srcs{$dl}{$src_ipdir}{$dst}
+                                            {$chain}{$intf}{$proto} = $ctr;
+                                    } else {
+                                        $scan_srcs{$src_ipdir}{$dst}{'dl'}
+                                            = $dl;
+                                        $scan_srcs{$src_ipdir}{$dst}
+                                            {$chain}{$intf}{$proto} = $ctr;
+                                    }
+                                }
                             }
                         }
                     }
@@ -4261,7 +4265,11 @@ sub status_psad_daemon() {
             my @lines = <F>;
             close F;
             if (@lines) {
-                print STDOUT "        $_" for @lines;
+                for my $line (@lines) {
+                    if ($line =~ /^\s*(.*):\s*(\d+)/) {
+                        print "        \"$1\": $2\n";
+                    }
+                }
             } else {
                 print STDOUT "        [NONE]\n";
             }
@@ -5068,6 +5076,11 @@ sub dump_conf() {
         } else {
             printf STDOUT "%-30s %s\n", " .. $var", $config{$var};
         }
+    }
+    if ($debug) {
+        print STDERR "\n .. Command paths:\n\n";
+    } else {
+        print STDOUT "\n .. Command paths:\n\n";
     }
     for my $var (sort keys %cmds) {
         if ($debug) {

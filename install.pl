@@ -243,13 +243,6 @@ sub install() {
         &perms_ownership("${PSAD_DIR}/fwdata", 0600);
     }
 
-    if ($Cmds{'iptables'} && -x $Cmds{'iptables'}) {
-        &logr(" ... Testing syslog configuration.\n");
-        ### make sure we actually see packets being logged by
-        ### the firewall.
-        &test_syslog_config();
-    }
-
     unless (-d $USRSBIN_DIR) {
         &logr(" ... Creating $USRSBIN_DIR\n");
         mkdir $USRSBIN_DIR,0755;
@@ -324,7 +317,7 @@ sub install() {
             "http://www.cipherdyne.com\n";
     }
 
-    &logr(" ... Compiling kmsgsd and psadwatchd:\n");
+    &logr(" ... Compiling kmsgsd, psadwatchd, and diskmond:\n");
 
     ### remove any previously compiled kmsgsd
     unlink 'kmsgsd' if -e 'kmsgsd';
@@ -443,6 +436,14 @@ sub install() {
         copy 'psad.conf', "${PSAD_CONFDIR}/psad.conf";
         &perms_ownership("${PSAD_CONFDIR}/psad.conf", 0600);
     }
+
+    if ($Cmds{'iptables'} && -x $Cmds{'iptables'}) {
+        &logr(" ... Found iptables.  Testing syslog configuration.\n");
+        ### make sure we actually see packets being logged by
+        ### the firewall.
+        &test_syslog_config();
+    }
+
     my $email_str = &query_email();
     if ($email_str) {
         &put_email("${PSAD_CONFDIR}/psad.conf", $email_str);

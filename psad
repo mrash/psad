@@ -18,7 +18,7 @@
 #
 # Credits:  (see the CREDITS file)
 #
-# Version: 1.2
+# Version: 1.2.1
 #
 # Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.org)
 #
@@ -35,13 +35,20 @@
 #    USA
 #
 # TODO:
+#   - Custom logging line upon auto-blocking an ip.
+#   - Customizable subject line that include the danger level.
+#   - RPM package.
+#   - Extend install.pl to provide an option to dowload the latest perl
+#     modules (Date:Calc, Unix::Syslog, etc.) from CPAN.
 #   - Extend passive OS fingerprinting to make use of more types of
 #     packets than just tcp/syn packets.
+#   - Enhance --Status output to include the iptables chains to which
+#     packets are logged.
 #   - Add a density calculation for a range of scanned ports, and also
 #     add a "verbose" mode that will display which of the scanned ports
 #     actually resolve to something in the IANA spec.
 #   - Packet grapher mode with annotated scan alerts.
-#   - Database support?
+#   - Mysql database support?
 #   - Get rid of the psad_signatures file in favor of just parsing the
 #     snort rules files directly.
 #   - Make use of other logging options available in iptables to detect
@@ -296,6 +303,7 @@ my $kill             = 0;
 my $restart          = 0;
 my $status           = 0;
 my $status_ip        = '';
+my $status_sort_dl   = 0;
 my $benchmark        = 0;
 my $b_packets        = 0;
 my $usr1             = 0;
@@ -385,7 +393,9 @@ Getopt::Long::Configure('no_ignore_case');
                                               # added via the auto blocking code.
     'Status'            => \$status,          # Display status of any currently
                                               # running psad processes.
-    'ip-status=s'       => \$status_ip,       # Display status for a specific ip.
+    'status-ip=s'       => \$status_ip,       # Display status for a specific ip.
+    'status-sort-dl'    => \$status_sort_dl,  # Sort by danger level instead of by
+                                              # ip address in --Status output.
     'Benchmark'         => \$benchmark,       # Run in benchmark mode.
     'packets=i'         => \$b_packets,       # Specify number of packets to use
                                               # in benchmark test.
@@ -435,7 +445,11 @@ if ($ver) {
 }
 
 if ($status_ip && ! $status) {
-    die ' ** The --ip option can only be specified along with ',
+    die ' ** The --status-ip option can only be specified along with ',
+        'the --Status option.  Exiting.';
+}
+if ($status_sort_dl && ! $status) {
+    die ' ** The --status-sort-dl option can only be specified along with ',
         'the --Status option.  Exiting.';
 }
 
@@ -2865,7 +2879,7 @@ sub restart() {
     &stop_psad();
     print " .. Restarting the psad daemons on $hostname\n";
     system "$cmds{'psad'} $cmdline";
-    return 1;
+    return 0;
 }
 
 ### display the status of all four psad daemons
@@ -2874,14 +2888,6 @@ sub status() {
     ### print the status of a specific ip address
     &status_ip() if $status_ip;
 
-    my $cmdline;
-    ### only the psad daemon (normally) runs with command line arguments
-    if (-e $cmdline_file) {
-        open CMD, "< $cmdline_file" or die ' ** Could not open ',
-            "$cmdline_file: $!";
-        $cmdline = <CMD>;
-        chomp $cmdline;
-    }
     my $rv = 0;   ### assume psad is not running and test...
     for my $pidname qw(psad psadwatchd kmsgsd diskmond) {
         my $pidfile = $pidfiles{$pidname};
@@ -2902,83 +2908,8 @@ sub status() {
                         print "  %CPU: $1  %MEM: $2\n";
                         print "     Running since: " .
                             localtime(stat($pidfile)->mtime) . "\n";
-                        next unless $pidname eq 'psad';
-                        if ($cmdline) {
-                            print "     Command line arguments: $cmdline\n";
-                        } else {
-                            print "     Command line arguments: [none specified]\n";
-                        }
-                        print "     Alert email address(es): ",
-                            "$config{'EMAIL_ADDRESSES'}\n";
-                        ### print the packet counters
-                        if (-e $config{'PACKET_COUNTER_FILE'}) {
-                            print "\n     Global packet counters:\n";
-                            open F, "< $config{'PACKET_COUNTER_FILE'}" or
-                                die " ** $config{'PACKET_COUNTER_FILE'}: $!";
-                            print STDOUT "        $_" while (<F>);
-                            close F;
-                        }
-                        ### sort and print the scan source ips
-                        my %scan_source_ips;
-                        chdir $config{'PSAD_DIR'} or
-                            die " ** Could not chdir $config{'PSAD_DIR'}: $!";
-                        opendir D, $config{'PSAD_DIR'} or
-                            die " ** Could not open dir: $config{'PSAD_DIR'}: $!";
-                        my @files = readdir D;
-                        closedir D;
-                        shift @files; shift @files;
-                        for my $file (@files) {
-                            if ($file =~ /$ip_re/ && -d $file) {
-                                ### $file is a current scan source ip
-                                my $src_ipdir = $file;
-                                my $dl = 0;
-                                my $tcp_ctr = 0;
-                                my $udp_ctr = 0;
-                                my $icmp_ctr = 0;
-                                if (-e "${src_ipdir}/danger_level") {
-                                    open F, "< ${src_ipdir}/danger_level" or
-                                        die " ** Could not open ",
-                                            "${src_ipdir}/danger_level: $!";
-                                    $dl = <F>;
-                                    close F;
-                                    chomp $dl;
-                                }
-                                if (-e "${src_ipdir}/packet_ctr") {
-                                    open F, "< ${src_ipdir}/packet_ctr" or
-                                        die " ** Could not open ",
-                                            "${src_ipdir}/packet_ctr: $!";
-                                    my @lines = <F>;
-                                    close F;
-                                    for my $line (@lines) {
-                                        $tcp_ctr = $1 if $line =~ /tcp:\s+(\d+)/;
-                                        $udp_ctr = $1 if $line =~ /udp:\s+(\d+)/;
-                                        $icmp_ctr = $1 if $line =~ /icmp:\s+(\d+)/;
-                                    }
-                                }
-                                $scan_source_ips{$dl}{$src_ipdir}{'tcp'}
-                                    = $tcp_ctr;
-                                $scan_source_ips{$dl}{$src_ipdir}{'udp'}
-                                    = $udp_ctr;
-                                $scan_source_ips{$dl}{$src_ipdir}{'icmp'}
-                                    = $icmp_ctr;
-                            }
-                        }
-                        print STDOUT "\n";
-                        printf("     %-18s%-9s%-9s%-9s%-9s\n", 'IP', 'TCP',
-                            'UDP', 'ICMP', 'Danger Level');
-                        if (%scan_source_ips) {
-                            for my $dl (sort {$b <=> $a} keys %scan_source_ips) {
-                                for my $src (keys %{$scan_source_ips{$dl}}) {
-                                    my $tcp = $scan_source_ips{$dl}{$src}{'tcp'};
-                                    my $udp = $scan_source_ips{$dl}{$src}{'udp'};
-                                    my $icmp = $scan_source_ips{$dl}{$src}{'icmp'};
-                                    printf("     %-18s%-9s%-9s%-9s%-9s\n",
-                                        $src, $tcp, $udp, $icmp, $dl);
-                                }
-                            }
-                        } else {
-                            print STDOUT "     [No scans detected.]\n";
-                        }
+                        next PS unless $pidname eq 'psad';
+                        &status_psad_ips();  ### print individual ip info
                         last PS;
                     }
                 }
@@ -2993,6 +2924,115 @@ sub status() {
         }
     }
     return $rv;
+}
+
+sub status_psad_ips() {
+    my $cmdline;
+    ### only the psad daemon (normally) runs with command line arguments
+    if (-e $cmdline_file) {
+        open CMD, "< $cmdline_file" or die ' ** Could not open ',
+            "$cmdline_file: $!";
+        $cmdline = <CMD>;
+        chomp $cmdline;
+    }
+    if ($cmdline) {
+        print "     Command line arguments: $cmdline\n";
+    } else {
+        print "     Command line arguments: [none specified]\n";
+    }
+    print "     Alert email address(es): ",
+        "$config{'EMAIL_ADDRESSES'}\n";
+    ### print the packet counters
+    if (-e $config{'PACKET_COUNTER_FILE'}) {
+        print "\n     Global packet counters:\n";
+        open F, "< $config{'PACKET_COUNTER_FILE'}" or
+            die " ** $config{'PACKET_COUNTER_FILE'}: $!";
+        print STDOUT "        $_" while (<F>);
+        close F;
+    }
+    ### sort and print the scan source ips
+    my %scan_source_ips;
+    chdir $config{'PSAD_DIR'} or
+        die " ** Could not chdir $config{'PSAD_DIR'}: $!";
+    opendir D, $config{'PSAD_DIR'} or
+        die " ** Could not open dir: $config{'PSAD_DIR'}: $!";
+    my @files = readdir D;
+    closedir D;
+    shift @files; shift @files;
+    for my $file (@files) {
+        if ($file =~ /$ip_re/ && -d $file) {
+            ### $file is a current scan source ip
+            my $src_ipdir = $file;
+            my $dl = 0;
+            my $tcp_ctr = 0;
+            my $udp_ctr = 0;
+            my $icmp_ctr = 0;
+            if (-e "${src_ipdir}/danger_level") {
+                open F, "< ${src_ipdir}/danger_level" or
+                    die " ** Could not open ",
+                        "${src_ipdir}/danger_level: $!";
+                $dl = <F>;
+                close F;
+                chomp $dl;
+            }
+            if (-e "${src_ipdir}/packet_ctr") {
+                open F, "< ${src_ipdir}/packet_ctr" or
+                    die " ** Could not open ",
+                        "${src_ipdir}/packet_ctr: $!";
+                my @lines = <F>;
+                close F;
+                for my $line (@lines) {
+                    $tcp_ctr = $1 if $line =~ /tcp:\s+(\d+)/;
+                    $udp_ctr = $1 if $line =~ /udp:\s+(\d+)/;
+                    $icmp_ctr = $1 if $line =~ /icmp:\s+(\d+)/;
+                }
+            }
+            if ($status_sort_dl) {
+                $scan_source_ips{$dl}{$src_ipdir}{'tcp'}
+                    = $tcp_ctr;
+                $scan_source_ips{$dl}{$src_ipdir}{'udp'}
+                    = $udp_ctr;
+                $scan_source_ips{$dl}{$src_ipdir}{'icmp'}
+                    = $icmp_ctr;
+            } else {
+                $scan_source_ips{$src_ipdir}{'dl'} = $dl;
+                $scan_source_ips{$src_ipdir}{'tcp'}
+                    = $tcp_ctr;
+                $scan_source_ips{$src_ipdir}{'udp'}
+                    = $udp_ctr;
+                $scan_source_ips{$src_ipdir}{'icmp'}
+                    = $icmp_ctr;
+            }
+        }
+    }
+    print STDOUT "\n";
+    printf("     %-18s%-9s%-9s%-9s%-9s\n", 'IP', 'TCP',
+        'UDP', 'ICMP', 'Danger Level');
+    if (%scan_source_ips) {
+        if ($status_sort_dl) {
+            for my $dl (sort {$b <=> $a} keys %scan_source_ips) {
+                for my $src (keys %{$scan_source_ips{$dl}}) {
+                    my $tcp  = $scan_source_ips{$dl}{$src}{'tcp'};
+                    my $udp  = $scan_source_ips{$dl}{$src}{'udp'};
+                    my $icmp = $scan_source_ips{$dl}{$src}{'icmp'};
+                    printf("     %-18s%-9s%-9s%-9s%-9s\n",
+                        $src, $tcp, $udp, $icmp, $dl);
+                }
+            }
+        } else {
+            for my $src (sort keys %scan_source_ips) {
+                my $dl   = $scan_source_ips{$src}{'dl'};
+                my $tcp  = $scan_source_ips{$src}{'tcp'};
+                my $udp  = $scan_source_ips{$src}{'udp'};
+                my $icmp = $scan_source_ips{$src}{'icmp'};
+                printf("     %-18s%-9s%-9s%-9s%-9s\n",
+                    $src, $tcp, $udp, $icmp, $dl);
+            }
+        }
+    } else {
+        print STDOUT "     [No scans detected.]\n";
+    }
+    return;
 }
 
 sub status_ip() {
@@ -3596,9 +3636,9 @@ Usage: psad [-a <auto ips file>] [-c <config file>] [-l] [-i <interval>]
        [-h] [-B] [-F] [-S] [-K] [-R] [-U] [-V] [-f] [-o] [-p] [-D] [-d]
        [--signatures <sig file>] [--passive-os-sigs <posf file>]
        [--snort-sids] [--snort-type <type>] [--snort-rdir <rules dir>]
-       [--interval <seconds>] [--ip-status <ip>] [--no-fwcheck]
-       [--no-daemon] [--no-rdns] [--no-whois] [--no-netstat]
-       [--no-ipt-errors] [--no-passiveos]
+       [--interval <seconds>] [--status-ip <ip>] [--status-sort-dl]
+       [--no-fwcheck] [--no-daemon] [--no-rdns] [--no-whois]
+       [--no-netstat] [--no-ipt-errors] [--no-passiveos]
 
 Options:
     --signatures <sigs file>      - Manually specify the path to the
@@ -3635,7 +3675,9 @@ Options:
     -R   --Restart                - Restart all running psad processes.
     -S   --Status                 - Displays the status of any
                                     currently running psad processes.
-    --ip-status    <ip address>   - View status for a specific ip.
+    --status-ip    <ip address>   - View status for a specific ip.
+    --status-sort-dl              - Sort --Status output by danger level
+                                    instead of by ip address.
     -B   --Benchmark              - run psad in benchmark mode.
     -p   --packets                - Specify number of packets to use in
                                     benchmark test.

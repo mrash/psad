@@ -165,6 +165,7 @@ unless (-e "/usr/local/bin/whois.psad") {
 		if (! system("$Cmds{'make'} -C whois-4.5.6")) {  # remember unix return value...
 			print "=-=-=  Copying whois binary to /usr/local/bin/whois.psad\n";
 			copy("whois-4.5.6/whois", "/usr/local/bin/whois.psad");
+			perms_ownership("/usr/local/bin/whois.psad", 0755);
 		}
 	}
 }

@@ -10,24 +10,24 @@
 .SH DESCRIPTION
 .B psad
 makes use of ipchains/iptables log messages to detect, alert, and
-(optionally) block port scans in real time. psad configures syslog to
+(optionally) block port scans in real time.  psad configures syslog to
 write all kern.info messages to a named pipe
 .B /var/lib/psad/psadfifo
 and then reads all messages out of the pipe that are matched by a regular
 expression designed to catch any packets that have been
-dropped/denied/rejected by the firewall. In this way psad is supplied
+dropped/denied/rejected by the firewall.  In this way psad is supplied
 with a pure data stream that exclusively contains packets that the
-firewall has deemed unfit to enter the network. For iptables
+firewall has deemed unfit to enter the network.  For iptables
 firewalls in the 2.4.x series kernels, psad analyzes the tcp flags
 used in the scan to determine the scan type (syn, fin, xmas, etc.)
 and the corresponding command line options that could be supplied to
-nmap to generate such a scan. In addition, psad makes use of many tcp, udp,
+nmap to generate such a scan.  In addition, psad makes use of many tcp, udp,
 and icmp signatures contained within the Snort intrusion detection
 system (see http://www.snort.org) to detect suspect network traffic such
 as probes for common backdoors, DDoS tools, OS fingerprinting attempts,
-and more. Psad features a set of highly configurable danger thresholds
+and more.  Psad features a set of highly configurable danger thresholds
 (with sensible defaults provided) that allow the administrator to define
-what constitutes a port scan or other suspect traffic. Email alerts sent
+what constitutes a port scan or other suspect traffic.  Email alerts sent
 by psad contain the scanning ip, number of packets sent to each port, any
 tcp, udp, or icmp signatures that have been matched (e.g. "NMAP XMAS scan"),
 the scanned port range, the current danger level (from 1 to 5), reverse dns
@@ -71,13 +71,13 @@ line with the --config option.
 .BR \-s ", " \-\^\-signatures\ \ <sig\ file>
 The iptables firewalling code included within the linux 2.4.x kernel
 series has the ability to distinguish and log any of the tcp flags
-present within tcp packets that traverse the interfaces. Psad makes
+present within tcp packets that traverse the interfaces.  Psad makes
 use of this logging capability to detect several types of tcp scan
 signatures included within
 .B /etc/psad/psad_signatures.
 The signatures were
 originally included within the Snort intrusion detection
-system. New signatures can be included and modifications to existing
+system.  New signatures can be included and modifications to existing
 signatures can be made to the signature file and psad will import
 the change automatically without having to restart the psad process.
 Unfortunately tcp signature checking is not compatible with the
@@ -90,13 +90,13 @@ that were originally included within Snort.
 .BR \-a ", " \-\^\-auto-ips\ \<auto\ ips\ file>
 Occasionally certain ip addresses are repeat offenders and
 should automatically be given a higher danger level than
-would normally be assigned. Additionally, some ip addresses
+would normally be assigned.  Additionally, some ip addresses
 can always be ignored depending on your network configuration
 (the loopback interface 127.0.0.1 might be a good candidate
 for example).
 .B /etc/psad/psad_auto_ips
 provides an interface for psad to automatically
-increase/decrease/ignore scanning ip danger levels. Modifications
+increase/decrease/ignore scanning ip danger levels.  Modifications
 can be made to psad_auto_ips (installed by default in /etc/psad)
 and psad will import them without having to restart the psad process.
 .TP
@@ -116,7 +116,7 @@ corresponding danger levels that have scanned the network.
 
 .BR \-K ", " \-\^\-Kill
 Kill the current psad process along with psadwatchd, kmsgsd,
-and diskmond. This provides a quick and easy way to kill
+and diskmond.  This provides a quick and easy way to kill
 all psad processes without having to look in the process table or
 appeal to the psad-init script.
 .TP
@@ -146,7 +146,7 @@ discovered, and then exit.
 .BR \-i ", " \-\^\-interval\ \<seconds>
 Specify the interval (in seconds) that psad should use to
 check whether or not packets have been denied by the
-firewall. Psad will use the default of 15 seconds unless a
+firewall.  Psad will use the default of 15 seconds unless a
 different value is specified.
 .TP
 
@@ -160,7 +160,7 @@ store scan data within system memory.
 .TP
 
 .BR \-d ", " \-\^\-debug
-Run psad in debugging mode. This will automatically prevent
+Run psad in debugging mode.  This will automatically prevent
 psad from running as a daemon, and will print the contents
 of the %Scan hash and a few other things on STDOUT at crucial
 points as psad executes.
@@ -176,7 +176,7 @@ messages to STDOUT.
 
 .BR \-L ", " \-\^\-log-server
 This option should be used if psad is being executed on a syslog
-logging server. Running psad on a logging server requires that
+logging server.  Running psad on a logging server requires that
 check_firewall_rules() and auto_psad_response() not be executed
 since the firewall is probably not being run locally.
 .TP
@@ -186,7 +186,7 @@ Print the psad version and exit.
 .TP
 
 .BR \-\^\-no-daemon
-Do not run psad as a daemon. This option is most useful
+Do not run psad as a daemon.  This option is most useful
 if used in conjunction with --output so that scan warning messages
 can be viewed on STDOUT instead of being written to
 .B /var/log/psad/scanlog.
@@ -198,9 +198,9 @@ Occasionally messages written by syslog to
 or to
 .B /var/log/messages
 do not conform to the normal firewall logging format if the kernel
-ring buffer used by klogd becomes full. psad will write these message to
+ring buffer used by klogd becomes full.  psad will write these message to
 .B /var/log/psad/fwerrorlog
-by default. Passing the --no-error option will make psad ignore
+by default.  Passing the --no-error option will make psad ignore
 all such erroneous firewall messages.
 .TP
 
@@ -227,7 +227,7 @@ the --no-rdns command line argument.
 .BR \-\^\-no-netstat
 By default for iptables firewalls psad will determine whether
 or not your machine is listening on a port for which a tcp
-signature has been matched. Specifying --no-netstat
+signature has been matched.  Specifying --no-netstat
 disables this feature.
 .TP
 
@@ -237,7 +237,7 @@ Print a page of usage information for psad and exit.
 .SH FILES
 .B /etc/psad/psad_signatures
 .RS
-Contains the signatures psad uses to recognize nasty traffic. The
+Contains the signatures psad uses to recognize nasty traffic.  The
 signatures are written in a manner similar to the *lib signature
 files used in the Snort IDS.
 .RE
@@ -246,7 +246,7 @@ files used in the Snort IDS.
 .RS
 Contains a listing of any ip addresses that should be assigned
 a danger level based on any traffic that is denied/rejected by the
-firewall. The syntax is "<ip address> <danger level>" where
+firewall.  The syntax is "<ip address> <danger level>" where
 <danger level> is an integer from 0 to 5, with 0 meaning to ignore
 all traffic from <ip address>, and 5 is to assign the highest danger
 level to <ip address>.
@@ -254,11 +254,8 @@ level to <ip address>.
 
 .B /etc/psad/psad.conf
 .RS
-The psad configuration file is used if and only if the --config
-option is specified on the command line. Normally all configuration
-parameters are specified within the configuration section of the psad
-program itself. See
-.B /usr/sbin/psad.
+The psad configuration file which contains all configuration variables
+mentioned in the section below.
 
 .SH PSAD CONFIGURATION VARIABLES
 This section describes what each of the more important psad configuration
@@ -331,7 +328,7 @@ exceeds DANGER_LEVEL1).
 .BR SHOW_ALL_SIGNATURES
 If "Y", psad will display all signatures detected from a single scanning
 ip since a scan was first detected instead of just displaying newly-detected
-signatures.  SHOW_ALL_SIGNATURES is set to "N" by default. All signatures are
+signatures.  SHOW_ALL_SIGNATURES is set to "N" by default.  All signatures are
 listed in the file
 .B psad_signatures.
 .TP
@@ -415,10 +412,10 @@ and log" policy for any traffic that is not explicitly allowed through.
 This is consistent with a secure network configuration since all traffic
 that has not been explicitly allowed should be blocked by the firewall
 ruleset.  By default, psad attempts to determine whether or not the
-firewall has been configured in this way. This feature can be disabled with
-the --no-fwcheck or --log-server options. The --log-server option
+firewall has been configured in this way.  This feature can be disabled with
+the --no-fwcheck or --log-server options.  The --log-server option
 is useful if psad is running on a syslog logging server that is separate
-from the firewall. For more information on compatible ipchains/iptables
+from the firewall.  For more information on compatible ipchains/iptables
 rulesets, see the
 .B FW_EXAMPLE_RULES
 file that is bundled with the psad source distribution.
@@ -426,17 +423,17 @@ file that is bundled with the psad source distribution.
 .B psad
 also requires that syslog be configured to write all kern.info messages to
 the named pipe
-\fB/var/log/psadfifo\fR. A simple
+\fB/var/log/psadfifo\fR.  A simple
 .IP
 .B echo -e 'kern.info\\\\t/var/run/psadfifo' >> /etc/syslog.conf
 .PP
-will do. Remember also to restart \fBsyslog\fR after the changes to
+will do.  Remember also to restart \fBsyslog\fR after the changes to
 this file.
 
 .SH DIAGNOSTICS
 The --debug option can be used to display crucial information
 about the psad data structures on STDOUT as a scan generates firewall
-log messages. --debug disables daemon mode execution.
+log messages.  --debug disables daemon mode execution.
 
 Another more effective way to peer into the runtime execution of psad
 is to send (as root) a USR1 signal to the psad process which will
@@ -456,12 +453,12 @@ represents the pid of the psad process.
 Michael Rash <mbr@cipherdyne.com>
 
 .SH BUGS
-Send bug reports to mbr@cipherdyne.com. Suggestions and/or comments are
+Send bug reports to mbr@cipherdyne.com.  Suggestions and/or comments are
 always welcome as well.
 
 -If $ENABLE_PERSISTENCE="Y", the scan data structures can become
 large over time and consume lots of memory depending on the popularity
-of your machine/site. Restarting psad solves this problem of course,
+of your machine/site.  Restarting psad solves this problem of course,
 but a better way is on the TODO list.
 
 -For iptables firewalls as of Linux kernel version 2.4.19, if the ip_conntrack

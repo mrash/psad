@@ -1904,21 +1904,30 @@ sub scan_logr() {
 }
 
 sub scan_logr_signatures() {
-    my ($src, $dst, $print_hsh_href) = @_;
+    my ($src, $dst, $print_hr) = @_;
     ### ok, these hash keys are too much
     for my $proto qw(TCP UDP ICMP) {
         next unless (defined $scan{$src}{$dst}{$proto}{'CURR_SIG'}
             || defined $scan{$src}{$dst}{$proto}{'SNORT_SID'});
-        &Psad::logr("\n", $print_hsh_href);
-        &Psad::logr("---- $proto scan signatures ----\n", $print_hsh_href);
+        &Psad::logr("\n", $print_hr);
+        &Psad::logr("---- $proto scan signatures ----\n", $print_hr);
         print "scan_logr_signatures(): src: $src dst: $dst proto: $proto\n"
             if $debug;
         for my $sid (keys %{$scan{$src}{$dst}{$proto}{'SNORT_SID'}}) {
             my $msg = $snort_msgs{$sid}{'msg'};
             my $classtype = $snort_msgs{$sid}{'classtype'};
             my $pkts = $scan{$src}{$dst}{$proto}{'SNORT_SID'}{$sid};
-            &Psad::logr("\"$msg\" sid=$sid classtype=$classtype packets=$pkts\n",
-                $print_hsh_href);
+            my $content;
+            if (defined $snort_msgs{$sid}{'content'}) {
+                $content = $snort_msgs{$sid}{'content'};
+            }
+            &Psad::logr("\"$msg\"\n", $print_hr);
+            &Psad::logr("       classtype: $classtype\n", $print_hr);
+            &Psad::logr("       sid:       $sid\n", $print_hr);
+            &Psad::logr("       content:   $content\n", $print_hr)
+                if $content;
+            &Psad::logr("       packets:   $pkts\n", $print_hr);
+            &Psad::logr("\n", $print_hr);
         }
         for my $sig_id (keys %{$scan{$src}{$dst}{$proto}{'CURR_SIG'}}) {
             my $msg = $sigs_attr{$sig_id}{'msg'};
@@ -1935,7 +1944,7 @@ sub scan_logr_signatures() {
                     my $l_str = "** Your machine is listening on TCP port: $dp!\n";
                     ### avoid "." operator
                     &Psad::logr("\"$msg\" dp=$dp flags=[$flags] packets=$pkts $l_str",
-                        $print_hsh_href);
+                        $print_hr);
                 }
                 for my $dp (keys
                     %{$scan{$src}{$dst}{'TCP'}
@@ -1948,7 +1957,7 @@ sub scan_logr_signatures() {
                         {$sig_id}{'NO_LISTEN'}{$dp}{'PKTS'};
                     my $l_str = "No server on TCP port: $dp\n";
                     &Psad::logr("\"$msg\" dp=$dp flags=[$flags] packets=$pkts $l_str",
-                        $print_hsh_href);
+                        $print_hr);
                 }
             } elsif ($proto eq 'UDP') {
                 for my $dp (keys
@@ -1959,7 +1968,7 @@ sub scan_logr_signatures() {
                         {$sig_id}{'LISTEN'}{$dp}{'PKTS'};
                     my $l_str = "** Your machine is listening on UDP port: $dp!\n";
                     &Psad::logr("\"$msg\" dp=$dp packets=$pkts $l_str",
-                        $print_hsh_href);
+                        $print_hr);
                 }
                 for my $dp (keys
                     %{$scan{$src}{$dst}{'UDP'}{'CURR_SIG'}
@@ -1969,12 +1978,12 @@ sub scan_logr_signatures() {
                         {$sig_id}{'NO_LISTEN'}{$dp}{'PKTS'};
                     my $l_str = "No server on UDP port: $dp\n";
                     &Psad::logr("\"$msg\" dp=$dp packets=$pkts $l_str",
-                        $print_hsh_href);
+                        $print_hr);
                 }
             } else {
                 my $pkts = $scan{$src}{$dst}{'ICMP'}
                     {'CURR_SIG'}{$sig_id}{'PKTS'};
-                &Psad::logr("\"$msg\" packets=$pkts\n", $print_hsh_href);
+                &Psad::logr("\"$msg\" packets=$pkts\n", $print_hr);
             }
 
             ### signature logging with syslog is not yet supported

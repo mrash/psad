@@ -5,9 +5,17 @@ psad-1.3 ():
       udp signature matching that don't autovivify hash keys.
     - Removed support for ipchains.
     - Added support for metalog.
+    - Re-worked %auto_blocked_ips hash and corresponding blocking
+      routines.  This (hopefully) fixes a restart bug seen on older
+      systems such as those that are still running versions of perl
+      less than 5.6.
     - Re-worked firewall policy parsing routines.  Chains that have
       a default policy of DROP are handled properly now.
     - Bugfix for missing NULL char in kmsgsd.c.
+    - Updated scan alerting format.  Put current interval protocol
+      status before source and destination addresses.
+    - Buffer overflow fix in kmsgsd.c for size of buf[MAX_LINE_BUF]
+      buffer in read() call.
     - Added --no-kmsgsd option to aid in psad --debug mode.
 
 psad-1.2.4 (10/15/2003):

@@ -267,6 +267,7 @@ void rm_data(char *fwdata_file, char *psad_dir, char *archive_dir) {
     if ((fd = open(path_tmp, O_TRUNC)) >= 0)
         close(fd);
 
+    /* send alert email */
     return;
 }
 

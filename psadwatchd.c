@@ -44,6 +44,7 @@ short int diskmond_syscalls_ctr = 0;
 const char mail_redr[] = " < /dev/null > /dev/null 2>&1";
 const char hostname[] = HOSTNAME;
 char mail_addrs[MAX_GEN_LEN];
+char shCmd[MAX_GEN_LEN];
 char mailCmd[MAX_GEN_LEN];
 
 /* PROTOTYPES ***************************************************************/
@@ -51,10 +52,12 @@ static void parse_config(
     char *config_file,
     char *psad_binary,
     char *psad_pid_file,
+    char *psad_cmdline_file,
     char *kmsgsd_binary,
     char *kmsgsd_pid_file,
     char *diskmond_binary,
     char *diskmond_pid_file,
+    char *shCmd,
     char *mailCmd,
     char *mail_addrs,
     char *psadwatchd_pid_file,
@@ -64,18 +67,21 @@ static void parse_config(
 static void check_process(
     const char *pid_name,
     const char *pid_file,
+    const char *cmdline_file,
     const char *binary_path,
     unsigned int max_retries
 );
 static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries);
 static void reset_syscall_ctr(const char *pid_name);
 static void give_up(const char *pid_name);
+static void exec_binary(const char *binary_path, const char *cmdline_file);
 
 /* MAIN *********************************************************************/
 int main(int argc, char *argv[]) {
     char config_file[MAX_PATH_LEN];
     char psadCmd[MAX_PATH_LEN];
     char psad_pid_file[MAX_PATH_LEN];
+    char psad_cmdline_file[MAX_PATH_LEN];
     char kmsgsdCmd[MAX_PATH_LEN];
     char kmsgsd_pid_file[MAX_PATH_LEN];
     char diskmondCmd[MAX_PATH_LEN];
@@ -132,10 +138,12 @@ int main(int argc, char *argv[]) {
         config_file,
         psadCmd,
         psad_pid_file,
+        psad_cmdline_file,
         kmsgsdCmd,
         kmsgsd_pid_file,
         diskmondCmd,
         diskmond_pid_file,
+        shCmd,
         mailCmd,
         mail_addrs,
         psadwatchd_pid_file,
@@ -156,11 +164,11 @@ int main(int argc, char *argv[]) {
 
     /* MAIN LOOP: */
     for (;;) {
-        check_process("psad", psad_pid_file,
+        check_process("psad", psad_pid_file, psad_cmdline_file,
             psadCmd, psadwatchd_max_retries);
-        check_process("kmsgsd", kmsgsd_pid_file,
+        check_process("kmsgsd", kmsgsd_pid_file, NULL,
             kmsgsdCmd, psadwatchd_max_retries);
-        check_process("diskmond", diskmond_pid_file,
+        check_process("diskmond", diskmond_pid_file, NULL,
             diskmondCmd, psadwatchd_max_retries);
 
         /* check to see if we need to re-import the config file */
@@ -173,10 +181,12 @@ int main(int argc, char *argv[]) {
                 config_file,
                 psadCmd,
                 psad_pid_file,
+                psad_cmdline_file,
                 kmsgsdCmd,
                 kmsgsd_pid_file,
                 diskmondCmd,
                 diskmond_pid_file,
+                shCmd,
                 mailCmd,
                 mail_addrs,
                 psadwatchd_pid_file,
@@ -196,6 +206,7 @@ int main(int argc, char *argv[]) {
 static void check_process(
     const char *pid_name,
     const char *pid_file,
+    const char *cmdline_file,
     const char *binary_path,
     unsigned int max_retries)
 {
@@ -210,7 +221,6 @@ static void check_process(
 #ifdef DEBUG
     printf(" .. Could not open pid_file: %s\n", pid_file);
 #endif
-        strlcat(mail_str, mailCmd, MAX_MSG_LEN);
         strlcat(mail_str, " -s \" ** psadwatchd: Restarting ", MAX_MSG_LEN);
         strlcat(mail_str, pid_name, MAX_MSG_LEN);
         strlcat(mail_str, " on ", MAX_MSG_LEN);
@@ -223,10 +233,10 @@ static void check_process(
     printf("sending mail:  %s\n", mail_str);
 #endif
         /* send the email */
-        system(mail_str);
+        send_alert_email(shCmd, mailCmd, mail_str);
 
         /* restart the process */
-        system(binary_path);
+        exec_binary(binary_path, cmdline_file);
 
         /* increment the number of times we have tried to restart the binary */
         incr_syscall_ctr(pid_name, max_retries);
@@ -250,9 +260,9 @@ static void check_process(
 
     if (kill(pid, 0) != 0) {  /* the process is not running so start it */
 #ifdef DEBUG
-        printf(" .. Executing system(%s)\n", binary_path);
+        printf(" .. executing exec_binary(%s)\n", binary_path);
 #endif
-        strlcat(mail_str, mailCmd, MAX_MSG_LEN);
+        //strlcat(mail_str, mailCmd, MAX_MSG_LEN);
         strlcat(mail_str, " -s \" ** psadwatchd: Restarting ", MAX_MSG_LEN);
         strlcat(mail_str, pid_name, MAX_MSG_LEN);
         strlcat(mail_str, " on ", MAX_MSG_LEN);
@@ -262,13 +272,13 @@ static void check_process(
         strlcat(mail_str, mail_redr, MAX_MSG_LEN);
 
 #ifdef DEBUG
-    printf("sending mail:  %s\n", mail_str);
+    // printf("sending mail:  %s\n", mail_str);
 #endif
         /* send the email */
-        system(mail_str);
+        send_alert_email(shCmd, mailCmd, mail_str);
 
         /* execute the binary_path psad daemon */
-        system(binary_path);
+        exec_binary(binary_path, cmdline_file);
 
         /* increment the number of times we have tried to restart the binary */
         incr_syscall_ctr(pid_name, max_retries);
@@ -329,7 +339,6 @@ static void give_up(const char *pid_name)
 #ifdef DEBUG
     printf(" ** Could not restart %s process.  Exiting.\n", pid_name);
 #endif
-    strlcat(mail_str, mailCmd, MAX_MSG_LEN);
     strlcat(mail_str, " -s \"** psadwatchd: Could not restart ", MAX_MSG_LEN);
     strlcat(mail_str, pid_name, MAX_MSG_LEN);
     strlcat(mail_str, " on ", MAX_MSG_LEN);
@@ -339,18 +348,98 @@ static void give_up(const char *pid_name)
     strlcat(mail_str, mail_redr, MAX_MSG_LEN);
 
     /* Send the email */
-    system(mail_str);
+    send_alert_email(shCmd, mailCmd, mail_str);
     exit(EXIT_FAILURE);
+}
+
+static void exec_binary(const char *binary, const char *cmdlinefile)
+{
+    FILE *cmdline_ptr;
+    char *prog_argv[MAX_ARG_LEN];
+    char cmdline_buf[MAX_LINE_BUF];
+    char *index;
+    pid_t child_pid;
+    int arg_num=0, non_ws, i;
+
+    prog_argv[arg_num] = (char *) malloc(strlen(binary));
+    if (prog_argv[arg_num] == NULL) {
+        exit(EXIT_FAILURE);
+    }
+    strlcpy(prog_argv[arg_num], binary, MAX_ARG_LEN);
+    arg_num++;
+
+    if (cmdlinefile != NULL) {
+        /* restart binary with its command line arguments intact */
+        if ((cmdline_ptr = fopen(cmdlinefile, "r")) == NULL) {
+            exit(EXIT_FAILURE);
+        }
+        if ((fgets(cmdline_buf, MAX_LINE_BUF, cmdline_ptr)) == NULL) {
+            exit(EXIT_FAILURE);
+        }
+        fclose(cmdline_ptr);
+
+        /* initialize index to the beginning of the line */
+        index = cmdline_buf;
+
+        /* advance the index pointer through any whitespace
+         * at the beginning of the line */
+        while (*index == ' ' || *index == '\t') index++;
+
+        while (*index != '\n' && *index != '\0') {
+            non_ws = 0;
+            while (*index != ' ' && *index != '\t'
+                    && index != '\0' && *index != '\n') {
+                index++;
+                non_ws++;
+            }
+            prog_argv[arg_num] = (char *) malloc(non_ws+1);
+            if (prog_argv[arg_num] == NULL) {
+                exit(EXIT_FAILURE);
+            }
+            for (i=0; i<non_ws; i++)
+                prog_argv[arg_num][i] = *(index - (non_ws - i));
+            prog_argv[arg_num][i] = '\0';
+
+            arg_num++;
+
+            /* get past any whitespace */
+            while (*index == ' ' || *index == '\t') index++;
+        }
+    }
+    /* is it necessary to malloc for the ending NULL? */
+    prog_argv[arg_num] = (char *) malloc(1);
+    if (prog_argv[arg_num] == NULL) {
+        exit(EXIT_FAILURE);
+    }
+    prog_argv[arg_num] = NULL;
+
+    if ((child_pid = fork()) < 0)
+        /* could not fork */
+        exit(EXIT_FAILURE);
+    else if (child_pid > 0) {
+        wait(NULL);
+        for (i=0; i<=arg_num; i++) {
+            free(prog_argv[i]);
+        }
+    } else {
+#ifdef DEBUG
+        printf(" .. restarting %s\n", binary);
+#endif
+        execve(binary, prog_argv, NULL);  /* don't use environment */
+    }
+    return;
 }
 
 static void parse_config(
     char *config_file,
     char *psadCmd,
     char *psad_pid_file,
+    char *psad_cmdline_file,
     char *kmsgsdCmd,
     char *kmsgsd_pid_file,
     char *diskmondCmd,
     char *diskmond_pid_file,
+    char *shCmd,
     char *mailCmd,
     char *mail_addrs,
     char *psadwatchd_pid_file,
@@ -385,10 +474,12 @@ static void parse_config(
 
             find_char_var("psadCmd ", psadCmd, index);
             find_char_var("PSAD_PID_FILE ", psad_pid_file, index);
+            find_char_var("PSAD_CMDLINE_FILE ", psad_cmdline_file, index);
             find_char_var("kmsgsdCmd ", kmsgsdCmd, index);
             find_char_var("KMSGSD_PID_FILE ", kmsgsd_pid_file, index);
             find_char_var("diskmondCmd ", diskmondCmd, index);
             find_char_var("DISKMOND_PID_FILE ", diskmond_pid_file, index);
+            find_char_var("shCmd ", shCmd, index);
             find_char_var("mailCmd ", mailCmd, index);
             find_char_var("EMAIL_ADDRESSES ", mail_addrs, index);
             find_char_var("PSADWATCHD_CHECK_INTERVAL ",

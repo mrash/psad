@@ -8,9 +8,51 @@
 #
 
 use lib '/usr/lib/psad';
+use Psad;
 use IPTables::Parse;
 use Getopt::Long 'GetOptions';
 use strict;
+
+### default psad config file.
+my $config_file  = '/etc/psad/psad.conf';
+
+### config hash
+my %config = ();
+
+### commands hash
+my %cmds;
+
+my $help = 0;
+my $fw_analyze = 0;
+my $fw_file    = '';
+
+&usage(1) unless (GetOptions(
+    'config=s'  => \$config_file, # Specify path to configuration file.
+    'fw-file=s' => \$fw_file,     # Analyze ruleset contained within
+                                  # $fw_file instead of a running
+                                  # policy.
+    'help'      => \$help,        # Display help.
+));
+&usage(0) if $help;
+
+### Everthing after this point must be executed as root.
+$< == 0 && $> == 0 or
+    die ' ** fwcheck_psad.pl: You must be root (or equivalent ',
+        "UID 0 account) to execute fwcheck_psad.pl!  Exiting.\n";
+
+### import psad.conf
+&Psad::buildconf(\%config, \%cmds, $config_file);
+
+### check to make sure the commands specified in the config section
+### are in the right place, and attempt to correct automatically if not.
+&Psad::check_commands(\%cmds);
+
+### check the iptables policy
+&fw_check();
+
+exit 0;
+
+#========================== end main =========================
 
 sub fw_check() {
     unlink $config{'FW_CHECK_FILE'} if -e $config{'FW_CHECK_FILE'};
@@ -22,7 +64,7 @@ sub fw_check() {
     my $input_chain_rv = &ipt_chk_chain('INPUT');
 
     unless ($input_chain_rv) {
-#        &print_fw_help('INPUT');
+        &print_fw_help('INPUT');
         $send_alert = 1;
     }
 
@@ -32,12 +74,13 @@ sub fw_check() {
     if (&check_forwarding()) {
         $forward_chain_rv = &ipt_chk_chain('FORWARD');
         unless ($forward_chain_rv) {
-#            &print_fw_help('FORWARD');
+            &print_fw_help('FORWARD');
             $send_alert = 1;
         }
     }
 
-    if ($send_alert) {
+#    if ($send_alert) {
+    if (1) {
         &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
         &Psad::logr(' .. NOTE: IPTables::Parse does not yet parse user ' .
             'defined chains and so it is possible your firewall config ' .
@@ -116,7 +159,6 @@ sub check_forwarding() {
         $forwarding = <F>;
         close F;
         chomp $forwarding;
-        print STDERR " .. forwarding value: $forwarding\n" if $debug;
         return 0 if $forwarding == 0;
     } else {
         die " ** Make sure the path to the IP forwarding file correct.\n",
@@ -133,7 +175,6 @@ sub check_forwarding() {
             $num_intf++;
         }
     }
-    print STDERR " .. number of interfaces: $num_intf\n" if $debug;
     if ($num_intf < 2) {
         return 0;
     }
@@ -144,8 +185,6 @@ sub check_forwarding() {
 ### should probably make this into its own script
 sub ipt_chk_chain() {
     my $chain = shift;
-
-    print STDERR " .. ipt_chk_chain($chain)\n" if $debug;
 
     my $ipt = new IPTables::Parse 'iptables' => $cmds{'iptables'};
 
@@ -162,8 +201,6 @@ sub ipt_chk_chain() {
     } else {
         $ld_hr = $ipt->default_drop('filter', $chain);
     }
-
-    print STDERR Dumper $ld_hr if $debug;
 
     my $rv = 1;
     my $num_keys = 0;

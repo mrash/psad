@@ -428,9 +428,25 @@ sub install() {
         copy 'psadwatchd.pl', 'psadwatchd';
     }
 
+    ### install fwcheck_psad.pl
     print "\n\n";
+    &logr(" .. Verifying compilation of fwcheck_psad.pl script:\n");
+    unless (((system "$Cmds{'perl'} -c fwcheck_psad.pl")>>8) == 0) {
+        die " ** fwcheck_psad.pl does not compile with \"perl -c\".  Download ",
+            "the latest sources from:\n\nhttp://www.cipherdyne.org\n";
+    }
+    print "\n\n";
+
+    ### put the fwcheck_psad.pl script in place
+    &logr(" .. Copying fwcheck_psad.pl -> ${USRSBIN_DIR}/fwcheck_psad.pl\n");
+    unlink "${USRSBIN_DIR}/fwcheck_psad.pl" if -e "${USRSBIN_DIR}/fwcheck_psad.pl";
+    copy 'fwcheck_psad.pl', "${USRSBIN_DIR}/fwcheck_psad.pl";
+    &perms_ownership("${USRSBIN_DIR}/fwcheck_psad.pl", 0500);
+    print "\n\n";
+
     ### make sure the psad (perl) daemon compiles.  The other three
     ### daemons have all been re-written in C.
+    print "\n\n";
     &logr(" .. Verifying compilation of psad perl daemon:\n");
     unless (((system "$Cmds{'perl'} -c psad")>>8) == 0) {
         die " ** psad does not compile with \"perl -c\".  Download the",

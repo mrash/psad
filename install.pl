@@ -1483,7 +1483,7 @@ sub query_dshield() {
     while ($ans ne 'y' && $ans ne 'n') {
         &logr('    Would you like to enable DShield alerts (y/[n])?  ');
         $ans = <STDIN>;
-        $ans = 'y' if $ans eq "\n";
+        $ans = 'n' if $ans eq "\n";
         chomp $ans;
     }
     if ($ans eq 'y') {

@@ -200,13 +200,13 @@ or to
 do not conform to the normal firewall logging format if the kernel
 ring buffer used by klogd becomes full. psad will write these message to
 .B /var/log/psad/fwerrorlog
-by default. Passing the --no_error option will make psad ignore
+by default. Passing the --no-error option will make psad ignore
 all such erroneous firewall messages.
 .TP
 
 .BR \-\^\-no-whois
 By default psad will issue a whois query against any ip from which
-a scan has originated, but this can be disabled with the --no_whois
+a scan has originated, but this can be disabled with the --no-whois
 command line argument.
 .TP
 
@@ -214,20 +214,20 @@ command line argument.
 psad performs a rudimentary check of the firewall ruleset that
 exists on the machine on which psad is deployed to determine
 whether or not the firewall has a compatible configuration.
-Passing the --no_fwcheck or --Logging_server options will
+Passing the --no-fwcheck or --log-server options will
 disable this check.
 .TP
 
 .BR \-\^\-no-rdns
 Psad normally attempts to find the name associated with a
 scanning ip address, but this feature can be disabled with
-the --no_rdns command line argument.
+the --no-rdns command line argument.
 .TP
 
 .BR \-\^\-no-netstat
 By default for iptables firewalls psad will determine whether
 or not your machine is listening on a port for which a tcp
-signature has been matched. Specifying --no_netstat
+signature has been matched. Specifying --no-netstat
 disables this feature.
 .TP
 
@@ -396,12 +396,12 @@ files can be changed:
 Disable the firewall check and the local port lookup subroutines; most useful
 if psad is deployed on a syslog logging server:
 
-.B # psad --Logging_server --no_netstat
+.B # psad --log-server --no-netstat
 
 Disable reverse dns and whois lookups of scanning ip addresses; most useful
 if speed of psad is the main concern:
 
-.B # psad --no_rdns --no_whois
+.B # psad --no-rdns --no-whois
 
 .SH DEPENDENCIES
 .B psad
@@ -411,7 +411,7 @@ This is consistent with a secure network configuration since all traffic
 that has not been explicitly allowed should be blocked by the firewall
 ruleset.  By default, psad attempts to determine whether or not the
 firewall has been configured in this way. This feature can be disabled with
-the --no_fwcheck or --Logging_server options. The --Logging_server option
+the --no-fwcheck or --log-server options. The --log-server option
 is useful if psad is running on a syslog logging server that is separate
 from the firewall. For more information on compatible ipchains/iptables
 rulesets, see the

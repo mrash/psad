@@ -169,7 +169,7 @@ USAGE:
           Psad performs a rudimentary check of the firewall rules that
           exist on the machine on which psad is deployed to determine
           whether or not the firewall has a compatible configuration.
-          Passing the --no_fwcheck option will disable this check.
+          Passing the --no-fwcheck option will disable this check.
 
     --no-daemon
           Do not run psad as a daemon.  This option is most useful
@@ -199,7 +199,7 @@ USAGE:
     --no-whois
           By default psad will issue a whois query against any ip from
           which a scan has originated, but this can be disabled with
-          the --no_whois command line argument.
+          the --no-whois command line argument.
 
     -V  --Version
           Print the psad version and exit.
@@ -227,7 +227,9 @@ OPTIONS:
       -o   --output                   - print all messages to STDOUT (this
                                         does not include bad packet messages
                                         that are printed to the error log).
-      -L   --Logging_server           - psad is being run on a syslog
+      -f   --fw-check                 - analyze the firewall ruleset and
+                                        exit.
+      -L   --log-server               - psad is being run on a syslog
                                         logging server.
       -K   --Kill                     - kill all running psad processes.
       -R   --Restart                  - restart all running psad processes.
@@ -240,14 +242,14 @@ OPTIONS:
                                         signal.
       -V   --Version                  - print the psad version and exit.
 
-      --no_daemon                     - do not run as a daemon.
-      --no_errors                     - do not write errors to the error
+      --no-daemon                     - do not run as a daemon.
+      --no-errors                     - do not write errors to the error
                                         log.
-      --no_whois                      - disable whois lookups.
-      --no_fwcheck                    - disable firewall rules verification.
-      --no_rdns                       - disable name resolution against
+      --no-whois                      - disable whois lookups.
+      --no-fwcheck                    - disable firewall rules verification.
+      --no-rdns                       - disable name resolution against
                                         scanning ips.
-      --no_netstat                    - disable local port lookups for scan
+      --no-netstat                    - disable local port lookups for scan
                                         signatures.
       -h   --help                     - prints this help message.
 

@@ -1073,7 +1073,7 @@ sub check_scan() {
     ### Don't manage the firewall or tcpwrapper rules if
     ### psad is running on a syslog server
     if ($config{'ENABLE_AUTO_IDS'} eq 'Y' and
-            ! $syslog_server) {
+            not $syslog_server) {
         &auto_psad_response(\%current_scan);
     }
     return;
@@ -1306,6 +1306,7 @@ sub posf() {
                     and ($max_ttl <= $posf_sigs{$os}{'ttl'})
                     and $id_str eq $posf_sigs{$os}{'id'}) {
                 $posf{$src}{'guess'} = $os;
+                print " .. posf(): matched OS: $os\n" if $debug;
                 return;
             }
         }
@@ -2097,7 +2098,8 @@ sub scan_logr() {
             ### danger level 1 or above.
             next DST unless $scan_dl{$src} >= 1;
             my $syslog_flags = '';
-            my $dns_str      = '';
+            my $src_dns_str  = '';
+            my $dst_dns_str  = '';
             my $rdns         = '';
             my $syslog_range = '';
             my $tcp_newrange = '';
@@ -2208,15 +2210,29 @@ sub scan_logr() {
                     my $ipaddr = gethostbyname $src;
                     ### my $rdns = gethostbyaddr($ipaddr, AF_INET);
                     if ($rdns = gethostbyaddr $ipaddr, 2) {
-                        $dns_str = $rdns;
+                        $src_dns_str = $rdns;
                     } else {
-                        $dns_str = '[No reverse dns info available]';
+                        $src_dns_str = '[No reverse dns info available]';
                     }
                 } else {
                     ### $ipaddr was already reported as
                     ### a host name by iptables (does this actually
                     ### happen?)
-                    $dns_str = $src;
+                    $src_dns_str = $src;
+                }
+                if ($dst =~ /$ip_re/) {
+                    my $ipaddr = gethostbyname $dst;
+                    ### my $rdns = gethostbyaddr($ipaddr, AF_INET);
+                    if ($rdns = gethostbyaddr $ipaddr, 2) {
+                        $dst_dns_str = $rdns;
+                    } else {
+                        $dst_dns_str = '[No reverse dns info available]';
+                    }
+                } else {
+                    ### $ipaddr was already reported as
+                    ### a host name by iptables (does this actually
+                    ### happen?)
+                    $dst_dns_str = $dst;
                 }
             }
 
@@ -2248,18 +2264,18 @@ sub scan_logr() {
             print E " ** psad: Suspicious traffic detected against ",
                 "$config{'HOSTNAME'} ($dst).\n\n\n";
             printf E "%${log_len}s%s", 'Source: ', "$src\n";
-            printf E "%${log_len}s%s", 'Source DNS: ', "$dns_str\n"
+            printf E "%${log_len}s%s", 'Source DNS: ', "$src_dns_str\n"
                 unless $no_rdns;
             if (!$no_posf && defined $posf{$src}{'guess'}) {
                 printf E "%${log_len}s%s", 'Source OS guess: ',
-                    "$posf{$src}{'guess'}\n\n";
+                    "$posf{$src}{'guess'}\n";
             }
+            print E "\n";
             printf E "%${log_len}s%s", 'Destination: ', "$dst\n";
+            printf E "%${log_len}s%s", 'Destination DNS: ', "$dst_dns_str\n";
+            print E "\n";
             printf E "%${log_len}s%s", 'Danger level: ',
                 "[$scan_dl{$src}] (out of 5)\n\n";
-            printf E "%${log_len}s%s", 'Current interval: ',
-                "$s_time (start)\n";
-            printf E "%${log_len}s%s", '', "$time (end)\n";
             if ($tcp_f) {
                 printf E "%${log_len}s%s", 'Scanned tcp ports: ',
                     "[$tcp_newrange: $tcp_newpkts packets]\n";
@@ -2304,6 +2320,10 @@ sub scan_logr() {
             }
             print E "\n";
 
+            printf E "%${log_len}s%s", 'Current interval: ',
+                "$s_time (start)\n";
+            printf E "%${log_len}s%s", '', "$time (end)\n";
+            print E "\n";
             ### print the overall stats since the scan began
             printf E "%${log_len}s%s", 'Overall stats since: ',
                 "$abs_s_time\n";
@@ -2658,6 +2678,8 @@ sub ipt_test_block() {
 
     for my $table (keys %ipt_chains) {
         for my $chain (keys %{$ipt_chains{$table}}) {
+            print " .. ipt_test_block(): table: $table, chain: $chain\n"
+                if $debug;
             my @rules = `$cmds{'iptables'} -t $table -nL $chain`;
             RULE: for my $rule (@rules) {
                 chomp $rule;
@@ -2678,6 +2700,8 @@ sub ipt_block() {
     my $src = shift;
     for my $table (keys %ipt_chains) {
         for my $chain (keys %{$ipt_chains{$table}}) {
+            print " .. ipt_block(): table: $table, chain: $chain\n"
+                if $debug;
             system "$cmds{'iptables'} -t $table -I $chain " .
                 "$config{'IPTABLES_AUTO_RULENUM'} -s $src -j " .
                 "DROP 2> /dev/null 1>&2";
@@ -2721,8 +2745,8 @@ sub ipt_remove_block() {
     if ($rm_block) {
         &rm_blocked_ip($src, $config{'AUTO_BLOCK_IPT_FILE'});
     } else {
-        &Psad::psyslog('psad', "** could not locate iptables block rule for $src.")
-            if $flush_fw;
+        &Psad::psyslog('psad', "** could not locate iptables " .
+            "block rule for $src.") if $flush_fw;
     }
     return $rm_block;
 }
@@ -2773,19 +2797,18 @@ sub tcpwr_remove_block() {
 }
 
 sub auto_psad_response() {
+    my $current_scan_href = shift;
+
     if (not $chk_ipt_chains) {
         ### determine whether or not the NAT or mangle code has
         ### been compiled into iptables
         &get_iptables_chains();
     }
-    for my $src (keys %scan) {
 
+    for my $src (keys %$current_scan_href) {
         ### make sure we are not attempting to block 0.0.0.0
         ### or 127.0.0.1 or any of the interface ips.
-        if (&auto_block_ignore_ip($src)) {
-            &Psad::psyslog('psad', ".. ignoring $src ip for auto block");
-            next;
-        }
+        next if &auto_block_ignore_ip($src);
 
         my $dl = $scan_dl{$src};
         ### We only want to block the IP once.  Currently this will block
@@ -2869,18 +2892,52 @@ sub timeout_auto_blocked_ips() {
 }
 
 sub get_iptables_chains() {
+
+    my $nat_rv    = 1;
+    my $mangle_rv = 1;
+    my $filter_input_rv   = 1;
+    my $filter_forward_rv = 1;
     $chk_ipt_chains = 1;
-    $ipt_chains{'filter'}{'INPUT'}   = '';
-    $ipt_chains{'filter'}{'FORWARD'} = '';
-    my $nat_rv = (system "$cmds{'iptables'} -nL -t nat " .
-        "> /dev/null 2>&1") >> 8;
-    my $mangle_rv = (system "$cmds{'iptables'} -nL -t mangle " .
-        "> /dev/null 2>&1") >> 8;
-    if ($nat_rv == 0) {
-        $ipt_chains{'nat'}{'PREROUTING'} = '';
-    }
-    if ($mangle_rv == 0) {
-        $ipt_chains{'mangle'}{'PREROUTING'} = '';
+
+    my %iptables_testing = (
+        'filter' => {
+            'INPUT'   => '',
+            'FORWARD' => ''
+        },
+        'nat' => {
+            'PREROUTING' => ''
+        },
+        'mangle' => {
+            'PREROUTING' => ''
+        }
+    );
+
+    for my $table (keys %iptables_testing) {
+        for my $chain (keys %{$iptables_testing{$table}}) {
+            my $rv = 1;
+            eval {
+                $rv = (system "$cmds{'iptables'} -nL -t $table " .
+                    "> /dev/null 2>&1") >> 8;
+            };
+            if ($rv == 0) {
+                eval {
+                    $rv = (system "$cmds{'iptables'} -t $table -I " .
+                        "$chain 1 -s 127.0.0.2 -j DROP > /dev/null " .
+                        "2>&1") >> 8;
+                };
+                if ($rv == 0) {
+                    eval {
+                        $rv = (system "$cmds{'iptables'} -t $table -D " .
+                            "$chain 1 > /dev/null 2>&1") >> 8;
+                    };
+                }
+                if ($rv == 0) {
+                    $ipt_chains{$table}{$chain} = '';
+                }
+            }
+            print " .. get_iptables_chains(): $table $chain rv: $rv\n"
+                if $debug;
+        }
     }
     return;
 }
@@ -2918,13 +2975,14 @@ sub rm_blocked_ip() {
             die " ** Could not open $file: $!";
         my @lines = <B>;
         close B;
-        open W, "> $file" or
-            die " ** Could not open $file: $!";
+        open W, "> ${file}.tmp" or
+            die " ** Could not open ${file}.tmp: $!";
         for my $line (@lines) {
             chomp $line;
             print W $line, "\n" unless $line eq $src;
         }
         close W;
+        move "${file}.tmp", $file;
     }
     return;
 }

@@ -666,8 +666,8 @@ for (;;) {
         &write_global_packet_counters() unless $benchmark;
     }
 
-    ### Timeout any auto-blocked ips that are past due (need to
-    ### check the timeouts against existing ips in the scan hash
+    ### Timeout any auto-blocked IPs that are past due (need to
+    ### check the timeouts against existing IPs in the scan hash
     ### even if new packets are not found).
     if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
             and $config{'AUTO_BLOCK_TIMEOUT'} > 0
@@ -2103,7 +2103,7 @@ sub import_auto_ips() {
                 $all_proto = 0;
             }
             if ($all_proto) {
-                $auto_ips{'ip'}{$ip}{'allprto'} = $dl;
+                $auto_ips{'ip'}{$ip}{'allproto'} = $dl;
             }
         } elsif ($line =~ m|^\s*($ip_re/\d+)\s+([0-5])|) {
             my $net = $1;
@@ -2124,7 +2124,7 @@ sub import_auto_ips() {
                 $all_proto = 0;
             }
             if ($all_proto) {
-                $auto_ips{'net'}{$net}{'allprto'} = $dl;
+                $auto_ips{'net'}{$net}{'allproto'} = $dl;
             }
         } else {
             my $subject = " ** psad import warning: " .
@@ -2133,7 +2133,14 @@ sub import_auto_ips() {
                 $cmds{'mail'});
         }
     }
-    &Psad::psyslog('psad', '.. imported psad_auto_ips');
+    if (%auto_ips) {
+        my $ip_ctr = 0;
+        my $net_ctr = 0;
+        $ip_ctr++ for keys %{$auto_ips{'ip'}};
+        $net_ctr++ for keys %{$auto_ips{'net'}};
+        &Psad::psyslog('psad',
+            ".. imported psad_auto_ips, got $ip_ctr IPs and $net_ctr networks");
+    }
     return;
 }
 
@@ -2306,34 +2313,41 @@ sub assign_danger_level() {
 sub assign_auto_danger_level() {
     my $current_scan_href = shift;
     ### note that we only _increase_ danger levels (or ignore ips
-    ### altogether) here; we never ### decrease them.
+    ### altogether) here; we never decrease them.
     SRC: for my $src (keys %$current_scan_href) {
         if (defined $auto_ips{'ip'}{$src}) {
-            for my $proto qw(allprto tcp udp icmp) {
-                if (defined $auto_ips{'ip'}{$src}{$proto}) {
-                    ### ignore $src if the auto danger level is zero
-                    next SRC if $auto_ips{'ip'}{$src}{$proto} == 0;
-                    if ($scan_dl{$src} < $auto_ips{'ip'}{$src}{$proto}) {
-                        $scan_dl{$src} = $auto_ips{'ip'}{$src}{$proto};
-                        $assigned_auto_dl{$src} = '';
-                        ### the danger level has increased so set the
-                        ### alerted flag to zero for all destinations
-                        &set_alerted_zero($scan{$src});
-                    }
+            PR: for my $proto qw(allproto tcp udp icmp) {
+                next PR unless defined $auto_ips{'ip'}{$src}{$proto};
+                ### ignore $src if the auto danger level is zero
+                next SRC if $auto_ips{'ip'}{$src}{$proto} == 0;
+                next PR unless &check_scan_proto($proto, $current_scan_href->{$src});
+                if ($scan_dl{$src} < $auto_ips{'ip'}{$src}{$proto}) {
+                    $scan_dl{$src} = $auto_ips{'ip'}{$src}{$proto};
+                    $assigned_auto_dl{$src} = '';
+                    ### the danger level has increased so set the
+                    ### alerted flag to zero for all destinations
+                    &set_alerted_zero($scan{$src});
+                    &Psad::psyslog('psad',
+                        ".. auto-assigned dl: $auto_ips{'ip'}{$src}{$proto} " .
+                        "for IP: $src");
                 }
             }
         } else {
-            for my $net (keys %{$auto_ips{'net'}}) {
-                next unless ipv4_in_network($net, $src);
-                for my $proto qw(allprto tcp udp icmp) {
-                    if (defined $auto_ips{'net'}{$src}{$proto}) {
-                        ### ignore $src if the auto danger level is zero
-                        next SRC if $auto_ips{'net'}{$src}{$proto} == 0;
-                        if ($scan_dl{$src} < $auto_ips{'net'}{$src}{$proto}) {
-                            $scan_dl{$src} = $auto_ips{'net'}{$src}{$proto};
-                            $assigned_auto_dl{$src} = '';
-                            &set_alerted_zero($scan{$src});
-                        }
+            NET: for my $net (keys %{$auto_ips{'net'}}) {
+                next NET unless ipv4_in_network($net, $src);
+                PR: for my $proto qw(allproto tcp udp icmp) {
+                    next PR unless defined $auto_ips{'net'}{$src}{$proto};
+                    ### ignore $src if the auto danger level is zero
+                    next SRC if $auto_ips{'net'}{$src}{$proto} == 0;
+                    next PR unless &check_scan_proto($proto,
+                        $current_scan_href->{$src});
+                    if ($scan_dl{$src} < $auto_ips{'net'}{$src}{$proto}) {
+                        $scan_dl{$src} = $auto_ips{'net'}{$src}{$proto};
+                        $assigned_auto_dl{$src} = '';
+                        &set_alerted_zero($scan{$src});
+                        &Psad::psyslog('psad',
+                            ".. auto-assigned dl: $auto_ips{'net'}{$src}{$proto} " .
+                            "for IP: $src");
                     }
                 }
             }
@@ -3715,8 +3729,7 @@ sub status() {
 sub status_psad_daemon() {
     my $cmdline;
     if (not $analyze_msgs) {
-        ### only the psad daemon (normally) runs
-        ### with command line arguments
+        ### get any command line args
         if (-e $cmdline_file) {
             open CMD, "< $cmdline_file" or die ' ** Could not open ',
                 "$cmdline_file: $!";
@@ -3796,6 +3809,8 @@ sub status_psad_daemon() {
     if (%scan_srcs) {
         printf "    %-17s%-17s%-8s%-12s%-6s%-6s%-7s%-7s\n", 'src:', 'dst:',
             'chain:', 'interface:', 'tcp:', 'udp:', 'icmp:', 'dl:';
+        my %uniq_srcs = ();
+        my %uniq_dsts = ();
         if ($status_sort_dl) {
             my $found_equal_status = 0;
             for my $dl (sort {$b <=> $a} keys %scan_srcs) {
@@ -3830,7 +3845,9 @@ sub status_psad_daemon() {
                                     $udp_ctr, $icmp_ctr, $dl;
                             }
                         }
+                        $uniq_dsts{$dst} = '';
                     }
+                    $uniq_srcs{$src} = ''
                 }
                 unless ($found_equal_status) {
                     print STDOUT "    [No level $status_dl scans detected]\n";
@@ -3870,12 +3887,20 @@ sub status_psad_daemon() {
                                 $udp_ctr, $icmp_ctr, $dl;
                         }
                     }
+                    $uniq_dsts{$dst} = '';
                 }
+                $uniq_srcs{$src} = '';
             }
             unless ($found_equal_status) {
                 print STDOUT "    [No level $status_dl scans detected]\n";
             }
         }
+        my $src_ctr = 0;
+        my $dst_ctr = 0;
+        $src_ctr++ for keys %uniq_srcs;
+        $dst_ctr++ for keys %uniq_dsts;
+        print "\n    Total scan sources: $src_ctr\n",
+            "    Total scan destinations: $dst_ctr\n";
     } else {
         print STDOUT "    [No scans detected]\n";
     }

@@ -16,22 +16,32 @@ use strict;
 ### default psad config file.
 my $config_file  = '/etc/psad/psad.conf';
 
+### default fw_search file where FW_MSG_SEARCH strings
+### are set.  Both psad and kmsgsd reference this single
+### file now instead of having FW_MSG_SEARCH appear in
+### psad.conf and kmsgsd.conf.
+my $fw_search_file = '/etc/psad/fw_search.conf';
+
 ### config hash
 my %config = ();
 
 ### commands hash
 my %cmds;
 
+### fw search string array
+my @fw_search = ();
+
 my $help = 0;
 my $fw_analyze = 0;
 my $fw_file    = '';
 
 &usage(1) unless (GetOptions(
-    'config=s'  => \$config_file, # Specify path to configuration file.
-    'fw-file=s' => \$fw_file,     # Analyze ruleset contained within
-                                  # $fw_file instead of a running
-                                  # policy.
-    'help'      => \$help,        # Display help.
+    'config=s'    => \$config_file, # Specify path to configuration file.
+    'fw-file=s'   => \$fw_file,     # Analyze ruleset contained within
+                                    # $fw_file instead of a running
+                                    # policy.
+    'fw-search=s' => \$fw_search_file,  # Specify path to fw_search.conf.
+    'help'        => \$help,        # Display help.
 ));
 &usage(0) if $help;
 
@@ -47,15 +57,28 @@ $< == 0 && $> == 0 or
 ### are in the right place, and attempt to correct automatically if not.
 &Psad::check_commands(\%cmds);
 
+### import FW_MSG_SEARCH strings
+&import_fw_search();
+
+open FWCHECK, "> $config{'FW_CHECK_FILE'}" or die " ** Could not ",
+    "open $config{'FW_CHECK_FILE'}: $!";
+
+print FWCHECK " .. Available search strings in $fw_search_file:\n\n";
+print FWCHECK "        $_\n" for @fw_search;
+print FWCHECK
+"\n .. Additional search strings can be added be specifying more FW_MSG_SEARCH\n",
+"    lines in $fw_search_file\n\n";
+
 ### check the iptables policy
 &fw_check();
+
+close FWCHECK;
 
 exit 0;
 
 #========================== end main =========================
 
 sub fw_check() {
-    unlink $config{'FW_CHECK_FILE'} if -e $config{'FW_CHECK_FILE'};
 
     ### only send a firewall config alert if we really need to.
     my $send_alert = 0;
@@ -79,13 +102,11 @@ sub fw_check() {
         }
     }
 
-#    if ($send_alert) {
-    if (1) {
-        &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
-        &Psad::logr(' .. NOTE: IPTables::Parse does not yet parse user ' .
-            'defined chains and so it is possible your firewall config ' .
-            "is compatible with psad anyway.\n",
-            {$config{'FW_CHECK_FILE'} => 1});
+    if ($send_alert) {
+        print FWCHECK
+"\n .. NOTE: IPTables::Parse does not yet parse user defined chains and so\n",
+"    it is possible your firewall config is compatible with psad anyway.\n";
+
         &Psad::sendmail(" ** psad: firewall setup warning on " .
             "$config{'HOSTNAME'}!", $config{'FW_CHECK_FILE'},
             $config{'EMAIL_ADDRESSES'},
@@ -99,10 +120,10 @@ sub fw_check() {
                 "$config{'EMAIL_ADDRESSES'}\n";
         }
     } else {
-        &Psad::logr(" .. The iptables ruleset on $config{'HOSTNAME'} " .
-            "will log and block unwanted packets in both the INPUT and " .
-            "FORWARD chains.  Firewall config success!\n",
-            {$config{'FW_CHECK_FILE'} => 1});
+        print FWCHECK
+" .. The iptables ruleset on $config{'HOSTNAME'} will log and block unwanted\n",
+"    packets in both the INPUT and FORWARD chains.  Firewall config success!\n";
+
         if ($fw_analyze) {
             print scalar localtime(), " .. Firewall config looks good.\n";
             print scalar localtime(), " .. Completed check of firewall ruleset.\n";
@@ -117,31 +138,21 @@ sub fw_check() {
 
 sub print_fw_help() {
     my $chain = shift;
-    &Psad::logr(" ** The $chain chain in the iptables ruleset on " .
-        "$config{'HOSTNAME'} does not include default rules that will " .
-        "log and drop unwanted packets. You need to include two default " .
-        "rules; one that logs packets that have not been accepted by " .
-        "previous rules (this rule should have a logging prefix of " .
-        "\"$config{'FW_MSG_SEARCH'}\"), and a final rule that drops any " .
-        "unwanted packets.\n",
-        {$config{'FW_CHECK_FILE'} => 1});
-    &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
-    &Psad::logr('    FOR EXAMPLE:  Assuming you have already setup ' .
-        'iptables rules to accept traffic you want to allow, you can ' .
-        'probably execute the following two commands to have iptables ' .
-        "log and drop unwanted packets in the $chain chain by " .
-        "default.\n",
-        {$config{'FW_CHECK_FILE'} => 1});
-    &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
-    &Psad::logr("              iptables -A $chain -j LOG --log-prefix " .
-        qq("$config{'FW_MSG_SEARCH'} "\n), {$config{'FW_CHECK_FILE'} => 1});
-    &Psad::logr("              iptables -A $chain -j DROP\n\n",
-        {$config{'FW_CHECK_FILE'} => 1});
-    &Psad::logr(" ** Psad will not detect in the iptables $chain chain " .
-        'scans without an iptables ruleset that includes rules similar ' .
-        "to the two rules above.\n",
-        {$config{'FW_CHECK_FILE'} => 1});
-    &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
+    print FWCHECK
+" ** The $chain chain in the iptables ruleset on $config{'HOSTNAME'} does not\n",
+"    include default rules that will log and drop unwanted packets. You need\n",
+"    to include two default rules; one that logs packets that have not been\n",
+"    accepted by previous rules (this rule should have a logging prefix of one\n",
+"    of the search string mentioned above), and a final rule that drops any\n",
+"    unwanted packets.\n\n",
+"    FOR EXAMPLE:  Assuming you have already setup iptables rules to accept\n",
+"    traffic you want to allow, you can probably execute the following two\n",
+"    commandsto have iptables log and drop unwanted packets in the $chain\n",
+"    chain by default.\n\n",
+"              iptables -A $chain -j LOG --log-prefix \"$fw_search[0] \"\n",
+"              iptables -A $chain -j DROP\n\n",
+" ** Psad will not detect in the iptables $chain chain scans without an\n",
+"    iptables ruleset that includes rules similar to the two rules above.\n\n";
     return;
 }
 
@@ -223,36 +234,39 @@ sub ipt_chk_chain() {
                     $str1 = "for the $proto protocol";
                     $str2 = "$proto scans";
                 }
-                &Psad::logr(" ** The $chain chain in the iptables ruleset on " .
-                    "$config{'HOSTNAME'} does not include a default LOG rule " .
-                    "$str1.  psad will not be able to detect $str2 without " .
-                    "such a rule.\n",
-                    {$config{'FW_CHECK_FILE'} => 1});
-                &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
+                print FWCHECK
+" ** The $chain chain in the iptables ruleset on $config{'HOSTNAME'} does not\n",
+"    include a default LOG rule $str1.  psad will not be able to\n",
+"    detect $str2 without such a rule.\n\n";
+
                 $rv = 0;
             }
-            if (defined $ld_hr->{$proto}->{'LOG'}->{'prefix'}
-                    && $ld_hr->{$proto}->{'LOG'}->{'prefix'}
-                    !~ /$config{'FW_MSG_SEARCH'}/) {
-                if ($proto eq 'all') {
-                    $str1 = " ** The $chain chain in the iptables ruleset " .
-                    "on $config{'HOSTNAME'} includes a default LOG rule for " .
-                    "all protocols,";
-                    $str2 = 'scans';
-                } else {
-                    $str1 = " ** The $chain chain in the iptables ruleset " .
-                    "on $config{'HOSTNAME'} inclues a default LOG rule for " .
-                    "the $proto protocol,";
-                    $str2 = "$proto scans";
+            if (defined $ld_hr->{$proto}->{'LOG'}->{'prefix'}) {
+                my $found = 0;
+                for my $fwstr (@fw_search) {
+                    $found = 1
+                        if $ld_hr->{$proto}->{'LOG'}->{'prefix'} =~ /$fwstr/;
                 }
-                &Psad::logr("$str1 but the rule does not have a log prefix " .
-                    qq(of "$config{'FW_MSG_SEARCH'}".  It appears as though ) .
-                    qq(the log prefix is set to "$ld_hr->{$proto}->{'LOG'}->{'prefix'}".) .
-                    qq(  psad will not be able to detect $str2 without adding ) .
-                    qq(--log-prefix "$config{'FW_MSG_SEARCH'}" to the rule.\n),
-                    {$config{'FW_CHECK_FILE'} => 1});
-                &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
-                $rv = 0;
+                unless ($found) {
+                    if ($proto eq 'all') {
+                        $str1 = " ** The $chain chain in the iptables ruleset " .
+                        "on $config{'HOSTNAME'} includes a default\n    LOG rule for " .
+                        "all protocols,";
+                        $str2 = 'scans';
+                    } else {
+                        $str1 = " ** The $chain chain in the iptables ruleset " .
+                        "on $config{'HOSTNAME'} inclues a default\n    LOG rule for " .
+                        "the $proto protocol,";
+                        $str2 = "$proto scans";
+                    }
+                    print FWCHECK
+"$str1\n",
+"    but the rule does not include one of the log prefixes mentioned above.\n",
+"    It appears as though the log prefix is set to \"$ld_hr->{$proto}->{'LOG'}->{'prefix'}\"\n",
+"    psad will not be able to detect $str2 without adding one of the above\n",
+"    logging prefixes to the rule.\n\n";
+                    $rv = 0;
+                }
             }
             if (! defined $ld_hr->{$proto}->{'DROP'}) {
                 if ($proto eq 'all') {
@@ -260,17 +274,31 @@ sub ipt_chk_chain() {
                 } else {
                     $str1 = "for the $proto protocol";
                 }
-                &Psad::logr(" ** The $chain chain in the iptables ruleset on " .
-                    "$config{'HOSTNAME'} does not include a default DROP " .
-                    "rule $str1.\n", {$config{'FW_CHECK_FILE'} => 1});
-                &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
+                print FWCHECK
+" ** The $chain chain in the iptables ruleset on $config{'HOSTNAME'} does not\n",
+"    include a default DROP rule $str1.\n\n";
+
                 $rv = 0;
             }
         }
     }
-    ### make sure there was _something_ return from the IPTables::Parse
+    ### make sure there was _something_ returned from the IPTables::Parse
     ### module.
     return 0 unless $num_keys > 0;
     return $rv;
 }
 
+sub import_fw_search() {
+    open F, "< $fw_search_file" or die " ** Could not open fw search ",
+        "string file $fw_search_file: $!";
+    my @lines = <F>;
+    close F;
+    for my $line (@lines) {
+        next unless $line =~ /\S/;
+        next if $line =~ /^\s*#/;
+        if ($line =~ /^\s*FW_MSG_SEARCH\s+(.*?);/) {
+            push @fw_search, $1;
+        }
+    }
+    return;
+}

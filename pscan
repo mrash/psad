@@ -1,6 +1,9 @@
 #!/usr/bin/perl -w
 
-# pscan: perl scan
+# pscan: perl scan, lightweight port scanner.  Simply tries to
+# open a socket to each of the ports in the range specified on
+# the command line.  You do not need to be root to execute this
+# script.
 
 use Socket;
 use Getopt::Long;

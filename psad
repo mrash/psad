@@ -786,16 +786,22 @@ sub check_scan() {
     my @err_pkts = ();
 
     my $pkt_ctr = 0;
-    my $print_scale_factor = int($#$fw_packets_aref/10);
-    if ($print_scale_factor < 100) {
-        $print_scale_factor -= $print_scale_factor % 10;
-    } elsif ($print_scale_factor < 1000) {
-        $print_scale_factor -= $print_scale_factor % 100;
-    } elsif ($print_scale_factor < 10000) {
-        $print_scale_factor -= $print_scale_factor % 1000;
-    } elsif ($print_scale_factor < 100000) {
-        $print_scale_factor -= $print_scale_factor % 10000;
+    my $print_scale_factor = 0;
+    if ($#$fw_packets_aref < 100) {
+        $print_scale_factor = $#$fw_packets_aref;
+    } else {
+        $print_scale_factor = int($#$fw_packets_aref/10);
+        if ($print_scale_factor < 100) {
+            $print_scale_factor -= $print_scale_factor % 10;
+        } elsif ($print_scale_factor < 1000) {
+            $print_scale_factor -= $print_scale_factor % 100;
+        } elsif ($print_scale_factor < 10000) {
+            $print_scale_factor -= $print_scale_factor % 1000;
+        } elsif ($print_scale_factor < 100000) {
+            $print_scale_factor -= $print_scale_factor % 10000;
+        }
     }
+    $print_scale_factor++ if $print_scale_factor == 0;
     PKT: for my $pkt (@$fw_packets_aref) {
         my $src = '';
         my $dst = '';

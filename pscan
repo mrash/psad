@@ -42,7 +42,7 @@ if ($ipaddress && $start_port && $end_port) {
 		$i++;
 	}
 	print "Port:	Status:\n";
-	foreach my $o_port (@open_ports) {
+	for my $o_port (@open_ports) {
 		print "$o_port	open\n";
 	}
 	if ($#closed_ports == ($end_port - $start_port)) {

@@ -356,7 +356,7 @@ for (;;) {
 		my $sigs_mtime_end = stat($signatures)->mtime;
 		if ($sigs_mtime_start != $sigs_mtime_end) {  # the signatures were updated... import the new signatures.
 			$Sigs_href = &import_signatures($signatures);
-                	foreach my $email_address (@EMAIL_ADDRESSES) {
+                	for my $email_address (@EMAIL_ADDRESSES) {
                         	system "$Cmds{'mail'} $email_address -s \"psad: re-read $signatures file on $HOSTNAME\" < /dev/null";
                 	}
 		}
@@ -368,7 +368,7 @@ for (;;) {
 			$Auto_ips_href = &import_auto_ips($auto_ips);
 			# need to set $Scan_href->{$srcip}->{$dstip}->{'AUTO'} = "N" since $Auto_ips_href was updated.
 			$Scan_href = &reset_auto_tags($Scan_href);
-			foreach my $email_address (@EMAIL_ADDRESSES) {
+			for my $email_address (@EMAIL_ADDRESSES) {
                                 system "$Cmds{'mail'} $email_address -s \"psad: re-read $auto_ips file on $HOSTNAME\" < /dev/null";
                         }
 		}
@@ -402,12 +402,12 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 	my @bad_packets;
 	my $local_listening_ports_href;
 	my ($srcip, $dstip, $proto, $srcport, $dstport, $flags);
-	# if necessary check which firewall (ipchains vs. iptables)
+	# if necessary, check which firewall (ipchains vs. iptables)
 	&check_fw($process_lines_aref->[0]) unless ($USE_IPCHAINS || $USE_IPTABLES);
 	unless ($netstat_lookup) {
 		$local_listening_ports_href = &get_listening_ports($Cmds_href);
 	}
-	READPKT: foreach my $l (@$process_lines_aref) {
+	READPKT: for my $l (@$process_lines_aref) {
 		chomp $l;
 		if ($USE_IPTABLES) {
 			# sometimes the log entry is messed up by iptables so we write it to the error log
@@ -515,7 +515,7 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 			print "     Scan{srcip}{dstip}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'} = $Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'}\n";
 		}
 		if ($signatures && $USE_IPTABLES) {  # might try use ipchains also, but then cannot use tcp flags except for -y -l rules
-			foreach my $msg (keys %{$sigs_href->{$proto}}) {   # need to iterate through all signatures since a packet may match several
+			for my $msg (keys %{$sigs_href->{$proto}}) {   # need to iterate through all signatures since a packet may match several
 				my $dstport_criteria = 0;
 				my $srcport_criteria = 0;
 				my $rv = 0;
@@ -623,7 +623,7 @@ sub import_signatures() {
 	open SIGS, "< $sigfile" or die "Could not open the signatures file $sigfile: $!\n";
 	my @sigs = <SIGS>;
 	close SIGS;
-	foreach my $s (@sigs) {
+	for my $s (@sigs) {
 		chomp $s;
 		next if ($s =~ /^#/);
 		if ($s =~ /^tcp/) {
@@ -721,7 +721,7 @@ sub import_auto_ips() {
 	open AUTO, "< $auto_ips_file";
 	my @lines = <AUTO>;
 	close AUTO;
-	foreach my $l (@lines) {
+	for my $l (@lines) {
 		next if ($l =~ /^#/);
 		if ($l =~ /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+([0-5]|\-1)/) {
 			$Auto_ips{$1} = $2;
@@ -731,8 +731,8 @@ sub import_auto_ips() {
 }
 sub reset_auto_tags() {
 	my $Scan_href = shift;
-	foreach my $srcip (keys %$Scan_href) {
-		foreach my $dstip (keys %{$Scan_href->{$srcip}}) {
+	for my $srcip (keys %$Scan_href) {
+		for my $dstip (keys %{$Scan_href->{$srcip}}) {
 			$Scan_href->{$srcip}->{$dstip}->{'AUTO'} = "N";
 		}
 	}
@@ -747,9 +747,9 @@ sub check_range() {
 sub assign_danger_level() {
 	my ($Scan_href, $Auto_ips_href, $port_range_scan_threshold, $alert_all, $danger_levels_href) = @_;
 	$Scan_href = &automatic_ip_danger_assignment($Scan_href, $Auto_ips_href) if ($Auto_ips_href); 
-	foreach my $srcip (keys %$Scan_href) {
+	for my $srcip (keys %$Scan_href) {
 		print "assign_danger_level(): source ip: $srcip\n" if $DEBUG;
-		foreach my $dstip (keys %{$Scan_href->{$srcip}}) {
+		for my $dstip (keys %{$Scan_href->{$srcip}}) {
 			my $absnum = $Scan_href->{$srcip}->{$dstip}->{'ABSNUM'};
 			my $range = $Scan_href->{$srcip}->{$dstip}->{'END_PORT'} - $Scan_href->{$srcip}->{$dstip}->{'START_PORT'};
 			if ($DEBUG) {
@@ -820,9 +820,9 @@ sub assign_danger_level() {
 }
 sub automatic_ip_danger_assignment() {
 	my ($Scan_href, $Auto_ips_href) = @_;
-	foreach my $scan_ip (keys %$Scan_href) {
-		foreach my $dstip (keys %{$Scan_href->{$scan_ip}}) {
-			foreach my $auto_ip (keys %$Auto_ips_href) {
+	for my $scan_ip (keys %$Scan_href) {
+		for my $dstip (keys %{$Scan_href->{$scan_ip}}) {
+			for my $auto_ip (keys %$Auto_ips_href) {
 				if ($scan_ip eq $auto_ip && $Scan_href->{$scan_ip}->{$dstip}->{'AUTO'} eq "N") {
 					$Scan_href->{$scan_ip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} = $Auto_ips_href->{$auto_ip};
 					$Scan_href->{$scan_ip}->{$dstip}->{'ALERTED'} = "N";
@@ -836,7 +836,7 @@ sub automatic_ip_danger_assignment() {
 sub collect_errors() {
 	my ($bad_packets_aref, $error_log) = @_;
 	open ERRORS, ">> $error_log";
-	foreach my $l (@$bad_packets_aref) {
+	for my $l (@$bad_packets_aref) {
 		print ERRORS "$l\n";
 	}
 	close ERRORS;
@@ -857,9 +857,9 @@ sub scan_logr() {
 		$hndl = "LOG"; 
 		open $hndl, ">> $logfile";
        	}
-	foreach my $srcip (keys %$Scan_href) {
+	for my $srcip (keys %$Scan_href) {
 		print "scan_logr(): source ip: $srcip\n" if $DEBUG;
-		foreach my $dstip (keys %{$Scan_href->{$srcip}}) {
+		for my $dstip (keys %{$Scan_href->{$srcip}}) {
 			print "scan_logr(): dst ip: $dstip\n" if $DEBUG;
 			my ($tcp, $udp) = (0,0);
 			my $current_danger_level = $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'};
@@ -976,7 +976,7 @@ sub scan_logr() {
 				}
 				if ($USE_IPTABLES) {
 					my $i = 0;
-					SIGS: foreach my $p ($tcp, $udp) {
+					SIGS: for my $p ($tcp, $udp) {
 						my $proto;
 						next SIGS unless $p;
 						if ($p && $i == 0) {
@@ -985,7 +985,7 @@ sub scan_logr() {
 							$proto = "UDP";
 						}
 						if ($proto eq "TCP") {  # print tcp flags
-							foreach my $flags (keys %{$Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'FLAGS'}}) {
+							for my $flags (keys %{$Scan_href->{$srcip}->{$dstip}->{'TCP'}->{'FLAGS'}}) {
 								my $nmapOpts = 0;
 								$nmapOpts = "-sT or -sS" if ($flags eq "SYN");
 								$nmapOpts = "-sF" if ($flags eq "FIN");
@@ -1007,7 +1007,7 @@ sub scan_logr() {
 							print EMAILALERT "\n";
 							print $hndl "=-=-= $proto alert signatures found since [$Scan_href->{$srcip}->{$dstip}->{$proto}->{'CURRENT_SIGMATCH_START_TIME'}]\n";
 							print EMAILALERT "=-=-= $proto alert signatures found since [$Scan_href->{$srcip}->{$dstip}->{$proto}->{'CURRENT_SIGMATCH_START_TIME'}]\n";
-							foreach my $sigmatch (keys %{$Scan_href->{$srcip}->{$dstip}->{$proto}->{'CURRENT_SIGMATCH'}}) {
+							for my $sigmatch (keys %{$Scan_href->{$srcip}->{$dstip}->{$proto}->{'CURRENT_SIGMATCH'}}) {
                                         	        	print $hndl "$sigmatch  Packets=$Scan_href->{$srcip}->{$dstip}->{$proto}->{'CURRENT_SIGMATCH'}->{$sigmatch}\n";
                                                 		print EMAILALERT "$sigmatch  Packets=$Scan_href->{$srcip}->{$dstip}->{$proto}->{'CURRENT_SIGMATCH'}->{$sigmatch}\n";
 	                                        	}
@@ -1019,7 +1019,7 @@ sub scan_logr() {
                                         		print EMAILALERT "\n";
 							print $hndl "=-=-= ALL $proto alert signatures found since [$start_time]\n";
         	                                	print EMAILALERT "=-=-= ALL $proto alert signatures found since [$start_time]\n";
-							foreach my $sigmatch (keys %{$Scan_href->{$srcip}->{$dstip}->{$proto}->{'SIGMATCH'}}) {
+							for my $sigmatch (keys %{$Scan_href->{$srcip}->{$dstip}->{$proto}->{'SIGMATCH'}}) {
 								print $hndl "$sigmatch  Packets=$Scan_href->{$srcip}->{$dstip}->{$proto}->{'SIGMATCH'}->{$sigmatch}\n";
 								print EMAILALERT "$sigmatch  Packets=$Scan_href->{$srcip}->{$dstip}->{$proto}->{'SIGMATCH'}->{$sigmatch}\n";
 							}
@@ -1034,8 +1034,8 @@ sub scan_logr() {
                                         print $hndl "   =-=-=-=-=-=-= Whois Information: =-=-=-=-=-=-=\n";
                                         print EMAILALERT "\n\n";
                                         print EMAILALERT "   =-=-=-=-=-=-= Whois Information =-=-=-=-=-=-=\n";
-                                        print $hndl $_ foreach (@$whois_info_aref);
-                                        print EMAILALERT $_ foreach (@$whois_info_aref);
+                                        print $hndl $_ for (@$whois_info_aref);
+                                        print EMAILALERT $_ for (@$whois_info_aref);
                                         print $hndl "\n";
                                         print EMAILALERT "\n";
                                 }
@@ -1058,33 +1058,33 @@ sub scan_logr() {
 }
 sub auto_psad_response(){
         my ($Scan_href, $auto_psad_level, $Cmds_href, $email_addresses_aref) = @_;
-	SOURCEIP: foreach my $srcip (keys %$Scan_href) {
-		foreach my $dstip (keys %{$Scan_href->{$srcip}}) {
+	SOURCEIP: for my $srcip (keys %$Scan_href) {
+		for my $dstip (keys %{$Scan_href->{$srcip}}) {
 			my $current_danger_level = $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'};
 			### We only want to block the IP once.  Currently this will block all traffic from the host to _all_ destinations
 			### that are protected by the firewall if the ip trips the $auto_psad_level threshold for _any_ destination. 
         		if ($current_danger_level >= $auto_psad_level && !(defined $Scan_href->{$srcip}->{$dstip}->{'BLOCKED'})) {
                 		if ($USE_IPCHAINS) {
                         		my @chains = &get_input_chains($Cmds_href->{'ipchains'});
-                        		foreach my $inchain (@chains) {
+                        		for my $inchain (@chains) {
                                 		`$Cmds_href->{'ipchains'} -I $inchain 1 -s $srcip -l -j DENY`;
                         		}
-					foreach my $dst (keys %{$Scan_href->{$srcip}}) {
+					for my $dst (keys %{$Scan_href->{$srcip}}) {
 						$Scan_href->{$srcip}->{$dst}->{'BLOCKED'} = "Y";
 					}
-                			foreach my $email_address (@$email_addresses_aref) {
+                			for my $email_address (@$email_addresses_aref) {
                         			system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $srcip has been BLOCKED on $HOSTNAME\" < /dev/null";
                 			}
 					next SOURCEIP; 
                 		} elsif ($USE_IPTABLES) {
                         		my @chains = &get_input_chains($Cmds_href->{'iptables'});
-                        		foreach my $inchain (@chains) {
+                        		for my $inchain (@chains) {
                                 		`$Cmds_href->{'iptables'} -I $inchain 1 -s $srcip -j DROP`;
                         		}
-					foreach my $dst (keys %{$Scan_href->{$srcip}}) {
+					for my $dst (keys %{$Scan_href->{$srcip}}) {
                                                 $Scan_href->{$srcip}->{$dst}->{'BLOCKED'} = "Y";
                                         }
-                                        foreach my $email_address (@$email_addresses_aref) {
+                                        for my $email_address (@$email_addresses_aref) {
                                                 system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $srcip has been BLOCKED on $HOSTNAME\" < /dev/null";
                                         }
                                         next SOURCEIP;
@@ -1099,7 +1099,7 @@ sub get_input_chains() {
         my @rules;
         my @chains;
         @rules = `$fwCmd -L`;
-        foreach my $r (@rules) {
+        for my $r (@rules) {
                 next unless ($r =~ /Chain/);
                 my ($cname) = ($r =~ /Chain\s(\w+)/);
                 next unless ($cname =~ /in/i);  # we don't have an input chain
@@ -1109,7 +1109,7 @@ sub get_input_chains() {
 }
 sub send_email_alert() {
         my ($Scan_href, $srcip, $dstip, $flags_mesg, $email_alertfile, $email_addresses_aref, $Cmds_href) = @_;
-	foreach my $email_address (@$email_addresses_aref) {
+	for my $email_address (@$email_addresses_aref) {
 		print "send_email_alert(): sending scan alert email to: $email_address\n" if $DEBUG;
 		system("$Cmds_href->{'mail'} $email_address -s \"psad WARNING: $HOSTNAME has been scanned!\" < $email_alertfile");
 	}

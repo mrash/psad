@@ -298,6 +298,22 @@ sub install() {
     chdir '..';
     print "\n\n";
 
+    ### installing Bit::Vector
+    &logr(" .. Installing the Bit::Vector (6.3) perl module\n");
+    chdir 'Bit-Vector' or die " ** Could not chdir to ",
+        "Bit-Vector: $!";
+    unless (-e 'Makefile.PL') {
+        die " ** Your source directory appears to be incomplete!  Bit-Vector ",
+            "is missing.\n    Download the latest sources from ",
+            "http://www.cipherdyne.org\n";
+    }
+    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
+    system $Cmds{'make'};
+#    system "$Cmds{'make'} test";
+    system "$Cmds{'make'} install";
+    chdir '..';
+    print "\n\n";
+
     ### installing Date::Calc
     &logr(" .. Installing the Date::Calc (5.3) perl module\n");
     chdir 'Date-Calc' or die " ** Could not chdir to ",
@@ -715,7 +731,7 @@ sub set_hostname() {
         open PH, "> $file";
         for my $line (@lines) {
             chomp $line;
-            if ($line =~ /^\s*HOSTNAME(\s+)_CHANGE.?ME_/) {
+            if ($line =~ /^\s*HOSTNAME(\s+)_?CHANGE.?ME_?/) {
                 print PH "HOSTNAME${1}$HOSTNAME;\n";
             } else {
                 print PH "$line\n";

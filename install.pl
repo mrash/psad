@@ -65,7 +65,7 @@ my $CONF_ARCHIVE = "${PSAD_CONFDIR}/archive";
 my @LOGR_FILES   = (*STDOUT, $INSTALL_LOG);
 my $RUNLEVEL;    ### This should only be set if install.pl
                  ### cannot determine the correct runlevel
-my $WHOIS_PSAD   = '/usr/bin/whois.psad';
+my $WHOIS_PSAD   = '/usr/bin/whois_psad';
 
 ### directory in which to install snort rules
 my $SNORT_DIR    = "${PSAD_CONFDIR}/snort-1.8.7_rules";
@@ -542,6 +542,9 @@ sub install() {
         &logr(" .. To execute psad, run \"${INIT_DIR}/psad start\"\n");
     }
     &logr("\n .. Psad has been installed!\n");
+
+    ### remove old whois.psad location
+    unlink '/usr/bin/whois.psad' if (-e '/usr/bin/whois.psad');
     return;
 }
 
@@ -608,6 +611,11 @@ sub uninstall() {
     if (-e $PSAD_FIFO) {
         print " .. Removing named pipe: $PSAD_FIFO\n";
         unlink $PSAD_FIFO;
+    }
+    ### remove old whois binary location
+    if (-e '/usr/bin/whois.psad') {
+        print " .. Removing $WHOIS_PSAD\n";
+        unlink $WHOIS_PSAD;
     }
     if (-e $WHOIS_PSAD) {
         print " .. Removing $WHOIS_PSAD\n";
@@ -877,9 +885,11 @@ sub check_old_psad_installation() {
         unlink "${PSAD_CONFDIR}/psad.conf.old";
     }
     ### Psad.pm will be installed The Right Way using "make"
-    unlink "${PERL_INSTALL_DIR}/Psad.pm" if (-e "${PERL_INSTALL_DIR}/Psad.pm");
+    unlink "${PERL_INSTALL_DIR}/Psad.pm"
+        if (-e "${PERL_INSTALL_DIR}/Psad.pm");
     if (-e '/var/log/psadfifo') {  ### this is the old psadfifo location
-        if (-e "${USRSBIN_DIR}/psad" && system "${USRSBIN_DIR}/psad --Status > /dev/null") {
+        if (-e "${USRSBIN_DIR}/psad"
+            && system "${USRSBIN_DIR}/psad --Status > /dev/null") {
             ### deal with this later.  The user should be prompted before
             ### the old psadfifo is removed since kmsgsd will have a problem
         } else {

@@ -37,3 +37,7 @@ Donnie Armstrong		Suggested fix for incorrectly parsing
 				included ipv6 interfaces).
 
 Ryan Bebeau			Suggested fix for AF_INET protocol error.
+
+Cliff Rayman			Helped track down a nasty bug in which psad would
+				parse iptables messages that included a dns name
+				instead of just an ip address for the source and

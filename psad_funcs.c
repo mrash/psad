@@ -32,10 +32,17 @@
 *  $Id$
 */
 
-/* INCLUDES *****************************************************************/
+/* includes */
 #include "psad.h"
 
-/* FUNCTIONS ****************************************************************/
+/* shared functions */
+void slogr(const char *ident, const char *msg) {
+    openlog(ident, LOG_DAEMON, LOG_LOCAL7);
+    syslog(LOG_INFO, "%s", msg);
+    closelog();
+    return;
+}
+
 void check_unique_pid(const char *pid_file, const char *prog_name)
 {
     FILE *pidfile_ptr;
@@ -90,7 +97,8 @@ void write_pid(const char *pid_file, const pid_t pid)
 
     /* write the pid to the pid file */
     if (fprintf(pidfile_ptr, "%d\n", pid) == 0) {
-        printf(" ** pid: %d could not be written to pid file: %s", pid, pid_file);
+        printf(" ** pid: %d could not be written to pid file: %s",
+                pid, pid_file);
         exit(EXIT_FAILURE);
     }
 
@@ -107,22 +115,27 @@ void find_char_var(char *search_str, char *charvar, char *line)
 
     index_tmp = line;
 
-    /* look for specific variables in the config file that match the search_str */
+    /* look for specific variables in the config
+     * file that match the search_str */
     if (strstr(index_tmp, search_str) != NULL) {
 
 #ifdef DEBUG
-        printf(" .. find_char_var(): found %s in line: %s", search_str, line);
+        printf(" .. find_char_var(): found %s in line: %s",
+                search_str, line);
 #endif
 
         /* increment the pointer past the variable name */
         while (*index_tmp != ' ') index_tmp++;
 
-        /* increment the pointer past the whitespace before the variable value */
+        /* increment the pointer past the whitespace
+         * before the variable value */
         while (*index_tmp == ' ') index_tmp++;
 
-        /* make sure that the variable has a semicolon at the end of the line */
+        /* make sure that the variable has a semicolon
+         * at the end of the line */
 
-        /* get the number of characters in the variable before the ending semicolon */
+        /* get the number of characters in the variable
+         * before the ending semicolon */
         while (index_tmp[char_ctr] != ';' && index_tmp[char_ctr] != '\0' &&
                index_tmp[char_ctr] != '\n')
             char_ctr++;
@@ -135,7 +148,7 @@ void find_char_var(char *search_str, char *charvar, char *line)
 
         if (char_ctr > 48) {
             printf(" ** find_char_var(): the config line for %s is too long.  Exiting.\n",
-                search_str);
+                    search_str);
             exit(EXIT_FAILURE);
         }
 
@@ -160,7 +173,8 @@ void daemonize_process(const char *pid_file)
 
     if (child_pid > 0) {
 #ifdef DEBUG
-        printf(" .. writing pid: %d to pid file: %s\n", child_pid, pid_file);
+        printf(" .. writing pid: %d to pid file: %s\n",
+                child_pid, pid_file);
 #endif
         write_pid(pid_file, child_pid);
         exit(EXIT_SUCCESS);   /* exit the parent process */
@@ -193,7 +207,8 @@ void daemonize_process(const char *pid_file)
     return;
 }
 
-void send_alert_email(const char *shCmd, const char *mailCmd, const char *mail_str)
+void send_alert_email(const char *shCmd, const char *mailCmd,
+        const char *mail_str)
 {
     char mail_line[MAX_MSG_LEN] = "";
     pid_t child_pid;

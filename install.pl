@@ -156,7 +156,7 @@ my $init_dir = '';
 if (-d $INIT_DIR) {
     $init_dir = $INIT_DIR;
 } elsif (-d '/etc/rc.d/init.d') {
-    $init_dir = '/etc/init.d';
+    $init_dir = '/etc/rc.d/init.d';
 } else {
     die "[*] Cannot find the init script directory, edit ",
         "the \$INIT_DIR variable.\n";
@@ -195,6 +195,12 @@ sub install() {
             "    that contains the psad sources!  Exiting.";
     }
     &logr("\n[+] " . localtime() . " Installing psad on hostname: $HOSTNAME\n");
+
+    ### make sure another psad process is not running
+    if (&ask_to_stop_psad()) {
+        &stop_psad();
+    }
+
     unless (-d $RUNDIR) {
         &logr("[+] Creating $RUNDIR\n");
         mkdir $RUNDIR, 0500;
@@ -300,7 +306,8 @@ sub install() {
         system "$Cmds{'make'} -C whois";
         if (-e 'whois/whois') {
             &logr("[+] Copying whois binary to $WHOIS_PSAD\n");
-            copy "whois/whois", $WHOIS_PSAD;
+            copy "whois/whois", $WHOIS_PSAD or die "[*] Could not copy ",
+                "whois/whois -> $WHOIS_PSAD";
         } else {
             die "[*] Could not compile whois";
         }
@@ -314,22 +321,6 @@ sub install() {
         "Unix-Syslog: $!";
     unless (-e 'Makefile.PL' && -e 'Syslog.pm') {
         die "[*] Your source directory appears to be incomplete!  Syslog.pm ",
-            "is missing.\n    Download the latest sources from ",
-            "http://www.cipherdyne.org\n";
-    }
-    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
-    system $Cmds{'make'};
-#    system "$Cmds{'make'} test";
-    system "$Cmds{'make'} install";
-    chdir '..';
-    print "\n\n";
-
-    ### installing Bit::Vector
-    &logr("[+] Installing the Bit::Vector (6.3) perl module\n");
-    chdir 'Bit-Vector' or die "[*] Could not chdir to ",
-        "Bit-Vector: $!";
-    unless (-e 'Makefile.PL') {
-        die "[*] Your source directory appears to be incomplete!  Bit-Vector ",
             "is missing.\n    Download the latest sources from ",
             "http://www.cipherdyne.org\n";
     }
@@ -415,7 +406,9 @@ sub install() {
     for my $rfile (@rfiles) {
         next unless $rfile =~ /\.rules$/;
         &logr("[+] Installing snort_rules/${rfile}\n");
-        copy "snort_rules/${rfile}", "${SNORT_DIR}/${rfile}";
+        copy "snort_rules/${rfile}", "${SNORT_DIR}/${rfile}" or
+            die "[*] Could not copy snort_rules/${rfile} -> ",
+                "${SNORT_DIR}/${rfile}: $!";
     }
     print "\n\n";
 
@@ -436,7 +429,8 @@ sub install() {
                 "Download the latest sources " .
                 "from:\n\nhttp://www.cipherdyne.org\n";
         }
-        copy 'kmsgsd.pl', 'kmsgsd';
+        copy 'kmsgsd.pl', 'kmsgsd' or die "[*] Could not copy ",
+            "kmsgsd.pl -> kmsgsd: $!";
     }
     if (! -e 'psadwatchd' && -e 'psadwatchd.pl') {
         &logr("[-] Could not compile psadwatchd.c.  " .
@@ -446,7 +440,8 @@ sub install() {
                 "Download the latest sources " .
                 "from:\n\nhttp://www.cipherdyne.org\n";
         }
-        copy 'psadwatchd.pl', 'psadwatchd';
+        copy 'psadwatchd.pl', 'psadwatchd' or die "[*] Could not copy ",
+            "psadwatchd.pl -> psadwatchd: $!";
     }
 
     ### install fwcheck_psad.pl
@@ -469,23 +464,27 @@ sub install() {
     ### put the fwcheck_psad.pl script in place
     &logr("[+] Copying fwcheck_psad.pl -> ${USRSBIN_DIR}/fwcheck_psad\n");
     unlink "${USRSBIN_DIR}/fwcheck_psad" if -e "${USRSBIN_DIR}/fwcheck_psad";
-    copy 'fwcheck_psad.pl', "${USRSBIN_DIR}/fwcheck_psad";
+    copy 'fwcheck_psad.pl', "${USRSBIN_DIR}/fwcheck_psad" or die "[*] Could ",
+        "not copy fwcheck_psad.pl -> ${USRSBIN_DIR}/fwcheck_psad: $!";
     &perms_ownership("${USRSBIN_DIR}/fwcheck_psad", 0500);
 
     ### put the psad daemons in place
     &logr("[+] Copying psad -> ${USRSBIN_DIR}/psad\n");
     unlink "${USRSBIN_DIR}/psad" if -e "${USRSBIN_DIR}/psad";
-    copy 'psad', "${USRSBIN_DIR}/psad";
+    copy 'psad', "${USRSBIN_DIR}/psad" or die "[*] Could not copy ",
+        "psad -> ${USRSBIN_DIR}/psad: $!";
     &perms_ownership("${USRSBIN_DIR}/psad", 0500);
 
     &logr("[+] Copying psadwatchd -> ${USRSBIN_DIR}/psadwatchd\n");
     unlink "${USRSBIN_DIR}/psadwatchd" if -e "${USRSBIN_DIR}/psadwatchd";
-    copy 'psadwatchd', "${USRSBIN_DIR}/psadwatchd";
+    copy 'psadwatchd', "${USRSBIN_DIR}/psadwatchd" or die "[*] Could not ",
+        "copy psadwatchd -> ${USRSBIN_DIR}/psadwatchd: $!";
     &perms_ownership("${USRSBIN_DIR}/psadwatchd", 0500);
 
     &logr("[+] Copying kmsgsd -> ${USRSBIN_DIR}/kmsgsd\n");
     unlink "${USRSBIN_DIR}/kmsgsd" if -e "${USRSBIN_DIR}/kmsgsd";
-    copy 'kmsgsd', "${USRSBIN_DIR}/kmsgsd";
+    copy 'kmsgsd', "${USRSBIN_DIR}/kmsgsd" or die "[*] Could not copy ",
+        "kmsgsd -> ${USRSBIN_DIR}/kmsgsd: $!";
     &perms_ownership("${USRSBIN_DIR}/kmsgsd", 0500);
 
     unless (-d $PSAD_CONFDIR) {
@@ -507,7 +506,8 @@ sub install() {
                 &preserve_config($file);
             } else {
                 &logr("[+] Copying $file -> ${PSAD_CONFDIR}/$file\n");
-                copy $file, "${PSAD_CONFDIR}/$file";
+                copy $file, "${PSAD_CONFDIR}/$file" or die "[*] Could not ",
+                    "copy $file -> ${PSAD_CONFDIR}/$file: $!";
                 &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
             }
             if ($file eq 'fw_search.conf' and @old_fw_msg_search) {
@@ -516,7 +516,8 @@ sub install() {
             }
         } else {
             &logr("[+] Copying $file -> ${PSAD_CONFDIR}/$file\n");
-            copy $file, "${PSAD_CONFDIR}/$file";
+            copy $file, "${PSAD_CONFDIR}/$file" or die "[*] Could not copy ",
+                "$file -> ${PSAD_CONFDIR}/$file: $!";
             &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
 
             ### Deal with legacy FW_MSG_SEARCH in psad.conf.  Note that
@@ -543,12 +544,14 @@ sub install() {
                 ### keep the installed file intact (the user must have
                 ### modified it).
                 &logr("[+] Copying $file -> ${PSAD_CONFDIR}/$file\n");
-                copy $file, "${PSAD_CONFDIR}/$file";
+                copy $file, "${PSAD_CONFDIR}/$file" or die "[*] Could not ",
+                    "copy $file -> ${PSAD_CONFDIR}/$file: $!";
                 &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
             }
         } else {
             &logr("[+] Copying $file -> ${PSAD_CONFDIR}/$file\n");
-            copy $file, "${PSAD_CONFDIR}/$file";
+            copy $file, "${PSAD_CONFDIR}/$file" or die "[*] Could not copy ",
+                "$file -> ${PSAD_CONFDIR}/$file: $!";
             &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
         }
     }
@@ -669,40 +672,22 @@ sub install() {
 
     if ($init_dir) {
         &logr("[+] Copying $init_file -> ${init_dir}/psad\n");
-        copy $init_file, "${init_dir}/psad";
+        copy $init_file, "${init_dir}/psad" or die "[*] Could not copy ",
+            "$init_file -> ${init_dir}/psad: $!";
         &perms_ownership("${init_dir}/psad", 0744);
         &enable_psad_at_boot($distro);
     }
 
-    my $running;
-    my $pid;
-    if (-e "${RUNDIR}/psad.pid") {
-        open PID, "< ${RUNDIR}/psad.pid" or die "[*] Could not open ",
-            "${RUNDIR}/psad.pid: $!";
-        $pid = <PID>;
-        close PID;
-        chomp $pid;
-        $running = kill 0, $pid;
-    } else {
-        $running = 0;
-    }
     &logr("\n========================================================\n");
     if ($preserve_rv) {
         &logr("\n[+] Psad has been installed (with your original config).\n");
     } else {
         &logr("\n[+] Psad has been installed.\n");
     }
-    if ($running) {
-        &logr("\n");
-        &logr("[+] An older version of psad is already running.  To ".
-            "start the new\n");
-        &logr("    version, run \"${USRSBIN_DIR}/psad --Restart\"\n");
+    if ($init_dir) {
+        &logr("\n[+] To start psad, run \"${init_dir}/psad start.\"\n");
     } else {
-        if ($init_dir) {
-            &logr("\n[+] To execute psad, run \"${init_dir}/psad start.\"\n");
-        } else {
-            &logr("\n[+] To execute psad, run ${USRSBIN_DIR}/psad.\"\n");
-        }
+        &logr("\n[+] To start psad, run ${USRSBIN_DIR}/psad.\"\n");
     }
     return;
 }
@@ -821,6 +806,53 @@ sub uninstall() {
     return;
 }
 
+sub ask_to_stop_psad() {
+    if (-e "$RUNDIR/psad.pid") {
+        open P, "< $RUNDIR/psad.pid" or die "[*] Could not open ",
+            "$RUNDIR/psad.pid: $!";
+        my $pid = <P>;
+        close P;
+        chomp $pid;
+        if (kill 0, $pid) {
+            print "[+] An existing psad daemon is running.\n";
+            my $ans = '';
+            while ($ans ne 'y' && $ans ne 'n') {
+                print "    Can I stop the existing psad daemon ([y]/n)?  ";
+                $ans = <STDIN>;
+                if ($ans eq "\n") {  ### allow the default of "y" to take over
+                    $ans = 'y';
+                }
+                chomp $ans;
+            }
+            if ($ans eq 'y') {
+                return 1;
+            } else {
+                die "[*] Aborting install.";
+            }
+        }
+    }
+    return 0;
+}
+
+sub stop_psad() {
+    if (-e "$RUNDIR/psad.pid") {
+        open P, "< $RUNDIR/psad.pid" or die "[*] Could not open ",
+            "$RUNDIR/psad.pid: $!";
+        my $pid = <P>;
+        close P;
+        chomp $pid;
+        if (kill 0, $pid) {
+            print "[+] Stopping running psad daemons.\n";
+            if ($init_dir) {
+                system "$init_dir/psad stop";
+            } else {
+                system "$USRSBIN_DIR/psad -K";
+            }
+        }
+    }
+    return;
+}
+
 sub set_home_net() {
     my $file = shift;
     my @ifconfig_out = `$Cmds{'ifconfig'} -a`;
@@ -929,7 +961,9 @@ sub append_fifo_syslog_ng() {
     &logr("    $PSAD_FIFO\n");
     unless (-e '/etc/syslog-ng/syslog-ng.conf.orig') {
         copy '/etc/syslog-ng/syslog-ng.conf',
-            '/etc/syslog-ng/syslog-ng.conf.orig';
+            '/etc/syslog-ng/syslog-ng.conf.orig' or die "[*] Could not ",
+            "copy /etc/syslog-ng/syslog-ng.conf -> ",
+            "/etc/syslog-ng/syslog-ng.conf.orig: $!";
     }
     &archive('/etc/syslog-ng/syslog-ng.conf');
     open RS, '< /etc/syslog-ng/syslog-ng.conf' or
@@ -957,7 +991,8 @@ sub append_fifo_syslog_ng() {
 sub config_metalog() {
     unless (-e '/etc/metalog/metalog.conf.orig') {
         copy '/etc/metalog/metalog.conf',
-            '/etc/metalog/metalog.conf.orig'
+            '/etc/metalog/metalog.conf.orig' or die "[*] Could not copy ",
+            "/etc/metalog/metalog.conf -> /etc/metalog/metalog.conf.orig: $!";
     }
     open RS, "< /etc/metalog/metalog.conf" or
         die "[*] Unable to open /etc/metalog/metalog.conf: $!\n";
@@ -1127,7 +1162,8 @@ sub append_fifo_syslog() {
         "messages to\n");
     &logr("    $PSAD_FIFO\n");
     unless (-e '/etc/syslog.conf.orig') {
-        copy '/etc/syslog.conf', '/etc/syslog.conf.orig';
+        copy '/etc/syslog.conf', '/etc/syslog.conf.orig' or die "[*] Could ",
+            "not copy /etc/syslog.conf -> /etc/syslog.conf.orig: $!";
     }
     &archive('/etc/syslog.conf');
     open RS, '< /etc/syslog.conf' or
@@ -1554,7 +1590,9 @@ sub archive() {
     }
     &logr("[+] Archiving $file -> ${base}1\n");
     unlink "${base}1.gz" if -e "${base}1.gz";
-    copy $file, "${base}1";   ### move $file into the archive directory
+    ### move $file into the archive directory
+    copy $file, "${base}1" or die "[*] Could not copy ",
+        "$file -> ${base}1: $!";
     system "$Cmds{'gzip'} ${base}1";
     chdir $curr_pwd or die $!;
     return;

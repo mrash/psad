@@ -68,6 +68,7 @@ my $uninstall = 0;
 
 my %Cmds = (
 	"ps"		=> $psCmd,
+	"mknod"		=> $mknodCmd,
 	"grep"		=> $grepCmd,
 	"uname"		=> $unameCmd,
 	"find"		=> $findCmd,
@@ -76,7 +77,6 @@ my %Cmds = (
 	"ifconfig"	=> $ifconfigCmd,
 	"ipchains"      => $ipchainsCmd,
 	"iptables"	=> $iptablesCmd,
-	"psad"		=> $psadCmd
 );
 
 ### need to make sure this exists before attempting to write anything to the install log.
@@ -122,10 +122,11 @@ if ($uninstall) {
 		print " ----  Removing ${INIT_DIR}/psad  ----\n";
 		unlink "${INIT_DIR}/psad";
 	}
-        if (-e "${PERL_INSTALL_DIR}/Psad.pm") {
-                print " ----  Removing ${PERL_INSTALL_DIR}/Psad.pm  ----\n";
-                unlink "${PERL_INSTALL_DIR}/Psad.pm";
-        }
+	### deal with the uninstallation of Psad.pm later...
+#        if (-e "${PERL_INSTALL_DIR}/Psad.pm") {
+#                print " ----  Removing ${PERL_INSTALL_DIR}/Psad.pm  ----\n";
+#                unlink "${PERL_INSTALL_DIR}/Psad.pm";
+#        }
 	if (-e "/etc/psad") {
 		print " ----  Removing configuration directory: /etc/psad  ----\n";
 		rmtree("/etc/psad", 1, 0);
@@ -168,7 +169,7 @@ if ($uninstall) {
 ### Start the installation code...
 
 ### make sure install.pl is being called from the source directory
-unless (-e "psad" && -e "Psad.pm") {
+unless (-e "psad" && -e "Psad.pm/Psad.pm") {
 	die "\n@@@@@  install.pl can only be executed from the directory that contains the psad sources!  Exiting.\n\n";
 }
 
@@ -231,8 +232,17 @@ unless (-e "/usr/bin/whois.psad") {
 } else {
 	&perms_ownership("/usr/bin/whois.psad", 0755);  # make absolutely certain we can execute whois.psad
 }
-&logr(" ----  Copying Psad.pm -> ${PERL_INSTALL_DIR}/  ----\n", \@LOGR_FILES);
-copy("Psad.pm", "${PERL_INSTALL_DIR}/Psad.pm");
+&logr(" ----  Installing the Psad.pm perl module  ----\n", \@LOGR_FILES);
+	
+chdir "Psad.pm";
+unless (-e "Makefile.PL" && -e "Psad.pm") {
+	die "@@@@@  Your source kit appears to be incomplete!\n";
+}
+system "perl Makefile.PL";
+system "make";
+system "make test";
+system "make install";
+chdir "..";
 
 if ( -e "${INSTALL_DIR}/psad" && (! $nopreserve)) {  # need to grab the old config
 	&logr(" ----  Copying psad -> ${INSTALL_DIR}/psad  ----\n", \@LOGR_FILES);
@@ -424,6 +434,7 @@ sub check_old_psad_installation() {
 	move("${old_install_dir}/psadwatchd", "${INSTALL_DIR}/psadwatchd") if (-e "${old_install_dir}/psadwatchd");
 	move("${old_install_dir}/diskmond", "${INSTALL_DIR}/diskmond") if (-e "${old_install_dir}/diskmond");
 	move("${old_install_dir}/kmsgsd", "${INSTALL_DIR}/kmsgsd") if (-e "${old_install_dir}/kmsgsd");
+	unlink "${PERL_INSTALL_DIR}/Psad.pm" if (-e "${PERL_INSTALL_DIR}/Psad.pm"); ### Psad.pm will be installed The Right Way
 	return;
 }
 sub get_distro() {

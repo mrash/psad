@@ -43,7 +43,7 @@ firewalls in the 2.4.x series kernels, psad analyzes the tcp flags
 used in the scan to determine the scan type (syn, fin, xmas, etc.)
 and the corresponding command line options that could be supplied to
 nmap to generate such a scan.  In addition, psad makes use of many tcp, udp,
-and icmp signatures contained within the Snort intrusion detection
+and icmp signatures contained within the snort intrusion detection
 system (see http://www.snort.org/) to detect suspect network traffic such
 as probes for common backdoors, DDoS tools, OS fingerprinting attempts,
 and more.  By default psad also provides alerts for snort rules that are
@@ -95,12 +95,12 @@ makes use of this logging capability to detect several types of tcp scan
 signatures included within
 .B /etc/psad/psad_signatures.
 The signatures were
-originally included within the Snort intrusion detection
+originally included within the snort intrusion detection
 system.  New signatures can be included and modifications to existing
 signatures can be made to the signature file and psad will import
 the changes upon receiving a USR1 signal (see the --USR1 command line
 option) without having to restart the psad process.  Psad also detects
-many udp and icmp signatures that were originally included within Snort.
+many udp and icmp signatures that were originally included within snort.
 .TP
 
 .BI \-\^\-snort-type "  type"
@@ -316,7 +316,7 @@ Print a page of usage information for psad and exit.
 .RS
 Contains the signatures psad uses to recognize nasty traffic.  The
 signatures are written in a manner similar to the *lib signature
-files used in the Snort IDS.
+files used in the snort IDS.
 .RE
 
 .B /etc/psad/snort_rules/*.rules

@@ -12,9 +12,6 @@ tcp any -> 23456 msg:"Possible EvilFTP access"; flags: S;
 tcp any -> 1243 msg:"Possible SubSeven access"; flags: S;
 tcp any -> 6776 msg:"Possible SubSeven access"; flags: S;
 
-# testing
-tcp any -> 515 msg:"testing 515 signature"; flags: S;
-
 # DDoS signatures
 tcp any -> any 15104 msg: "IDS111 - DDoS - mstream client to handler"; flags: S; 
 tcp any -> 20432 msg:"IDS254 - DDoS shaft client to handler"; flags: AP; 

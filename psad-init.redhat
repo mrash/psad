@@ -1,0 +1,71 @@
+#!/bin/sh
+#
+# Startup script for psad
+#
+# chkconfig: 345 99 05
+# description: The Port Scan Attack Detector (psad)
+# processname: psad
+# pidfile: /var/run/psad.pid
+# config: /etc/psad/psad.conf
+#
+# $Id$
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+restart() {
+    $0 stop
+    $0 start
+}
+
+# See how we were called.
+case "$1" in
+start)
+    if grep -q psadfifo /etc/syslog.conf; then
+        echo -n "Starting the psad daemons: "
+        ### psad enables signature matching and auto
+        ### danger level assignment by default, so
+        ### command line args are not necessary here.
+        daemon /usr/sbin/psad
+        RETVAL=$?
+        echo
+        if [ $RETVAL -eq 0 ]; then
+            touch /var/lock/subsys/psad
+        fi
+    else
+        echo "Syslog has not been configured to send kern.info messages to"
+        echo "/var/lib/psad/psadfifo.  Do you need to run the psad installer?"
+    fi
+    ;;
+stop)
+    echo -n "Shutting down the psad psadwatchd daemon: "
+        killproc psadwatchd
+        echo
+        echo -n "Shutting down the psad daemon: "
+        killproc psad
+    RETVAL=$?
+    [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/psad
+    echo
+    echo -n "Shutting down the psad kmsgsd daemon: "
+    killproc kmsgsd
+    echo
+    echo -n "Shutting down the psad diskmond daemon: "
+    killproc diskmond
+    echo
+    ;;
+status)
+    status kmsgsd
+    status psad
+    status psadwatchd
+    status diskmond
+    ;;
+restart|reload)
+    restart
+    ;;
+condrestart)
+    [ -f /var/lock/subsys/psad ] && restart || :
+    ;;
+*)
+    echo "Usage: psad {start|stop|status|restart|reload|condrestart}"
+    exit 1
+esac

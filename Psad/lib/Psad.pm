@@ -43,7 +43,8 @@ $VERSION = '1.4.1';
 
 ### subroutines ###
 sub buildconf() {
-    my ($config_hr, $cmds_hr, $conf_file) = @_;
+    my ($config_hr, $cmds_hr, $multi_line_hr, $conf_file) = @_;
+
     open C, "< $conf_file" or croak "[*] Could not open " .
         "config file $conf_file: $!";
     my @lines = <C>;
@@ -58,7 +59,12 @@ sub buildconf() {
                 ### found a command
                 $cmds_hr->{$1} = $val;
             } else {
-                $config_hr->{$varname} = $val;
+                ### build array refs out of multi-line variables
+                if (defined $multi_line_hr->{$varname}) {
+                    push @{$config_hr->{$varname}}, $val;
+                } else {
+                    $config_hr->{$varname} = $val;
+                }
             }
         }
     }

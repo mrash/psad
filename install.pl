@@ -8,13 +8,17 @@ use File::Path; # used for the 'rmtree' function for removing directories
 use File::Copy; # used for copying/moving files
 use Getopt::Long;
 use Text::Wrap;
+use Sys::Hostname "hostname";
 
 ### globals
-use vars qw($INSTALL_DIR $INIT_DIR $SUB_TAB);
+use vars qw($HOSTNAME $INSTALL_DIR $INSTALL_LOG @LOGR_FILES $INIT_DIR $SUB_TAB);
 
 #============== config ===============
 $INIT_DIR = "/etc/rc.d/init.d";
 $INSTALL_DIR = "/usr/sbin";	### consistent with FHS (Filesystem Hierarchy Standard)
+$INSTALL_LOG = "/var/log/psad/install.log";
+@LOGR_FILES = ("STDOUT", $INSTALL_LOG);
+$HOSTNAME = hostname;
 my $SYSLOG_INIT = "${INIT_DIR}/syslog";
 
 my $psCmd = "/bin/ps";
@@ -61,28 +65,25 @@ my %Cmds = (
 	"psad"		=> $psadCmd
 );
 
+### need to make sure this exists before attempting to write anything to the install log.
+&create_varlogpsad();
+
 %Cmds = &check_commands(\%Cmds);
 
 $< == 0 && $> == 0 or die "You need to be root (or equivalent UID 0 account) to install/uninstall psad!\n";
 
 &check_old_psad_installation();  ### check for a pre-0.9.2 installation of psad.
 
-### make sure we know where the syslog init script is.
-unless (-e $SYSLOG_INIT) {
-	my $s = `$Cmds{'find'} / -name syslog 2> /dev/null |$Cmds{'grep'} init |$Cmds{'grep'} -v grep`;
-	chomp $s;
-	if ($s) {
-		$SYSLOG_INIT = $s;
-	} else {
-		print STDERR wrap("", $SUB_TAB, "@@@@  Could not find the syslog init script!  The current path is: $SYSLOG_INIT.  Edit the config section of install.pl.  Exiting.\n");
-		exit 0;
-	}
-}
-
 if ($uninstall) {
+	my $t = localtime();
+	my $time = " ----     Uninstalling psad from $HOSTNAME: $t    ----\n";
+	&logr("\n", \@LOGR_FILES);
+	&logr($time, \@LOGR_FILES);
+	&logr("\n", \@LOGR_FILES);
+
 	my $ans = "";
 	while ($ans ne "y" && $ans ne "n") {
-		print wrap('', $SUB_TAB, " ----  This will completely remove psad from your system.  Are you sure (y/n)?  ");
+		print wrap("", $SUB_TAB, " ----  This will completely remove psad from your system.  Are you sure (y/n)? ");
 		$ans = <STDIN>;
 		chomp $ans;
 	}
@@ -95,7 +96,7 @@ if ($uninstall) {
 		unlink "${INIT_DIR}/psad";
 	}	
 	if (-e "${INSTALL_DIR}/psad") {
-		print " ----  Removing psad daemons: ${INSTALL_DIR}/(psad, psadwatchd, kmsgsd, diskmond)  ----\n";
+		print wrap("", $SUB_TAB, " ----  Removing psad daemons: ${INSTALL_DIR}/(psad, psadwatchd, kmsgsd, diskmond)  ----\n");
 		unlink "${INSTALL_DIR}/psad" or warn "@@@@@  Could not remove ${INSTALL_DIR}/psad!!!\n";
 		unlink "${INSTALL_DIR}/psadwatchd" or warn "@@@@@  Could not remove ${INSTALL_DIR}/psadwatchd!!!\n";
 		unlink "${INSTALL_DIR}/kmsgsd" or warn "@@@@@  Could not remove ${INSTALL_DIR}/kmsgsd!!!\n";
@@ -122,7 +123,7 @@ if ($uninstall) {
 		move("/etc/syslog.conf.orig", "/etc/syslog.conf");
 #		`$Cmds{'mv'} /etc/syslog.conf.orig /etc/syslog.conf`;
 	} else {
-		print wrap('', $SUB_TAB, " ----  /etc/syslog.conf.orig does not exist.  Editing /etc/syslog.conf directly.  ----\n");
+	 	print wrap("", $SUB_TAB, " ----  /etc/syslog.conf.orig does not exist.  Editing /etc/syslog.conf directly.\n");
 		open ESYS, "< /etc/syslog.conf" or die "@@@@@  Unable to open /etc/syslog.conf: $!\n";
 		my @sys = <ESYS>;
 		close ESYS;
@@ -141,13 +142,32 @@ if ($uninstall) {
 }
 
 ### Start the installation code...
+### make sure we know where the syslog init script is.
+
+my $t = localtime();
+my $time = " ----     Installing psad on $HOSTNAME: $t    ----\n";
+&logr("\n", \@LOGR_FILES);
+&logr($time, \@LOGR_FILES);
+&logr("\n", \@LOGR_FILES);
+
+unless (-e $SYSLOG_INIT) {
+        my $s = `$Cmds{'find'} / -name syslog 2> /dev/null |$Cmds{'grep'} init |$Cmds{'grep'} -v grep`;
+        chomp $s;
+        if ($s) {
+                $SYSLOG_INIT = $s;
+        } else {
+                &logr("@@@@  Could not find the syslog init script!  The current path is: $SYSLOG_INIT.  Edit the config section of install.pl.  Exiting.\n", ["STDERR", $INSTALL_LOG]);
+                exit 0;
+        }
+}
+
 unless (-e "/var/log/psadfifo") {
-	print " ----  Creating named pipe /var/log/psadfifo  ----\n";
+	&logr(" ----  Creating named pipe /var/log/psadfifo  ----\n", \@LOGR_FILES);
 	# create the named pipe
 	`$Cmds{'mknod'} -m 600 /var/log/psadfifo p`;	#  die does not seem to work right here.
 }
 unless (`$Cmds{'grep'} psadfifo /etc/syslog.conf`) {
-	print " ----  Modifying /etc/syslog.conf  ----\n";
+	&logr(" ----  Modifying /etc/syslog.conf  ----\n", \@LOGR_FILES);
 	copy("/etc/syslog.conf", "/etc/syslog.conf.orig") unless (-e "/etc/syslog.conf.orig");
 	open SYSLOG, ">> /etc/syslog.conf" or die "@@@@@  Unable to open /etc/syslog.conf: $!\n";
 	print SYSLOG "kern.info  |/var/log/psadfifo\n\n";  #reinstate kernel logging to our named pipe
@@ -156,25 +176,25 @@ unless (`$Cmds{'grep'} psadfifo /etc/syslog.conf`) {
 	system("$SYSLOG_INIT restart");
 }
 unless (-e "/var/log/psad") {
-	print " ----  Creating /var/log/psad/  ----\n";
+	&logr(" ----  Creating /var/log/psad/  ----\n", \@LOGR_FILES);
 	mkdir "/var/log/psad",400;
 }
 unless (-e "/var/log/psad/fwdata") {
-	print " ----  Creating /var/log/psad/fwdata file  ----\n";
+	&logr(" ----  Creating /var/log/psad/fwdata file  ----\n", \@LOGR_FILES);
 	open F, ">> /var/log/psad/fwdata";
 	close F;
 	chmod 0600, "/var/log/psad/fwdata";
 	&perms_ownership("/var/log/psad/fwdata", 0600);
 }
 unless (-e $INSTALL_DIR) {
-	print " ----  Creating $INSTALL_DIR  ----\n";
+	&logr(" ----  Creating $INSTALL_DIR  ----\n", \@LOGR_FILES);
 	mkdir $INSTALL_DIR,755;
 }
 unless (-e "/usr/bin/whois.psad") {
 	if (-e "whois-4.5.6") {
-		print " ----  Compiling Marco d'Itri's whois client  ----\n";
+		&logr(" ----  Compiling Marco d'Itri's whois client  ----\n", \@LOGR_FILES);
 		if (! system("$Cmds{'make'} -C whois-4.5.6")) {  # remember unix return value...
-			print " ----  Copying whois binary to /usr/bin/whois.psad  ----\n";
+			&logr(" ----  Copying whois binary to /usr/bin/whois.psad  ----\n", \@LOGR_FILES);
 			copy("whois-4.5.6/whois", "/usr/bin/whois.psad");
 			&perms_ownership("/usr/bin/whois.psad", 0755);
 		}
@@ -183,94 +203,92 @@ unless (-e "/usr/bin/whois.psad") {
 	&perms_ownership("/usr/bin/whois.psad", 0755);  # make absolutely certain we can execute whois.psad
 }
 if ( -e "${INSTALL_DIR}/psad" && (! $nopreserve)) {  # need to grab the old config
-	print " ----  Copying psad -> ${INSTALL_DIR}/psad  ----\n";
-	print "       Preserving old config within ${INSTALL_DIR}/psad\n";
+	&logr(" ----  Copying psad -> ${INSTALL_DIR}/psad  ----\n", \@LOGR_FILES);
+	&logr("       Preserving old config within ${INSTALL_DIR}/psad\n", \@LOGR_FILES);
 	&preserve_config("psad", "${INSTALL_DIR}/psad", \%Cmds);
 	### we don't need to run with -w for production code, and they are daemons so nothing would see warnings anyway if there are any.
 	&rm_perl_options("${INSTALL_DIR}/psad", \%Cmds);
 	&perms_ownership("${INSTALL_DIR}/psad", 0500)
 } else {
-	print " ----  Copying psad -> ${INSTALL_DIR}/  ----\n";
+	&logr(" ----  Copying psad -> ${INSTALL_DIR}/  ----\n", \@LOGR_FILES);
 	copy("psad", "${INSTALL_DIR}/psad");
 	&rm_perl_options("${INSTALL_DIR}/psad", \%Cmds);
 	&perms_ownership("${INSTALL_DIR}/psad", 0500);
-	&change_email("${INSTALL_DIR}/psad");
 }
 if ( -e "${INSTALL_DIR}/psadwatchd" && (! $nopreserve)) {  # need to grab the old config
-        print " ----  Copying psadwatchd -> ${INSTALL_DIR}/psadwatchd  ----\n";
-        print "       Preserving old config within ${INSTALL_DIR}/psadwatchd\n";
+        &logr(" ----  Copying psadwatchd -> ${INSTALL_DIR}/psadwatchd  ----\n", \@LOGR_FILES);
+        &logr("       Preserving old config within ${INSTALL_DIR}/psadwatchd\n", \@LOGR_FILES);
         &preserve_config("psadwatchd", "${INSTALL_DIR}/psadwatchd", \%Cmds);
 	&rm_perl_options("${INSTALL_DIR}/psadwatchd", \%Cmds);
         &perms_ownership("${INSTALL_DIR}/psadwatchd", 0500);
 } else {
-        print " ----  Copying psadwatchd -> ${INSTALL_DIR}/  ----\n";
+        &logr(" ----  Copying psadwatchd -> ${INSTALL_DIR}/  ----\n", \@LOGR_FILES);
 	copy("psadwatchd", "${INSTALL_DIR}/psadwatchd");
 	&rm_perl_options("${INSTALL_DIR}/psadwatchd", \%Cmds);
         &perms_ownership("${INSTALL_DIR}/psadwatchd", 0500);
-	&change_email("${INSTALL_DIR}/psadwatchd");
 }
 if (-e "${INSTALL_DIR}/kmsgsd" && (! $nopreserve)) { 
-	print " ----  Copying kmsgsd -> ${INSTALL_DIR}/kmsgsd\n";
-	print "       Preserving old config within ${INSTALL_DIR}/kmsgsd  ----\n";
+	&logr(" ----  Copying kmsgsd -> ${INSTALL_DIR}/kmsgsd\n", \@LOGR_FILES);
+	&logr("       Preserving old config within ${INSTALL_DIR}/kmsgsd  ----\n", \@LOGR_FILES);
 	&preserve_config("kmsgsd", "${INSTALL_DIR}/kmsgsd", \%Cmds);
 	&rm_perl_options("${INSTALL_DIR}/kmsgsd", \%Cmds);
 	&perms_ownership("${INSTALL_DIR}/kmsgsd", 0500);
 } else {
-	print " ----  Copying kmsgsd -> ${INSTALL_DIR}/kmsgsd  ----\n";
+	&logr(" ----  Copying kmsgsd -> ${INSTALL_DIR}/kmsgsd  ----\n", \@LOGR_FILES);
 	copy("kmsgsd", "${INSTALL_DIR}/kmsgsd");
 	&rm_perl_options("${INSTALL_DIR}/kmsgsd", \%Cmds);
 	&perms_ownership("${INSTALL_DIR}/kmsgsd", 0500);
 }
 if (-e "${INSTALL_DIR}/diskmond" && (! $nopreserve)) {
-	print " ----  Copying diskmond -> ${INSTALL_DIR}/diskmond  ----\n";
-	print "       Preserving old config within ${INSTALL_DIR}/diskmond\n";
+	&logr(" ----  Copying diskmond -> ${INSTALL_DIR}/diskmond  ----\n", \@LOGR_FILES);
+	&logr("       Preserving old config within ${INSTALL_DIR}/diskmond\n", \@LOGR_FILES);
         &preserve_config("diskmond", "${INSTALL_DIR}/diskmond", \%Cmds);
 	&rm_perl_options("${INSTALL_DIR}/diskmond", \%Cmds);
         &perms_ownership("${INSTALL_DIR}/diskmond", 0500);
 } else {
-	print " ----  Copying diskmond -> ${INSTALL_DIR}/diskmond  ----\n";
+	&logr(" ----  Copying diskmond -> ${INSTALL_DIR}/diskmond  ----\n", \@LOGR_FILES);
 	copy("diskmond", "${INSTALL_DIR}/diskmond");
 	&rm_perl_options("${INSTALL_DIR}/diskmond", \%Cmds);
 	&perms_ownership("${INSTALL_DIR}/diskmond", 0500);
 }
 unless (-e "/etc/psad") {
-        print " ----  Creating /etc/psad/  ----\n";
+        &logr(" ----  Creating /etc/psad/  ----\n", \@LOGR_FILES);
         mkdir "/etc/psad",400;
 }
 if (-e "/etc/psad/psad_signatures") {
-	print " ----  Copying psad_signatures -> /etc/psad/psad_signatures  ----\n";
-	print "       Preserving old signatures file as /etc/psad/psad_signatures.old\n";
+	&logr(" ----  Copying psad_signatures -> /etc/psad/psad_signatures  ----\n", \@LOGR_FILES);
+	&logr("       Preserving old signatures file as /etc/psad/psad_signatures.old\n", \@LOGR_FILES);
 	move("/etc/psad/psad_signatures", "/etc/psad/psad_signatures.old");
 	copy("psad_signatures", "/etc/psad/psad_signatures");
 	&perms_ownership("/etc/psad/psad_signatures", 0600);
 } else {
-	print " ----  Copying psad_signatures -> /etc/psad/psad_signatures  ----\n";
+	&logr(" ----  Copying psad_signatures -> /etc/psad/psad_signatures  ----\n", \@LOGR_FILES);
 	copy("psad_signatures", "/etc/psad/psad_signatures");
 	&perms_ownership("/etc/psad/psad_signatures", 0600);
 }
 if (-e "/etc/psad/psad_auto_ips") {
-	print " ----  Copying psad_auto_ips -> /etc/psad/psad_auto_ips  ----\n";
-	print "       Preserving old auto_ips file as /etc/psad/psad_auto_ips.old\n";
+	&logr(" ----  Copying psad_auto_ips -> /etc/psad/psad_auto_ips  ----\n", \@LOGR_FILES);
+	&logr("       Preserving old auto_ips file as /etc/psad/psad_auto_ips.old\n", \@LOGR_FILES);
 	move("/etc/psad/psad_auto_ips", "/etc/psad/psad_auto_ips.old");
 	copy("psad_auto_ips", "/etc/psad/psad_auto_ips");
 	&perms_ownership("/etc/psad/psad_auto_ips", 0600);
 } else {
-	print " ----  Copying psad_auto_ips -> /etc/psad/psad_auto_ips  ----\n";
+	&logr(" ----  Copying psad_auto_ips -> /etc/psad/psad_auto_ips  ----\n", \@LOGR_FILES);
 	copy("psad_auto_ips", "/etc/psad/psad_auto_ips");
 	&perms_ownership("/etc/psad/psad_auto_ips", 0600);
 }
 if (-e "/etc/psad/psad.conf") {
-	print " ----  Copying psad.conf -> /etc/psad/psad.conf  ----\n";
-	print "       Preserving old psad.conf file as /etc/psad/psad.conf\n";
+	&logr(" ----  Copying psad.conf -> /etc/psad/psad.conf  ----\n", \@LOGR_FILES);
+	&logr("       Preserving old psad.conf file as /etc/psad/psad.conf\n", \@LOGR_FILES);
 	move("/etc/psad/psad.conf", "/etc/psad/psad.conf.old");
 	copy("psad.conf", "/etc/psad/psad.conf");
 	&perms_ownership("/etc/psad/psad.conf", 0600);
 } else {
-	print " ----  Copying psad.conf -> /etc/psad/psad.conf  ----\n";
+	&logr(" ----  Copying psad.conf -> /etc/psad/psad.conf  ----\n", \@LOGR_FILES);
 	copy("psad.conf", "/etc/psad/psad.conf");
 	&perms_ownership("/etc/psad/psad.conf", 0600);
 }
-print " ----  Installing psad(8) man page  ----\n";
+&logr(" ----  Installing psad(8) man page  ----\n", \@LOGR_FILES);
 if (-e "/etc/man.config") {
 	# prefer to install psad.8 in /usr/local/man/man8 if this directory is configured in /etc/man.config
 	if (open MPATH, "< /etc/man.config" and grep /MANPATH\s+\/usr\/local\/man/, <MPATH> and close MPATH) {
@@ -303,17 +321,16 @@ if (-e "/etc/man.config") {
 }
 
 my $distro = &get_distro();
-my $kernel = &get_kernel(\%Cmds);
 
-if ($distro eq "redhat61" || $distro eq "redhat62" || $distro eq "redhat70" || $distro eq "redhat71") {
+if ($distro eq "redhat61" || "redhat62" || "redhat70" || "redhat71") {
 	if (-e $INIT_DIR) {
-		print " ----  Copying psad-init -> ${INIT_DIR}/psad  ----\n";
+		&logr(" ----  Copying psad-init -> ${INIT_DIR}/psad  ----\n", \@LOGR_FILES);
 		copy("psad-init", "${INIT_DIR}/psad");
 		&perms_ownership("${INIT_DIR}/psad", 0744);
 		# remove signature checking from psad process if we are not running an iptables-enabled kernel
 #		system "$Cmds{'perl'} -p -i -e 's|\\-s\\s/etc/psad/psad_signatures||' ${INIT_DIR}/psad" if ($kernel !~ /^2.3/ && $kernel !~ /^2.4/);
 	} else {
-		print wrap('', $SUB_TAB, "@@@@@  The init script directory, \"${INIT_DIR}\" does not exist!.  Edit the \$INIT_DIR variable in the config section.\n");
+		&logr("@@@@@  The init script directory, \"${INIT_DIR}\" does not exist!.  Edit the \$INIT_DIR variable in the config section.\n", \@LOGR_FILES);
 	}
 }
 # need to put checks in here for redhat vs. other systems.
@@ -331,71 +348,39 @@ unless($fwcheck) {
 			$running = 0;
 		}
 		if ($execute_psad) {
-			if ($distro eq "redhat61" || $distro eq "redhat62") {
+			if ($distro eq "redhat61" || "redhat62" || "redhat70" || "redhat71") {
 				if ($running) {
-					print " ----  Restarting the psad daemons...  ----\n";
+					&logr(" ----  Restarting the psad daemons...  ----\n", \@LOGR_FILES);
 					system "${INIT_DIR}/psad restart";
 				} else {
-					print " ----  Starting the psad daemons...  ----\n";
-					system "${INIT_DIR}/psad start";
+					&logr(" ----  Starting the psad daemons...  ----\n", \@LOGR_FILES);
+					system "${INIT_DIR} -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips";
 				}
 			} else {
 				if ($running) {
-					print " ----  Restarting the psad daemons...  ----\n";
-					system "$Cmds{'psad'} --kill";
-					if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/) {
-                                                system "$Cmds{'psad'} -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips";
-                                        } elsif ($kernel =~ /^2.2/) {
-                                                system "$Cmds{'psad'} -a /etc/psad/psad_auto_ips";
-                                        } else {
-                                                print wrap('', $SUB_TAB, " ----  You are running kernel $kernel.  Assuming ipchains support.  ----\n");
-                                                system "$Cmds{'psad'} -a /etc/psad/psad_auto_ips";
-                                        }
+					&logr(" ----  Restarting the psad daemons...  ----\n", \@LOGR_FILES);
+					system "$Cmds{'psad'} --Restart";
 				} else {
-					print " ----  Starting the psad daemons...  ----\n";
-					if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/) {	
-                                        	system "$Cmds{'psad'} -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips";
-					} elsif ($kernel =~ /^2.2/) {
-						system "$Cmds{'psad'} -a /etc/psad/psad_auto_ips";
-					} else {
-						print wrap('', $SUB_TAB, " ----  You are running kernel $kernel.  Assuming ipchains support.  ----\n");
-						system "$Cmds{'psad'} -a /etc/psad/psad_auto_ips";
-					}
+					&logr(" ----  Starting the psad daemons...  ----\n", \@LOGR_FILES);
+                                      	system "$Cmds{'psad'} -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips";
 				}
 			}
 		} else {
-			if ($distro eq "redhat61" || $distro eq "redhat62") {
+			if ($distro eq "redhat61" || "redhat62" || "redhat70" || "redhat71") {
 				if ($running) {
-					print " ----  An older version of psad is already running.  To execute, run \"${INIT_DIR}/psad restart\"  ----\n";
+					&logr(" ----  An older version of psad is already running.  To execute, run \"${INIT_DIR}/psad restart\"  ----\n", \@LOGR_FILES);
 				} else {
-					print " ----  To execute psad, run \"${INIT_DIR}/psad start\"  ----\n";
+					&logr(" ----  To execute psad, run \"${INIT_DIR}/psad start\"  ----\n", \@LOGR_FILES);
 				}
 			} else {
 				if ($running) {
-					print " ----  An older version of psad is already running.  kill pid $pid, and then execute:\n";
-					if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/) {
-                                       		print "${INSTALL_DIR}/psad -s /etc/psad/psad_signatures, ${INSTALL_DIR}/psadwatchd,\n";
-						print "${INSTALL_DIR}/diskmond, and ${INSTALL_DIR}/kmsgsd\n"; 
-                                        } elsif ($kernel =~ /^2.2/) {
-						print "${INSTALL_DIR}/psad, ${INSTALL_DIR}/psadwatchd, ${INSTALL_DIR}/diskmond, and ${INSTALL_DIR}/kmsgsd\n";
-                                        } else {
-						print "${INSTALL_DIR}/psad (you are running kernel $kernel... assuming ipchains support),\n";
-						print "${INSTALL_DIR}/psadwatchd, ${INSTALL_DIR}/diskmond, and ${INSTALL_DIR}/kmsgsd\n";
-                                        }
+					&logr(" ----  An older version of psad is already running.  kill pid $pid, and then execute:\n", \@LOGR_FILES);
+					&logr("${INSTALL_DIR}/psad -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips\n", \@LOGR_FILES);
 				} else {
-                                	if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/) {
-                                                print "${INSTALL_DIR}/psad -s /etc/psad/psad_signatures, ${INSTALL_DIR}/diskmond, and ${INSTALL_DIR}/kmsgsd\n";
-                                        } elsif ($kernel =~ /^2.2/) {
-                                                print "${INSTALL_DIR}/psad, ${INSTALL_DIR}/diskmond, and ${INSTALL_DIR}/kmsgsd\n";
-                                        } else {
-                                                print "${INSTALL_DIR}/psad (you are running kernel $kernel... assuming ipchains support),\n";
-                                                print "${INSTALL_DIR}/diskmond, and ${INSTALL_DIR}/kmsgsd\n";
-					}
+					&logr("To start psad, execute: ${INSTALL_DIR}/psad -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips\n", \@LOGR_FILES);
 				}
 			}	
 		}
-	} else {
-		print wrap('', $SUB_TAB, " ----  After setting up your firewall per the above note, execute \"${INIT_DIR}/psad start\" to start psad\n");
 	}
 }
 
@@ -409,154 +394,139 @@ sub check_old_psad_installation() {
 	move("${old_install_dir}/kmsgsd", "${INSTALL_DIR}/kmsgsd") if (-e "${old_install_dir}/kmsgsd");
 	return;
 }
-sub change_email() {
-	my $daemon = shift;
-	my $filename = (split /\//, $daemon)[$#_];
-	my @email_addresses;
-	my $ans = "";
-	while ($ans ne "y" && $ans ne "n") {
-		print wrap('', $SUB_TAB, " ----  The default email address to which send alerts are sent is: \"root\@localhost\"\n");
-		print wrap('', $SUB_TAB, " ----  Would you like to change this so that email alerts will be sent to a different address (y/n)?  ");
-		$ans = <STDIN>;
-		chomp $ans;
-	}
-	if ($ans eq "y") {
-        	while ($ans !~ /\S+?\@\S+?\.\S+?/) {
-                	print " ----  Enter an email addresss:  ";
-                	$ans = <STDIN>;
-                	chomp $ans;
-		}
-		push @email_addresses, '$ans';
-		$ans = "";
-		E: while ($ans ne "n") {
-			print " ----  Would you like to enter an additional email address (y/n)?  ";
-			$ans = <STDIN>;
-			chomp $ans;
-			if ($ans eq "n") {
-				last E;
-			} elsif ($ans ne "y") {
-				next E;
-			}
-			while ($ans !~ /\S+?\@\S+?\.\S+?/) {
-				print " ----  Enter an email address:  ";
-				$ans = <STDIN>;
-				chomp $ans;
-			}
-			push @email_addresses, '$ans';
-		}
-        }
-	print "EMAILS: \n";
-	print "$_\n" for (@email_addresses);
-	return;
-}
 sub check_firewall_rules() {
 	my $Cmds_href = shift;
 	my @localips;
-	my $kernel = get_kernel($Cmds_href);
-        my $iptables = 1 if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/);
-        my $ipchains = 1 if ($kernel =~ /^2.2/); # and also 2.0.x ?
-	my @localips_tmp = `$Cmds_href->{'ifconfig'} -a |$Cmds_href->{'grep'} inet`;
- 	push @localips, (split /:/, (split /\s+/, $_)[2])[1] foreach (@localips_tmp);
-	if ($iptables) {
-# target     prot opt source               destination
-# LOG        tcp  --  anywhere             anywhere           tcp flags:SYN,RST,ACK/SYN LOG level warning prefix `DENY '
-# DROP       tcp  --  anywhere             anywhere           tcp flags:SYN,RST,ACK/SYN
+	### see which of the two firewall commands we are able to execute
+	my $ipchains_rv = system "$Cmds_href->{'ipchains'} -nL > /dev/null 2>&1";
+	$ipchains_rv >>= 8;	# return value from system call is a 16 bit number, the high byte is the real return value
+	my $iptables_rv = system "$Cmds_href->{'iptables'} -nL > /dev/null 2>&1";
+	$iptables_rv >>= 8;
+	
+        my @localips_tmp = `$Cmds_href->{'ifconfig'} -a |$Cmds_href->{'grep'} inet |$Cmds{'grep'} -v grep`;
+        push @localips, (split /:/, (split /\s+/, $_)[2])[1] foreach (@localips_tmp);
 
-# ACCEPT     tcp  --  0.0.0.0/0            64.44.21.15        tcp dpt:80 flags:0x0216/0x022
-# LOG        tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0216/0x022 LOG flags 0 level 4 prefix `DENY '
-# DROP       tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0216/0x022
-		my @rules = `$Cmds_href->{'iptables'} -nL`;
-		my $drop_rule = 0;
-		my $drop_tcp = 0;
-		my $drop_udp = 0;
-		FWPARSE: foreach my $rule (@rules) {
-			next FWPARSE if ($rule =~ /^Chain/ || $rule =~ /^target/);
-			if ($rule =~ /^(LOG)\s+(\w+)\s+\S+\s+\S+\s+(\S+)\s.+prefix\s\`(.+)\'/) {
-				($target, $proto, $dst, $prefix) = ($1, $2, $3, $4);
-				if ($target eq "LOG" && $proto =~ /all/ && $prefix =~ /drop|reject|deny/i) {
-				# this needs work... see above _two_ rules.
-					if (check_destination($dst, \@localips)) {
-						print STDOUT wrap('', $SUB_TAB, " ----  Your firewall setup looks good.  Unauthorized tcp and/or udp packets will be logged. ----\n");
-						return 1;
-					}
-				} elsif ($target eq "LOG" && $proto =~ /tcp/ && $prefix =~ /drop|reject|deny/i) {
-					$drop_tcp = 1 if (check_destination($dst, \@localips));
-				} elsif ($target eq "LOG" && $proto =~ /udp/ && $prefix =~ /drop|reject|deny/i) {
-					$drop_udp = 1 if (check_destination($dst, \@localips));
+	### prefer iptables so check it first
+	if (! $iptables_rv && $ipchains_rv) {  ### iptables works if the return value is 0
+		if (&check_iptables_rules(\@localips, $Cmds_href)) {
+			return 1;
+		} else {
+			return 0;
+		}
+	} elsif (! $ipchains_rv && $iptables_rv) {
+		if (&check_ipchains_rules(\@localips, $Cmds_href)) {
+			return 1;
+		} else {
+			return 0;
+		}
+	} elsif ($iptables_rv && $ipchains_rv) {
+		print "could not run either firewall\n";
+	} elsif (! $iptables_rv && ! $ipchains_rv) {  ### this should _never_ happen (means the kernel is compatible with _both_ firewalls at the same time).
+		print "kernel bad\n";
+	}
+	return;
+}
+sub check_iptables_rules() {
+	my ($localips_aref, $Cmds_href) = @_;
+	# target     prot opt source               destination
+	# LOG        tcp  --  anywhere             anywhere           tcp flags:SYN,RST,ACK/SYN LOG level warning prefix `DENY '
+	# DROP       tcp  --  anywhere             anywhere           tcp flags:SYN,RST,ACK/SYN
+
+	# ACCEPT     tcp  --  0.0.0.0/0            64.44.21.15        tcp dpt:80 flags:0x0216/0x022
+	# LOG        tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0216/0x022 LOG flags 0 level 4 prefix `DENY '
+	# DROP       tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0216/0x022
+	my @rules = `$Cmds_href->{'iptables'} -nL`;
+	my $drop_rule = 0;
+	my $drop_tcp = 0;
+	my $drop_udp = 0;
+	FWPARSE: foreach my $rule (@rules) {
+		next FWPARSE if ($rule =~ /^Chain/ || $rule =~ /^target/);
+		if ($rule =~ /^(LOG)\s+(\w+)\s+\S+\s+\S+\s+(\S+)\s.+prefix\s\`(.+)\'/) {
+			($target, $proto, $dst, $prefix) = ($1, $2, $3, $4);
+			if ($target eq "LOG" && $proto =~ /all/ && $prefix =~ /drop|reject|deny/i) {
+			# this needs work... see above _two_ rules.
+				if (&check_destination($dst, $localips_aref)) {
+					&logr(" ----  Your firewall setup looks good.  Unauthorized tcp and/or udp packets will be logged.\n", \@LOGR_FILES);
+					return 1;
+				}
+			} elsif ($target eq "LOG" && $proto =~ /tcp/ && $prefix =~ /drop|reject|deny/i) {
+				$drop_tcp = 1 if (&check_destination($dst, $localips_aref));
+			} elsif ($target eq "LOG" && $proto =~ /udp/ && $prefix =~ /drop|reject|deny/i) {
+				$drop_udp = 1 if (&check_destination($dst, $localips_aref));
+			}
+		}
+	}
+	if ($drop_tcp && $drop_udp) {
+		&logr(" ----  Your firewall setup looks good.  Unauthorized tcp and/or udp packets will be logged.\n", \@LOGR_FILES);
+		return 1;
+	} elsif ($drop_tcp) {
+		&logr(" ----  Your firewall will log unauthorized tcp packets, but not all udp packets.\n", \@LOGR_FILES);
+		&logr("       Hence psad will be able to detect tcp scans, but not udp ones.\n", \@LOGR_FILES);
+		&logr("       Suggestion: After making sure you accept any udp traffic that you need to (such as udp/53\n", \@LOGR_FILES);
+		&logr("       for nameservice) add a rule to log and drop all other udp traffic with the following two commands:\n", \@LOGR_FILES);
+		&logr("          # iptables -A INPUT -p udp -j LOG --log-prefix \"DENY \"\n", \@LOGR_FILES);
+		&logr("          # iptables -A INPUT -p udp -j DROP\n", \@LOGR_FILES);
+		return 1;
+	} elsif ($drop_tcp) {
+                &logr(" ----  Your firewall will log unauthorized udp packets, but not all tcp packets.\n", \@LOGR_FILES);
+                &logr("       Hence psad will be able to detect udp scans, but not tcp ones.\n", \@LOGR_FILES);
+                &logr("       Suggestion: After making sure you accept any tcp traffic that you need to (such as tcp/80\n", \@LOGR_FILES);
+                &logr("       etc.) add a rule to log and drop all other tcp traffic with the following two commands:\n", \@LOGR_FILES);
+                &logr("          # iptables -A INPUT -p tcp -j LOG --log-prefix \"DENY \"\n", \@LOGR_FILES);
+                &logr("          # iptables -A INPUT -p tcp -j DROP\n", \@LOGR_FILES);
+		return 1;
+	}
+	&logr(" ----  Your firewall does not include rules that will log dropped/rejected packets.\n", \@LOGR_FILES);
+	&logr("       You need to include a default rule that logs packets that have not been accepted\n", \@LOGR_FILES);
+	&logr("       by previous rules, and this rule should have a logging prefix of \"drop\", \"deny\"\n", \@LOGR_FILES);
+	&logr("       or \"reject\".\n", \@LOGR_FILES);
+	&logr("\n", \@LOGR_FILES);
+	&logr("       FOR EXAMPLE:   Suppose that you are running a webserver to which you\n", \@LOGR_FILES);
+	&logr("       also need ssh access.  Then a iptables ruleset that is compatible with psad\n", \@LOGR_FILES);
+	&logr("       could be built with the following commands:\n", \@LOGR_FILES);
+	&logr("\n", \@LOGR_FILES);
+	&logr("              iptables -A INPUT -s 0/0 -d <webserver_ip> 80 -j ACCEPT\n", \@LOGR_FILES);
+	&logr("              iptables -A INPUT -s 0/0 -d <webserver_ip> 22 -j ACCEPT\n", \@LOGR_FILES);
+	&logr("              iptables -A INPUT -j LOG --log-prefix \" DROP\"\n", \@LOGR_FILES);
+	&logr("              iptables -A INPUT -j DENY\n", \@LOGR_FILES);
+	&logr("\n", \@LOGR_FILES);	
+	&logr("@@@@@  Psad will not run without an iptables ruleset that includes rules similar to the\n", \@LOGR_FILES);
+	&logr("@@@@@  last two rules above.\n", \@LOGR_FILES);
+	return 0;
+} 
+sub check_ipchains_rules() {
+	my ($localips_aref, $Cmds_href) = @_;
+	#  target     prot opt     source                destination           ports
+	# DENY       tcp  ----l-  anywhere             anywhere              any ->   telnet
+
+	#Chain input (policy ACCEPT):
+	#target     prot opt     source                destination           ports
+	#ACCEPT     tcp  ------  0.0.0.0/0            0.0.0.0/0             * ->   22
+	#DENY       tcp  ----l-  0.0.0.0/0            0.0.0.0/0             * ->   *
+	my @rules = `$Cmds_href->{'ipchains'} -nL`;
+	FWPARSE: foreach my $rule (@rules) {
+		chomp $rule;
+                next FWPARSE if ($rule =~ /^Chain/ || $rule =~ /^target/);
+		if ($rule =~ /^(\w+)\s+(\w+)\s+(\S+)\s+\S+\s+(\S+)\s+(\*)\s+\-\>\s+(\*)/) {
+			my ($target, $proto, $opt, $dst, $srcpt, $dstpt) = ($1, $2, $3, $4, $5, $6);
+                       	if ($target =~ /drop|reject|deny/i && $proto =~ /all|tcp/ && $opt =~ /....l./) {
+				if (&check_destination($dst, $localips_aref)) {
+					&logr(" ----  Your firewall setup looks good.  Unauthorized tcp packets will be dropped and logged.\n", \@LOGR_FILES); 
+                               		return 1;
+				}
+			}
+		} elsif ($rule =~ /^(\w+)\s+(\w+)\s+(\S+)\s+\S+\s+(\S+)\s+(n\/a)/) {  # kernel 2.2.14 (and others) show "n/a" instead of "*"
+			my ($target, $proto, $opt, $dst, $ports) = ($1, $2, $3, $4, $5);
+			if ($target =~ /drop|reject|deny/i && $proto =~ /all|tcp/ && $opt =~ /....l./) {
+				if (&check_destination($dst, $localips_aref)) {
+					&logr(" ----  Your firewall setup looks good.  Unauthorized tcp packets will be dropped and logged.\n", \@LOGR_FILES);
+					return 1;
 				}
 			}
 		}
-		if ($drop_tcp && $drop_udp) {
-			print STDOUT wrap('', $SUB_TAB, " ----  Your firewall setup looks good.  Unauthorized tcp and/or udp packets will be logged. ----\n");
-			return 1;
-		} elsif ($drop_tcp) {
-			print STDOUT wrap('', $SUB_TAB, "=-=-=  Your firewall will log unauthorized tcp packets, but not all udp packets.\n");
-			print STDOUT wrap('', $SUB_TAB, "=-=-=  Hence psad will be able to detect tcp scans, but not udp ones.\n");
-			print STDOUT wrap('', $SUB_TAB, "=-=-=  Suggestion: After making sure you accept any udp traffic that you need to (such as udp/53\n");
-			print STDOUT wrap('', $SUB_TAB, "=-=-=  for nameservice) add a rule to log and drop all other udp traffic with the following two commands:\n");
-			print STDOUT wrap('', $SUB_TAB, "=-=-=     # /usr/local/bin/iptables -A INPUT -p udp -j LOG --log-prefix \"DENY \"\n");
-			print STDOUT wrap('', $SUB_TAB, "=-=-=     # /usr/local/bin/iptables -A INPUT -p udp -j DROP\n");
-			return 1;
-		} elsif ($drop_tcp) {
-                        print STDOUT wrap('', $SUB_TAB, "=-=-=  Your firewall will log unauthorized udp packets, but not all tcp packets.\n");
-                        print STDOUT wrap('', $SUB_TAB, "=-=-=  Hence psad will be able to detect udp scans, but not tcp ones.\n");
-                        print STDOUT wrap('', $SUB_TAB, "=-=-=  Suggestion: After making sure you accept any tcp traffic that you need to (such as tcp/80\n");  
-                        print STDOUT wrap('', $SUB_TAB, "=-=-=  etc.) add a rule to log and drop all other tcp traffic with the following two commands:\n");
-                        print STDOUT wrap('', $SUB_TAB, "=-=-=     # /usr/local/bin/iptables -A INPUT -p tcp -j LOG --log-prefix \"DENY \"\n");
-                        print STDOUT wrap('', $SUB_TAB, "=-=-=     # /usr/local/bin/iptables -A INPUT -p tcp -j DROP\n");
-			return 1;
-                }
-		print STDOUT wrap('', $SUB_TAB, "=-=-=  Your firewall does not include rules that will log dropped/rejected packets.\n");
-		print STDOUT wrap('', $SUB_TAB, "    You need to include a default rule that logs packets that have not been accepted\n");
-		print STDOUT wrap('', $SUB_TAB, "    by previous rules, and this rule should have a logging prefix of \"drop\", \"deny\"\n");
-		print STDOUT wrap('', $SUB_TAB, "    or \"reject\".  For example suppose that you are running a webserver to which you\n");
-		print STDOUT wrap('', $SUB_TAB, "    also need ssh access.  Then a iptables ruleset that is compatible with psad\n");
-		print STDOUT wrap('', $SUB_TAB, "    could be built with the following commands:\n");
-		print STDOUT "\n";
-		print STDOUT wrap('', $SUB_TAB, "    iptables -A INPUT -s 0/0 -d <webserver_ip> 80 -j ACCEPT\n");
-		print STDOUT wrap('', $SUB_TAB, "    iptables -A INPUT -s 0/0 -d <webserver_ip> 22 -j ACCEPT\n");
-		print STDOUT wrap('', $SUB_TAB, "    iptables -A INPUT -j LOG --log-prefix \" DROP\"\n");
-		print STDOUT wrap('', $SUB_TAB, "    iptables -A INPUT -j DENY\n");
-		print STDOUT "\n";	
-		print STDOUT wrap('', $SUB_TAB, "    Psad will not run without an iptables ruleset that includes rules similar to the\n");
-		print STDOUT wrap('', $SUB_TAB, "    last two rules above.\n");
-		return 0;
-	} elsif ($ipchains) {
-# target     prot opt     source                destination           ports
-# DENY       tcp  ----l-  anywhere             anywhere              any ->   telnet
-
-#Chain input (policy ACCEPT):
-#target     prot opt     source                destination           ports
-#ACCEPT     tcp  ------  0.0.0.0/0            0.0.0.0/0             * ->   22
-#DENY       tcp  ----l-  0.0.0.0/0            0.0.0.0/0             * ->   *
-		my @rules = `$Cmds_href->{'ipchains'} -nL`;
-		FWPARSE: foreach my $rule (@rules) {
-			chomp $rule;
-                        next FWPARSE if ($rule =~ /^Chain/ || $rule =~ /^target/);
-			if ($rule =~ /^(\w+)\s+(\w+)\s+(\S+)\s+\S+\s+(\S+)\s+(\*)\s+\-\>\s+(\*)/) {
-				my ($target, $proto, $opt, $dst, $srcpt, $dstpt) = ($1, $2, $3, $4, $5, $6);
-                        	if ($target =~ /drop|reject|deny/i && $proto =~ /all|tcp/ && $opt =~ /....l./) {
-					if (check_destination($dst, \@localips)) {
-						print STDOUT wrap('', $SUB_TAB, "=-=-=  Your firewall setup looks good.  Unauthorized tcp packets will be dropped and logged.\n"); 
-                                		return 1;
-					}
-				}
-			} elsif ($rule =~ /^(\w+)\s+(\w+)\s+(\S+)\s+\S+\s+(\S+)\s+(n\/a)/) {  # kernel 2.2.14 (and others) show "n/a" instead of "*"
-				my ($target, $proto, $opt, $dst, $ports) = ($1, $2, $3, $4, $5);
-				if ($target =~ /drop|reject|deny/i && $proto =~ /all|tcp/ && $opt =~ /....l./) {
-					if (check_destination($dst, \@localips)) {
-						print STDOUT wrap('', $SUB_TAB, "=-=-=  Your firewall setup looks good.  Unauthorized tcp packets will be dropped and logged.\n");
-						return 1;
-					}
-				}
-			}
-                }
-		print STDOUT wrap('', $SUB_TAB, "=-=-=  Your firewall does not include rules that will log dropped/rejected packets.  Psad will not work with such a firewall setup.\n");
-                return 0;
-	} else {
-		print wrap ("", $SUB_TAB, "@@@@@  The linux kernel version you are currently running (v $kernel) does not seem to support ipchains or iptables.  psad will not run!\n");
-		exit 0;
-	}
+        }
+	&logr(" ----  Your firewall does not include rules that will log dropped/rejected packets.  Psad will not work with such a firewall setup.\n", \@LOGR_FILES);
+	return 0;
 } 
 sub check_destination() {
 	my ($dst, $localips_aref) = @_;
@@ -585,11 +555,6 @@ sub get_distro() {
 		return "NA";
 	}
 }
-sub get_kernel() {
-	my $Cmds_href = shift;
-	my $kernel = (split /\s/, `$Cmds_href->{'uname'} -a`)[2];
-	return $kernel;
-}
 sub check_commands() {
 	my $Cmds_href = shift;
 	CMD: foreach my $cmd (keys %$Cmds_href) {
@@ -599,7 +564,7 @@ sub check_commands() {
 			$real_location = `which $cmd 2> /dev/null`;
 			chomp $real_location;
 			if ($real_location) {
-				print wrap('', $SUB_TAB, "=-=-=  $cmd is not located at $Cmds_href->{$cmd}.  Using $real_location\n");
+				&logr("@@@@@  $cmd is not located at $Cmds_href->{$cmd}.  Using $real_location\n", \@LOGR_FILES);
 				$Cmds_href->{$cmd} = $real_location;
 			} else {
 				if ($cmd ne "ipchains" && $cmd ne "iptables") {
@@ -710,7 +675,7 @@ sub preserve_config() {
 							if ($mailbox ne "root" && $host ne "localhost") {
 								$defc =~ s/root/$mailbox/;
 								$defc =~ s/localhost/$host/;
-								print wrap('', $SUB_TAB, "-----  Removing depreciated email format.  Preserving email address in production installation.\n");
+								&logr("-----  Removing depreciated email format.  Preserving email address in production installation.\n", \@LOGR_FILES);
 								$prodvars{'STRING'}{'EMAIL_ADDRESS'}{'FOUND'} = "Y";
 								print TMP "$defc\n";
 								next PDEF;
@@ -721,12 +686,12 @@ sub preserve_config() {
 						$defc = $prodvars{$type}{$varname}{'LINE'};
 						$prodvars{$type}{$varname}{'FOUND'} = "Y";
 						if ($verbose) {
-							print wrap('', $SUB_TAB, "*****  Using configuration value from production installation of psad for $type variable: $varname\n");
+							&logr("*****  Using configuration value from production installation of psad for $type variable: $varname\n", \@LOGR_FILES);
 						}
 						print TMP "$defc\n";
 					} else {
 						$prodvars{$type}{$varname}{'FOUND'} = "Y";
-						print wrap('', $SUB_TAB, "+++++  Adding new configuration $type variable \"$varname\" introduced in this version of psad.\n");
+						&logr("+++++  Adding new configuration $type variable \"$varname\" introduced in this version of psad.\n", \@LOGR_FILES);
 						print TMP "$defc\n";
 					}
 				} else {
@@ -737,7 +702,7 @@ sub preserve_config() {
 				foreach my $varname (keys %{$prodvars{$type}}) {
 					next if ($varname =~ /EMAIL_ADDRESS/);
 					unless ($prodvars{$type}{$varname}{'FOUND'} eq "Y") {
-						print wrap('', $SUB_TAB, "-----  Removing depreciated $type variable: \"$varname\" not needed in this version of psad.\n");
+						&logr("-----  Removing depreciated $type variable: \"$varname\" not needed in this version of psad.\n", \@LOGR_FILES);
 					}
 				}
 			}	
@@ -780,6 +745,12 @@ sub perms_ownership() {
 	chown 0, 0, $file;	# chown uid, gid, $file
 	return;
 }
+sub create_varlogpsad() {
+	unless (-e "/var/log/psad") {
+		mkdir "/var/log/psad", 400;
+	}
+	return;
+}
 sub rm_perl_options() {
 	my ($file, $Cmds_href) = @_;
 	my $tmp = $file . ".tmp";
@@ -794,6 +765,27 @@ sub rm_perl_options() {
 	print F $_ for (@lines);
 	close F;
 	return;
+}
+sub logr() {
+        my ($msg, $files_aref) = @_;
+        for my $f (@$files_aref) {
+                if ($f eq "STDOUT" || $f eq "STDERR") {
+                        if (length($msg) > 72) {
+                                print $f  wrap("", $SUB_TAB, $msg);
+                        } else {
+                                print $f $msg;
+                        }
+                } else {
+                        open F, ">> $f";
+                        if (length($msg) > 72) {
+                                print F wrap("", $SUB_TAB, $msg);
+                        } else {
+                                print F $msg;
+                        }
+                        close F;
+                }
+        }
+        return;
 }
 sub usage_and_exit() {
         my $exitcode = shift;

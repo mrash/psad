@@ -153,7 +153,7 @@ unless (-e "/usr/local/bin/whois.psad") {
 }
 if ( -e "/usr/local/bin/psad" && (! $nopreserve)) {  # need to grab the old config
 	print "=-=-=  Copying psad -> /usr/local/bin/psad\n";
-	print "     Preserving old config within /usr/local/bin/psad\n";
+	print "       Preserving old config within /usr/local/bin/psad\n";
 	preserve_config("psad", "/usr/local/bin/psad", \%Cmds);
 	perms_ownership("/usr/local/bin/psad", 0500)
 } else {
@@ -163,7 +163,7 @@ if ( -e "/usr/local/bin/psad" && (! $nopreserve)) {  # need to grab the old conf
 }
 if ( -e "/usr/local/bin/psadwatchd" && (! $nopreserve)) {  # need to grab the old config
         print "=-=-=  Copying psad -> /usr/local/bin/psadwatchd\n";
-        print "     Preserving old config within /usr/local/bin/psadwatchd\n";
+        print "       Preserving old config within /usr/local/bin/psadwatchd\n";
         preserve_config("psadwatchd", "/usr/local/bin/psadwatchd", \%Cmds);
         perms_ownership("/usr/local/bin/psadwatchd", 0500)
 } else {
@@ -173,7 +173,7 @@ if ( -e "/usr/local/bin/psadwatchd" && (! $nopreserve)) {  # need to grab the ol
 }
 if (-e "/usr/local/bin/kmsgsd" && (! $nopreserve)) { 
 	print "=-=-=  Copying kmsgsd -> /usr/local/bin/kmsgsd\n";
-	print "     Preserving old config within /usr/local/bin/kmsgsd\n";
+	print "       Preserving old config within /usr/local/bin/kmsgsd\n";
 	preserve_config("kmsgsd", "/usr/local/bin/kmsgsd", \%Cmds);
 	perms_ownership("/usr/local/bin/kmsgsd", 0500);
 } else {
@@ -183,7 +183,7 @@ if (-e "/usr/local/bin/kmsgsd" && (! $nopreserve)) {
 }
 if (-e "/usr/local/bin/diskmond" && (! $nopreserve)) {
 	print "=-=-=  Copying diskmond -> /usr/local/bin/diskmond\n";
-	print "     Preserving old config within /usr/local/bin/diskmond\n";
+	print "       Preserving old config within /usr/local/bin/diskmond\n";
         preserve_config("diskmond", "/usr/local/bin/diskmond", \%Cmds);
         perms_ownership("/usr/local/bin/diskmond", 0500);
 } else {
@@ -197,7 +197,7 @@ unless (-e "/etc/psad") {
 }
 if (-e "/etc/psad/psad_signatures") {
 	print "=-=-=  Copying psad_signatures -> /etc/psad/psad_signatures\n";
-	print "     Preserving old signatures file as /etc/psad/psad_signatures.old\n";
+	print "       Preserving old signatures file as /etc/psad/psad_signatures.old\n";
 	`$Cmds{'mv'} /etc/psad/psad_signatures /etc/psad/psad_signatures.old`;
 	`$Cmds{'cp'} psad_signatures /etc/psad/psad_signatures`;
 	perms_ownership("/etc/psad/psad_signatures", 0600);
@@ -208,7 +208,7 @@ if (-e "/etc/psad/psad_signatures") {
 }
 if (-e "/etc/psad/psad_auto_ips") {
 	print "=-=-=  Copying psad_auto_ips -> /etc/psad/psad_auto_ips\n";
-	print "     Preserving old auto_ips file as /etc/psad/psad_auto_ips.old\n";
+	print "       Preserving old auto_ips file as /etc/psad/psad_auto_ips.old\n";
 	`$Cmds{'mv'} /etc/psad/psad_auto_ips /etc/psad/psad_auto_ips.old`;
 	`$Cmds{'cp'} psad_auto_ips /etc/psad/psad_auto_ips`;
 	perms_ownership("/etc/psad/psad_auto_ips", 0600);
@@ -218,8 +218,8 @@ if (-e "/etc/psad/psad_auto_ips") {
 	perms_ownership("/etc/psad/psad_auto_ips", 0600);
 }
 if (-e "/etc/psad/psad.conf") {
-	print "=-=-= Copying psad.conf -> /etc/psad/psad.conf\n";
-	print "     Preserving old psad.conf file as /etc/psad/psad.conf\n";
+	print "=-=-=  Copying psad.conf -> /etc/psad/psad.conf\n";
+	print "       Preserving old psad.conf file as /etc/psad/psad.conf\n";
 	`$Cmds{'mv'} /etc/psad/psad.conf /etc/psad/psad.conf.old`;
 	`$Cmds{'cp'} psad.conf /etc/psad/psad.conf`;
 	perms_ownership("/etc/psad/psad.conf", 0600);

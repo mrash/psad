@@ -374,7 +374,6 @@ my $oldarg_rdns;
 my $oldarg_nrdns;
 my $oldarg_whois;
 my $oldarg_nwhois;
-my $oldarg_netstat;
 my $oldarg_nlport;
 my $oldarg_fwcheck;
 my $oldarg_nfwchk;
@@ -449,7 +448,7 @@ Getopt::Long::Configure('no_ignore_case');
     'no-fwcheck'        => \$no_fwcheck,      # Do not check firewall rules.
     'no-rdns'           => \$no_rdns,         # Do not issue dns lookups against
                                               # Scanning ip address.
-    'no-localport'      => \$no_netstat,      # Do not check to see if the
+    'no-netstat'        => \$no_netstat,      # Do not check to see if the
                                               # firewall is listening on localport
                                               # that has been scanned.
     'no-ipt-errors'     => \$no_ipt_errors,   # Do not write malformed packet.
@@ -460,11 +459,9 @@ Getopt::Long::Configure('no_ignore_case');
     'help'              => \$help,            # Display help.
     ### old args
     'Logging_server'    => \$oldarg_logserv, # old command line arg
-#    'Daemon'            => \$oldarg_daemon, # old command line arg
     'no_fw_check'       => \$oldarg_nfwchk,  # old command line arg
     'snort-sids'        => \$oldarg_snort_sids, # old command line arg
     'reversedns'        => \$oldarg_rdns,    # old command line arg
-    'localport'         => \$oldarg_netstat, # old command line arg
     'errors'            => \$oldarg_errs,    # old command line arg
     'no_errors'         => \$oldarg_nerrs,   # old command line arg
     'no-errors'         => \$oldarg_nerrs2,  # old command line arg
@@ -713,7 +710,7 @@ for (;;) {
     ### check the timeouts against existing ips in the scan hash
     ### even if new packets are not found).
     if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
-            && $config{'AUTO_BLOCK_TIMEOUT'} > 0) {
+            and $config{'AUTO_BLOCK_TIMEOUT'} > 0) {
         &timeout_auto_blocked_ips();
     }
 
@@ -1028,8 +1025,15 @@ sub check_scan() {
         ### on the paper "Passive OS Fingerprinting: Details
         ### and Techniques" by Toby Miller).
         unless ($no_posf) {
-            &posf($src, $len, $tos, $ttl, $id, $win)
-                if ($proto eq 'tcp' && $flags =~ /SYN/);
+            ### make sure we have not already guessed the OS,
+            ### and if we have been unsuccessful in guessing
+            ### the OS after 100 packets don't keep trying.
+            if (not defined $posf{$src}{'guess'}
+                    and $scan{$src}{$dst}{'absnum'} < 100
+                    and $proto eq 'tcp'
+                    and $flags =~ /SYN/) {
+                &posf($src, $len, $tos, $ttl, $id, $win)
+            }
         }
 
         if ($sid and ! $no_snort_sids) {
@@ -1276,35 +1280,34 @@ sub match_sigs() {
 
 sub posf() {
     my ($src, $len, $tos, $ttl, $id, $win) = @_;
-    print STDOUT " .. posf():  $src  LEN: $len, TOS: $tos, TTL: $ttl, ",
-        "ID: $id, WIN: $win\n" if $debug;
-    return if defined $posf{$src}{'guess'};  ### we already guessed the OS
+
+    my $min_ttl;
+    my $max_ttl;
+    my $id_str;
+
     $posf{$src}{'len'}{$len}++;
     $posf{$src}{'tos'}{$tos}++;
     $posf{$src}{'ttl'}{$ttl}++;
-    push @{$posf{$src}{'id'}}, $id;  ### need to maintain ordering
     $posf{$src}{'win'}{$win}++;
     $posf{$src}{'ctr'}++;
+    push @{$posf{$src}{'id'}}, $id;  ### need to maintain ordering
 
-    my $id_incr_rv = -1;
-    my $id_str = 'RANDOM';
-    my $min_ttl;
-    my $max_ttl;
+    print STDOUT " .. posf():  $src  LEN: $len, TOS: $tos, TTL: $ttl, ",
+        "ID: $id, WIN: $win\n" if $debug;
+
+    $id_str = &id_incr(\@{$posf{$src}{'id'}});
     for my $os (keys %posf_sigs) {
-        if ($posf{$src}{'ctr'} >= $posf_sigs{$os}{'numpkts'}
-                and $id_incr_rv < 0) {
-            $id_incr_rv = &id_incr(\@{$posf{$src}{'id'}});
-            $id_str = 'SMALLINCR' if $id_incr_rv;
+        if ($posf{$src}{'ctr'} >= $posf_sigs{$os}{'numpkts'}) {
             ($min_ttl, $max_ttl) = &ttl_range($posf{$src}{'ttl'});
-        }
-        if ($posf{$src}{'ctr'} >= $posf_sigs{$os}{'numpkts'}
-                and defined $posf{$src}{'win'}{$posf_sigs{$os}{'win'}}
-                and defined $posf{$src}{'tos'}{$posf_sigs{$os}{'tos'}}
-                and defined $posf{$src}{'len'}{$posf_sigs{$os}{'len'}}
-                and ($min_ttl > ($posf_sigs{$os}{'ttl'}-$max_hops))
-                and ($max_ttl <= $posf_sigs{$os}{'ttl'})
-                and $id_str eq $posf_sigs{$os}{'id'}) {
-            $posf{$src}{'guess'} = $os;
+            if (defined $posf{$src}{'win'}{$posf_sigs{$os}{'win'}}
+                    and defined $posf{$src}{'tos'}{$posf_sigs{$os}{'tos'}}
+                    and defined $posf{$src}{'len'}{$posf_sigs{$os}{'len'}}
+                    and ($min_ttl > ($posf_sigs{$os}{'ttl'}-$max_hops))
+                    and ($max_ttl <= $posf_sigs{$os}{'ttl'})
+                    and $id_str eq $posf_sigs{$os}{'id'}) {
+                $posf{$src}{'guess'} = $os;
+                return;
+            }
         }
     }
     return;
@@ -1313,11 +1316,11 @@ sub posf() {
 sub id_incr() {
     my $aref = shift;
     for (my $i=0; $i<$#$aref; $i++) {
-        return 0 unless ($aref->[$i] < $aref->[$i+1]
-            && ($aref->[$i+1] - $aref->[$i]) < 1000);
+        return 'RANDOM'
+            unless ($aref->[$i] < $aref->[$i+1]
+                and ($aref->[$i+1] - $aref->[$i]) < 1000);
     }
-    ### 1 => small increments, 2 => random
-    return 1;
+    return 'SMALLINCR';
 }
 
 sub ttl_range() {
@@ -3521,8 +3524,7 @@ sub check_old_cmdargs() {
     &print_old_arg('no_rdns', 'no-rdns') if $oldarg_nrdns;
     &print_old_arg('whois', 'no-whois') if $oldarg_whois;
     &print_old_arg('no_whois', 'no-whois') if $oldarg_nwhois;
-    &print_old_arg('no_localport', 'no-localport') if $oldarg_nlport;
-    &print_old_arg('localport', 'no-netstat') if $oldarg_netstat;
+    &print_old_arg('no_localport', 'no-netstat') if $oldarg_nlport;
     &print_old_arg('no_fw_check', 'no-fwcheck') if $oldarg_nfwchk;
     &print_old_arg('Daemon', 'no-daemon') if $oldarg_daemon;
     return;

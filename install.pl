@@ -755,25 +755,25 @@ sub preserve_config() {
     ### re-import a full config file
     open CONF, "> ${PSAD_CONFDIR}/psad.conf.new" or die " ** Could not open ",
         "${PSAD_CONFDIR}/psad.conf.new: $!";
-    for my $orig_line (@new_lines) {
-        if ($orig_line =~ /^\s*(\w+)/) {
+    for my $new_line (@new_lines) {
+        if ($new_line =~ /^\s*(\w+)/) {
             my $var = $1;
             my $found = 0;
-            for my $new_line (@new_lines) {
-                if ($new_line =~ /^\s*$var\s/) {
-                    print CONF $new_line;
+            for my $orig_line (@orig_lines) {
+                if ($orig_line =~ /^\s*$var\s/) {
+                    print CONF $orig_line;
                     $found = 1;
                 }
             }
             unless ($found) {
-                print CONF $orig_line;
+                print CONF $new_line;
             }
         } else {
-            print CONF $orig_line;
+            print CONF $new_line;
         }
     }
     close CONF;
-    move "${PSAD_DIR}/psad.conf.new", "${PSAD_DIR}/psad/psad.conf";
+    move "${PSAD_CONFDIR}/psad.conf.new", "${PSAD_CONFDIR}/psad.conf";
     $preserved_config = 1;
     return;
 }

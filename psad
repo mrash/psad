@@ -527,8 +527,8 @@ if ($benchmark) {
 }
 
 ### let the user know where email alerts will be sent
-print STDOUT " .. psad started; email alerts will be sent to:\n",
-    " ----> $config{'EMAIL_ADDRESSES'}\n";
+#print STDOUT " .. psad started; email alerts will be sent to:\n",
+#    " ----> $config{'EMAIL_ADDRESSES'}\n";
 
 ### daemonize psad unless running with --no_daemon or --debug
 unless ($no_daemon || $debug || $benchmark) {

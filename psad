@@ -179,6 +179,7 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
                         }
 		}
 		# hash initialization
+		$Scan{$srcip}{'LOGR'} = "Y";
 		$Scan{$srcip}{'ABSNUM'} = 0 unless (defined $Scan{$srcip});
 		$Scan{$srcip}{'DSTIP'} = $dstip unless (defined $Scan{$srcip}{'DSTIP'});
 		$Scan{$srcip}{'FLAGS'}{$flags} = 0 unless (defined $Scan{$srcip}{'FLAGS'}{$flags});
@@ -216,7 +217,11 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 						}
 					}
 					my $alert_string = "$msg  sp=$srcport, dp=$dstport, flags=$flags.  $listening_port";
-					$Scan{$srcip}{'SIGMATCH'}{$alert_string} = "";
+					if (defined $Scan{$srcip}{'SIGMATCH'}{$alert_string}) {
+						$Scan{$srcip}{'SIGMATCH'}{$alert_string}++;
+					} else {
+						$Scan{$srcip}{'SIGMATCH'}{$alert_string} = 1;
+					}
 				}
 			} 
 		}
@@ -375,7 +380,7 @@ sub logr() {
        	}
 	foreach my $ip (keys %$Scan_href) {
 		my $current_danger_level = $Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'};
-		if ($current_danger_level >= 1) {
+		if ($current_danger_level >= 1 && $Scan_href->{$ip}->{'LOGR'} eq "Y") {
 			my $start_range = $Scan_href->{$ip}->{'START_PORT'};
 			my $end_range = $Scan_href->{$ip}->{'END_PORT'};
 			my $start_time = $Scan_href->{$ip}->{'START_TIME'};
@@ -395,9 +400,9 @@ sub logr() {
 			} else {
 				$range = "$start_range-$end_range";
 			}
-			$mesg = "$time PORTSCAN  $ip -> $dstip [$range]  pkts=$Scan_href->{$ip}->{'ABSNUM'}, start=[$start_time], end=[$end_time], DangerLevel=[$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} out of 5], $dnsstring";
+			$mesg = "**** $time PORTSCAN  $ip -> $dstip [$range]  pkts=$Scan_href->{$ip}->{'ABSNUM'}, start=[$start_time], end=[$end_time], DangerLevel=[$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} out of 5], $dnsstring";
 			print $hndl "$mesg\n";
-			print $hndl "\n";
+#			print $hndl "\n";
 			if ($USE_IPTABLES) {
 				foreach my $flags (keys %{$Scan_href->{$ip}->{'FLAGS'}}) {
 					my $nmapOpts = 0;
@@ -409,14 +414,14 @@ sub logr() {
 						print $hndl "$flags_mesg\n";
 					} else {
 						$flags_mesg = "TCP_flags: [$flags]  Number_of_packets: $Scan_href->{$ip}->{'FLAGS'}->{$flags}\n";
-						print $hndl "\n";
+#						print $hndl "\n";
 						print $hndl "$flags_mesg\n";
 					}
 				}
-				print $hndl "\n";
+#				print $hndl "\n";
 				if (defined $Scan_href->{$ip}->{'SIGMATCH'}) {
 					foreach my $sigmatch (keys %{$Scan_href->{$ip}->{'SIGMATCH'}}) {
-						print $hndl "$sigmatch\n";
+						print $hndl "$sigmatch  Packets=$Scan_href->{$ip}->{'SIGMATCH'}->{$sigmatch}\n";
 					}
 				}
 			} else {
@@ -425,6 +430,7 @@ sub logr() {
 			if ($Scan_href->{$ip}->{'ALERTED'} eq "N" && $current_danger_level >= $EMAIL_ALERT_DANGER_LEVEL) {
 				$Scan_href = email_alert($Scan_href, $ip, $mesg, $flags_mesg, $email_alertfile, $email_address, $mailCmd);
 			}
+			$Scan_href->{$ip}->{'LOGR'} = "N";
 		}
 	}
 	close $hndl unless $output;

@@ -160,7 +160,7 @@ int main(int argc, char *argv[]) {
                     "Received HUP signal, re-imported kmsgsd.conf");
         }
 
-        /* see if we matched a firewall message write it to the
+        /* see if we matched a firewall message and write it to the
          * fwdata file */
         if (((strstr(buf, "OUT") != NULL && strstr(buf, "IN") != NULL)
             && (strstr(buf, fw_msg_search) != NULL || strstr(buf, snort_sid_str)))

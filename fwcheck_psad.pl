@@ -188,7 +188,7 @@ sub print_fw_help() {
 "    that drops any unwanted packets.\n\n",
 "    FOR EXAMPLE:  Assuming you have already setup iptables rules to accept\n",
 "    traffic you want to allow, you can probably execute the following two\n",
-"    commandsto have iptables log and drop unwanted packets in the $chain\n",
+"    commands to have iptables log and drop unwanted packets in the $chain\n",
 "    chain by default.\n\n";
     if ($fw_search_all) {
         print FWCHECK
@@ -250,7 +250,7 @@ sub ipt_chk_chain() {
         print "[+] Parsing iptables $chain chain rules.\n";
     }
 
-    if ($fw_search_all) {
+    unless ($fw_search_all) {
         ### we are looking for specific log prefixes.
         ### for now we are only looking at the filter table, so if
         ### the iptables ruleset includes the log and drop rules in

@@ -2755,7 +2755,8 @@ sub scan_logr() {
                     and $scan{$src}{$dst}{'email_ctr'}
                     > $config{'PSAD_EMAIL_LIMIT'}) {
                 ### ignore PSAD_EMAIL_LIMIT if it is zero
-                unless (defined $scan{$src}{$dst}{'stop_email'}) {
+                unless (defined $scan{$src}{$dst}{'stop_email'}
+                        or $config{'EMAIL_LIMIT_STATUS_MSG'} eq 'N') {
                     &email_limit_reached($src, $dst);
                 }
                 next DST;
@@ -5323,7 +5324,7 @@ sub required_vars() {
         ETC_SYSLOG_CONF ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL
         ANALYSIS_MODE_DIR IMPORT_OLD_SCANS PSAD_ICMP_TYPES_FILE
         SHOW_ALL_SIGNATURES IPT_PREFIX_COUNTER_FILE IGNORE_PORTS
-        ENABLE_SCAN_ARCHIVE
+        ENABLE_SCAN_ARCHIVE EMAIL_LIMIT_STATUS_MSG
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

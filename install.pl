@@ -23,7 +23,6 @@ $INSTALL_DIR = "/usr/sbin";	### consistent with FHS (Filesystem Hierarchy Standa
 $INSTALL_LOG = "/var/log/psad/install.log";
 @LOGR_FILES = ("STDOUT", $INSTALL_LOG);
 @EMAILS = qw(root@localhost);
-$HOSTNAME = hostname;
 my $SYSLOG_INIT = "${INIT_DIR}/syslog";
 
 ### system binaries ###
@@ -37,6 +36,9 @@ my $ipchainsCmd = "/sbin/ipchains";
 my $iptablesCmd = "/usr/local/bin/iptables";
 my $psadCmd = "${INSTALL_DIR}/psad";
 #============ end config ============
+
+### get the hostname of the system
+$HOSTNAME = hostname;
 
 ### set the install directory for the Psad.pm module
 my $found = 0;

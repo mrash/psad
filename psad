@@ -712,16 +712,16 @@ sub check_scan() {
         chomp $pkt;
         my $sid = 0;
         if ($use_iptables) {
+            if ($snort_sids) {
+                if ($pkt =~ /$config{'SNORT_SID_STR'}(\d+)\s+IN/) {
+                    $sid = $1;
+                }
+            }
             if ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+
                          LEN=(\d+).*TTL=(\d+).*PROTO=(\S+)\s+
                          SPT=(\d+)\s+DPT=(\d+)/x) {
                 ($src, $dst, $len, $ttl, $proto, $srcport, $dstport) =
                     ($1,$2,$3,$4,$5,$6,$7,$8);
-                if ($snort_sids) {
-                    if ($pkt =~ /$config{'SNORT_SID_STR'}(\d+)\s+IN/) {
-                        $sid = $1;
-                    }
-                }
                 if ($proto ne 'TCP' && $proto ne 'UDP') {
                     ### it was some weird non-tcp/udp packet
                     ### with source and destination ports

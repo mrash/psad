@@ -120,7 +120,7 @@ sub check_process() {
             }
             ### should check the rv of this system() call
             system "$Cmds{$pidname} $pidcmdline";
-            my $subject = "psadwatchd: restarted $pidname on $HOSTNAME";
+            my $subject = " ** psadwatchd: restarted $pidname on $HOSTNAME";
             &Psad::sendmail($subject, '', $emailaddrs_aref, $Cmds{'mail'});
             $$email_count_ref++;
             return;
@@ -129,7 +129,7 @@ sub check_process() {
             $$email_count_ref = 0;
         }
     } else {
-        my $subject = "psadwatchd: pid file $pidfile\" does not exist " .
+        my $subject = " ** psadwatchd: pid file $pidfile\" does not exist " .
                       "for $pidname.  Starting $pidname daemon.";
         &Psad::sendmail($subject, '', $emailaddrs_aref, $Cmds{'mail'});
         ### start $pidname

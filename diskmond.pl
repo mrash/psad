@@ -188,6 +188,6 @@ sub check_config() {
         MAX_DISK_PERCENTAGE DISKMOND_PID_FILE
         PSAD_DIR SCAN_DATA_ARCHIVE_DIR
     );
-    &Psad::validate_config($CONFIG_FILE, \@required_vars, $Config_href);
+    &Psad::defined_vars($CONFIG_FILE, \@required_vars, $Config_href);
     return;
 }

@@ -134,6 +134,6 @@ sub check_facility() {
 sub check_config() {
     my @required_vars = qw(KMSGSD_PID_FILE PSAD_FIFO FW_DATA
     FW_MSG_SEARCH SNORT_SID_STR);
-    &Psad::validate_config($CONFIG_FILE, \@required_vars, $Config_href);
+    &Psad::defined_vars($CONFIG_FILE, \@required_vars, $Config_href);
     return;
 }

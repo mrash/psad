@@ -190,6 +190,6 @@ sub check_config() {
         PSADWATCHD_CHECK_INTERVAL
         PSADWATCHD_MAX_RETRIES
     );
-    &Psad::validate_config($CONFIG_FILE, \@required_vars, $Config_href);
+    &Psad::defined_vars($CONFIG_FILE, \@required_vars, $Config_href);
     return;
 }

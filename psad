@@ -648,6 +648,7 @@ sub check_scan() {
                 next PKT;
             }
         }
+### best place for buggy iptables state tracking exceptions
 
         ### see if we need to timeout any old scans
         if ($config{'ENABLE_PERSISTENCE'} eq 'N') {
@@ -1361,6 +1362,8 @@ sub scan_logr() {
     for my $src (keys %scan) {
         print STDOUT "scan_logr(): source ip: $src\n" if $debug;
         DST: for my $dst (keys %{$scan{$src}}) {
+            next DST if $scan{$src}{$dst}{'ALERTED'};  ### already sent an alert
+            next DST unless $scan{$src}{$dst}{'CURR_DL'} >= 1;
             my $syslog_flags = '';
             my $dnsstring    = '';
             my $rdns         = '';
@@ -1397,7 +1400,6 @@ sub scan_logr() {
                 next DST;
             }
             print STDOUT "scan_logr(): dst ip: $dst\n" if $debug;
-            next DST unless $curr_dlevel >= 1;
 
             ### make $src directory here in /var/log/psad
             ### unless it already exists
@@ -1566,8 +1568,7 @@ sub scan_logr() {
             }
             &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=" .
                 "-=-=-=-=\n", \%print_hsh);
-            if ($scan{$src}{$dst}{'ALERTED'} == 0
-                && $curr_dlevel >= $config{'EMAIL_ALERT_DANGER_LEVEL'}) {
+            if ($curr_dlevel >= $config{'EMAIL_ALERT_DANGER_LEVEL'}) {
                 my $subject;
                 if ($rdns) {
                     $subject = "psad: SCAN DETECTED from: $rdns";
@@ -1576,7 +1577,6 @@ sub scan_logr() {
                 }
                 &Psad::sendmail($subject, $email_alert, $config{'EMAIL_ADDRESSES'},
                     $cmds{'mail'});
-                $scan{$src}{$dst}{'ALERTED'} = 1;
                 $scan{$src}{$dst}{'EMAIL_COUNT'}++;
 
                 ### print the number of email alerts we have sent
@@ -1588,6 +1588,9 @@ sub scan_logr() {
             delete $scan{$src}{$dst}{'PROTO'}{'TCP'}{'CURR_INT'};
             delete $scan{$src}{$dst}{'PROTO'}{'UDP'}{'CURR_INT'};
             delete $scan{$src}{$dst}{'PROTO'}{'ICMP'}{'CURR_INT'};
+
+            ### we have sent an alert for $dst
+            $scan{$src}{$dst}{'ALERTED'} = 1;
         }
     }
     return;

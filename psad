@@ -2140,6 +2140,7 @@ sub scan_logr() {
                     $syslog_flags .= "$flags ";
                     my $n_pkts = $scan{$src}{$dst}{'TCP'}
                         {'C_INT'}{'FLAGS'}{$flags};
+                    ### FUTURE: replace this with a simple hash lookup
                     if ($flags eq 'SYN') {
                         $nmap_opts = '-sT or -sS';
                     } elsif ($flags eq 'FIN') {
@@ -2185,20 +2186,12 @@ sub scan_logr() {
                     "[$udp_absrange]\n";
             }
             print E "\n";
-            printf E "    %-12s%-14s%-10s\n", 'Protocol:', 'Chain Type:',
-                'Packets:';
-            printf E "      %-12s%-14s%-10d\n", 'TCP', 'input',
-                $tot_input_tcp;
-            printf E "      %-12s%-14s%-10d\n", 'UDP', 'input',
-                $tot_input_udp;
-            printf E "      %-12s%-14s%-10d\n", 'ICMP', 'input',
-                $tot_input_icmp;
-            printf E "      %-12s%-14s%-10d\n", 'TCP', 'forward',
-                $tot_forward_tcp;
-            printf E "      %-12s%-14s%-10d\n", 'UDP', 'forward',
-                $tot_forward_udp;
-            printf E "      %-12s%-14s%-10d\n", 'ICMP', 'forward',
-                $tot_forward_icmp;
+            printf E "    %-14s%-7s%-7s%-7s\n", 'Chain Type:', 'TCP:', 'UDP:',
+                'ICMP:';
+            printf E "    %-14s%-7s%-7s%-7s\n", 'input', $tot_input_tcp,
+                $tot_input_udp, $tot_input_icmp;
+            printf E "    %-14s%-7s%-7s%-7s\n", 'forward', $tot_forward_tcp,
+                $tot_forward_udp, $tot_forward_icmp;
 
             if ($use_iptables) {
                 ### print out any matched signatures to the email
@@ -3063,7 +3056,7 @@ sub status() {
                         print "    Running since: " .
                             localtime(stat($pidfile)->mtime) . "\n";
                         next PS unless $pidname eq 'psad';
-                        &status_psad_ips();  ### print individual ip info
+                        &status_psad_daemon();  ### print individual ip info
                         last PS;
                     }
                 }
@@ -3081,7 +3074,7 @@ sub status() {
     return $rv;
 }
 
-sub status_psad_ips() {
+sub status_psad_daemon() {
     my $cmdline;
     ### only the psad daemon (normally) runs with command line arguments
     if (-e $cmdline_file) {
@@ -3601,7 +3594,7 @@ sub setup() {
                 die " ** Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
             print SYSLOGNG "\n";
             print SYSLOGNG 'destination psadpipe { pipe(',
-                "\"/var/run/psadfifo\"); };\n";
+                "\"$config{'PSAD_FIFO'}\"); };\n";
             print SYSLOGNG "filter f_kerninfo { facility(kern) ",
                 "and level(info); };\n";
             print SYSLOGNG 'log { source(src); ',

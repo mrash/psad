@@ -49,7 +49,7 @@
 #define CONFIG_FILE "/etc/psad/psad.conf" /* default config file */
 
 /* this will automatically be set by install.pl */
-#define HOSTNAME HOSTNAME
+#define HOSTNAME "HOSTNAME"
 
 #define MAX_LINE_BUF 1024
 #define MAX_PID_SIZE 5

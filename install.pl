@@ -162,19 +162,19 @@ sub install() {
 
     unless (-d $RUNDIR) {
         &logr(" ... Creating $RUNDIR\n");
-        mkdir $RUNDIR,0500;
+        mkdir $RUNDIR, 0500;
     }
     unless (-d $VARLIBDIR) {
         &logr(" ... Creating $VARLIBDIR\n");
-        mkdir $VARLIBDIR,0500;
+        mkdir $VARLIBDIR, 0500;
     }
     unless (-d $LIBDIR) {
         &logr(" ... Creating $LIBDIR\n");
-        mkdir $LIBDIR,0500;
+        mkdir $LIBDIR, 0500;
     }
     unless (-d $PSAD_CONFDIR) {
         &logr(" ... Creating $PSAD_CONFDIR\n");
-        mkdir $PSAD_CONFDIR,0500;
+        mkdir $PSAD_CONFDIR, 0500;
     }
     unless (-d $CONF_ARCHIVE) {
         &logr(" ... Creating $CONF_ARCHIVE\n");
@@ -289,8 +289,8 @@ sub install() {
         open PH, "> psad.h";
         for my $line (@lines) {
             chomp $line;
-            if ($line =~ /^#define\s+HOSTNAME\s+HOSTNAME/) {
-                print PH "#define HOSTNAME $HOSTNAME\n";
+            if ($line =~ /^#define\s+HOSTNAME\s+\"HOSTNAME\"/) {
+                print PH "#define HOSTNAME \"$HOSTNAME\"\n";
             } else {
                 print PH $line . "\n";
             }
@@ -307,7 +307,7 @@ sub install() {
     unlink 'kmsgsd' if -e 'kmsgsd';
     ### remove any previously compiled psadwatchd
     unlink 'psadwatchd' if -e 'psadwatchd';
-    system "$Cmds{'make'}";
+    system $Cmds{'make'};
     if (! -e 'kmsgsd' && -e 'kmsgsd.pl') {
         &logr(" ... @@@ Could not compile kmsgsd.c.  Installing perl kmsgsd.\n");
         unless ((system "$Cmds{'perl'} -c kmsgsd.pl") == 0) {
@@ -343,18 +343,22 @@ sub install() {
 
     ### put the psad daemons in place
     &logr(" ... Copying psad -> ${SBIN_DIR}/psad\n");
+    unlink "${SBIN_DIR}/psad" if -e "${SBIN_DIR}/psad";
     copy 'psad', "${SBIN_DIR}/psad";
     &perms_ownership("${SBIN_DIR}/psad", 0500);
 
     &logr(" ... Copying psadwatchd -> ${SBIN_DIR}/psadwatchd\n");
+    unlink "${SBIN_DIR}/psadwatchd" if -e "${SBIN_DIR}/psadwatchd";
     copy 'psadwatchd', "${SBIN_DIR}/psadwatchd";
     &perms_ownership("${SBIN_DIR}/psadwatchd", 0500);
 
     &logr(" ... Copying kmsgsd -> ${SBIN_DIR}/kmsgsd\n");
+    unlink "${SBIN_DIR}/kmsgsd" if -e "${SBIN_DIR}/kmsgsd";
     copy 'kmsgsd', "${SBIN_DIR}/kmsgsd";
     &perms_ownership("${SBIN_DIR}/kmsgsd", 0500);
 
     &logr(" ... Copying diskmond -> ${SBIN_DIR}/diskmond\n");
+    unlink "${SBIN_DIR}/diskmond" if -e "${SBIN_DIR}/diskmond";
     copy 'diskmond', "${SBIN_DIR}/diskmond";
     &perms_ownership("${SBIN_DIR}/diskmond", 0500);
 

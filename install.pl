@@ -715,7 +715,7 @@ sub set_hostname() {
         open PH, "> $file";
         for my $line (@lines) {
             chomp $line;
-            if ($line =~ /^\s*HOSTNAME(\s+)CHANGE.?ME/) {
+            if ($line =~ /^\s*HOSTNAME(\s+)_CHANGE.?ME_/) {
                 print PH "HOSTNAME${1}$HOSTNAME;\n";
             } else {
                 print PH "$line\n";

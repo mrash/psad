@@ -66,7 +66,7 @@ can be viewed on STDOUT instead of being written to
 .I /var/log/psad/scanlog.
 .TP
 
-.BR \-d ", " \-\^\-error
+.BR \-e ", " \-\^\-error
 Occasionally messages written by syslog to
 .I /var/log/psadfifo
 or to 
@@ -104,7 +104,7 @@ messages to STDOUT.
 psad performs a rudimentary check of the firewall ruleset that
 exists on the machine on which psad is deployed to determine
 whether or not the firewall has a compatible configuration.
-Passing the --firewallcheck or --Syslog_server options will 
+Passing the --firewallcheck or --Logging_server options will 
 disable this check.
 .TP
 
@@ -119,6 +119,10 @@ appeal to the psad-init script.
 Restart the currently running psad processes.  This option will
 preserve the command line options that were supplied to the original
 psad process. 
+.TP
+
+.BR \-S ", " \-\^\-Status
+Display the status of any psad processes that may or not be running.
 .TP
 
 .BR \-c ", " \-\^\-config\ \<configuration\ file>
@@ -140,7 +144,7 @@ a scan has originated, but this can be disabled with the --whois
 command line argument.
 .TP
 
-.BR \-S ", " \-\^\-Syslog_server
+.BR \-L ", " \-\^\-Logging_server
 This option should be used if psad is being executed on a syslog 
 logging server. Running psad on a logging server requires that 
 check_firewall_rules() and auto_psad_response() not be executed 
@@ -232,7 +236,7 @@ most situations):
 Disable the firewall check and the local port lookup subroutines; most useful 
 if psad is deployed on a syslog logging server:
 
-.B psad --Syslog --local_port_lookup
+.B psad --Logging_server --local_port_lookup
 
 Disable reverse dns and whois lookups of scanning ip addresses; most useful
 if speed of psad is the main concern:
@@ -247,7 +251,7 @@ This is consistent with a secure network configuration since all traffic
 that has not been explicitly allowed should be blocked by the firewall
 ruleset. By default, psad attempts to determine whether or not the 
 firewall has been configured in this way. This feature can be disabled with 
-the --firewallcheck or --Syslog_server options. The --Syslog_server option
+the --firewallcheck or --Loggine_server options. The --Logging_server option
 is useful if psad is running on a syslog logging server that is separate 
 from the firewall. For more information on compatible ipchains/iptables
 rulesets, see the

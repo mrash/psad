@@ -123,7 +123,7 @@ USAGE:
 		  scanning ip address, but this feature can be disabled with 
 		  the -n command line argument.
 	
-	-S  --Syslog_server
+	-L  --Logging_server
 		  Psad is being executed on a syslog server.  This requires
 		  that check_firewall_rules() and auto_psad_response() not be
 		  executed since the firewall is probably not being run locally.
@@ -134,9 +134,13 @@ USAGE:
 		  appeal to the psad-init script.
 
 	-R  --Restart
-              	  Restart the currently running psad processes. This option will 
-		  preserve the command line options that were supplied to the 
-		  original psad process.
+              	  Restart the currently running psad processes. This option 
+		  will preserve the command line options that were supplied to 
+		  the original psad process.
+
+	-S  --Status
+		  Display the status of any psad processes that may or may
+		  not be running.
 
 	-V  --Version
 		  Print the psad version and exit.
@@ -200,7 +204,7 @@ Usage: psad [-n] [-d] [-o] [-e] [-f] [-r] [-w] [-S] [-l] [-i <interval>] [-h]
         -s   --signatures <sig file>    - import scan signatures.
         -a   --auto_ips <ips file>      - import auto ips file for automatic
                                           ip danger level increases/decreases.
-	-S   --Syslog_server		- psad is being run on a syslog
+	-L   --Logging_server		- psad is being run on a syslog
 					  server.
         -l   --local_port_lookup        - disable local port lookups for scan
                                           signatures.

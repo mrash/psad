@@ -83,8 +83,8 @@ psadpidofproc() {
 case "$1" in
 start)
 	if grep -q psadfifo /etc/syslog.conf; then
-		echo -n "Starting the psad daemon: "
-		daemon /usr/local/bin/psad -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips
+		echo -n "Starting the psad daemons: "
+		daemon /usr/sbin/psad -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips
 		echo
 	else
 	        echo "Syslog has not been configured to send kern.info messages to"
@@ -98,10 +98,10 @@ stop)
         echo -n "Shutting down the psad daemon: "
         psadkillproc psad
 	echo
-	echo -n "Shutting down the kmsgs daemon: "
+	echo -n "Shutting down the kmsgsd daemon: "
 	psadkillproc kmsgsd
 	echo
-	echo -n "Shutting down the disk monitoring daemon: "
+	echo -n "Shutting down the diskmond monitoring daemon: "
 	psadkillproc diskmond
 	echo
 	;;

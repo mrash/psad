@@ -2393,7 +2393,7 @@ sub assign_danger_level() {
             my $s_port = 65535;
             my $e_port = 0;
 
-            if (defined $changed_dl) {
+            if ($changed_dl) {
                 $scan{$src}{$dst}{'alerted'} = 0
                     if $config{'ALERT_ALL'} eq 'N';
             }

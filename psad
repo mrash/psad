@@ -98,7 +98,7 @@ my $CONFIG_FILE       = "${CONFIG_DIR}/psad.conf";
 my $SIGS_FILE         = "${CONFIG_DIR}/psad_signatures";
 my $AUTOIPS_FILE      = "${CONFIG_DIR}/psad_auto_ips";
 my $AUTO_BLOCKED_FILE = "${CONFIG_DIR}/psad_auto_blocked_ips";
-my $USE_IPCHAINS      = 0;
+my $USE_IPCHAINS      = 1;
 my $USE_IPTABLES      = 0;
 my $DEBUG             = 0;
 my $HOSTNAME          = hostname; ### Calculate hostname of the machine on which psad is running.
@@ -388,6 +388,14 @@ sub check_scan() {
             ### could implement source port checking here
             if ($l =~ /PROTO\=(\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\:(\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\:(\d+)/) {
                 ($proto, $src, $srcport, $dst, $dstport) = ($1,$2,$3,$4,$5);
+                ### should implement protocol mapping with /etc/protocols here
+                if ($proto == 1) {
+                    $proto = 'ICMP';
+                } elsif ($proto == 6) {
+                    $proto = 'TCP';
+                } elsif ($proto == 17) {
+                    $proto = 'UDP';
+                }
                 $flags = 'NONE';
             } else {
                 push @bad_packets, $l;
@@ -846,7 +854,7 @@ sub assign_danger_level() {
                 print "assign_danger_level(): destination ip: $dst\n";
                 print "assign_danger_level(): ABSNUM: $Scan{$src}{$dst}{'ABSNUM'}\n";
                 if (defined $Scan{$src}{$dst}{'START_PORT'}) {
-                    print 'assign_danger_level(): START_PORT: $Scan{$src}{$dst}{'START_PORT'}, '
+                    print "assign_danger_level(): START_PORT: $Scan{$src}{$dst}{'START_PORT'}, "
                         . "END_PORT: $Scan{$src}{$dst}{'END_PORT'}\n";
                 }
                 print 'assign_danger_level(): CURRENT_DANGER_LEVEL (before assignment) = '

@@ -969,7 +969,7 @@ sub query_preserve_config() {
         &logr(' .. Would you like to preserve the config from the ' .
             'existing psad installation ([y]/n)?  ');
         $ans = <STDIN>;
-        return 1 if $ans eq "\n";
+        $ans = 'y' if $ans eq "\n";
         chomp $ans;
     }
     if ($ans eq 'y') {
@@ -987,7 +987,7 @@ sub query_preserve_sigs_autoips() {
         &logr('    (NOTE: This is only recommended if you have manually ' .
             "edited $file)  (y/[n])?  ");
         $ans = <STDIN>;
-        return 0 if $ans eq "\n";
+        $ans = 'n' if $ans eq "\n";
         chomp $ans;
     }
     if ($ans eq 'y') {
@@ -1338,8 +1338,7 @@ sub get_fw_search_strings() {
     while ($ans ne 'y' and $ans ne 'n') {
         print
 "\n    Would you like psad to only parse specific strings in iptables\n",
-"    messages?\n",
-"    (y/[n])?  ";
+"    messages (y/[n])?  ";
         $ans = <STDIN>;
         if ($ans eq "\n") {  ### allow the default answer to take over
             $ans = 'n';

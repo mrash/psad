@@ -287,7 +287,6 @@ my $auto_dl_file     = '';
 my $snort_rules_dir  = '';
 my $srules_type      = '';
 my $cmdline_file     = '';
-my $messages_file    = '';
 my $analyze_msgs     = 0;
 my $syslog_server    = 0;
 my $kill             = 0;
@@ -312,9 +311,11 @@ my $fw_analyze       = 0;
 my $fw_file          = '';
 my $rm_data_ctr      = 0;
 my $analysis_emails  = 0;
+my $analysis_whois   = 0;
 my $netstat_lkup_ctr = 0;
 my $warn_msg         = '';
 my $die_msg          = '';
+my $messages_file    = '/var/log/messages';
 my $local_ips_lkup_ctr = 0;
 
 ### these flags are used to disable several features
@@ -372,6 +373,8 @@ Getopt::Long::Configure('no_ignore_case');
     'Analyze-msgs'      => \$analyze_msgs,    # Analysis mode for old iptables
                                               # messages in the psad fwdata file
                                               # (or messages file; see --messages).
+    'whois-analysis'    => \$analysis_whois,  # Issue whois lookups in analysis
+                                              # mode.
     'email-analysis'    => \$analysis_emails, # Send analysis mode emails.
     'messages-file=s'   => \$messages_file,   # Specify the path to file containing
                                               # old iptables messages (fwdata by
@@ -440,7 +443,6 @@ Getopt::Long::Configure('no_ignore_case');
     'reversedns'        => \$oldarg_rdns,    # old command line arg
     'no_errors'         => \$oldarg_nerrs,   # old command line arg
     'no-errors'         => \$oldarg_nerrs2,  # old command line arg
-    'whois'             => \$oldarg_whois,   # old command line arg
     'no_whois'          => \$oldarg_nwhois,  # old command line arg
     'no_rdns'           => \$oldarg_nrdns,   # old command line arg
     'no_localport'      => \$oldarg_nlport,  # old command line arg
@@ -4047,7 +4049,7 @@ sub analysis_mode() {
     &check_scan(\@ipt_msgs);
     print "[+] Displaying status output.\n";
     &status_psad_daemon();
-    print "\n.. Finished --Analyze cycle.\n";
+    print "\n[+] Finished --Analyze cycle.\n";
     return 0;
 }
 
@@ -4850,9 +4852,8 @@ sub handle_cmdline() {
     ### file was specified on the command line.
     $fw_analyze = 1 if $fw_file;
 
-    ### make sure to go into message analysis mode if --messages-file
-    ### argument was given.
-    $analyze_msgs = 1 if $messages_file;
+    ### disable whois lookups if we are running in -A mode.
+    $no_whois = 1 if $analyze_msgs and not $analysis_whois;
 
     return;
 }
@@ -4885,11 +4886,6 @@ sub setup() {
         move '/usr/bin/whois.psad', $cmds{'whois'} or die "[*] Could not ",
             "move /usr/bin/whois.psad -> $cmds{'whois'}";
     }
-
-    ### set the /var/log/messages file as the default file to
-    ### analyze if we are in --Analyze mode.
-    $messages_file = '/var/log/messages'
-        if ($analyze_msgs and not $messages_file);
 
     die '[*] No system logger config file could be found.'
         unless (-e $config{'ETC_SYSLOG_CONF'}
@@ -5211,8 +5207,8 @@ sub usage() {
     print <<_HELP_;
 
 psad; the Port Scan Attack Detector
- .. Version: $version
- .. By Michael Rash (mbr\@cipherdyne.org, http://www.cipherdyne.org)
+[+] Version: $version
+[+] By Michael Rash (mbr\@cipherdyne.org, http://www.cipherdyne.org)
 
 Usage: psad [-a <auto ips file>] [-c <config file>] [-l] [-i <interval>]
        [-h] [-B] [-A] [-F] [-S] [-K] [-R] [-U] [-V] [-o] [-p] [-D] [-d]
@@ -5243,7 +5239,9 @@ Options:
                                     $config_file.
     -A   --Analyze-msgs           - Analyze iptables logfile and exit.
     -e   --email-analysis         - Send emails for scans detected in
-                                    analysis mode.
+                                    offline analysis mode.
+    -w   --whois-analysis         - Enable whois lookups when running
+                                    in offline analysis mode.
     -m   --messages-file <file>   - Specify the path to the iptables
                                     logfile (use in conjunction with
                                     --Analyze-msgs).

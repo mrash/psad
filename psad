@@ -3647,6 +3647,7 @@ sub fw_check() {
         $forward_chain_rv = &ipt_chk_chain('FORWARD');
     }
 
+    my $send_alert = 0;
     if ($input_chain_rv && $forward_chain_rv) {
         &Psad::logr(" .. The iptables ruleset on $config{'HOSTNAME'} " .
             "will log and block unwanted packets in both the INPUT and " .
@@ -3656,7 +3657,14 @@ sub fw_check() {
             print scalar localtime(), " .. Firewall config looks good.\n";
             print scalar localtime(), " .. Completed check of firewall ruleset.\n";
         }
-    } else {
+    } elsif ($input_chain_rv and not $forward_chain_rv) {
+        &print_fw_help('FORWARD');
+        $send_alert = 1;
+    } elsif ($forward_chain_rv and not $input_chain_rv) {
+        &print_fw_help('INPUT');
+        $send_alert = 1;
+    }
+    if ($send_alert) {
         &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
         &Psad::logr(' .. NOTE: IPTables::Parse does not yet parse user ' .
             'defined chains and so it is possible your firewall config ' .
@@ -3720,8 +3728,6 @@ sub check_forwarding() {
 sub ipt_chk_chain() {
     my $chain = shift;
 
-    my $rv = 1;
-
     my $ipt = new IPTables::Parse 'iptables' => $cmds{'iptables'};
 
     if ($fw_analyze) {
@@ -3735,8 +3741,10 @@ sub ipt_chk_chain() {
 
     print Dumper $ld_hr if $debug;
 
-    my $fwc = $config{'FW_CHECK_FILE'};
+    my $rv = 1;
+    my $num_keys = 0;
     if (defined $ld_hr && keys %$ld_hr) {
+        $num_keys++;
         my @protos;
         my $found_all = 0;
         if (defined $ld_hr->{'all'}) {
@@ -3760,8 +3768,8 @@ sub ipt_chk_chain() {
                     "$config{'HOSTNAME'} does not include a default LOG rule " .
                     "$str1.  psad will not be able to detect $str2 without " .
                     "such a rule.\n",
-                    {$fwc => 1});
-                &Psad::logr("\n", {$fwc => 1});
+                    {$config{'FW_CHECK_FILE'} => 1});
+                &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
                 $rv = 0;
             }
             if (defined $ld_hr->{$proto}->{'LOG'}->{'prefix'}
@@ -3783,8 +3791,8 @@ sub ipt_chk_chain() {
                     qq(the log prefix is set to "$ld_hr->{$proto}->{'LOG'}->{'prefix'}".) .
                     qq(  psad will not be able to detect $str2 without adding ) .
                     qq(--log-prefix "$config{'FW_MSG_SEARCH'}" to the rule.\n),
-                    {$fwc => 1});
-                &Psad::logr("\n", {$fwc => 1});
+                    {$config{'FW_CHECK_FILE'} => 1});
+                &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
                 $rv = 0;
             }
             if (! defined $ld_hr->{$proto}->{'DROP'}) {
@@ -3795,52 +3803,46 @@ sub ipt_chk_chain() {
                 }
                 &Psad::logr(" ** The $chain chain in the iptables ruleset on " .
                     "$config{'HOSTNAME'} does not include a default DROP " .
-                    "rule $str1.\n", {$fwc => 1});
-                &Psad::logr("\n", {$fwc => 1});
+                    "rule $str1.\n", {$config{'FW_CHECK_FILE'} => 1});
+                &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
                 $rv = 0;
             }
-            if ($found_all) {  ### avoid $ld_hr->{'all'} autovivification
-                return $rv;
-            }
         }
-        unless ($found_all) {
-            &Psad::logr(' ** The best way to fix the above errors is to ' .
-                'first setup iptables to accept traffic that you need ' .
-                "to/through the iptables $chain chain, and then execute the " .
-                "following commands:\n", {$fwc => 1});
-            &Psad::logr("        iptables -A $chain -j LOG --log-prefix " .
-                qq("$config{'FW_MSG_SEARCH'}"\n), {$fwc => 1});
-            &Psad::logr("        iptables -A $chain -j DROP\n",
-                {$fwc => 1});
-        }
-    } else {
-        &Psad::logr(" ** The $chain chain in the iptables ruleset on " .
-            "$config{'HOSTNAME'} does not include default rules that will " .
-            "log and drop unwanted packets. You need to include two default " .
-            "rules; one that logs packets that have not been accepted by " .
-            "previous rules (this rule should have a logging prefix of " .
-            "\"$config{'FW_MSG_SEARCH'}\"), and a final rule that drops any " .
-            "unwanted packets.\n",
-            {$fwc => 1});
-        &Psad::logr("\n", {$fwc => 1});
-        &Psad::logr('    FOR EXAMPLE:  Assuming you have already setup ' .
-            'iptables rules to accept traffic you want to accept, you can ' .
-            'probably execute the following two commands to have iptables ' .
-            "log and drop unwanted packets in the $chain chain by " .
-            "default.\n",
-            {$fwc => 1});
-        &Psad::logr("\n", {$fwc => 1});
-        &Psad::logr("              iptables -A $chain -j LOG --log-prefix " .
-            qq(" $config{'FW_MSG_SEARCH'}"\n), {$fwc => 1});
-        &Psad::logr("              iptables -A $chain -j DROP\n\n",
-            {$fwc => 1});
-        &Psad::logr(" ** Psad will not detect in the iptables $chain chain " .
-            'scans without an iptables ruleset that includes rules similar ' .
-            "to the two rules above.\n",
-            {$fwc => 1});
-        &Psad::logr("\n", {$fwc => 1});
     }
+    ### make sure there was _something_ return from the IPTables::Parse
+    ### module.
+    return 0 unless $num_keys > 0;
     return $rv;
+}
+
+sub print_fw_help() {
+    my $chain = shift;
+    &Psad::logr(" ** The $chain chain in the iptables ruleset on " .
+        "$config{'HOSTNAME'} does not include default rules that will " .
+        "log and drop unwanted packets. You need to include two default " .
+        "rules; one that logs packets that have not been accepted by " .
+        "previous rules (this rule should have a logging prefix of " .
+        "\"$config{'FW_MSG_SEARCH'}\"), and a final rule that drops any " .
+        "unwanted packets.\n",
+        {$config{'FW_CHECK_FILE'} => 1});
+    &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
+    &Psad::logr('    FOR EXAMPLE:  Assuming you have already setup ' .
+        'iptables rules to accept traffic you want to allow, you can ' .
+        'probably execute the following two commands to have iptables ' .
+        "log and drop unwanted packets in the $chain chain by " .
+        "default.\n",
+        {$config{'FW_CHECK_FILE'} => 1});
+    &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
+    &Psad::logr("              iptables -A $chain -j LOG --log-prefix " .
+        qq(" $config{'FW_MSG_SEARCH'}"\n), {$config{'FW_CHECK_FILE'} => 1});
+    &Psad::logr("              iptables -A $chain -j DROP\n\n",
+        {$config{'FW_CHECK_FILE'} => 1});
+    &Psad::logr(" ** Psad will not detect in the iptables $chain chain " .
+        'scans without an iptables ruleset that includes rules similar ' .
+        "to the two rules above.\n",
+        {$config{'FW_CHECK_FILE'} => 1});
+    &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
+    return;
 }
 
 sub disk_space_exceeded() {

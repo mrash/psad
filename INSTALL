@@ -46,22 +46,21 @@ require that the patch be applied and then the kernel to be recompiled.
 For more information on how to do this, see the Kernel-HOWTO available
 at: http://www.linuxdoc.org/HOWTO/Kernel-HOWTO.html.
 
-    Before executing the install.pl script, edit the config sections
-at the beginning of the psad, diskmond, kmsgsd, and install.pl scripts.
-Sensible defaults are provided for each of the scripts so hopefully
+    Before executing the install.pl script, edit the config section
+at the beginning.  Sensible defaults are provided so hopefully
 there will be a minimal number of things to change to get psad to work
 on your system, but if system binaries are in places the scripts don't
 know about then you will need to provide the correct paths.  After the
-config sections are the way you want them, just run 'install.pl', and
-then run '/etc/rc.d/init.d/psad-init start' to start psad, kmsgsd,
-and diskmond, or just run them from the command line.  The install.pl
-script installs psad, kmsgsd, and diskmond in /usr/local/bin/ by
+config section is the way you want it, just run 'install.pl', and
+then run '/etc/init.d/psad-init start' to start psad, kmsgsd,
+and psadwatchd, or just run them from the command line.  The install.pl
+script installs psad, kmsgsd, and psadwatchd in /usr/sbin/ by
 default.
 
     You can install a new version of psad over an existing one; just
 run install.pl.  The installation script will preserve any old
 configuration parameters when installing the new versions of psad,
-psadwatchd, kmsgsd, and diskmond.  If you don't need or want any old
+psadwatchd, and kmsgsd.  If you don't need or want any old
 configurations to be preserved, just execute "./install.pl -n".
 
     Even though it is a good idea to edit the config sections

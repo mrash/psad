@@ -145,12 +145,11 @@ since the firewall is probably not being run locally.
 .TP
 
 .BR \-s ", " \-\^\-signatures\ \ <sig\ file>
-The firewalling code included within the linux 2.4.x kernel
-series, iptables, has the ability to distinguish and log any
-of the tcp flags present within tcp packets that traverse
-the interfaces. Psad makes use of this logging capability
-to detect several types of tcp scan signatures included
-within
+The iptables firewalling code included within the linux 2.4.x kernel
+series has the ability to distinguish and log any of the tcp flags
+present within tcp packets that traverse the interfaces. Psad makes
+use of this logging capability to detect several types of tcp scan
+signatures included within
 .B /etc/psad/psad_signatures.
 The signatures were
 originally included within the Snort intrusion detection
@@ -401,15 +400,15 @@ large over time and consume lots of memory depending on the popularity
 of your machine/site. Restarting psad solves this problem of course,
 but a better way is on the TODO list.
 
--For iptables firewalls, if the ip_conntrack module is loaded (or compiled
-into the kernel) and the firewall has been configured to keep state of
-connections, occasionally packets that are supposed to be part of normal TCP
-traffic will not be correctly identified and hence dropped.  Such packets
-will then be interpreted as a scan by psad even though they are not part of
-any malicious activity.  Fortunately the fix for this problem is to simply
-extend the TCP_CONNTRACK_CLOSE_WAIT timeout value in
-linux/net/ipv4/netfilter/ip_conntrack_proto_tcp.c from 60 seconds to 2 minutes,
-and a kernel patch "conntrack_patch" is included with the psad source to
+-For iptables firewalls as of Linux kernel version 2.4.19, if the ip_conntrack
+module is loaded (or compiled into the kernel) and the firewall has been
+configured to keep state of connections, occasionally packets that are supposed
+to be part of normal TCP traffic will not be correctly identified due to a bug
+in the firewall and hence dropped.  Such packets will then be interpreted as a
+scan by psad even though they are not part of any malicious activity.  Fortunately
+an interim fix for this problem is to simply extend the TCP_CONNTRACK_CLOSE_WAIT timeout
+value in linux/net/ipv4/netfilter/ip_conntrack_proto_tcp.c from 60 seconds to 2
+minutes, and a kernel patch "conntrack_patch" is included with the psad source to
 change this.  (Requires a kernel recompile of course, see the Kernel-HOWTO.)
 
 .SH DISTRIBUTION

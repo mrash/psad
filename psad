@@ -47,7 +47,6 @@
 #     should be done in a way that allows some scan data to persist.
 #   - Put source and destination ip addresses back into psad_signatures.
 #   - Ipfilter support on *BSD platforms.
-#   - Re-write significant components (kmsgsd, diskmond, psadwatchd) in C.
 #   - Possibly add a daemon to take into account ACK PSH, ACK FIN, RST etc.
 #     packets that the client may generate after the ip_conntrack module
 #     is reloaded.  Without anticipating such packets psad will interpret
@@ -298,8 +297,12 @@ my ($config_href, $cmds_href) = &Psad::buildconf($config_file);
 ### make sure the configuration is complete
 &check_config();
 
-my %config      = %$config_href;
-my %cmds        = %$cmds_href;
+my %config = %$config_href;
+my %cmds   = %$cmds_href;
+
+### release the memory in config_href and cmds_href
+%$config_href = ();
+%$cmds_href   = ();
 
 ### store the psad command line.
 my $cmdline_file = $config{'PSAD_CMDLINE_FILE'};
@@ -419,12 +422,12 @@ unless ($no_daemon || $debug) {
 ### Note that this is the best place to start the other daemons since we
 ### just wrote the psad pid to PSAD_PID_FILE above.
 if ($config_file eq '/etc/psad/psad.conf') {
-    system "$cmds{'kmsgsd'}";
-    system "$cmds{'diskmond'}";
-    system "$cmds{'psadwatchd'}" unless ($debug);
+    system $cmds{'kmsgsd'};
+    system $cmds{'diskmond'};
+    system $cmds{'psadwatchd'} unless ($debug);
 } else {  ### start the other daemons with the new (non-default) config file
     system "$cmds{'kmsgsd'} $config_file";
-    system "$cmds{'diskmond'} -c $config_file";
+    system "$cmds{'diskmond'} $config_file";
     system "$cmds{'psadwatchd'} $config_file" unless ($debug);
 }
 
@@ -558,7 +561,9 @@ sub check_scan() {
         if ($use_iptables) {
             ### Sometimes the log entry is messed up by iptables so
             ### we write it to the error log.
-            if ($line =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+).*TTL=(\d+).*PROTO=(\S+)\s+SPT=(\d+)\s+DPT=(\d+)/) {
+            if ($line =~ /SRC=(\S+)\s+DST=(\S+)\s+
+                          LEN=(\d+).*TTL=(\d+).*PROTO=(\S+)\s+
+                          SPT=(\d+)\s+DPT=(\d+)/x) {
                 ($src, $dst, $len, $ttl, $proto, $srcport, $dstport) =
                     ($1,$2,$3,$4,$5,$6,$7,$8);
                 if ($proto ne 'TCP' && $proto ne 'UDP') {
@@ -592,7 +597,9 @@ sub check_scan() {
                     ### define since we already have the ports, etc.
                     $udp_ctr++;
                 }
-            } elsif ($line =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+).*TTL=(\d+).*PROTO=ICMP\s+TYPE=(\d+)\s+CODE=(\d+)\s+ID=(\d+)\s+SEQ=(\d+)/) {
+            } elsif ($line =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+).*
+                               TTL=(\d+).*PROTO=ICMP\s+TYPE=(\d+)\s+
+                               CODE=(\d+)\s+ID=(\d+)\s+SEQ=(\d+)/x) {
                 ($src, $dst, $len, $ttl, $type, $code, $id, $seq) =
                     ($1,$2,$3,$4,$5,$6,$7,$8);
                 $proto = 'ICMP';
@@ -603,7 +610,8 @@ sub check_scan() {
             }
         } elsif ($use_ipchains) {
             ### could implement source port checking here
-            if ($line =~ /PROTO\=(\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\:(\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\:(\d+)/) {
+            if ($line =~ /PROTO\=(\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\:
+                          (\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\:(\d+)/x) {
                 ($proto, $src, $srcport, $dst, $dstport) = ($1,$2,$3,$4,$5);
                 ### should implement protocol mapping
                 ### with /etc/protocols here
@@ -2183,6 +2191,7 @@ sub setup_psad() {
         close SYSLOG;
         system "$cmds{'killall'} -HUP $cmds{'syslogd'}";
     }
+
     return;
 }
 

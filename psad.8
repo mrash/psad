@@ -284,10 +284,16 @@ Michael B. Rash <mbr@cipherdyne.com>
 Send bug reports to mbr@cipherdyne.com. Suggestions and/or comments are
 always welcome as well.
 
-If $ENABLE_PERSISTENCE="Y", the scan data structures can become
+-If $ENABLE_PERSISTENCE="Y", the scan data structures can become
 large over time and consume lots of memory depending on the popularity
 of your machine/site. Restarting psad solves this problem of course,
 but a better way is on the TODO list.
+
+-For iptables firewalls, if the ipt_state.o module is loaded and the firewall
+has been configured to keep state of connections, occasionally packets that
+are supposed to be part of normal TCP traffic will not be correctly identified
+and hence dropped.  Such packets will then be interpreted as a scan by psad
+even though they are not part of any malicious activity.  
 
 .SH DISTRIBUTION 
 .I psad 

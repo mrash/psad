@@ -42,8 +42,6 @@
 #     actually resolve to something in the IANA spec.
 #   - Send psad alerts to network abuse alerting services such as
 #     abuse.net and dshield.org.
-#   - Auto blocked ip timeouts.
-#   - External program/script execution with tie in to source ip address.
 #   - Packet grapher mode with annotated scan alerts.
 #   - Database support?
 #   - Get rid of the psad_signatures file in favor of just parsing the
@@ -192,6 +190,10 @@ my %scan;
 
 ### cache scan danger levels
 my %scan_dl;
+
+### cache executions of external script (only used if
+### ENABLE_EXT_SCRIPT_EXEC is set to 'Y');
+my %scan_ext_exec;
 
 ### cache all scan signatures (initialized by default)
 my %sigs;
@@ -1907,12 +1909,12 @@ sub scan_logr() {
                 &Psad::logr("$scan{$src}{$dst}{'EMAIL_COUNT'}\n",
                     {$ecount_file => 0});
 
-                if ($config{'ENABLE_EXTERNAL_SCRIPT'} eq 'Y') {
+                if ($config{'ENABLE_EXT_SCRIPT_EXEC'} eq 'Y') {
                     if ($config{'EXEC_EXT_SCRIPT_PER_ALERT'} eq 'Y') {
-#                        &exec_external_script($src);
+                        &exec_external_script($src);
                     } else {
-#                        &exec_external_script($src) unless
-#                            defined $scan{$src}
+                        &exec_external_script($src) unless
+                            defined $scan_ext_exec{$src};
                     }
                 }
             }
@@ -2023,6 +2025,29 @@ sub scan_logr_signatures() {
             unless $config{'SHOW_ALL_SIGNATURES'} eq 'Y';
         delete $scan{$src}{$dst}{$proto}{'SNORT_SID'}
             unless $config{'SHOW_ALL_SIGNATURES'} eq 'Y';
+    }
+    return;
+}
+
+sub exec_external_script() {
+    my $src = shift;
+    $scan_ext_exec{$src} = '';
+    my $cmd = $config{'EXTERNAL_SCRIPT'};
+    $cmd =~ s/SRCIP/$src/;
+    my $pid;
+    if ($pid = fork()) {
+        local $SIG{'ALRM'} = sub {die " ** External script timeout.\n"};
+        alarm 30;  ### the external script should be finished in 30 secs.
+        eval {
+            waitpid($pid, 0);
+        };
+        alarm 0;
+        if ($@) {
+            kill 9, $pid;
+        }
+    } else {
+        die " ** Could not fork for external script: $!" unless defined $pid;
+        exec qq{$cmd};
     }
     return;
 }
@@ -2975,9 +3000,9 @@ sub check_config() {
         PROC_FORWARD_FILE ENABLE_PERSISTENCE AUTO_BLOCK_IPT_FILE
         AUTO_BLOCK_IPCH_FILE AUTO_BLOCK_TCPWR_FILE PSAD_SIGS_FILE
         PSAD_AUTO_IPS_FILE AUTO_BLOCK_TIMEOUT EXTERNAL_SCRIPT
-        ENABLE_EXTERNAL_SCRIPT EXEC_EXT_SCRIPT_PER_ALERT
+        ENABLE_EXT_SCRIPT_EXEC EXEC_EXT_SCRIPT_PER_ALERT
     );
-    &Psad::validate_config($config_file, \@required_vars, $config_href);
+    &Psad::defined_vars($config_file, \@required_vars, $config_href);
     return;
 }
 

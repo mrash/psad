@@ -85,7 +85,6 @@ if grep -q psadfifo /etc/syslog.conf; then
 	# See how we were called.
 	case "$1" in
   	start)
-		echo
 		echo -n "Starting the kmsgs daemon: "
 		daemon /usr/local/bin/kmsgsd
 		echo

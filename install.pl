@@ -293,7 +293,8 @@ sub install() {
             "http://www.cipherdyne.com\n";
     }
 #    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR INST_ARCHLIB=$LIBDIR LIB=$LIBDIR";
-    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
+#    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
+    system "$Cmds{'perl'} Makefile.PL";
     system "$Cmds{'make'}";
 #    system "$Cmds{'make'} test";
     system "$Cmds{'make'} install";

@@ -1,0 +1,46 @@
+#!/sbin/runscript
+# Copyright 1999-2003 Gentoo Technologies, Inc.
+# Distributed under the terms of the GNU General Public License v2         
+# $Header$
+
+depend() {
+        need logger
+}
+
+checkconfig() {
+        if [ ! -f /etc/psad/psad.conf ] ; then
+                eerror "Please create /etc/psad/psad.conf"
+                eerror "You can find a sample config file at /etc/psad/psad.conf.sample"
+                return 1
+        fi
+        return 0
+}
+
+start() {
+        checkconfig || return $?
+
+        ebegin "Starting psad"
+        start-stop-daemon --start --quiet --pidfile /var/run/psad/psad.pid \
+                --exec /usr/sbin/psad
+        eend $? "Failed to start psad"
+}
+
+stop() {
+        ebegin "Stopping psadwatchd"
+        start-stop-daemon --stop --quiet --pidfile /var/run/psad/psadwatchd.pid
+        eend $? "Failed to stop psadwatchd"
+
+        ebegin "Stopping kmsgsd"
+        start-stop-daemon --stop --quiet --pidfile /var/run/psad/kmsgsd.pid
+        eend $? "Failed to stop kmsgsd"
+
+        ebegin "Stopping psad"
+        start-stop-daemon --stop --quiet --pidfile /var/run/psad/psad.pid
+        eend $? "Failed to stop psad"
+
+        # clean stale pidfiles
+        [ -f /var/run/psad/psad.pid ] && rm -f /var/run/psad/psad.pid
+        [ -f /var/run/psad/psadwatchd.pid ] && rm -f /var/run/psad/psadwatchd.pid
+        [ -f /var/run/psad/kmsgsd.pid ] && rm -f /var/run/psad/kmsgsd.pid
+}
+

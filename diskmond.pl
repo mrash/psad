@@ -39,7 +39,6 @@ use Psad;
 use Sys::Hostname 'hostname';
 use File::stat;
 use File::Copy;
-use File::Path;
 use POSIX 'setsid';
 use Getopt::Long 'GetOptions';
 use strict;
@@ -134,10 +133,6 @@ sub rm_data() {
     &rm_scanlog($Config{'PSAD_DIR'});
     &rm_scanlog($Config{'SCAN_DATA_ARCHIVE_DIR'});
 
-    if (-d $Config{'SCAN_DATA_ARCHIVE_DIR'}) {
-        rmtree $Config{'SCAN_DATA_ARCHIVE_DIR'};
-        mkdir $Config{'SCAN_DATA_ARCHIVE_DIR'}, 0500;
-    }
     if (-e $Config{'FW_DATA'}) {
         open F, "> $Config{'FW_DATA'}";
         close F;

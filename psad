@@ -573,6 +573,9 @@ for (;;) {
     ### (we received a USR1 signal)
     if ($usr1_flag) {
         $usr1_flag = 0;  ### clear the USR1 flag
+
+        &Psad::psyslog('psad', 'Received USR1 signal, printing scan hashes ' .
+            "to $config{'PSAD_DIR'}/scan_hash.$$");
         &print_scan();
     }
 

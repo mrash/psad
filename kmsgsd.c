@@ -14,7 +14,7 @@
 *
 *  Credits:  (see the CREDITS file)
 *
-*  Version: 1.0.0-pre3
+*  Version: 1.0.0-pre4
 *
 *  Copyright (C) 1999-2001 Michael B. Rash (mbr@cipherdyne.com)
 *

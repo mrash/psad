@@ -67,6 +67,9 @@ my $RUNLEVEL;    ### This should only be set if install.pl
                  ### cannot determine the correct runlevel
 my $WHOIS_PSAD   = '/usr/bin/whois.psad';
 
+### directory in which to install snort rules
+my $SNORT_DIR    = "${PSAD_CONFDIR}/snort-1.8.7_rules";
+
 ### system binaries ###
 my $chkconfigCmd = '/sbin/chkconfig';
 my $gzipCmd      = '/usr/bin/gzip';
@@ -293,6 +296,22 @@ sub install() {
     system "$Cmds{'make'} install";
     chdir '..';
 
+    print "\n\n";
+
+    &logr(" .. Installing snort-1.8.7 signatures in $SNORT_DIR\n");
+    unless (-d $SNORT_DIR) {
+        mkdir $SNORT_DIR, 0500 or die " ** Could not create $SNORT_DIR: $!";
+    }
+    opendir D, 'snort-1.8.7_rules' or die " ** Could not open " .
+        'the snort-1.8.7_rules directory';
+    my @rfiles = readdir D;
+    closedir D;
+    shift @rfiles; shift @rfiles;
+    for my $rfile (@rfiles) {
+        next unless $rfile =~ /\.rules$/;
+        &logr(" .. Installing snort-1.8.7_rules/${rfile} ");
+        copy "snort-1.8.7_rules/${rfile}", "${SNORT_DIR}/${rfile}";
+    }
     print "\n\n";
 
     &logr(" .. Setting hostname to \"$HOSTNAME\" in psad.h\n");

@@ -216,6 +216,8 @@ my $syslog_server     = 0;
 my $kill              = 0;
 my $restart           = 0;
 my $status            = 0;
+my $benchmark         = 0;
+my $b_packets         = 0;
 my $usr1              = 0;
 my $print_version     = 0;
 my $help              = 0;
@@ -241,6 +243,7 @@ my $whoislookups;
 my $netstat_lookup;
 my $fwcheck;
 my $daemon;
+my $b_time;
 
 ### get the hostname of the machine
 my $hostname = hostname;
@@ -274,6 +277,9 @@ Getopt::Long::Configure('no_ignore_case');
                                           # via the auto blocking code.
     'Status'         => \$status,         # Display status of any currently
                                           # running psad processes.
+    'Benchmark'      => \$benchmark,      # Run in benchmark mode.
+    'packets=s'      => \$b_packets,      # Specify number of packets to use
+                                          # in benchmark test.
     'USR1'           => \$usr1,           # Send an existing psad process a
                                           # USR1 signal (useful for debugging).
     'no_whois'       => \$no_whois,       # Do not issue whois lookups against
@@ -355,7 +361,8 @@ if ($flush_fw_rules) {
         &old_auto_blocked_ips();
         unlink $auto_blocked_file;
     } else {
-        print " ... @@@ Currently there are no auto-generated block rules in effect.\n";
+        print " ... @@@ Currently there are no auto-generated ".
+            "block rules in effect.\n";
     }
     exit 0;
 }
@@ -426,7 +433,7 @@ unless ($no_fwcheck || $syslog_server) {
 }
 
 ### daemonize psad unless running with --no_daemon or --debug
-unless ($no_daemon || $debug) {
+unless ($no_daemon || $debug || $benchmark) {
     my $pid = fork();
     exit if $pid;
     die " ... @@@  $0: Couldn't fork: $!" unless defined($pid);
@@ -446,13 +453,17 @@ unless ($no_daemon || $debug) {
 ### Note that this is the best place to start the other daemons since we
 ### just wrote the psad pid to PSAD_PID_FILE above.
 if ($config_file eq '/etc/psad/psad.conf') {
-    system $cmds{'kmsgsd'};
-    system $cmds{'diskmond'};
-    system $cmds{'psadwatchd'} unless ($debug);
+    unless ($benchmark) {
+        system $cmds{'kmsgsd'};
+        system $cmds{'diskmond'};
+        system $cmds{'psadwatchd'} unless $debug;
+    }
 } else {  ### start the other daemons with the new (non-default) config file
-    system "$cmds{'kmsgsd'} $config_file";
-    system "$cmds{'diskmond'} $config_file";
-    system "$cmds{'psadwatchd'} $config_file" unless ($debug);
+    unless ($benchmark) {
+        system "$cmds{'kmsgsd'} $config_file";
+        system "$cmds{'diskmond'} $config_file";
+        system "$cmds{'psadwatchd'} $config_file" unless $debug;
+    }
 }
 
 ### import the scan signatures and auto ips file
@@ -467,7 +478,7 @@ if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
 }
 
 ### archive old firewall and scan data
-&archive_data();
+&archive_data() unless $benchmark;
 
 ### Install signal handlers for debugging %scan with Data::Dumper,
 ### and for reaping zombie whois processes
@@ -485,15 +496,30 @@ my $config_mtime   = stat($config_file)->mtime;
 ### are all zero at this point).
 &write_packet_counters();
 
+if ($benchmark) {
+    print localtime() . " ... Entering benchmark mode.\n";
+    $no_rdns  = 1;  ### turn off network related functions
+    $no_whois = 1;
+    if ($b_packets) {
+        print localtime() . " ... Executing a $b_packets packet test.\n";
+    } else {
+        print localtime() . " ... The --packets command line " .
+            "option was not specified.\n";
+        print localtime() . " ... Defaulting to a 10,000 packet test.\n";
+        $b_packets = 10000;
+    }
+}
+
 ### Get an open filehandle for the main firewall data file $FW_DATA.
 ### All firewall drop/deny/reject log messages are written to $FW_DATA
 ### by kmsgsd.
-open FWDATA, $config{'FW_DATA'};
+open FWDATA, $config{'FW_DATA'} unless $benchmark;
 
 ###=========================================================###
 ######                    MAIN LOOP                      ######
 ###=========================================================###
 for (;;) {
+
     ### See if we need to import any changed config variables
     &check_import_config(\$config_mtime, $config_file);
 
@@ -505,26 +531,48 @@ for (;;) {
 
     ### Get any new packets have been written to
     ### $FW_DATA by kmsgsd for psad analysis.
-    my @new_packets = <FWDATA>;
+    my @new_packets;
+    if ($benchmark) {
+        $b_time = time();
+        print localtime() . " ... Creating packet array.\n";
+        my $dst_port = 1000;
+        for (my $i=0; $i <= $b_packets; $i++) {
+            push @new_packets, "Feb 15 16:42:58 orthanc kernel: DROP IN=eth0 " .
+                "OUT= MAC=00:a0:cc:28:42:5a:00:03:6c:00:98:54:08:00 " .
+                "SRC=10.0.0.1 DST=10.0.0.2 LEN=48 TOS=0x00 PREC=0x00 " .
+                "TTL=110 ID=13383 DF PROTO=TCP SPT=1389 DPT=$dst_port " .
+                "WINDOW=16384 RES=0x00 SYN URGP=0";
+            $dst_port++ if $dst_port < 50000;
+        }
+    } else {
+        @new_packets = <FWDATA>;
+    }
     if (@new_packets) {
+        print localtime() . " ... check_scan()\n" if $benchmark;
+
         my $found_potential_scan = &check_scan(
             \@new_packets,
             $sigs_file,
         );
         if ($found_potential_scan) {
 
+            print localtime() . " ... assign_danger_level()\n"
+                if $benchmark;
             ### Assign a danger level to the scan
             &assign_danger_level();
 
-            ### Log and send an email/syslog alert
+            print localtime() . " ... scan_logr()\n" if $benchmark;
+            ### Log and send email and syslog alerts
             &scan_logr();
 
             ### Don't manage the firewall rules if
             ### psad is running on a syslog server
-            if ($config{'ENABLE_AUTO_IDS'} eq 'Y' && ! $syslog_server) {
+            if ($config{'ENABLE_AUTO_IDS'} eq 'Y' &&
+                ! $syslog_server) {
                 &auto_psad_response();
             }
         }
+
         ### write the number of tcp/udp/icmp packets out
         ### to the packet counters file
         &write_packet_counters();
@@ -535,9 +583,16 @@ for (;;) {
         print "MAIN: number of new packets: $#new_packets\n";
     }
 
+    if ($benchmark) {
+        print localtime() . " ... Packet creation and processing time: ",
+            time() - $b_time, " sec.\n";
+        print localtime() . " ... Exiting benchmark mode.\n";
+        exit 0;
+    }
+
     sleep $config{'PSAD_CHECK_INTERVAL'};
     ### clearerr() on the FWDATA filehandle to be ready for new packets
-    FWDATA->clearerr();
+    FWDATA->clearerr() unless $benchmark;
 }
 exit 0;
 ###=========================================================###
@@ -1603,9 +1658,17 @@ sub scan_logr() {
             if ($curr_dlevel >= $config{'EMAIL_ALERT_DANGER_LEVEL'}) {
                 my $subject;
                 if ($rdns) {
-                    $subject = "psad: SCAN DETECTED from: $rdns";
+                    if ($benchmark) {
+                        $subject = "psad: BENCHMARK SCAN from: $rdns";
+                    } else {
+                        $subject = "psad: SCAN DETECTED from: $rdns";
+                    }
                 } else {
-                    $subject = "psad: SCAN DETECTED from: $src";
+                    if ($benchmark) {
+                        $subject = "psad: BENCHMARK SCAN from: $src";
+                    } else {
+                        $subject = "psad: SCAN DETECTED from: $src";
+                    }
                 }
                 &Psad::sendmail($subject, $email_alert, $config{'EMAIL_ADDRESSES'},
                     $cmds{'mail'});
@@ -2427,6 +2490,9 @@ OPTIONS:
       -R   --Restart                  - restart all running psad processes.
       -S   --Status                   - displays the status of any
                                         currently running psad processes.
+      -B   --Benchmark                - Run psad in benchmark mode.
+      -p   --packets                  - Specify number of packets to use in
+                                        benchmark test.
       -U   --USR1                     - send a running psad process a USR1
                                         signal (generates a dump of psad
                                         data structures on STDOUT).

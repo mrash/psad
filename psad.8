@@ -126,6 +126,17 @@ preserve the command line options that were supplied to the original
 psad process.
 .TP
 
+.BR \-B ", " \-\^\-Benchmark
+Run psad in benchmark mode.  By default benchmark mode will simulate
+a scan of 10,000 packets (see the --packets option) and then report
+the elapsed time.
+.TP
+
+.BR \-R ", " \-\^\-packets
+Specify the number of packets to use in benchmark mode.  The
+default is 10,000 packets.
+.TP
+
 .BR \-i ", " \-\^\-interval\ \<seconds>
 Specify the interval (in seconds) that psad should use to
 check whether or not packets have been denied by the

@@ -662,14 +662,13 @@ sub usage_and_exit() {
 
 Usage: psad [-f] [-n] [-e] [-u] [-v] [-h]
 	
-	-no_preserve		- disable preservation of old configs.
-	-exec_psad		- execute psad after installing.
-        -firewall_check         - disable firewall rules verification.
-	-uninstall		- uninstall psad.
-	-verbose		- verbose mode.
-        -h                      - prints this help message.
+	-n  --no_preserve	- disable preservation of old configs.
+	-e  --exec_psad		- execute psad after installing.
+        -f  --firewall_check    - disable firewall rules verification.
+	-u  --uninstall		- uninstall psad.
+	-v  --verbose		- verbose mode.
+        -h  --help              - prints this help message.
 
 _HELP_
         exit $exitcode;
 }
-

@@ -38,6 +38,8 @@
 #   - More syslog messages from psadwatchd, diskmond, and kmsgsd.
 #   - Put a "psad signature strategy" link in all alert emails.
 #   - Module tests for Psad.pm
+#   - Add command line argument "-dl <n>" to --Status to show only
+#     those ips that have reached a danger level >= n.
 #   - Extract default behavior into psad.conf.
 #   - Remove dependency on DROP tag in iptables messages.
 #   - Custom logging line upon auto-blocking an ip.
@@ -686,7 +688,7 @@ for (;;) {
             ### Don't manage the firewall or tcpwrapper rules if
             ### psad is running on a syslog server
             if ($config{'ENABLE_AUTO_IDS'} eq 'Y' &&
-                ! $syslog_server) {
+                    ! $syslog_server) {
                 &auto_psad_response();
             }
         }
@@ -694,7 +696,9 @@ for (;;) {
         ### to the global packet counters file
         &write_global_packet_counters();
     }
-    ### timeout any auto-blocked ips that are past due
+    ### timeout any auto-blocked ips that are past due (need to
+    ### check the timeouts against existing ips in the scan hash
+    ### even if new packets are not found).
     if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
             && $config{'AUTO_BLOCK_TIMEOUT'} > 0) {
         &timeout_auto_blocked_ips();
@@ -928,6 +932,20 @@ sub check_scan() {
         ### initialize the danger level to 0 if it is not already defined
         unless (defined $scan_dl{$src}) {
             $scan_dl{$src} = 0;
+        }
+
+        if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
+            if (not defined $auto_blocked_ips{$src}) {
+                ### $auto_block_ips{$src} may be zero if $src has been
+                ### timed out
+                $auto_blocked_ips{$src} = 0;
+            } elsif ((time() - $auto_blocked_ips{$src})
+                    > $config{'AUTO_BLOCK_TIMEOUT'}) {
+                ### the timeout for $src has expired, but we have seen
+                ### new packets from the ip so renew setup to renew the
+                ### block
+                $auto_blocked_ips{$src} = 0;
+            }
         }
 
         ### we will always send an alert email for any new "bad" packet
@@ -2429,7 +2447,7 @@ sub renew_auto_blocked_ips() {
                         $timeout_str, '', $config{'EMAIL_ADDRESSES'},
                         $cmds{'mail'});
                 }
-                ### set the block start time here since
+                ### set the auto-block start time here since
                 ### renew_auto_blocked_ips() is only called
                 ### at startup.
                 $auto_blocked_ips{$ip} = time();
@@ -2746,7 +2764,7 @@ sub auto_psad_response() {
         ### protected by the firewall if the ip trips the $auto_psad_level
         ### threshold for _any_ destination.
         if ($dl >= $config{'AUTO_IDS_DANGER_LEVEL'}
-                && ! defined $auto_blocked_ips{$src}) {
+                && not $auto_blocked_ips{$src}) {
             my $timeout_str = '.';
             if ($config{'AUTO_BLOCK_TIMEOUT'} > 0) {
                 $timeout_str = " for $config{'AUTO_BLOCK_TIMEOUT'} seconds.";
@@ -2828,7 +2846,6 @@ sub timeout_auto_blocked_ips() {
                         $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
                 }
             }
-            delete $auto_blocked_ips{$ip};
         }
     }
     return;

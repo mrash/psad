@@ -2011,8 +2011,8 @@ sub status_psad() {
                 print "\n";
                 $rv = 1;
             } else {
-                printf "%-16s %s", " ... $pidname ", "is not currently " .
-                    "running on $hostname\n";
+                printf "%-16s %s", " ... @@@ $pidname ", "is not currently " .
+                    "running on $hostname\n\n";
             }
         } else {
             print " ... @@@  psad: pid file $pidfile does not exist for " .

@@ -477,6 +477,7 @@ if ($ver) {
 $status = 1 if ($status_ip and not $status);
 $status = 1 if ($status_sort_dl and not $status);
 $status = 1 if ($status_dl and not $status);
+
 if ($status_dl and $status_dl > 5) {
     die ' ** The --status-dl must be between 1 and 5.  Exiting.';
 }
@@ -489,6 +490,10 @@ if ($no_kmsgsd and not $debug) {
 ### check for any old command line arguments
 &check_old_cmdargs();
 
+### make sure to go into firewall analysis mode if a ruleset
+### file was specified on the command line.
+$fw_analyze = 1 if $fw_file;
+
 ### Everthing after this point must be executed as root.
 $< == 0 && $> == 0 or
     die ' ** psad: You must be root (or equivalent ',
@@ -499,7 +504,8 @@ $< == 0 && $> == 0 or
 &import_configs();
 
 ### check to make sure another psad process is not already running.
-&Psad::unique_pid($config{'PSAD_PID_FILE'}) unless $fw_analyze;
+&Psad::unique_pid($config{'PSAD_PID_FILE'})
+    unless $fw_analyze;
 
 ### get the ip addresses that are local to this machine
 &get_local_ips();
@@ -508,7 +514,7 @@ $< == 0 && $> == 0 or
 ### bundled with psad can't be found
 unless ($no_whois) {
     unless (defined $cmds{'whois'}
-            && -x $cmds{'whois'}) {  ### we couldn't find whois_psad
+            and -x $cmds{'whois'}) {  ### we couldn't find whois_psad
         warn ' ** Could not locate whois_psad binary.  ',
             "Disabling whois lookups.\n";
         $no_whois = 1;
@@ -529,7 +535,8 @@ if ($benchmark) {
     $test_pktend = 'WINDOW=16384 RES=0x00 SYN URGP=0';
 }
 
-### daemonize psad unless running with --no_daemon or --debug
+### daemonize psad unless running with --no-daemon or an
+### analysis mode
 unless ($no_daemon or $debug or $benchmark) {
     my $pid = fork();
     exit 0 if $pid;
@@ -551,7 +558,8 @@ unless ($no_daemon or $debug or $benchmark) {
 ### just wrote the psad pid to PSAD_PID_FILE above.
 unless ($benchmark) {
     system $cmds{'kmsgsd'} unless $no_kmsgsd;
-    system $cmds{'psadwatchd'} unless $debug or $no_daemon;
+    system $cmds{'psadwatchd'}
+        unless $debug or $no_daemon;
 }
 
 ### Check to see if psad automatically blocked some ips from
@@ -566,7 +574,7 @@ unless ($benchmark) {
 ### Install signal handlers for debugging %scan with Data::Dumper,
 ### and for reaping zombie whois processes.  Only install signal
 ### handlers if we are not running in benchmark mode
-unless ($benchmark) {
+unless ($benchmark or $fw_analyze) {
     $SIG{'__WARN__'} = \&Psad::warn_handler;
     $SIG{'__DIE__'}  = \&Psad::die_handler;
     $SIG{'CHLD'}     = \&REAPER;
@@ -576,7 +584,8 @@ unless ($benchmark) {
 
 ### zero out the packet counter file (the counters
 ### are all zero at this point anyway).
-&write_global_packet_counters();
+&write_global_packet_counters()
+    unless $fw_analyze;
 
 if ($benchmark) {
     print scalar localtime(), " .. Entering benchmark mode.\n";

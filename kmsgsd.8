@@ -7,7 +7,7 @@
 .B kmsgsd
 .SH DESCRIPTION
 .B kmsgsd
-reads messages from the /var/log/psadfifo named pipe and prints any firewall
+reads messages from the /var/lib/psad/psadfifo named pipe and prints any firewall
 related log messages to the psad data file "/var/log/psad/fwdata".
 .B psad
 cannot detect port scans or other suspect traffic without kmsgsd running on
@@ -20,7 +20,6 @@ on the command line.
 .SH SEE ALSO
 .BR psad (8),
 .BR psadwatchd (8),
-.BR diskmond (8)
 .SH AUTHOR
 Michael Rash (mbr@cipherdyne.org)
 

@@ -89,10 +89,9 @@ chmod 0600, "/etc/psad/psad_signatures";
 my $distro = get_distro();
 my $kernel = get_kernel(\%Cmds);
 
-# remove signature checking from psad process if we are not running an iptables-enabled kernel
-system "perl -p -i -e 's|\-s\s/etc/psad/psad_signatures||' psad-init" if ($kernel !~ /^2.3/ && $kernel !~ /^2.4/);
-
 if ($distro eq "redhat61" || $distro eq "redhat62") {
+	# remove signature checking from psad process if we are not running an iptables-enabled kernel
+	system "perl -p -i -e 's|\\-s\\s/etc/psad/psad_signatures||' psad-init" if ($kernel !~ /^2.3/ && $kernel !~ /^2.4/);
 	print "*** Copying psad-init -> /etc/rc.d/init.d/psad-init\n";
 	`$Cmds{'cp'} psad-init /etc/rc.d/init.d/psad-init`;
 } 

@@ -191,9 +191,17 @@ Richard K. Szabo        Discovered and helped test a bug where psad was not
 
 Stefan Rydberg          Discovered a perl internal pp_match bug with psad-
                         1.3.1 on SuSE 8.  Helped troubleshoot -pre
-                        releases of psad-1.3.2.
+                        releases of psad-1.3.2.  Provided a system on which
+                        to troubleshoot psad-1.3.3 (this facilitated the
+                        isolation of the pp_match bug to an older version
+                        perl on SuSE 8).
 
 Joshua Jensen           Found bug with the manner in which fwcheck_psad.pl
                         was being called from psad (improperly passing
                         --no-fw-search-all option even if FW_SEARCH_ALL
                         was set to "Y").
+
+Mate Wierdl             Found bug in EMAIL_ADDRESSES format (psad needed to
+                        allow addressed separated by commas).  Submitted
+                        patch for new init-scripts directory for psad.spec
+                        file.

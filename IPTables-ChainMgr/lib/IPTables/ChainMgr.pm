@@ -50,12 +50,12 @@ sub create_chain() {
     my $chain = shift || croak '[*] Must specify a chain to create.';
     my $iptables = $self->{'_iptables'};
 
-    if (&run_ipt_cmd($iptables, "-t $table -nL $chain") == 0) {
+    if (&run_ipt_cmd("$iptables -t $table -nL $chain") == 0) {
         ### the chain already exists
         return 1, "[+] $chain already exists.";
     } else {
         ### create the chain
-        if (&run_ipt_cmd($iptables, "-t $table -N $chain") == 0) {
+        if (&run_ipt_cmd("$iptables -t $table -N $chain") == 0) {
             return 1, "[+] $chain chain created.";
         } else {
             ### could not create the chain
@@ -71,10 +71,10 @@ sub delete_chain() {
     my $iptables = $self->{'_iptables'};
 
     ### see if the chain exists first
-    if (&run_ipt_cmd($iptables, "-t $table -nL $chain") == 0) {
+    if (&run_ipt_cmd("$iptables -t $table -nL $chain") == 0) {
         ### flush the chain first
-        if (&run_ipt_cmd($iptables, "-t $table -F $chain") == 0) {
-            if (&run_ipt_cmd($iptables, "-t $table -X $chain") == 0) {
+        if (&run_ipt_cmd("$iptables -t $table -F $chain") == 0) {
+            if (&run_ipt_cmd("$iptables -t $table -X $chain") == 0) {
                 return 1, "[+] $chain chain deleted.";
             } else {
                 return 0, "[-] Could not delete $chain chain.";
@@ -118,7 +118,7 @@ sub add_rule() {
         return 1, '[-] Rule already exists.';
     } else {
         ### we need to add the rule
-        if (&run_ipt_cmd($iptables,
+        if (&run_ipt_cmd("$iptables " .
             "-t $table -I $chain 1 -s $normalized_src -j $target") == 0) {
             return 1, '[+] Added rule.';
         } else {
@@ -158,7 +158,7 @@ sub delete_rule() {
             $chain, $target, $iptables);
     if ($rulenum) {
         ### we need to delete the rule
-        if (&run_ipt_cmd($iptables,
+        if (&run_ipt_cmd("$iptables " .
             "-t $table -D $chain $rulenum") == 0) {
             return 1, "[+] Deleted rule #$rulenum";
         } else {
@@ -195,23 +195,19 @@ sub find_rule() {
 }
 
 sub run_ipt_cmd() {
-    my ($iptables, $cmd) = @_;
-    croak "[*] Must specify an iptables command to run unless $cmd"
-        unless $cmd;
-    return (system "$iptables $cmd > /dev/null 2>&1") >> 8;
+    my $cmd = shift || croak '[*] Must specify an iptables command to run.';
+    return (system "$cmd > /dev/null 2>&1") >> 8;
 }
 
 sub run_ipt_cmd_output() {
-    my ($iptables, $cmd) = @_;
-    croak "[*] Must specify an iptables command to run unless $cmd"
-        unless $cmd;
+    my $cmd = shift || croak '[*] Must specify an iptables command to run.';
     my @output = ();
     my $rv = 0;
     eval {
-        open IPT, "$iptables $cmd |"
-            or croak "[*] Could not execute $iptables $cmd: $!";
+        open IPT, "$cmd |"
+            or croak "[*] Could not execute $cmd: $!";
         @output = <IPT>;
-        close IPT or croak "[*] Could not close command $iptables $cmd: $!";
+        close IPT or croak "[*] Could not close command $cmd: $!";
         $rv = $?;
     };
     return $rv, \@output;

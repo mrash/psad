@@ -760,7 +760,7 @@ sub set_home_net() {
             $net_ctr++;
         }
     }
-    if ($net_ctr > 0) {
+    if ($net_ctr > 1) {
         ### found two or more subnets, so forwarding traffic becomes
         ### possible through the box.
         &logr(" .. It appears your machine is connected to " .

@@ -71,9 +71,9 @@ int main(int argc, char *argv[]) {
 #endif
 
 #ifdef DEBUG
-    printf(" .. Entering DEBUG mode ..n");
+    printf(" .. Entering DEBUG mode ..\n");
     printf(" .. Firewall messages will be written to both ");
-    printf("STDOUT _and_ to fwdata\n\n");
+    printf("STDOUT _and_ to fwdata.\n\n");
 #endif
 
     /* handle command line arguments */
@@ -114,16 +114,22 @@ int main(int argc, char *argv[]) {
 
     /* open the psadfifo named pipe.  Note that we are opening the pipe
      * _without_ the O_NONBLOCK flag since we want the read on the file
-     * descriptor to block until there is something new in the pipe. */
-    if ((fifo_fd = open(psadfifo_file, O_RDONLY)) < 0) {
-        perror(" ** Could not open psadfifo");
+     * descriptor to block until there is something new in the pipe.
+     * Also, not that we are opening with O_RDWR, since this seems to
+     * fix the problem with kmsgsd not blocking on the read() if the
+     * system logger dies (and hence closes its file descriptor for the
+     * psadfifo). */
+    if ((fifo_fd = open(psadfifo_file, O_RDWR)) < 0) {
+        fprintf(stderr, " ** Could not open %s for reading.\n",
+            psadfifo_file);
         exit(EXIT_FAILURE);  /* could not open psadfifo named pipe */
     }
 
     /* open the fwdata file in append mode so we can write messages from
      * the pipe into this file. */
-    if ((fwdata_fd = open(fwdata_file, O_CREAT|O_WRONLY|O_APPEND, 0600)) < 0) {
-        perror(" ** Could not open the fwdata_file");
+    if ((fwdata_fd = open(fwdata_file,
+            O_CREAT|O_WRONLY|O_APPEND, 0600)) < 0) {
+        fprintf(stderr, " ** Could not open %s for writing.\n", fwdata_file);
         exit(EXIT_FAILURE);  /* could not open fwdata file */
     }
 
@@ -132,6 +138,10 @@ int main(int argc, char *argv[]) {
      * O_NONBLOCK) and write it to the fwdata file if it is a firewall message
      */
     while ((numbytes = read(fifo_fd, buf, MAX_LINE_BUF)) >= 0) {
+
+#ifdef DEBUG
+        printf("read %d bytes from %s fifo.\n", numbytes, psadfifo_file);
+#endif
 
         /* make sure the buf contents qualifies as a string */
         buf[numbytes] = '\0';
@@ -151,13 +161,15 @@ int main(int argc, char *argv[]) {
 
             /* re-open psadfifo and fwdata files */
             if ((fifo_fd = open(psadfifo_file, O_RDONLY)) < 0) {
-                perror(" ** Could not open psadfifo");
+                fprintf(stderr, " ** Could not open %s for reading.\n",
+                    psadfifo_file);
                 exit(EXIT_FAILURE);  /* could not open psadfifo named pipe */
             }
 
             if ((fwdata_fd = open(fwdata_file, O_CREAT|O_WRONLY|O_APPEND,
                     0600)) < 0) {
-                perror(" ** Could not open the fwdata_file");
+                fprintf(stderr, "** Could not open %s for writing.\n",
+                    fwdata_file);
                 exit(EXIT_FAILURE);  /* could not open fwdata file */
             }
             slogr("psad(kmsgsd)",
@@ -175,6 +187,7 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_FAILURE);  /* could not write to the fwdata file */
 #ifdef DEBUG
             puts(buf);
+            printf(" ** Line matched search strings.\n");
             fwlinectr++;
             if (fwlinectr % 50 == 0)
                 printf(" .. Processed %d firewall lines.\n", fwlinectr);
@@ -203,7 +216,8 @@ static void parse_config(char *config_file, char *psadfifo_file,
     char *index;
 
     if ((config_ptr = fopen(config_file, "r")) == NULL) {
-        perror(" ** Could not open config file");
+        fprintf(stderr, " ** Could not open %s for reading.\n",
+            config_file);
         exit(EXIT_FAILURE);
     }
 

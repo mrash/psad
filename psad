@@ -617,11 +617,11 @@ for (;;) {
     if ($benchmark) {
         $b_time = time();
         print localtime() . " .. Creating packet array.\n";
-        my $dst_port = 1000;
+        my $dp = 1000;
         for (my $i=0; $i <= $b_packets; $i++) {
             ### avert "." operator
-            push @new_packets, "$test_pkt DPT=$dst_port $test_pktend";
-            $dst_port++ if $dst_port < 50000;
+            push @new_packets, "$test_pkt DPT=$dp $test_pktend";
+            $dp++ if $dp < 50000;
         }
     } else {
         @new_packets = <FWDATA>;
@@ -932,10 +932,10 @@ sub match_fastsigs() {
                     unless $no_netstat;
             }
         }
-        if (defined $sigs_fast{'TCP'}{$dstport}{'any_src_port'}{$flags}) {
+        if (defined $sigs_fast{'TCP'}{$dstport}{'any_sp'}{$flags}) {
             for my $sig_id (keys
-                    %{$sigs_fast{'TCP'}{$dstport}{'any_src_port'}{$flags}}) {
-                print "matched $dstport,any_src_port,$flags, ",
+                    %{$sigs_fast{'TCP'}{$dstport}{'any_sp'}{$flags}}) {
+                print "matched $dstport,any_sp,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
@@ -945,10 +945,10 @@ sub match_fastsigs() {
                     unless $no_netstat;
             }
         }
-        if (defined $sigs_fast{'TCP'}{'any_dst_port'}{$srcport}{$flags}) {
+        if (defined $sigs_fast{'TCP'}{'any_dp'}{$srcport}{$flags}) {
             for my $sig_id (keys
-                    %{$sigs_fast{'TCP'}{'any_dst_port'}{$srcport}{$flags}}) {
-                print "matched any_dst_port,$srcport,$flags, ",
+                    %{$sigs_fast{'TCP'}{'any_dp'}{$srcport}{$flags}}) {
+                print "matched any_dp,$srcport,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
@@ -958,10 +958,10 @@ sub match_fastsigs() {
                     unless $no_netstat;
             }
         }
-        if (defined $sigs_fast{'TCP'}{'any_dst_port'}{'any_src_port'}{$flags}) {
+        if (defined $sigs_fast{'TCP'}{'any_dp'}{'any_sp'}{$flags}) {
             for my $sig_id (keys
-                    %{$sigs_fast{'TCP'}{'any_dst_port'}{'any_src_port'}{$flags}}) {
-                print "matched any_dst_port,any_src_port,$flags, ",
+                    %{$sigs_fast{'TCP'}{'any_dp'}{'any_sp'}{$flags}}) {
+                print "matched any_dp,any_sp,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
@@ -1424,28 +1424,28 @@ sub build_tcp_udp_sigs() {
             } elsif ($src_port =~ /any/i) {
                 if ($proto eq 'TCP') {
                     $sigs_fast{$proto}{$dst_port}
-                        {'any_src_port'}{$flags}{$sig_id} = '';
+                        {'any_sp'}{$flags}{$sig_id} = '';
                 } elsif ($proto eq 'UDP') {
                     $sigs_fast{$proto}{$dst_port}
-                        {'any_src_port'}{$sig_id} = '';
+                        {'any_sp'}{$sig_id} = '';
                 }
             }
         } elsif ($dst_port =~ /any/i) {
             if ($src_port !~ /\D/) {
                 if ($proto eq 'TCP') {
-                    $sigs_fast{$proto}{'any_dst_port'}
+                    $sigs_fast{$proto}{'any_dp'}
                         {$src_port}{$flags}{$sig_id} = '';
                 } elsif ($proto eq 'UDP') {
-                    $sigs_fast{$proto}{'any_dst_port'}
+                    $sigs_fast{$proto}{'any_dp'}
                         {$src_port}{$sig_id} = '';
                 }
             } elsif ($src_port =~ /any/i) {
                 if ($proto eq 'TCP') {
-                    $sigs_fast{$proto}{'any_dst_port'}
-                        {'any_src_port'}{$flags}{$sig_id} = '';
+                    $sigs_fast{$proto}{'any_dp'}
+                        {'any_sp'}{$flags}{$sig_id} = '';
                 } elsif ($proto eq 'UDP') {
-                    $sigs_fast{$proto}{'any_dst_port'}
-                        {'any_src_port'}{$sig_id} = '';
+                    $sigs_fast{$proto}{'any_dp'}
+                        {'any_sp'}{$sig_id} = '';
                 }
             }
         }

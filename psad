@@ -149,7 +149,6 @@ use File::Path;
 use Getopt::Long 'GetOptions';
 use Socket;
 use Sys::Hostname 'hostname';
-use Unix::Syslog qw(:subs :macros);
 use POSIX;
 use IO::Handle;
 use Data::Dumper;
@@ -160,18 +159,9 @@ use strict;
 ### set current the psad version number
 my $version = '1.1.1';
 
-### regex to match an ip address
-my $ip_re = '(?:\d{1,3}\.){3}\d{1,3}';
-
-### establish some default paths
-my $config_dir   = '/etc/psad';
-my $config_file  = "${config_dir}/psad.conf";
-my $sigs_file    = "${config_dir}/psad_signatures";
-my $autoips_file = "${config_dir}/psad_auto_ips";
-
-### snort rule directory; this path can be changed with
-### --snort-rdir
-my $snort_rules_dir = "${config_dir}/snort_rules";
+### default config file for psad (can be changed with
+### --config switch)
+my $config_file  = '/etc/psad/psad.conf';
 
 ### disable debugging by default
 my $debug = 0;
@@ -189,7 +179,7 @@ my $flush_fw       = 0;
 ### Cache the default table->chain relationships used
 ### by the auto blocking code for iptables firewalls.
 ### The nat and mangle PREROUTING chains will be added
-### by iptables_flags().
+### by get_iptables_chains() if they are active.
 my %ipt_chains;
 
 ### define the input chains for ipchains firewalls (this
@@ -222,12 +212,19 @@ my %sigs_attr;
 ### if the "-a <auto ips file>" is specified on the command line).
 my %auto_ips;
 
+### cache the source ips that we have automatically blocked
+### (if ENABLE_AUTO_IDS == 'Y')
+my %auto_blocked_ips;
+
 ### cache the addresses we have executed whois lookups for
 my %whois_cache;
 
 ### cache ports the local machine is listening on (periodically
 ### updated by get_listening_ports()).
 my %local_ports;
+
+### regex to match an ip address
+my $ip_re = '(?:\d{1,3}\.){3}\d{1,3}';
 
 ### packet counters
 my $tcp_ctr  = 0;
@@ -236,8 +233,11 @@ my $icmp_ctr = 0;
 
 ### initialize and scope some default variables (command
 ### line args can override some default values)
-my $snort_sids       = 0;
+my $sigs_file        = '';
+my $autoips_file     = '';
+my $snort_rules_dir  = '';
 my $srules_type      = '';
+my $snort_sids       = 0;
 my $output           = 0;
 my $syslog_server    = 0;
 my $kill             = 0;
@@ -409,7 +409,7 @@ my @pidfiles = (
 );
 
 ### The --Kill command line switch was given.
-exit &kill_psad() if $kill;
+exit &stop_psad() if $kill;
 
 ### The --Flush command line switch was given.
 exit &flush_auto_blocked_ips() if $flush_fw;
@@ -417,8 +417,17 @@ exit &flush_auto_blocked_ips() if $flush_fw;
 ### The --USR1 command line switch was given.
 exit &usr1() if $usr1;
 
-### The -i <check interval> command line argument was given
+### The -i switch was given
 $config{'PSAD_CHECK_INTERVAL'} = $chk_interval if $chk_interval;
+
+### The --snort-rdir switch was given
+$config{'SNORT_RULES_DIR'} = $snort_rules_dir if $snort_rules_dir;
+
+### The --signatures switch was given
+$config{'PSAD_SIGS_FILE'} = $sigs_file if $sigs_file;
+
+### The --auto-ips switch was given
+$config{'PSAD_AUTO_IPS_FILE'} = $autoips_file if $autoips_file;
 
 ### check to make sure the commands specified in the config section
 ### are in the right place, and attempt to correct automatically if not.
@@ -432,10 +441,7 @@ $config{'PSAD_CHECK_INTERVAL'} = $chk_interval if $chk_interval;
 &setup();
 
 ### the --Restart command line switch was given
-if ($restart) {
-    &restart();
-    exit 0;
-}
+exit &restart if $restart;
 
 ### check to make sure another psad process is not already running.
 &Psad::unique_pid($config{'PSAD_PID_FILE'});
@@ -517,14 +523,14 @@ if ($config_file eq '/etc/psad/psad.conf') {
 }
 
 ### import the scan signatures and auto ips file
-&import_signatures() if $sigs_file;
-&import_auto_ips()   if $autoips_file;
+&import_signatures() unless $no_signatures;
+&import_auto_ips()   unless $no_auto_ips;
 
 ### Check to see if psad automatically blocked some ips from
 ### a previous run.  This feature is most useful for preserving
-### automatically blocked ips after a reboot or after
-### restarting psad.
-&renew_blocked_ips() if $config{'ENABLE_AUTO_IDS'} eq 'Y';
+### auto-block rules ips after a reboot or after restarting
+### psad.
+&renew_auto_blocked_ips() if $config{'ENABLE_AUTO_IDS'} eq 'Y';
 
 ### archive old firewall and scan data
 &archive_data() unless $benchmark;
@@ -537,12 +543,12 @@ $SIG{'CHLD'}     = \&REAPER;
 $SIG{'USR1'}     = \&process_usr1;
 
 ### Get the mtimes of the signatures and auto ips files.
-my $sigs_mtime     = stat($sigs_file)->mtime;
-my $auto_ips_mtime = stat($autoips_file)->mtime;
+my $sigs_mtime     = stat($config{'PSAD_SIGS_FILE'})->mtime;
+my $auto_ips_mtime = stat($config{'PSAD_AUTO_IPS_FILE'})->mtime;
 my $config_mtime   = stat($config_file)->mtime;
 
 ### zero out the packet counter file (the counters
-### are all zero at this point).
+### are all zero at this point anyway).
 &write_global_packet_counters();
 
 if ($benchmark) {
@@ -574,10 +580,10 @@ for (;;) {
     &check_import_config(\$config_mtime);
 
     ### See if we need to import any new signatures
-    &check_import(\$sigs_mtime, $sigs_file, 1);
+    &check_import(\$sigs_mtime, $config{'PSAD_SIGS_FILE'}, 1);
 
     ### See if we need to re-import the psad_auto_ips file
-    &check_import(\$auto_ips_mtime, $autoips_file, 0);
+    &check_import(\$auto_ips_mtime, $config{'PSAD_AUTO_IPS_FILE'}, 0);
 
     ### See if we need to print out the %scan datastructure
     ### (we received a USR1 signal)
@@ -603,7 +609,7 @@ for (;;) {
 
         my $found_potential_scan = &check_scan(
             \@new_packets,
-            $sigs_file,
+            $config{'PSAD_SIGS_FILE'},
         );
         if ($found_potential_scan) {
 
@@ -1197,8 +1203,8 @@ sub check_import_config() {
 }
 
 sub import_snort_rules() {
-    opendir D, $snort_rules_dir
-        or die " ** Could not open $snort_rules_dir";
+    opendir D, $config{'SNORT_RULES_DIR'}
+        or die " ** Could not open $config{'SNORT_RULES_DIR'}";
     my @rfiles = readdir D;
     closedir D;
     shift @rfiles; shift @rfiles;
@@ -1211,7 +1217,7 @@ sub import_snort_rules() {
         my ($type) = ($rfile =~ /(\w+)\.rules/);
 #        printf("%-30s", " .. $rfile");
 #        &logr(" .. Parsing $rfile\n", $logfile);
-        open R, "< ${snort_rules_dir}/${rfile}" or die " ** Could not " .
+        open R, "< ${config{'SNORT_RULES_DIR'}}/${rfile}" or die " ** Could not " .
             "open: ${srules_type}/${rfile}";
         my @lines = <R>;
         close R;
@@ -1247,8 +1253,8 @@ sub import_snort_rules() {
 
 sub import_signatures() {
     %sigs = ();  ### undef %sigs so don't leave old signatures around
-    open SIGS, "< $sigs_file" or die
-        " ** Could not open the signatures file $sigs_file: $!";
+    open SIGS, "< $config{'PSAD_SIGS_FILE'}" or die
+        " ** Could not open the signatures file $config{'PSAD_SIGS_FILE'}: $!";
     my @lines = <SIGS>;
     close SIGS;
     SIG: for my $line (@lines) {
@@ -1329,7 +1335,7 @@ sub import_signatures() {
                 $sigs{'icmp'}{$sig_id}{'icmp_id'} = $1;
             }
         } else {  ### the signature line could not be recognized
-            warn " ** Bad signature in $sigs_file: $line\n";
+            warn " ** Bad signature in $config{'PSAD_SIGS_FILE'}: $line\n";
             next SIG;
         }
     }
@@ -1446,8 +1452,8 @@ sub is_range() {
 
 sub import_auto_ips() {
     %auto_ips = ();  ### undef so we don't leave old ips in %auto_ips
-    open A, "< $autoips_file" or die ' ** Could not open ',
-        "$autoips_file: $!";
+    open A, "< $config{'PSAD_AUTO_IPS_FILE'}" or die ' ** Could not open ',
+        "$config{'PSAD_AUTO_IPS_FILE'}: $!";
     my @lines = <A>;
     close A;
     my $i = 1;
@@ -1460,7 +1466,7 @@ sub import_auto_ips() {
         } elsif ($line =~ m|^\s*($ip_re/\d+)\s+([0-5])|) {
             $auto_ips{'net'}{$1} = $2;
         } else {
-            my $subject = " ** psad import warning: $autoips_file " .
+            my $subject = " ** psad import warning: $config{'PSAD_AUTO_IPS_FILE'} " .
                 "error on line: $i";
             &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
                 $cmds{'mail'});
@@ -1868,12 +1874,10 @@ sub scan_logr() {
             }
 
             ### write a message to syslog
-            openlog 'psad', LOG_DAEMON, LOG_LOCAL7;
-            syslog LOG_INFO, "scan detected: $src -> $dst $syslog_range " .
+            &Psad::psyslog("scan detected: $src -> $dst $syslog_range " .
                 "tcp=$tcp_newpkts udp=$udp_newpkts icmp=$icmp_newpkts " .
-                "dangerlevel: $curr_dlevel";
-            closelog();
-            &Psad::logr();
+                "dangerlevel: $curr_dlevel");
+
             unless ($no_whois) {
                 &Psad::logr("\n\n", \%print_hsh);
                 &Psad::logr("---- Whois Information: ----\n", \%print_hsh);
@@ -2018,6 +2022,57 @@ sub scan_logr_signatures() {
     return;
 }
 
+sub renew_auto_blocked_ips() {
+    my $timeout_str = '.';
+    if ($config{'AUTO_BLOCKED_TIMEOUT'} > 0) {
+        $timeout_str = " for $config{'AUTO_BLOCKED_TIMEOUT'} seconds.";
+    }
+    if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y'
+        && -e $config{'AUTO_BLOCKED_IPTABLES'}) {
+
+        ### get the active iptables chains
+        &get_iptables_chains() unless $chk_ipt_chains;
+
+        open B, "< $config{'AUTO_BLOCKED_IPTABLES'}" or
+            die " ** Could not open $config{'AUTO_BLOCKED_IPTABLES'}: $!";
+        my @lines = <B>;
+        close B;
+        for my $line (@lines) {
+            if ($line =~ /($ip_re)/) {
+                my $ip = $1;
+                ### add block rule for $ip unless it is already blocked
+                unless (&ipt_test_blocked($ip)) {
+                    &ipt_block($ip);
+                    &Psad::sendmail(" ** psad: RENEWED iptables BLOCK against $ip" .
+                        $timeout_str, '', $config{'EMAIL_ADDRESSES'},
+                        $cmds{'mail'});
+                }
+                $auto_blocked_ips{$ip} = '';
+            }
+        }
+    } elsif ($config{'IPCHAINS_BLOCK_METHOD'} eq 'Y'
+        && -e $config{'AUTO_BLOCKED_IPCHAINS'}) {
+        open B, "< $config{'AUTO_BLOCKED_IPCHAINS'}" or
+            die " ** Could not open $config{'AUTO_BLOCKED_IPCHAINS'}: $!";
+        my @lines = <B>;
+        close B;
+        for my $line (@lines) {
+            if ($line =~ /($ip_re)/) {
+                my $ip = $1;
+                ### add block rule for $ip unless it is already blocked
+                unless (&ipch_test_blocked($ip)) {
+                    &ipchains_block($ip);
+                    &Psad::sendmail(" ** psad: RENEWED ipchains BLOCK against $ip" .
+                        $timeout_str, '', $config{'EMAIL_ADDRESSES'},
+                        $cmds{'mail'});
+                }
+                $auto_blocked_ips{$ip} = '';
+            }
+        }
+    }
+    return;
+}
+
 sub flush_auto_blocked_ips() {
     my $found_blocked = 0;
     my $rv = 0;
@@ -2027,13 +2082,11 @@ sub flush_auto_blocked_ips() {
             die " ** Could not open $config{'AUTO_BLOCKED_IPTABLES'}: $!";
         my @lines = <B>;
         close B;
-        my @blocked_ips;
         for my $line (@lines) {
-            push @blocked_ips, $1 if $line =~ /($ip_re)/;
-        }
-        for my $ip (@blocked_ips) {
-            if (&ipt_test_blocked($ip)) {  ### see if the ip has been blocked
-                &ipt_remove_block($ip);  ### remove all block rules for $ip
+            if ($line =~ /($ip_re)/) {
+                my $ip = $1;
+                ### remove block rules for $ip if it has been blocked
+                &ipt_remove_block($ip) if &ipt_test_blocked($ip);
             }
         }
         ### we have removed the iptables block rules, so remove
@@ -2047,13 +2100,11 @@ sub flush_auto_blocked_ips() {
             die " ** Could not open $config{'AUTO_BLOCKED_IPCHAINS'}: $!";
         my @lines = <B>;
         close B;
-        my @blocked_ips;
         for my $line (@lines) {
-            push @blocked_ips, $1 if $line =~ /($ip_re)/;
-        }
-        for my $ip (@blocked_ips) {
-            if (&ipch_test_blocked($ip)) {  ### see if the ip has been blocked
-                &ipch_remove_block($ip);  ### remove all block rules for $ip
+            if ($line =~ /($ip_re)/) {
+                my $ip = $1;
+                ### remove block rules for $ip if it has been blocked
+                &ipch_remove_block($ip) if &ipch_test_blocked($ip);
             }
         }
         unlink $config{'AUTO_BLOCKED_IPCHAINS'};
@@ -2176,80 +2227,57 @@ sub auto_psad_response() {
     if ($use_iptables && ! $chk_ipt_chains) {
         ### determine whether or not the NAT or mangle code has
         ### been compiled into iptables
-        &iptables_flags();
+        &get_iptables_chains();
     }
-    SOURCE: for my $src (keys %scan) {
+    for my $src (keys %scan) {
+        my $max_dl = 0;
         for my $dst (keys %{$scan{$src}}) {
-            my $current_danger_level = $scan{$src}{$dst}{'DL'};
-            ### We only want to block the IP once.  Currently this will block
-            ### all traffic from the host to _all_ destinations that are
-            ### protected by the firewall if the ip trips the $auto_psad_level
-            ### threshold for _any_ destination.
-            if ($current_danger_level
-                >= $config{'AUTO_IDS_DANGER_LEVEL'}
-                && ! defined $scan{$src}{$dst}{'BLOCKED'}) {
-                if ($use_ipchains) {
-                    my $blocked_str = '';
-                    if ($config{'IPCHAINS_BLOCK_METHOD'} eq 'Y') {
-                        for my $chain (@ipchains_chains) {
-                            &ipchains_block($chain, $src);
-                        }
-                        $blocked_str = 'via ipchains';
-                    } elsif ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
-                        ### NOTE the elsif here since we only really want
-                        ### to block the ip in one way, and we prefer
-                        ### the firewall.
-                        open H, ">> /etc/hosts.deny" or die
-                            "Could not open /etc/hosts.deny: $!";
-                        print H "ALL: $src\n";
-                        close H;
-                        $blocked_str = 'via tcp wrappers';
-                    }
-                    for my $dst (keys %{$scan{$src}}) {
-                        $scan{$src}{$dst}{'BLOCKED'} = 1;
-                    }
-                    if ($config{'ALERT_AUTO_BLOCKED'} eq 'Y' && $blocked_str) {
-                        my $subject = " ** psad: All traffic from $src has been " .
-                            "BLOCKED $blocked_str on $hostname ($dst)";
-                        &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
-                            $cmds{'mail'});
-                    }
-                    ### write the $src ip to the $auto_blocked_file
-                    &write_blocked_ip($src);
-                    next SOURCE;
-                } elsif ($use_iptables) {
-                    my $blocked_str = '';
-                    if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
-                        for my $table (keys %ipt_chains) {
-                            for my $chain (keys %{$ipt_chains{$table}}) {
-                                &iptables_block($table, $chain, $src);
-                            }
-                        }
-                        $blocked_str = 'via iptables';
-                    } elsif ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
-                        ### NOTE the elsif here since we only really want
-                        ### to block the ip in one way, and we prefer
-                        ### the firewall.
-                        open H, '>> /etc/hosts.deny' or
-                            die "Could not open /etc/hosts.deny: $!";
-                        print H "ALL: $src\n";
-                        close H;
-                        $blocked_str = 'via tcp wrappers';
-                    }
-                    for my $dst (keys %{$scan{$src}}) {
-                        $scan{$src}{$dst}{'BLOCKED'} = 1;
-                    }
-                    if ($config{'ALERT_AUTO_BLOCKED'} eq 'Y' && $blocked_str) {
-                        my $subject = " ** psad: All traffic from $src has been ".
-                            "BLOCKED $blocked_str on $hostname ($dst)";
-                        &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
-                            $cmds{'mail'});
-                    }
-                    ### write the $src ip to the $auto_blocked_file
-                    &write_blocked_ip($src);
-                    next SOURCE;
-                }
+            if ($scan{$src}{$dst}{'DL'} > $max_dl) {
+                $max_dl = $scan{$src}{$dst}{'DL'};   ### XXX
             }
+        }
+        ### We only want to block the IP once.  Currently this will block
+        ### all traffic from the host to _all_ destinations that are
+        ### protected by the firewall if the ip trips the $auto_psad_level
+        ### threshold for _any_ destination.
+        if ($max_dl >= $config{'AUTO_IDS_DANGER_LEVEL'}
+            && ! defined $auto_blocked_ips{$src}) {
+
+            my $timeout_str = '.';
+            if ($config{'AUTO_BLOCKED_TIMEOUT'} > 0) {
+                $timeout_str = " for $config{'AUTO_BLOCKED_TIMEOUT'} seconds.";
+            }
+            ### we have seen at least one packet logged by the firewall
+            ### at this point
+            if ($use_iptables && $config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
+                &ipt_block($src);
+                &Psad::sendmail(" ** psad: iptables AUTO-BLOCK against $src" .
+                    $timeout_str, '', $config{'EMAIL_ADDRESSES'},
+                    $cmds{'mail'});
+                ### write the ip out to the auto blocked file
+                &write_blocked_ip($src, $config{'AUTO_BLOCKED_IPTABLES'});
+            }
+            if ($use_ipchains && $config{'IPCHAINS_BLOCK_METHOD'} eq 'Y') {
+                &ipchains_block($src);
+                &Psad::sendmail(" ** psad: ipchains AUTO-BLOCK against $src" .
+                    $timeout_str, '', $config{'EMAIL_ADDRESSES'},
+                    $cmds{'mail'});
+                ### write the ip out to the auto blocked file
+                &write_blocked_ip($src, $config{'AUTO_BLOCKED_IPCHAINS'});
+            }
+            if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
+                &Psad::sendmail(" ** psad: tcpwrappers AUTO-BLOCK against $src" .
+                    $timeout_str, '', $config{'EMAIL_ADDRESSES'},
+                    $cmds{'mail'});
+                open H, ">> /etc/hosts.deny" or die
+                    "Could not open /etc/hosts.deny: $!";
+                print H "ALL: $src\n";
+                close H;
+                ### write the ip out to the auto blocked file
+                &write_blocked_ip($src, $config{'AUTO_BLOCKED_TCPWR'});
+            }
+            ### keep track of when we blocked the ip
+            $auto_blocked_ips{$src} = time();
         }
     }
     return;
@@ -2272,32 +2300,36 @@ sub get_iptables_chains() {
     return;
 }
 
-sub iptables_block() {
-    my ($table, $chain, $src) = @_;
-    system "$cmds{'iptables'} -t $table -I $chain 1 " .
-        "-s $src -j DROP 2> /dev/null 1>&2";
+sub ipt_block() {
+    my $src = shift;
+    for my $table (keys %ipt_chains) {
+        for my $chain (keys %{$ipt_chains{$table}}) {
+            system "$cmds{'iptables'} -t $table -I $chain 1 " .
+                "-s $src -j DROP 2> /dev/null 1>&2";
+        }
+    }
     return;
 }
 
 sub ipchains_block() {
-    my ($chain, $src) = @_;
-    system "$cmds{'ipchains'} -I $chain 1 -s $src " .
-        "-j DENY 2> /dev/null 1>&2";
+    my $src = shift;
+    for my $chain (@ipchains_chains) {
+        system "$cmds{'ipchains'} -I $chain 1 -s $src " .
+            "-j DENY 2> /dev/null 1>&2";
+    }
     return;
 }
 
 sub write_blocked_ip() {
-    my $src = shift;
-    if (-e $auto_blocked_file) {
-        open B, ">> $auto_blocked_file" or warn
-                " ** Could not append to $auto_blocked_file\n" and return;
+    my ($src, $file) = @_;
+    if (-e $file) {
+        open B, ">> $file" or
+            die " ** Could not append to $file";
         print B "$src\n";
         close B;
     } else {
-        open B, "> $auto_blocked_file" or warn
-                " ** Could not create $auto_blocked_file\n" and return;
-        print B "IPTABLES\n" if $use_iptables;
-        print B "IPCHAINS\n" if $use_ipchains;
+        open B, "> $file" or
+            die " ** Could not create $file";
         print B "$src\n";
         close B;
     }
@@ -2417,7 +2449,7 @@ sub check_permissions() {
     return;
 }
 
-sub kill_psad() {
+sub stop_psad() {
     my $rv = 0;
     ### must kill psadwatchd first since if not, it might try to restart
     ### any of the other three daemons (its pid file is listed first in
@@ -2462,10 +2494,10 @@ sub restart() {
         die " ** psad:  No other psad process is ",
             "running on $hostname!";
     }
-    &kill_psad();
+    &stop_psad();
     print " .. Restarting the psad daemons on $hostname\n";
     system "$cmds{'psad'} $cmdline";
-    return;
+    return 1;
 }
 
 ### display the status of all four psad daemons
@@ -2536,9 +2568,8 @@ sub status() {
                                     open F, "< ${src_ipdir}/danger_level" or
                                         die " ** Could not open ",
                                             "${src_ipdir}/danger_level: $!";
-                                    my $dl = <F>;
+                                    $dl = <F>;
                                     close F;
-                                    chomp $dl;
                                 }
                                 if (-e "${src_ipdir}/packet_ctr") {
                                     open F, "< ${src_ipdir}/packet_ctr" or
@@ -2814,10 +2845,11 @@ sub check_config() {
         PORT_RANGE_SCAN_THRESHOLD ALERT_ALL PSAD_EMAIL_LIMIT
         IPTABLES_BLOCK_METHOD IPCHAINS_BLOCK_METHOD
         TCPWRAPPERS_BLOCK_METHOD EMAIL_ALERT_DANGER_LEVEL
-        PSAD_FIFO WHOIS_THRESHOLD WHOIS_TIMEOUT
+        PSAD_FIFO WHOIS_THRESHOLD WHOIS_TIMEOUT SNORT_RULES_DIR
         PACKET_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR
         PROC_FORWARD_FILE ENABLE_PERSISTENCE AUTO_BLOCKED_IPTABLES
-        AUTO_BLOCKED_IPCHAINS AUTO_BLOCKED_TCPWR
+        AUTO_BLOCKED_IPCHAINS AUTO_BLOCKED_TCPWR PSAD_SIGS_FILE
+        PSAD_AUTO_IPS_FILE AUTO_BLOCKED_TIMEOUT
     );
     &Psad::validate_config($config_file, \@required_vars, $config_href);
     return;

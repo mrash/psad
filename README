@@ -110,8 +110,43 @@ USAGE:
 		  scanning ip address, but this feature can be disabled with 
 		  the -n command line argument.
 
+	-s  -signatures <sig file>
+		  The firewalling code included within the linux 2.4.x kernel
+		  series, iptables, has the ability to distinguish and log any
+		  of the tcp flags present within tcp packets that traverse 
+		  the interfaces.  Psad makes use of this logging capability 
+		  to detect several types of tcp scan signatures included
+		  within the psad_signatures file.  The signatures were 
+		  originally included within the Snort intrusion detection
+		  system (see http://www.snort.org).  A modification can be 
+		  made to the signature file (installed by default in /etc/psad)
+		  and psad will import the change automatically without having
+		  to restart the psad process.  Unfortunately tcp signature 
+		  checking is not compatible with the ipchains firewalling code 
+		  built into the 2.2.x kernel series due to the fact that 
+		  ipchains cannot distinguish any tcp flags other than syn and 
+		  ack.
 
-Usage: psad [-d] [-o] [-e] [-f] [-c <config file>] [-s <signature file>] [-h]
+	-a  -auto_ips <auto ips file>
+		  Occasionally certain ip addresses are repeat offenders and 
+		  should automatcially be given a higher danger level than
+		  would normally be assigned.  Additionally, some ip addresses
+		  can always be ignored depending on your network configuration
+		  (the loopback interface 127.0.0.1 might be a good candidate
+		  for example).  The psad_auto_ips file provides an interface 
+		  for psad to automatically increase/decrease/ignore scanning 
+		  ip danger levels.  Modifications can be made to psad_auto_ips
+		  (installed by default in /etc/psad) and psad will import them
+		  without having to restart the psad process.
+
+	-l  -local_port_lookup
+		  By default for iptables firewalls psad will determine whether 
+		  or not your machine is listening on a port for which a tcp 
+		  signature has been matched.  Specifying the -l command line 
+		  argument diables this feature.
+
+
+Usage: psad [-d] [-o] [-e] [-f] [-c <config file>] [-s <signature file>] [-a <auto ips file>] [-h]
 
         -daemon                 - do not run as a daemon.
         -error                  - do not write errors to the error log.

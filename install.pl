@@ -581,6 +581,7 @@ sub install() {
     } else {
         $running = 0;
     }
+    &logr("\n========================================================\n");
     if ($preserve_rv) {
         &logr("\n .. Psad has been installed (with your original config).\n");
     } else {
@@ -1064,11 +1065,11 @@ sub perms_ownership() {
 sub get_fw_search_string() {
     print "\n";
     print " .. psad checks the firewall configuration on the underlying machine\n",
-        "     to see if packets will be logged and dropped that have not\n",
-        "     explicitly allowed through.  By default psad looks for the\n",
-        "     string \"DROP\". However, if your particular firewall configuration\n",
-        "     logs blocked packets with the string \"Audit\" for example, psad\n",
-        "     can be configured here to look for this string.\n\n";
+        "    to see if packets will be logged and dropped that have not\n",
+        "    explicitly allowed through.  By default psad looks for the\n",
+        "    string \"DROP\". However, if your particular firewall configuration\n",
+        "    logs blocked packets with the string \"Audit\" for example, psad\n",
+        "    can be configured here to look for this string.\n\n";
     my $ans = '';
     while ($ans ne 'y' && $ans ne 'n') {
         print "     Would you like to add a new string that will be used to analyze\n",

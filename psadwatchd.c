@@ -145,10 +145,6 @@ int main(int argc, char *argv[]) {
     /* start doing the real work now that the daemon is running and
      * the config file has been processed */
 
-#ifdef DEBUG
-    printf("\n");
-#endif
-
     /* MAIN LOOP: */
     for (;;) {
         check_process("psad", psad_pid_file,
@@ -157,7 +153,6 @@ int main(int argc, char *argv[]) {
             kmsgsdCmd, psadwatchd_max_retries);
         check_process("diskmond", diskmond_pid_file,
             diskmondCmd, psadwatchd_max_retries);
-        sleep(psadwatchd_check_interval);
 
         /* check to see if we need to re-import the config file */
         if (check_import_config(&config_mtime, config_file)) {
@@ -180,6 +175,8 @@ int main(int argc, char *argv[]) {
                 &psadwatchd_max_retries
             );
         }
+
+        sleep(psadwatchd_check_interval);
     }
 
     /* this statement doesn't get executed, but for completeness... */

@@ -37,14 +37,19 @@
 # TODO:
 #   - More verbose --Status output to include scan start time, end time,
 #     whether or not each ip has an auto-assigned danger level, etc.
+#   - Add a density calculation for a range of scanned ports, and also
+#     add a "verbose" mode that will display which of the scanned ports
+#     actually resolve to something in the IANA spec.
 #   - Send psad alerts to network abuse alerting services such as
 #     abuse.net and dshield.org.
 #   - Packet grapher mode with annotated scan alerts.
+#   - Allow ip ranges to be specified in psad_auto_ips and validated with
+#     the ipv4_in_network() function in the Net::IPv4Addr CPAN module.
 #   - Make use of other logging options available in iptables to detect
 #     more tcp signatures.  (E.g. --log-tcp-options, --log-ip-options,
 #     --log-tcp-sequence, etc.) for better signature recognition.
 #   - Make use of string matching support to look for application level
-#     signatures.  See http://www.stearns.org/snort2iptables.
+#     signatures.  See http://www.stearns.org/snort2iptables
 #   - Include a verbose message in the body of certain emails that as
 #     of psad-1.0.0-pre2 only contain a subject line.
 #   - Allow ipchains to use tcp signatures that only require a syn packet
@@ -222,8 +227,9 @@ my $status            = 0;
 my $benchmark         = 0;
 my $b_packets         = 0;
 my $usr1              = 0;
-my $print_version     = 0;
+my $ver               = 0;
 my $help              = 0;
+my $dump_conf         = 0;
 my $check_interval    = 0;
 my $netstat_lkup_ctr  = 0;
 my $log_len           = 29;  ### used in scan_logr()
@@ -257,6 +263,11 @@ my $oldarg_logserv;
 
 ### used in --Benchmark test
 my $b_time;
+my $test_pkt = 'Feb 15 16:42:58 orthanc kernel: DROP IN=eth0 ' .
+    'OUT= MAC=00:a0:cc:28:42:5a:00:03:6c:00:98:54:08:00 ' .
+    'SRC=10.0.0.1 DST=10.0.0.2 LEN=48 TOS=0x00 PREC=0x00 ' .
+    'TTL=110 ID=13383 DF PROTO=TCP SPT=1389 DPT=';
+my $test_pktend = 'WINDOW=16384 RES=0x00 SYN URGP=0';
 
 ### get the hostname of the machine
 my $hostname = hostname;
@@ -268,66 +279,67 @@ my @args_cp = @ARGV;
 Getopt::Long::Configure('no_ignore_case');
 
 &usage(1) unless (GetOptions(
-    'signatures=s'   => \$sigs_file,      # Path to psad signatures file.
-    'auto-ips=s'     => \$autoips_file,   # Path to psad auto ips file for
-                                          # auto-setting ip danger level.
-    'output'         => \$output,         # Write scanlog messages to STDOUT.
-    'debug'          => \$debug,          # Run in debug mode.
-    'interval=i'     => \$check_interval, # Set $check_interval from the
-                                          # command line.
-    'config=s'       => \$config_file,    # Specify configuration file.
-    'fw-check'       => \$fw_analyze,     # Analyze the firewall ruleset and
-                                          # exit.
-    'log-server'     => \$syslog_server,  # We are running psad on a syslog
-                                          # logging server.
-    'Kill'           => \$kill,           # Kill all running psad processes.
-                                          # (psadwatchd, psad, kmsgsd,
-                                          # diskmond).
-    'Restart'        => \$restart,        # Restart psad with all options of
-                                          # the currently running psad process.
-    'Flush'          => \$flush_fw_rules, # Flush any rules that psad added
-                                          # via the auto blocking code.
-    'Status'         => \$status,         # Display status of any currently
-                                          # running psad processes.
-    'Benchmark'      => \$benchmark,      # Run in benchmark mode.
-    'packets=i'      => \$b_packets,      # Specify number of packets to use
-                                          # in benchmark test.
-    'USR1'           => \$usr1,           # Send an existing psad process a
-                                          # USR1 signal (useful for debugging).
-    'no-whois'       => \$no_whois,       # Do not issue whois lookups against
-    'no-signatures'  => \$no_signatures,  # Disable signature processing.
-    'no-auto_ips'    => \$no_auto_ips,    # Disable auto danger level
-                                          # assignment.
-    'no-daemon'      => \$no_daemon,      # Do not run as a daemon.
-    'no-fwcheck'     => \$no_fwcheck,     # Do not check firewall rules.
-    'no-rdns'        => \$no_rdns,        # Do not issue dns lookups against
-                                          # Scanning ip address.
-    'no-localport'   => \$no_netstat,     # Do not check to see if the
-                                          # firewall is listening on localport
-                                          # that has been scanned.
-    'no-errors'      => \$no_errors,      # Do not write malformed packet.
-                                          # messages to error log.
-    'Version'        => \$print_version,  # Print the psad version and exit.
-    'help'           => \$help,           # Display help.
+    'signatures=s'  => \$sigs_file,      # Path to psad signatures file.
+    'auto-ips=s'    => \$autoips_file,   # Path to psad auto ips file for
+                                         # auto-setting ip danger level.
+    'output'        => \$output,         # Write scanlog messages to STDOUT.
+    'debug'         => \$debug,          # Run in debug mode.
+    'Dump-conf'     => \$dump_conf,      # Dump config and exit.
+    'interval=i'    => \$check_interval, # Set $check_interval from the
+                                         # command line.
+    'config=s'      => \$config_file,    # Specify configuration file.
+    'fw-check'      => \$fw_analyze,     # Analyze the firewall ruleset and
+                                         # exit.
+    'log-server'    => \$syslog_server,  # We are running psad on a syslog
+                                         # logging server.
+    'Kill'          => \$kill,           # Kill all running psad processes.
+                                         # (psadwatchd, psad, kmsgsd,
+                                         # diskmond).
+    'Restart'       => \$restart,        # Restart psad with all options of
+                                         # the currently running psad process.
+    'Flush'         => \$flush_fw_rules, # Flush any rules that psad added
+                                         # via the auto blocking code.
+    'Status'        => \$status,         # Display status of any currently
+                                         # running psad processes.
+    'Benchmark'     => \$benchmark,      # Run in benchmark mode.
+    'packets=i'     => \$b_packets,      # Specify number of packets to use
+                                         # in benchmark test.
+    'USR1'          => \$usr1,           # Send an existing psad process a
+                                         # USR1 signal (useful for debugging).
+    'no-whois'      => \$no_whois,       # Do not issue whois lookups against
+    'no-signatures' => \$no_signatures,  # Disable signature processing.
+    'no-auto_ips'   => \$no_auto_ips,    # Disable auto danger level
+                                         # assignment.
+    'no-daemon'     => \$no_daemon,      # Do not run as a daemon.
+    'no-fwcheck'    => \$no_fwcheck,     # Do not check firewall rules.
+    'no-rdns'       => \$no_rdns,        # Do not issue dns lookups against
+                                         # Scanning ip address.
+    'no-localport'  => \$no_netstat,     # Do not check to see if the
+                                         # firewall is listening on localport
+                                         # that has been scanned.
+    'no-errors'     => \$no_errors,      # Do not write malformed packet.
+                                         # messages to error log.
+    'Version'       => \$ver,            # Print the psad version and exit.
+    'help'          => \$help,           # Display help.
     ### old args
-    'Logging_server' => \$oldarg_logserv, #    old command line arg
-    'Daemon'         => \$oldarg_daemon,  #    old command line arg
-    'firewallcheck'  => \$oldarg_fwcheck, #    old command line arg
-    'no_fw_check'    => \$oldarg_nfwchk,  #    old command line arg
-    'reversedns'     => \$oldarg_rdns,    #    old command line arg
-    'localport'      => \$oldarg_netstat, #    old command line arg
-    'errors'         => \$oldarg_errs,    #    old command line arg
-    'no_errors'      => \$oldarg_nerrs,   #    old command line arg
-    'whois'          => \$oldarg_whois,   #    old command line arg
-    'no_whois'       => \$oldarg_nwhois,  #    old command line arg
-    'no_rdns'        => \$oldarg_nrdns,   #    old command line arg
-    'no_localport'   => \$oldarg_nlport,  #    old command line arg
+    'Logging_server' => \$oldarg_logserv, # old command line arg
+    'Daemon'         => \$oldarg_daemon,  # old command line arg
+    'firewallcheck'  => \$oldarg_fwcheck, # old command line arg
+    'no_fw_check'    => \$oldarg_nfwchk,  # old command line arg
+    'reversedns'     => \$oldarg_rdns,    # old command line arg
+    'localport'      => \$oldarg_netstat, # old command line arg
+    'errors'         => \$oldarg_errs,    # old command line arg
+    'no_errors'      => \$oldarg_nerrs,   # old command line arg
+    'whois'          => \$oldarg_whois,   # old command line arg
+    'no_whois'       => \$oldarg_nwhois,  # old command line arg
+    'no_rdns'        => \$oldarg_nrdns,   # old command line arg
+    'no_localport'   => \$oldarg_nlport,  # old command line arg
 ));
 &usage(0) if $help;
 
 ### Print the version number and exit if -V given on the command line.
-if ($print_version) {
-    print " .. psad version $version, by Michael B. Rash " .
+if ($ver) {
+    print " .. psad v$version, by Michael Rash " .
         "(mbr\@cipherdyne.com)\n";
     exit 0;
 }
@@ -337,7 +349,7 @@ if ($print_version) {
 
 ### Everthing after this point must be executed as root.
 $< == 0 && $> == 0 or
-    die " ** psad: You must be root (or equivalent " .
+    die " ** psad: You must be root (or equivalent ",
         "UID 0 account) to execute psad!  Exiting.\n";
 
 ### read in configuration file
@@ -352,6 +364,9 @@ my %cmds   = %$cmds_href;
 ### release the memory in config_href and cmds_href
 %$config_href = ();
 %$cmds_href   = ();
+
+### dump configuration to STDOUT
+&dump_conf() if $dump_conf;
 
 ### store the psad command line.
 my $cmdline_file = $config{'PSAD_CMDLINE_FILE'};
@@ -444,20 +459,26 @@ unless ($no_whois) {
 ### rules since they may not be local.
 unless ($no_fwcheck || $syslog_server) {
     my $rv = &Psad::check_firewall_rules(
-        $config{'FW_MSG_SEARCH'},
+        $config{'FW_MSG_SEARCH1'},  ### FW_MSG_SEARCH2 is normally used for
+                                    ### snort "sid" values so don't include
+                                    ### it within the firewall check
         $config{'EMAIL_ADDRESSES'},
         "$config{'PSAD_DIR'}/fw_check.txt",
         \%cmds
     );
-    if ($fw_analyze) {
-        if ($rv) {
+    if ($rv) {
+        if ($fw_analyze) {
             print localtime() . " .. Firewall config looks good.\n";
             print localtime() . " .. Completed check of firewall ruleset.\n";
-        } else {
+        }
+    } else {
+        if ($fw_analyze) {
             print localtime() . " ** Errors found in firewall config.\n";
             print localtime() . " ** Results emailed to " .
                 "$config{'EMAIL_ADDRESSES'}\n";
         }
+    }
+    if ($fw_analyze) {
         print localtime() . " .. Exiting.\n";
         exit 0;
     }
@@ -568,11 +589,8 @@ for (;;) {
         print localtime() . " .. Creating packet array.\n";
         my $dst_port = 1000;
         for (my $i=0; $i <= $b_packets; $i++) {
-            push @new_packets, "Feb 15 16:42:58 orthanc kernel: DROP IN=eth0 " .
-                "OUT= MAC=00:a0:cc:28:42:5a:00:03:6c:00:98:54:08:00 " .
-                "SRC=10.0.0.1 DST=10.0.0.2 LEN=48 TOS=0x00 PREC=0x00 " .
-                "TTL=110 ID=13383 DF PROTO=TCP SPT=1389 DPT=$dst_port " .
-                "WINDOW=16384 RES=0x00 SYN URGP=0";
+            ### avert "." operator
+            push @new_packets, "$test_pkt DPT=$dst_port $test_pktend";
             $dst_port++ if $dst_port < 50000;
         }
     } else {
@@ -701,7 +719,8 @@ sub check_scan() {
                     }
                     ### per page 595 of the Camel book, "if /blah1|blah2/"
                     ### can be slower than "if /blah1/ || /blah2/
-                    unless ($flags =~ /URG/ ||
+                    unless ($flags !~ /WIN/ &&
+                            $flags =~ /URG/ ||
                             $flags =~ /ACK/ ||
                             $flags =~ /PSH/ ||
                             $flags =~ /RST/ ||
@@ -1111,7 +1130,8 @@ sub check_import() {
             &import_auto_ips($file);
         }
         my $subject = "psad: re-read $file on $hostname";
-        &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+        &Psad::sendmail($subject, '',
+            $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         $$mtime_ref = $mtime_tmp;
     }
     return;
@@ -1130,7 +1150,8 @@ sub check_import_config() {
         %config = %$config_href;
         %cmds   = %$cmds_href;
         my $subject = "psad: re-read $file on $hostname";
-        &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+        &Psad::sendmail($subject, '',
+            $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         $$mtime_ref = $mtime_tmp;
 
         ### kill kmsgsd since it does not have the capability of
@@ -2178,7 +2199,7 @@ sub restart() {
         close CMD;
         chomp $cmdline;
     } else {
-        die " ** psad:  No other psad process is " .
+        die " ** psad:  No other psad process is ",
             "running on $hostname!";
     }
     &kill_psad();
@@ -2246,7 +2267,7 @@ sub status() {
                                     my $src_ipdir = $file;
                                     if (-e "${src_ipdir}/danger_level") {
                                         open F, "< ${src_ipdir}/danger_level" or
-                                            die " ** Could not open " .
+                                            die " ** Could not open ",
                                                 "${src_ipdir}/danger_level\n";
                                         my $dl = <F>;
                                         close F;
@@ -2318,18 +2339,18 @@ sub usr1() {
 }
 
 sub archive_data() {
-    chdir $config{'PSAD_DIR'} or die " ** Could not chdir " .
+    chdir $config{'PSAD_DIR'} or die " ** Could not chdir ",
         "$config{'PSAD_DIR'}: $!";
     unless (-d $config{'SCAN_DATA_ARCHIVE_DIR'}) {
         mkdir $config{'SCAN_DATA_ARCHIVE_DIR'}, 0500 or
-            die " ** Could not create dir: " .
+            die " ** Could not create dir: ",
             "$config{'SCAN_DATA_ARCHIVE_DIR'}: $!";
     }
 
     ### archive all of the old ip address directories since
     ### we are restarting psad (should add a way to import
     ### these directories back into memory)
-    opendir D, $config{'PSAD_DIR'} or die " ** Could not open dir: " .
+    opendir D, $config{'PSAD_DIR'} or die " ** Could not open dir: ",
         "$config{'PSAD_DIR'}: $!";
     my @files = readdir D;
     closedir D;
@@ -2439,7 +2460,7 @@ sub setup() {
         ### reinstate kernel logging to our named pipe
         print SYSLOG "### Send kern.info messages to psadfifo for " .
             "analysis by kmsgsd\n";
-        print SYSLOG "kern.info		|$config{'PSAD_FIFO'}\n";
+        print SYSLOG "kern.info\t\t|$config{'PSAD_FIFO'}\n";
         close SYSLOG;
         system "$cmds{'killall'} -HUP $cmds{'syslogd'}";
     }
@@ -2471,17 +2492,25 @@ sub setup() {
 sub check_config() {
     my @required_vars = qw(
         EMAIL_ADDRESSES  PSAD_CHECK_INTERVAL FW_DATA ERROR_LOG
-        FW_MSG_SEARCH ENABLE_AUTO_IDS IGNORE_CONNTRACK_BUG_PKTS
-        SCAN_TIMEOUT DANGER_LEVEL1 DANGER_LEVEL2 DANGER_LEVEL3
-        DANGER_LEVEL4 DANGER_LEVEL5 PORT_RANGE_SCAN_THRESHOLD
-        ALERT_ALL PSAD_EMAIL_LIMIT IPTABLES_BLOCK_METHOD
-        IPCHAINS_BLOCK_METHOD TCPWRAPPERS_BLOCK_METHOD
-        EMAIL_ALERT_DANGER_LEVEL PSAD_FIFO WHOIS_THRESHOLD
-        WHOIS_TIMEOUT PACKET_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR
+        FW_MSG_SEARCH1 FW_MSG_SEARCH2 ENABLE_AUTO_IDS
+        IGNORE_CONNTRACK_BUG_PKTS SCAN_TIMEOUT DANGER_LEVEL1
+        DANGER_LEVEL2 DANGER_LEVEL3 DANGER_LEVEL4 DANGER_LEVEL5
+        PORT_RANGE_SCAN_THRESHOLD ALERT_ALL PSAD_EMAIL_LIMIT
+        IPTABLES_BLOCK_METHOD IPCHAINS_BLOCK_METHOD
+        TCPWRAPPERS_BLOCK_METHOD EMAIL_ALERT_DANGER_LEVEL
+        PSAD_FIFO WHOIS_THRESHOLD WHOIS_TIMEOUT
+        PACKET_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR
         ENABLE_PERSISTENCE
     );
     &Psad::validate_config($config_file, \@required_vars, $config_href);
     return;
+}
+
+sub dump_conf() {
+    for my $var (keys %config) {
+        printf("%30s%s\n", " .. $var", $config{$var});
+    }
+    exit 0;
 }
 
 sub usage() {
@@ -2490,7 +2519,7 @@ sub usage() {
 
 psad; the Port Scan Attack Detector
 Version: $version
-By Michael B. Rash (mbr\@cipherdyne.com, http://www.cipherdyne.com)
+By Michael Rash (mbr\@cipherdyne.com, http://www.cipherdyne.com)
 
 Usage: psad [-s <signature file>] [-a <auto ips file>] [-c <config file>]
        [-l] [-i <interval>] [-h] [-B] [-F] [-S] [-K] [-R] [-U] [-V] [-f] [-o]

@@ -39,3 +39,4 @@ clean :
 	if [ -f a.out ]; then rm a.out; fi
 	if [ -f core ]; then rm core; fi
 	if [ -f kmsgsd ]; then rm kmsgsd; fi
+	if [ -f psadwatchd ]; then rm psadwatchd; fi

@@ -10,21 +10,20 @@ DESCRIPTION:
 
     The Port Scan Attack Detector (psad) is a collection of three lightweight
 system daemons written in Perl and in C that are designed to work with Linux
-iptables firewalling code (iptables in the 2.4.x kernels) to detect port scans
-and other suspect traffic.  It features a set of highly configurable danger
-thresholds (with sensible defaults provided), verbose alert messages that
-include the source, destination, scanned port range, begin and end times,
-tcp flags and corresponding nmap options (Linux 2.4.x kernels only), reverse
-DNS info, email and syslog alerting, and automatic blocking of offending ip
-addresses via dynamic configuration of iptables firewall rulesets.  In
-addition, psad incorporates many of the tcp, udp, and icmp signatures included
-in the Snort intrusion detection system (http://www.snort.org) to detect
-highly suspect scans for various backdoor programs (e.g. EvilFTP, GirlFriend,
+iptables firewalling code to detect port scans and other suspect traffic.  It
+features a set of highly configurable danger thresholds (with sensible
+defaults provided), verbose alert messages that include the source,
+destination, scanned port range, begin and end times, tcp flags and
+corresponding nmap options, reverse DNS info, email and syslog alerting,
+automatic blocking of offending ip addresses via dynamic configuration of
+iptables rulesets, and passive operating system fingerprinting.  In addition,
+psad incorporates many of the tcp, udp, and icmp signatures included in the
+snort intrusion detection system (http://www.snort.org) to detect highly
+suspect scans for various backdoor programs (e.g. EvilFTP, GirlFriend,
 SubSeven), DDoS tools (mstream, shaft), and advanced port scans (syn, fin,
 xmas) which are easily leveraged against a machine via nmap.  psad can also
-alert on snort signatures that are logged via fwsnort (which makes use of the
-iptables string match module to detect application layer signatures).  See the
-"--snort-sids" command line option.
+alert on snort signatures that are logged via fwsnort, which makes use of the
+iptables string match module to detect application layer signatures.
 
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 METHODOLOGY:

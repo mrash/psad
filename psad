@@ -483,7 +483,7 @@ if ($benchmark) {
 }
 
 ### let the user know where email alerts will be sent
-print STDOUT " .. Email alerts will be sent to:\n",
+print STDOUT " .. psad started; email alerts will be sent to:\n",
     " ----> $config{'EMAIL_ADDRESSES'}\n";
 
 ### daemonize psad unless running with --no_daemon or --debug
@@ -3533,9 +3533,9 @@ sub ipt_chk_chain() {
             "unwanted packets.\n",
             {$fwc => 1});
         &Psad::logr("\n", {$fwc => 1});
-        &Psad::logr("    FOR EXAMPLE:  Assuming you have already setup " .
-            "iptables rules to accept traffic you want to accept, you can " .
-            "probably execute the following two commands to have iptables " .
+        &Psad::logr('    FOR EXAMPLE:  Assuming you have already setup ' .
+            'iptables rules to accept traffic you want to accept, you can ' .
+            'probably execute the following two commands to have iptables ' .
             "log and drop unwanted packets in the $chain chain by " .
             "default.\n",
             {$fwc => 1});

@@ -753,7 +753,7 @@ for (;;) {
     ### clearerr() on the FWDATA filehandle to be ready for new packets
     FWDATA->clearerr() unless $benchmark;
 
-    ### sleep for the check interval number of seconds
+    ### sleep for the check interval seconds
     sleep $config{'PSAD_CHECK_INTERVAL'};
 }
 exit 0;
@@ -764,9 +764,8 @@ exit 0;
 #=================== BEGIN SUBROUTINES ========================
 
 ### Keeps track of scanning ip's, increments packet counters,
-### keep track of tcp flags for each scan (iptables only),
-### test for snort sid values in iptables packets (if fwsnort
-### is being used).
+### keep track of tcp flags for each scan, test for snort sid
+### values in iptables packets (if fwsnort is being used).
 sub check_scan() {
     my $fw_packets_aref = shift;
 
@@ -774,8 +773,16 @@ sub check_scan() {
     my @err_pkts = ();
 
     my $pkt_ctr = 0;
-    my $scale_print_factor = int($#$fw_packets_aref/10)
-        + (100 - int($#$fw_packets_aref/10));  ### round to nearest 100
+    my $print_scale_factor = int($#$fw_packets_aref/10);
+    if ($print_scale_factor < 100) {
+        $print_scale_factor -= $print_scale_factor % 10;
+    } elsif ($print_scale_factor < 1000) {
+        $print_scale_factor -= $print_scale_factor % 100;
+    } elsif ($print_scale_factor < 10000) {
+        $print_scale_factor -= $print_scale_factor % 1000;
+    } elsif ($print_scale_factor < 100000) {
+        $print_scale_factor -= $print_scale_factor % 10000;
+    }
     PKT: for my $pkt (@$fw_packets_aref) {
         my $src = '';
         my $dst = '';
@@ -801,7 +808,7 @@ sub check_scan() {
 
         if ($analyze_msgs) {
             $pkt_ctr++;
-            if ($pkt_ctr % $scale_print_factor == 0) {
+            if ($pkt_ctr % $print_scale_factor == 0) {
                 print "    Processed $pkt_ctr packets.\n";
             }
         }

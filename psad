@@ -198,6 +198,9 @@ my %scan_ext_exec;
 ### cache passive os fingerprinting information
 my %posf;
 
+### cache passive os fingerprinting signature information
+my %posf_sigs;
+
 ### cache all scan signatures (initialized by default)
 my %sigs;
 
@@ -234,6 +237,9 @@ my %local_ports;
 ### regex to match an ip address
 my $ip_re = '(?:\d{1,3}\.){3}\d{1,3}';
 
+### psad logging hash
+my %log_hsh;
+
 ### ttl values are decremented depending on the number of hops
 ### the packet has taken before it hits the firewall.  We will
 ### assume packets will not jump through more than 30 hops on
@@ -251,6 +257,7 @@ my $sigs_file        = '';
 my $autoips_file     = '';
 my $snort_rules_dir  = '';
 my $srules_type      = '';
+my $psad_logfile     = '';
 my $snort_sids       = 0;
 my $output           = 0;
 my $syslog_server    = 0;
@@ -331,6 +338,7 @@ Getopt::Long::Configure('no_ignore_case');
     'config=s'      => \$config_file,     # Specify configuration file.
     'fw-check'      => \$fw_analyze,      # Analyze the firewall ruleset and
                                           # exit.
+    'logfile=s'     => \$psad_logfile,    # The psad logfile.
     'log-server'    => \$syslog_server,   # We are running psad on a syslog
                                           # logging server.
     'Kill'          => \$kill,            # Kill all running psad processes.
@@ -457,7 +465,7 @@ $config{'PSAD_AUTO_IPS_FILE'} = $autoips_file if $autoips_file;
 ### the --Status command line switch was given
 &status() if $status;
 
-### make sure $PSAD_DIR, $FW_DATA, and /var/lib/psad/psadfifo, etc.
+### make sure PSAD_DIR, FW_DATA_FILE, and /var/lib/psad/psadfifo, etc.
 ### actually exist
 &setup();
 
@@ -469,8 +477,8 @@ exit &restart if $restart;
 
 ### make sure the permissions on these files is 0600
 &check_permissions(
-    $config{'FW_DATA'},
-    $config{'ERROR_LOG'},
+    $config{'FW_DATA_FILE'},
+    $config{'FW_ERROR_LOG'},
 );
 
 ### get the ip addresses that are local to this machine
@@ -505,9 +513,14 @@ if ($benchmark) {
     $test_pktend = 'WINDOW=16384 RES=0x00 SYN URGP=0';
 }
 
+### define the psad logging hash
+$psad_logfile = $config{'PSAD_LOG'} unless $psad_logfile;
+%log_hsh = ($psad_logfile => 1);
+
 ### print the startup message
 print STDOUT " .. psad started; email alerts will be sent to:\n",
     " ----> $config{'EMAIL_ADDRESSES'}\n";
+&Psad::logr(localtime() . " .. psad started ..\n", \%log_hsh);
 
 ### daemonize psad unless running with --no_daemon or --debug
 unless ($no_daemon || $debug || $benchmark) {
@@ -547,6 +560,7 @@ if ($config_file eq '/etc/psad/psad.conf') {
 ### import the scan signatures and auto ips file
 &import_signatures() unless $no_signatures;
 &import_auto_ips()   unless $no_auto_ips;
+&import_posf_sigs()  unless $no_posf;
 
 ### Check to see if psad automatically blocked some ips from
 ### a previous run.  This feature is most useful for preserving
@@ -587,11 +601,11 @@ if ($benchmark) {
     }
 }
 
-### Get an open filehandle for the main firewall data file $FW_DATA.
-### All firewall drop/deny/reject log messages are written to $FW_DATA
+### Get an open filehandle for the main firewall data file FW_DATA_FILE.
+### All firewall drop/deny/reject log messages are written to FW_DATA_FILE
 ### by kmsgsd.
-open FWDATA, $config{'FW_DATA'} or die ' ** Could not open ',
-    "$config{'FW_DATA'}: $!" unless $benchmark;
+open FWDATA, $config{'FW_DATA_FILE'} or die ' ** Could not open ',
+    "$config{'FW_DATA_FILE'}: $!" unless $benchmark;
 
 ###=========================================================###
 ######                    MAIN LOOP                      ######
@@ -612,7 +626,7 @@ for (;;) {
     &print_scan() if $usr1_flag;
 
     ### Get any new packets have been written to
-    ### $FW_DATA by kmsgsd for psad analysis.
+    ### FW_DATA_FILE by kmsgsd for psad analysis.
     my @new_packets;
     if ($benchmark) {
         $b_time = time();
@@ -660,7 +674,7 @@ for (;;) {
         &timeout_auto_blocked_ips();
     }
 
-    ### Print the number of new packets we saw in FW_DATA if we are
+    ### Print the number of new packets we saw in FW_DATA_FILE if we are
     ### running in debug mode
     if ($debug) {
         print "MAIN: number of new packets: $#new_packets\n";
@@ -1062,71 +1076,33 @@ sub posf() {
     my ($src, $len, $tos, $ttl, $id, $win) = @_;
     print STDOUT " .. posf():  $src  LEN: $len, TOS: $tos, TTL: $ttl, ",
         "ID: $id, WIN: $win\n" if $debug;
-    return if defined $posf{$src}{'guess'};
+    return if defined $posf{$src}{'guess'};  ### we already guessed the OS
     $posf{$src}{'len'}{$len}++;
     $posf{$src}{'tos'}{$tos}++;
     $posf{$src}{'ttl'}{$ttl}++;
     push @{$posf{$src}{'id'}}, $id;  ### need to maintain ordering
     $posf{$src}{'win'}{$win}++;
     $posf{$src}{'ctr'}++;
-    ### Require at least three packets before making an OS guess
-    if ($posf{$src}{'ctr'} >= 3) {
-        my $id_incr_rv = &id_incr(\@{$posf{$src}{'id'}});
-        my ($min_ttl, $max_ttl) = &ttl_range($posf{$src}{'ttl'});
-        ### Windows 2000
-        if (defined $posf{$src}{'win'}{'16384'}
-                && defined $posf{$src}{'tos'}{'0x00'}
-                && defined $posf{$src}{'len'}{'48'}
-                && ($min_ttl > (128-$max_hops))
-                && ($max_ttl <= 128)
-                && $id_incr_rv) {
-            $posf{$src}{'guess'} = 'Windows 2000';
+
+    my $id_incr_rv = -1;
+    my $id_str = 'RANDOM';
+    my $min_ttl;
+    my $max_ttl;
+    for my $os (keys %posf_sigs) {
+        if ($posf{$src}{'ctr'} >= $posf_sigs{$os}{'numpkts'}
+                && $id_incr_rv < 0) {
+            $id_incr_rv = &id_incr(\@{$posf{$src}{'id'}});
+            $id_str = 'SMALLINCR' if $id_incr_rv;
+            ($min_ttl, $max_ttl) = &ttl_range($posf{$src}{'ttl'});
         }
-        ### Linux 2.2
-        if (defined $posf{$src}{'win'}{'32120'}
-                && defined $posf{$src}{'tos'}{'0x10'}
-                && defined $posf{$src}{'len'}{'60'}
-                && ($min_ttl > (64-$max_hops))
-                && ($max_ttl <= 64)
-                && ! $id_incr_rv) {  ### assume sessions are not established
-            $posf{$src}{'guess'} = 'Linux (2.2.x kernel)';
-        }
-        ### Linux 2.4
-        if (defined $posf{$src}{'win'}{'5840'}
-                && defined $posf{$src}{'tos'}{'0x10'}
-                && defined $posf{$src}{'len'}{'60'}
-                && ($min_ttl > (64-$max_hops))
-                && ($max_ttl <= 64)
-                && ! $id_incr_rv) {  ### assume sessions are not established
-            $posf{$src}{'guess'} = 'Linux (2.4.x kernel)';
-        }
-        ### OpenBSD (require six packets to "confirm" randomness)
-        if ($posf{$src}{'ctr'} >= 6
-                && defined $posf{$src}{'win'}{'16384'}
-#                && defined $posf{$src}{'tos'}{'0x10'}
-                && defined $posf{$src}{'len'}{'64'}
-                && ($min_ttl > (64-$max_hops))
-                && ($max_ttl <= 64)
-                && ! $id_incr_rv) {  ### assume sessions are not established
-            $posf{$src}{'guess'} = 'OpenBSD';
-        }
-        ### Solaris 7
-        if (defined $posf{$src}{'win'}{'8760'}
-#                && defined $posf{$src}{'tos'}{'0x10'}
-                && defined $posf{$src}{'len'}{'44'}
-                && ($min_ttl > (255-$max_hops))
-                && ($max_ttl <= 255)
-                && $id_incr_rv) {  ### assume sessions are not established
-            $posf{$src}{'guess'} = 'Solaris 7';
-        }
-        ### AIX 4.3
-        if (defined $posf{$src}{'win'}{'16384'}
-#                && defined $posf{$src}{'tos'}{'0x10'}
-                && defined $posf{$src}{'len'}{'44'}
-                && ($min_ttl > (64-$max_hops))
-                && ($max_ttl <= 64)
-                && $id_incr_rv) {  ### assume sessions are not established
-            $posf{$src}{'guess'} = 'AIX 4.3';
+        if ($posf{$src}{'ctr'} >= $posf_sigs{$os}{'numpkts'}
+                && defined $posf{$src}{'win'}{$posf_sigs{$os}{'win'}}
+                && defined $posf{$src}{'tos'}{$posf_sigs{$os}{'tos'}}
+                && defined $posf{$src}{'len'}{$posf_sigs{$os}{'len'}}
+                && ($min_ttl > ($posf_sigs{$os}{'ttl'}-$max_hops))
+                && ($max_ttl <= $posf_sigs{$os}{'ttl'})
+                && $id_str eq $posf_sigs{$os}{'id'}) {
+            $posf{$src}{'guess'} = $os;
         }
     }
     return;
@@ -1134,8 +1110,8 @@ sub posf() {
 
 sub id_incr() {
     my $aref = shift;
-    my $rv = 1;
-    for (my $i=0; $i<=$#$aref; $i++) {
+    my $rv = 1;  ### 1 => small increments, 2 => random
+    for (my $i=0; $i<$#$aref; $i++) {
         $rv = 0 unless ($aref->[$i] < $aref->[$i+1]
             && ($aref->[$i+1] - $aref->[$i]) < 1000);
     }
@@ -1602,6 +1578,85 @@ sub import_auto_ips() {
     return;
 }
 
+sub import_posf_sigs() {
+    %posf_sigs = ();
+    my $posf_file = $config{'PSAD_POSF_FILE'};
+    open P, "< $posf_file" or die ' ** Could not open ',
+        "$posf_file: $!";
+    my @lines = <P>;
+    close P;
+    my $os = '';
+    for my $line (@lines) {
+        chomp $line;
+        next if ($line =~ /^\s*#/);
+        next unless ($line =~ /\S/);
+        if ($line =~ /^\s*OS\s+(.*);/) {
+            $os = $1;
+        } elsif ($line =~ /^\s*NUMPKTS\s+(\d+);/) {
+            $posf_sigs{$os}{'numpkts'} = $1;
+        } elsif ($line =~ /^\s*TOS\s+(\w+);/) {
+            $posf_sigs{$os}{'tos'} = $1;
+        } elsif ($line =~ /^\s*LEN\s+(\d+);/) {
+            $posf_sigs{$os}{'len'} = $1;
+        } elsif ($line =~ /^\s*TTL\s+(\d+);/) {
+            $posf_sigs{$os}{'ttl'} = $1;
+        } elsif ($line =~ /^\s*ID\s+(\w+);/) {
+            $posf_sigs{$os}{'id'} = $1;
+        } elsif ($line =~ /^\s*WINDOW\s+(\d+);/) {
+            $posf_sigs{$os}{'win'} = $1;
+        }
+    }
+    ### make sure each of the os signatures has all fields defined
+    OS: for my $os (keys %posf_sigs) {
+        unless (defined $posf_sigs{$os}{'numpkts'}) {
+            &Psad::logr(localtime() . " ** $posf_file: missing " .
+                "NUMPKTS for os: $os\n", \%log_hsh);
+            delete $posf_sigs{$os};
+            next OS;
+        }
+        unless (defined $posf_sigs{$os}{'tos'}) {
+            &Psad::logr(localtime() . " ** $posf_file: missing " .
+                "TOS for os: $os\n", \%log_hsh);
+            delete $posf_sigs{$os};
+            next OS;
+        }
+        unless (defined $posf_sigs{$os}{'len'}) {
+            &Psad::logr(localtime() . " ** $posf_file: missing " .
+                "LEN for os: $os\n", \%log_hsh);
+            delete $posf_sigs{$os};
+            next OS;
+        }
+        unless (defined $posf_sigs{$os}{'ttl'}) {
+            &Psad::logr(localtime() . " ** $posf_file: missing " .
+                "TTL for os: $os\n", \%log_hsh);
+            delete $posf_sigs{$os};
+            next OS;
+        }
+        unless (defined $posf_sigs{$os}{'id'}) {
+            &Psad::logr(localtime() . " ** $posf_file: missing " .
+                "ID for os: $os\n", \%log_hsh);
+            delete $posf_sigs{$os};
+            next OS;
+        } else {
+            unless ($posf_sigs{$os}{'id'} eq 'SMALLINCR'
+                    || $posf_sigs{$os}{'id'} eq 'RANDOM') {
+                &Psad::logr(localtime() . " ** $posf_file: ID must be " .
+                    "either SMALLINCR or RANDOM for os: $os\n", \%log_hsh);
+                delete $posf_sigs{$os};
+                next OS;
+            }
+        }
+        unless (defined $posf_sigs{$os}{'win'}) {
+            &Psad::logr(localtime() . " ** $posf_file: missing " .
+                "WINDOW for os: $os\n", \%log_hsh);
+            delete $posf_sigs{$os};
+            next OS;
+        }
+    }
+    print Dumper %posf_sigs if $debug;
+    return;
+}
+
 sub check_range() {
     my ($port, $start, $end) = @_;
     $start = $port if ($port < $start);
@@ -1732,8 +1787,8 @@ sub write_src_packet_counters() {
 
 sub collect_errors() {
     my ($bad_packets_aref) = @_;
-    open ERR, ">> $config{'ERROR_LOG'}" or die ' ** Could not open ',
-        "$config{'ERROR_LOG'}: $!";
+    open ERR, ">> $config{'FW_ERROR_LOG'}" or die ' ** Could not open ',
+        "$config{'FW_ERROR_LOG'}: $!";
     for my $line (@$bad_packets_aref) {
         print ERR "$line\n";
     }
@@ -2854,21 +2909,21 @@ sub status() {
 sub status_ip() {
     my $rv = 0;
     my @match_ip;
-    die " ** $config{'FW_DATA'} does not exist yet.  Exiting."
-        unless -e $config{'FW_DATA'};
-    die " ** No data yet in $config{'FW_DATA'}.  Exiting."
-        unless -s $config{'FW_DATA'} > 0;
+    die " ** $config{'FW_DATA_FILE'} does not exist yet.  Exiting."
+        unless -e $config{'FW_DATA_FILE'};
+    die " ** No data yet in $config{'FW_DATA_FILE'}.  Exiting."
+        unless -s $config{'FW_DATA_FILE'} > 0;
     die " ** No scans from $status_ip have been detected.\n",
         "    See 'psad --Status' for a complete list."
         unless -d "$config{'PSAD_DIR'}/$status_ip";
-    open FW, "< $config{'FW_DATA'}" or die " ** Could not open ",
-        "$config{'FW_DATA'}: $!";
+    open FW, "< $config{'FW_DATA_FILE'}" or die " ** Could not open ",
+        "$config{'FW_DATA_FILE'}: $!";
     while (<FW>) {
         push @match_ip, $_ if $_ =~ /SRC=$status_ip\s/
             || $_ =~ /DST=$status_ip\s/;
     }
     close FW;
-    die " ** Could not match $status_ip to packets in $config{'FW_DATA'}.  ",
+    die " ** Could not match $status_ip to packets in $config{'FW_DATA_FILE'}.  ",
         "Exiting." unless @match_ip;
     open D, "> $config{'PSAD_DIR'}/$status_ip/fwdata" or
         die " ** Could not open $config{'PSAD_DIR'}/$status_ip/fwdata";
@@ -2987,7 +3042,7 @@ sub archive_data() {
     }
 
     ### archive the fwdata file
-    my $fwdata    = $config{'FW_DATA'};
+    my $fwdata    = $config{'FW_DATA_FILE'};
     my $fwarchive = "$config{'SCAN_DATA_ARCHIVE_DIR'}/fwdata_archive";
     ### first see how big the archive file is and zero out if
     ### it is larger than about 10,000 lines
@@ -3005,7 +3060,7 @@ sub archive_data() {
     open AR, ">> $fwarchive" or die "Could not open $fwarchive: $!";
     print AR $_ for @fwlines;
     close AR;
-    ### zero out $FW_DATA
+    ### zero out $FW_DATA_FILE
     open F, "> $fwdata" or die ' ** Could not open ',
         "$fwdata: $!";
     close F;
@@ -3053,14 +3108,14 @@ sub setup() {
             mkdir $config{'DSHIELD_DIR'}, 0500;
         }
     }
-    unless (-e $config{'FW_DATA'}) {
-        open F, "> $config{'FW_DATA'}" or die ' ** Could not open ',
-            "$config{'FW_DATA'}: $!";
+    unless (-e $config{'FW_DATA_FILE'}) {
+        open F, "> $config{'FW_DATA_FILE'}" or die ' ** Could not open ',
+            "$config{'FW_DATA_FILE'}: $!";
         close F;
     }
-    unless (-e $config{'ERROR_LOG'}) {
-        open E, "> $config{'ERROR_LOG'}" or die ' ** Could not open ',
-            "$config{'ERROR_LOG'}: $!";
+    unless (-e $config{'FW_ERROR_LOG'}) {
+        open E, "> $config{'FW_ERROR_LOG'}" or die ' ** Could not open ',
+            "$config{'FW_ERROR_LOG'}: $!";
         close E;
     }
     unless (-e $config{'PSAD_FIFO'}) {
@@ -3131,7 +3186,7 @@ sub setup() {
 
 sub check_config() {
     my @required_vars = qw(
-        EMAIL_ADDRESSES  PSAD_CHECK_INTERVAL FW_DATA ERROR_LOG
+        EMAIL_ADDRESSES  PSAD_CHECK_INTERVAL FW_DATA_FILE FW_ERROR_LOG
         FW_MSG_SEARCH SNORT_SID_STR ENABLE_AUTO_IDS
         IGNORE_CONNTRACK_BUG_PKTS SCAN_TIMEOUT DANGER_LEVEL1
         DANGER_LEVEL2 DANGER_LEVEL3 DANGER_LEVEL4 DANGER_LEVEL5
@@ -3152,23 +3207,23 @@ sub check_config() {
 sub fw_check() {
     my $rv = 0;
     if (defined $cmds{'iptables'} && -x $cmds{'iptables'}) {
-        unlink "$config{'PSAD_DIR'}/fw_check.txt";
+        unlink $config{'FW_CHECK_FILE'} if -e $config{'FW_CHECK_FILE'};
         my $input_rv = &ipt_chk_chain('INPUT');
         my $forward_rv = &ipt_chk_chain('FORWARD');
         if ($input_rv && $forward_rv) {
             &Psad::logr(" .. The iptables ruleset on $hostname will log and " .
                 "block unwanted packets in both the INPUT and FORWARD " .
                 "chains.  Firewall config success!\n",
-                {"$config{'PSAD_DIR'}/fw_check.txt" => 1});
+                {$config{'FW_CHECK_FILE'} => 1});
             $rv = 1;
         } else {
-            &Psad::logr("\n", {"$config{'PSAD_DIR'}/fw_check.txt" => 1});
+            &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
             &Psad::logr(' .. NOTE: IPTables::Parse does not yet parse user ' .
                 'defined chains and so it is possible your firewall config ' .
                 "is compatible with psad anyway.\n",
-                {"$config{'PSAD_DIR'}/fw_check.txt" => 1});
+                {$config{'FW_CHECK_FILE'} => 1});
             &Psad::sendmail(" ** psad: firewall setup warning on $hostname!",
-                "$config{'PSAD_DIR'}/fw_check.txt",
+                $config{'FW_CHECK_FILE'},
                 $config{'EMAIL_ADDRESSES'},
                 $cmds{'mail'}
             );
@@ -3179,7 +3234,7 @@ sub fw_check() {
                                        ### snort "sid" values so don't include
                                        ### it within the firewall check
             $config{'EMAIL_ADDRESSES'},
-            "$config{'PSAD_DIR'}/fw_check.txt",
+            $config{'FW_CHECK_FILE'},
             \%cmds
         );
     }
@@ -3190,7 +3245,7 @@ sub fw_check() {
         } else {
             print localtime() . " ** Errors found in firewall config.\n";
             print localtime() . " ** Results in " .
-                "$config{'PSAD_DIR'}/fw_check.txt\n";
+                "$config{'FW_CHECK_FILE'}\n";
             print localtime() . "    emailed to ",
                 "$config{'EMAIL_ADDRESSES'}\n";
         }
@@ -3252,7 +3307,7 @@ sub ipt_chk_chain() {
 
     print Dumper $ld_hr if $debug;
 
-    my $fw_check_file = "$config{'PSAD_DIR'}/fw_check.txt";
+    my $fw_check_file = "$config{'FW_CHECK_FILE'}/fw_check";
     if (defined $ld_hr && keys %$ld_hr) {
         my @protos;
         my $found_all = 0;

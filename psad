@@ -243,6 +243,7 @@ my $status           = 0;
 my $benchmark        = 0;
 my $b_packets        = 0;
 my $usr1             = 0;
+my $usr1_flag        = 0;
 my $ver              = 0;
 my $help             = 0;
 my $dump_conf        = 0;
@@ -544,7 +545,7 @@ if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
 $SIG{'__WARN__'} = \&Psad::warn_handler;
 $SIG{'__DIE__'}  = \&Psad::die_handler;
 $SIG{'CHLD'}     = \&REAPER;
-$SIG{'USR1'}     = \&print_scan;
+$SIG{'USR1'}     = \&process_usr1;
 
 ### Get the mtimes of the signatures and auto ips files.
 my $sigs_mtime     = stat($sigs_file)->mtime;
@@ -587,6 +588,10 @@ for (;;) {
 
     ### See if we need to re-import the psad_auto_ips file
     &check_import(\$auto_ips_mtime, $autoips_file, 0);
+
+    ### See if we need to print out the %scan datastructure
+    ### (we received a USR1 signal)
+    &print_scan() if $usr1_flag;
 
     ### Get any new packets have been written to
     ### $FW_DATA by kmsgsd for psad analysis.
@@ -646,7 +651,9 @@ for (;;) {
         exit 0;
     }
 
+    ### sleep for the check interval number of seconds
     sleep $config{'PSAD_CHECK_INTERVAL'};
+
     ### clearerr() on the FWDATA filehandle to be ready for new packets
     FWDATA->clearerr() unless $benchmark;
 }
@@ -1075,9 +1082,9 @@ sub chk_local_port() {
 sub check_port_range() {
     my ($sig_id, $srcport, $dstport, $proto) = @_;
     ### check dst port first
-    if (defined $sigs{$proto}{$sig_id}{'dstport'}{'unique_or_any'}) {
-        unless ($sigs{$proto}{$sig_id}{'dstport'}{'unique_or_any'} eq 'any') {
-            if ($dstport != $sigs{$proto}{$sig_id}{'dstport'}{'unique_or_any'}) {
+    if (defined $sigs{$proto}{$sig_id}{'dstport'}{'uniq_or_any'}) {
+        unless ($sigs{$proto}{$sig_id}{'dstport'}{'uniq_or_any'} eq 'any') {
+            if ($dstport != $sigs{$proto}{$sig_id}{'dstport'}{'uniq_or_any'}) {
                 return 0;
             }
         }
@@ -1097,9 +1104,9 @@ sub check_port_range() {
     }
 
     ### check src port
-    if (defined $sigs{$proto}{$sig_id}{'srcport'}{'unique_or_any'}) {
-        unless ($sigs{$proto}{$sig_id}{'srcport'}{'unique_or_any'} eq 'any') {
-            if ($dstport != $sigs{$proto}{$sig_id}{'srcport'}{'unique_or_any'}) {
+    if (defined $sigs{$proto}{$sig_id}{'srcport'}{'uniq_or_any'}) {
+        unless ($sigs{$proto}{$sig_id}{'srcport'}{'uniq_or_any'} eq 'any') {
+            if ($dstport != $sigs{$proto}{$sig_id}{'srcport'}{'uniq_or_any'}) {
                 return 0;
             }
         }
@@ -1373,7 +1380,8 @@ sub build_tcp_udp_sigs() {
             $sigs{$proto}{$sig_id}{'srcport'}{'negstart'} = $start;
             $sigs{$proto}{$sig_id}{'srcport'}{'negend'}   = $end;
         } else {
-            $sigs{$proto}{$sig_id}{'srcport'}{'unique_or_any'} = $src_port;
+            $sigs{$proto}{$sig_id}{'srcport'}{'uniq_or_any'}
+                = $src_port;
         }
 
         ### deal with destination port ranges
@@ -1393,44 +1401,45 @@ sub build_tcp_udp_sigs() {
             $sigs{$proto}{$sig_id}{'dstport'}{'negstart'} = $start;
             $sigs{$proto}{$sig_id}{'dstport'}{'negend'}   = $end;
         } else {
-            $sigs{$proto}{$sig_id}{'dstport'}{'unique_or_any'} = $dst_port;
+            $sigs{$proto}{$sig_id}{'dstport'}{'uniq_or_any'}
+                = $dst_port;
         }
     } else {
         ### build up the %sigs_fast lookup cache
         if ($dst_port !~ /\D/) {
             if ($src_port !~ /\D/) {
                 if ($proto eq 'TCP') {
-                    $sigs_fast{$proto}{$dst_port}{$src_port}{$flags}{$sig_id}
-                        = '';
+                    $sigs_fast{$proto}{$dst_port}
+                        {$src_port}{$flags}{$sig_id} = '';
                 } elsif ($proto eq 'UDP') {
-                    $sigs_fast{$proto}{$dst_port}{$src_port}{$sig_id}
-                        = '';
+                    $sigs_fast{$proto}{$dst_port}
+                        {$src_port}{$sig_id} = '';
                 }
             } elsif ($src_port =~ /any/i) {
                 if ($proto eq 'TCP') {
-                    $sigs_fast{$proto}{$dst_port}{'any_src_port'}{$flags}{$sig_id}
-                        = '';
+                    $sigs_fast{$proto}{$dst_port}
+                        {'any_src_port'}{$flags}{$sig_id} = '';
                 } elsif ($proto eq 'UDP') {
-                    $sigs_fast{$proto}{$dst_port}{'any_src_port'}{$sig_id}
-                        = '';
+                    $sigs_fast{$proto}{$dst_port}
+                        {'any_src_port'}{$sig_id} = '';
                 }
             }
         } elsif ($dst_port =~ /any/i) {
             if ($src_port !~ /\D/) {
                 if ($proto eq 'TCP') {
-                    $sigs_fast{$proto}{'any_dst_port'}{$src_port}{$flags}{$sig_id}
-                        = '';
+                    $sigs_fast{$proto}{'any_dst_port'}
+                        {$src_port}{$flags}{$sig_id} = '';
                 } elsif ($proto eq 'UDP') {
-                    $sigs_fast{$proto}{'any_dst_port'}{$src_port}{$sig_id}
-                        = '';
+                    $sigs_fast{$proto}{'any_dst_port'}
+                        {$src_port}{$sig_id} = '';
                 }
             } elsif ($src_port =~ /any/i) {
                 if ($proto eq 'TCP') {
-                    $sigs_fast{$proto}{'any_dst_port'}{'any_src_port'}{$flags}{$sig_id}
-                        = '';
+                    $sigs_fast{$proto}{'any_dst_port'}
+                        {'any_src_port'}{$flags}{$sig_id} = '';
                 } elsif ($proto eq 'UDP') {
-                    $sigs_fast{$proto}{'any_dst_port'}{'any_src_port'}{$sig_id}
-                        = '';
+                    $sigs_fast{$proto}{'any_dst_port'}
+                        {'any_src_port'}{$sig_id} = '';
                 }
             }
         }
@@ -2247,12 +2256,12 @@ sub email_limit_reached() {
 }
 
 sub print_scan() {  ### this should primarily be used for debugging
+    $usr1_flag = 0;  ### clear the flag
     my $scanfile = $config{'PRINT_SCAN_HASH'} . ".$$";
     open PSCAN, "> $scanfile";
     print PSCAN Dumper \%scan;
     close PSCAN;
     chmod 0600, $scanfile;
-    print STDOUT " .. Printing scan data structures to $scanfile\n\n";
     return;
 }
 
@@ -2504,16 +2513,24 @@ sub usr1() {
         if (kill 0, $pid) {  ### make sure psad is actually running
             if (kill 'USR1', $pid) {
                 $rv = 1;
-                ### sleep to give time for the USR1 signal to be delivered
-                ### and for the file to be created.
-                sleep 1;
-                open U, "< $config{'PSAD_DIR'}/scan_hash.${pid}"
-                    or print " ** Sent psad pid $pid a USR1 ",
-                        "signal, but could not open\n",
-                        "\"$config{'PSAD_DIR'}/scan_hash.${pid}\n\""
-                    and return $rv;
-                print while(<U>);
-                close U;
+                print " .. USR1 signal sent to pid: $pid\n";
+                for (my $try=0; $try<=$config{'PSAD_CHECK_INTERVAL'}; $try++) {
+                    sleep 1;
+                    print " .. Checking for file: ",
+                        "$config{'PSAD_DIR'}/scan_hash.${pid}\n";
+                    if (-e "$config{'PSAD_DIR'}/scan_hash.${pid}") {
+                        open U, "< $config{'PSAD_DIR'}/scan_hash.${pid}"
+                            or print " ** Sent psad pid $pid a USR1 ",
+                                "signal, but could not open\n",
+                                "\"$config{'PSAD_DIR'}/scan_hash.${pid}\n\""
+                            and return $rv;
+                        print while(<U>);
+                        close U;
+                        print " .. Results available here: ",
+                            "$config{'PSAD_DIR'}/scan_hash.${pid}\n";
+                        last;
+                    }
+                }
             } else {
                 print " ** Could not send psad the USR1 signal on $hostname\n";
             }
@@ -2522,6 +2539,11 @@ sub usr1() {
         }
     }
     return $rv;
+}
+
+sub process_usr1() {
+    $usr1_flag = 1;
+    return;
 }
 
 sub archive_data() {

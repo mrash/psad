@@ -145,7 +145,7 @@ int main(int argc, char *argv[]) {
     for (;;) {
         if (!statfs(psad_dir, &statfsbuf)) {
             current_prct =
-                (float) statfsbuf.f_bfree / statfsbuf.f_blocks * 100;
+                (float) 100 - (float) statfsbuf.f_bfree / statfsbuf.f_blocks * 100;
             if (current_prct > max_disk_percentage) {
                 rm_data(fwdata_file, psad_dir, archive_dir);
             }

@@ -743,9 +743,11 @@ sub set_home_net() {
     my %connected_subnets;
     for my $line (@ifconfig_out) {
         if ($line =~ /^\s*lo\s+Link/) {
+            $intf_name = '';
             next;
         }
         if ($line =~ /^\s*dummy.*\s+Link/) {
+            $intf_name = '';
             next;
         }
         if ($line =~ /^(\w+)\s+Link/) {
@@ -901,7 +903,7 @@ sub config_metalog() {
         &logr(' .. Generated /usr/sbin/psadpipe.sh ' .
             "which writes to $PSAD_FIFO");
 
-        ### (Dennis Freise <cat@final-frontier.ath.cx>
+        ### (Dennis Freise <cat@final-frontier.ath.cx>)
         ### Metalog seems to simply die on SIGHUP and SIGALRM, and I
         ### found no signal or option to reload it's config... :-(
         &logr(' ** All files written. You have to manually restart metalog! ',

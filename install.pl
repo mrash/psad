@@ -205,12 +205,11 @@ sub install() {
     open SYSLOG, '> /etc/syslog.conf' or
         die " ... @@@  Unable to open /etc/syslog.conf: $!\n";
     for my $line (@slines) {
-        chomp $line;
         unless ($line =~ /psadfifo/) {
-            print SYSLOG "$line\n";
+            print SYSLOG $line;
         }
     }
-    print SYSLOG "# Send kern.info messages to psadfifo for " .
+    print SYSLOG "### Send kern.info messages to psadfifo for " .
         "analysis by kmsgsd\n";
     ### reinstate kernel logging to our named pipe
     print SYSLOG "kern.info		|$PSAD_FIFO\n";

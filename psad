@@ -23,9 +23,9 @@
 # TODO: 
 #	- make line counts of fwdata file take high-rate scans into
 #	  account.
-#	- signal handler for configuration checking (implies we have a 
-#	  config file).
-#	- "ignore ips" file
+#	- signal handler for configuration updating 
+#	- "ignore ips" file so that psad will ignore scans originating
+#	  from any ip contained within this file
 #
 # Sample packet (rejected by ipchains)
 # Dec 19 11:54:07 orthanc kernel: Packet log: input REJECT lo PROTO=1
@@ -74,6 +74,7 @@ my $touchCmd = "/bin/touch";
 my $ifconfigCmd = "/sbin/ifconfig";
 my $grepCmd = "/bin/grep";
 my $netstatCmd = "/bin/netstat";
+my $unameCmd = "/bin/uname";
 #================== end config ====================
 #===================== main =======================
 
@@ -108,6 +109,10 @@ usage_and_exit(1) unless (GetOptions (
 ));
 usage_and_exit(0) if ($help);
 
+unless (check_firewall_rules($unameCmd, $ipchainsCmd, $iptablesCmd, $ifconfigCmd, $grepCmd)) {
+        die "*** After setting up your firewall per the above note, execute \"/etc/rc.d/init.d/psad-init start\" to start psad\n";
+}
+
 fork and exit unless ($daemon);
 
 if ($config) {
@@ -122,7 +127,7 @@ unless ($errors) {
 }
 `$touchCmd $FW_DATA` unless (-e $FW_DATA);
 my $Sigs_href = import_signatures($signatures) if $signatures;
-my @LOCAL_IPS = get_local_ips($ifconfigCmd, $grepCmd);
+# my @LOCAL_IPS = get_local_ips($ifconfigCmd, $grepCmd);
 # main loop
 for (;;) {
 	$fwdata_start_lines = (split /\s+/, `$wcCmd -l $FW_DATA`)[1];
@@ -507,7 +512,77 @@ sub check_fw() {
 	} else {
 		$USE_IPTABLES = 1;
 	}
-}	
+}
+sub check_firewall_rules() {
+        my ($unameCmd, $ipchainsCmd, $iptablesCmd, $ifconfigCmd, $grepCmd) = @_;
+        my @localips;
+        my $kernel = (split /\s/, `$unameCmd -a`)[2];
+        my @localips_tmp = `$ifconfigCmd -a |$grepCmd inet`;
+        push @localips, (split /:/, (split /\s+/, $_)[2])[1] foreach (@localips_tmp);
+        my $iptables = 1 if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/);
+        my $ipchains = 1 if ($kernel =~ /^2.2/); # and also 2.0.x ?
+        if ($iptables) {
+# target     prot opt source               destination
+# LOG        tcp  --  anywhere             anywhere           tcp flags:SYN,RST,ACK/SYN LOG level warning prefix `DENY '
+# DROP       tcp  --  anywhere             anywhere           tcp flags:SYN,RST,ACK/SYN
+
+# ACCEPT     tcp  --  0.0.0.0/0            64.44.21.15        tcp dpt:80 flags:0x0216/0x022
+# LOG        tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0216/0x022 LOG flags 0 level 4 prefix `DENY '
+# DROP       tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0216/0x022
+                my @rules = `$iptablesCmd -nL`;
+                my $drop_rule = 0;
+                FWPARSE: foreach my $rule (@rules) {
+                        next FWPARSE if ($rule =~ /^Chain/ || $rule =~ /^target/);
+                        if ($rule =~ /^(LOG)\s+(\w+)\s+\S+\s+\S+\s+(\S+)\s.+prefix\s\`(.+)\'/) {
+                                ($target, $proto, $dst, $prefix) = ($1, $2, $3, $4);
+                                if ($target eq "LOG" && $proto =~ /all|tcp/ && $prefix =~ /drop|reject|deny/i) { # only tcp supported right now...
+                                # this needs work... see above _two_ rules.
+                                        if (check_destination($dst, \@localips)) {
+#                                                print STDOUT "*** Your firewall setup looks good.  Unauthorized tcp packets will be logged.\n";
+                                                return 1;
+                                        }
+                                }
+                        }
+                }
+                print STDERR "*** Your firewall does not include rules that will log dropped/rejected packets.  Psad will not work with such a firewall setup.\n";
+                return 0;
+        } elsif ($ipchains) {
+# target     prot opt     source                destination           ports
+# DENY       tcp  ----l-  anywhere             anywhere              any ->   telnet
+
+#Chain input (policy ACCEPT):
+#target     prot opt     source                destination           ports
+#ACCEPT     tcp  ------  0.0.0.0/0            0.0.0.0/0             * ->   22
+#DENY       tcp  ----l-  0.0.0.0/0            0.0.0.0/0             * ->   *
+                my @rules = `$ipchainsCmd -nL`;
+                FWPARSE: foreach my $rule (@rules) {
+                        chomp $rule;
+                        next FWPARSE if ($rule =~ /^Chain/ || $rule =~ /^target/);
+                        if ($rule =~ /^(\w+)\s+(\w+)\s+(\S+)\s+\S+\s+(\S+)\s+(\*)\s+\-\>\s+(\*)/) {
+                                my ($target, $proto, $opt, $dst, $srcpt, $dstpt) = ($1, $2, $3, $4, $5, $6);
+                                if ($target =~ /drop|reject|deny/i && $proto =~ /all|tcp/ && $opt =~ /....l./) {
+                                        if (check_destination($dst, \@localips)) {
+#                                                print STDOUT "*** Your firewall setup looks good.  Unauthorized tcp packets will be dropped and logged.\n";
+                                                return 1;
+                                        }
+                                }
+                        }
+                }
+                print STDERR "*** Your firewall does not include rules that will log dropped/rejected packets.  Psad will not work with such a firewall setup.\n";
+                return 0;
+        } else {
+                die "*** The linux kernel version you are currently running (v $kernel) does not seem to support ipchains or iptables.  psad will not run!\n";
+        }
+}
+sub check_destination() {
+        my ($dst, $localips_aref) = @_;
+        return 1 if ($dst =~ /0\.0\.0\.0\/0/);
+        foreach my $ip (@$localips_aref) {
+                my ($oct) = ($ip =~ /^(\d{1,3}\.\d{1,3})/);
+                return 1 if ($dst =~ /^$oct/);
+        }
+        return 0;
+}
 #sub read_services() {
 #	my $service_file = shift;
 #	my %service_hash;

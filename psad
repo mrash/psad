@@ -259,8 +259,8 @@ my $tcp_ctr  = 0;
 my $udp_ctr  = 0;
 my $icmp_ctr = 0;
 
-### pid file array
-my @pidfiles;
+### pid file hash
+my %pidfiles;
 
 ### initialize and scope some default variables (command
 ### line args can override some default values)
@@ -1263,12 +1263,6 @@ sub import_configs() {
     ### parse snort rules if we enable psad to match on iptables log
     ### messages that include snort SID's
     &import_snort_rules() if $snort_sids;
-
-    ### make sure the permissions on these files is 0600
-    &check_permissions(
-        $config{'FW_DATA_FILE'},
-        $config{'FW_ERROR_LOG'},
-    );
 
     return;
 }
@@ -2678,17 +2672,15 @@ sub REAPER {
     return;
 }
 
-sub check_permissions() {
-    my @files = @_;
-    for my $file (@files) {
-        if (-e $file) {
-            chmod 0600, $file;
-        } else {
-            open T, "> $file" or die ' ** Could not open ',
-                "$file: $!";
-            close T;
-            chmod 0600, $file;
-        }
+sub file_permissions() {
+    my $file = shift;
+    if (-e $file) {
+        chmod 0600, $file;
+    } else {
+        open T, "> $file" or die ' ** Could not open ',
+            "$file: $!";
+        close T;
+        chmod 0600, $file;
     }
     return;
 }
@@ -2696,10 +2688,9 @@ sub check_permissions() {
 sub stop_psad() {
     my $rv = 0;
     ### must kill psadwatchd first since if not, it might try to restart
-    ### any of the other three daemons (its pid file is listed first in
-    ### @pidfiles)
-    for my $pidfile (@pidfiles) {
-        my ($pidname) = ($pidfile =~ m|.*/(\w+)\.pid|);
+    ### any of the other three daemons.
+    for my $pidname qw(psadwatchd psad kmsgsd diskmond) {
+        my $pidfile = $pidfiles{$pidname};
         if (-e $pidfile) {
             open PIDFILE, "< $pidfile" or die ' ** Could not open ',
                 "$pidfile: $!";
@@ -2759,11 +2750,8 @@ sub status() {
         chomp $cmdline;
     }
     my $rv = 0;   ### assume psad is not running and test...
-    for my $pidfile ($config{'PSAD_PID_FILE'},
-            $config{'PSADWATCHD_PID_FILE'},
-            $config{'KMSGSD_PID_FILE'},
-            $config{'DISKMOND_PID_FILE'}) {
-        my ($pidname) = ($pidfile =~ /(\w+)\.pid$/);
+    for my $pidname qw(psad psadwatchd kmsgsd diskmond) {
+        my $pidfile = $pidfiles{$pidname};
         if (-e $pidfile) {
             open PIDFILE, "< $pidfile" or die ' ** Could not open ',
                 "$pidfile: $!";
@@ -2934,7 +2922,7 @@ sub status_ip() {
 
 sub usr1() {
     my $rv = 0;
-    my $psad_pidfile = $pidfiles[1];
+    my $psad_pidfile = $pidfiles{'psad'};
     if (-e $psad_pidfile) {
         open PIDFILE, "< $psad_pidfile" or
                 die " ** Could not open $psad_pidfile: $!";
@@ -2979,20 +2967,22 @@ sub usr1_sig() {
 
 sub hup() {
     my $rv = 0;
-    for my $pidfile (@pidfiles) {
+    for my $pidname qw(psadwatchd psad kmsgsd diskmond) {
+        my $pidfile = $pidfiles{$pidname};
         open PID, "< $pidfile" or die " ** Could not open $pidfile: $!";
         my $pid = <PID>;
         close PID;
         chomp $pid;
         if (kill 0, $pid) {
             if (kill 'HUP', $pid) {
-                print " .. HUP sent to pid $pid for $pidfile.\n";
+                print " .. HUP sent to $pidname (pid: $pid)\n";
             } else {
-                print " ** Could not send $pidfile a HUP signal.\n";
+                print " ** Could not send $pidname ",
+                    "(pid: $pid) a HUP signal.\n";
                 $rv = 1;
             }
         } else {
-            print " ** Daemon not running for pid file: $pidfile\n";
+            print " ** $pidname daemon not running.\n";
             $rv = 1;
         }
     }
@@ -3116,12 +3106,12 @@ sub setup() {
     ### store the psad command line.
     $cmdline_file = $config{'PSAD_CMDLINE_FILE'};
 
-    ### pid file array
-    @pidfiles = (
-        $config{'PSADWATCHD_PID_FILE'},
-        $config{'PSAD_PID_FILE'},
-        $config{'KMSGSD_PID_FILE'},
-        $config{'DISKMOND_PID_FILE'}
+    ### pid file hash
+    %pidfiles = (
+        'psadwatchd' => $config{'PSADWATCHD_PID_FILE'},
+        'psad'       => $config{'PSAD_PID_FILE'},
+        'kmsgsd'     => $config{'KMSGSD_PID_FILE'},
+        'diskmond'   => $config{'DISKMOND_PID_FILE'}
     );
 
     unless (-d $config{'PSAD_DIR'}) {
@@ -3222,6 +3212,10 @@ sub setup() {
         '  Exiting.' unless $config{'PORT_RANGE_SCAN_THRESHOLD'} < 65535;
     die ' ** PORT_RANGE_SCAN_THRESHOLD must be greater than 0.',
         '  Exiting.' unless $config{'PORT_RANGE_SCAN_THRESHOLD'} > 0;
+
+    ### make sure the permissions on these files is 0600
+    &file_permissions($config{'FW_DATA_FILE'});
+    &file_permissions($config{'FW_ERROR_LOG'});
     return;
 }
 

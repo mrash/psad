@@ -708,7 +708,6 @@ sub import_signatures() {
     for my $sig (@sigs) {
         chomp $sig;
         next if ($sig =~ /^\s*#/);
-        print "parsing: $sig\n";
         &get_signature_fields($sig);
     }
     print STDOUT Dumper %Sigs if $DEBUG;

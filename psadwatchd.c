@@ -3,11 +3,11 @@
 *
 *  File: psadwatchd.c
 *
-* Purpose: psadwatchd checks on an interval of every five seconds to make
-*          sure that both kmsgsd and psad are running on the box.  If
-*          either daemon has died, psadwatchd will restart it notify each
-*          email address in @email_addresses that the daemon has been
-*          restarted.
+*  Purpose: psadwatchd checks on an interval of every five seconds to make
+*           sure that both kmsgsd and psad are running on the box.  If
+*           either daemon has died, psadwatchd will restart it and notify
+*           each email address in @email_addresses that the daemon has been
+*           restarted.
 *
 *  Author: Michael B. Rash (mbr@cipherdyne.com)
 *
@@ -70,7 +70,6 @@ static void check_process(
 static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries);
 static void reset_syscall_ctr(const char *pid_name);
 static void give_up(const char *pid_name);
-// static int check_import_config(time_t *mtime, char *config_file);
 
 /* MAIN *********************************************************************/
 int main(int argc, char *argv[]) {
@@ -156,7 +155,6 @@ int main(int argc, char *argv[]) {
             kmsgsdCmd, psadwatchd_max_retries);
         check_process("diskmond", diskmond_pid_file,
             diskmondCmd, psadwatchd_max_retries);
-        printf("check_process\n");
         sleep(psadwatchd_check_interval);
 
         /* check to see if we need to re-import the config file */
@@ -274,25 +272,6 @@ static void check_process(
     }
     return;
 }
-
-/*
-static int check_import_config(time_t *config_mtime, char *config_file)
-{
-    struct stat statbuf_tmp;
-
-    if (stat(config_file, &statbuf_tmp)) {
-        printf(" ... @@@ Could not get mtime for config file: %s\n",
-            config_file);
-        exit(EXIT_FAILURE);
-    }
-
-    if (*config_mtime != statbuf_tmp.st_mtime) {
-        *config_mtime = statbuf_tmp.st_mtime;
-        return 1;
-    }
-    return 0;
-}
-*/
 
 static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries)
 {

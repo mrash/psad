@@ -499,8 +499,6 @@ unless ($no_fwcheck || $syslog_server) {
 ### messages that include snort SID's
 &import_snort_rules() if $snort_sids;
 
-print Dumper %snort_msgs if $debug;
-
 ### initialize benchmarking test packets if we are running
 ### in benchmark mode
 if ($benchmark) {
@@ -712,7 +710,7 @@ sub check_scan() {
     }
     PKT: for my $pkt (@$fw_pkts_aref) {
         chomp $pkt;
-        my $found_sid = 0;
+        my $sid = 0;
         if ($use_iptables) {
             if ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+
                          LEN=(\d+).*TTL=(\d+).*PROTO=(\S+)\s+
@@ -720,8 +718,8 @@ sub check_scan() {
                 ($src, $dst, $len, $ttl, $proto, $srcport, $dstport) =
                     ($1,$2,$3,$4,$5,$6,$7,$8);
                 if ($snort_sids) {
-                    if ($pkt =~ /($config{'SNORT_SID_STR'}\d+)\s+SRC/) {
-                        $found_sid = $1;
+                    if ($pkt =~ /$config{'SNORT_SID_STR'}(\d+)\s+IN/) {
+                        $sid = $1;
                     }
                 }
                 if ($proto ne 'TCP' && $proto ne 'UDP') {
@@ -736,15 +734,16 @@ sub check_scan() {
                         $flags = $1;
                     }
 
-                    if ($config{'IGNORE_CONNTRACK_BUG_PKTS'} eq 'Y' &&
+                    if (!$sid && $config{'IGNORE_CONNTRACK_BUG_PKTS'} eq 'Y' &&
 #                        $dstport > 1024 && ($flags =~ /ACK/ ||
                         ($flags =~ /ACK/ || $flags =~ /RST/)) {
                         ### XXX ignore TCP packets that have the ACK or RST
-                        ### bits set since _usually_ we see these packets
-                        ### as a result of the iptables connection tracking
-                        ### bug.  Also, note that no signatures make use of
-                        ### the RST flag and very few that use the ACK flag
-                        ### (need to add code back in for these signatures).
+                        ### bits set (unless we matched a snort sid) since
+                        ### _usually_ we see these packets as a result of the
+                        ### iptables connection tracking bug.  Also, note that
+                        ### no signatures make use of the RST flag and very
+                        ### few that use the ACK flag (need to add code back
+                        ### in for these signatures).
                         next PKT;
                     }
                     ### per page 595 of the Camel book, "if /blah1|blah2/"
@@ -888,8 +887,9 @@ sub check_scan() {
         ### also, but then cannot use tcp flags except for -y -l rules
         next PKT unless ($signatures && $use_iptables);
 
-        if ($snort_sids && $found_sid) {
+        if ($snort_sids && $sid) {
             ### found a snort sid in the packet log message
+            &add_snort_sid($src, $dst, $proto, $sid);
         } else {
             ### attempt to match any tcp/udp/icmp signatures in the
             ### %sigs_fast hash
@@ -1037,9 +1037,23 @@ sub match_sigs() {
                 {$sig_id}{'PKTS'}++;
             }
         }
-        if ($matched_sig && !$no_netstat && $proto ne 'ICMP') {
+        if ($matched_sig && !$no_netstat) {
             &chk_local_port($src, $dst, $proto, $dstport, $flags, $sig_id);
         }
+    }
+    return;
+}
+
+sub add_snort_sid() {
+    my ($src, $dst, $proto, $sid) = @_;
+    if (defined $snort_msgs{$sid}) {
+        unless ($scan{$src}{$dst}{'CURR_DL'} >= 2) {
+            ### for now hardcode snort sid matches at
+            ### a danger level of two
+            $scan{$src}{$dst}{'CURR_DL'} = 2;
+            $scan{$src}{$dst}{'ALERTED'} = 0;
+        }
+        $scan{$src}{$dst}{'PROTO'}{$proto}{'SNORT_SID'}{$sid}++;
     }
     return;
 }
@@ -1227,6 +1241,7 @@ sub import_snort_rules() {
         close R;
         RULE: for my $line (@lines) {
             next RULE unless $line =~ /^alert/;
+            chomp $line;
             my $msg;
             my $sid;
             my $classtype;
@@ -1239,6 +1254,7 @@ sub import_snort_rules() {
             }
         }
     }
+    print Dumper %snort_msgs if $debug;
     return;
 }
 
@@ -1819,12 +1835,19 @@ sub scan_logr_signatures() {
     my ($src, $dst, $print_hsh_href) = @_;
     ### ok, these hash keys are too much
     for my $proto (keys %{$scan{$src}{$dst}{'PROTO'}}) {
-        if (defined $scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_SIG'}) {
-            &Psad::logr("\n", $print_hsh_href);
-            &Psad::logr("---- $proto scan signatures ----\n", $print_hsh_href);
-        }
+        next unless (defined $scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_SIG'}
+            || defined $scan{$src}{$dst}{'PROTO'}{$proto}{'SNORT_SID'});
+        &Psad::logr("\n", $print_hsh_href);
+        &Psad::logr("---- $proto scan signatures ----\n", $print_hsh_href);
         print "scan_logr_signatures(): src: $src dst: $dst proto: $proto\n"
             if $debug;
+        for my $sid (keys %{$scan{$src}{$dst}{'PROTO'}{$proto}{'SNORT_SID'}}) {
+            my $msg = $snort_msgs{$sid}{'msg'};
+            my $classtype = $snort_msgs{$sid}{'classtype'};
+            my $pkts = $scan{$src}{$dst}{'PROTO'}{$proto}{'SNORT_SID'}{$sid};
+            &Psad::logr("\"$msg\" classtype=$classtype packets=$pkts\n",
+                $print_hsh_href);
+        }
         for my $sig_id (keys %{$scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_SIG'}}) {
             my $msg = $sigs_attr{$sig_id}{'msg'};
             if ($proto eq 'TCP') {
@@ -1837,8 +1860,9 @@ sub scan_logr_signatures() {
                     my $pkts =
                         $scan{$src}{$dst}{'PROTO'}{'TCP'}
                         {'CURR_SIG'}{$sig_id}{'LISTEN'}{$dp}{'PKTS'};
-                    &Psad::logr("\"$msg\" dp=$dp flags=[$flags] packets=$pkts " .
-                        "** Your machine is listening on TCP port: $dp!\n",
+                    my $l_str = "** Your machine is listening on TCP port: $dp!\n";
+                    ### avoid "." operator
+                    &Psad::logr("\"$msg\" dp=$dp flags=[$flags] packets=$pkts $l_str",
                         $print_hsh_href);
                 }
                 for my $dp (keys
@@ -1850,8 +1874,9 @@ sub scan_logr_signatures() {
                     my $pkts =
                         $scan{$src}{$dst}{'PROTO'}{'TCP'}{'CURR_SIG'}
                         {$sig_id}{'NO_LISTEN'}{$dp}{'PKTS'};
-                    &Psad::logr("\"$msg\" dp=$dp flags=[$flags] packets=$pkts " .
-                        "No server on TCP port: $dp\n", $print_hsh_href);
+                    my $l_str = "No server on TCP port: $dp\n";
+                    &Psad::logr("\"$msg\" dp=$dp flags=[$flags] packets=$pkts $l_str",
+                        $print_hsh_href);
                 }
             } elsif ($proto eq 'UDP') {
                 for my $dp (keys
@@ -1860,8 +1885,8 @@ sub scan_logr_signatures() {
                     my $pkts =
                         $scan{$src}{$dst}{'PROTO'}{'UDP'}{'CURR_SIG'}
                         {$sig_id}{'LISTEN'}{$dp}{'PKTS'};
-                    &Psad::logr("\"$msg\" dp=$dp packets=$pkts " .
-                        "** Your machine is listening on UDP port: $dp!\n",
+                    my $l_str = "** Your machine is listening on UDP port: $dp!\n";
+                    &Psad::logr("\"$msg\" dp=$dp packets=$pkts $l_str",
                         $print_hsh_href);
                 }
                 for my $dp (keys
@@ -1870,13 +1895,14 @@ sub scan_logr_signatures() {
                     my $pkts =
                         $scan{$src}{$dst}{'PROTO'}{'UDP'}{'CURR_SIG'}
                         {$sig_id}{'NO_LISTEN'}{$dp}{'PKTS'};
-                    &Psad::logr("\"$msg\" dp=$dp packets=$pkts " .
-                        "No server on UDP port: $dp\n", $print_hsh_href);
+                    my $l_str = "No server on UDP port: $dp\n";
+                    &Psad::logr("\"$msg\" dp=$dp packets=$pkts $l_str",
+                        $print_hsh_href);
                 }
             } else {
                 my $pkts = $scan{$src}{$dst}{'PROTO'}{'ICMP'}
                     {'CURR_SIG'}{$sig_id}{'PKTS'};
-                &Psad::logr("\"$msg\"  packets=$pkts\n", $print_hsh_href);
+                &Psad::logr("\"$msg\" packets=$pkts\n", $print_hsh_href);
             }
 
             ### signature logging with syslog is not yet supported
@@ -1888,6 +1914,8 @@ sub scan_logr_signatures() {
         ### need to delete the current signature so it
         ### won't show up in the next alert
         delete $scan{$src}{$dst}{'PROTO'}{$proto}{'CURR_SIG'}
+            unless $config{'SHOW_ALL_SIGNATURES'} eq 'Y';
+        delete $scan{$src}{$dst}{'PROTO'}{$proto}{'SNORT_SID'}
             unless $config{'SHOW_ALL_SIGNATURES'} eq 'Y';
     }
     return;

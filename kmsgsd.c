@@ -37,6 +37,9 @@
 /* INCLUDES *****************************************************************/
 #include "psad.h"
 
+/* DEFINES *****************************************************************/
+#define KMSGSD_CONF "/etc/psad/kmsgsd.conf"
+
 /* PROTOTYPES ***************************************************************/
 static void parse_config(
     char *config_file,
@@ -70,10 +73,12 @@ int main(int argc, char *argv[]) {
 
     /* handle command line arguments */
     if (argc == 1) {
-        /* nothing but the program name was specified on the command line */
-        strlcpy(config_file, CONFIG_FILE, MAX_PATH_LEN);
+        /* nothing but the program name was
+         * specified on the command line */
+        strlcpy(config_file, KMSGSD_CONF, MAX_PATH_LEN);
     } else if (argc == 2) {
-        /* the path to the config file was supplied on the command line */
+        /* the path to the config file was
+         * supplied on the command line */
         strlcpy(config_file, argv[1], MAX_PATH_LEN);
     } else {
         printf(" .. You may only specify the path to a single config file:  ");

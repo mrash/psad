@@ -1,39 +1,52 @@
 #!/usr/bin/perl -w
 #
-##############################################################################
+###############################################################################
 #
 # File: snort_compat.pl
 #
-# Purpose: To generate a listing of snort rules that are compatible with psad
-#          according to the following criteria:
+# Purpose: To assist in the construction of a set of Snort rules that can be
+#          made compatible with psad.
 #
-#   - Most snort rules include a "content:" field to instruct snort to
-#     inspect the application portion of packets.  Psad relies strictly on
-#     iptables log messages to detect suspect traffic, and hence cannot
-#     inspect the application portion of packets (unless the iptables string
-#     match extension is being used; see "fwsnort":
-#     http://www.cipherdyne.org/fwsnort).  However, iptables log messages do
-#     include information on many fields of the transport and network headers
-#     so psad just ignores the content field, but only for those tcp and udp
-#     signatures that do not involve traffic over IANA assigned ports.  There
-#     are many such backdoor and ddos signatures since these programs
-#     frequently communicate over custom port numbers.
+# Methodology:  Psad exclusively uses Netfilter log messages as its source
+#   of intrusion detection data.  This means that psad cannot accurately
+#   detect most Snort rules because payload data is not available (the
+#   Netfilter string match extension can provide string matching capabilities
+#   against application layer data; see "fwsnort" at
+#   http://www.cipherdyne.org/fwsnort).  However, there are several backdoor
+#   programs, DDoS tools, and other suspect traffic that can be inferred from
+#   looking at transport layer data (for tcp and udp) as long as it does not
+#   involve a commonly used IANA specified port number.  For example, consider
+#   the following three Snort rules, which are designed to detect various
+#   communication aspects of the Trin00 DDoS tool:
 #
-#   - Several additional snort options cannot be matched within iptables
-#     log messages, and hence all such snort rules are not compatible with
-#     psad.  Such options include:
+#   alert tcp $EXTERNAL_NET any -> $HOME_NET 27665 (msg:"DDOS Trin00 Attacker to Master default startup password"; flow:established,to_server; content:"betaalmostdone"; reference:arachnids,197; classtype:attempted-dos; sid:233; rev:3;)
+#   alert tcp $EXTERNAL_NET any -> $HOME_NET 27665 (msg:"DDOS Trin00 Attacker to Master default password"; flow:established,to_server; content:"gOrave"; classtype:attempted-dos; sid:234; rev:2;)
+#   alert tcp $EXTERNAL_NET any -> $HOME_NET 27665 (msg:"DDOS Trin00 Attacker to Master default mdie password"; flow:established,to_server; content:"killme"; classtype:bad-unknown; sid:235; rev:2;)
 #
-#           dsize
-#           ack
-#           fragbits
-#           content-list
-#           rpc
-#           byte_test
-#           byte_jump
-#           distance
-#           within
+#   Each of the above rules uses the Snort "content" keyword to detect a
+#   specific aspect of the Trin00 communication in order to be able to
+#   distinguish the "default startup password" from the "default password"
+#   for example.  Each of the rules only applies to traffic over an
+#   established TCP session (see the "established" argument give to the
+#   "flow" keyword).  It is impossible to extract the same level of
+#   granularity from Netfilter logs alone.  However, if Netfilter logs a SYN
+#   packet directed to TCP port 27665, it is a good bet that a Trin00 DDoS
+#   client is attempting to contact a Trin00 master client.  Hence psad will
+#   generate the alert "DDOS Trin00 Attacker to Master" upon monitoring such
+#   a packet in the Netfilter log.  Even if the Snort rules above are
+#   improved by the Snort community to use the more advanced features of the
+#   Snort rules language, the basic fact that SYN packets to TCP/27665 may
+#   be associated with the Trin00 DDoS remains.  This is the general
+#   methodology used to write psad signatures that are derived from Snort
+#   rules.  Of course, this type of analysis is not possible for heavily
+#   utilized services that run over IANA specified ports (such as web, dns,
+#   and stmp servers for example).  Detecting attacks over such services
+#   requires application data inspection as provided by the Snort rules
+#   language.  The snort_compat.pl script generates a listing of Snort rules
+#   that may be compatible with psad.  The resulting rules are then reviewed
+#   and altered for inclusion within the psad signatures file.
 #
-##############################################################################
+###############################################################################
 #
 # $Id$
 #
@@ -45,23 +58,8 @@ use strict;
 my $services_file  = '/etc/services';
 my $rules_dir      = 'snort_rules';
 
-my @unsupported_opts = (
-    'dsize:',
-    'ack:',
-    'fragbits:',
-#    'content-list:',
-    'rpc:',
-    'byte_test:',
-    'byte_jump:',
-    'distance:',
-    'within:',
-    'seq:',
-    'ack:'
-);
-
 ### ignore all snort rules in these files
 my @ignore_files = (
-    'attack-responses.rules',
     'deleted.rules',
     'exploit.rules',  ### really need content inspection for these
     'web-misc.rules',
@@ -85,6 +83,8 @@ for my $line (@lines) {
         $services{$proto}{$port} = $service;
     }
 }
+$services{'tcp'}{'80'} = '' unless defined $services{'tcp'};
+$services{'udp'}{'53'} = '' unless defined $services{'udp'};
 
 if ($ARGV[0]) {
     push @files, $ARGV[0];
@@ -115,27 +115,34 @@ FILE: for my $file (@files) {
             my $dst_p = $6;
             next RULE if $src_p =~ /\$/;  ### skip things like $HTTP_PORTS
             next RULE if $dst_p =~ /\$/;
-            my $found_unsupported = 0;
-            for my $opt (@unsupported_opts) {
-                $found_unsupported = 1 if $rule =~ /$opt/;
-            }
-            ### skip rules that contain unsupported options
-            next RULE if $found_unsupported;
-#            next if $src_p =~ /\D/ and $dst_p =~ /\D/;
 
             next RULE if ($rule =~ /content:/
                     and $src_p eq 'any' and $dst_p eq 'any');
-            if ($rule !~ /content:/) {
-                print $rule, "\n";
-            } elsif (! defined $services{$proto}) {
-                print $rule, "\n";
-#            } elsif (!defined $services{$proto}{$src_p}
-            } elsif (!defined $services{$proto}{$src_p}
-                    and !defined $services{$proto}{$dst_p}) {
+
+            if (not defined $services{$proto}) {
                 print $rule, "\n";
             } else {
-                ### we matched a signature that has a content: field
-                ### and depends on a IANA specified port
+                my @src_p_arr;
+                my @dst_p_arr;
+                if ($src_p =~ /:/) {
+                    @src_p_arr = split /\s*:\s*/, $src_p;
+                } else {
+                    push @src_p_arr, $src_p;
+                }
+                if ($dst_p =~ /:/) {
+                    @dst_p_arr = split /\s*:\s*/, $dst_p;
+                } else {
+                    push @dst_p_arr, $dst_p;
+                }
+
+                for my $src_p (@src_p_arr) {
+                    next RULE if defined $services{$proto}{$src_p};
+                }
+                for my $dst_p (@dst_p_arr) {
+                    next RULE if defined $services{$proto}{$dst_p};
+                }
+
+                print $rule, "\n";
             }
         }
     }

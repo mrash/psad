@@ -143,6 +143,15 @@ USAGE:
 		  Display the status of any psad processes that may or may
 		  not be running.
 
+	-U --USR1
+		  Send a running psad process a  USR1  signal.  This will cause 
+		  psad to dump the contents of the %Scan hash to the file 
+		  "/var/log/psad/scan_hash.$$" where "$$" represents the pid of 
+		  the psad process.  This is mostly useful for debugging 
+		  purposes, but it also allows the administrator to peer into 
+		  the %Scan hash, which is the primary data structure used to 
+		  store scan data within system memory.
+
 	-V  --Version
 		  Print the psad version and exit.
 

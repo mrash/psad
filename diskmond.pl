@@ -130,23 +130,42 @@ sub get_usage() {
 sub rm_data() {
     chdir $Config{'PSAD_DIR'} or die
         " ... @@@ Could not chdir $Config{'PSAD_DIR'}: $!";
-    opendir D, $Config{'PSAD_DIR'} or die
-        " ... @@@ Could not open dir: $Config{'PSAD_DIR'}: $!";
+
+    &rm_scanlog($Config{'PSAD_DIR'});
+    &rm_scanlog($Config{'SCAN_DATA_ARCHIVE_DIR'});
+
+    if (-d $Config{'SCAN_DATA_ARCHIVE_DIR'}) {
+        rmtree $Config{'SCAN_DATA_ARCHIVE_DIR'};
+        mkdir $Config{'SCAN_DATA_ARCHIVE_DIR'}, 0500;
+    }
+    if (-e $Config{'FW_DATA'}) {
+        open F, "> $Config{'FW_DATA'}";
+        close F;
+    }
+    if (-e "$Config{'SCAN_DATA_ARCHIVE_DIR'}/fwdata_archive") {
+        open F, "> $Config{'SCAN_DATA_ARCHIVE_DIR'}/fwdata_archive";
+        close F;
+    }
+    return;
+}
+
+sub rm_scanlog() {
+    my $dir = shift;
+    chdir $dir or die " ... @@@ Could not chdir($dir): $!\n";
+    opendir D, $dir or
+        die " ... @@@ Could not open dir: $dir: $!";
     my @files = readdir D;
     closedir D;
     shift @files; shift @files;
     for my $file (@files) {
         if ($file =~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/ && -d $file) {
             ### we found a directory like /var/log/psad/<ip>, which
-            ### contains the fwdata file for this ip
-            rmtree $file;  ### it is really a directory
+            ### contains the scanlog file for this ip
+            if (-e "${file}/scanlog") {
+                open F, "> ${file}/scanlog";
+                close F;
+            }
         }
-    }
-    open F, "> $Config{'FW_DATA'}";
-    close F;
-    if (-d $Config{'SCAN_DATA_ARCHIVE_DIR'}) {
-        rmtree $Config{'SCAN_DATA_ARCHIVE_DIR'};
-        mkdir $Config{'SCAN_DATA_ARCHIVE_DIR'}, 0500;
     }
     return;
 }

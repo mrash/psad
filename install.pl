@@ -157,6 +157,8 @@ if (-d $INIT_DIR) {
     $init_dir = $INIT_DIR;
 } elsif (-d '/etc/rc.d/init.d') {
     $init_dir = '/etc/rc.d/init.d';
+} elsif (-d '/etc/rc.d') {  ### for Slackware
+    $init_dir = '/etc/rc.d';
 } else {
     die "[*] Cannot find the init script directory, edit ",
         "the \$INIT_DIR variable.\n";

@@ -63,6 +63,8 @@ my $EMAIL_ALERT_DANGER_LEVEL = 1;  # Send email alert if danger level >= to this
 my $EMAIL_ADDRESS = "root\@localhost";  # Email the alert to this address
 my $ENABLE_AUTO_IDS = "N"; 	# Automated IDS response #
 my $AUTO_IDS_DANGER_LEVEL = 5;  # Block all traffic from offending IP if danger level >= to this value 
+
+# system binaries
 my $ipchainsCmd = "/sbin/ipchains";
 my $iptablesCmd = "/usr/local/bin/iptables";
 my $wcCmd = "/usr/bin/wc";

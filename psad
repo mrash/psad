@@ -592,15 +592,15 @@ unless ($benchmark) {
 &write_global_packet_counters();
 
 if ($benchmark) {
-    print localtime() . " .. Entering benchmark mode.\n";
+    print scalar localtime(), " .. Entering benchmark mode.\n";
     $no_rdns  = 1;  ### turn off network related functions
     $no_whois = 1;
     if ($b_packets) {
-        print localtime() . " .. Executing a $b_packets packet test.\n";
+        print scalar localtime(), " .. Executing a $b_packets packet test.\n";
     } else {
-        print localtime() . ' .. The --packets command line ',
+        print scalar localtime(), ' .. The --packets command line ',
             "option was not specified.\n";
-        print localtime() . " .. Defaulting to a 10,000 packet test.\n";
+        print scalar localtime(), " .. Defaulting to a 10,000 packet test.\n";
         $b_packets = 10000;
     }
 }
@@ -661,7 +661,7 @@ for (;;) {
     ### FW_DATA_FILE by kmsgsd for psad analysis.
     if ($benchmark) {
         $b_time = time();
-        print localtime() . " .. Creating packet array.\n";
+        print scalar localtime(), " .. Creating packet array.\n";
         my $dp = 1000;
         for (my $i=0; $i <= $b_packets; $i++) {
             push @fw_packets, "$test_pkt DPT=$dp $test_pktend";
@@ -671,15 +671,15 @@ for (;;) {
         @fw_packets = <FWDATA>;
     }
     if (@fw_packets) {
-        print localtime() . " .. check_scan()\n" if $benchmark;
+        print scalar localtime(), " .. check_scan()\n" if $benchmark;
 
         if (&check_scan()) {
-            print localtime() . " .. assign_danger_level()\n"
+            print scalar localtime(), " .. assign_danger_level()\n"
                 if $benchmark;
             ### Assign a danger level to the scan
             &assign_danger_level();
 
-            print localtime() . " .. scan_logr()\n" if $benchmark;
+            print scalar localtime(), " .. scan_logr()\n" if $benchmark;
             ### Log and send email and syslog alerts
             &scan_logr();
 
@@ -712,9 +712,9 @@ for (;;) {
     }
 
     if ($benchmark) {
-        print localtime() . " .. Packet creation and processing time: ",
+        print scalar localtime(), " .. Packet creation and processing time: ",
             time() - $b_time, " sec.\n";
-        print localtime() . " .. Exiting benchmark mode.\n";
+        print scalar localtime(), " .. Exiting benchmark mode.\n";
         exit 0;
     }
 
@@ -3667,16 +3667,16 @@ sub fw_check() {
     }
     if ($fw_analyze) {
         if ($rv) {
-            print localtime() . " .. Firewall config looks good.\n";
-            print localtime() . " .. Completed check of firewall ruleset.\n";
+            print scalar localtime(), " .. Firewall config looks good.\n";
+            print scalar localtime(), " .. Completed check of firewall ruleset.\n";
         } else {
-            print localtime() . " ** Errors found in firewall config.\n";
-            print localtime() . " ** Results in " .
+            print scalar localtime(), " ** Errors found in firewall config.\n";
+            print scalar localtime(), " ** Results in " .
                 "$config{'FW_CHECK_FILE'}\n";
-            print localtime() . "    emailed to ",
+            print scalar localtime(), "    emailed to ",
                 "$config{'EMAIL_ADDRESSES'}\n";
         }
-        print localtime() . " .. Exiting.\n";
+        print scalar localtime(), " .. Exiting.\n";
         exit 0;
     }
 }
@@ -3725,7 +3725,7 @@ sub ipt_chk_chain() {
     my $ipt = new IPTables::Parse 'iptables' => $cmds{'iptables'};
 
     if ($fw_analyze) {
-        print localtime() . " .. Parsing iptables $chain chain rules.\n";
+        print scalar localtime(), " .. Parsing iptables $chain chain rules.\n";
     }
     ### for now we are only looking at the filter table, so if
     ### the iptables ruleset includes the log and drop rules in

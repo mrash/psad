@@ -32,6 +32,8 @@
 #    USA
 #
 # TODO:
+#   - More verbose --Status output to include scan start time, end time,
+#     whether or not each ip has an auto-assigned danger level, etc.
 #   - Make use of other logging options available in iptables to detect
 #     more tcp signatures.  (E.g. --log-tcp-options, --log-ip-options,
 #     --log-tcp-sequence, etc.) for better signature recognition.
@@ -2191,7 +2193,28 @@ sub setup_psad() {
         close SYSLOG;
         system "$cmds{'killall'} -HUP $cmds{'syslogd'}";
     }
+    if (-e '/etc/syslog-ng/syslog-ng.conf') {
+        open RS, '< /etc/syslog-ng/syslog-ng.conf' or
+            die " ... @@@  Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
+        my @slines = <RS>;
+        close RS;
 
+        my $found_fifo = 0;
+        for my $line (@slines) {
+            $found_fifo = 1 if ($line =~ /psadfifo/);
+        }
+
+        unless ($found_fifo) {
+            open SYSLOGNG, '>> /etc/syslog-ng/syslog-ng.conf' or
+                die " ... @@@ Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
+            print SYSLOGNG "\n";
+            print SYSLOGNG "destination psadpipe { pipe(\"/var/run/psadfifo\"); };\n";
+            print SYSLOGNG "filter f_kerninfo { facility(kern) and level(info); };\n";
+            print SYSLOGNG "log { source(src); filter(f_kerninfo); destination(psadpipe); };\n";
+            close SYSLOGNG;
+            system "$cmds{'killall'} -HUP syslog-ng";
+        }
+    }
     return;
 }
 

@@ -1089,7 +1089,7 @@ sub scan_logr() {
                 print STDOUT "scan_logr():  generating email......\n" if $DEBUG;
                 unlink $email_alertfile;  ### remove $email_alertfile so we don't send old alert info
                 &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=-=-=-=-=-=-=\n", \@print_array);
-                &Psad::logr("Portscan Detected by psad on $HOSTNAME ($dst).\n", \@print_array);
+                &Psad::logr("psad: Portscan Detected on $HOSTNAME ($dst).\n", \@print_array);
                 &Psad::logr("\n", [$logfile, $email_alertfile]);
                 &Psad::logr("Source:                      $src\n", \@print_array);
                 &Psad::logr("Destination:                 $dst\n", \@print_array);
@@ -1133,7 +1133,7 @@ sub scan_logr() {
                             for my $sigmatch (keys %{$Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_SIGMATCH'}}) {
                                 next if ($sigmatch eq "PACKETS" || $sigmatch eq "START_TIME");
                                 my $sig_num_packets = $Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_SIGMATCH'}->{$sigmatch};
-                                &Psad::logr("...$sigmatch  Packets=$sig_num_packets\n", \@print_array);
+                                &Psad::logr("$sigmatch  Packets=$sig_num_packets\n", \@print_array);
                             }
                             ### need to undef the current interval so it won't show up in the next alert
                             undef $Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_SIGMATCH'};

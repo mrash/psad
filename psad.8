@@ -725,12 +725,7 @@ Michael Rash <mbr@cipherdyne.org>
 Send bug reports to mbr@cipherdyne.org.  Suggestions and/or comments are
 always welcome as well.
 
--If $ENABLE_PERSISTENCE="Y", the scan data structures can become
-large over time and consume lots of memory depending on the popularity
-of your machine/site.  Restarting psad solves this problem of course,
-but a better way is on the TODO list.
-
--For iptables firewalls as of Linux kernel version 2.4.21, if the ip_conntrack
+-For iptables firewalls as of Linux kernel version 2.4.26, if the ip_conntrack
 module is loaded (or compiled into the kernel) and the firewall has been
 configured to keep state of connections, occasionally packets that are supposed
 to be part of normal TCP traffic will not be correctly identified due to a bug
@@ -741,9 +736,9 @@ TCP_CONNTRACK_CLOSE_WAIT timeout value in
 linux/net/ipv4/netfilter/ip_conntrack_proto_tcp.c from 60 seconds to 2 minutes,
 and a kernel patch "conntrack_patch" is included with the psad sources to
 change this.  (Requires a kernel recompile of course, see the Kernel-HOWTO.)
-Also, by default the IGNORE_CONNTRACK_BUG_PKTS variable is set in psad.conf
-which causes psad to ignore all tcp packets that have the ACK bit set unless
-the packets match a specific signature.
+Also, by default the IGNORE_CONNTRACK_BUG_PKTS variable is set to "Y" in
+psad.conf which causes psad to ignore all tcp packets that have the ACK bit set
+unless the packets match a specific signature.
 
 .SH DISTRIBUTION
 .B psad

@@ -728,6 +728,10 @@ sub uninstall() {
             }
         }
     }
+    if (-e "${USRSBIN_DIR}/fwcheck_psad") {
+        print " .. Removing ${USRSBIN_DIR}/fwcheck_psad\n";
+        unlink "${USRSBIN_DIR}/fwcheck_psad";
+    }
     if (-e "${USRSBIN_DIR}/psad") {
         print wrap('', $SUB_TAB, " .. Removing psad daemons: ${USRSBIN_DIR}/" .
             "(psad, psadwatchd, kmsgsd)\n");

@@ -1,10 +1,10 @@
 
 The following firewall rulesets are examples of rulesets that are compatible
 with psad.  Basically, the only criteria is have the firewall log and
-drop/deny/reject packets that should not be allowed through.  Then a port scan
-will manifest itself within /var/log/messages as packets are dropped and
-logged, at which time these messages will be written to the
-/var/lib/psad/psadfifo named pipe and analyzed by psad.
+drop packets that should not be allowed through.  Then a port scan will
+manifest itself within /var/log/messages as packets are dropped and logged,
+at which time these messages will be written to the /var/lib/psad/psadfifo
+named pipe and analyzed by psad.
 
 
 ### iptables:

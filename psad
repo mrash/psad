@@ -1172,8 +1172,8 @@ sub write_packet_counters() {
 sub collect_errors() {
     my ($bad_packets_aref) = @_;
     open ERR, ">> $config{'ERROR_LOG'}";
-    for my $l (@$bad_packets_aref) {
-        print ERR "$l\n";
+    for my $line (@$bad_packets_aref) {
+        print ERR "$line\n";
     }
     close ERR;
 }
@@ -1189,8 +1189,10 @@ sub scan_logr() {
         DST: for my $dst (keys %{$scan{$src}}) {
             unless (defined $scan{$src}{$dst}{'EMAIL_LIMIT'}) {
                 $scan{$src}{$dst}{'EMAIL_LIMIT'} = 0;
-            } elsif ($scan{$src}{$dst}{'EMAIL_LIMIT'}
-                    > $config{'PSAD_EMAIL_LIMIT'}) {
+            } elsif ($config{'PSAD_EMAIL_LIMIT'} > 0
+                && $scan{$src}{$dst}{'EMAIL_LIMIT'}
+                > $config{'PSAD_EMAIL_LIMIT'}) {
+                ### ignore PSAD_EMAIL_LIMIT if it is zero
                 unless (defined $scan{$src}{$dst}{'EMAIL_STOPPED'}) {
                     &email_limit_reached($src, $dst);
                     $scan{$src}{$dst}{'EMAIL_STOPPED'} = 1;
@@ -1476,14 +1478,14 @@ sub check_auto_blocked() {
         my $use_ipchains;
         my $use_iptables;
         my @block_ips;
-        for my $l (@blines) {
-            chomp $l;
-            if ($l =~ /IPTABLES/) {
+        for my $line (@blines) {
+            chomp $line;
+            if ($line =~ /IPTABLES/) {
                 $use_iptables = 1;
-            } elsif ($l =~ /IPCHAINS/) {
+            } elsif ($line =~ /IPCHAINS/) {
                 $use_ipchains = 1;
             }
-            if ($l =~ /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/) {
+            if ($line =~ /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/) {
                 push @block_ips, $1;
             }
         }

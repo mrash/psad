@@ -294,6 +294,7 @@ my $hup_flag         = 0;
 my $ver              = 0;
 my $help             = 0;
 my $dump_conf        = 0;
+my $status_brief     = 0;
 my $chk_interval     = 0;
 my $log_len          = 23;  ### used in scan_logr()
 my $fw_analyze       = 0;
@@ -353,8 +354,8 @@ Getopt::Long::Configure('no_ignore_case');
                                               # "backdoor").
     'snort-rdir=s'      => \$snort_rules_dir, # Specify a directory for snort
                                               # rules.
-    'auto-ips=s'        => \$autoips_file,    # Path to psad auto ips file for
-                                              # auto-setting ip danger level.
+    'auto-ips=s'        => \$autoips_file,    # Path to psad auto IPs file for
+                                              # auto-setting IP danger level.
     'Analyze-msgs'      => \$analyze_msgs,    # Analysis mode for old iptables
                                               # messages in the psad fwdata file
                                               # (or messages file; see --messages).
@@ -382,11 +383,13 @@ Getopt::Long::Configure('no_ignore_case');
                                               # added via the auto blocking code.
     'Status'            => \$status,          # Display status of any currently
                                               # running psad processes.
-    'status-ip=s'       => \$status_ip,       # Display status for a specific ip.
+    'status-ip=s'       => \$status_ip,       # Display status for a specific IP.
     'status-sort-dl'    => \$status_sort_dl,  # Sort by danger level instead of by
-                                              # ip address in --Status output.
+                                              # IP address in --Status output.
     'status-dl=i'       => \$status_dl,       # Display status for scans that have
                                               # reached at least this danger level.
+    'status-brief'      => \$status_brief,    # Do not include number of email
+                                              # alerts or os guess in status output.
     'Benchmark'         => \$benchmark,       # Run in benchmark mode.
     'packets=i'         => \$b_packets,       # Specify number of packets to use
                                               # in benchmark test.
@@ -406,7 +409,7 @@ Getopt::Long::Configure('no_ignore_case');
     'no-daemon'         => \$no_daemon,       # Do not run as a daemon.
     'no-fwcheck'        => \$no_fwcheck,      # Do not check firewall rules.
     'no-rdns'           => \$no_rdns,         # Do not issue dns lookups against
-                                              # Scanning ip address.
+                                              # Scanning IP address.
     'no-netstat'        => \$no_netstat,      # Do not check to see if the
                                               # firewall is listening on localport
                                               # that has been scanned.
@@ -441,7 +444,9 @@ if ($ver) {
 ### check for any old command line arguments
 &check_old_cmdargs();
 
-### Everthing after this point must be executed as root.
+### Everthing after this point must be executed as root (psad
+### only needs root if run in auto-blocking mode; should take
+### this into account and drop privileges).
 $< == 0 && $> == 0 or
     die ' ** psad: You must be root (or equivalent ',
         "UID 0 account) to execute psad!  Exiting.\n";
@@ -787,13 +792,13 @@ sub check_scan() {
         ### get the in/out interface and iptables chain
         if ($pkt =~ /IN=(\S+)\s+OUT=\s/) {
             $intf = $1;
-            $chain = 'input';
+            $chain = 'INPUT';
         } elsif ($pkt =~ /IN=(\S+)\s+OUT=\S/) {
             $intf = $1;
-            $chain = 'forward';
+            $chain = 'FORWARD';
         } elsif ($pkt =~ /IN=\s+OUT=(\S+)/) {
             $intf = $1;
-            $chain = 'output';
+            $chain = 'OUTPUT';
         }
 
         unless ($intf and $chain) {
@@ -1297,7 +1302,7 @@ sub dshield_email_log() {
 sub check_src() {
     my ($chain, $src, $sig_src) = @_;
     return 1 if $sig_src eq 'any';
-    if ($chain eq 'input') {
+    if ($chain eq 'INPUT') {
         if ($sig_src eq 'EXTERNAL_NET') {
             ### scans that originate from the EXTERNAL_NET are
             ### included here if they are directed at the
@@ -1310,7 +1315,7 @@ sub check_src() {
         } elsif (&check_ip_in_network($src, $sig_src)) {
             return 1;
         }
-    } elsif ($chain eq 'forward') {
+    } elsif ($chain eq 'FORWARD') {
         return 0 unless $config{'HOME_NET'} =~ /$ip_re/;
         if (&check_ip_in_network($src, $config{'HOME_NET'})) {
             if ($sig_src eq 'HOME_NET') {
@@ -1329,7 +1334,7 @@ sub check_src() {
                 return 1;
             }
         }
-    } elsif ($chain eq 'output') {
+    } elsif ($chain eq 'OUTPUT') {
         if ($sig_src eq 'HOME_NET') {
             ### if we are in the output chain then the packet
             ### was generated by the firewall and hence by
@@ -1347,7 +1352,7 @@ sub check_src() {
 sub check_dst() {
     my ($chain, $dst, $sig_dst) = @_;
     return 1 if $sig_dst eq 'any';
-    if ($chain eq 'input') {
+    if ($chain eq 'INPUT') {
         if ($sig_dst eq 'HOME_NET') {
             ### scans that appear on the external interface are
             ### included here since the firewall is considered
@@ -1360,7 +1365,7 @@ sub check_dst() {
         } elsif (&check_ip_in_network($dst, $sig_dst)) {
             return 1;
         }
-    } elsif ($chain eq 'forward') {
+    } elsif ($chain eq 'FORWARD') {
         if (&check_ip_in_network($dst, $config{'HOME_NET'})) {
             if ($sig_dst eq 'HOME_NET') {
                 return 1;
@@ -1378,7 +1383,7 @@ sub check_dst() {
                 return 1;
             }
         }
-    } elsif ($chain eq 'output') {
+    } elsif ($chain eq 'OUTPUT') {
         if ($sig_dst eq 'HOME_NET') {
             if (&check_ip_in_network($dst, $config{'HOME_NET'})) {
                 return 1;
@@ -3746,6 +3751,8 @@ sub status_psad_daemon() {
     }
     ### sort and print the scan source ips
     my %scan_srcs;
+    my %scan_os;
+    my %scan_alerts;
     chdir $config{'PSAD_DIR'} or
         die " ** Could not chdir $config{'PSAD_DIR'}: $!";
     opendir D, $config{'PSAD_DIR'} or
@@ -3771,12 +3778,28 @@ sub status_psad_daemon() {
             my @ipdirfiles = readdir D;
             closedir D;
             shift @ipdirfiles; shift @ipdirfiles;
-            for my $file (@ipdirfiles) {
+            FILE: for my $file (@ipdirfiles) {
                 my $dst;
+                if ($file =~ /os_guess/ and -e "${src_ipdir}/os_guess") {
+                    open F, "< ${src_ipdir}/os_guess" or die " ** Could not ",
+                        "open ${src_ipdir}/os_guess: $!";
+                    my $os = <F>;
+                    chomp $os;
+                    $scan_os{$src_ipdir} = $os;
+                    next FILE;
+                }
+                if ($file =~ /email_count/ and -e "${src_ipdir}/email_count") {
+                    open F, "< ${src_ipdir}/email_count" or die " ** Could not ",
+                        "open ${src_ipdir}/email_count: $!";
+                    my $email_count = <F>;
+                    chomp $email_count;
+                    $scan_alerts{$src_ipdir} = $email_count;
+                    next FILE;
+                }
                 if ($file =~ /($ip_re)_packet_ctr/) {
                     $dst = $1;
                 } else {
-                    next;
+                    next FILE;
                 }
                 if (-e "${src_ipdir}/${dst}_packet_ctr") {
                     open F, "< ${src_ipdir}/${dst}_packet_ctr" or
@@ -3790,6 +3813,9 @@ sub status_psad_daemon() {
                             my $intf  = $2;
                             my $proto = $3;
                             my $ctr   = $4;
+                            $chain = uc $chain if $chain eq 'input'
+                                    or $chain eq 'forward'
+                                    or $chain eq 'output';
                             if ($status_sort_dl) {
                                 $scan_srcs{$dl}{$src_ipdir}{$dst}
                                     {$chain}{$intf}{$proto} = $ctr;
@@ -3807,8 +3833,13 @@ sub status_psad_daemon() {
     }
     print STDOUT "\n";
     if (%scan_srcs) {
-        printf "    %-17s%-17s%-8s%-12s%-6s%-6s%-7s%-7s\n", 'src:', 'dst:',
-            'chain:', 'interface:', 'tcp:', 'udp:', 'icmp:', 'dl:';
+        if ($status_brief) {
+            printf "    %-16s%-16s%-8s%-7s%-6s%-6s%-7s%-5s\n", 'src:', 'dst:',
+                'chain:', 'intf:', 'tcp:', 'udp:', 'icmp:', 'dl:';
+        } else {
+            printf "    %-16s%-16s%-8s%-7s%-6s%-6s%-7s%-5s%-9s%s\n", 'src:', 'dst:',
+                'chain:', 'intf:', 'tcp:', 'udp:', 'icmp:', 'dl:', 'alerts:', 'os_guess:';
+        }
         my %uniq_srcs = ();
         my %uniq_dsts = ();
         if ($status_sort_dl) {
@@ -3820,13 +3851,13 @@ sub status_psad_daemon() {
                 $found_equal_status = 1;
                 for my $src (keys %{$scan_srcs{$dl}}) {
                     for my $dst (keys %{$scan_srcs{$dl}{$src}}) {
-                        for my $chain qw(input forward output) {
+                        for my $chain qw(INPUT FORWARD OUTPUT) {
                             next unless defined
                                 $scan_srcs{$dl}{$src}{$dst}{$chain};
                             for my $intf (keys
                                     %{$scan_srcs{$dl}{$src}{$dst}{$chain}}) {
-                                my $tcp_ctr = 0;
-                                my $udp_ctr = 0;
+                                my $tcp_ctr  = 0;
+                                my $udp_ctr  = 0;
                                 my $icmp_ctr = 0;
                                 $tcp_ctr = $scan_srcs{$dl}{$src}
                                 {$dst}{$chain}{$intf}{'tcp'}
@@ -3840,9 +3871,21 @@ sub status_psad_daemon() {
                                 {$dst}{$chain}{$intf}{'icmp'}
                                     if defined $scan_srcs{$dl}{$src}
                                             {$dst}{$chain}{$intf}{'icmp'};
-                                printf "    %-17s%-17s%-8s%-12s%-6s%-6s%-7s%-7s\n",
-                                    $src, $dst, $chain, $intf, $tcp_ctr,
-                                    $udp_ctr, $icmp_ctr, $dl;
+                                if ($status_brief) {
+                                    printf "    %-16s%-16s%-8s%-7s%-6s%-6s%-7s%-5s\n",
+                                        $src, $dst, $chain, $intf, $tcp_ctr,
+                                        $udp_ctr, $icmp_ctr, $dl;
+                                } else {
+                                    my $alerts   = '';
+                                    my $os_guess = '';
+                                    $alerts = $scan_alerts{$src}
+                                        if defined $scan_alerts{$src};
+                                    $os_guess = $scan_os{$src}
+                                        if defined $scan_os{$src};
+                                    printf "    %-16s%-16s%-8s%-7s%-6s%-6s%-7s%-5s%-9s%s\n",
+                                        $src, $dst, $chain, $intf, $tcp_ctr,
+                                        $udp_ctr, $icmp_ctr, $dl, $alerts, $os_guess;
+                                }
                             }
                         }
                         $uniq_dsts{$dst} = '';
@@ -3862,7 +3905,7 @@ sub status_psad_daemon() {
                         next unless $dl >= $status_dl;
                     }
                     $found_equal_status = 1;
-                    for my $chain qw(input forward output) {
+                    for my $chain qw(INPUT FORWARD OUTPUT) {
                         next unless defined
                             $scan_srcs{$src}{$dst}{$chain};
                         for my $intf (keys
@@ -3882,9 +3925,21 @@ sub status_psad_daemon() {
                             {$dst}{$chain}{$intf}{'icmp'}
                                 if defined $scan_srcs{$src}
                                         {$dst}{$chain}{$intf}{'icmp'};
-                            printf "    %-17s%-17s%-8s%-12s%-6s%-6s%-7s%-7s\n",
-                                $src, $dst, $chain, $intf, $tcp_ctr,
-                                $udp_ctr, $icmp_ctr, $dl;
+                            if ($status_brief) {
+                                printf "    %-16s%-16s%-8s%-7s%-6s%-6s%-7s%-5s\n",
+                                    $src, $dst, $chain, $intf, $tcp_ctr,
+                                    $udp_ctr, $icmp_ctr, $dl;
+                            } else {
+                                my $alerts   = '';
+                                my $os_guess = '';
+                                $alerts = $scan_alerts{$src}
+                                    if defined $scan_alerts{$src};
+                                $os_guess = $scan_os{$src}
+                                    if defined $scan_os{$src};
+                                printf "    %-16s%-16s%-8s%-7s%-6s%-6s%-7s%-5s%-9s%s\n",
+                                    $src, $dst, $chain, $intf, $tcp_ctr,
+                                    $udp_ctr, $icmp_ctr, $dl, $alerts, $os_guess;
+                            }
                         }
                     }
                     $uniq_dsts{$dst} = '';
@@ -3943,8 +3998,8 @@ sub status_ip() {
         print STDOUT $match_ip[$i] if defined $match_ip[$i];
     }
     print STDOUT "\n .. The above packet output shows up to 10 of the ",
-        "most recently\n    logged packets for $status_ip.\n";
-    print STDOUT " .. All packets logged by iptables specifically ",
+        "most recently\n    logged packets for $status_ip.\n",
+        " .. All packets logged by iptables specifically ",
         "for $status_ip\n    can be viewed here: ",
         "$config{'PSAD_DIR'}/$status_ip/fwdata\n";
 
@@ -4045,6 +4100,9 @@ sub import_old_scans() {
                         $chain = $1;
                         $intf  = $2;
                         $pkts  = $3;
+                        $chain = uc $chain if $chain eq 'input'
+                                or $chain eq 'forward'
+                                or $chain eq 'output';
                         $proto = 'icmp';
                     } elsif ($line =~ /^(\w+)_(\w+)_(tcp|udp):
                             \s+(\d+)\s+\[(\S+)\]/x) {
@@ -4052,6 +4110,9 @@ sub import_old_scans() {
                         $intf  = $2;
                         $proto = $3;
                         $pkts  = $4;
+                        $chain = uc $chain if $chain eq 'input'
+                                or $chain eq 'forward'
+                                or $chain eq 'output';
                         my $port_rng = $5;
                         if ($port_rng =~ /(\d+)\-(\d+)/) {
                             $scan{$src}{$dst}{$proto}{'abs_sp'} = $1;
@@ -4292,11 +4353,12 @@ sub handle_cmdline() {
     ### The --auto-ips switch was given
     $config{'PSAD_AUTO_IPS_FILE'} = $autoips_file if $autoips_file;
 
-    ### make sure to go into status display mode if the following
+    ### make sure to go into status display mode if any of the following
     ### args were given.
     $status = 1 if ($status_ip and not $status);
     $status = 1 if ($status_sort_dl and not $status);
     $status = 1 if ($status_dl and not $status);
+    $status = 1 if ($status_brief and not $status);
 
     ### make sure to go into firewall analysis mode if a ruleset
     ### file was specified on the command line.
@@ -4932,6 +4994,8 @@ Options:
     --status-dl <dl>              - Display status information for only
                                     those scans that have reach at least
                                     <dl> (from 1 to 5).
+    --status-brief                - Do not include number of email alerts
+                                    or OS guess in --Status output.
     -B   --Benchmark              - run psad in benchmark mode.
     --packets <number>            - Specify number of packets to use in
                                     benchmark test (default is 10,000).

@@ -90,18 +90,25 @@ usage_and_exit(1) unless (GetOptions (
         'help'          => \$help,
 	'output'	=> \$output,
 	'daemon'	=> \$daemon,
+	'config=s'	=> \$config,
 	'errors'	=> \$errors
 ));
 usage_and_exit(0) if ($help);
 
 fork and exit unless ($daemon);
 
+if ($config) {
+	print "Config file: $config\n";
+	open CONF, "< $config";
+	eval $_ while(<CONF>);
+	close CONF;
+}	
 unless ($errors) {
 	open ERR, ">> $ERROR_LOG";
 	print ERR "============= psad: pid $$ ===============\n";
 	close ERR;
 }
-
+print "danger 3: $DANGER_LEVELS{'3'}\n";
 `$touchCmd $FW_DATA` unless (-e $FW_DATA);
 
 for (;;) {
@@ -341,13 +348,15 @@ sub usage_and_exit() {
         my $exitcode = shift;
         print <<_HELP_;
 
-Usage: psad [-d] [-o] [-e] [-h]
+Usage: psad [-d] [-o] [-e] [-c <config file>] [-h]
 
         -daemon			- do not run as a daemon.
 	-error			- do not write errors to the error log.
 	-output			- print all messages to STDOUT (this 
 				  does not include bad packet messages
 				  that are printed to the error log).
+	-config <config file>	- use config file instead of the values
+				  contained within the psad script.
         -h                      - prints this help message.
 
 _HELP_

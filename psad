@@ -587,19 +587,18 @@ if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
 my $last_disk_check = time();
 
 if ($config{'IMPORT_OLD_SCANS'} eq 'Y') {
-    ### import old scans from /var/log/psad/<ip> directories
+    ### import old scans and counters from /var/log/psad/
     &import_old_scans();
 }
 
 ### zero out the packet counter file (the counters
 ### are all zero at this point anyway unless we
 ### imported old scans).
-&write_global_packet_counters()
-    unless $fw_analyze;
-
-### zero out prefix counters
 unless ($fw_analyze or $benchmark) {
-    &write_prefix_counters() if %ipt_prefixes;
+    &write_global_packet_counters();
+
+    ### zero out prefix counters
+    &write_prefix_counters();
 }
 
 ### zero out dshield alert stats (note we do this here regardles of
@@ -837,7 +836,7 @@ sub check_scan() {
             $pkt_ctr++;
             if ($pkt_ctr % $print_scale_factor == 0) {
                 print "    ", scalar localtime(),
-                    " Processed $pkt_ctr packets.\n";
+                    " .. Processed $pkt_ctr packets.\n";
             }
         }
 
@@ -1015,7 +1014,7 @@ sub check_scan() {
                 if $config{'ALERT_ALL'} eq 'N';
         }
 
-        if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
+            if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
                 and not $benchmark
                 and not $analyze_msgs
                 and $dshield_str) {
@@ -1341,7 +1340,17 @@ sub dshield_email_log() {
             open MAIL, qq(| $cmds{'mail'} -s "$subject" ) .
                 $config{'DSHIELD_ALERT_EMAIL'} or die ' ** Could not send ',
                 'dshield alert email.';
-            print MAIL for @dshield_data;
+            if ($config{'DSHIELD_DL_THRESHOLD'} > 0) {
+                for my $line (@dshield_data) {
+                    if ($line =~ /^.*?($ip_re)/) {
+                        if ($scan_dl{$1} >= $config{'DSHIELD_DL_THRESHOLD'}) {
+                            print MAIL $line;
+                        }
+                    }
+                }
+            } else {
+                print MAIL for @dshield_data;
+            }
             close MAIL;
         } else {
             open MAIL, "| $cmds{'sendmail'} -oi -t" or die ' ** Could not ',
@@ -1349,7 +1358,17 @@ sub dshield_email_log() {
             print MAIL "From: $config{'DSHIELD_USER_EMAIL'}\n",
                 "To: $config{'DSHIELD_ALERT_EMAIL'}\n",
                 "Subject: $subject\n";
-            print MAIL for @dshield_data;
+            if ($config{'DSHIELD_DL_THRESHOLD'} > 0) {
+                for my $line (@dshield_data) {
+                    if ($line =~ /^.*?($ip_re)/) {
+                        if ($scan_dl{$1} >= $config{'DSHIELD_DL_THRESHOLD'}) {
+                            print MAIL $line;
+                        }
+                    }
+                }
+            } else {
+                print MAIL for @dshield_data;
+            }
             close MAIL;
         }
 
@@ -4231,14 +4250,21 @@ sub status_psad_daemon() {
                 my $count = $ipt_prefixes{$prefix};
                 print "        $prefix: $count\n";
             }
+        } else {
+            print "        [NONE]\n";
         }
     } else {
         if (-e $config{'IPT_PREFIX_COUNTER_FILE'}) {
             print "\n    Iptables prefix counters:\n";
             open F, "< $config{'IPT_PREFIX_COUNTER_FILE'}" or
                 die " ** $config{'IPT_PREFIX_COUNTER_FILE'}: $!";
-            print STDOUT "        $_" while (<F>);
+            my @lines = <F>;
             close F;
+            if (@lines) {
+                print STDOUT "        $_" for @lines;
+            } else {
+                print STDOUT "        [NONE]\n";
+            }
         }
     }
 
@@ -5068,11 +5094,11 @@ sub required_vars() {
         AUTO_BLOCK_TIMEOUT EXTERNAL_SCRIPT ENABLE_EXT_SCRIPT_EXEC
         EXEC_EXT_SCRIPT_PER_ALERT ENABLE_DSHIELD_ALERTS
         DSHIELD_ALERT_INTERVAL DSHIELD_ALERT_EMAIL DSHIELD_USER_ID
-        DSHIELD_USER_EMAIL DISK_CHECK_INTERVAL DISK_MAX_PERCENTAGE
-        DISK_MAX_RM_RETRIES ETC_HOSTS_DENY ETC_SYSLOG_CONF
-        ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL ANALYSIS_MODE_DIR
-        IMPORT_OLD_SCANS PSAD_ICMP_TYPES_FILE SHOW_ALL_SIGNATURES
-        IPT_PREFIX_COUNTER_FILE
+        DSHIELD_USER_EMAIL DSHIELD_DL_THRESHOLD DISK_CHECK_INTERVAL
+        DISK_MAX_PERCENTAGE DISK_MAX_RM_RETRIES ETC_HOSTS_DENY
+        ETC_SYSLOG_CONF ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL
+        ANALYSIS_MODE_DIR IMPORT_OLD_SCANS PSAD_ICMP_TYPES_FILE
+        SHOW_ALL_SIGNATURES IPT_PREFIX_COUNTER_FILE
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

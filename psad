@@ -139,13 +139,10 @@ use strict;
 my $version = '1.0.0-pre4';
 
 ### establish some default paths
-my $config_dir        = '/etc/psad';
-my $config_file       = "${config_dir}/psad.conf";
-my $sigs_file         = "${config_dir}/psad_signatures";
-my $autoips_file      = "${config_dir}/psad_auto_ips";
-
-### get the hostname of the machine
-my $hostname = hostname;
+my $config_dir   = '/etc/psad';
+my $config_file  = "${config_dir}/psad.conf";
+my $sigs_file    = "${config_dir}/psad_signatures";
+my $autoips_file = "${config_dir}/psad_auto_ips";
 
 ### disable debugging by default
 my $debug = 0;
@@ -224,13 +221,16 @@ my $netstat_lookup;
 my $fwcheck;
 my $daemon;
 
+### get the hostname of the machine
+my $hostname = hostname;
+
 ### save a copy of the command line arguments
 my @args_cp = @ARGV;
 
 ### make Getopts case sensitive
 Getopt::Long::Configure('no_ignore_case');
 
-&usage_and_exit(1) unless (GetOptions (
+&usage(1) unless (GetOptions (
     'signatures=s'   => \$sigs_file,      # Path to psad signatures file.
     'auto_ips=s'     => \$autoips_file,   # Path to psad auto ips file for
                                           # auto-setting ip danger level.
@@ -274,7 +274,7 @@ Getopt::Long::Configure('no_ignore_case');
     'whois'          => \$whoislookups,   #    old command line arg
     'help'           => \$help,           # Display help.
 ));
-&usage_and_exit(0) if ($help);
+&usage(0) if ($help);
 
 ### Print the version number and exit if -V given on the command line.
 if ($print_version) {
@@ -2122,27 +2122,27 @@ sub archive_data() {
 sub check_old_cmdargs() {
     if ($errors) {
         print " ... @@@ The \"errors\" option has been changed to \"no_errors.\"\n";
-        &usage_and_exit(1);
+        &usage(1);
     }
     if ($errors) {
         print " ... @@@ The \"reversedns\" option has been changed to \"no_rdns.\"\n";
-        &usage_and_exit(1);
+        &usage(1);
     }
     if ($errors) {
         print " ... @@@ The \"whois\" option has been changed to \"no_whois.\"\n";
-        &usage_and_exit(1);
+        &usage(1);
     }
     if ($errors) {
         print " ... @@@ The \"localport\" option has been changed to \"no_netstat.\"\n";
-        &usage_and_exit(1);
+        &usage(1);
     }
     if ($errors) {
         print " ... @@@ The \"firewallcheck\" option has been changed to \"no_fwcheck.\"\n";
-        &usage_and_exit(1);
+        &usage(1);
     }
     if ($errors) {
         print " ... @@@ The \"Daemon\" option has been changed to \"Daemon.\"\n";
-        &usage_and_exit(1);
+        &usage(1);
     }
     return;
 }
@@ -2211,7 +2211,7 @@ sub check_config() {
     return;
 }
 
-sub usage_and_exit() {
+sub usage() {
     my $exitcode = shift;
     print <<_HELP_;
 

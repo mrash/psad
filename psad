@@ -848,7 +848,7 @@ sub check_scan() {
             $pkt_ctr++;
             if ($pkt_ctr % $print_scale_factor == 0) {
                 print "    ", scalar localtime(),
-                    "[+] Processed $pkt_ctr packets.\n";
+                    " [+] Processed $pkt_ctr packets.\n";
             }
         }
 
@@ -896,7 +896,7 @@ sub check_scan() {
 
         ### see if there is a logging prefix (used for scan email alert even
         ### if we are running with FW_SEARCH_ALL = Y).
-        if ($pkt =~ /kernel:\s+(\S+?.*?)\s*IN=/) {
+        if ($pkt =~ /kernel:\s+(.*?)\s*IN=/) {
             $log_prefix = $1;
             $ipt_prefixes{$log_prefix}++;
         }
@@ -2287,7 +2287,7 @@ sub import_auto_dl() {
                 $auto_dl{'net'}{$net}{'allproto'} = $dl;
             }
         } else {
-            my $subject = "[-] psad import warning: " .
+            my $subject = "[psad-error] import warning: " .
                 "$config{'PSAD_AUTO_DL_FILE'} error on line: $i";
             &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
                 $cmds{'mail'});
@@ -2662,6 +2662,7 @@ sub scan_logr() {
             my $dst_dns_str  = '';
             my $rdns         = '';
             my $src_subj     = '';
+            my $dst_subj     = '';
             my $syslog_range = '';
             my $tcp_newrange = '';
             my $tcp_absrange = '';
@@ -2803,8 +2804,11 @@ sub scan_logr() {
                     $src_subj    = $src;
                 }
                 $dst_dns_str = &get_dns_info($dst);
-                unless ($dst_dns_str) {
+                if ($src_dns_str) {
+                    $dst_subj = $dst_dns_str;
+                } else {
                     $dst_dns_str = '[No reverse dns info available]';
+                    $dst_subj    = $dst;
                 }
             }
 
@@ -3006,9 +3010,11 @@ sub scan_logr() {
                 unless ($analyze_msgs and not $analysis_emails) {
                     my $subject;
                     if ($analyze_msgs) {
-                        $subject = "[+] psad (analysis mode): [DL$curr_dl] SCAN from: $src_subj";
+                        $subject = "[psad-alert] DL$curr_dl (analysis mode) " .
+                            "src: $src_subj dst: $dst_subj";
                     } else {
-                        $subject = "[+] psad: [DL$curr_dl] SCAN from: $src_subj";
+                        $subject = "[psad-alert] DL$curr_dl src: " .
+                            "$src_subj dst: $dst_subj";
                     }
                     &Psad::psyslog('psad', "sending email alert to: " .
                         "$config{'EMAIL_ADDRESSES'}\n");
@@ -3267,7 +3273,7 @@ sub renew_auto_blocked_ips() {
                 ### add block rule for $ip unless it is already blocked
                 unless (&ipt_test_block($ip)) {
                     &ipt_block($ip);
-                    &Psad::sendmail("[+] psad: RENEWED iptables BLOCK against $ip" .
+                    &Psad::sendmail("[psad-status] RENEWED iptables BLOCK against $ip" .
                         $timeout_str, '', $config{'EMAIL_ADDRESSES'},
                         $cmds{'mail'});
                 }
@@ -3290,7 +3296,7 @@ sub renew_auto_blocked_ips() {
                 my $ip = $1;
                 unless (&tcpwr_test_block($ip)) {
                     &tcpwr_block($ip);
-                    &Psad::sendmail("[+] psad: RENEWED tcpwrappers BLOCK against $ip" .
+                    &Psad::sendmail("[psad-status] RENEWED tcpwrappers BLOCK against $ip" .
                         $timeout_str, '', $config{'EMAIL_ADDRESSES'},
                         $cmds{'mail'});
                 }
@@ -3478,7 +3484,7 @@ sub ipt_remove_block() {
         if (not $flush_fw) {
             ### don't send timeout email if we are manually flushing
             ### the auto-block rules from the command line with --Flush.
-            &Psad::sendmail("[+] psad: removed iptables block " .
+            &Psad::sendmail("[psad-status] removed iptables block " .
                 "against $src (timeout expired).", '',
                 $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         }
@@ -3528,7 +3534,7 @@ sub tcpwr_remove_block() {
         chomp $line;
         if ($line =~ /ALL:\s+$ip$/) {
             &rm_blocked_ip($ip, $config{'AUTO_BLOCK_TCPWR_FILE'});
-            &Psad::sendmail("[+] psad: removed tcpwrappers block " .
+            &Psad::sendmail("[psad-status] removed tcpwrappers block " .
                 "against $ip (timeout expired).", '',
                 $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         } else {
@@ -3571,12 +3577,12 @@ sub auto_psad_response() {
             ### at this point
             if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
                 &ipt_block($src);
-                &Psad::sendmail("[+] psad: iptables AUTO-BLOCK against $src" .
+                &Psad::sendmail("[psad-status] iptables AUTO-BLOCK against $src" .
                     $timeout_str, '', $config{'EMAIL_ADDRESSES'},
                     $cmds{'mail'});
             }
             if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
-                &Psad::sendmail("[+] psad: tcpwrappers AUTO-BLOCK against $src" .
+                &Psad::sendmail("[psad-status] tcpwrappers AUTO-BLOCK against $src" .
                     $timeout_str, '', $config{'EMAIL_ADDRESSES'},
                     $cmds{'mail'});
                 my $found = 0;
@@ -3741,7 +3747,7 @@ sub rm_blocked_ip() {
 
 sub email_limit_reached() {
     my ($src, $dst) = @_;
-    my $subject = "[-] psad: email message limit for $src has " .
+    my $subject = "[psad-status] email message limit for $src has " .
         "been reached on $config{'HOSTNAME'} ($dst)";
     &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
     $scan{$src}{$dst}{'stop_email'} = 1;
@@ -3769,6 +3775,7 @@ sub get_local_ips() {
         "$cmds{'ifconfig'} -a: $!";
     my @ips = <IFC>;
     close IFC;
+    return unless @ips;
     for my $line (@ips) {
         if ($line =~ /inet\s+.*?:($ip_re)\s/) {
             $local_ips{$1} = '';
@@ -3779,12 +3786,13 @@ sub get_local_ips() {
 
 sub get_listening_ports() {
     %local_ports = ();
-    open NETS, "$cmds{'netstat'} -an |" or die "[*] Could not execute ",
-        "$cmds{'netstat'} -an: $!";
+    open NETS, "$cmds{'netstat'} -an 2> /dev/null |" or
+        die "[*] Could not execute $cmds{'netstat'} -an: $!";
     my @lines = <NETS>;
     close NETS;
     return unless @lines;
     for my $line (@lines) {
+        next unless $line;
         chomp $line;
         if ($line =~ m/^\s*(tcp|udp)\s+\d+\s+\d+\s+\S+:(\d+)\s/) {
             ### $1 == protocol (tcp/udp), $2 == port number
@@ -4864,7 +4872,7 @@ sub setup() {
                 system "$cmds{'killall'} -HUP syslogd";
             }
         } else {
-            &Psad::sendmail("[-] psad: $config{'ETC_SYSLOG_CONF'} does not " .
+            &Psad::sendmail("[psad-error] $config{'ETC_SYSLOG_CONF'} does not " .
                 "exist, check SYSLOG_DAEMON setting on $config{'HOSTNAME'}",
                 '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         }
@@ -4910,7 +4918,7 @@ sub setup() {
                 system "$cmds{'killall'} -HUP syslog-ng";
             }
         } else {
-            &Psad::sendmail("[-] psad: $config{'ETC_SYSLOGNG_CONF'} does not " .
+            &Psad::sendmail("[psad-error] $config{'ETC_SYSLOGNG_CONF'} does not " .
                 "exist, check SYSLOG_DAEMON setting on $config{'HOSTNAME'}",
                 '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         }
@@ -4962,7 +4970,7 @@ sub setup() {
 #          system "$cmds{'killall'} -HUP metalog";
            }
         } else {
-            &Psad::sendmail("[-] psad: $config{'ETC_METALOG_CONF'} does not " .
+            &Psad::sendmail("[psad-error] $config{'ETC_METALOG_CONF'} does not " .
                 "exist, check SYSLOG_DAEMON setting on $config{'HOSTNAME'}",
                 '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         }
@@ -4995,7 +5003,7 @@ sub disk_space_exceeded() {
         &Psad::psyslog('psad', "disk partition associated with " .
             "$config{'PSAD_DIR'} exceeded " .
             "$config{'DISK_MAX_PERCENTAGE'} prct utilization.");
-        &Psad::sendmail("[-] psad: Exceeded max disk utilization for " .
+        &Psad::sendmail("[psad-error] Exceeded max disk utilization for " .
             "$config{'PSAD_DIR'} on $config{'HOSTNAME'}", '',
             $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         &Psad::psyslog('psad', "removing data in $config{'PSAD_DIR'}");
@@ -5031,10 +5039,10 @@ sub disk_space_exceeded() {
             &Psad::psyslog('psad', "could not sufficiently reduce disk " .
                 "utilization in $config{'PSAD_DIR'} partition.  " .
                 "Stopping psad!");
-            &Psad::sendmail("[-] psad: Could not reduce disk utilization on " .
+            &Psad::sendmail("[psad-error] Could not reduce disk utilization on " .
                 $config{'HOSTNAME'}, '', $config{'EMAIL_ADDRESSES'},
                 $cmds{'mail'});
-            &Psad::sendmail("[*] psad: Stopping psad on $config{'HOSTNAME'}!",
+            &Psad::sendmail("[psad-fatal] Stopping psad on $config{'HOSTNAME'}!",
                 '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
             for my $pidname qw(psadwatchd kmsgsd) {
                 my $pidfile = $pidfiles{$pidname};

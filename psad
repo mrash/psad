@@ -2856,7 +2856,7 @@ sub ipt_chk_chain() {
             }
             if (defined $ld_hr->{$proto}->{'LOG'}->{'prefix'}
                 && $ld_hr->{$proto}->{'LOG'}->{'prefix'}
-                ne $config{'FW_MSG_SEARCH'}) {
+                !~ /$config{'FW_MSG_SEARCH'}/) {
                 if ($proto eq 'all') {
                     $str1 = " ** The $chain chain in the iptables ruleset " .
                     "on $hostname includes a default LOG rule for all " .

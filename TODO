@@ -1,0 +1,61 @@
+   - OS guess in --Status output.
+   - Ability to remove email block for a specific ip from a running
+     psad process.
+   - Multi-language support in ifconfig output.
+   - Summary report emails like dshield does.
+   - Number of emails sent for same source.
+   - Ability to download latest signatures from cipherdyne.org.
+   - Number of DShield alert messages sent in --Status output.
+   - Ability to search on multiple strings.
+   - Replace full ascii signature listings in <ip>_signatures with sid
+     numbers and packet counts.
+   - Rework IGNORE_CONNTRACK_BUG_PKTS strategy to maximze signature
+     detection.
+   - More syslog messages from psad, psadwatchd, and kmsgsd.
+   - Put a "psad signature strategy" link in all alert emails.
+   - Module tests for Psad.pm
+   - Extract default behavior into psad.conf.
+   - Remove dependency on DROP tag in iptables messages.
+   - Custom logging line upon auto-blocking an ip.
+   - Add difference notification (via syslog) for changed variables
+     after receiving a HUP signal.
+   - Signature based auto block rules.
+   - Include the ability to specify a network in CIDR notation with
+     --Status output.
+   - Drop root privileges if not running in auto-blocking mode.
+   - Extend install.pl to provide an option to dowload the latest perl
+     modules (Date:Calc, Unix::Syslog, etc.) from CPAN.
+   - Extend passive OS fingerprinting to make use of more types of
+     packets than just tcp/syn packets.
+   - Extend passive OS fingerprinting to include signatures from
+     Xprobe from http://www.sys-security.com.
+   - Add a density calculation for a range of scanned ports, and also
+     add a "verbose" mode that will display which of the scanned ports
+     actually resolve to something in the IANA spec.
+   - Packet grapher mode with annotated scan alerts.
+   - Mysql database support?
+   - Make use of other logging options available in iptables to detect
+     more tcp signatures.  (E.g. --log-tcp-options, --log-ip-options,
+     --log-tcp-sequence, etc.) for better signature recognition.
+   - Include a verbose message in the body of certain emails that as
+     of psad-1.0.0-pre2 only contain a subject line.
+   - Deal with the possibility that psad could eat lots of memory over
+     time if $ENABLE_PERSISTENCE="Y". This should involve periodically
+     deleting entries in %scan (or maybe the entire hash), but this
+     should be done in a way that allows some scan data to persist.
+   - Ipfilter support on *BSD platforms.
+   - Take into account syslog message summarization; i.e. "last message
+     repeated n times".
+   - Possibly add a daemon to take into account ACK PSH, ACK FIN, RST etc.
+     packets that the client may generate after the ip_conntrack module
+     is reloaded.  Without anticipating such packets psad will interpret
+     them as a belonging to a port scan.  NOTE: This problem is mostly
+     corrected by the conntrack patch to the kernel.  Also, the
+     IGNORE_CONNTRACK_BUG_PKTS variable was added to mitigate this
+     problem.
+   - Improve check_firewall_rules() to check for a state rule (iptables)
+     since having such a rule greatly improves the quality of the data
+     stream provided to psad by kmsgsd since more packet types will be
+     denied without requiring overly complicated firewall rules to detect
+     odd tcp flag combinations.
+   - perldoc

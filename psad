@@ -18,7 +18,7 @@
 #
 # Credits:  (see the CREDITS file)
 #
-# Version: 1.1.1
+# Version: 1.2
 #
 # Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.org)
 #
@@ -154,7 +154,7 @@ use strict;
 ### ========================== main =================================
 
 ### set current the psad version number
-my $version = '1.1.1';
+my $version = '1.2';
 
 ### default config file for psad (can be changed with
 ### --config switch)
@@ -729,7 +729,7 @@ sub check_scan() {
             ### DST=192.168.20.1 LEN=60 TOS=0x10 PREC=0x00 TTL=64 ID=47300 DF
             ### PROTO=TCP SPT=34111 DPT=6345 WINDOW=5840 RES=0x00 SYN URGP=0
             if ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+)\s+TOS=(\S+)
-                        \s.*TTL=(\d+)\s+ID=(\d+)\s+PROTO=TCP\s+
+                        \s*.*\s+TTL=(\d+)\s+ID=(\d+)\s*.*\s+PROTO=TCP\s+
                         SPT=(\d+)\s+DPT=(\d+)\s+WINDOW=(\d+)\s+
                         RES=\S+\s*(.*)\s+URGP=/x) {
                 ($src, $dst, $len, $tos, $ttl, $id, $sp, $dp, $win, $flags) =
@@ -775,7 +775,7 @@ sub check_scan() {
             ### SRC=192.168.20.25 DST=192.168.20.1 LEN=28 TOS=0x00 PREC=0x00
             ### TTL=40 ID=47523 PROTO=UDP SPT=57339 DPT=305 LEN=8
             } elsif ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+)\s+TOS=(\S+)
-                              \s.*TTL=(\d+)\s+ID=(\d+)\s+PROTO=UDP\s+
+                              \s.*TTL=(\d+)\s+ID=(\d+)\s*.*\s+PROTO=UDP\s+
                               SPT=(\d+)\s+DPT=(\d+)/x) {
                 ($src, $dst, $len, $tos, $ttl, $id, $sp, $dp) =
                     ($1,$2,$3,$4,$5,$6,$7,$8);
@@ -783,7 +783,7 @@ sub check_scan() {
                 print STDOUT "matched packet: src: $src, dst: $dst, len: " .
                     "$len, sp: $sp\n    dp: $dp, proto: $proto\n" if $debug;
                 if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
-                    $dshield_str = "$src\t$type\t$dst\t$code\t$proto";
+                    $dshield_str = "$src\t$sp\t$dst\t$dp\t$proto";
                 }
                 $udp_ctr++;
             } elsif ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+).*

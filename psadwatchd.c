@@ -70,6 +70,7 @@ static void check_process(
 static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries);
 static void reset_syscall_ctr(const char *pid_name);
 static void give_up(const char *pid_name);
+// static int check_import_config(time_t *mtime, char *config_file);
 
 /* MAIN *********************************************************************/
 int main(int argc, char *argv[]) {
@@ -83,6 +84,8 @@ int main(int argc, char *argv[]) {
     char psadwatchd_pid_file[MAX_PATH_LEN+1];
     unsigned int psadwatchd_check_interval = 5;  /* default to 5 seconds */
     unsigned int psadwatchd_max_retries = 10; /* default to 10 tries */
+    time_t config_mtime;
+    struct stat statbuf;
 
 #ifdef DEBUG
     printf(" ... Entering DEBUG mode ...\n");
@@ -99,6 +102,16 @@ int main(int argc, char *argv[]) {
         printf("Usage:  psadwatchd <configfile>\n");
         exit(EXIT_FAILURE);
     }
+
+    if (stat(config_file, &statbuf)) {
+        printf(" ... @@@ Could not get mtime for config file: %s\n",
+            config_file);
+        exit(EXIT_FAILURE);
+    }
+
+    /* initialize config_mtime */
+    config_mtime = statbuf.st_mtime;
+
 
 #ifdef DEBUG
     printf(" ... parsing config_file: %s\n", config_file);
@@ -145,6 +158,28 @@ int main(int argc, char *argv[]) {
             diskmondCmd, psadwatchd_max_retries);
         printf("check_process\n");
         sleep(psadwatchd_check_interval);
+
+        /* check to see if we need to re-import the config file */
+        if (check_import_config(&config_mtime, config_file)) {
+#ifdef DEBUG
+    printf(" ... re-parsing config file: %s\n", config_file);
+#endif
+            /* reparse the config file since it was updated */
+            parse_config(
+                config_file,
+                psadCmd,
+                psad_pid_file,
+                kmsgsdCmd,
+                kmsgsd_pid_file,
+                diskmondCmd,
+                diskmond_pid_file,
+                mailCmd,
+                mail_addrs,
+                psadwatchd_pid_file,
+                &psadwatchd_check_interval,
+                &psadwatchd_max_retries
+            );
+        }
     }
 
     /* this statements don't get executed, but for completeness... */
@@ -174,7 +209,7 @@ static void check_process(
         strcat(mail_str, pid_name);
         strcat(mail_str, " on ");
         strcat(mail_str, hostname);
-        strcat(mail_str, ".\" ");
+        strcat(mail_str, "\" ");
         strcat(mail_str, mail_addrs);
         strcat(mail_str, mail_redr);
 
@@ -216,7 +251,7 @@ static void check_process(
         strcat(mail_str, pid_name);
         strcat(mail_str, " on ");
         strcat(mail_str, hostname);
-        strcat(mail_str, ".\" ");
+        strcat(mail_str, "\" ");
         strcat(mail_str, mail_addrs);
         strcat(mail_str, mail_redr);
 
@@ -239,6 +274,25 @@ static void check_process(
     }
     return;
 }
+
+/*
+static int check_import_config(time_t *config_mtime, char *config_file)
+{
+    struct stat statbuf_tmp;
+
+    if (stat(config_file, &statbuf_tmp)) {
+        printf(" ... @@@ Could not get mtime for config file: %s\n",
+            config_file);
+        exit(EXIT_FAILURE);
+    }
+
+    if (*config_mtime != statbuf_tmp.st_mtime) {
+        *config_mtime = statbuf_tmp.st_mtime;
+        return 1;
+    }
+    return 0;
+}
+*/
 
 static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries)
 {

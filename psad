@@ -79,7 +79,7 @@ use Psad;
 use File::stat "stat";
 use Getopt::Long "GetOptions";
 use autouse 'Data::Dumper' => "Dumper";  ### this one is not used very much so don't load immediately
-use autouse 'Socket' => "AF_INET";       ### not used until a scan is detected so don't load until it is needed
+use autouse 'Socket';       ### not used until a scan is detected so don't load until it is needed
 use Sys::Hostname "hostname";
 # use Sys::Syslog qw(openlog syslog closelog);   ### this does not seem to play nice with perl-5.005_03
 use POSIX "setsid";
@@ -202,7 +202,7 @@ Getopt::Long::Configure("no_ignore_case");  # make Getopts case sensitive
 print "psad version $VERSION, by Michael B. Rash (mbr\@cipherdyne.com)\n" and exit 0 if $print_version;
 
 ### everthing after this point must be executed as root.
-$< == 0 && $> == 0 or die "\n@@@@@  (psad): You must be root (or equivalent UID 0 account) to execute psad!  Exiting.\n\n";
+$< == 0 && $> == 0 or die "\n@@@@@  psad: You must be root (or equivalent UID 0 account) to execute psad!  Exiting.\n\n";
 
 ### the --Kill command line switch was given
 if ($kill) {
@@ -212,8 +212,8 @@ if ($kill) {
 
 ### the --Status command line switch was given
 if ($status) {
-        &psad_status(\@PIDFILES);
-        exit 0;
+        $rv = &psad_status(\@PIDFILES);
+        exit $rv;
 }
 
 my %Cmds = (
@@ -259,7 +259,7 @@ $SIG{USR1} = \&print_scan;
 
 ### if psad is running on a syslog server, don't check the firewall rules since they may not be local.
 unless ($fwcheck || $Syslog_server) {
-	&check_firewall_rules(\@EMAIL_ADDRESSES, ["/tmp/psad_fw_check.txt"], \%Cmds);
+	&check_firewall_rules(\@EMAIL_ADDRESSES, ["/var/log/psad/fw_check.txt"], \%Cmds);
 }
 
 ### daemonize psad unless running with --Daemon or --debug
@@ -1163,12 +1163,12 @@ sub kill_psad() {
 			chomp $pid;
 			if (kill 0, $pid) {
 				print " ----  Killing $pidname, pid: $pid  ----\n";
-				kill 15, $pid or print "@@@@@  (psad): Could not kill $pidname, pid: $pid\n";
+				kill 15, $pid or print "@@@@@  psad: Could not kill $pidname, pid: $pid\n";
 			} else {
-				print "@@@@@  (psad): $pidname is not running on $HOSTNAME.\n";
+				print "@@@@@  psad: $pidname is not running on $HOSTNAME.\n";
 			}
 		} else {
-			print "@@@@@  (psad): pid file $pidfile does not exist for $pidname on $HOSTNAME\n";
+			print "@@@@@  psad: pid file $pidfile does not exist for $pidname on $HOSTNAME\n";
 		}
 	}
 	return;
@@ -1182,7 +1182,7 @@ sub restart_psad() {
                 close CMD;
                 chomp $cmdline;
         } else {
-                die "@@@@@  (psad):  No other psad process is currently running on $HOSTNAME!\n";
+                die "@@@@@  psad:  No other psad process is currently running on $HOSTNAME!\n";
         }
         &kill_psad($pidfiles_aref);
         print " ----  Restarting the psad daemons on $HOSTNAME.  ----\n";
@@ -1191,6 +1191,7 @@ sub restart_psad() {
 }
 sub psad_status() {
 	my $pidfiles_aref = shift;
+	my $rv = 0;   ### assume psad is not running and test...
 	for my $pidfile (@$pidfiles_aref) {
 		my $pidname = (split /\./, $pidfile)[1];
 		if (-e $pidfile) {
@@ -1200,14 +1201,15 @@ sub psad_status() {
 			chomp $pid;
 			if (kill 0, $pid) {
 				print " ----  $pidname is currently running on $HOSTNAME as pid: $pid  ----\n";
+				$rv = 1;
 			} else {
 				print " ----  $pidname is not currently running on $HOSTNAME  ----\n";
 			}
 		} else {
-			print "@@@@@  (psad): pid file $pidfile does not exist for $pidname on $HOSTNAME\n";
+			print "@@@@@  psad: pid file $pidfile does not exist for $pidname on $HOSTNAME\n";
 		}
 	}
-	return;
+	return $rv;
 }
 sub markerline() {
         my $hndl = shift;

@@ -8,77 +8,6 @@
 # Source function library.
 . /etc/rc.d/init.d/functions
 
-psadkillproc() {
-	# Test syntax.
-	if [ $# = 0 ]; then
-		echo "Usage: killproc {program} [signal]"
-		return 1
-	fi
-
-	notset=0
-	# check for second arg to be kill level
-	if [ "$2" != "" ] ; then
-		killlevel=$2
-	else
-		notset=1
-		killlevel="-9"
-	fi
-
-        # Save basename.
-        base=`basename $1`
-
-        # Find pid.
-        pid=`psadpidofproc $base`
-
-        # Kill it.
-        if [ "$pid" != "" ] ; then
-                [ $BOOTUP = "verbose" ] && echo -n "$base "
-		if [ "$notset" = "1" ] ; then
-		       if ps h $pid>/dev/null 2>&1; then
-			   # TERM first, then KILL if not dead
-			   kill -TERM $pid
-			   usleep 100000
-			   if ps h $pid >/dev/null 2>&1 ; then
-				sleep 1
-				if ps h $pid >/dev/null 2>&1 ; then
-				        sleep 3
-					if ps h $pid >/dev/null 2>&1 ; then
-					   kill -KILL $pid
-					fi
-				fi
-			   fi
-		        fi
-			ps h $pid >/dev/null 2>&1 && failure "$base shutdown" || success "$base shutdown"
-		# use specified level only
-		else
-		        if ps h $pid >/dev/null 2>&1; then
-	                	kill $killlevel $pid && success "$base $killlevel" || failure "$base $killlevel"
-			fi
-		fi
-	else
-	    failure "$base shutdown"
-	fi
-
-        # Remove pid file if any.
-	if [ "$notset" = "1" ]; then
-            rm -f /var/run/$base.pid
-	fi
-}
-
-# A function to find the pid of a program.
-psadpidofproc() {
-
-# psad addition: "pidof -x" to get parent process... this is used by
-# the Port Scan Attack Detector.
-
-        # Next try "pidof"
-        pid=`pidof -x $1`
-        if [ "$pid" != "" ] ; then
-                echo $pid
-                return 0
-        fi
-}
-
 # See how we were called.
 case "$1" in
 start)
@@ -93,16 +22,16 @@ start)
 	;;
 stop)
 	echo -n "Shutting down the psadwatchd monitoring daemon: "
-	psadkillproc psadwatchd
+	killproc psadwatchd
         echo
         echo -n "Shutting down the psad daemon: "
-        psadkillproc psad
+        killproc psad
 	echo
 	echo -n "Shutting down the kmsgsd daemon: "
-	psadkillproc kmsgsd
+	killproc kmsgsd
 	echo
 	echo -n "Shutting down the diskmond monitoring daemon: "
-	psadkillproc diskmond
+	killproc diskmond
 	echo
 	;;
 status)

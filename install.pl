@@ -1,14 +1,18 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -w -I .
 
 # TODO: 
 #	- make install.pl preserve psad_signatures and psad_auto_ips
 #	  with "diff" and "patch" from the old to the new.
 
+use Psad;
 use File::Path; # used for the 'rmtree' function for removing directories
 use File::Copy; # used for copying/moving files
 use Getopt::Long;
 use Text::Wrap;
 use Sys::Hostname "hostname";
+
+### Note that Psad.pm is not included within the above list (installation
+### over existing psad install should not make use of an old Psad.pm).
 
 ### globals
 use vars qw($HOSTNAME $INSTALL_DIR $PERL_INSTALL_DIR $INSTALL_LOG @LOGR_FILES $INIT_DIR $SUB_TAB @EMAILS);
@@ -101,12 +105,13 @@ if ($uninstall) {
 		chomp $ans;
 	}
 	exit 0 if ($ans eq "n");
-	if (-e "${INIT_DIR}/psad") {
+	if (-e "${INSTALL_DIR}/psad" && system "${INSTALL_DIR}/psad --Status > /dev/null") {
 		print " ----  Stopping psad daemons!  ----\n";
-#		system("/etc/rc.d/init.d/psad stop") or warn "@@@@@  Could not stop psad daemons!  ----\n";
-		system "${INIT_DIR}/psad stop";
-		print " ----  Removing ${INIT_DIR}/psad  ----\n";
-		unlink "${INIT_DIR}/psad";
+		if (-e "${INIT_DIR}/psad") {
+			system "${INIT_DIR}/psad stop";
+		} else {
+			system "${INSTALL_DIR}/psad --Kill";
+		}
 	}	
 	if (-e "${INSTALL_DIR}/psad") {
 		print wrap("", $SUB_TAB, " ----  Removing psad daemons: ${INSTALL_DIR}/(psad, psadwatchd, kmsgsd, diskmond)  ----\n");
@@ -114,6 +119,10 @@ if ($uninstall) {
 		unlink "${INSTALL_DIR}/psadwatchd" or warn "@@@@@  Could not remove ${INSTALL_DIR}/psadwatchd!!!\n";
 		unlink "${INSTALL_DIR}/kmsgsd" or warn "@@@@@  Could not remove ${INSTALL_DIR}/kmsgsd!!!\n";
 		unlink "${INSTALL_DIR}/diskmond" or warn "@@@@@  Could not remove ${INSTALL_DIR}/diskmond!!!\n";
+	}
+	if (-e "${INIT_DIR}/psad") {
+		print " ----  Removing ${INIT_DIR}/psad  ----\n";
+		unlink "${INIT_DIR}/psad";
 	}
         if (-e "${PERL_INSTALL_DIR}/Psad.pm") {
                 print " ----  Removing ${PERL_INSTALL_DIR}/Psad.pm  ----\n";
@@ -159,7 +168,11 @@ if ($uninstall) {
 }
 
 ### Start the installation code...
-### make sure we know where the syslog init script is.
+
+### make sure install.pl is being called from the source directory
+unless (-e "psad" && -e "Psad.pm") {
+	die "\n@@@@@  install.pl can only be executed from the directory that contains the psad sources!  Exiting.\n\n";
+}
 
 my $t = localtime();
 my $time = " ----     Installing psad on $HOSTNAME: $t    ----\n";
@@ -167,6 +180,7 @@ my $time = " ----     Installing psad on $HOSTNAME: $t    ----\n";
 &logr($time, \@LOGR_FILES);
 &logr("\n", \@LOGR_FILES);
 
+### make sure we know where the syslog init script is.
 unless (-e $SYSLOG_INIT) {
         my $s = `$Cmds{'find'} / -name syslog 2> /dev/null |$Cmds{'grep'} init |$Cmds{'grep'} -v grep`;
         chomp $s;
@@ -220,9 +234,7 @@ unless (-e "/usr/bin/whois.psad") {
 	&perms_ownership("/usr/bin/whois.psad", 0755);  # make absolutely certain we can execute whois.psad
 }
 &logr(" ----  Copying Psad.pm -> ${PERL_INSTALL_DIR}/  ----\n", \@LOGR_FILES);
-copy("Psad.pm", "${PERL_INSTALL_DIR}/psad");
-&rm_perl_options("${PERL_INSTALL_DIR}/psad", \%Cmds);
-&perms_ownership("${PERL_INSTALL_DIR}/psad", 0500);
+copy("Psad.pm", "${PERL_INSTALL_DIR}/Psad.pm");
 
 if ( -e "${INSTALL_DIR}/psad" && (! $nopreserve)) {  # need to grab the old config
 	&logr(" ----  Copying psad -> ${INSTALL_DIR}/psad  ----\n", \@LOGR_FILES);
@@ -401,6 +413,7 @@ if ($execute_psad) {
 		}
 	}	
 }
+&logr("\n ----  Psad has been installed!  ----\n", \@LOGR_FILES);
 
 exit 0;
 #==================== end main =====================
@@ -604,46 +617,6 @@ sub rm_perl_options() {
 	print F $_ for (@lines);
 	close F;
 	return;
-}
-### check paths to commands and attempt to correct if any are wrong.
-sub check_commands() {
-        my $Cmds_href = shift;
-        my $caller = $0;
-        CMD: foreach my $cmd (keys %$Cmds_href) {
-                unless (-e $Cmds_href->{$cmd}) {
-                        my $real_location = `which $cmd 2> /dev/null`;
-                        chomp $real_location;
-                        if ($real_location) {
-                                $Cmds_href->{$cmd} = $real_location;
-                        } else {
-                                die "\n@@@@@  ($caller): Could not find $cmd anywhere!!!  Please edit the config section to include the path to $cmd.\n";
-                        }
-                }
-        }
-        return %$Cmds_href;
-}
-
-### logging subroutine that handles multiple filehandles
-sub logr() {
-        my ($msg, $files_aref) = @_;
-        for my $f (@$files_aref) {
-                if ($f eq "STDOUT" || $f eq "STDERR") {
-                        if (length($msg) > 72) {
-                                print $f  wrap("", $SUB_TAB, $msg);
-                        } else {
-                                print $f $msg;
-                        }
-                } else {
-                        open F, ">> $f";
-                        if (length($msg) > 72) {
-                                print F wrap("", $SUB_TAB, $msg);
-                        } else {
-                                print F $msg;
-                        }
-                        close F;
-                }
-        }
-        return;
 }
 sub usage_and_exit() {
         my $exitcode = shift;

@@ -28,14 +28,13 @@
 #    USA
 #
 # TODO:
-#   - make install.pl preserve psad_signatures and psad_auto_ips
-#     with "diff" and "patch" from the old to the new.
 #
 #########################################################################
 #
 # $Id$
 #
 
+use Cwd;
 use File::Path;
 use File::Copy;
 use Text::Wrap;
@@ -86,7 +85,7 @@ my $psadCmd      = "${USRSBIN_DIR}/psad";
 #============ end config ============
 
 ### get the hostname of the system
-my $HOSTNAME = hostname;
+my $HOSTNAME = hostname();
 
 if (-e $INSTALL_LOG) {
     open INSTALL, "> $INSTALL_LOG" or
@@ -126,6 +125,7 @@ my $help         = 0;
 &usage(0) if ($help);
 
 my %Cmds = (
+    'gzip'     => $gzipCmd,
     'ps'       => $psCmd,
     'mknod'    => $mknodCmd,
     'netstat'  => $netstatCmd,
@@ -466,51 +466,15 @@ sub install() {
         &logr(" .. Creating $CONF_ARCHIVE\n");
         mkdir $CONF_ARCHIVE, 0500;
     }
-    if (-e "${PSAD_CONFDIR}/psad_signatures") {
-        &archive("${PSAD_CONFDIR}/psad_signatures") unless $noarchive;
-        &logr(" .. Copying psad_signatures -> " .
-            "${PSAD_CONFDIR}/psad_signatures\n");
-        copy 'psad_signatures', "${PSAD_CONFDIR}/psad_signatures";
-        &perms_ownership("${PSAD_CONFDIR}/psad_signatures", 0600);
-    } else {
-        &logr(" .. Copying psad_signatures -> " .
-            "${PSAD_CONFDIR}/psad_signatures\n");
-        copy 'psad_signatures', "${PSAD_CONFDIR}/psad_signatures";
-        &perms_ownership("${PSAD_CONFDIR}/psad_signatures", 0600);
-    }
-    if (-e "${PSAD_CONFDIR}/psad_posf") {
-        &archive("${PSAD_CONFDIR}/psad_posf") unless $noarchive;
-        &logr(" .. Copying psad_posf -> " .
-            "${PSAD_CONFDIR}/psad_posf\n");
-        copy 'psad_posf', "${PSAD_CONFDIR}/psad_posf";
-        &perms_ownership("${PSAD_CONFDIR}/psad_posf", 0600);
-    } else {
-        &logr(" .. Copying psad_posf -> " .
-            "${PSAD_CONFDIR}/psad_posf\n");
-        copy 'psad_posf', "${PSAD_CONFDIR}/psad_posf";
-        &perms_ownership("${PSAD_CONFDIR}/psad_posf", 0600);
-    }
-    if (-e "${PSAD_CONFDIR}/psad_auto_ips") {
-        &archive("${PSAD_CONFDIR}/psad_auto_ips") unless $noarchive;
-        &logr(" .. Copying psad_auto_ips -> " .
-            "${PSAD_CONFDIR}/psad_auto_ips\n");
-        copy 'psad_auto_ips', "${PSAD_CONFDIR}/psad_auto_ips";
-        &perms_ownership("${PSAD_CONFDIR}/psad_auto_ips", 0600);
-    } else {
-        &logr(" .. Copying psad_auto_ips -> " .
-            "${PSAD_CONFDIR}/psad_auto_ips\n");
-        copy 'psad_auto_ips', "${PSAD_CONFDIR}/psad_auto_ips";
-        &perms_ownership("${PSAD_CONFDIR}/psad_auto_ips", 0600);
-    }
-    my $query_rv = 0;
+    my $preserve_rv = 0;
     if (-e "${PSAD_CONFDIR}/psad.conf") {
-        $query_rv = &query_preserve_config();
+        $preserve_rv = &query_preserve_config();
     }
 
     for my $file qw(psad.conf psadwatchd.conf kmsgsd.conf diskmond.conf) {
         if (-e "${PSAD_CONFDIR}/$file") {
             &archive("${PSAD_CONFDIR}/$file") unless $noarchive;
-            if ($query_rv) {
+            if ($preserve_rv) {
                 &preserve_config($file);
             } else {
                 &logr(" .. Copying $file -> ${PSAD_CONFDIR}/$file\n");
@@ -523,8 +487,16 @@ sub install() {
             &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
         }
     }
+    ### deal with psad_auto_ips, psad_signatures, psad_posf here
+    ### add &query_preserve_sigs_autoips();
+    my $preserve_sigs_rv = 0;
+    if (-e "${PSAD_CONFDIR}/psad_signatures") {
+#        $preserve_sigs_rv = &query_preserve_sigs_autoips();
+    }
+    for my $file qw(psad_signatures psad_posf psad_auto_ips) {
+    }
 
-    if ($Cmds{'iptables'} && -x $Cmds{'iptables'}) {
+    if (-x $Cmds{'iptables'}) {
         &logr(" .. Found iptables.  Testing syslog configuration.\n");
         ### make sure we actually see packets being logged by
         ### the firewall.
@@ -532,7 +504,7 @@ sub install() {
     }
 
     my $email_str = '';
-    unless ($query_rv) {  ### we preserved the existing config
+    unless ($preserve_rv) {  ### we preserved the existing config
         $email_str = &query_email();
     }
     if ($email_str) {
@@ -599,16 +571,16 @@ sub install() {
     } else {
         $running = 0;
     }
-    if ($running) {
-        &logr(" .. An older version of psad is already running.  To ".
-            "start the new version, run \"${USRSBIN_DIR}/psad --Restart\"\n");
-    } else {
-        &logr(" .. To execute psad, run \"${INIT_DIR}/psad start\"\n");
-    }
-    if ($query_rv) {
+    if ($preserve_rv) {
         &logr("\n .. Psad has been installed (with your original config).\n");
     } else {
         &logr("\n .. Psad has been installed.\n");
+    }
+    if ($running) {
+        &logr("\n .. An older version of psad is already running.  To ".
+            "start the new version, run \"${USRSBIN_DIR}/psad --Restart\"\n");
+    } else {
+        &logr("\n .. To execute psad, run \"${INIT_DIR}/psad start\"\n");
     }
     return;
 }
@@ -782,17 +754,21 @@ sub preserve_config() {
 
     &logr(" .. Preserving existing config: ${PSAD_CONFDIR}/$file\n");
     ### write to a tmp file and then move so any running psad daemon will
-    ### re-import a full config file
+    ### re-import a full config file if a HUP signal is received during
+    ### the install.
     open CONF, "> ${PSAD_CONFDIR}/${file}.new" or die " ** Could not open ",
         "${PSAD_CONFDIR}/${file}.new: $!";
     for my $new_line (@new_lines) {
-        if ($new_line =~ /^\s*(\w+)/) {
+        if ($new_line =~ /^\s*#/) {
+            print CONF $new_line;
+        } elsif ($new_line =~ /^\s*(\S+)/) {
             my $var = $1;
             my $found = 0;
             for my $orig_line (@orig_lines) {
                 if ($orig_line =~ /^\s*$var\s/) {
                     print CONF $orig_line;
                     $found = 1;
+                    last;
                 }
             }
             unless ($found) {
@@ -1195,21 +1171,20 @@ sub put_string() {
 
 sub archive() {
     my $file = shift;
+    my $curr_pwd = cwd();
+    chdir $CONF_ARCHIVE or die $!;
     my ($filename) = ($file =~ m|.*/(.*)|);
-    my $targetbase = "${CONF_ARCHIVE}/${filename}.old";
-    for (my $i = 4; $i > 1; $i--) {  ### keep five copies of the old config files
-        my $oldfile = $targetbase . $i;
-        my $newfile = $targetbase . ($i+1);
-        if (-e $oldfile) {
-            move $oldfile, $newfile;
-        }
+    my $base = "${filename}.old";
+    for (my $i = 5; $i > 1; $i--) {  ### keep five copies of old config files
+        my $j = $i - 1;
+        unlink "${base}${i}.gz" if -e "${base}${i}.gz";
+        move "${base}${j}.gz", "${base}${i}.gz" if -e "${base}${j}.gz";
     }
-    if (-e $targetbase) {
-        my $newfile = $targetbase . '2';
-        move $targetbase, $newfile;
-    }
-    &logr(" .. Archiving $file -> $targetbase\n");
-    copy $file, $targetbase;   ### move $file into the archive directory
+    &logr(" .. Archiving $file -> ${base}1\n");
+    unlink "${base}1.gz" if -e "${base}1.gz";
+    copy $file, "${base}1";   ### move $file into the archive directory
+    system "$Cmds{'gzip'} ${base}1";
+    chdir $curr_pwd or die $!;
     return;
 }
 

@@ -12,6 +12,16 @@ firewall rulebase.  Some example firewall rulesets that are compatible
 with psad are contained within the file FW.EXAMPLES.
 
 
+	The functionality of psad is affected by the version of the 
+Linux kernel on which the software is deployed.  For kernel versions 
+2.2.x (and 2.0.x?) the built-in ipchains firewalling code does not have
+any capability to log or distinguish any tcp flags other than syn, or ack.  
+Hence, most of the tcp signatures included in psad_signatures cannot be 
+detected by psad running on these kernel versions.  By contrast, the 
+iptables firewalling code (see http://netfilter.kernelnotes.org) 
+integrated within the 2.4.x kernels can distinguish all tcp flags and 
+hence make the signature logic possible within psad.
+
 	Before executing the install.pl script, edit the config sections
 at the beginning of the psad, diskmond, kmsgsd, and install.pl scripts.
 Sensible defaults are provided for each of the scripts so hopefully 
@@ -41,7 +51,7 @@ USAGE:
 
 Usage: psad [-f] [-h] [-n] [-h]
 
-        -no_preserve             - disable preservation of old configs.
+        -no_preserve            - disable preservation of old configs.
         -exec_psad              - execute psad after installing.
         -firewallcheck          - disable firewall rules verification.
         -h                      - prints this help message.

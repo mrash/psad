@@ -811,8 +811,8 @@ sub check_scan() {
         }
 
         unless ($intf and $chain) {
-            print STDERR " ** err packet: could not determine interface and chain.\n"
-                if $debug;
+            print STDERR " ** err packet: could not determine ",
+                "interface and chain.\n" if $debug;
             push @err_pkts, $pkt;
             next PKT;
         }
@@ -1591,6 +1591,13 @@ sub validate_config() {
         unless (&is_digit($config{'DSHIELD_ALERT_INTERVAL'})
             && 0 < $config{'DSHIELD_ALERT_INTERVAL'}
             && $config{'DSHIELD_ALERT_INTERVAL'} < 24);
+    if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
+            and $config{'IPTABLES_BLOCK_METHOD'} eq 'N'
+            and $config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'N') {
+        &Psad::psyslog('psad', ".. config warning, ENABLE_AUTO_IDS=Y, but " .
+            "both IPTABLES_BLOCK_METHOD and TCPWRAPPERS_BLOCK_METHOD are " .
+            "set to N.");
+    }
     return;
 }
 
@@ -1628,7 +1635,7 @@ sub validate_home_net() {
             $found = 1 if $home_net eq $net;
         }
         unless ($found) {
-            &Psad::psyslog('psad', " .. HOME_NET definition in psad.conf " .
+            &Psad::psyslog('psad', ".. HOME_NET definition in psad.conf " .
                 "contains $home_net which does not appear to be directly " .
                 "connected to the local system.");
         }
@@ -2153,7 +2160,7 @@ sub assign_danger_level() {
                     $scan_dl{$src} = 5;
                 }
             }
-            print STDERR 'assign_danger_level(): DL (after assignment) = ',
+            print STDERR ' .. assign_danger_level(): DL (after assignment) = ',
                 "$scan_dl{$src}\n" if $debug;
         }
     }
@@ -2800,13 +2807,19 @@ sub ipt_test_block() {
                 next RULE if $rule =~ /^\s*target\s/;
                 ### DROP       all  --  1.1.1.1        0.0.0.0/0
                 if ($rule =~ /^DROP\s+all.*?$ip\s+0\.0\.0\.0\/0/) {
-                    print STDERR " .. ipt_test_block($ip): found ip: $ip\n"
-                        if $debug;
+                    if ($debug) {
+                        print STDERR " .. ipt_test_block($ip): found ip: ",
+                            "$ip\n";
+                        print STDERR " .. ipt_test_block($ip): matched ",
+                            "rule: $rule\n";
+                    }
                     return 1;
                 }
             }
         }
     }
+    print STDERR " ** ipt_test_block($ip): did not find ip: $ip\n"
+        if $debug;
     ### did not find the ip
     return 0;
 }
@@ -2834,10 +2847,14 @@ sub ipt_block() {
     }
     if ($block_success) {
         ### write the ip out to the auto blocked file
+        print STDERR " .. ipt_block(): added block for $src\n"
+            if $debug;
         &write_blocked_ip($src, $config{'AUTO_BLOCK_IPT_FILE'});
     } else {
         &Psad::psyslog('psad', "** could not add iptables " .
             "block rule for: $src");
+        print STDERR " ** Could not add iptables block rule for: $src\n"
+            if $debug;
     }
     return;
 }
@@ -2852,11 +2869,16 @@ sub ipt_remove_block() {
 
     my $rm_block = 0;
     for my $table (keys %ipt_chains) {
-        for my $chain (keys %{$ipt_chains{$table}}) {
-            open IPT, "$cmds{'iptables'} -t $table -nL $chain |" or next;
-            my @rules = <IPT>;
-            close IPT;
-
+        CHAIN: for my $chain (keys %{$ipt_chains{$table}}) {
+            print STDERR " .. ipt_remove_block($src): executing ",
+                "$cmds{'iptables'} -t $table -nL $chain\n" if $debug;
+            my @rules = ();
+            eval {
+                open IPT, "$cmds{'iptables'} -t $table -nL $chain |"
+                    or next CHAIN;
+                @rules = <IPT>;
+                close IPT;
+            };
             my $rulenum = 1;
             RULE: for my $rule (@rules) {
                 chomp $rule;
@@ -2869,8 +2891,12 @@ sub ipt_remove_block() {
                             "table $chain chain:\n";
                         print "        $rule\n";
                     }
-                    print STDERR " .. ipt_remove_block($src) removing block ",
-                        "in $table $chain\n" if $debug;
+                    if ($debug) {
+                        print STDERR " .. ipt_remove_block($src) removing ",
+                            "block in $table $chain\n";
+                        print STDERR " .. ipt_remove_block($src): matched ",
+                            "rule: $rule\n";
+                    }
                     my $rv = 1;
                     eval {
                         $rv = (system "$cmds{'iptables'} -t $table -D " .
@@ -2892,6 +2918,8 @@ sub ipt_remove_block() {
                 "against $src (timeout expired).", '',
                 $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         }
+        print STDERR " .. ipt_remove_block(): removed iptables block ",
+            "against $src (timeout expired).\n" if $debug;
         &rm_blocked_ip($src, $config{'AUTO_BLOCK_IPT_FILE'});
     } else {
         &Psad::psyslog('psad', "** could not locate iptables " .
@@ -2989,7 +3017,7 @@ sub auto_psad_response() {
                     $cmds{'mail'});
                 my $found = 0;
                 open H, "< $config{'ETC_HOSTS_DENY'}" or die
-                    "Could not open $config{'ETC_HOSTS_DENY'}: $!";
+                    " ** Could not open $config{'ETC_HOSTS_DENY'}: $!";
                 my @lines = <H>;
                 close H;
                 for my $line (@lines) {
@@ -2998,7 +3026,7 @@ sub auto_psad_response() {
                 }
                 unless ($found) {
                     open H, ">> $config{'ETC_HOSTS_DENY'}" or die
-                        "Could not open $config{'ETC_HOSTS_DENY'}: $!";
+                        " ** Could not open $config{'ETC_HOSTS_DENY'}: $!";
                     print H "ALL: $src\n";
                     close H;
                     ### write the ip out to the auto blocked file

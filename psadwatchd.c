@@ -37,6 +37,9 @@
 /* INCLUDES *****************************************************************/
 #include "psad.h"
 
+/* DEFINES *****************************************************************/
+#define PSADWATCHD_CONF "/etc/psad/psadwatchd.conf"
+
 /* GLOBALS ******************************************************************/
 short int psad_syscalls_ctr     = 0;
 short int kmsgsd_syscalls_ctr   = 0;
@@ -91,7 +94,6 @@ int main(int argc, char *argv[]) {
     unsigned int psadwatchd_max_retries = 10; /* default to 10 tries */
     time_t config_mtime;
     struct stat statbuf;
-    int len;
 
 #ifdef DEBUG
     printf(" .. Entering DEBUG mode ..n");
@@ -101,18 +103,10 @@ int main(int argc, char *argv[]) {
     /* handle command line arguments */
     if (argc == 1) {  /* nothing but the program name was
                          specified on the command line */
-        len = strlen(CONFIG_FILE);
-        if (len > MAX_PATH_LEN)
-            len = MAX_PATH_LEN;
-        memcpy(config_file, CONFIG_FILE, len);
-        config_file[len] = '\0';
+        strlcpy(config_file, PSADWATCHD_CONF, MAX_PATH_LEN);
     } else if (argc == 2) {  /* the path to the config file was
                                 supplied on the command line */
-        len = strlen(argv[1]);
-        if (len > MAX_PATH_LEN)
-            len = MAX_PATH_LEN;
-        memcpy(config_file, argv[1], len);
-        config_file[len] = '\0';
+        strlcpy(config_file, argv[1], MAX_PATH_LEN);
     } else {
         printf(" .. You may only specify the path to a single config file:  ");
         printf("Usage:  psadwatchd <configfile>\n");
@@ -127,7 +121,6 @@ int main(int argc, char *argv[]) {
 
     /* initialize config_mtime */
     config_mtime = statbuf.st_mtime;
-
 
 #ifdef DEBUG
     printf(" .. parsing config_file: %s\n", config_file);
@@ -194,7 +187,6 @@ int main(int argc, char *argv[]) {
                 &psadwatchd_max_retries
             );
         }
-
         sleep(psadwatchd_check_interval);
     }
 
@@ -249,6 +241,7 @@ static void check_process(
 #ifdef DEBUG
     printf(" .. Could not read the pid_file: %s\n", pid_file);
 #endif
+        fclose(pidfile_ptr);
         return;
     }
 

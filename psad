@@ -1107,7 +1107,8 @@ sub assign_danger_level() {
 }
 
 sub write_packet_counters() {
-    open P, "> $Config{'PACKET_COUNTER_FILE'}" or die " ... @@@ Could not open $Config{'PACKET_COUNTER_FILE'}: $!";
+    open P, "> $Config{'PACKET_COUNTER_FILE'}" or die
+            " ... @@@ Could not open $Config{'PACKET_COUNTER_FILE'}: $!";
     print P "tcp:  $tcp_ctr\n";
     print P "udp:  $udp_ctr\n";
     print P "icmp: $icmp_ctr\n";
@@ -1115,30 +1116,13 @@ sub write_packet_counters() {
     return;
 }
 
-#sub automatic_ip_danger_assignment() {
-#    for my $scan_ip (keys %Scan) {
-#        for my $dst (keys %{$Scan{$scan_ip}}) {
-#            for my $auto_ip (keys %Auto_ips) {
-#                if ($scan_ip eq $auto_ip
-#                        && $Scan{$scan_ip}{$dst}{'AUTO'} eq 'N') {
-#                    $Scan{$scan_ip}{$dst}{'CURR_DL'}
-#                                                    = $Auto_ips{$auto_ip};
-#                    $Scan{$scan_ip}{$dst}{'ALERTED'} = 'N';
-#                    $Scan{$scan_ip}{$dst}{'AUTO'} = 'Y';
-#                }
-#            }
-#        }
-#    }
-#    return;
-#}
-
 sub collect_errors() {
     my ($bad_packets_aref) = @_;
-    open ERRORS, ">> $Config{'ERROR_LOG'}";
+    open ERR, ">> $Config{'ERROR_LOG'}";
     for my $l (@$bad_packets_aref) {
-        print ERRORS "$l\n";
+        print ERR "$l\n";
     }
-    close ERRORS;
+    close ERR;
 }
 
 sub scan_logr() {
@@ -1202,13 +1186,16 @@ sub scan_logr() {
                 }
                 my $start_time = $Scan{$src}{$dst}{'S_TIME'}{'READABLE'};
                 my $end_time   = $Scan{$src}{$dst}{'E_TIME'}{'READABLE'};
-                my @time = split /\s+/, scalar localtime;   ### Get the current time as a nice ASCII string.
-                pop @time; shift @time;    ### Get rid of the day and the year to make the time consistent with syslog
+                ### Get the current time as a nice ASCII string.
+                my @time = split /\s+/, scalar localtime;
+                pop @time; shift @time;    ### Get rid of the day and the year to make
+                                           ### the time consistent with syslog
                 my $time = join ' ', @time;
                 unless ($dnslookups) {
                     my $src_tmp = $src;
                     $src_tmp =~ s/\.//g;
-                    if ($src_tmp =~ /\D/) {  ### $ipaddr was reported as a host name by iptables
+                    if ($src_tmp =~ /\D/) {
+                        ### $ipaddr was reported as a host name by iptables
                         $dnsstring = $src;
                     } else {
                         my $ipaddr = gethostbyname($src);

@@ -151,6 +151,8 @@ my $debug = 0;
 
 ### we don't yet know which type of firewall we are
 ### running on; this will be calculated by check_scan().
+### when the first dropped packet hits the firewall and
+### we can examine the logging format.
 my $use_ipchains = 0;
 my $use_iptables = 0;
 
@@ -223,19 +225,6 @@ Getopt::Long::Configure('no_ignore_case');
     'auto_ips=s'     => \$autoips_file,   # Path to psad auto ips file for
                                           # auto-setting ip danger level.
     'output'         => \$output,         # Write scanlog messages to STDOUT.
-    'no_whois'       => \$no_whois,       # Do not issue whois lookups against
-    'no_signatures'  => \$no_signatures,  # Disable signature processing.
-    'no_auto_ips'    => \$no_auto_ips,    # Disable auto danger level
-                                          # assignment.
-    'no_daemon'      => \$no_daemon,      # Do not run as a daemon.
-    'no_fw_check'    => \$no_fwcheck,     # Do not check firewall rules.
-    'no_rdns'        => \$no_rdns,        # Do not issue dns lookups against
-                                          # Scanning ip address.
-    'no_localport'   => \$no_netstat,     # Do not check to see if the
-                                          # firewall is listening on localport
-                                          # that has been scanned.
-    'no_errors'      => \$no_errors,      # Do not write malformed packet.
-                                          # messages to error log.
     'debug'          => \$debug,          # Run in debug mode.
     'interval=s'     => \$check_interval, # Set $check_interval from the
                                           # command line.
@@ -251,6 +240,19 @@ Getopt::Long::Configure('no_ignore_case');
                                           # running psad processes.
     'USR1'           => \$usr1,           # Send an existing psad process a
                                           # USR1 signal (useful for debugging).
+    'no_whois'       => \$no_whois,       # Do not issue whois lookups against
+    'no_signatures'  => \$no_signatures,  # Disable signature processing.
+    'no_auto_ips'    => \$no_auto_ips,    # Disable auto danger level
+                                          # assignment.
+    'no_daemon'      => \$no_daemon,      # Do not run as a daemon.
+    'no_fw_check'    => \$no_fwcheck,     # Do not check firewall rules.
+    'no_rdns'        => \$no_rdns,        # Do not issue dns lookups against
+                                          # Scanning ip address.
+    'no_localport'   => \$no_netstat,     # Do not check to see if the
+                                          # firewall is listening on localport
+                                          # that has been scanned.
+    'no_errors'      => \$no_errors,      # Do not write malformed packet.
+                                          # messages to error log.
     'Version'        => \$print_version,  # Print the psad version and exit.
     'Daemon'         => \$daemon,         #    old command line arg
     'firewallcheck'  => \$fwcheck,        #    old command line arg
@@ -264,7 +266,7 @@ Getopt::Long::Configure('no_ignore_case');
 
 ### Print the version number and exit if -V given on the command line.
 if ($print_version) {
-    print " .. psad version $version, by Michael B. Rash " .
+    print " ... psad version $version, by Michael B. Rash " .
         "(mbr\@cipherdyne.com)\n";
     exit 0;
 }
@@ -1570,9 +1572,9 @@ sub auto_psad_response(){
         for my $dst (keys %{$scan{$src}}) {
             my $current_danger_level = $scan{$src}{$dst}{'CURR_DL'};
             ### We only want to block the IP once.  Currently this will block
-            ### all traffic from the host to _all_ destinations that are protected
-            ### by the firewall if the ip trips the $auto_psad_level threshold for
-            ### _any_ destination.
+            ### all traffic from the host to _all_ destinations that are
+            ### protected by the firewall if the ip trips the $auto_psad_level
+            ### threshold for _any_ destination.
             if ($current_danger_level
                 >= $config{'AUTO_IDS_DANGER_LEVEL'}
                 && !(defined $scan{$src}{$dst}{'BLOCKED'})) {

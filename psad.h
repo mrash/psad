@@ -48,7 +48,7 @@
 #include <syslog.h>
 
 /* DEFINES ********************************************************************/
-#define HOSTNAME "HOSTNAME"
+#define HOSTNAME "orthanc"
 
 #define MAX_LINE_BUF 1024
 #define MAX_PID_SIZE 6

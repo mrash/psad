@@ -1063,17 +1063,17 @@ sub perms_ownership() {
 
 sub get_fw_search_string() {
     print "\n";
-    print " .. psad checks the firewall configuration on the underlying machine\n"
-        . "     to see if packets will be logged and dropped that have not\n"
-        . "     explicitly allowed through.  By default psad looks for the\n"
-        . "     string \"DROP\". However, if your particular firewall configuration\n"
-        . "     logs blocked packets with the string \"Audit\" for example, psad\n"
-        . "     be configured here to look for this string.\n\n";
+    print " .. psad checks the firewall configuration on the underlying machine\n",
+        "     to see if packets will be logged and dropped that have not\n",
+        "     explicitly allowed through.  By default psad looks for the\n",
+        "     string \"DROP\". However, if your particular firewall configuration\n",
+        "     logs blocked packets with the string \"Audit\" for example, psad\n",
+        "     can be configured here to look for this string.\n\n";
     my $ans = '';
     while ($ans ne 'y' && $ans ne 'n') {
-        print "     Would you like to add a new string that will be used to analyze\n"
-            . "     firewall log messages?  (Is it usually safe to say \"n\" here).\n"
-            . "     (y/[n])? ";
+        print "     Would you like to add a new string that will be used to analyze\n",
+            "     firewall log messages?  (Is it usually safe to say \"n\" here).\n",
+            "     (y/[n])?  ";
         $ans = <STDIN>;
         if ($ans eq "\n") {  ### allow the default answer to take over
             $ans = 'n';
@@ -1357,7 +1357,7 @@ sub install_manpage() {
     }
     mkdir $mpath, 0755 unless -d $mpath;
     my $mfile = "${mpath}/${manpage}";
-    &logr(" .. Installing $manpage man page as $mfile\n");
+    &logr(" .. Installing $manpage man page at $mfile\n");
     copy $manpage, $mfile or die " ** Could not copy $manpage to " .
         "$mfile: $!";
     &perms_ownership($mfile, 0644);

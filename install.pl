@@ -117,15 +117,17 @@ unless ($found) {
     $PERL_INSTALL_DIR = $INC[0];
 }
 
-### set the default execution flags
-my $noarchive    = 0;
-my $uninstall    = 0;
-my $help         = 0;
+### set the default execution flags and command line args
+my $noarchive   = 0;
+my $uninstall   = 0;
+my $help        = 0;
+my $syslog_conf = '';
 
 &usage(1) unless (GetOptions(
-    'no-preserve' => \$noarchive,   ### Don't preserve existing configs.
-    'uninstall'   => \$uninstall,   ### Uninstall psad.
-    'help'        => \$help         ### Display help.
+    'no-preserve'   => \$noarchive,   ### Don't preserve existing configs.
+    'syslog-conf=s' => \$syslog_conf, ### specify path to syslog config file.
+    'uninstall'     => \$uninstall,   ### Uninstall psad.
+    'help'          => \$help         ### Display help.
 ));
 &usage(0) if $help;
 
@@ -266,30 +268,6 @@ sub install() {
         }
     }
 
-    my $restarted_syslog = 0;
-    if (-e '/etc/syslog.conf') {
-        &append_fifo_syslog();
-        if (((system "$Cmds{'killall'} -HUP syslogd 2> /dev/null")>>8) == 0) {
-            &logr("[+] Restarted syslog.\n");
-            $restarted_syslog = 1;
-        }
-    }
-    if (-e '/etc/syslog-ng/syslog-ng.conf') {
-        &append_fifo_syslog_ng();
-        if (((system "$Cmds{'killall'} -HUP syslog-ng 2> /dev/null")>>8) == 0) {
-            &logr("[+] Restarted syslog-ng.\n");
-            $restarted_syslog = 1;
-        }
-    }
-    if (-e '/etc/metalog/metalog.conf') {
-        &config_metalog();
-        &logr("[-] Metalog support is shaky in psad.  " .
-            "Use at your own risk.\n");
-    }
-
-    unless ($restarted_syslog) {
-        &logr("[-] Could not restart any syslog daemons.\n");
-    }
     unless (-d $PSAD_DIR) {
         &logr("[+] Creating $PSAD_DIR\n");
         mkdir $PSAD_DIR, 0500;
@@ -492,13 +470,6 @@ sub install() {
     }
     &logr("\n");
 
-    if (-x $Cmds{'iptables'}) {
-        &logr("[+] Found iptables.  Testing syslog configuration:\n");
-        ### make sure we actually see packets being logged by
-        ### the firewall.
-        &test_syslog_config();
-    }
-
     unless ($preserve_rv) {  ### we want to preserve the existing config
 
         ### get email address(es)
@@ -509,13 +480,6 @@ sub install() {
                 &put_string('EMAIL_ADDRESSES', $email_str,
                     "${PSAD_CONFDIR}/$file");
             }
-        }
-
-        ### get syslog daemon (e.g. syslog, syslog-ng, or metalog)
-        my $syslog_str = &query_syslog();
-        if ($syslog_str) {
-            &put_string('SYSLOG_DAEMON', $syslog_str,
-                "${PSAD_CONFDIR}/psad.conf");
         }
 
         ### Give the admin the opportunity to set the strings that are
@@ -566,6 +530,68 @@ sub install() {
             &logr("[+] Setting hostname to \"$HOSTNAME\" in $file\n");
             &set_hostname($file);
         }
+    }
+
+    ### get syslog daemon (e.g. syslog, syslog-ng, or metalog)
+    my $syslog_str = &query_syslog();
+
+    &put_string('SYSLOG_DAEMON', $syslog_str,
+        "${PSAD_CONFDIR}/psad.conf");
+
+    my $restarted_syslog = 0;
+    if ($syslog_str eq 'syslogd') {
+        ### allow command line --syslog-conf arg to take over
+        $syslog_conf = '/etc/syslog.conf' unless $syslog_conf;
+        if (-e $syslog_conf) {
+            &append_fifo_syslog($syslog_conf);
+            if (((system "$Cmds{'killall'} -HUP syslogd 2> /dev/null")>>8) == 0) {
+                &logr("[+] HUP signal sent to syslogd.\n");
+                $restarted_syslog = 1;
+            }
+        } else {
+            die
+"[-] The config file $syslog_conf for syslogd does not exist. Re-run\n",
+"    install.pl with the --syslog-conf argument.\n";
+        }
+    } elsif ($syslog_str eq 'syslog-ng') {
+        ### allow command line --syslog-conf arg to take over
+        $syslog_conf = '/etc/syslog-ng/syslog-ng.conf' unless $syslog_conf;
+        if (-e $syslog_conf) {
+            &append_fifo_syslog_ng($syslog_conf);
+            if (((system "$Cmds{'killall'} -HUP syslog-ng 2> /dev/null")>>8) == 0) {
+                &logr("[+] HUP signal sent to syslog-ng.\n");
+                $restarted_syslog = 1;
+            }
+        } else {
+            die
+"[-] The config file $syslog_conf for syslog-ng does not\n",
+"    exist. Re-run install.pl with the --syslog-conf argument.\n";
+        }
+    } elsif ($syslog_str eq 'metalog') {
+        ### allow command line --syslog-conf arg to take over
+        $syslog_conf = '/etc/metalog/metalog.conf' unless $syslog_conf;
+        if (-e $syslog_conf) {
+            &config_metalog($syslog_conf);
+            &logr("[-] Metalog support is shaky in psad.  " .
+                "Use at your own risk.\n");
+            ### don't send warning about not restarting metalog daemon
+            $restarted_syslog = 1;
+        } else {
+            die
+"[-] The config file $syslog_conf for metalog does not\n",
+"    exist. Re-run install.pl with the --syslog-conf argument.\n";
+        }
+    }
+
+    unless ($restarted_syslog) {
+        &logr("[-] Could not restart any syslog daemons.\n");
+    }
+
+    if (-x $Cmds{'iptables'}) {
+        &logr("[+] Found iptables. Testing syslog configuration:\n");
+        ### make sure we actually see packets being logged by
+        ### the firewall.
+        &test_syslog_config($syslog_str);
     }
 
     ### see if there are any "_CHANGEME_" strings left and give the
@@ -945,18 +971,9 @@ sub set_hostname() {
 }
 
 sub append_fifo_syslog_ng() {
-    &logr('[+] Modifying /etc/syslog-ng/syslog-ng.conf to write kern.info ' .
-        "messages to\n");
-    &logr("    $PSAD_FIFO\n");
-    unless (-e '/etc/syslog-ng/syslog-ng.conf.orig') {
-        copy '/etc/syslog-ng/syslog-ng.conf',
-            '/etc/syslog-ng/syslog-ng.conf.orig' or die "[*] Could not ",
-            "copy /etc/syslog-ng/syslog-ng.conf -> ",
-            "/etc/syslog-ng/syslog-ng.conf.orig: $!";
-    }
-    &archive('/etc/syslog-ng/syslog-ng.conf');
-    open RS, '< /etc/syslog-ng/syslog-ng.conf' or
-        die "[*] Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
+    my $syslog_conf = shift;
+    open RS, "< $syslog_conf" or
+        die "[*] Unable to open $syslog_conf: $!\n";
     my @slines = <RS>;
     close RS;
 
@@ -966,8 +983,16 @@ sub append_fifo_syslog_ng() {
     }
 
     unless ($found_fifo) {
-        open SYSLOGNG, '>> /etc/syslog-ng/syslog-ng.conf' or
-            die "[*] Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
+        &logr("[+] Modifying $syslog_conf to write kern.info " .
+            "messages to\n    $PSAD_FIFO");
+        unless (-e "$syslog_conf.orig") {
+            copy $syslog_conf, "$syslog_conf.orig" or die "[*] Could not ",
+                "copy $syslog_conf -> $syslog_conf.orig: $!";
+        }
+        &archive($syslog_conf);
+
+        open SYSLOGNG, ">> $syslog_conf" or
+            die "[*] Unable to open $syslog_conf: $!\n";
         print SYSLOGNG "\n",
             "destination psadpipe { pipe(\"/var/lib/psad/psadfifo\"); };\n",
 #            "filter f_kerninfo { facility(kern) and level(info); };\n",
@@ -979,13 +1004,9 @@ sub append_fifo_syslog_ng() {
 }
 
 sub config_metalog() {
-    unless (-e '/etc/metalog/metalog.conf.orig') {
-        copy '/etc/metalog/metalog.conf',
-            '/etc/metalog/metalog.conf.orig' or die "[*] Could not copy ",
-            "/etc/metalog/metalog.conf -> /etc/metalog/metalog.conf.orig: $!";
-    }
-    open RS, "< /etc/metalog/metalog.conf" or
-        die "[*] Unable to open /etc/metalog/metalog.conf: $!\n";
+    my $syslog_conf = shift;
+    open RS, "< $syslog_conf" or
+        die "[*] Unable to open $syslog_conf: $!\n";
     my @lines = <RS>;
     close RS;
 
@@ -997,8 +1018,14 @@ sub config_metalog() {
         }
     }
     unless ($found) {
-        open METALOG, "> /etc/metalog/metalog.conf" or
-            die "[*] Unable to open /etc/metalog/metalog.conf: $!";
+        &logr("[+] Modifying $syslog_conf to write kern.info messages " .
+            "to\n    $PSAD_FIFO (with script /usr/sbin/psadpipe.sh)");
+        unless (-e "$syslog_conf.orig") {
+            copy $syslog_conf, "$syslog_conf.orig" or die "[*] Could not copy ",
+                "$syslog_conf -> $syslog_conf.orig: $!";
+        }
+        open METALOG, "> $syslog_conf" or
+            die "[*] Unable to open $syslog_conf: $!";
 
         print METALOG "\n";
         print METALOG "\nPSAD :\n",
@@ -1149,34 +1176,44 @@ sub preserve_config() {
 }
 
 sub append_fifo_syslog() {
-    &logr('[+] Modifying /etc/syslog.conf to write kern.info ' .
-        "messages to\n");
-    &logr("    $PSAD_FIFO\n");
-    unless (-e '/etc/syslog.conf.orig') {
-        copy '/etc/syslog.conf', '/etc/syslog.conf.orig' or die "[*] Could ",
-            "not copy /etc/syslog.conf -> /etc/syslog.conf.orig: $!";
-    }
-    &archive('/etc/syslog.conf');
-    open RS, '< /etc/syslog.conf' or
-        die "[*] Unable to open /etc/syslog.conf: $!\n";
+    my $syslog_conf = shift;
+    open RS, "< $syslog_conf" or
+        die "[*] Unable to open $syslog_conf: $!\n";
     my @slines = <RS>;
     close RS;
-    open SYSLOG, '> /etc/syslog.conf' or
-        die "[*] Unable to open /etc/syslog.conf: $!\n";
+
+    my $found_fifo = 0;
     for my $line (@slines) {
-        unless ($line =~ /psadfifo/) {
-            print SYSLOG $line;
-        }
+        $found_fifo = 1 if $line =~ /psadfifo/;
     }
-    print SYSLOG '### Send kern.info messages to psadfifo for ',
-        "analysis by kmsgsd\n";
-    ### reinstate kernel logging to our named pipe
-    print SYSLOG "kern.info\t\t|$PSAD_FIFO\n";
-    close SYSLOG;
+
+    unless ($found_fifo) {
+        &logr("[+] Modifying $syslog_conf to write kern.info " .
+            "messages to\n");
+        &logr("    $PSAD_FIFO\n");
+        unless (-e "$syslog_conf.orig") {
+            copy $syslog_conf, "$syslog_conf.orig" or die "[*] Could ",
+                "not copy $syslog_conf -> $syslog_conf.orig: $!";
+        }
+        &archive($syslog_conf);
+        open SYSLOG, "> $syslog_conf" or
+            die "[*] Unable to open $syslog_conf: $!\n";
+        for my $line (@slines) {
+            unless ($line =~ /psadfifo/) {
+                print SYSLOG $line;
+            }
+        }
+        print SYSLOG '### Send kern.info messages to psadfifo for ',
+            "analysis by kmsgsd\n";
+        ### reinstate kernel logging to our named pipe
+        print SYSLOG "kern.info\t\t|$PSAD_FIFO\n";
+        close SYSLOG;
+    }
     return;
 }
 
 sub test_syslog_config() {
+    my $syslog_str = shift;
     my %used_ports;
 
     ### first find an unused high tcp port to use for testing
@@ -1292,11 +1329,11 @@ sub test_syslog_config() {
     &scrub_fwdata();
 
     if ($found) {
-        &logr("[+] Successful syslog reconfiguration.\n\n");
+        &logr("[+] Successful $syslog_str reconfiguration.\n\n");
     } else {
-        &logr("[-] unsuccessful syslog reconfiguration.\n");
+        &logr("[-] unsuccessful $syslog_str reconfiguration.\n");
         &logr("    Consult the psad man page for the basic " .
-            "syslog requirement to get psad to work.\n\n");
+            "$syslog_str requirement to get psad to work.\n\n");
     }
 
     if ($start_kmsgsd && -e "${RUNDIR}/kmsgsd.pid") {
@@ -1375,13 +1412,7 @@ sub check_old_psad_installation() {
     unlink "${PERL_INSTALL_DIR}/Psad.pm"
         if (-e "${PERL_INSTALL_DIR}/Psad.pm");
     if (-e '/var/log/psadfifo') {  ### this is the old psadfifo location
-        if (-e "${USRSBIN_DIR}/psad"
-            && system "${USRSBIN_DIR}/psad --Status > /dev/null") {
-            ### deal with this later.  The user should be prompted before
-            ### the old psadfifo is removed since kmsgsd will have a problem
-        } else {
-            unlink '/var/log/psadfifo';
-        }
+        unlink '/var/log/psadfifo';
     }
     return;
 }
@@ -1565,8 +1596,13 @@ sub query_syslog() {
         &logr("    Which system logger is running (syslogd, " .
             "syslog-ng, metalog)?  ");
         $ans = <STDIN>;
-        chomp $ans;
+        $ans =~ s/\s*//g;
     }
+    die "[-] Invalid syslog daemon \"$ans\"\n"
+        unless ($ans and
+            ($ans eq 'syslogd'
+            or $ans eq 'syslog-ng'
+            or $ans eq 'metalog'));
     print "\n";
     return $ans;
 }

@@ -240,7 +240,7 @@ Getopt::Long::configure("no_ignore_case");
     'interval=s'     => \$check_interval, # Set $check_interval from the
                                           # command line.
     'config=s'       => \$config_file,    # Specify configuration file.
-    'logging_server' => \$syslog_server,  # We are running psad on a syslog
+    'Logging_server' => \$syslog_server,  # We are running psad on a syslog
                                           # logging server.
     'Kill'           => \$kill,           # Kill all running psad processes.
                                           # (psadwatchd, psad, kmsgsd,
@@ -2124,35 +2124,26 @@ psad; the Port Scan Attack Detector
 Version: $version
 By Michael B. Rash (mbr\@cipherdyne.com, http://www.cipherdyne.com)
 
-USAGE: psad [-D] [-d] [-o] [-e] [-L] [-f] [-r] [-w] [-l] [-i <interval>] [-h]
-       [-V] [-K] [-R] [-U] [-S] [-c <config file>] [-s <signature file>]
-       [-a <auto ips file>]
+USAGE: psad [-s <signature file>] [-a <auto ips file>] [-c <config file>] [-o]
+       [-L] [-i <interval>] [-h] [-S] [-K] [-R] [-U] [-V] [--no_fwcheck]
+       [--no_daemon] [--no_rdns] [--no_whois] [--no_netstat] [--no_errors]
 
 OPTIONS:
-      -D   --Daemon                   - do not run as a daemon.
-      -e   --errors                   - do not write errors to the error
-                                        log.
-      -d   --debug                    - run psad in debugging mode.
-      -w   --whois                    - disable whois lookups.
-      -i   --interval                 - configure the check interval from
-                                        the command line to override the 15
-                                        second default.
-      -f   --firewallcheck            - disable firewall rules verification.
-      -o   --output                   - print all messages to STDOUT (this
-                                        does not include bad packet messages
-                                        that are printed to the error log).
-      -c   --config <config file>     - use config file instead of the
-                                        values contained within the psad
-                                        script.
-      -L   --Logging_server           - psad is being run on a syslog
-                                        logging server.
-      -r   --reversedns               - disable name resolution against
-                                        scanning ips.
       -s   --signatures <sig file>    - import scan signatures.
       -a   --auto_ips <ips file>      - import auto ips file for automatic
                                         ip danger level increases/decreses.
-      -l   --local_port_lookup        - disable local port lookups for scan
-                                        signatures.
+      -c   --config <config file>     - use config file instead of the
+                                        values contained within the psad
+                                        script.
+      -i   --interval                 - configure the check interval from
+                                        the command line to override the 15
+                                        second default.
+      -d   --debug                    - run psad in debugging mode.
+      -o   --output                   - print all messages to STDOUT (this
+                                        does not include bad packet messages
+                                        that are printed to the error log).
+      -L   --Logging_server           - psad is being run on a syslog
+                                        logging server.
       -K   --Kill                     - kill all running psad processes.
       -R   --Restart                  - restart all running psad processes.
       -S   --Status                   - displays the status of any
@@ -2160,6 +2151,16 @@ OPTIONS:
       -U   --USR1                     - send a running psad process a USR1
                                         signal.
       -V   --Version                  - print the psad version and exit.
+
+      --no_daemon                     - do not run as a daemon.
+      --no_errors                     - do not write errors to the error
+                                        log.
+      --no_whois                      - disable whois lookups.
+      --no_fwcheck                    - disable firewall rules verification.
+      --no_rdns                       - disable name resolution against
+                                        scanning ips.
+      --no_netstat                    - disable local port lookups for scan
+                                        signatures.
       -h   --help                     - prints this help message.
 
 _HELP_

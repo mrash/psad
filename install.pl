@@ -27,13 +27,13 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
 #    USA
 #
-# TODO: 
+# TODO:
 #   - make install.pl preserve psad_signatures and psad_auto_ips
 #     with "diff" and "patch" from the old to the new.
 #########################################################################
 
-use File::Path; # used for the 'rmtree' function for removing directories
-use File::Copy; # used for copying/moving files
+use File::Path;
+use File::Copy;
 use Getopt::Long;
 use Text::Wrap;
 use Sys::Hostname;
@@ -42,17 +42,12 @@ use strict;
 ### Note that Psad.pm is not included within the above list (installation
 ### over existing psad install should not make use of an old Psad.pm).
 
-### globals
-use vars qw($HOSTNAME $INSTALL_DIR $PERL_INSTALL_DIR $INSTALL_LOG @LOGR_FILES $INIT_DIR $SUB_TAB @EMAILS);
-
 #============== config ===============
-$INIT_DIR       = "/etc/rc.d/init.d";
-$INSTALL_DIR    = "/usr/sbin"; ### consistent with FHS (Filesystem Hierarchy Standard)
-$INSTALL_LOG    = "/var/log/psad/install.log";
-@LOGR_FILES     = (*STDOUT, $INSTALL_LOG);
-@EMAILS         = qw(root@localhost);
-my $SYSLOG_INIT = "${INIT_DIR}/syslog";
-my $RUNLEVEL;  ### This should only be set if install.pl cannot determine the correct runlevel
+my $INIT_DIR    = "/etc/rc.d/init.d";
+my $INSTALL_DIR = "/usr/sbin"; ### consistent with FHS (Filesystem Hierarchy Standard)
+my $INSTALL_LOG = "/var/log/psad/install.log";
+my @LOGR_FILES  = (*STDOUT, $INSTALL_LOG);
+my @EMAILS      = qw(root@localhost);
 
 ### system binaries ###
 my $chkconfigCmd = "/sbin/chkconfig";
@@ -60,6 +55,7 @@ my $mknodCmd     = "/bin/mknod";
 my $grepCmd      = "/bin/grep";
 my $makeCmd      = "/usr/bin/make";
 my $findCmd      = "/usr/bin/find";
+my $killallCmd   = "/usr/bin/killall";
 my $perlCmd      = "/usr/bin/perl";
 my $ipchainsCmd  = "/sbin/ipchains";
 my $iptablesCmd  = "/usr/local/bin/iptables";
@@ -67,7 +63,11 @@ my $psadCmd      = "${INSTALL_DIR}/psad";
 #============ end config ============
 
 ### get the hostname of the system
-$HOSTNAME = hostname;
+my $HOSTNAME = hostname;
+
+### scope these vars
+my $PERL_INSTALL_DIR;
+my $RUNLEVEL;  ### This should only be set if install.pl cannot determine the correct runlevel
 
 ### set the install directory for the Psad.pm module
 my $found = 0;
@@ -83,7 +83,7 @@ unless ($found) {
 }
 
 ### set the default execution
-$SUB_TAB = "     ";
+my $SUB_TAB = "     ";
 my $execute_psad = 0;
 my $nopreserve   = 0;
 my $uninstall    = 0;
@@ -104,6 +104,7 @@ my %Cmds = (
     "grep"     => $grepCmd,
     "find"     => $findCmd,
     "make"     => $makeCmd,
+    "killall"  => $killallCmd,
     "perl"     => $perlCmd,
     "ipchains" => $ipchainsCmd,
     "iptables" => $iptablesCmd,
@@ -196,7 +197,7 @@ if ($uninstall) {
         close CSYS;
     }
     print " ... Restarting syslog.\n";
-    system("$SYSLOG_INIT restart");
+    system("$Cmds{'killall'} -HUP syslogd");
     print "\n";
     print " ... Psad has been uninstalled!\n";
     exit 0;
@@ -215,18 +216,6 @@ my $time = " ... Installing psad on $HOSTNAME: $t\n";
 &logr($time, \@LOGR_FILES);
 &logr("\n", \@LOGR_FILES);
 
-### make sure we know where the syslog init script is.
-unless (-e $SYSLOG_INIT) {
-        my $s = `$Cmds{'find'} / -name syslog 2> /dev/null |$Cmds{'grep'} init |$Cmds{'grep'} -v grep`;
-        chomp $s;
-        if ($s) {
-                $SYSLOG_INIT = $s;
-        } else {
-                &logr("@@@@  Could not find the syslog init script!  The current path is: $SYSLOG_INIT.  Edit the config section of install.pl.  Exiting.\n", ["STDERR", $INSTALL_LOG]);
-                exit 0;
-        }
-}
-
 unless (-e "/var/log/psadfifo") {
     &logr(" ... Creating named pipe /var/log/psadfifo\n", \@LOGR_FILES);
     ### create the named pipe
@@ -239,10 +228,10 @@ unless (`$Cmds{'grep'} psadfifo /etc/syslog.conf`) {
     &logr(" ... Modifying /etc/syslog.conf\n", \@LOGR_FILES);
     copy("/etc/syslog.conf", "/etc/syslog.conf.orig") unless (-e "/etc/syslog.conf.orig");
     open SYSLOG, ">> /etc/syslog.conf" or die "@@@@@  Unable to open /etc/syslog.conf: $!\n";
-    print SYSLOG "kern.info		|/var/log/psadfifo\n\n";  #reinstate kernel logging to our named pipe
+    print SYSLOG "kern.info		|/var/log/psadfifo\n\n";  ### reinstate kernel logging to our named pipe
     close SYSLOG;
     print " ... Restarting syslog.\n";
-    system("$SYSLOG_INIT restart");
+    system("$Cmds{'killall'} -HUP syslogd");
 }
 unless (-d "/var/log/psad") {
     &logr(" ... Creating /var/log/psad/\n", \@LOGR_FILES);

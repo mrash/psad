@@ -943,7 +943,7 @@ sub check_scan() {
         ### PROTO=TCP SPT=34111 DPT=6345 WINDOW=5840 RES=0x00 SYN URGP=0
         if ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+)\s+TOS=(\S+)
                     \s*.*\s+TTL=(\d+)\s+ID=(\d+)\s*.*\s+PROTO=TCP\s+
-                    SPT=(\d+)\s+DPT=(\d+)\s(.*)\s*WINDOW=(\d+)\s+
+                    SPT=(\d+)\s+DPT=(\d+)\s.*\s*WINDOW=(\d+)\s+
                     RES=\S+\s*(.*)\s+URGP=/x) {
             ($src, $dst, $len, $tos, $ttl, $id, $sp, $dp, $win, $flags) =
                 ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);

@@ -242,9 +242,9 @@ my %log_hsh;
 
 ### ttl values are decremented depending on the number of hops
 ### the packet has taken before it hits the firewall.  We will
-### assume packets will not jump through more than 30 hops on
+### assume packets will not jump through more than 20 hops on
 ### average.
-my $max_hops = 30;
+my $max_hops = 20;
 
 ### packet counters
 my $tcp_ctr  = 0;
@@ -513,14 +513,14 @@ if ($benchmark) {
     $test_pktend = 'WINDOW=16384 RES=0x00 SYN URGP=0';
 }
 
-### define the psad logging hash
+### make sure the psad logfile is where we think it is.
 $psad_logfile = $config{'PSAD_LOG'} unless $psad_logfile;
-%log_hsh = ($psad_logfile => 1);
 
 ### print the startup message
 print STDOUT " .. psad started; email alerts will be sent to:\n",
     " ----> $config{'EMAIL_ADDRESSES'}\n";
-&Psad::logr(localtime() . " .. psad started ..\n", \%log_hsh);
+&Psad::logr_nowrap(localtime() . " .. psad started ..\n",
+   $psad_logfile);
 
 ### daemonize psad unless running with --no_daemon or --debug
 unless ($no_daemon || $debug || $benchmark) {
@@ -580,6 +580,7 @@ $SIG{'USR1'}     = \&process_usr1;
 
 ### Get the mtimes of the signatures and auto ips files.
 my $sigs_mtime     = stat($config{'PSAD_SIGS_FILE'})->mtime;
+my $posf_mtime     = stat($config{'PSAD_POSF_FILE'})->mtime;
 my $auto_ips_mtime = stat($config{'PSAD_AUTO_IPS_FILE'})->mtime;
 my $config_mtime   = stat($config_file)->mtime;
 
@@ -617,6 +618,9 @@ for (;;) {
 
     ### See if we need to import any new signatures
     &check_import(\$sigs_mtime, $config{'PSAD_SIGS_FILE'}, 1);
+
+    ### See if we need to import any new posf signatures
+    &check_import(\$posf_mtime, $config{'PSAD_POSF_FILE'}, 2);
 
     ### See if we need to re-import the psad_auto_ips file
     &check_import(\$auto_ips_mtime, $config{'PSAD_AUTO_IPS_FILE'}, 0);
@@ -1257,13 +1261,15 @@ sub check_misc_fields() {
 }
 
 sub check_import() {
-    my ($mtime_ref, $file, $sigs) = @_;
+    my ($mtime_ref, $file, $type) = @_;
     my $mtime_tmp = stat($file)->mtime;
     if ($mtime_tmp != $$mtime_ref) {  ### the file was modified, so import
-        if ($sigs) {  ### import signatures
-            &import_signatures($file);
+        if ($type == 0) {  ### import signatures
+            &import_auto_ips();
+        } elsif ($type == 1) {
+            &import_signatures();
         } else {
-            &import_auto_ips($file);
+            &import_posf_sigs();
         }
         my $subject = " ** psad: re-read $file on $hostname";
         &Psad::sendmail($subject, '',
@@ -1609,46 +1615,48 @@ sub import_posf_sigs() {
     ### make sure each of the os signatures has all fields defined
     OS: for my $os (keys %posf_sigs) {
         unless (defined $posf_sigs{$os}{'numpkts'}) {
-            &Psad::logr(localtime() . " ** $posf_file: missing " .
-                "NUMPKTS for os: $os\n", \%log_hsh);
+            &Psad::logr_nowrap(localtime() . " ** $posf_file: missing " .
+                "NUMPKTS for os: $os\n", $psad_logfile);
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'tos'}) {
-            &Psad::logr(localtime() . " ** $posf_file: missing " .
-                "TOS for os: $os\n", \%log_hsh);
+            &Psad::logr_nowrap(localtime() . " ** $posf_file: missing " .
+                "TOS for os: $os\n", $psad_logfile);
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'len'}) {
-            &Psad::logr(localtime() . " ** $posf_file: missing " .
-                "LEN for os: $os\n", \%log_hsh);
+            &Psad::logr_nowrap(localtime() . " ** $posf_file: missing " .
+                "LEN for os: $os\n", $psad_logfile);
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'ttl'}) {
-            &Psad::logr(localtime() . " ** $posf_file: missing " .
-                "TTL for os: $os\n", \%log_hsh);
+            &Psad::logr_nowrap(localtime() . " ** $posf_file: missing " .
+                "TTL for os: $os\n", \%$psad_logfile);
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'id'}) {
-            &Psad::logr(localtime() . " ** $posf_file: missing " .
-                "ID for os: $os\n", \%log_hsh);
+            &Psad::logr_nowrap(localtime() . " ** $posf_file: missing " .
+                "ID for os: $os\n", \%$psad_logfile);
             delete $posf_sigs{$os};
             next OS;
         } else {
             unless ($posf_sigs{$os}{'id'} eq 'SMALLINCR'
                     || $posf_sigs{$os}{'id'} eq 'RANDOM') {
-                &Psad::logr(localtime() . " ** $posf_file: ID must be " .
-                    "either SMALLINCR or RANDOM for os: $os\n", \%log_hsh);
+                &Psad::logr_nowrap(localtime() . " ** $posf_file: ID must " .
+                    "be either SMALLINCR or RANDOM for os: $os\n",
+                    $psad_logfile);
                 delete $posf_sigs{$os};
                 next OS;
             }
         }
         unless (defined $posf_sigs{$os}{'win'}) {
-            &Psad::logr(localtime() . " ** $posf_file: missing " .
-                "WINDOW for os: $os\n", \%log_hsh);
+            &Psad::logr_nowrap(localtime() . " ** $posf_file: missing " .
+                "WINDOW for os: $os\n",
+                $psad_logfile);
             delete $posf_sigs{$os};
             next OS;
         }

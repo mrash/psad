@@ -1026,7 +1026,7 @@ sub scan_logr() {
                 }
                 my $start_time = $Scan_href->{$src}->{$dst}->{'START_TIME'}->{'READABLE'};
                 my $end_time = $Scan_href->{$src}->{$dst}->{'END_TIME'}->{'READABLE'};
-                my @time = split /\s/, scalar localtime;   ### Get the current time as a nice ASCII string.
+                my @time = split /\s+/, scalar localtime;   ### Get the current time as a nice ASCII string.
                 pop @time; shift @time;    ### Get rid of the day and the year to make the time consistent with syslog
                 my $time = join ' ', @time;
                 unless ($dnslookups) {

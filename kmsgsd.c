@@ -188,7 +188,7 @@ int main(int argc, char *argv[]) {
 
             if ((fwdata_fd = open(fwdata_file, O_CREAT|O_WRONLY|O_APPEND,
                     0600)) < 0) {
-                fprintf(stderr, "** Could not open %s for writing.\n",
+                fprintf(stderr, "[*] Could not open %s for writing.\n",
                     fwdata_file);
                 exit(EXIT_FAILURE);  /* could not open fwdata file */
             }

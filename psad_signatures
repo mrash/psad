@@ -36,19 +36,19 @@ psad:0011; tcp; any -> 1243;  msg: "Possible SubSeven access"; flags: S; dlevel:
 psad:0012; tcp; any -> 6776;  msg: "Possible SubSeven access"; flags: S; dlevel: 2;
 
 # DDoS signatures
-psad:0013; tcp; any -> 15104; msg: "IDS111 - DDoS - mstream client to handler"; flags: S; dlevel: 1;
-psad:0014; tcp; any -> 20432; msg: "IDS254 - DDoS shaft client to handler"; flags: AP; dlevel: 1;
+psad:0013; tcp; any -> 15104; msg: "DDoS - mstream client to handler"; flags: S; dlevel: 1;
+psad:0014; tcp; any -> 20432; msg: "DDoS shaft client to handler"; flags: AP; dlevel: 1;
 # tcp :1024 -> any msg:"IDS253 - DDoS shaft synflood outgoing"; flags: S; seq: 674711609; dlevel: 1;
 # tcp :1024 -> any msg:"IDS252 - DDoS shaft synflood incoming"; flags: S; seq: 674711609; dlevel: 1;
 
 # Miscellaneous signatures
-psad:0015; tcp; 6000:6005 -> any; msg: "IDS126 - Outgoing Xterm"; flags: AS; dlevel: 1;
-psad:0016; tcp; 53 -> :1023;  msg: "IDS007 - MISC-Source Port Traffic 53 TCP"; flags: S; dlevel: 1;
-psad:0017; tcp; 20 -> :1023;  msg: "IDS006 - MISC-Source Port Traffic 20 TCP"; flags: S; dlevel: 1;
+psad:0015; tcp; 6000:6005 -> any; msg: "Outgoing Xterm"; flags: AS; dlevel: 1;
+psad:0016; tcp; 53 -> :1023;  msg: "MISC-Source Port Traffic 53 TCP"; flags: S; dlevel: 1;
+psad:0017; tcp; 20 -> :1023;  msg: "MISC-Source Port Traffic 20 TCP"; flags: S; dlevel: 1;
 psad:0018; tcp; !53 -> 1080;  msg: "MISC-WinGate-1080-Attempt"; flags: S; dlevel: 1;
 psad:0019; tcp; !53 -> 8080;  msg: "MISC-WinGate-8080-Attempt"; flags: S; dlevel: 1;
 psad:0020; tcp; any -> 32771; msg: "MISC-Attempted Sun RPC high port access"; dlevel: 1;
-psad:0021; tcp; 7161 -> any;  msg: "IDS129 - CVE-1999-0430 - Cisco Catalyst Remote Access"; flags: AS; dlevel: 1;
+psad:0021; tcp; 7161 -> any;  msg: "CVE-1999-0430 - Cisco Catalyst Remote Access"; flags: AS; dlevel: 1;
 # tcp any -> any msg:"MISC-Traceroute TCP"; ttl:"1"; dlevel: 1; 
 # tcp any -> any ipopts: lsrr; msg: "Source routed packet"; dlevel: 1; 
 # tcp any -> 617 msg:"MISC Knox Arkeia DOS"; flags:AP; dsize:>1445; dlevel: 1; 
@@ -63,11 +63,11 @@ psad:0022; tcp; any -> 53; msg: "DNS tcp probe"; flags: SF; dlevel: 2;
 
 ### oddball scans OS fingerprinting, SYN-FIN, etc...
 psad:0023; tcp; any -> any; msg: "Possible NMAP Fingerprint attempt"; flags: UPSF; dlevel: 2;
-psad:0024; tcp; any -> any; msg: "IDS005 - SCAN-Possible NMAP Fingerprint attempt"; flags: UPSF; dlevel: 2;
+psad:0024; tcp; any -> any; msg: "SCAN-Possible NMAP Fingerprint attempt"; flags: UPSF; dlevel: 2;
 psad:0025; tcp; any -> any; msg: "SCAN-SYN FIN"; flags: SF; dlevel: 2;
 psad:0026; tcp; any -> any; msg: "SCAN-NULL"; flags: N; dlevel: 2;
 psad:0027; tcp; any -> any; msg: "NMAP XMAS scan"; flags: UPF; dlevel: 2;
-psad:0028; tcp; any -> any; msg: "IDS027 - SCAN-FIN"; flags: F; dlevel: 2;
+psad:0028; tcp; any -> any; msg: "SCAN-FIN"; flags: F; dlevel: 2;
 # tcp any -> any msg:"IDS236 - SCAN-IP Eye SYN Scan"; flags: S; seq: 1958810375; dlevel: 1; 
 # tcp any -> any msg:"IDS004 - SCAN-NULL Scan"; flags:0; seq:0; ack:0; dlevel: 1; 
 # tcp any -> any msg:"IDS029 - SCAN-Possible Queso Fingerprint attempt"; flags:S12; dlevel: 1; 
@@ -92,14 +92,14 @@ psad:0037; udp; 53 -> 54:136;   msg: "MISC-Source Port Traffic 54-136"; dlevel: 
 psad:0038; udp; 53 -> 0:52;     msg: "MISC-Source Port Traffic 0-52"; dlevel: 1;
 
 ############ icmp signatures #############
-psad:0039; icmp; msg: "IDS183 - DDoS - TFN client command LE"; itype: 0; icmp_id: 51201; icmp_seq: 0; dlevel: 1;
-psad:0040; icmp; msg: "IDS184 - DDoS - TFN client command BE"; itype: 0; icmp_id: 456; icmp_seq: 0; dlevel: 1;
+psad:0039; icmp; msg: "DDoS - TFN client command LE"; itype: 0; icmp_id: 51201; icmp_seq: 0; dlevel: 1;
+psad:0040; icmp; msg: "DDoS - TFN client command BE"; itype: 0; icmp_id: 456; icmp_seq: 0; dlevel: 1;
 psad:0041; icmp; msg: "MISC-IRDP-Router-Selection(l0phtattack)";itype:10; dlevel: 1;
-psad:0042; icmp; msg: "IDS174 - MISC-IRDPRouterSelection";itype:10; dlevel: 1;
-psad:0043; icmp; msg: "IDS173 - MISC-IRDPRouterAdvertisement";itype:9; dlevel: 1;
-psad:0044; icmp; msg: "IDS199 - CVE-1999-0265 - MISC-ICMPRedirectNet";itype:5;icode:0; dlevel: 1;
-psad:0045; icmp; msg: "IDS135 - CVE-1999-0265 - MISC-ICMPRedirectHost";itype:5;icode:1; dlevel: 1;
-psad:0046; icmp; msg: "IDS118 - MISC-Traceroute ICMP";ttl:1;itype:8; dlevel: 1;
+psad:0042; icmp; msg: "MISC-IRDPRouterSelection";itype:10; dlevel: 1;
+psad:0043; icmp; msg: "MISC-IRDPRouterAdvertisement";itype:9; dlevel: 1;
+psad:0044; icmp; msg: "CVE-1999-0265 - MISC-ICMPRedirectNet";itype:5;icode:0; dlevel: 1;
+psad:0045; icmp; msg: "CVE-1999-0265 - MISC-ICMPRedirectHost";itype:5;icode:1; dlevel: 1;
+psad:0046; icmp; msg: "MISC-Traceroute ICMP";ttl:1;itype:8; dlevel: 1;
 psad:0047; icmp; msg: "ICMP Message"; itype:18; dlevel: 1;
 psad:0048; icmp; msg: "ICMP Destination Unreachable"; itype:3; dlevel: 1;
 psad:0049; icmp; msg: "ICMP Source Quench"; itype:4; dlevel: 1;
@@ -108,7 +108,7 @@ psad:0051; icmp; msg: "ICMP Parameter Problem"; itype:12; dlevel: 1;
 psad:0052; icmp; msg: "ICMP Timestamp"; itype:13; dlevel: 1;
 psad:0053; icmp; msg: "ICMP Information Request"; itype:15; dlevel: 1;
 psad:0054; icmp; msg: "ICMP Information Reply"; itype:16; dlevel: 1;
-psad:0055; icmp; msg: "IDS216 - ICMP Subnet Mask Request"; itype:17; dlevel: 1;
+psad:0055; icmp; msg: "ICMP Subnet Mask Request"; itype:17; dlevel: 1;
 psad:0056; icmp; msg: "Windows Traceroute"; TTL: 1; itype: 8; dlevel: 1;
 # icmp msg:"echo request"; TTL: 64; itype: 8; dlevel: 1;
 # icmp 3.3.3.3/32 any -> $EXTERNAL_NET any (msg:"IDS193 - DDoS - Stacheldraht server-spoof"; itype: 0; icmp_id: 666;

@@ -92,9 +92,11 @@ int main(int argc, char *argv[]) {
 #endif
 
     /* handle command line arguments */
-    if (argc == 1) {  /* nothing but the program name was specified on the command line */
+    if (argc == 1) {  /* nothing but the program name was
+                         specified on the command line */
         strcpy(config_file, CONFIG_FILE);
-    } else if (argc == 2) {  /* the path to the config file was supplied on the command line */
+    } else if (argc == 2) {  /* the path to the config file was
+                                supplied on the command line */
         strcpy(config_file, argv[1]);
     } else {
         printf(" ... You may only specify the path to a single config file:  ");
@@ -357,7 +359,6 @@ static void parse_config(
     char *index;
 
     if ((config_ptr = fopen(config_file, "r")) == NULL) {
-        /* fprintf(stderr, " ... @@@ Could not open the config file: %s\n", config_file);  */
         perror(" ... @@@ Could not open config file");
         exit(EXIT_FAILURE);
     }
@@ -365,13 +366,16 @@ static void parse_config(
     /* increment through each line of the config file */
     while ((fgets(config_buf, MAX_LINE_BUF, config_ptr)) != NULL) {
         linectr++;
-        index = config_buf;  /* set the index pointer to the beginning of the line */
+        index = config_buf;  /* set the index pointer to the
+                                beginning of the line */
 
-        /* advance the index pointer through any whitespace at the beginning of the line */
+        /* advance the index pointer through any whitespace
+         * at the beginning of the line */
         while (*index == ' ' || *index == '\t') index++;
 
         /* skip comments and blank lines, etc. */
-        if ((*index != '#') && (*index != '\n') && (*index != ';') && (index != NULL)) {
+        if ((*index != '#') && (*index != '\n') &&
+                (*index != ';') && (index != NULL)) {
 
             find_char_var("psadCmd ", psadCmd, index);
             find_char_var("PSAD_PID_FILE ", psad_pid_file, index);

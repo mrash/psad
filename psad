@@ -288,7 +288,7 @@ unless ($fwcheck || $Syslog_server) {
     &Psad::check_firewall_rules(
         $Config{'FW_MSG_SEARCH'},
         $Emails_aref,
-        {"$Config{'PSAD_DIR'}/fw_check.txt" => 0},  ### overwrite-mode for logr()
+        "$Config{'PSAD_DIR'}/fw_check.txt",
         \%Cmds
     );
 }

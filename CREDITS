@@ -138,3 +138,14 @@ Jeff Lunglhofer         Suggested bugfix for packet counters and multiple
 
 Ruben Vanhoutte         Bugfix for incorrect path to psadfifo in syslog.ng
                         config.
+
+Stefan Divjak           Suggested that psad ignore addresses such as
+                        0.0.0.0, 127.0.0.1, and local interface ips from
+                        auto blocking routines.  Suggested a generic way
+                        to (un)block addresses using an external script.
+                        Suggested psad offer analysis capabilities for
+                        snort alert files.
+
+Martijn Kruissen        Suggested putting danger levels into psad email
+                        alert subjects.  Suggested custom logging line that
+                        that will trigger psad to auto block an ip.

@@ -298,7 +298,6 @@ my ($config_href, $cmds_href) = &Psad::buildconf($config_file);
 
 my %config      = %$config_href;
 my %cmds        = %$cmds_href;
-my $emails_aref = $config{'EMAIL_ADDRESSES'};
 
 ### store the psad command line.
 my $cmdline_file = $config{'PSAD_CMDLINE_FILE'};
@@ -391,7 +390,7 @@ unless ($no_whois) {
 unless ($no_fwcheck || $syslog_server) {
     &Psad::check_firewall_rules(
         $config{'FW_MSG_SEARCH'},
-        $emails_aref,
+        $config{'EMAIL_ADDRESSES'},
         "$config{'PSAD_DIR'}/fw_check.txt",
         \%cmds
     );
@@ -911,7 +910,7 @@ sub check_import() {
             &import_auto_ips($file);
         }
         my $subject = "psad: re-read $file on $hostname";
-        &Psad::sendmail($subject, '', $emails_aref, $cmds{'mail'});
+        &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         $$mtime_ref = $mtime_tmp;
     }
     return;
@@ -929,9 +928,8 @@ sub check_import_config() {
 
         %config = %$config_href;
         %cmds   = %$cmds_href;
-        $emails_aref = $config{'EMAIL_ADDRESSES'};
         my $subject = "psad: re-read $file on $hostname";
-        &Psad::sendmail($subject, '', $emails_aref, $cmds{'mail'});
+        &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         $$mtime_ref = $mtime_tmp;
 
         ### restart kmsgsd since it does not have the capability of
@@ -1075,7 +1073,8 @@ sub import_auto_ips() {
         } else {
             my $subject = "psad import warning: $autoips_file " .
                 "error on line: $i";
-            &Psad::sendmail($subject, '', $emails_aref, $cmds{'mail'});
+            &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
+                $cmds{'mail'});
         }
     }
     return;
@@ -1248,7 +1247,7 @@ sub scan_logr() {
             if ($current_danger_level >= 1 && $scan{$src}{$dst}{'LOGR'} == 1) {
                 ### make $src directory here in /var/log/psad
                 ### unless it already exists
-                mkdir "$config{'PSAD_DIR'}/${src}" unless
+                mkdir "$config{'PSAD_DIR'}/${src}", 0500 unless
                     -d "$config{'PSAD_DIR'}/${src}";
                 my $scanlog     = "$config{'PSAD_DIR'}/${src}/scanlog";
                 my $email_alert = "$config{'PSAD_DIR'}/${src}/email_alert";
@@ -1507,7 +1506,8 @@ sub scan_logr() {
                     } else {
                         $subject = "psad: SCAN DETECTED from: $src";
                     }
-                    &Psad::sendmail($subject, $email_alert, $emails_aref, $cmds{'mail'});
+                    &Psad::sendmail($subject, $email_alert, $config{'EMAIL_ADDRESSES'},
+                        $cmds{'mail'});
                     $scan{$src}{$dst}{'ALERTED'} = 1;
                     $scan{$src}{$dst}{'EMAIL_COUNT'}++;
 
@@ -1659,7 +1659,8 @@ sub auto_psad_response() {
                     if ($config{'ALERT_AUTO_BLOCKED'} eq 'Y' && $blocked_str) {
                         my $subject = "psad: All traffic from $src has been " .
                             "BLOCKED $blocked_str on $hostname ($dst)";
-                        &Psad::sendmail($subject, '', $emails_aref, $cmds{'mail'});
+                        &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
+                            $cmds{'mail'});
                     }
                     ### write the $src ip to the $auto_blocked_file
                     &write_blocked_ip($src);
@@ -1689,7 +1690,8 @@ sub auto_psad_response() {
                     if ($config{'ALERT_AUTO_BLOCKED'} eq 'Y' && $blocked_str) {
                         my $subject = "psad: All traffic from $src has been ".
                             "BLOCKED $blocked_str on $hostname ($dst)";
-                        &Psad::sendmail($subject, '', $emails_aref, $cmds{'mail'});
+                        &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
+                            $cmds{'mail'});
                     }
                     ### write the $src ip to the $auto_blocked_file
                     &write_blocked_ip($src);
@@ -1754,7 +1756,7 @@ sub email_limit_reached() {
     my ($src, $dst) = @_;
     my $subject = "psad: Email message limit for $src has been reached on " .
         "$hostname ($dst)!!!";
-    &Psad::sendmail($subject, '', $emails_aref, $cmds{'mail'});
+    &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
     return;
 }
 
@@ -2054,8 +2056,9 @@ sub archive_data() {
     chdir $config{'PSAD_DIR'} or die " ... @@@ Could not chdir " .
         "$config{'PSAD_DIR'}: $!";
     unless (-d $config{'SCAN_DATA_ARCHIVE_DIR'}) {
-        mkdir $config{'SCAN_DATA_ARCHIVE_DIR'} or die " ... @@@ Could not " .
-            "create dir: $config{'SCAN_DATA_ARCHIVE_DIR'}: $!";
+        mkdir $config{'SCAN_DATA_ARCHIVE_DIR'}, 0500 or
+            die " ... @@@ Could not create dir: " .
+            "$config{'SCAN_DATA_ARCHIVE_DIR'}: $!";
     }
 
     ### archive all of the old ip address directories since
@@ -2136,10 +2139,10 @@ sub check_old_cmdargs() {
 
 sub setup_psad() {
     unless (-d $config{'PSAD_DIR'}) {
-        mkdir $config{'PSAD_DIR'}, 400;
+        mkdir $config{'PSAD_DIR'}, 0500;
     }
     unless (-d $config{'PSAD_ERROR_DIR'}) {
-        mkdir $config{'PSAD_ERROR_DIR'}, 400;
+        mkdir $config{'PSAD_ERROR_DIR'}, 0500;
     }
     unless (-e $config{'FW_DATA'}) {
         open F, "> $config{'FW_DATA'}";

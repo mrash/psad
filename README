@@ -1,5 +1,5 @@
-psad (Port Scan Attack Detector) 
-Version:  0.9.8
+psad (Port Scan Attack Detector)
+Version:  0.9.9
 Author:   Michael B. Rash (mbr@cipherdyne.com)
 Website:  http://www.cipherdyne.com
 
@@ -118,6 +118,13 @@ USAGE:
           present within the configuration section of the psad script
           itself.  This can be overridden by specifying a configuration
           file on the command line.
+
+    -c  --config <configuration file>
+          By default all of the psad daemons (psad, psadwatchd, kmsgsd,
+          and diskmond) make use of the configuration file
+          /etc/psad/psad.conf for almost all configuration parameters.
+          psad can be made to override this path by specifying a
+          different file on the command line with the --config option.
 
     -r  --reversedns
           Psad normally attempts to find the name associated with a

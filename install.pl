@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 #
-# $Id$
-#
 # File: install.pl
 #
 # Purpose:  install.pl is the installation script for psad.  It is safe
@@ -11,7 +9,7 @@
 #
 # Credits:  (see the CREDITS file)
 #
-# Version: 0.9.8
+# Version: 0.9.9
 #
 # Copyright (C) 1999-2002 Michael B. Rash (mbr@cipherdyne.com)
 #
@@ -30,6 +28,10 @@
 # TODO:
 #   - make install.pl preserve psad_signatures and psad_auto_ips
 #     with "diff" and "patch" from the old to the new.
+#
+#
+# $Id$
+#
 #########################################################################
 
 use File::Path;

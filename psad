@@ -82,6 +82,8 @@ use autouse 'Socket' => "AF_INET";       ### not used until a scan is detected s
 use Sys::Hostname "hostname";
 use POSIX "setsid";
 # use strict;
+### psad does not yet support 'strict refs' since several hashes have $hsh{key} = "someval" and $hsh{key1}{key2} = "anotherval"... should probably fix this.
+# no strict "refs";
 
 ### these are globals
 use vars qw(%Scan $PRINT_SCAN_HASH $USE_IPCHAINS $USE_IPTABLES $DEBUG $HOSTNAME);
@@ -555,6 +557,7 @@ sub check_flags() {
 }
 sub check_port() {
 	my ($sigs_href, $msg, $port_to_check, $portdirection, $proto) = @_;
+	print "check_port(): msg: $msg, start: port_to_check: $port_to_check\n" if $DEBUG;
         if (defined $sigs_href->{$proto}->{$msg}->{$portdirection} && $sigs_href->{$proto}->{$msg}->{$portdirection} eq "any") {
         	return 1;
         } elsif (defined $sigs_href->{$proto}->{$msg}->{$portdirection} && $port_to_check == $sigs_href->{$proto}->{$msg}->{$portdirection}) {
@@ -1339,7 +1342,7 @@ sub usage_and_exit() {
         print <<_HELP_;
 
 Usage: psad [-D] [-d] [-o] [-e] [-S] [-f] [-r] [-w] [-l] [-i <interval>] [-h]
-       [-V] [-K] [-R] [-c <config file>] [-s <signature file>] 
+       [-V] [-K] [-R] [-L] [-c <config file>] [-s <signature file>] 
        [-a <auto ips file>]
 
         -D   --Daemon                   - do not run as a daemon.

@@ -226,6 +226,9 @@ my %ignore_ports = ();
 ### ignore protocols
 my %ignore_protocols = ();
 
+### ignore interfaces
+my %ignore_interfaces = ();
+
 ### data array used for dshield.org logs
 my @dshield_data;
 
@@ -304,6 +307,7 @@ my $status_sort_dl   = 0;
 my $status_dl        = 0;
 my $fw_list_auto     = 0;
 my $fw_block_ip      = '';
+my $fw_del_chains    = 0;
 my $benchmark        = 0;
 my $b_packets        = 0;
 my $usr1             = 0;
@@ -421,6 +425,9 @@ Getopt::Long::Configure('no_ignore_case');
     'fw-block-ip=s'     => \$fw_block_ip,     # Add an IP/net to the psad auto-
                                               #   blocking chains.  Then psad can
                                               #   manage timeouts, etc.
+    'fw-del-chains'     => \$fw_del_chains,   # Delete psad chains in addition to
+                                              #   flushing them (requires --F as
+                                              #   well).
     'log-server'        => \$syslog_server,   # We are running psad on a syslog
                                               #   logging server.
     'Kill'              => \$kill,            # Kill all running psad processes.
@@ -611,10 +618,6 @@ if ($benchmark) {
         $b_packets = 10000;
     }
 }
-
-### stop any old running diskmond process (psad now deals with
-### disk space directly).
-&stop_legacy_diskmond();
 
 if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
     $last_dshield_alert = time() unless $last_dshield_alert;
@@ -928,6 +931,12 @@ sub check_scan() {
                 "interface and chain.\n" if $debug;
             push @err_pkts, $pkt;
             next PKT;
+        }
+
+        if (%ignore_interfaces) {
+            for my $ignore_intf (keys %ignore_interfaces) {
+                next PKT if $intf eq $ignore_intf;
+            }
         }
 
         ### get the syslog logging host for this packet
@@ -2037,6 +2046,12 @@ sub psad_init() {
     ### list any existing Netfilter IPT_AUTO_CHAIN chains
     exit &ipt_list_auto_chains() if $fw_list_auto;
 
+    ### add an IP/network to the cache file used by a running psad
+    ### process (note that &cache_file_add_ipt_block_ip() calls
+    ### &import_auto_dl() to make sure we don't add an IP that should
+    ### be ignored).
+    exit &cache_file_add_ipt_block_ip() if $fw_block_ip;
+
     ### import psad signatures (note that these signatures have been
     ### adapted from the Snort IDS and contain several keywords that
     ### were added by the psad project).
@@ -2057,12 +2072,6 @@ sub psad_init() {
     ### level assignment
     &import_auto_dl() unless $no_auto_dl;
 
-    ### add an IP/network to the cache file used by a running psad
-    ### process (note we call it here after &import_auto_dl()
-    ### because any ignored IP/network in this file should take
-    ### precedence).
-    exit &cache_file_add_ipt_block_ip() if $fw_block_ip;
-
     ### parse snort rules if we enable psad to match on iptables log
     ### messages that include snort SID's (see "fwsnort":
     ### http://www.cipherdyne.org/fwsnort).
@@ -2074,10 +2083,13 @@ sub psad_init() {
     &validate_home_net();
 
     ### there is a set of ports that should be ignored
-    &parse_ignore_ports() if $config{'IGNORE_PORTS'} ne 'NONE';
+    &parse_ignore_ports();
 
     ### there is a set of protocols that should be ignored
-    &parse_ignore_protocols() if $config{'IGNORE_PROTOCOLS'} ne 'NONE';
+    &parse_ignore_protocols();
+
+    ### there is a set of interfaces that should be ignored
+    &parse_ignore_interfaces();
 
     ### don't continue with init if we are running in firewall
     ### analysis mode or benchmarking mode
@@ -2120,12 +2132,15 @@ sub validate_config() {
             'set to N.');
     }
     if ($status_dl and $status_dl > 5) {
-        die '[*] The --status-dl must be between 1 and 5.  Exiting.';
+        die '[*] The --status-dl must be between 1 and 5.';
     }
 
     if ($no_kmsgsd and not $debug) {
-        die '[*] The --no-kmsgsd option can only be used with ',
-            '--debug.  Exiting.';
+        die '[*] The --no-kmsgsd option can only be used with --debug.';
+    }
+
+    if ($fw_del_chains and not $flush_fw) {
+        die '[*] The --fw-del-chains option can only be used with --Flush.';
     }
 
     if ($fw_block_ip) {
@@ -2233,7 +2248,12 @@ sub import_fw_search() {
 }
 
 sub parse_ignore_ports() {
+
+    ### zero out the hash since a HUP signal may have been received
     %ignore_ports = ();
+
+    return if $config{'IGNORE_PORTS'} ne 'NONE';
+
     my @fields = split /\s*,\s*/, $config{'IGNORE_PORTS'};
     for my $field (@fields) {
         if ($field =~ m/(tcp|udp)\/(\d+)\s*-\s*(\d+)/) {
@@ -2265,7 +2285,12 @@ sub parse_ignore_ports() {
 }
 
 sub parse_ignore_protocols() {
+
+    ### zero out the hash since a HUP signal may have been received
     %ignore_protocols = ();
+
+    return if $config{'IGNORE_PROTOCOLS'} ne 'NONE';
+
     my @protos = split /\s*,\s*/, $config{'IGNORE_PROTOCOLS'};
     for my $proto (@protos) {
         if ($proto =~ /\W/) {
@@ -2276,6 +2301,24 @@ sub parse_ignore_protocols() {
             } else {
                 $ignore_protocols{uc($proto)} = '';
             }
+        }
+    }
+    return;
+}
+
+sub parse_ignore_interfaces() {
+
+    ### zero out the hash since a HUP signal may have been received
+    %ignore_interfaces = ();
+
+    return if $config{'IGNORE_INTERFACES'} ne 'NONE';
+
+    my @interfaces = split /\s*,\s*/, $config{'IGNORE_INTERFACES'};
+    for my $intf (@interfaces) {
+        if ($intf =~ /\W/) {
+            &Psad::psyslog('psad', 'invalid interface in IGNORE_INTERFACES var');
+        } else {
+            $ignore_interfaces{$intf} = '';
         }
     }
     return;
@@ -2672,10 +2715,12 @@ sub import_auto_dl() {
                 $auto_dl{'net'}{$net}{'allproto'} = $dl;
             }
         } else {
-            my $subject = "[psad-error] import warning: " .
-                "$config{'AUTO_DL_FILE'} error on line: $i";
-            &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
-                $cmds{'mail'});
+            unless ($fw_block_ip) {
+                my $subject = "[psad-error] import warning: " .
+                    "$config{'AUTO_DL_FILE'} error on line: $i";
+                &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
+                    $cmds{'mail'});
+            }
         }
     }
     if (%auto_dl) {
@@ -2683,8 +2728,13 @@ sub import_auto_dl() {
         my $net_ctr = 0;
         $ip_ctr++ for keys %{$auto_dl{'ip'}};
         $net_ctr++ for keys %{$auto_dl{'net'}};
-        &Psad::psyslog('psad', "imported auto_dl, got $ip_ctr " .
-            "IP addresses and $net_ctr networks");
+
+        ### don't write syslog message if we are running in --fw-block-ip
+        ### mode
+        unless ($fw_block_ip) {
+            &Psad::psyslog('psad', "imported auto_dl, got $ip_ctr " .
+                "IP addresses and $net_ctr networks");
+        }
     }
     return;
 }
@@ -3762,21 +3812,39 @@ sub flush_auto_blocked_ips() {
         'iptables' => $cmds{'iptables'}
     ) or die '[*] Could not acquire IPTables::ChainMgr object.';
 
-    print "[+] Flushing and deleting Netfilter IPT_AUTO_CHAIN chains...\n";
+    if ($fw_del_chains) {
+        print "[+] Flushing and deleting Netfilter IPT_AUTO_CHAIN chains...\n";
+    } else {
+        print "[+] Flushing Netfilter IPT_AUTO_CHAIN chains...\n";
+    }
+    if (&Psad::pidrunning($config{'PID_FILE'})) {
+        print "    WARNING: psad is currently running, so flushing the ",
+            "chains may cause some\n    warning syslog messages to appear.\n";
+    }
     if (@ipt_block_config) {
-        my $flushed_chain = 0;
         for my $block_hr (@ipt_block_config) {
             my $table      = $block_hr->{'table'};
             my $from_chain = $block_hr->{'from_chain'};
             my $to_chain   = $block_hr->{'to_chain'};
 
-            my ($rv, $status_msg) = $ipt->delete_chain($table,
-                $from_chain, $to_chain);
-            if ($rv) {
-                print "[+] $status_msg\n";
-                $flushed_chain = 1;
+            if ($ipt->chain_exists($table, $to_chain)) {
+                if ($fw_del_chains) {
+                    my ($rv, $status_msg) = $ipt->delete_chain($table,
+                        $from_chain, $to_chain);
+                    if ($rv) {
+                        print "[+] $status_msg\n";
+                    } else {
+                        print "[-] $status_msg\n";
+                    }
+                } else {
+                    if ($ipt->flush_chain($table, $to_chain)) {
+                        print "[+] Flushed: $to_chain.\n";
+                    } else {
+                        print "[-] Could not flush: $to_chain\n";
+                    }
+                }
             } else {
-                print "[-] $status_msg\n";
+                print "[-] Chain: $to_chain does not exist.\n";
             }
         }
     } else {
@@ -3826,7 +3894,7 @@ sub ipt_block() {
 
     my $ipt = new IPTables::ChainMgr(
         'iptables' => $cmds{'iptables'}
-    ) or die "[*] Could not acquire IPTables::ChainMgr object.";
+    ) or die '[*] Could not acquire IPTables::ChainMgr object.';
 
     my $block_success = 0;
 
@@ -3911,15 +3979,26 @@ sub ipt_block() {
         }
     }
     if ($block_success) {
+
+        ### make sure the ip is in the auto_blocked_ips cache (the ip
+        ### may have come from the command line with --fw-block-ip
+        ### instead of through the Netfilter log).
+        unless (defined $auto_blocked_ips{$ip}) {
+            $auto_blocked_ips{$ip}{'time'}    = time();
+            $auto_blocked_ips{$ip}{'blocked'} = 1;
+        }
+
         my $mail_msg = "iptables auto-block against $ip $timeout_str";
         if ($renewed_status) {
             $mail_msg = "renewed $mail_msg";
         } else {
             $mail_msg = "added $mail_msg";
         }
+
         &Psad::sendmail("[psad-status] $mail_msg", '',
             $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         &Psad::psyslog('psad', $mail_msg);
+
         ### write the ip out to the auto blocked file
         print STDERR "[+] ipt_block(): added block for $ip\n"
             if $debug;
@@ -3962,13 +4041,15 @@ sub ipt_rm_block() {
         }
 
         if ($src and $dst) {
-            my ($rv, $status_msg) = $ipt->delete_ip_rule($src, $dst,
-                $table, $to_chain, $target);
-            if ($rv) {
-                $rm_block = 1;
-            } else {
-                &Psad::psyslog('psad', $status_msg);
-                print STDERR "[-] ipt_rm_block(): $status_msg\n" if $debug;
+            if ($ipt->find_ip_rule($src, $dst, $table, $to_chain, $target)) {
+                my ($rv, $status_msg) = $ipt->delete_ip_rule($src, $dst,
+                    $table, $to_chain, $target);
+                if ($rv) {
+                    $rm_block = 1;
+                } else {
+                    &Psad::psyslog('psad', $status_msg);
+                    print STDERR "[-] ipt_rm_block(): $status_msg\n" if $debug;
+                }
             }
         } else {
             next;
@@ -3978,13 +4059,15 @@ sub ipt_rm_block() {
             ### need to delete reverse rule for FORWARD chain
             my $src2 = $dst;
             my $dst2 = $src;
-            my ($rv, $status_msg) = $ipt->delete_ip_rule($src, $dst,
-                $table, $to_chain, $target);
-            if ($rv) {
-                $rm_block = 1;
-            } else {
-                &Psad::psyslog('psad', $status_msg);
-                print STDERR "[-] ipt_rm_block(): $status_msg\n" if $debug;
+            if ($ipt->find_ip_rule($src2, $dst2, $table, $to_chain, $target)) {
+                my ($rv, $status_msg) = $ipt->delete_ip_rule($src2, $dst2,
+                    $table, $to_chain, $target);
+                if ($rv) {
+                    $rm_block = 1;
+                } else {
+                    &Psad::psyslog('psad', $status_msg);
+                    print STDERR "[-] ipt_rm_block(): $status_msg\n" if $debug;
+                }
             }
         }
     }
@@ -4072,13 +4155,56 @@ sub cache_file_add_ipt_block_ip() {
         print "[-] ENABLE_AUTO_IDS is not enabled. Exiting.";
         return 0;
     }
+
+    my $block_ip     = '';
+    my $block_subnet = '';
+    if ($fw_block_ip =~ m|^\s*($ip_re)\s*$|) {
+        $block_ip = $1;
+        $block_subnet = '32';
+    } elsif ($fw_block_ip =~ m|^\s*($ip_re)/(.*)\s*$|) {
+        $block_ip     = $1;
+        $block_subnet = $2;
+    }
+
+    ### import auto_dl file
+    &import_auto_dl();
+
+    ### make sure $fw_block_ip is not supposed to be ignored
+#    if (defined $auto_dl{'ip'}) {
+#        for my $ip (keys %{$auto_dl{'ip'}}) {
+#            ### note that we only check for all protocols being
+#            ### ignored (i.e. the IP is whitelisted).
+#            if (defined $auto_dl{'ip'}{$ip}{'allproto'}) {
+#                my $dl = $auto_dl{'ip'}{$ip}{'allproto'};
+#                if ($dl == 0) {
+#                    ### see if there is any overlap
+#                    if (&net_overlap($block_ip, $block_subnet, $ip, '32')) {
+#                        die "[*] $fw_block_ip overlaps with a whitelisted ",
+#                            "IP/net in $config{'AUTO_DL_FILE'}";
+#                    }
+#                }
+#            }
+#        }
+#    } elsif (defined $auto_dl{'net'}) {
+#        for my $net (keys %{$auto_dl{'net'}}) {
+#            ### note that we only check for all protocols being
+#            ### ignored (i.e. the IP is whitelisted).
+#            if (defined $auto_dl{'net'}{$net}{'allproto'}) {
+#                my $dl = $auto_dl{'net'}{$net}{'allproto'};
+#                if ($dl == 0) {
+#                    ### see if there is any overlap
+#                    my $
+#                    if (&net_overlap($block_ip, $block_subnet, $net, '32')) {
+#                        die "[*] $fw_block_ip overlaps with a whitelisted ",
+#                            "IP/net in $config{'AUTO_DL_FILE'}";
+#                    }
+#                }
+#            }
+#        }
+#    }
+
     if (-e $config{'PID_FILE'}) {
-        open PIDFILE, "< $config{'PID_FILE'}" or die '[*] Could not open ',
-        "$config{'PID_FILE'}: $!";
-        my $pid = <PIDFILE>;
-        close PIDFILE;
-        chomp $pid;
-        if (kill 0, $pid) {
+        if (&Psad::pidrunning($config{'PID_FILE'})) {
             print "[+] Writing $fw_block_ip to cache file. Psad will add the IP\n",
                 "    within $config{'CHECK_INTERVAL'} seconds.\n";
             open F, "> $config{'AUTO_IPT_ADD_IP_FILE'}.tmp" or die "[*] Could ",
@@ -4091,10 +4217,10 @@ sub cache_file_add_ipt_block_ip() {
             move "$config{'AUTO_IPT_ADD_IP_FILE'}.tmp",
                 $config{'AUTO_IPT_ADD_IP_FILE'} or die $!;
         } else {
-            print '[-] There is no running psad process. Exiting.'
+            print "[-] There is no running psad process. Exiting.\n"
         }
     } else {
-        print '[-] There is no running psad process. Exiting.'
+        print "[-] There is no running psad process. Exiting.\n"
     }
     return 0;
 }
@@ -4230,10 +4356,17 @@ sub timeout_auto_blocked_ips() {
     for my $ip (keys %auto_blocked_ips) {
         if ((time() - $auto_blocked_ips{$ip}{'time'})
                 > $config{'AUTO_BLOCK_TIMEOUT'}) {
-            &ipt_rm_block($ip)
-                if $config{'IPTABLES_BLOCK_METHOD'} eq 'Y';
-            &tcpwr_remove_block($ip)
-                if $config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y';
+
+            ### remove all Netfiler blocking rules for $ip
+            if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
+                &ipt_rm_block($ip);
+            }
+
+            ### remove all tcpwrapper blocking rules for $ip
+            if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
+                &tcpwr_remove_block($ip);
+            }
+
             ### delete the ip from the hash (if new packets are seen
             ### from the same ip, then the hash will be updated again
             ### in check_scan()).
@@ -4479,12 +4612,8 @@ sub stop_psad() {
     for my $pidname qw(psadwatchd kmsgsd psad) {
         my $pidfile = $pidfiles{$pidname};
         if (-e $pidfile) {
-            open PIDFILE, "< $pidfile" or die '[*] Could not open ',
-                "$pidfile: $!";
-            my $pid = <PIDFILE>;
-            close PIDFILE;
-            chomp $pid;
-            if (kill 0, $pid) {
+            my $pid = &Psad::pidrunning($pidfile);
+            if ($pid) {
                 print "[+] Stopping $pidname, pid: $pid\n";
                 unless (kill 15, $pid) {
                     kill 9, $pid or print "[*] psad: Could not kill ",
@@ -4590,12 +4719,8 @@ sub status() {
     for my $pidname qw(psadwatchd kmsgsd psad) {
         my $pidfile = $pidfiles{$pidname};
         if (-e $pidfile) {
-            open PIDFILE, "< $pidfile" or die '[*] Could not open ',
-                "$pidfile: $!";
-            my $pid = <PIDFILE>;
-            close PIDFILE;
-            chomp $pid;
-            if (kill 0, $pid) {
+            my $pid = &Psad::pidrunning($pidfile);
+            if ($pid) {
                 print "[+] $pidname (pid: $pid)";
                 ### FIXME: should probably just parse /proc instead of
                 ### using ps
@@ -5230,12 +5355,8 @@ sub usr1() {
     my $rv = 0;
     my $psad_pidfile = $pidfiles{'psad'};
     if (-e $psad_pidfile) {
-        open PIDFILE, "< $psad_pidfile" or
-            die "[*] Could not open $psad_pidfile: $!";
-        my $pid = <PIDFILE>;
-        close PIDFILE;
-        chomp $pid;
-        if (kill 0, $pid) {  ### make sure psad is actually running
+        my $pid = &Psad::pidrunning($psad_pidfile);
+        if ($pid) {  ### make sure psad is actually running
             if (kill 'USR1', $pid) {
                 $rv = 1;
                 print "[+] USR1 signal sent to pid: $pid\n";
@@ -5276,11 +5397,8 @@ sub hup() {
     my $rv = 0;
     for my $pidname qw(psadwatchd psad kmsgsd) {
         my $pidfile = $pidfiles{$pidname};
-        open PID, "< $pidfile" or die "[*] Could not open $pidfile: $!";
-        my $pid = <PID>;
-        close PID;
-        chomp $pid;
-        if (kill 0, $pid) {
+        my $pid = &Psad::pidrunning($pidfile);
+        if ($pid) {
             if (kill 'HUP', $pid) {
                 print "[+] HUP signal sent to $pidname (pid: $pid)\n";
             } else {
@@ -5700,12 +5818,8 @@ sub disk_space_exceeded() {
                 '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
             for my $pidname qw(psadwatchd kmsgsd) {
                 my $pidfile = $pidfiles{$pidname};
-                open PIDFILE, "< $pidfile" or die '[*] Could not open ',
-                    "$pidfile: $!";
-                my $pid = <PIDFILE>;
-                close PIDFILE;
-                chomp $pid;
-                if (kill 0, $pid) {
+                my $pid = &Psad::pidrunning($pidfile);
+                if ($pid) {
                     unless (kill 15, $pid) {  ### attempt to stop with SIGTERM
                         kill 9, $pid;
                     }
@@ -5718,27 +5832,6 @@ sub disk_space_exceeded() {
         $rm_data_ctr = 0;
     }
     return $rv;
-}
-
-sub stop_legacy_diskmond() {
-    my $diskmond_pidfile = '/var/run/psad/diskmond.pid';
-    if (-e $diskmond_pidfile) {
-        open PIDFILE, "< $diskmond_pidfile" or
-            die "[*] Could not open $diskmond_pidfile: $!";
-        my $pid = <PIDFILE>;
-        close PIDFILE;
-        chomp $pid;
-        if (kill 0, $pid) {
-            unless (kill 15, $pid) {  ### attempt to stop with SIGTERM
-                kill 9, $pid;
-            }
-        }
-        unlink $diskmond_pidfile;
-    }
-    if (-e '/etc/psad/diskmond.conf') {
-        unlink '/etc/psad/diskmond.conf';
-    }
-    return;
 }
 
 sub dump_conf() {
@@ -5790,7 +5883,7 @@ sub required_vars() {
         IMPORT_OLD_SCANS ICMP_TYPES_FILE SHOW_ALL_SIGNATURES
         IPT_PREFIX_COUNTER_FILE IGNORE_PORTS ENABLE_SCAN_ARCHIVE
         EMAIL_LIMIT_STATUS_MSG P0F_FILE IGNORE_PROTOCOLS IPT_AUTO_CHAIN1
-        AUTO_IPT_ADD_IP_FILE
+        AUTO_IPT_ADD_IP_FILE IGNORE_INTERFACES
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

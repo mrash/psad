@@ -35,6 +35,7 @@
 #    USA
 #
 # TODO:
+#   - Module tests for Psad.pm
 #   - Custom logging line upon auto-blocking an ip.
 #   - Customizable subject line that include the danger level.
 #   - RPM package.
@@ -3596,6 +3597,7 @@ sub ipt_chk_chain() {
 }
 
 sub dump_conf() {
+    print " .. Dumping psad config from: $config_file\n";
     for my $var (sort keys %config) {
         printf("%-30s %s\n", " .. $var", $config{$var});
     }

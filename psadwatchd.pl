@@ -37,7 +37,6 @@
 
 use lib '/usr/lib/psad';
 use Psad;
-use File::stat;
 use POSIX qw(setsid);
 use Getopt::Long 'GetOptions';
 use Sys::Hostname 'hostname';
@@ -45,7 +44,16 @@ use strict;
 
 ### establish the default path to the config file (can be
 ### over-ridden with the -c <file> command line option.
-my $CONFIG_FILE = '/etc/psad/psad.conf';
+my $CONFIG_FILE = '/etc/psad/psadwatchd.conf';
+
+### configuration hash
+my %config;
+
+### commands hash
+my %cmds;
+
+### flag used for HUP signal
+my $hup_flag = 0;
 
 ### handle command line arguments
 die " ** Specify the path to the psad.conf file with " .
@@ -53,21 +61,14 @@ die " ** Specify the path to the psad.conf file with " .
     'config=s' => \$CONFIG_FILE
 ));
 
-### read in the configuration file
-my ($Config_href, $Cmds_href) = &Psad::buildconf($CONFIG_FILE);
-
-### make sure the configuration is complete
-&check_config();
-
-my %Config = %$Config_href;
-my %Cmds   = %$Cmds_href;
-my $emailaddrs_aref = $Config{'EMAIL_ADDRESSES'};
+### import config
+&import_config();
 
 ### Make sure the commands are where the config says they are
-&Psad::check_commands(\%Cmds);
+&Psad::check_commands(\%cmds);
 
 ### make sure this is the only psadwatchd running on this system
-&Psad::unique_pid($Config{'PSADWATCHD_PID_FILE'});
+&Psad::unique_pid($config{'PSADWATCHD_PID_FILE'});
 
 ### install WARN and DIE handlers
 $SIG{'__WARN__'} = \&Psad::warn_handler;
@@ -79,27 +80,33 @@ die " ** $0: Couldn't fork: $!" unless defined($pid);
 POSIX::setsid() or die " ** $0: Can't start a new session: $!\n";
 
 ### write the pid to the pid file
-&Psad::writepid($Config{'PSADWATCHD_PID_FILE'});
+&Psad::writepid($config{'PSADWATCHD_PID_FILE'});
 
 my $HOSTNAME = hostname;
 
 ### get the psad command line args
-my $psad_Cmdline = &get_psad_Cmdline($Config{'PSAD_CMDLINE_FILE'});
+my $psad_Cmdline = &get_psad_Cmdline($config{'PSAD_CMDLINE_FILE'});
 
 my ($d_emails, $k_emails, $p_emails) = (0,0,0);
 
-my $config_mtime = stat($CONFIG_FILE)->mtime;
 #=================== end main ==================
 ### main loop
 for (;;) {
-    ### See if we need to import any changed config variables
-    &check_import_config(\$config_mtime, $CONFIG_FILE);
 
-    &check_process('psad', $psad_Cmdline, $Config{'PSAD_PID_FILE'}, \$p_emails);
-    &check_process('kmsgsd', '', $Config{'KMSGSD_PID_FILE'}, \$k_emails);
-    &check_process('diskmond', '', $Config{'DISKMOND_PID_FILE'}, \$d_emails);
+    if ($hup_flag) {
+        ### clear the HUP flag
+        $hup_flag = 0;
+        &import_config();
+    }
 
-    sleep $Config{'PSADWATCHD_CHECK_INTERVAL'};
+    &check_process('psad', $psad_Cmdline,
+        $config{'PSAD_PID_FILE'}, \$p_emails);
+    &check_process('kmsgsd', '',
+        $config{'KMSGSD_PID_FILE'}, \$k_emails);
+    &check_process('diskmond', '',
+        $config{'DISKMOND_PID_FILE'}, \$d_emails);
+
+    sleep $config{'PSADWATCHD_CHECK_INTERVAL'};
 }
 exit 0;
 #=================== end main ==================
@@ -114,14 +121,15 @@ sub check_process() {
         unless (kill 0, $pid) {
             ### the daemon is not running so start it with $pidcmdline
             ### args (which may be empty)
-            if ($$email_count_ref > $Config{'PSADWATCHD_MAX_RETRIES'}) {
+            if ($$email_count_ref > $config{'PSADWATCHD_MAX_RETRIES'}) {
                 ### this will exit the program
                 &give_up($pidname);
             }
             ### should check the rv of this system() call
-            system "$Cmds{$pidname} $pidcmdline";
+            system "$cmds{$pidname} $pidcmdline";
             my $subject = " ** psadwatchd: restarted $pidname on $HOSTNAME";
-            &Psad::sendmail($subject, '', $emailaddrs_aref, $Cmds{'mail'});
+            &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
+                $cmds{'mail'});
             $$email_count_ref++;
             return;
         } else {
@@ -130,10 +138,11 @@ sub check_process() {
         }
     } else {
         my $subject = " ** psadwatchd: pid file $pidfile\" does not exist " .
-                      "for $pidname.  Starting $pidname daemon.";
-        &Psad::sendmail($subject, '', $emailaddrs_aref, $Cmds{'mail'});
+            "for $pidname.  Starting $pidname daemon.";
+        &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
+            $cmds{'mail'});
         ### start $pidname
-        system "$Cmds{$pidname} $pidcmdline";
+        system "$cmds{$pidname} $pidcmdline";
     }
     return;
 }
@@ -153,9 +162,9 @@ sub get_psad_Cmdline() {
         }
         sleep 1;
     }
-    my $subject = "psadwatchd: psad is not running on $HOSTNAME.  " .
-                  "Please start it.";
-    &Psad::sendmail($subject, '', $emailaddrs_aref, $Cmds{'mail'});
+    my $subject = " ** psadwatchd: psad is not running on $HOSTNAME.  " .
+        "Please start it.";
+    &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
     exit 0;
 }
 
@@ -163,26 +172,25 @@ sub give_up() {
     my $pidname = shift;
     my $subject = "psadwatchd: restart limit reached for $pidname " .
                   "on $HOSTNAME!!!  Exiting.";
-    &Psad::sendmail($subject, '', $emailaddrs_aref, $Cmds{'mail'});
+    &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
     exit 0;
 }
-sub check_import_config() {
-    my ($mtime_ref, $file) = @_;
-    my $mtime_tmp = stat($file)->mtime;
-    if ($mtime_tmp != $$mtime_ref) {  ### the file was modified, so import
 
-        ($Config_href, $Cmds_href) = &Psad::buildconf($file);
+sub import_config() {
+    ### read in the configuration file
+    &Psad::buildconf(\%config, \%cmds, $CONFIG_FILE);
 
-        ### make sure the configuration is complete
-        &check_config();
+    ### make sure the configuration is complete
+    &required_vars();
 
-        %Config = %$Config_href;
-        %Cmds   = %$Cmds_href;
-        $$mtime_ref = $mtime_tmp;
-    }
+    ### Check to make sure the commands specified in the config section
+    ### are in the right place, and attempt to correct automatically if not.
+    &Psad::check_commands(\%cmds);
+
     return;
 }
-sub check_config() {
+
+sub required_vars() {
     my @required_vars = qw(
         PSAD_PID_FILE PSAD_CMDLINE_FILE
         DISKMOND_PID_FILE KMSGSD_PID_FILE
@@ -190,6 +198,6 @@ sub check_config() {
         PSADWATCHD_CHECK_INTERVAL
         PSADWATCHD_MAX_RETRIES
     );
-    &Psad::defined_vars($CONFIG_FILE, \@required_vars, $Config_href);
+    &Psad::defined_vars($CONFIG_FILE, \@required_vars, \%config);
     return;
 }

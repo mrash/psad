@@ -1245,7 +1245,7 @@ sub auto_psad_response(){
                 if ($USE_IPCHAINS) {
                     my $chains_aref = &get_input_chains($Cmds{'ipchains'});
                     my $blocked_str = '';
-                    if ($Config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
+                    if ($Config{'IPCHAINS_BLOCK_METHOD'} eq 'Y') {
                         for my $inchain (@$chains_aref) {
                             system "$Cmds{'ipchains'} -I $inchain 1 -s $src -j DENY 2> /dev/null 1>&2";
                         }
@@ -1280,7 +1280,7 @@ sub auto_psad_response(){
                     }
                     if ($Config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
                         open H, '>> /etc/hosts.deny' or die "Could not open /etc/hosts.deny: $!";
-                        print H "ALL: $src";
+                        print H "ALL: $src\n";
                         close H;
                         $blocked_str = 'via tcp wrappers';
                     }
@@ -1619,8 +1619,9 @@ sub check_config() {
         DANGER_LEVEL1     DANGER_LEVEL2      DANGER_LEVEL3
         DANGER_LEVEL4 DANGER_LEVEL5 PORT_RANGE_SCAN_THRESHOLD
         ALERT_ALL    PSAD_EMAIL_LIMIT   IPTABLES_BLOCK_METHOD
-        TCPWRAPPERS_BLOCK_METHOD EMAIL_ALERT_DANGER_LEVEL
-        PSAD_FIFO WHOIS_THRESHOLD WHOIS_TIMEOUT
+        IPCHAINS_BLOCK_METHOD TCPWRAPPERS_BLOCK_METHOD
+        EMAIL_ALERT_DANGER_LEVEL PSAD_FIFO WHOIS_THRESHOLD
+        WHOIS_TIMEOUT
     );
     &Psad::validate_config($CONFIG_FILE, \@required_vars, $Config_href);
     return;

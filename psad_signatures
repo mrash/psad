@@ -9,78 +9,79 @@
 # messages.  This order is: "URG, ACK, PSH, RST, SYN, FIN"
 #
 # Also, as of psad 0.9.0 the only supported transport header fields are the
-# port number and the tcp flags.  Later versions will support other header that
-# ip tables can report such as with the --log-tcp-option, --log-tcp-sequence, 
-# --log-ip-options, etc...
+# port number and the tcp flags.  Later versions will support other header
+# fields that ip tables can report such as with --log-tcp-option, 
+# --log-tcp-sequence, --log-ip-options, etc...
 #
 ############# tcp signatures #############
 # Backdoor signatures
-tcp any -> 1524 msg: "default Backdoor access!"; flags: S;
-tcp any -> 12345 msg:"Netbus/GabanBus"; flags: S;
-tcp any -> 12346 msg:"Netbus/GabanBus"; flags: S;
-tcp any -> 12361 msg:"Whack-a-mole"; flags: S;
-tcp any -> 12362 msg:"Whack-a-mole"; flags: S;
-tcp any -> 31337 msg:"BIND Shell"; flags: S;
-tcp any -> 30100 msg:"Possible NetSphere access"; flags:S;
-tcp any -> 30102 msg:"Possible NetSphere FTP acces"; flags: S;
-tcp any -> 21554 msg:"Possible GirlFriend access"; flags: S;
-tcp any -> 23456 msg:"Possible EvilFTP access"; flags: S;
-tcp any -> 1243 msg:"Possible SubSeven access"; flags: S;
-tcp any -> 6776 msg:"Possible SubSeven access"; flags: S;
+tcp any -> 1524 msg: "default Backdoor access!"; flags: S: dlevel: 1;
+tcp any -> 12345 msg:"Netbus/GabanBus"; flags: S; dlevel: 1;
+tcp any -> 12346 msg:"Netbus/GabanBus"; flags: S; dlevel: 1;
+tcp any -> 12361 msg:"Whack-a-mole"; flags: S; dlevel: 1;
+tcp any -> 12362 msg:"Whack-a-mole"; flags: S; dlevel: 1;
+tcp any -> 31337 msg:"BIND Shell"; flags: S; dlevel: 2;
+tcp any -> 30100 msg:"Possible NetSphere access"; flags:S; dlevel: 1;
+tcp any -> 30102 msg:"Possible NetSphere FTP acces"; flags: S; dlevel: 1;
+tcp any -> 21554 msg:"Possible GirlFriend access"; flags: S; dlevel: 1;
+tcp any -> 23456 msg:"Possible EvilFTP access"; flags: S; dlevel: 1;
+tcp any -> 1243 msg:"Possible SubSeven access"; flags: S; dlevel: 2;
+tcp any -> 6776 msg:"Possible SubSeven access"; flags: S; dlevel: 2;
 
 # DDoS signatures
-tcp any -> 15104 msg: "IDS111 - DDoS - mstream client to handler"; flags: S; 
-tcp any -> 20432 msg:"IDS254 - DDoS shaft client to handler"; flags: AP; 
-# tcp :1024 -> any msg:"IDS253 - DDoS shaft synflood outgoing"; flags: S; seq: 674711609; 
-# tcp :1024 -> any msg:"IDS252 - DDoS shaft synflood incoming"; flags: S; seq: 674711609; 
+tcp any -> 15104 msg: "IDS111 - DDoS - mstream client to handler"; flags: S; dlevel: 1; 
+tcp any -> 20432 msg:"IDS254 - DDoS shaft client to handler"; flags: AP; dlevel: 1; 
+# tcp :1024 -> any msg:"IDS253 - DDoS shaft synflood outgoing"; flags: S; seq: 674711609; dlevel: 1; 
+# tcp :1024 -> any msg:"IDS252 - DDoS shaft synflood incoming"; flags: S; seq: 674711609; dlevel: 1; 
 
 # Miscellaneous signatures
-tcp 53 -> :1023 msg:"IDS007 - MISC-Source Port Traffic 53 TCP"; flags: S; 
-tcp 20 -> :1023 msg:"IDS006 - MISC-Source Port Traffic 20 TCP"; flags: S;  
-# tcp any -> any msg:"MISC-Traceroute TCP"; ttl:"1"; 
-tcp !53 -> 1080 msg:"MISC-WinGate-1080-Attempt"; flags: S; 
-tcp 6000:6005 ->  any msg:"IDS126 - Outgoing Xterm"; flags: AS; 
-tcp !53 -> 8080 msg:"MISC-WinGate-8080-Attempt"; flags: S; 
-tcp any -> 32771 msg:"MISC-Attempted Sun RPC high port access"; 
-# tcp any -> any ipopts: lsrr; msg: "Source routed packet"; 
-# tcp any -> 617 msg:"MISC Knox Arkeia DOS"; flags:AP; dsize:>1445; 
-# tcp any -> any ipopts: ssrr; msg: "Source routed packet"; 
-# tcp any -> 617 msg:"IDS261 - MISC DoS arkiea backup"; flags: AP; dsize: >1445; 
-tcp 7161 -> any msg:"IDS129 - CVE-1999-0430 - Cisco Catalyst Remote Access"; flags: AS; 
+tcp 53 -> :1023 msg:"IDS007 - MISC-Source Port Traffic 53 TCP"; flags: S; dlevel: 1; 
+tcp 20 -> :1023 msg:"IDS006 - MISC-Source Port Traffic 20 TCP"; flags: S; dlevel: 1;  
+# tcp any -> any msg:"MISC-Traceroute TCP"; ttl:"1"; dlevel: 1; 
+tcp !53 -> 1080 msg:"MISC-WinGate-1080-Attempt"; flags: S; dlevel: 1; 
+tcp 6000:6005 ->  any msg:"IDS126 - Outgoing Xterm"; flags: AS; dlevel: 1; 
+tcp !53 -> 8080 msg:"MISC-WinGate-8080-Attempt"; flags: S; dlevel: 1; 
+tcp any -> 32771 msg:"MISC-Attempted Sun RPC high port access"; dlevel: 1; 
+# tcp any -> any ipopts: lsrr; msg: "Source routed packet"; dlevel: 1; 
+# tcp any -> 617 msg:"MISC Knox Arkeia DOS"; flags:AP; dsize:>1445; dlevel: 1; 
+# tcp any -> any ipopts: ssrr; msg: "Source routed packet"; dlevel: 1; 
+# tcp any -> 617 msg:"IDS261 - MISC DoS arkiea backup"; flags: AP; dsize: >1445; dlevel: 1; 
+tcp 7161 -> any msg:"IDS129 - CVE-1999-0430 - Cisco Catalyst Remote Access"; flags: AS; dlevel: 1; 
 
 # "tcp ping" signature
-# tcp any -> any msg:"IDS028 - PING NMAP TCP"; flags:A; ack:0; 
+# tcp any -> any msg:"IDS028 - PING NMAP TCP"; flags:A; ack:0; dlevel: 1; 
 
 # DNS probe
-tcp any -> 53 msg:"DNS tcp probe"; flags:SF;
+tcp any -> 53 msg:"DNS tcp probe"; flags:SF; dlevel: 2;
 
 # oddball scans OS fingerprinting, SYN-FIN, etc...
-# tcp any -> any flags: A; ack: 0; msg:"NMAP TCP ping!";
-tcp any -> any msg:"Possible NMAP Fingerprint attempt"; flags: UPSF;
-# tcp any -> any msg:"Possible Queso Fingerprint attempt"; flags: S12;
-tcp any -> any msg:"IDS005 - SCAN-Possible NMAP Fingerprint attempt"; flags: UPSF; 
-# tcp any -> any msg:"IDS236 - SCAN-IP Eye SYN Scan"; flags: S; seq: 1958810375; 
-# tcp any -> any msg:"IDS004 - SCAN-NULL Scan"; flags:0; seq:0; ack:0; 
-# tcp any -> any msg:"IDS029 - SCAN-Possible Queso Fingerprint attempt"; flags:S12; 
-tcp any -> any msg:"SCAN-SYN FIN"; flags:SF; 
-tcp any -> any msg:"SCAN-NULL"; flags:NULL; 
-tcp any -> any msg:"NMAP XMAS scan"; flags: UPF;
-# tcp any -> 80 msg:"IDS146 - SCAN-Cybercop OS Probe sf12"; flags: SF12; dsize: 0; 
-tcp any -> any msg:"IDS027 - SCAN-FIN"; flags: F; 
+# tcp any -> any flags: A; ack: 0; msg:"NMAP TCP ping!"; dlevel: 1;
+tcp any -> any msg:"Possible NMAP Fingerprint attempt"; flags: UPSF; dlevel: 2;
+# tcp any -> any msg:"Possible Queso Fingerprint attempt"; flags: S12; dlevel: 1;
+tcp any -> any msg:"IDS005 - SCAN-Possible NMAP Fingerprint attempt"; flags: UPSF; dlevel: 2; 
+# tcp any -> any msg:"IDS236 - SCAN-IP Eye SYN Scan"; flags: S; seq: 1958810375; dlevel: 1; 
+# tcp any -> any msg:"IDS004 - SCAN-NULL Scan"; flags:0; seq:0; ack:0; dlevel: 1; 
+# tcp any -> any msg:"IDS029 - SCAN-Possible Queso Fingerprint attempt"; flags:S12; dlevel: 1; 
+tcp any -> any msg:"SCAN-SYN FIN"; flags:SF; dlevel: 2; 
+tcp any -> any msg:"SCAN-NULL"; flags:NULL; dlevel: 2; 
+tcp any -> any msg:"NMAP XMAS scan"; flags: UPF; dlevel: 2;
+# tcp any -> 80 msg:"IDS146 - SCAN-Cybercop OS Probe sf12"; flags: SF12; dsize: 0; dlevel: 1; 
+tcp any -> any msg:"IDS027 - SCAN-FIN"; flags: F; dlevel: 2; 
 
-# IIS scans ha, ha, we are not vulnerable, but don't you want to know when someone is trying these?
-tcp 1024: -> 1031:1035 msg:"IIS - Possible Attempt at NT INETINFO.EXE 100% CPU Utilization"; flags:S; 
-tcp 1024: -> 1029 msg:"IIS - Possible Attempt at NT DNS.EXE 100% CPU Utilization (port 1029)"; flags:S; 
-tcp 1024: -> 1091 msg:"IIS - Possible Attempt at NT DNS.EXE 100% CPU Utilization (port 1091)"; flags:S; 
-tcp 1024: -> 1043 msg:"IIS - Possible Attempt at NT WINS.EXE 100% CPU Utilization"; flags:S; 
-tcp 1024: -> 1038 msg:"IIS - Possible Attempt at NT TCPSVCS.EXE 100% CPU Utilization"; flags:S;
+# IIS scans.  Ha, ha, our Linux box is not vulnerable but if it is the firewall for a network that runs
+# Windoze boxen wouldn't you want to know when someone is trying these?
+tcp 1024: -> 1031:1035 msg:"IIS - Possible Attempt at NT INETINFO.EXE 100% CPU Utilization"; flags:S; dlevel: 1; 
+tcp 1024: -> 1029 msg:"IIS - Possible Attempt at NT DNS.EXE 100% CPU Utilization (port 1029)"; flags:S; dlevel: 1; 
+tcp 1024: -> 1091 msg:"IIS - Possible Attempt at NT DNS.EXE 100% CPU Utilization (port 1091)"; flags:S; dlevel: 1; 
+tcp 1024: -> 1043 msg:"IIS - Possible Attempt at NT WINS.EXE 100% CPU Utilization"; flags:S; dlevel: 1; 
+tcp 1024: -> 1038 msg:"IIS - Possible Attempt at NT TCPSVCS.EXE 100% CPU Utilization"; flags:S; dlevel: 1;
 
 ############# udp signatures #############
 # psad needs to support other packet fields such as ttl, len, etc. to recognize more signatures
 
-udp any -> 31337 msg:"Back Orifice";
-udp any -> 31338 msg:"Deep Back Orifice";
-udp 53 -> 138:1023 (msg:"MISC-Source Port Traffic 138-1023";)
-udp 53 -> 54:136 (msg:"MISC-Source Port Traffic 54-136";)
-udp 53 -> 0:52 (msg:"MISC-Source Port Traffic 0-52";)
+udp any -> 31337 msg:"Back Orifice"; dlevel: 2; 
+udp any -> 31338 msg:"Deep Back Orifice"; dlevel: 2;
+udp 53 -> 138:1023 msg:"MISC-Source Port Traffic 138-1023"; dlevel: 1;
+udp 53 -> 54:136 msg:"MISC-Source Port Traffic 54-136"; dlevel: 1;
+udp 53 -> 0:52 msg:"MISC-Source Port Traffic 0-52"; dlevel: 1;
 

@@ -357,15 +357,15 @@ if ($check_interval) {
 my $PSADCMD = $cmds{'psad'};
 
 ### the --Status command line switch was given
-&status_psad() if $status;
+&status() if $status;
 
 ### make sure $PSAD_DIR, $FW_DATA, and /var/lib/psad/psadfifo, etc.
 ### actually exist
-&setup_psad();
+&setup();
 
 ### the --Restart command line switch was given
 if ($restart) {
-    &restart_psad();
+    &restart();
     exit 0;
 }
 
@@ -1896,7 +1896,7 @@ sub kill_psad() {
     return;
 }
 
-sub restart_psad() {
+sub restart() {
     my $cmdline;
     if (-e $cmdline_file) {
         open CMD, "< $cmdline_file";
@@ -1914,7 +1914,7 @@ sub restart_psad() {
 }
 
 ### display the status of all four psad daemons
-sub status_psad() {
+sub status() {
     my $cmdline;
     ### only the psad daemon (normally) runs with command line arguments
     if (-e $cmdline_file) {
@@ -1929,27 +1929,6 @@ sub status_psad() {
             $config{'DISKMOND_PID_FILE'}) {
         my ($pidname) = ($pidfile =~ /(\w+)\.pid$/);
         if (-e $pidfile) {
-            my $pid_mtime = stat($pidfile)->mtime;
-            ### ($sec, $min, $hr, $day_of_month, $mon, $year,
-            ### $wday, $yday, $isdst) = localtime($mtime);
-            my @timevars = localtime($pid_mtime);
-            $timevars[4] += 1;
-            if ($timevars[4] =~ /^\d$/) {
-                $timevars[4] = '0' . $timevars[4];
-            }
-            if ($timevars[3] =~ /^\d$/) {
-                $timevars[3] = '0' . $timevars[3];
-            }
-            if ($timevars[0] =~ /^\d$/) {
-                $timevars[0] = '0' . $timevars[0];
-            }
-            if ($timevars[1] =~ /^\d$/) {
-                $timevars[1] = '0' . $timevars[1];
-            }
-            if ($timevars[2] =~ /^\d$/) {
-                $timevars[2] = '0' . $timevars[2];
-            }
-            $timevars[5] += 1900;
             open PIDFILE, "< $pidfile";
             my $pid = <PIDFILE>;
             close PIDFILE;
@@ -1961,8 +1940,8 @@ sub status_psad() {
                     chomp $line;
                     if ($line =~ /^\S+\s+$pid\s+(\S+)\s+(\S+)/) {
                         print "  %CPU: $1  %MEM: $2\n";
-                        print "     Running since: $timevars[2]:$timevars[1]:$timevars[0] " .
-                            "$timevars[4]/$timevars[3]/$timevars[5]\n";
+                        print "     Running since: " .
+                            localtime(stat($pidfile)->mtime) . "\n";
                         if ($pidname eq 'psad') {
                             if ($cmdline) {
                                 print "     Command line arguments: $cmdline\n";
@@ -2149,7 +2128,7 @@ sub check_old_cmdargs() {
     return;
 }
 
-sub setup_psad() {
+sub setup() {
     unless (-d $config{'PSAD_DIR'}) {
         mkdir $config{'PSAD_DIR'}, 0500;
     }

@@ -11,7 +11,7 @@
 .B ] [-c
 .I config-file
 .B ] [-l]
-.B ] [-h] [-B] [-F] [-S] [-K] [-R] [-U] [-V] [-f] [-o] [-p] [-D] [-d] [--signatures
+.B ] [-h] [-B] [-F] [-S] [-K] [-R] [-U] [-H] [-V] [-f] [-o] [-p] [-D] [-d] [--signatures
 .I sig-file
 .B ] [--interval
 .I interval
@@ -213,6 +213,12 @@ where "$$" represents the pid of the psad process.  This is mostly
 useful for debugging purposes, but it also allows the administrator to
 peer into the %Scan hash, which is the primary data structure used to
 store scan data within system memory.
+.TP
+
+.BR \-H ", " \-\^\-HUP
+Send all running psad daemons a HUP signal.  This will instruct the
+daemons to re-read their respective configuration files without causing
+scan data to be lost in the process.
 .TP
 
 .BR \-d ", " \-\^\-debug

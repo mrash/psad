@@ -82,7 +82,6 @@ my $ALERT_ALL = "Y";	# if "Y", send email for all new bad packets instead of jus
 my $ENABLE_AUTO_IDS = "N"; 	# if "Y", enable automated IDS response (auto manages firewall rulesets). 
 my $AUTO_IDS_DANGER_LEVEL = 5;  # Block all traffic from offending IP if danger level >= to this value 
 
-my $testvar = "hello";
 # system binaries
 my $ipchainsCmd = "/sbin/ipchains";
 my $iptablesCmd = "/usr/local/bin/iptables";

@@ -18,7 +18,7 @@
 #
 # Credits: (see the CREDITS file)
 #
-# Version: 1.2.3
+# Version: 1.2.4
 #
 # Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.org)
 #
@@ -35,11 +35,11 @@
 #    USA
 #
 # TODO:
+#   - Replace full ascii signature listings in <ip>_signatures with sid
+#     numbers and packet counts.
 #   - More syslog messages from psad, psadwatchd, and kmsgsd.
 #   - Put a "psad signature strategy" link in all alert emails.
 #   - Module tests for Psad.pm
-#   - Add command line argument "-dl <n>" to --Status to show only
-#     those ips that have reached a danger level >= n.
 #   - Extract default behavior into psad.conf.
 #   - Remove dependency on DROP tag in iptables messages.
 #   - Custom logging line upon auto-blocking an ip.
@@ -195,7 +195,7 @@ use strict;
 ### ========================== main =================================
 
 ### set current the psad version number
-my $version = '1.2.3';
+my $version = '1.2.4';
 
 ### default config file for psad (can be changed with
 ### --config switch)
@@ -709,7 +709,10 @@ for (;;) {
         &dshield_email_log();
     }
 
-    if ((time() - $last_disk_check) > $config{'DISK_CHECK_INTERVAL'}) {
+    ### Allow disk space utilization checks to be disabled by
+    ### setting DISK_MAX_PERCENTAGE = 0.
+    if ($config{'DISK_MAX_PERCENTAGE'} > 0 and (time() - $last_disk_check)
+            > $config{'DISK_CHECK_INTERVAL'}) {
         ### See how we are doing on disk space, and remove data
         ### if necessary.
         if (&disk_space_exceeded()) {
@@ -3963,9 +3966,10 @@ sub disk_space_exceeded() {
 }
 
 sub stop_legacy_diskmond() {
-    if (-e '/var/run/psad/diskmond.pid') {
-        open PIDFILE, '< /var/run/psad/diskmond.pid' or
-            die " ** Could not open /var/run/psad/diskmond.pid: $!";
+    my $diskmond_pidfile = '/var/run/psad/diskmond.pid';
+    if (-e $diskmond_pidfile) {
+        open PIDFILE, "< $diskmond_pidfile" or
+            die " ** Could not open $diskmond_pidfile: $!";
         my $pid = <PIDFILE>;
         close PIDFILE;
         chomp $pid;
@@ -3974,7 +3978,7 @@ sub stop_legacy_diskmond() {
                 kill 9, $pid;
             }
         }
-        unlink '/var/run/psad/diskmond.pid';
+        unlink $diskmond_pidfile;
     }
     if (-e '/etc/psad/diskmond.conf') {
         unlink '/etc/psad/diskmond.conf';

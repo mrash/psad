@@ -275,12 +275,17 @@ sub find_ip_rule() {
         if ($rule_href->{'target'} eq $target
                 and $rule_href->{'protocol'} eq 'all'
                 and $rule_href->{'src'} eq $src
-                and $rule_href->{'dst'} eq $dst
+                and $rule_href->{'dst'} eq $dst) {
+            if ($target eq 'LOG' or $target eq 'ULOG') {
+                ### built-in LOG and ULOG target rules always
+                ### have extended information
+                return $rulenum;
+            } elsif (not $rule_href->{'extended'}) {
                 ### don't want any additional criteria (such as
                 ### port numbers) in the rule. Note that we are
                 ### also not checking interfaces
-                and not $rule_href->{'extended'}) {
-            return $rulenum;
+                return $rulenum;
+            }
         }
         $rulenum++;
     }

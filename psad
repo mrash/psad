@@ -281,7 +281,7 @@ unless ($daemon || $DEBUG) {
     my $pid = fork;
     exit if $pid;
     die "@@@@@  $0: Couldn't fork: $!" unless defined($pid);
-    POSIX::setsid() or die "@@@@@  $0: Can't start a new session: $!\n";
+    POSIX::setsid() or die "@@@@@  $0: Can't start a new session: $!";
 }
 
 ### write the current pid associated with psad to the psad pid file
@@ -716,7 +716,7 @@ sub import_signatures() {
     my ($proto, $srcport, $dstport, $msg, $flags, $dangerlevel);
     my %Sigs;
     my ($start, $end, $tmpport);
-    open SIGS, "< $sigfile" or die "Could not open the signatures file $sigfile: $!\n";
+    open SIGS, "< $sigfile" or die "Could not open the signatures file $sigfile: $!";
     my @sigs = <SIGS>;
     close SIGS;
     for my $sig (@sigs) {
@@ -1364,7 +1364,7 @@ sub restart_psad() {
         close CMD;
         chomp $cmdline;
     } else {
-        die "@@@@@  psad:  No other psad process is currently running on $HOSTNAME!\n";
+        die "@@@@@  psad:  No other psad process is currently running on $HOSTNAME!";
     }
     &kill_psad($pidfiles_aref);
     print " ... Restarting the psad daemons on $HOSTNAME\n";
@@ -1442,7 +1442,7 @@ sub psad_usr1() {
     my $rv = 0;
     my $psad_pidfile = $pidfiles_aref->[1];
     if (-e $psad_pidfile) {
-        open PIDFILE, "< $psad_pidfile" or die "@@@@@  Could not open $psad_pidfile: $!\n";
+        open PIDFILE, "< $psad_pidfile" or die "@@@@@  Could not open $psad_pidfile: $!";
         my $pid = <PIDFILE>;
         close PIDFILE;
         chomp $pid;
@@ -1486,7 +1486,7 @@ sub psad_setup() {
     }
     unless (`$Cmds_href->{'grep'} psadfifo /etc/syslog.conf`) {
         copy("/etc/syslog.conf", "/etc/syslog.conf.orig") unless (-e "/etc/syslog.conf.orig");
-        open SYSLOG, ">> /etc/syslog.conf" or die "@@@@@  Unable to open /etc/syslog.conf: $!\n";
+        open SYSLOG, ">> /etc/syslog.conf" or die "@@@@@  Unable to open /etc/syslog.conf: $!";
         print SYSLOG "kern.info  |/var/log/psadfifo\n\n";  #reinstate kernel logging to our named pipe
         close SYSLOG;
         system("$Cmds_href->{'syslog_init'} restart");

@@ -135,11 +135,11 @@ if ($uninstall) {
 #                print " ----  Removing ${PERL_INSTALL_DIR}/Psad.pm  ----\n";
 #                unlink "${PERL_INSTALL_DIR}/Psad.pm";
 #        }
-    if (-e "/etc/psad") {
+    if (-d "/etc/psad") {
         print " ... Removing configuration directory: /etc/psad\n";
         rmtree("/etc/psad", 1, 0);
     }
-    if (-e "/var/log/psad") {
+    if (-d "/var/log/psad") {
         print " ... Removing logging directory: /var/log/psad\n";
         rmtree("/var/log/psad", 1, 0);
     }
@@ -216,7 +216,7 @@ unless (`$Cmds{'grep'} psadfifo /etc/syslog.conf`) {
     print " ... Restarting syslog.\n";
     system("$SYSLOG_INIT restart");
 }
-unless (-e "/var/log/psad") {
+unless (-d "/var/log/psad") {
     &logr(" ... Creating /var/log/psad/\n", \@LOGR_FILES);
     mkdir "/var/log/psad",400;
 }
@@ -227,22 +227,18 @@ unless (-e "/var/log/psad/fwdata") {
     chmod 0600, "/var/log/psad/fwdata";
     &perms_ownership("/var/log/psad/fwdata", 0600);
 }
-unless (-e $INSTALL_DIR) {
+unless (-d $INSTALL_DIR) {
     &logr(" ... Creating $INSTALL_DIR\n", \@LOGR_FILES);
     mkdir $INSTALL_DIR,755;
 }
-unless (-e "/usr/bin/whois.psad") {
-    if (-e "whois-4.5.6") {
-        &logr(" ... Compiling Marco d'Itri's whois client\n", \@LOGR_FILES);
-        if (! system("$Cmds{'make'} -C whois-4.5.6")) {  # remember unix return value...
-            &logr(" ... Copying whois binary to /usr/bin/whois.psad\n", \@LOGR_FILES);
-            copy("whois-4.5.6/whois", "/usr/bin/whois.psad");
-            &perms_ownership("/usr/bin/whois.psad", 0755);
-        }
+if (-d "whois-4.5.21") {
+    &logr(" ... Compiling Marco d'Itri's whois client\n", \@LOGR_FILES);
+    if (! system("$Cmds{'make'} -C whois-4.5.21")) {  # remember unix return value...
+        &logr(" ... Copying whois binary to /usr/bin/whois.psad\n", \@LOGR_FILES);
+        copy("whois-4.5.21/whois", "/usr/bin/whois.psad");
     }
-} else {
-    &perms_ownership("/usr/bin/whois.psad", 0755);  # make absolutely certain we can execute whois.psad
 }
+&perms_ownership("/usr/bin/whois.psad", 0755);
 &logr(" ... Installing the Psad.pm perl module\n", \@LOGR_FILES);
     
 chdir "Psad.pm";
@@ -338,9 +334,9 @@ if (-e "${INSTALL_DIR}/diskmond" && (! $nopreserve)) {
     &rm_perl_options("${INSTALL_DIR}/diskmond", \%Cmds);
     &perms_ownership("${INSTALL_DIR}/diskmond", 0500);
 }
-unless (-e "/etc/psad") {
-&logr(" ... Creating /etc/psad/\n", \@LOGR_FILES);
-mkdir "/etc/psad",400;
+unless (-d "/etc/psad") {
+    &logr(" ... Creating /etc/psad/\n", \@LOGR_FILES);
+    mkdir "/etc/psad",400;
 }
 if (-e "/etc/psad/psad_signatures") {
     &logr(" ... Copying psad_signatures -> /etc/psad/psad_signatures\n", \@LOGR_FILES);
@@ -411,7 +407,7 @@ if (-e "/etc/man.config") {
 }
 
 if ($distro =~ /redhat/) {
-    if (-e $INIT_DIR) {
+    if (-d $INIT_DIR) {
         &logr(" ... Copying psad-init -> ${INIT_DIR}/psad\n", \@LOGR_FILES);
         copy("psad-init", "${INIT_DIR}/psad");
         &perms_ownership("${INIT_DIR}/psad", 0744);
@@ -422,7 +418,7 @@ if ($distro =~ /redhat/) {
         &logr("@@@@@  The init script directory, \"${INIT_DIR}\" does not exist!.  Edit the \$INIT_DIR variable in the config section.\n", \@LOGR_FILES);
     }
 } else {  ### psad is being installed on a non-redhat distribution
-    if (-e $INIT_DIR) {
+    if (-d $INIT_DIR) {
         &logr(" ... Copying psad-init.generic -> ${INIT_DIR}/psad\n", \@LOGR_FILES);
         copy("psad-init.generic", "${INIT_DIR}/psad");
         &perms_ownership("${INIT_DIR}/psad", 0744);
@@ -672,7 +668,7 @@ sub perms_ownership() {
     return;
 }
 sub create_varlogpsad() {
-    unless (-e "/var/log/psad") {
+    unless (-d "/var/log/psad") {
         mkdir "/var/log/psad", 400;
     }
     return;

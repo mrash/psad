@@ -312,8 +312,8 @@ sub install() {
 
     ### installing IPTables::Parse
     &logr(" .. Installing the IPTables::Parse perl module\n");
-    chdir 'IPTables/Parse' or die " ** Could not chdir to ",
-        "IPTables/Parse: $!";
+    chdir 'IPTables-0.10/Parse' or die " ** Could not chdir to ",
+        "IPTables-0.10/Parse: $!";
     unless (-e 'Makefile.PL') {
         die " ** Your source directory appears to be incomplete!  " .
             "IPTables::Parse is missing.\n    Download the latest sources " .

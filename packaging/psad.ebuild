@@ -110,8 +110,8 @@ pkg_postinst() {
 	echo
 	einfo "Please be sure to edit /etc/psad/psad.conf to reflect your system's"
 	einfo "configuration or it may not work correctly or start up. Specifically, check"
-	einfo "the validity of the HOSTNAME setting and replace the EMAIL_ADDRESSES setting"
-	einfo "at the least."
+	einfo "the validity of the HOSTNAME setting and replace the EMAIL_ADDRESSES and"
+	einfo "HOME_NET settings at the least."
 	echo
 	ewarn "If you're using metalog as your system logger, please be aware that PSAD does"
 	ewarn "not officially support it, and it probably won't work. Syslog-ng and sysklogd"

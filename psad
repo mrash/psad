@@ -81,20 +81,14 @@ use Data::Dumper;
 use Socket;
 use Sys::Hostname "hostname";
 use POSIX;
+use strict;
 
-### could implement autouse for these modules, but is the performance
-### hit worth it?
+### could implement autouse for these modules, but is the performance hit worth it?
 # use autouse 'Data::Dumper' => "Dumper";  ### this one is not used very much so don't load immediately
 # use autouse 'Socket';       ### not used until a scan is detected so don't load until it is needed
 
 # use Sys::Syslog qw(openlog syslog closelog);   ### this does not seem to play nice with perl-5.005_03
 # use POSIX qw(:signal_h :errno_h :sys_wait_h setsid);
-
-### psad does not yet support 'strict refs' since several hashes have 
-### $hsh{key} = "someval" and $hsh{key1}{key2} = "anotherval"... should
-### probably fix this.
-# use strict;
-# no strict "refs";
 
 ### globals
 use vars qw($VERSION %Scan $PRINT_SCAN_HASH $USE_IPCHAINS $USE_IPTABLES $DEBUG $HOSTNAME);
@@ -173,7 +167,8 @@ $DEBUG = 0;
 $HOSTNAME = hostname;
 
 ### initialize and scope some default variables (command line args can override some default values)
-my $Scan_href;  # main psad data structure; contains ips, port ranges, tcp flags, and danger levels
+my $Scan_href;  ### main psad data structure; contains ips, port ranges, tcp flags, and danger levels
+my $found_new_packets = 0;
 my $daemon = 0;
 my $output = 0;
 my $errors = 0;
@@ -228,8 +223,8 @@ $< == 0 && $> == 0 or die "\n@@@@@  psad: You must be root (or equivalent UID 0 
 
 ### the --Kill command line switch was given
 if ($kill) {
-        &kill_psad(\@PIDFILES);
-        exit 0;
+	&kill_psad(\@PIDFILES);
+	exit 0;
 }
 
 ### the --USR1 command line switch was given
@@ -264,8 +259,8 @@ my %Cmds = (
 
 ### the --Status command line switch was given
 if ($status) {
-        my $rv = &psad_status(\@PIDFILES, $cmdline_file, \%Cmds);
-        exit $rv;
+	my $rv = &psad_status(\@PIDFILES, $cmdline_file, \%Cmds);
+	exit $rv;
 }
 
 ### make sure $PSAD_DIR, $FW_DATA, and /var/log/psadfifo, etc. actually exist
@@ -365,40 +360,45 @@ for (;;) {
 	my $sigs_mtime_start = stat($signatures)->mtime if $signatures;
 	sleep $CHECK_INTERVAL;
 	my $fwdata_end_lines = (split /\s+/, `$Cmds{'wc'} -l $FW_DATA`)[1];
-	if ($signatures) {  # scan $signatures for any signature updates
+	### scan $signatures for any signature updates
+	if ($signatures) {
 		my $sigs_mtime_end = stat($signatures)->mtime;
-		if ($sigs_mtime_start != $sigs_mtime_end) {  # the signatures were updated... import the new signatures.
+		### the signatures were updated... import the new signatures.
+		if ($sigs_mtime_start != $sigs_mtime_end) {
 			$Sigs_href = &import_signatures($signatures);
-                	for my $email_address (@EMAIL_ADDRESSES) {
-                        	system "$Cmds{'mail'} $email_address -s \"psad: re-read $signatures file on $HOSTNAME\" < /dev/null";
-                	}
+			for my $email_address (@EMAIL_ADDRESSES) {
+				system "$Cmds{'mail'} $email_address -s \"psad: re-read $signatures file on $HOSTNAME\" < /dev/null";
+			}
 		}
 	}
 	### scan $auto_ips for any ips that should automatically have a certain danger threshold set.
 	if ($auto_ips) {
 		my $auto_ips_mtime_end = stat($auto_ips)->mtime;
-		if ($auto_ips_mtime_start != $auto_ips_mtime_end) {  # the auto ips file was updated... import the new ip/danger level pairs.
+		if ($auto_ips_mtime_start != $auto_ips_mtime_end) {  ### auto_ips file was updated... import ip/danger level pairs.
 			$Auto_ips_href = &import_auto_ips($auto_ips);
-			# need to set $Scan_href->{$src}->{$dst}->{'AUTO'} = "N" since $Auto_ips_href was updated.
+			### need to set $Scan_href->{$src}->{$dst}->{'AUTO'} = "N" since $Auto_ips_href was updated.
 			$Scan_href = &reset_auto_tags($Scan_href);
 			for my $email_address (@EMAIL_ADDRESSES) {
-                                system "$Cmds{'mail'} $email_address -s \"psad: re-read $auto_ips file on $HOSTNAME\" < /dev/null";
-                        }
+				system "$Cmds{'mail'} $email_address -s \"psad: re-read $auto_ips file on $HOSTNAME\" < /dev/null";
+			}
 		}
 	}
-	if ($fwdata_end_lines - $fwdata_start_lines > 0) {   # new packets have been written to $FW_DATA by kmsgsd for psad analysis
+	### new packets have been written to $FW_DATA by kmsgsd for psad analysis
+	if ($fwdata_end_lines - $fwdata_start_lines > 0) {
 		my $grabnum = $fwdata_end_lines - $fwdata_start_lines;
 		my @process_lines = `$Cmds{'tail'} -$grabnum $FW_DATA`;
 		print "MAIN: calling check_scan()\n" if $DEBUG;
-		$Scan_href = &check_scan(\@process_lines, $Sigs_href, $signatures, $netstat_lookup, $local_ips_href, $errors, 
+		($Scan_href, $found_new_packets) = &check_scan(\@process_lines, $Sigs_href, $signatures, $netstat_lookup, $local_ips_href, $errors,
 									$ERROR_LOG, $ENABLE_PERSISTENCE, $SHOW_ALL_SIGNATURES, $SCAN_TIMEOUT, \%Cmds);
-		print "MAIN: calling assign_danger_level()\n" if $DEBUG;
-		$Scan_href = &assign_danger_level($Scan_href, $Auto_ips_href, $PORT_RANGE_SCAN_THRESHOLD, $ALERT_ALL, \%DANGER_LEVELS);
-		print "MAIN: calling scan_logr()\n" if $DEBUG;
-		$Scan_href = &scan_logr($Scan_href, $PSAD_LOGFILE, $output, $dnslookups, $whoislookups, $WHOIS_TIMEOUT, $ENABLE_EMAIL_ALERTS,
+		if ($found_new_packets) {
+			print "MAIN: calling assign_danger_level()\n" if $DEBUG;
+			$Scan_href = &assign_danger_level($Scan_href, $Auto_ips_href, $PORT_RANGE_SCAN_THRESHOLD, $ALERT_ALL, \%DANGER_LEVELS);
+			print "MAIN: calling scan_logr()\n" if $DEBUG;
+			$Scan_href = &scan_logr($Scan_href, $PSAD_LOGFILE, $output, $dnslookups, $whoislookups, $WHOIS_TIMEOUT, $ENABLE_EMAIL_ALERTS,
 					$EMAIL_ALERT_DANGER_LEVEL, $EMAIL_ALERTFILE, $EMAIL_LIMIT, \@EMAIL_ADDRESSES, $SHOW_ALL_SIGNATURES, \%Cmds);
-		if ($ENABLE_AUTO_IDS eq "Y" && ! $Syslog_server) {  # don't manage the firewall rules if psad is running on a syslog server.
-			$Scan_href = &auto_psad_response($Scan_href, $AUTO_IDS_DANGER_LEVEL, \%Cmds, \@EMAIL_ADDRESSES);
+			if ($ENABLE_AUTO_IDS eq "Y" && ! $Syslog_server) {  # don't manage the firewall rules if psad is running on a syslog server.
+				$Scan_href = &auto_psad_response($Scan_href, $AUTO_IDS_DANGER_LEVEL, \%Cmds, \@EMAIL_ADDRESSES);
+			}
 		}
 	}
 	print "MAIN: number of lines in $FW_DATA: $fwdata_end_lines\n" if $DEBUG;
@@ -420,11 +420,11 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 	unless ($netstat_lookup) {
 		$local_listening_ports_href = &get_listening_ports($Cmds_href);
 	}
+	my $matched_packet = 0;
 	READPKT: for my $l (@$process_lines_aref) {
 		chomp $l;
 		if ($USE_IPTABLES) {
 			# sometimes the log entry is messed up by iptables so we write it to the error log
-# 			if ($l =~ /SRC\=(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\sDST\=(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\sLEN\=(\d+)\s.+?TTL\=(\d+)\s.+?PROTO\=(\w{3,4})\sSPT\=(\d+)\sDPT\=(\d+)/) {
 			if ($l =~ /SRC\=(\S+)\sDST\=(\S+)\sLEN\=(\d+)\s.+?TTL\=(\d+)\s.+?PROTO\=(\w{3,4})\sSPT\=(\d+)\sDPT\=(\d+)/) {
 				($src, $dst, $len, $ttl, $proto, $srcport, $dstport) = ($1,$2,$3,$4,$5,$6,$7,$8);
 				if ($proto ne "TCP" && $proto ne "UDP") {  ### it was some weird non-tcp/udp packet that has source and destination ports
@@ -449,7 +449,6 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 						next READPKT;
 					}
 				} # else it is UDP, but there are no more fields we need to defined since we already have the ports, etc.
-#			} elsif ($l =~ /SRC\=(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\sDST\=(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\sLEN\=(\d+)\s.+?TTL\=(\d+)\s.+?PROTO\=ICMP\sTYPE\=(\d+)\sCODE\=(\d+)\sID\=(\d+)\sSEQ\=(\d+)/) {
 			} elsif ($l =~ /SRC\=(\S+)\sDST\=(\S+)\sLEN\=(\d+)\s.+?TTL\=(\d+)\s.+?PROTO\=ICMP\sTYPE\=(\d+)\sCODE\=(\d+)\sID\=(\d+)\sSEQ\=(\d+)/) {
 				($src, $dst, $len, $ttl, $type, $code, $id, $seq) = ($1,$2,$3,$4,$5,$6,$7,$8);
 				$proto = "ICMP";
@@ -476,7 +475,8 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 				}
 			}
 		} 
-		# hash initialization
+		$matched_packet = 1;
+		### hash initialization
 		$Scan{$src}{$dst}{'LOGR'} = "Y";
 #		if ($proto eq "TCP") {
 #			$Scan{$src}{$dst}{$proto}{'FLAGS'}{$flags} = 0 unless (defined $Scan{$src}{$dst}{$proto}{'FLAGS'}{$flags});
@@ -526,22 +526,20 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 								$Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}{'END_PORT'});
 		} 
 		if ($DEBUG) {
-			print "check_scan():\n";
-			print "     src: $src, dst: $dst\n";
-#			print "     Scan{src} = $Scan{$src}\n";
-#			print "     Scan{src}{dst} = $Scan{$src}{$dst}\n";
-			print "     Scan{src}{dst}{'LOGR'} = $Scan{$src}{$dst}{'LOGR'}\n";
-			print "     Scan{src}{dst}{'ABSNUM'} = $Scan{$src}{$dst}{'ABSNUM'}\n";
-			print "     Scan{src}{dst}{'TCP'}{'FLAGS'}{flags} = $Scan{$src}{$dst}{'TCP'}{'FLAGS'}{$flags}\n" if ($proto eq "TCP");
-			print "     flags: $flags\n" if ($proto eq "TCP");
-			print "     Scan{src}{dst}{'AUTO'} $Scan{$src}{$dst}{'AUTO'}\n";
-			print "     Scan{src}{dst}{'CURRENT_DANGER_LEVEL'} = $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'}\n";
-			print "     Scan{src}{dst}{'START_PORT'} = $Scan{$src}{$dst}{'START_PORT'}\n" unless ($proto eq "ICMP");
-			print "     Scan{src}{dst}{'END_PORT'} = $Scan{$src}{$dst}{'END_PORT'}\n" unless ($proto eq "ICMP");
-			print "     Scan{src}{dst}{'START_TIME'}{'READABLE'} = $Scan{$src}{$dst}{'START_TIME'}{'READABLE'}\n";
-			print "     Scan{src}{dst}{'START_TIME'}{'EPOCH_SECONDS'} = $Scan{$src}{$dst}{'START_TIME'}{'EPOCH_SECONDS'}\n" if ($enable_persistence eq "N");
-			print "     Scan{src}{dst}{'END_TIME'}{'READABLE'} = $Scan{$src}{$dst}{'END_TIME'}{'READABLE'}\n";
-			print "     Scan{src}{dst}{'END_TIME'}{'EPOCH_SECONDS'} = $Scan{$src}{$dst}{'END_TIME'}{'EPOCH_SECONDS'}\n" if ($enable_persistence eq "N");
+			print STDOUT "check_scan():\n";
+			print STDOUT "     src: $src, dst: $dst\n";
+			print STDOUT "     Scan{src}{dst}{'LOGR'} = $Scan{$src}{$dst}{'LOGR'}\n";
+			print STDOUT "     Scan{src}{dst}{'ABSNUM'} = $Scan{$src}{$dst}{'ABSNUM'}\n";
+			print STDOUT "     Scan{src}{dst}{'TCP'}{'FLAGS'}{flags} = $Scan{$src}{$dst}{'TCP'}{'FLAGS'}{$flags}\n" if ($proto eq "TCP");
+			print STDOUT "     flags: $flags\n" if ($proto eq "TCP");
+			print STDOUT "     Scan{src}{dst}{'AUTO'} $Scan{$src}{$dst}{'AUTO'}\n";
+			print STDOUT "     Scan{src}{dst}{'CURRENT_DANGER_LEVEL'} = $Scan{$src}{$dst}{'CURRENT_DANGER_LEVEL'}\n";
+			print STDOUT "     Scan{src}{dst}{'START_PORT'} = $Scan{$src}{$dst}{'START_PORT'}\n" unless ($proto eq "ICMP");
+			print STDOUT "     Scan{src}{dst}{'END_PORT'} = $Scan{$src}{$dst}{'END_PORT'}\n" unless ($proto eq "ICMP");
+			print STDOUT "     Scan{src}{dst}{'START_TIME'}{'READABLE'} = $Scan{$src}{$dst}{'START_TIME'}{'READABLE'}\n";
+			print STDOUT "     Scan{src}{dst}{'START_TIME'}{'EPOCH_SECONDS'} = $Scan{$src}{$dst}{'START_TIME'}{'EPOCH_SECONDS'}\n" if ($enable_persistence eq "N");
+			print STDOUT "     Scan{src}{dst}{'END_TIME'}{'READABLE'} = $Scan{$src}{$dst}{'END_TIME'}{'READABLE'}\n";
+			print STDOUT "     Scan{src}{dst}{'END_TIME'}{'EPOCH_SECONDS'} = $Scan{$src}{$dst}{'END_TIME'}{'EPOCH_SECONDS'}\n" if ($enable_persistence eq "N");
 			unless ($proto eq "ICMP") {
 				print "     Scan{src}{dst}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'} = "
 					. "$Scan{$src}{$dst}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'}\n";
@@ -629,7 +627,7 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 		}
 	}
 	&collect_errors(\@bad_packets, $error_log) unless $errors;
-	return \%Scan;
+	return \%Scan, $matched_packet;
 }
 # check_tcp_flags will eventually need to include all possible permutations of the six 
 # tcp flags so that any signature can be written, but for now this should be most 
@@ -650,8 +648,13 @@ sub check_tcp_flags() {
 }
 sub check_port() {
 	my ($sigs_href, $msg, $srcport, $dstport, $proto) = @_;
-	print "check_port(): msg: $msg, srcport: $srcport, dstport: $dstport\n" if $DEBUG;
+	print "check_port(): msg: $msg, srcport: $srcport, dstport: $dstport, proto: $proto\n" if $DEBUG;
 	### check dst port first
+	if (defined $sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'UNIQUE_OR_ANY'}) {
+		unless ($sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'UNIQUE_OR_ANY'} eq "any") {
+			return 0 if ($dstport != $sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'UNIQUE_OR_ANY'});
+		}
+	}
 	if (defined $sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'START'}) {
 		my $start = $sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'START'};
 		my $end = $sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'END'};
@@ -665,12 +668,12 @@ sub check_port() {
 		my $end = $sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'NEGEND'};
 		return 0 if ($dstport > $start || $dstport < $end);
 	}
-	if (defined $sigs_href->{$proto}->{$msg}->{'DSTPORT'}) {
-		unless ($sigs_href->{$proto}->{$msg}->{'DSTPORT'} eq "any") {
-			return 0 if ($dstport != $sigs_href->{$proto}->{$msg}->{'DSTPORT'});
+	### check src port
+	if (defined $sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'UNIQUE_OR_ANY'}) {
+		unless ($sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'UNIQUE_OR_ANY'} eq "any") {
+			return 0 if ($dstport != $sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'UNIQUE_OR_ANY'});
 		}
 	}
-	### check src port
 	if (defined $sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'START'}) {
 		my $start = $sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'START'};
 		my $end = $sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'END'};
@@ -683,11 +686,6 @@ sub check_port() {
 		my $start = $sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'NEGSTART'};
 		my $end = $sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'NEGEND'};
 		return 0 if ($dstport > $start || $dstport < $end);
-	}
-	if (defined $sigs_href->{$proto}->{$msg}->{'SRCPORT'}) {
-		unless ($sigs_href->{$proto}->{$msg}->{'SRCPORT'} eq "any") {
-			return 0 if ($dstport != $sigs_href->{$proto}->{$msg}->{'SRCPORT'});
-		}
 	}
 	return 1;   ### if we made it to here, then we matched both the src and dst port criteria
 }
@@ -758,7 +756,7 @@ sub get_signature_fields() {
 	}
 	if ($msg) {
 		if (defined $Sigs_href->{$proto}->{$msg}) {
-			$msg .= " ";   ### make sure we have a unique signature by apending whitespace if necessary
+			$msg .= " ";   ### make sure we have a unique signature by appending whitespace if necessary
 		}
 		if ($proto ne "ICMP") {   ### it is either tcp or udp
 			&get_signature_ports($Sigs_href, $sig, $proto, $msg);
@@ -808,7 +806,7 @@ sub get_signature_ports() {
 		$Sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'NEGSTART'} = $start;
 		$Sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'NEGEND'} = $end;
 	} else {
-		$Sigs_href->{$proto}->{$msg}->{'SRCPORT'} = $srcport;
+		$Sigs_href->{$proto}->{$msg}->{'SRCPORT'}->{'UNIQUE_OR_ANY'} = $srcport;
 	}
 	if ($dstport =~ /\:/ && $dstport !~ /\!/) {
 		($start, $end) = split /:/, $dstport;
@@ -826,7 +824,7 @@ sub get_signature_ports() {
 		$Sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'NEGSTART'} = $start;
 		$Sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'NEGEND'} = $end;
 	} else {
-		$Sigs_href->{$proto}->{$msg}->{'DSTPORT'} = $dstport;
+		$Sigs_href->{$proto}->{$msg}->{'DSTPORT'}->{'UNIQUE_OR_ANY'} = $dstport;
 	}
 	return;
 }
@@ -981,35 +979,30 @@ sub collect_errors() {
 }
 sub scan_logr() {
 	my ($Scan_href, $logfile, $output, $dnslookups, $whoislookups, $whois_timeout,
-		$enable_email_alerts, $email_alert_danger_level, $email_alertfile, 
-				$email_limit, $email_addresses_aref, $show_all_signatures, $Cmds_href) = @_;
+					$enable_email_alerts, $email_alert_danger_level, $email_alertfile,
+						$email_limit, $email_addresses_aref, $show_all_signatures, $Cmds_href) = @_;
 	my $flags_msg;
-	my $hndl;
 	my $range;
 	my ($tcp_newrange, $udp_newrange, $tcp_new_start_range, $tcp_new_end_range);
 	my ($udp_new_start_range, $udp_new_end_range);
 	my ($tcp_new_start_time, $udp_new_start_time, $icmp_new_start_time);
 	my $dnsstring = "";
 	my $whois_info_aref;
-	if ($output || $DEBUG) {
-		$hndl = "STDOUT";
-	} else {
-		$hndl = "LOG"; 
-		open $hndl, ">> $logfile";
-	}
+	$logfile = *STDOUT if ($output || $DEBUG);
+	my @print_array = ($logfile, $email_alertfile);
 	for my $src (keys %$Scan_href) {
-		print "scan_logr(): source ip: $src\n" if $DEBUG;
+		print STDOUT "scan_logr(): source ip: $src\n" if $DEBUG;
 		DST: for my $dst (keys %{$Scan_href->{$src}}) {
 			unless (defined $Scan_href->{$src}->{$dst}->{'EMAIL_LIMIT'}) {
 				$Scan_href->{$src}->{$dst}->{'EMAIL_LIMIT'} = 0;
 			} elsif ($Scan_href->{$src}->{$dst}->{'EMAIL_LIMIT'} > $email_limit) {
 				unless (defined $Scan_href->{$src}->{$dst}->{'EMAIL_STOPPED'}) {
-					&email_limit_reached($email_addresses_aref, $src, $Cmds_href);
+					&email_limit_reached($email_addresses_aref, $src, $dst, $Cmds_href);
 					$Scan_href->{$src}->{$dst}->{'EMAIL_STOPPED'} = 1;
 				}
 				next DST;
 			}
-			print "scan_logr(): dst ip: $dst\n" if $DEBUG;
+			print STDOUT "scan_logr(): dst ip: $dst\n" if $DEBUG;
 			my ($tcp, $udp, $icmp) = (0,0,0);
 			my $current_danger_level = $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'};
 			if ($current_danger_level >= 1 && $Scan_href->{$src}->{$dst}->{'LOGR'} eq "Y") {
@@ -1103,46 +1096,28 @@ sub scan_logr() {
 					undef $Scan_href->{$src}->{$dst}->{'ICMP'}->{'CURRENT_INTERVAL'};
 				}
 				print STDOUT "scan_logr():  generating email......\n" if $DEBUG;
-				open EMAILALERT, "> $email_alertfile";
-				&markerline($hndl);
-				### could use logr() here, but perhaps the subroutine call is slower?
-				print $hndl "$time:     Portscan Detected by psad (pid $$) on $HOSTNAME.\n";
-				print $hndl "\n";
-				print $hndl "Source:                     $src\n";
-				print $hndl "Destination:                $dst\n";
-				print $hndl "Newly scanned TCP ports:    [$tcp_newrange]  (since: $tcp_new_start_time)\n" if $tcp;
-				print $hndl "Newly Blocked TCP packets:  [$tcp_new_num_pkts] (since: $tcp_new_start_time)\n" if $tcp;
+				unlink $email_alertfile;  ### remove $email_alertfile so we don't send old alert info
+				&Psad::logr("=-=-=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=-=-=-=-=-=-=\n", \@print_array);
+				&Psad::logr("...psad: Portscan Detected on $HOSTNAME ($dst).\n", \@print_array);
+				&Psad::logr("\n", [$logfile, $email_alertfile]);
+				&Psad::logr("Source:                      $src\n", \@print_array);
+				&Psad::logr("Destination:                 $dst\n", \@print_array);
+				&Psad::logr("Newly scanned TCP ports:     [$tcp_newrange]	(since: $tcp_new_start_time)\n", \@print_array) if $tcp;
+				&Psad::logr("Newly Blocked TCP packets:   [$tcp_new_num_pkts]	(since: $tcp_new_start_time)\n", \@print_array) if $tcp;
 				if (@tcp_flags) {
-					print $hndl $_ for (@tcp_flags);
+					for my $flag (@tcp_flags) {
+						&Psad::logr($flag, \@print_array);
+					}
 				}
-				print $hndl "Newly scanned UDP ports:     [$udp_newrange]  (since: $udp_new_start_time)\n" if $udp;
-				print $hndl "Newly Blocked UDP packets:   [$udp_new_num_pkts] (since: $udp_new_start_time)\n" if $udp;
-				print $hndl "Newly Blocked ICMP packets:  [$icmp_new_num_pkts] (since: $icmp_new_start_time)\n" if $icmp;
-				print $hndl "Complete port range:         [$range]  (since: $start_time) TCP and/or UDP\n" unless $icmp;
-				print $hndl "Total blocked packets:       $Scan_href->{$src}->{$dst}->{'ABSNUM'}\n";
-				print $hndl "Start time:                  $start_time\n";
-				print $hndl "End time:                    $end_time\n";
-				print $hndl "Danger level:                $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} out of 5\n";
-				print $hndl "DNS info:                    $dnsstring\n" unless $dnslookups;
-				&markerline("EMAILALERT");
-				print EMAILALERT "$time:     Portscan Detected by psad (pid $$) on $HOSTNAME.\n";
-				print EMAILALERT "\n";
-				print EMAILALERT "Source:                      $src\n";
-				print EMAILALERT "Destination:                 $dst\n";
-				print EMAILALERT "Newly scanned TCP ports:     [$tcp_newrange]  (since: $tcp_new_start_time)\n" if $tcp;
-				print EMAILALERT "Newly Blocked TCP packets:   [$tcp_new_num_pkts] (since: $tcp_new_start_time)\n" if $tcp;
-				if (@tcp_flags) {
-					print EMAILALERT $_ for (@tcp_flags);
-				}
-				print EMAILALERT "Newly scanned UDP ports:     [$udp_newrange]  (since: $udp_new_start_time)\n" if $udp;
-				print EMAILALERT "Newly Blocked UDP packets    [$udp_new_num_pkts] (since: $udp_new_start_time)\n" if $udp;
-				print EMAILALERT "Newly Blocked ICMP packets:  [$icmp_new_num_pkts] (since: $icmp_new_start_time)\n" if $icmp;
-				print EMAILALERT "Complete port range:         [$range]  (since: $start_time) TCP and/or UDP\n" unless $icmp;
-				print EMAILALERT "Total blocked packets:       $Scan_href->{$src}->{$dst}->{'ABSNUM'}\n";
-				print EMAILALERT "Start time:                  $start_time\n";
-				print EMAILALERT "End time:                    $end_time\n";
-				print EMAILALERT "Danger level:                $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} out of 5\n";
-				print EMAILALERT "DNS info:                    $dnsstring\n" unless $dnslookups;
+				&Psad::logr("Newly scanned UDP ports:     [$udp_newrange]	(since: $udp_new_start_time)\n", \@print_array) if $udp;
+				&Psad::logr("Newly Blocked UDP packets:   [$udp_new_num_pkts]	(since: $udp_new_start_time)\n", \@print_array) if $udp;
+				&Psad::logr("Newly Blocked ICMP packets:  [$icmp_new_num_pkts]	(since: $icmp_new_start_time)\n", \@print_array) if $icmp;
+				&Psad::logr("Complete TCP/UDP port range: [$range]	(since: $start_time)\n", \@print_array) unless $icmp;
+				&Psad::logr("Total blocked packets:       $Scan_href->{$src}->{$dst}->{'ABSNUM'}\n", \@print_array);
+				&Psad::logr("Start time:                  $start_time\n", \@print_array);
+				&Psad::logr("End time:                    $end_time\n", \@print_array);
+				&Psad::logr("Danger level:                $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} out of 5\n", \@print_array);
+				&Psad::logr("DNS info:                    $dnsstring\n", \@print_array) unless $dnslookups;
 
 				### write a syslog message
 #				openlog("psad", "ndelay", "daemon");
@@ -1158,52 +1133,26 @@ sub scan_logr() {
 #
 #				syslog("warning", "Port scan detected: src: $src, dst: $dst, $syslog_print_range, pkts: $syslog_num_pkts, dangerlevel: $syslog_danger_level");
 #				closelog();
-				if ($DEBUG) {
-					print STDOUT "scan_logr(): printing email..................\n";
-					print STDOUT "     $time: Portscan Detected by psad (pid $$) on $HOSTNAME.\n";
-					print STDOUT "     Source:                   $src\n";
-					print STDOUT "     Destination:              $dst\n";
-					print STDOUT "     Newly scanned TCP ports:  [$tcp_newrange]  (since: $tcp_new_start_time)\n" if $tcp;
-					print STDOUT "     Blocked TCP packets       [$tcp_new_num_pkts] (since: $tcp_new_start_time)\n" if $tcp;
-					if (@tcp_flags) {
-						print STDOUT $_ for (@tcp_flags);
-					}
-					print STDOUT "     Newly scanned UDP ports:  [$udp_newrange]  (since: $udp_new_start_time)\n" if $udp;
-					print STDOUT "     Blocked UDP packets       [$udp_new_num_pkts] (since: $udp_new_start_time)\n" if $udp;
-					print STDOUT "     Blocked ICMP packets:     [$icmp_new_num_pkts] (since: $icmp_new_start_time)\n" if $icmp;
-					print STDOUT "     Complete port range:      [$range]  (since: $start_time) TCP and/or UDP\n" unless $icmp;
-					print STDOUT "     Total number of packets:  $Scan_href->{$src}->{$dst}->{'ABSNUM'}\n";
-					print STDOUT "     Start time:               $start_time\n";
-					print STDOUT "     End time:                 $end_time\n";
-					print STDOUT "     Danger level:             $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'} out of 5\n";
-					print STDOUT "     DNS info:                 $dnsstring\n" unless $dnslookups;
-				}
 				if ($USE_IPTABLES) {
 					SIGS: for my $proto ("TCP", "UDP", "ICMP") {
 						if (defined $Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_SIGMATCH'}) {
 							my $sig_start_time = $tcp_new_start_time;
-							print $hndl "\n";
-							print EMAILALERT "\n";
-							print $hndl "=-=-= $proto alert signatures found since [$sig_start_time]\n";
-							print EMAILALERT "=-=-= $proto alert signatures found since [$sig_start_time]\n";
+							&Psad::logr("\n", \@print_array);
+							&Psad::logr("=-=-= $proto alert signatures found since [$sig_start_time]\n", \@print_array);
 							for my $sigmatch (keys %{$Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_SIGMATCH'}}) {
 								next if ($sigmatch eq "PACKETS" || $sigmatch eq "START_TIME");
 								my $sig_num_packets = $Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_SIGMATCH'}->{$sigmatch};
-								print $hndl "$sigmatch  Packets=$sig_num_packets\n";
-								print EMAILALERT "$sigmatch  Packets=$sig_num_packets\n";
+								&Psad::logr("...$sigmatch  Packets=$sig_num_packets\n", \@print_array);
 							}
 							### need to undef the current interval so it won't show up in the next alert
 							undef $Scan_href->{$src}->{$dst}->{$proto}->{'CURRENT_SIGMATCH'};
 						}
 						if (defined $Scan_href->{$src}->{$dst}->{$proto}->{'SIGMATCH'} && $show_all_signatures eq "Y") {
-							print $hndl "\n";
-							print EMAILALERT "\n";
-							print $hndl "=-=-= ALL $proto alert signatures found since [$start_time]\n";
-							print EMAILALERT "=-=-= ALL $proto alert signatures found since [$start_time]\n";
+							&Psad::logr("\n", \@print_array);
+							&Psad::logr("=-=-= ALL $proto alert signatures found since [$start_time]\n", \@print_array);
 							for my $sigmatch (keys %{$Scan_href->{$src}->{$dst}->{$proto}->{'SIGMATCH'}}) {
 								my $sig_num_packets = $Scan_href->{$src}->{$dst}->{$proto}->{'SIGMATCH'}->{$sigmatch};
-								print $hndl "$sigmatch  Packets=$sig_num_packets\n";
-								print EMAILALERT "$sigmatch  Packets=$sig_num_packets\n";
+								&Psad::logr("$sigmatch  Packets=$sig_num_packets\n", \@print_array);
 							}
 						}
 					}
@@ -1211,33 +1160,27 @@ sub scan_logr() {
 					$flags_msg = 0;
 				}
 				unless ($whoislookups) {
-					print $hndl "\n\n";
-					print $hndl "   =-=-=-=-=-=-= Whois Information: =-=-=-=-=-=-=\n";
-					print EMAILALERT "\n\n";
-					print EMAILALERT "   =-=-=-=-=-=-= Whois Information =-=-=-=-=-=-=\n";
-					print $hndl $_ for (@$whois_info_aref);
-					print EMAILALERT $_ for (@$whois_info_aref);
-					print $hndl "\n";
-					print EMAILALERT "\n";
+					&Psad::logr("\n\n", \@print_array);
+					&Psad::logr("   =-=-=-=-=-=-= Whois Information: =-=-=-=-=-=-=\n", [$logfile, $email_alertfile]);
+					for my $w (@$whois_info_aref) {
+						&Psad::logr($w, \@print_array);
+					}
+					&Psad::logr("\n", \@print_array);
 				}
 				if ($USE_IPCHAINS) {
-					&markerline($hndl);
-					&markerline("EMAILALERT");
+					&Psad::logr("=-=-=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=-=-=-=-=-=-=\n", \@print_array);
 				}
-				&markerline("EMAILALERT");
-				close EMAILALERT;
-				if ($Scan_href->{$src}->{$dst}->{'ALERTED'} eq "N" && $current_danger_level
-											>= $EMAIL_ALERT_DANGER_LEVEL) {
+				if ($Scan_href->{$src}->{$dst}->{'ALERTED'} eq "N"
+										&& $current_danger_level >= $EMAIL_ALERT_DANGER_LEVEL) {
 					$Scan_href = &send_email_alert($Scan_href, $src, $dst, $flags_msg,
-								$email_alertfile, $email_addresses_aref, $Cmds_href);
+													$email_alertfile, $email_addresses_aref, $Cmds_href);
 				}
-				&markerline($hndl);
+				&Psad::logr("=-=-=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=-=-=-=-=-=-=\n", \@print_array);
 				$Scan_href->{$src}->{$dst}->{'LOGR'} = "N";
 				$Scan_href->{$src}->{$dst}->{'EMAIL_LIMIT'}++;
 			}
 		}
 	}
-	close $hndl unless ($output || $DEBUG);
 	return $Scan_href;
 }
 sub auto_psad_response(){
@@ -1257,7 +1200,7 @@ sub auto_psad_response(){
 						$Scan_href->{$src}->{$dst}->{'BLOCKED'} = "Y";
 					}
 					for my $email_address (@$email_addresses_aref) {
-						system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $src has been BLOCKED on $HOSTNAME\" < /dev/null";
+						system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $src has been BLOCKED on $HOSTNAME ($dst)\" < /dev/null";
 					}
 					next SOURCE;
 				} elsif ($USE_IPTABLES) {
@@ -1269,7 +1212,7 @@ sub auto_psad_response(){
 						$Scan_href->{$src}->{$dst}->{'BLOCKED'} = "Y";
 					}
 					for my $email_address (@$email_addresses_aref) {
-						system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $src has been BLOCKED on $HOSTNAME\" < /dev/null";
+						system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $src has been BLOCKED on $HOSTNAME ($dst)\" < /dev/null";
 					}
 					next SOURCE;
 				}
@@ -1279,9 +1222,9 @@ sub auto_psad_response(){
 	return $Scan_href;
 }
 sub email_limit_reached() {
-	my ($email_addresses_aref, $src, $Cmds_href) = @_;
+	my ($email_addresses_aref, $src, $dst, $Cmds_href) = @_;
 	for my $email_address (@$email_addresses_aref) {
-		system "$Cmds_href->{'mail'} $email_address -s \"psad: Email message limit for $src has been reached on $HOSTNAME!!!\" < /dev/null";
+		system "$Cmds_href->{'mail'} $email_address -s \"psad: Email message limit for $src has been reached on $HOSTNAME ($dst)!!!\" < /dev/null";
 	}
 	return;
 }
@@ -1302,7 +1245,7 @@ sub send_email_alert() {
 	my ($Scan_href, $src, $dst, $flags_msg, $email_alertfile, $email_addresses_aref, $Cmds_href) = @_;
 	for my $email_address (@$email_addresses_aref) {
 		print "send_email_alert(): sending scan alert email to: $email_address\n" if $DEBUG;
-		system("$Cmds_href->{'mail'} $email_address -s \"psad WARNING: $HOSTNAME has been scanned!\" < $email_alertfile");
+		system("$Cmds_href->{'mail'} $email_address -s \"psad WARNING: $HOSTNAME ($dst) has been scanned!\" < $email_alertfile");
 	}
 	$Scan_href->{$src}->{$dst}->{'ALERTED'} = "Y";
 	return $Scan_href;
@@ -1524,11 +1467,6 @@ sub psad_setup() {
 		system("$Cmds_href->{'syslog_init'} restart");
 	}
 	return;
-}
-sub markerline() {
-        my $hndl = shift;
-	print $hndl "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
-        return;
 }
 sub usage_and_exit() {
         my $exitcode = shift;

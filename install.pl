@@ -442,7 +442,7 @@ sub install() {
     ### the order of the config files is important (legacy FW_MSG_SEARCH
     ### vars in psad.conf).
     for my $file qw(psad.conf psadwatchd.conf
-            kmsgsd.conf fw_search.conf) {
+            kmsgsd.conf fw_search.conf alert.conf) {
         if (-e "${PSAD_CONFDIR}/$file") {
             &archive("${PSAD_CONFDIR}/$file") unless $noarchive;
             if ($preserve_rv) {

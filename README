@@ -6,28 +6,6 @@ Website:  http://www.cipherdyne.com
 Thanks to: (see the CREDITS file).
 
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-COPYRIGHT:
-
-Copyright (C)1999,2000,2001 Michael Rash (mbr@cipherdyne.com)
-
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
-
-psad makes use of many of the tcp, udp, and icmp signatures available in
-Snort (written by Marty Roesch, see http://www.snort.org).
-
-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 DESCRIPTION:
 
     The Port Scan Attack Detector (psad) is a collection of four lightweight
@@ -44,7 +22,10 @@ incorporates many of the tcp, udp, and icmp signatures included in the Snort
 intrusion detection system (http://www.snort.org) to detect highly suspect
 scans for various backdoor programs (e.g. EvilFTP, GirlFriend, SubSeven),
 DDoS tools (mstream, shaft), and advanced port scans (syn, fin, xmas) which
-are easily leveraged against a machine via nmap.
+are easily leveraged against a machine via nmap.  psad can also alert on
+snort signatures that are logged via fwsnort (which makes use of the iptables
+string match module to detect application layer signatures).  See the
+"--snort-sids" command line option.
 
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 METHODOLOGY:
@@ -75,188 +56,9 @@ administrator if it doesn't.  See the FW_EXAMPLE_RULES file for example
 firewall rulesets that are compatible with psad.
 
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-USAGE:
-
-    -c  --config <configuration file>
-          By default all of the psad daemons (psad, psadwatchd, kmsgsd,
-          and diskmond) make use of the configuration file
-          /etc/psad/psad.conf for almost all configuration parameters.
-          psad can be made to override this path by specifying a
-          different file on the command line with the --config option.
-
-    -s  --signatures <sig file>
-          The firewalling code included within the linux 2.4.x kernel
-          series, iptables, has the ability to distinguish and log any
-          of the tcp flags present within tcp packets that traverse
-          the interfaces.  Psad makes use of this logging capability
-          to detect several types of tcp scan signatures included
-          within the psad_signatures file.  The signatures were
-          originally included within the Snort intrusion detection
-          system (see http://www.snort.org).  A modification can be
-          made to the signature file (installed by default in /etc/psad)
-          and psad will import the change automatically without having
-          to restart the psad process.  Unfortunately tcp signature
-          checking is not compatible with the ipchains firewalling code
-          built into the 2.2.x kernel series due to the fact that
-          ipchains cannot distinguish any tcp flags other than syn and
-          ack.  Psad also detects several udp and icmp signatures that
-          were orginally included within Snort.
-
-    -a  --auto-ips <auto ips file>
-          Occasionally certain ip addresses are repeat offenders and
-          should automatically be given a higher danger level than
-          would normally be assigned.  Additionally, some ip addresses
-          can always be ignored depending on your network configuration
-          (the loopback interface 127.0.0.1 might be a good candidate
-          for example).  The psad_auto_ips file provides an interface
-          for psad to automatically increase/decrease/ignore scanning
-          ip danger levels.  Modifications can be made to psad_auto_ips
-          (installed by default in /etc/psad) and psad will import them
-          without having to restart the psad process.
-
-    -i  --interval
-          Specify the interval (in seconds) that psad should use to
-          check whether or not packets have been denied by the
-          firewall.  Psad will use the default of 15 seconds unless a
-          different value is specified.
-
-    -F  --Flush
-          Remove any auto-generated firewall block rules if psad was
-          configured  to  automatically respond to scans (see the
-          ENABLE_AUTO_IDS variable in psad.conf).
-
-    -S  --Status
-          Display the status of any psad processes that may or may
-          not be running.
-
-    -K  --Kill
-          Kill the current psad process along with psadwatchd, kmsgsd,
-          and diskmond. This provides a quick and easy way to kill all
-          psad processes without having to look in the process table or
-          appeal to the psad-init script.
-
-    -R  --Restart
-          Restart the currently running psad processes. This option
-          will preserve the command line options that were supplied to
-          the original psad process.
-
-    -U --USR1
-          Send a running psad process a  USR1  signal.  This will cause
-          psad to dump the contents of the %Scan hash to the file
-          "/var/log/psad/scan_hash.$$" where "$$" represents the pid of
-          the psad process.  This is mostly useful for debugging
-          purposes, but it also allows the administrator to peer into
-          the %Scan hash, which is the primary data structure used to
-          store scan data within system memory.
-
-    -d  --debug
-          Run psad in debugging mode.  This will automatically prevent
-          psad from running as a daemon, and will print the contents
-          of the %Scan hash and a few other things a crucial points
-          as psad executes.
-
-    -l  --log-server
-          Psad is being executed on a syslog server.  This requires
-          that check_firewall_rules() and auto_psad_response() not be
-          executed since the firewall is probably not being run locally.
-
-    -o  --output
-          By default all scan warning messages generated by psad are
-          written to /var/log/psad/scanlog.  Passing the -o option
-          instructs psad to write all error messages to STDOUT.
-
-    --no-fwcheck
-          Psad performs a rudimentary check of the firewall rules that
-          exist on the machine on which psad is deployed to determine
-          whether or not the firewall has a compatible configuration.
-          Passing the --no-fwcheck option will disable this check.
-
-    --no-daemon
-          Do not run psad as a daemon.  This option is most useful
-          if used in conjunction with -o so that scan warning messages
-          can be viewed on STDOUT instead of being written to
-          /var/log/psad/scanlog.
-
-    --no-error
-          Occasionally messages that are written by to the psadfifo
-          named pipe and also to /var/log/messages do not conform to
-          the normal firewall logging format and psad will write these
-          message to /var/log/psad/fwerrorlog by default.  Passing the
-          -error option will make psad ignore all such erroneous
-          firewall messages.
-
-    --no-rdns
-          Psad normally attempts to find the name associated with a
-          scanning ip address, but this feature can be disabled with
-          the -n command line argument.
-
-    --no-netstat
-          By default for iptables firewalls psad will determine whether
-          or not your machine is listening on a port for which a tcp
-          signature has been matched.  Specifying the -l command line
-          argument disables this feature.
-
-    --no-whois
-          By default psad will issue a whois query against any ip from
-          which a scan has originated, but this can be disabled with
-          the --no-whois command line argument.
-
-    -V  --Version
-          Print the psad version and exit.
-
-    -h, --help
-          Print a page of usage information for psad and exit.
-
-
-USAGE: psad [-s <signature file>] [-a <auto ips file>] [-c <config file>]
-       [-l] [-i <interval>] [-h] [-B] [-p] [-f] [-S] [-K] [-R] [-U] [-V] [-o]
-       [--no-fwcheck] [--no-daemon] [--no-rdns] [--no-whois] [--no-netstat]
-       [--no-errors]
-
-OPTIONS:
-      -s   --signatures <sig file>    - import scan signatures.
-      -a   --auto_ips <ips file>      - import auto ips file for automatic
-                                        ip danger level increases/decreses.
-      -c   --config <config file>     - use config file instead of the
-                                        values contained within the psad
-                                        script.
-      -i   --interval                 - configure the check interval from
-                                        the command line to override the 15
-                                        second default.
-      -d   --debug                    - run psad in debugging mode.
-      -o   --output                   - print all messages to STDOUT (this
-                                        does not include bad packet messages
-                                        that are printed to the error log).
-      -f   --fw-check                 - analyze the firewall ruleset and
-                                        exit.
-      -L   --log-server               - psad is being run on a syslog
-                                        logging server.
-      -K   --Kill                     - kill all running psad processes.
-      -R   --Restart                  - restart all running psad processes.
-      -S   --Status                   - displays the status of any
-                                        currently running psad processes.
-      -B   --Benchmark                - Run psad in benchmark mode.
-      -p   --packets                  - Specify number of packets to use in
-                                        benchmark test.
-      -U   --USR1                     - send a running psad process a USR1
-                                        signal.
-      -V   --Version                  - print the psad version and exit.
-
-      --no-daemon                     - do not run as a daemon.
-      --no-errors                     - do not write errors to the error
-                                        log.
-      --no-whois                      - disable whois lookups.
-      --no-fwcheck                    - disable firewall rules verification.
-      --no-rdns                       - disable name resolution against
-                                        scanning ips.
-      --no-netstat                    - disable local port lookups for scan
-                                        signatures.
-      -h   --help                     - prints this help message.
-
-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 INSTALLATION:
 
-    (See the INSTALL file in the source directory.)
+    (See the INSTALL file in the psad sources directory.)
 
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 PLATFORMS:
@@ -271,6 +73,28 @@ mostly included as a nicety; psad can be run from the command line like any
 other program.
 
 Ipfilter support on *BSD boxes is coming soon.
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+COPYRIGHT:
+
+Copyright (C)1999,2000,2001 Michael Rash (mbr@cipherdyne.com)
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+psad makes use of many of the tcp, udp, and icmp signatures available in
+Snort (written by Marty Roesch, see http://www.snort.org).
 
 
 $Id$

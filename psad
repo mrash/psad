@@ -157,10 +157,11 @@ use strict;
 my $version = '1.0';
 
 ### establish some default paths
-my $config_dir   = '/etc/psad';
-my $config_file  = "${config_dir}/psad.conf";
-my $sigs_file    = "${config_dir}/psad_signatures";
-my $autoips_file = "${config_dir}/psad_auto_ips";
+my $config_dir      = '/etc/psad';
+my $config_file     = "${config_dir}/psad.conf";
+my $sigs_file       = "${config_dir}/psad_signatures";
+my $autoips_file    = "${config_dir}/psad_auto_ips";
+my $snort_rules_dir = "${config_dir}/snort-1.8.7_rules";
 
 ### disable debugging by default
 my $debug = 0;
@@ -197,7 +198,7 @@ my %sigs;
 ### that log things like "SID123".  "fwsnort"
 ### (http://www.cipherdyne.com/fwsnort/) will automatically
 ### build such a ruleset from snort signatures.
-my %snort_sids;
+my %snort_msgs;
 
 ### cache signature info that can be check quickly against
 ### single hash keys
@@ -226,6 +227,7 @@ my $icmp_ctr = 0;
 ### initialize and scope some default variables (command
 ### line args can override some default values)
 my $snort_sids       = 0;
+my $srules_type      = '';
 my $output           = 0;
 my $syslog_server    = 0;
 my $kill             = 0;
@@ -286,6 +288,9 @@ Getopt::Long::Configure('no_ignore_case');
     'signatures=s'  => \$sigs_file,      # Path to psad signatures file.
     'snort-sids'    => \$snort_sids,     # Enable search for snort SID's
                                          # in iptables messages.
+    'snort-type=s'  => \$srules_type,    # Only process snort rules of
+                                         # this type (e.g. "ddos" or
+                                         # "backdoor").
     'auto-ips=s'    => \$autoips_file,   # Path to psad auto ips file for
                                          # auto-setting ip danger level.
     'output'        => \$output,         # Write scanlog messages to STDOUT.
@@ -489,6 +494,12 @@ unless ($no_fwcheck || $syslog_server) {
         exit 0;
     }
 }
+
+### parse snort rules if we enable psad to match on iptables log
+### messages that include snort SID's
+&import_snort_rules() if $snort_sids;
+
+print Dumper %snort_msgs if $debug;
 
 ### initialize benchmarking test packets if we are running
 ### in benchmark mode
@@ -1190,6 +1201,42 @@ sub check_import_config() {
             ### NOTE: we are not restarting kmsgsd here since we
             ###       don't want to create a race condition between
             ###       psad and psadwatchd both starting kmsgsd
+        }
+    }
+    return;
+}
+
+sub import_snort_rules() {
+    opendir D, $snort_rules_dir
+        or die " ** Could not open $snort_rules_dir";
+    my @rfiles = readdir D;
+    closedir D;
+    shift @rfiles; shift @rfiles;
+
+    FILE: for my $rfile (@rfiles) {
+        next FILE unless $rfile =~ /\.rules$/;
+        if ($srules_type) {
+            next FILE unless $rfile =~ /^${srules_type}\.rules$/;
+        }
+        my ($type) = ($rfile =~ /(\w+)\.rules/);
+#        printf("%-30s", " .. $rfile");
+#        &logr(" .. Parsing $rfile\n", $logfile);
+        open R, "< ${snort_rules_dir}/${rfile}" or die " ** Could not " .
+            "open: ${srules_type}/${rfile}";
+        my @lines = <R>;
+        close R;
+        RULE: for my $line (@lines) {
+            next RULE unless $line =~ /^alert/;
+            my $msg;
+            my $sid;
+            my $classtype;
+            $msg = $1 if $line =~ /msg:\s*\"(.*?)\"\s*;/;
+            $sid = $1 if $line =~ /[\s;]sid:\s*(\d+)\s*;/;
+            $classtype = $1 if $line =~ /[\s;]classtype:\s*(.*?)\s*;/;
+            if ($msg && $sid && $classtype) {
+                $snort_msgs{$sid}{'classtype'} = $classtype;
+                $snort_msgs{$sid}{'msg'}       = $msg;
+            }
         }
     }
     return;

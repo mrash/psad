@@ -322,9 +322,13 @@ if ($kill) {
 
 ### The --Flush command line switch was given.
 if ($flush_fw_rules) {
-    print " ... Removing auto-generated block rules.\n";
-    &old_auto_blocked_ips();
-    unlink $auto_blocked_file;
+    if (-e $auto_blocked_file) {
+        print " ... Removing auto-generated block rules.\n";
+        &old_auto_blocked_ips();
+        unlink $auto_blocked_file;
+    } else {
+        print " ... @@@ Currently there are no auto-generated block rules in effect.\n";
+    }
     exit 0;
 }
 
@@ -1540,23 +1544,28 @@ sub old_auto_blocked_ips() {
         }
         if ($use_iptables) {
             &iptables_flags unless $checked_iptables_flags;
-            for my $table (keys %iptables_chains) {
-                for my $chain (keys %{$iptables_chains{$table}}) {
-                    my @rules = `$cmds{'iptables'} -t $table -nL $chain`;
-                    for my $blockip (@block_ips) {
+            for my $blockip (@block_ips) {
+                if ($flush_fw_rules) {
+                    print " ... Removing rules for: $blockip\n";
+                }
+                for my $table (keys %iptables_chains) {
+                    for my $chain (keys %{$iptables_chains{$table}}) {
+                        ### The rule numbers can change for each ip
+                        my @rules = `$cmds{'iptables'} -t $table -nL $chain`;
                         my $blocked = 0;
                         my $rulenum = 1;
                         RULE: for my $rule (@rules) {
                             next RULE if ($rule =~ /^Chain\s/);
                             next RULE if ($rule =~ /^target\s/);
+                            chomp $rule;
                             ### DROP       all  --  1.1.1.1        0.0.0.0/0
                             if ($rule =~ /^DROP\s+all.*?$blockip\s+0\.0\.0\.0\/0/) {
+                                ### all traffic from $blockip is being blocked
+                                $blocked = 1;
                                 if ($flush_fw_rules) {
-                                    print "$cmds{'iptables'} -t $table -D $chain $rulenum\n";
+                                    print "     Deleting rule $table $chain: $rule\n";
                                     system "$cmds{'iptables'} -t $table -D $chain $rulenum";
                                 } else {
-                                    ### all traffic from $blockip is being blocked
-                                    $blocked = 1;
                                     last RULE;
                                 }
                             }
@@ -1565,23 +1574,33 @@ sub old_auto_blocked_ips() {
                         unless ($blocked || $flush_fw_rules) {
                             &iptables_block($table, $chain, $blockip);
                         }
+                        if ($flush_fw_rules && ! $blocked) {
+                            print " ... Could not locate any $table $chain " .
+                                "auto-generated rules for $blockip\n";
+                        }
                     }
                 }
             }
         } elsif ($use_ipchains) {
             for my $chain (@ipchains_chains) {
-                my @rules = `$cmds{'ipchains'} -nL $chain`;
                 for my $blockip (@block_ips) {
+                    ### The rule numbers can change for each ip
+                    my @rules = `$cmds{'ipchains'} -nL $chain`;
                     my $blocked = 0;
                     my $rulenum = 1;
+                    if ($flush_fw_rules) {
+                        print " ... Removing rules for: $blockip\n";
+                    }
                     RULE: for my $rule (@rules) {
+                        chomp $rule;
                         ### DENY       udp  ------  0.0.0.0/0      0.0.0.0/0      * ->   *
                         if ($rule =~ /^DENY\s+all.*?$blockip.*0\.0\.0\.0\/0\s+\*\s+\-\>\s+\*/) {
+                            ### all traffic from $blockip is being blocked
+                            $blocked = 1;
                             if ($flush_fw_rules) {
+                                print "     Deleting rule: $rule\n";
                                 system "$cmds{'ipchains'} -D $chain $rulenum";
                             } else {
-                                ### all traffic from $blockip is being blocked
-                                $blocked = 1;
                                 last RULE;
                             }
                         }
@@ -1589,6 +1608,10 @@ sub old_auto_blocked_ips() {
                     }
                     unless ($blocked || $flush_fw_rules) {
                         &ipchains_block($chain, $blockip);
+                    }
+                    if ($flush_fw_rules && ! $blocked) {
+                        print " ... Could not locate any auto-generated " .
+                            "rules for: $blockip\n";
                     }
                 }
             }

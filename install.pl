@@ -772,8 +772,8 @@ sub set_home_net() {
             "subnet)\n");
         &logr("    on a line by itself.\n");
         &logr("    Each of the subnets should be in the form <net>/<mask.\n");
-        &logr("    E.g. in CIDR notation: 192.168.10.0/24, or regularly: " .
-            "192.168.10.0/255.255.255.0\n");
+        &logr("    E.g. in CIDR notation: 192.168.10.0/24 (preferrable), or\n");
+        &logr("    regularly: 192.168.10.0/255.255.255.0\n");
         &logr("    End with a \".\" on a line by itself.\n");
         my $ans = '';
         while ($ans ne '.') {

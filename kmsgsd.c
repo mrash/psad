@@ -42,8 +42,8 @@ static void parse_config(
     char *config_file,
     char *psadfifo_file,
     char *fwdata_file,
-    char *fw_msg_search1,
-    char *fw_msg_search2,
+    char *fw_msg_search,
+    char *snort_sid_str,
     char *kmsgsd_pid_file
 );
 
@@ -52,8 +52,8 @@ int main(int argc, char *argv[]) {
     char psadfifo_file[MAX_PATH_LEN+1];
     char fwdata_file[MAX_PATH_LEN+1];
     char config_file[MAX_PATH_LEN+1];
-    char fw_msg_search1[MAX_PATH_LEN+1];
-    char fw_msg_search2[MAX_PATH_LEN+1];
+    char fw_msg_search[MAX_PATH_LEN+1];
+    char snort_sid_str[MAX_PATH_LEN+1];
     char kmsgsd_pid_file[MAX_PATH_LEN+1];
     int fifo_fd, fwdata_fd;  /* file descriptors */
     char buf[MAX_LINE_BUF+1];
@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
 #endif
     /* parse the config file */
     parse_config(config_file, psadfifo_file,
-        fwdata_file, fw_msg_search1, fw_msg_search2, kmsgsd_pid_file);
+        fwdata_file, fw_msg_search, snort_sid_str, kmsgsd_pid_file);
 
     /* make sure there isn't another kmsgsd already running */
     check_unique_pid(kmsgsd_pid_file, "kmsgsd");
@@ -120,7 +120,7 @@ int main(int argc, char *argv[]) {
      */
     while ((numbytes = read(fifo_fd, buf, MAX_LINE_BUF)) >= 0) {
         if (((strstr(buf, "MAC") != NULL && strstr(buf, "IN") != NULL)
-            && (strstr(buf, fw_msg_search1) != NULL || strstr(buf, fw_msg_search2)))
+            && (strstr(buf, fw_msg_search) != NULL || strstr(buf, snort_sid_str)))
             || (strstr(buf, "Packet log") != NULL)) {
 
             if (write(fwdata_fd, buf, numbytes) < 0)
@@ -144,7 +144,7 @@ int main(int argc, char *argv[]) {
 /******************** end main ********************/
 
 static void parse_config(char *config_file, char *psadfifo_file,
-    char *fwdata_file, char *fw_msg_search1, char *fw_msg_search2,
+    char *fwdata_file, char *fw_msg_search, char *snort_sid_str,
     char *kmsgsd_pid_file)
 {
     FILE *config_ptr;         /* FILE pointer to the config file */
@@ -173,8 +173,8 @@ static void parse_config(char *config_file, char *psadfifo_file,
 
             find_char_var("PSAD_FIFO ", psadfifo_file, index);
             find_char_var("FW_DATA ", fwdata_file, index);
-            find_char_var("FW_MSG_SEARCH1 ", fw_msg_search1, index);
-            find_char_var("FW_MSG_SEARCH2 ", fw_msg_search2, index);
+            find_char_var("FW_MSG_SEARCH ", fw_msg_search, index);
+            find_char_var("SNORT_SID_STR ", snort_sid_str, index);
             find_char_var("KMSGSD_PID_FILE ", kmsgsd_pid_file, index);
         }
     }
@@ -182,8 +182,8 @@ static void parse_config(char *config_file, char *psadfifo_file,
 #ifdef DEBUG
     printf(" .. PSAD_FIFO: %s\n", psadfifo_file);
     printf(" .. FW_DATA: %s\n", fwdata_file);
-    printf(" .. FW_MSG_SEARCH1: %s\n", fw_msg_search1);
-    printf(" .. FW_MSG_SEARCH2: %s\n", fw_msg_search2);
+    printf(" .. FW_MSG_SEARCH: %s\n", fw_msg_search);
+    printf(" .. SNORT_SID_STR: %s\n", snort_sid_str);
     printf(" .. KMSGSD_PID_FILE: %s\n", kmsgsd_pid_file);
 #endif
     return;

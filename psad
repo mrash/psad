@@ -32,6 +32,8 @@
 #    USA
 #
 # TODO:
+#   - Build data directories by ip address in /var/log/psad in a manner
+#     similar to snort.
 #   - Make use of other logging options available in iptables to detect
 #     more tcp signatures.  (E.g. --log-tcp-options, --log-ip-options,
 #     --log-tcp-sequence, etc.) for better signature recognition.
@@ -122,6 +124,9 @@ my %Sigs;
 ### be assigned a danger level (or ignored).  (Only initialized
 ### if the "-a <auto ips file>" is specified on the command line).
 my %Auto_ips;
+
+### cache the addresses we have executed whois lookups for
+my %whois_cache;
 
 ### initialize and scope some default variables (command line args can override some default values)
 my ($found_new_packets, $daemon, $output, $errors, $dnslookups, $whoislookups,
@@ -1383,25 +1388,31 @@ sub get_listening_ports() {
 sub get_whois_data() {
     my $ip = shift;
     my @whois_data;
-    eval {
-        local $SIG{'ALRM'} = sub {die "whois alarm\n"};
-        alarm $Config{'WHOIS_TIMEOUT'};
-        system "$Cmds{'whois.psad'} $ip > $Config{'WHOIS_DATAFILE'}";
-        alarm 0;
-    };
-    if ($@) {
-#         die unless $@ eq "whois alarm\n";
-#        warn "$@: $?";  ### let the warning handler save the error.
-        warn $@;
-        $#whois_data = 0;
-        @whois_data = ("Whois data not available!\n");
-        return \@whois_data;
+    my $whois_datafile = $Config{'WHOIS_DATAFILE'} . "_${ip}";
+    if (defined $whois_cache{$ip} && $whois_cache{$ip} < $Config{'WHOIS_THRESHOLD'} && -e $whois_datafile) {
+        $whois_cache{$ip}++;
     } else {
-        open W, "< $Config{'WHOIS_DATAFILE'}";
-        @whois_data = <W>;
-        close W;
-        return \@whois_data;
+        $whois_cache{$ip} = 0;
+        eval {
+            local $SIG{'ALRM'} = sub {die "whois alarm\n"};
+            alarm $Config{'WHOIS_TIMEOUT'};
+            system "$Cmds{'whois.psad'} $ip > $whois_datafile";
+            alarm 0;
+        };
+        if ($@) {
+            ### die unless $@ eq "whois alarm\n";
+            ### warn "$@: $?";  ### let the warning handler save the error.
+            warn $@;
+            $#whois_data = 0;
+            @whois_data = ("Whois data not available!\n");
+            unlink $whois_datafile;
+            return \@whois_data;
+        }
     }
+    open W, "< $whois_datafile" or die " ... @@@ Could not open $whois_datafile: $!";
+    @whois_data = <W>;
+    close W;
+    return \@whois_data;
 }
 sub REAPER {
     my $pid;
@@ -1601,14 +1612,16 @@ sub psad_setup() {
     return;
 }
 sub check_config() {
-    my @required_vars = qw(EMAIL_ADDRESSES  PSAD_CHECK_INTERVAL  PSAD_LOGFILE
-                           FW_DATA ERROR_LOG  EMAIL_ALERTFILE   FW_MSG_SEARCH
-                           ENABLE_AUTO_IDS  ENABLE_PERSISTENCE   SCAN_TIMEOUT
-                           DANGER_LEVEL1     DANGER_LEVEL2      DANGER_LEVEL3
-                           DANGER_LEVEL4 DANGER_LEVEL5 PORT_RANGE_SCAN_THRESHOLD
-                           ALERT_ALL    PSAD_EMAIL_LIMIT   IPTABLES_BLOCK_METHOD
-                           TCPWRAPPERS_BLOCK_METHOD EMAIL_ALERT_DANGER_LEVEL
-                           PSAD_FIFO);
+    my @required_vars = qw(
+        EMAIL_ADDRESSES  PSAD_CHECK_INTERVAL  PSAD_LOGFILE
+        FW_DATA ERROR_LOG  EMAIL_ALERTFILE   FW_MSG_SEARCH
+        ENABLE_AUTO_IDS  ENABLE_PERSISTENCE   SCAN_TIMEOUT
+        DANGER_LEVEL1     DANGER_LEVEL2      DANGER_LEVEL3
+        DANGER_LEVEL4 DANGER_LEVEL5 PORT_RANGE_SCAN_THRESHOLD
+        ALERT_ALL    PSAD_EMAIL_LIMIT   IPTABLES_BLOCK_METHOD
+        TCPWRAPPERS_BLOCK_METHOD EMAIL_ALERT_DANGER_LEVEL
+        PSAD_FIFO WHOIS_THRESHOLD WHOIS_TIMEOUT
+    );
     &Psad::validate_config($CONFIG_FILE, \@required_vars, $Config_href);
     return;
 }

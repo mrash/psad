@@ -23,9 +23,11 @@
 # TODO: 
 #	- make line counts of fwdata file take high-rate scans into
 #	  account.
-#	- signal handler for configuration updating 
+#	- signal handler for configuration updating. 
 #	- "ignore ips" file so that psad will ignore scans originating
-#	  from any ip contained within this file
+#	  from any ip contained within this file.
+#	- include check for running pid of kmsgsd an alert if not.
+#	- use %Cmds hash.
 #
 # Sample packet (rejected by ipchains)
 # Dec 19 11:54:07 orthanc kernel: Packet log: input REJECT lo PROTO=1

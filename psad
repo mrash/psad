@@ -39,7 +39,7 @@
 #     to a port as well as udp signatures.
 #   - Deal with the possibility that psad could eat lots of memory over
 #     time if $ENABLE_PERSISTENCE="Y". This should involve periodically
-#     deleting entries in %Scan (or maybe the entire hash), but this 
+#     deleting entries in %Scan (or maybe the entire hash), but this
 #     should be done in a way that allows some scan data to persist.
 #   - Put source and destination ip addresses back into psad_signatures.
 #   - Ipfilter support on *BSD platforms.
@@ -49,10 +49,10 @@
 #     is reloaded.  Without anticipating such packets psad will interpret
 #     them as a belonging to a port scan.  NOTE: This problem is mostly
 #     corrected by the conntrack patch to the kernel.
-#   - Improve check_firewall_rules() to check for a state rule (iptables) 
-#     since having such a rule greatly improves the quality of the data 
-#     stream provided to psad by kmsgsd since more packet types will be 
-#     denied without requiring overly complicated firewall rules to detect 
+#   - Improve check_firewall_rules() to check for a state rule (iptables)
+#     since having such a rule greatly improves the quality of the data
+#     stream provided to psad by kmsgsd since more packet types will be
+#     denied without requiring overly complicated firewall rules to detect
 #     odd tcp flag combinations.
 #   - Investigate the possibility of passive OS fingerprinting by looking
 #     at TTL and other fields in the headers (good idea Jay).
@@ -64,18 +64,18 @@
 #
 # Sample tcp packet (rejected by iptables... --log-prefix = "DENY")
 # Mar 11 13:15:52 orthanc kernel: DENY IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:08:00
-# SRC=127.0.0.1 DST=127.0.0.1 LEN=60 TOS=0x00 PREC=0x00 TTL=64 ID=0 DF PROTO=TCP SPT=44847 
+# SRC=127.0.0.1 DST=127.0.0.1 LEN=60 TOS=0x00 PREC=0x00 TTL=64 ID=0 DF PROTO=TCP SPT=44847
 # DPT=35 WINDOW=32304 RES=0x00 SYN URGP=0
 #
 # Sample icmp packet rejected by iptables
 # Nov 27 15:45:51 orthanc kernel: DENY IN=eth1 OUT= MAC=00:a0:cc:e2:1f:f2:00:20:78:10:70:e7:08:00
-# SRC=192.168.10.20 DST=192.168.10.1 LEN=84 TOS=0x00 PREC=0x00 TTL=64 ID=0 DF PROTO=ICMP TYPE=8 
+# SRC=192.168.10.20 DST=192.168.10.1 LEN=84 TOS=0x00 PREC=0x00 TTL=64 ID=0 DF PROTO=ICMP TYPE=8
 # CODE=0 ID=61055 SEQ=256
 #
-# There may be a bug in iptables, since occasionally log entries are generated 
-# by a long port scan like this (note there is no 'DPT' field): 
-#   Mar 16 23:50:25 orthanc kernel: DENY IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:08:00 
-#   SRC=127.0.0.1 DST=127.0.0.1 LEN=60 TOS=0x00 PREC=0x00 TTL=64 ID=0 DF PROTO=TCP SPT=39935 
+# There may be a bug in iptables, since occasionally log entries are generated
+# by a long port scan like this (note there is no 'DPT' field):
+#   Mar 16 23:50:25 orthanc kernel: DENY IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:08:00
+#   SRC=127.0.0.1 DST=127.0.0.1 LEN=60 TOS=0x00 PREC=0x00 TTL=64 ID=0 DF PROTO=TCP SPT=39935
 #   DINDOW=32304 RES=0x00 SYN URGP=0
 #################################################################################################
 
@@ -170,9 +170,7 @@ if ($kill) {
 }
 
 ### The --USR1 command line switch was given.
-if ($usr1) {
-    &psad_usr1();
-}
+&psad_usr1() if $usr1;
 
 ### read in configuration file
 my ($Config_href, $Cmds_href) = &Psad::buildconf($CONFIG_FILE);
@@ -198,10 +196,7 @@ if ($check_interval) {
 my $PSADCMD = $Cmds{'psad'};
 
 ### the --Status command line switch was given
-if ($status) {
-    my $rv = &psad_status();
-    exit $rv;
-}
+&psad_status() if $status;
 
 ### make sure $PSAD_DIR, $FW_DATA, and /var/log/psadfifo, etc. actually exist
 &psad_setup();
@@ -1496,7 +1491,7 @@ sub psad_status() {
             print "@@@@@  psad: pid file $pidfile does not exist for $pidname on $HOSTNAME\n";
         }
     }
-    return $rv;
+    exit $rv;
 }
 sub psad_usr1() {
     my $rv = 0;

@@ -267,7 +267,7 @@ sub install() {
     ### installing Unix::Syslog
     &logr(" ... Installing the Unix::Syslog perl module\n");
 
-    chdir 'Unix-Syslog-0.98';
+    chdir 'Unix-Syslog-0.100';
     unless (-e 'Makefile.PL' && -e 'Syslog.pm') {
         die " ... @@@  Your source kit appears to be incomplete!  Syslog.pm " .
             "is missing.\n       Download the latest sources from " .

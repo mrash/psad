@@ -1486,7 +1486,7 @@ sub scan_logr() {
 
                 ### write a message to syslog
                 openlog 'psad', LOG_DAEMON, LOG_LOCAL7;
-                syslog LOG_INFO, "psad: scan detected: $src -> $dst $syslog_print_range " .
+                syslog LOG_INFO, "scan detected: $src -> $dst $syslog_print_range " .
                     "pkts=$syslog_num_pkts dangerlevel: $syslog_danger_level";
                 closelog();
                 unless ($no_whois) {

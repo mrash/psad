@@ -120,6 +120,11 @@ USAGE:
           firewall.  Psad will use the default of 15 seconds unless a
           different value is specified.
 
+    -F  --Flush
+          Remove any auto-generated firewall block rules if psad was
+          configured  to  automatically respond to scans (see the
+          ENABLE_AUTO_IDS variable in psad.conf).
+
     -S  --Status
           Display the status of any psad processes that may or may
           not be running.

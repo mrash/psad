@@ -322,7 +322,9 @@ if ($kill) {
 
 ### The --Flush command line switch was given.
 if ($flush_fw_rules) {
-    &rm_auto_blocked_rules();
+    print " ... Removing auto-generated block rules.\n";
+    &old_auto_blocked_ips();
+    unlink $auto_blocked_file;
     exit 0;
 }
 
@@ -391,7 +393,7 @@ unless ($no_fwcheck || $syslog_server) {
     );
 }
 
-### daemonize psad unless running with --Daemon or --debug
+### daemonize psad unless running with --no_daemon or --debug
 unless ($no_daemon || $debug) {
     my $pid = fork();
     exit if $pid;
@@ -429,7 +431,7 @@ if ($config_file eq '/etc/psad/psad.conf') {
 ### a previous run.  This feature is most useful for preserving
 ### automatically blocked ips after a reboot.
 if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
-    &reinstate_auto_blocked();
+    &old_auto_blocked_ips();
 }
 
 ### archive old firewall and scan data
@@ -1516,7 +1518,7 @@ sub scan_logr() {
     return;
 }
 
-sub reinstate_auto_blocked() {
+sub old_auto_blocked_ips() {
     if (-e $auto_blocked_file) {
         open B, "< $auto_blocked_file" or
             warn " ... @@@ Could not open $auto_blocked_file\n" and return;
@@ -1543,15 +1545,24 @@ sub reinstate_auto_blocked() {
                     my @rules = `$cmds{'iptables'} -t $table -nL $chain`;
                     for my $blockip (@block_ips) {
                         my $blocked = 0;
+                        my $rulenum = 1;
                         RULE: for my $rule (@rules) {
+                            next RULE if ($rule =~ /^Chain\s/);
+                            next RULE if ($rule =~ /^target\s/);
                             ### DROP       all  --  1.1.1.1        0.0.0.0/0
                             if ($rule =~ /^DROP\s+all.*?$blockip\s+0\.0\.0\.0\/0/) {
-                                ### all traffic from $blockip is being blocked
-                                $blocked = 1;
-                                last RULE;
+                                if ($flush_fw_rules) {
+                                    print "$cmds{'iptables'} -t $table -D $chain $rulenum\n";
+                                    system "$cmds{'iptables'} -t $table -D $chain $rulenum";
+                                } else {
+                                    ### all traffic from $blockip is being blocked
+                                    $blocked = 1;
+                                    last RULE;
+                                }
                             }
+                            $rulenum++;
                         }
-                        unless ($blocked) {
+                        unless ($blocked || $flush_fw_rules) {
                             &iptables_block($table, $chain, $blockip);
                         }
                     }
@@ -1562,15 +1573,21 @@ sub reinstate_auto_blocked() {
                 my @rules = `$cmds{'ipchains'} -nL $chain`;
                 for my $blockip (@block_ips) {
                     my $blocked = 0;
+                    my $rulenum = 1;
                     RULE: for my $rule (@rules) {
                         ### DENY       udp  ------  0.0.0.0/0      0.0.0.0/0      * ->   *
                         if ($rule =~ /^DENY\s+all.*?$blockip.*0\.0\.0\.0\/0\s+\*\s+\-\>\s+\*/) {
-                            ### all traffic from $blockup is being blocked
-                            $blocked = 1;
-                            last RULE;
+                            if ($flush_fw_rules) {
+                                system "$cmds{'ipchains'} -D $chain $rulenum";
+                            } else {
+                                ### all traffic from $blockip is being blocked
+                                $blocked = 1;
+                                last RULE;
+                            }
                         }
+                        $rulenum++;
                     }
-                    unless ($blocked) {
+                    unless ($blocked || $flush_fw_rules) {
                         &ipchains_block($chain, $blockip);
                     }
                 }

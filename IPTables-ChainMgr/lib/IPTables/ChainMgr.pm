@@ -44,13 +44,34 @@ sub new() {
     bless $self, $class;
 }
 
+sub chain_exists() {
+    my $self = shift;
+    my $table = shift || croak '[*] Must specify a table, e.g. "filter".';
+    my $chain = shift || croak '[*] Must specify a chain to create.';
+    my $iptables = $self->{'_iptables'};
+
+    return &modinternal_chain_exists($table, $chain, $iptables);
+}
+
+sub modinternal_chain_exists() {
+    my $table = shift || croak '[*] Must specify a table, e.g. "filter".';
+    my $chain = shift || croak '[*] Must specify a chain to create.';
+    my $iptables = shift || croak '[*] Must specify iptables command.';
+
+    if (&run_ipt_cmd("$iptables -t $table -n -L $chain") == 0) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 sub create_chain() {
     my $self = shift;
     my $table = shift || croak '[*] Must specify a table, e.g. "filter".';
     my $chain = shift || croak '[*] Must specify a chain to create.';
     my $iptables = $self->{'_iptables'};
 
-    if (&run_ipt_cmd("$iptables -t $table -n -L $chain") == 0) {
+    if (&modinternal_chain_exists($table, $chain, $iptables)) {
         ### the chain already exists
         return 1, "[+] $chain already exists.";
     } else {
@@ -207,6 +228,11 @@ sub modinternal_find_ip_rule() {
     my $target = shift ||
         croak '[*] Must specify Netfilter target (this may be a chain).';
     my $iptables = shift || croak '[*] Must specify iptables command.]';
+
+    ### first make sure the chain actually exists
+    unless (&modinternal_chain_exists($table, $chain, $iptables)) {
+        return 0;
+    }
 
     my $ipt_parse = new IPTables::Parse('iptables' => $iptables)
         or croak "[*] Could not acquire IPTables::Parse object";

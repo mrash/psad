@@ -531,12 +531,15 @@ if ($config_file eq '/etc/psad/psad.conf') {
 &archive_data() unless $benchmark;
 
 ### Install signal handlers for debugging %scan with Data::Dumper,
-### and for reaping zombie whois processes
-$SIG{'__WARN__'} = \&Psad::warn_handler;
-$SIG{'__DIE__'}  = \&Psad::die_handler;
-$SIG{'CHLD'}     = \&REAPER;
-$SIG{'USR1'}     = \&usr1_handler;
-$SIG{'HUP'}      = \&hup_handler;
+### and for reaping zombie whois processes.  Only install signal
+### handlers if we are not running in benchmark mode
+unless ($benchmark) {
+    $SIG{'__WARN__'} = \&Psad::warn_handler;
+    $SIG{'__DIE__'}  = \&Psad::die_handler;
+    $SIG{'CHLD'}     = \&REAPER;
+    $SIG{'USR1'}     = \&usr1_handler;
+    $SIG{'HUP'}      = \&hup_handler;
+}
 
 ### zero out the packet counter file (the counters
 ### are all zero at this point anyway).
@@ -576,13 +579,23 @@ for (;;) {
 
         &Psad::psyslog('psad', 'Received HUP signal, ' .
             're-importing psad.conf');
+
+        my $orig_fwdata = $config{'FW_DATA_FILE'};
         ### Re-import all used config files (psad.conf, psad_auto_ips,
         ### psad_posf, psad_signatures) if we received a HUP signal.
         &import_configs();
 
-        close FWDATA;
-        open FWDATA, $config{'FW_DATA_FILE'} or die ' ** Could not open ',
-            "$config{'FW_DATA_FILE'}: $!" unless $benchmark;
+        if ($orig_fwdata ne $config{'FW_DATA_FILE'}) {
+            close FWDATA;
+            ### zero out the new fwdata file just in case (the path
+            ### has changed).
+            open FWDATA, "> $config{'FW_DATA_FILE'}" or die $!;
+            close FWDATA;
+
+            ### re-open the fwdata file
+            open FWDATA, $config{'FW_DATA_FILE'} or die
+                " ** Could not open $config{'FW_DATA_FILE'}: $!"
+        }
     }
 
     ### See if we need to print out the %scan datastructure
@@ -1170,8 +1183,8 @@ sub dshield_email_log() {
             close MAIL;
         }
 
-        &Psad::psyslog('psad',
-            "sent $#dshield_data lines of log data to dshield.org");
+        &Psad::psyslog('psad', "sent $#dshield_data lines of log data to " .
+            $config{'DSHIELD_ALERT_EMAIL'});
 
         ### store the current time
         $last_dshield_alert = time();
@@ -1640,7 +1653,7 @@ sub import_auto_ips() {
         $i++;
         next if ($line =~ /^\s*#/);
         next unless ($line =~ /\S/);
-        if ($line =~ /^\s*($ip_re)\s+([0-5])/) {
+        if ($line =~ m|^\s*($ip_re)\s+([0-5])|) {
             $auto_ips{'ip'}{$1} = $2;
         } elsif ($line =~ m|^\s*($ip_re/\d+)\s+([0-5])|) {
             $auto_ips{'net'}{$1} = $2;

@@ -80,7 +80,7 @@ unless (-e "/usr/local/bin") {
 }
 if ( -e "/usr/local/bin/psad" && (! $nopreserve)) {  # need to grab the old config
 	print "*** Copying psad -> /usr/local/bin/psad\n";
-	print "***	Preserving old config within /usr/local/bin/psad\n";
+	print "    Preserving old config within /usr/local/bin/psad\n";
 	preserve_config("psad", "/usr/local/bin/psad", \%Cmds);
 	perms_ownership("/usr/local/bin/psad", 0500)
 } else {
@@ -90,7 +90,7 @@ if ( -e "/usr/local/bin/psad" && (! $nopreserve)) {  # need to grab the old conf
 }
 if (-e "/usr/local/bin/kmsgsd" && (! $nopreserve)) { 
 	print "*** Copying kmsgsd -> /usr/local/bin/kmsgsd\n";
-	print "***	Preserving old config within /usr/local/bin/kmsgsd\n";
+	print "    Preserving old config within /usr/local/bin/kmsgsd\n";
 	preserve_config("kmsgsd", "/usr/local/bin/kmsgsd", \%Cmds);
 	perms_ownership("/usr/local/bin/kmsgsd", 0500);
 } else {
@@ -100,7 +100,7 @@ if (-e "/usr/local/bin/kmsgsd" && (! $nopreserve)) {
 }
 if (-e "/usr/local/bin/diskmond" && (! $nopreserve)) {
 	print "*** Copying diskmond -> /usr/local/bin/diskmond\n";
-	print "*** 	Preserving old config within /usr/local/bin/diskmond\n";
+	print "    Preserving old config within /usr/local/bin/diskmond\n";
         preserve_config("diskmond", "/usr/local/bin/diskmond", \%Cmds);
         perms_ownership("/usr/local/bin/diskmond", 0500);
 } else {
@@ -112,9 +112,9 @@ unless (-e "/etc/psad") {
         print "*** Creating /etc/psad/\n";
         mkdir "/etc/psad",400;
 }
-if (-e "/etc/psad/psad.conf") {
+if (-e "/etc/psad/psad_signatures") {
 	print "*** Copying psad_signatures -> /etc/psad/psad_signatures\n";
-	print "***	Preserving old signatures file as /etc/psad/psad_signatures.old\n";
+	print "    Preserving old signatures file as /etc/psad/psad_signatures.old\n";
 	`$Cmds{'mv'} /etc/psad/psad_signatures /etc/psad/psad_signatures.old`;
 	`$Cmds{'cp'} psad_signatures /etc/psad/psad_signatures`;
 	perms_ownership("/etc/psad/psad_signatures", 0600);
@@ -123,9 +123,20 @@ if (-e "/etc/psad/psad.conf") {
 	`$Cmds{'cp'} psad_signatures /etc/psad/psad_signatures`;
 	perms_ownership("/etc/psad/psad_signatures", 0600);
 }
+if (-e "/etc/psad/psad_auto_ips") {
+	print "*** Copying psad_auto_ips -> /etc/psad/psad_auto_ips\n";
+	print "    Preserving old auto_ips file as /etc/psad/psad_auto_ips.old\n";
+	`$Cmds{'mv'} /etc/psad/psad_auto_ips /etc/psad/psad_auto_ips.old`;
+	`$Cmds{'cp'} psad_auto_ips /etc/psad/psad_auto_ips`;
+	perms_ownership("/etc/psad/psad_auto_ips", 0600);
+} else {
+	print "*** Copying psad_auto_ips -> /etc/psad/psad_auto_ips\n";
+	`$Cmds{'cp'} psad_auto_ips /etc/psad/psad_auto_ips`;
+	perms_ownership("/etc/psad/psad_auto_ips", 0600);
+}
 if (-e "/etc/psad/psad.conf") {
 	print "*** Copying psad.conf -> /etc/psad/psad.conf\n";
-	print "***	Preserving old psad.conf file as /etc/psad/psad.conf\n";
+	print "    Preserving old psad.conf file as /etc/psad/psad.conf\n";
 	`$Cmds{'mv'} /etc/psad/psad.conf /etc/psad/psad.conf.old`;
 	`$Cmds{'cp'} psad.conf /etc/psad/psad.conf`;
 	perms_ownership("/etc/psad/psad.conf", 0600);
@@ -140,9 +151,9 @@ my $kernel = get_kernel(\%Cmds);
 
 if ($distro eq "redhat61" || $distro eq "redhat62") {
 	# remove signature checking from psad process if we are not running an iptables-enabled kernel
-	system "perl -p -i -e 's|\\-s\\s/etc/psad/psad_signatures||' psad-init" if ($kernel !~ /^2.3/ && $kernel !~ /^2.4/);
 	print "*** Copying psad-init -> /etc/rc.d/init.d/psad-init\n";
 	`$Cmds{'cp'} psad-init /etc/rc.d/init.d/psad-init`;
+	system "perl -p -i -e 's|\\-s\\s/etc/psad/psad_signatures||' /etc/rc.d/init.d/psad-init" if ($kernel !~ /^2.3/ && $kernel !~ /^2.4/);
 } 
 # need to put checks in here for redhat vs. other systems.
 unless($fwcheck) {
@@ -163,22 +174,22 @@ unless($fwcheck) {
 					my $pid = (split /\s+/, $pidstatement)[1];
 					system "$Cmds{'kill'} $pid";
 					if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/) {
-                                                system "/usr/local/bin/psad -s /etc/psad/psad_signatures";
+                                                system "/usr/local/bin/psad -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips";
                                         } elsif ($kernel =~ /^2.2/) {
-                                                system "/usr/local/bin/psad";
+                                                system "/usr/local/bin/psad -a /etc/psad/psad_auto_ips";
                                         } else {
                                                 print "*** You are running kernel $kernel.  Assuming ipchains support.\n";
-                                                system "/usr/local/bin/psad";
+                                                system "/usr/local/bin/psad -a /etc/psad/psad_auto_ips";
                                         }
 				} else {
 					print "*** Starting the psad daemons...\n";
 					if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/) {	
-                                        	system "/usr/local/bin/psad -s /etc/psad/psad_signatures";
+                                        	system "/usr/local/bin/psad -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips";
 					} elsif ($kernel =~ /^2.2/) {
-						system "/usr/local/bin/psad";
+						system "/usr/local/bin/psad -a /etc/psad/psad_auto_ips";
 					} else {
 						print "*** You are running kernel $kernel.  Assuming ipchains support.\n";
-						system "/usr/local/bin/psad";
+						system "/usr/local/bin/psad -a /etc/psad/psad_auto_ips";
 					}
 				}
 			}
@@ -251,7 +262,20 @@ sub check_firewall_rules() {
 				}
 			}
 		}
-		print STDOUT "*** Your firewall does not include rules that will log dropped/rejected packets.  Psad will not work with such a firewall setup.\n";
+		print STDOUT "*** Your firewall does not include rules that will log dropped/rejected packets.\n";
+		print STDOUT "    You need to include a default rule that logs packets that have not been accepted\n";
+		print STDOUT "    by previous rules, and this rule should have a logging prefix of \"drop\", \"deny\"\n";
+		print STDOUT "    or \"reject\".  For example suppose that you are running a webserver to which you\n";
+		print STDOUT "    also need ssh access.  Then a iptables ruleset that is compatible with psad\n";
+		print STDOUT "    could be built with the following commands:\n";
+		print STDOUT "\n";
+		print STDOUT "    iptables -A INPUT -s 0/0 -d <webserver_ip> 80 -j ACCEPT\n";
+		print STDOUT "    iptables -A INPUT -s 0/0 -d <webserver_ip> 22 -j ACCEPT\n";
+		print STDOUT "    iptables -A INPUT -j LOG --log-prefix \" DROP\"\n";
+		print STDOUT "    iptables -A INPUT -j DENY\n";
+		print STDOUT "\n";	
+		print STDOUT "    Psad will not run without an iptables ruleset that includes rules similar to the\n";
+		print STDOUT "    last two rules above.\n";
 		return 0;
 	} elsif ($ipchains) {
 # target     prot opt     source                destination           ports
@@ -266,14 +290,24 @@ sub check_firewall_rules() {
 			chomp $rule;
                         next FWPARSE if ($rule =~ /^Chain/ || $rule =~ /^target/);
 			if ($rule =~ /^(\w+)\s+(\w+)\s+(\S+)\s+\S+\s+(\S+)\s+(\*)\s+\-\>\s+(\*)/) {
+#			if ($rule =~ /^(\w+)\s+(\w+)\s+(\S+)\s+\S+\s+(\S+)/) {
 				my ($target, $proto, $opt, $dst, $srcpt, $dstpt) = ($1, $2, $3, $4, $5, $6);
+#				my ($target, $proto, $opt, $dst, $srcpt, $dstpt) = ($1, $2, $3, $4);
                         	if ($target =~ /drop|reject|deny/i && $proto =~ /all|tcp/ && $opt =~ /....l./) {
 					if (check_destination($dst, \@localips)) {
 						print STDOUT "*** Your firewall setup looks good.  Unauthorized tcp packets will be dropped and logged.\n"; 
                                 		return 1;
 					}
 				}
-                        }
+			} elsif ($rule =~ /^(\w+)\s+(\w+)\s+(\S+)\s+\S+\s+(\S+)\s+(n\/a)/) {  # kernel 2.2.14 (and others) show "n/a" instead of "*"
+				my ($target, $proto, $opt, $dst, $ports) = ($1, $2, $3, $4, $5);
+				if ($target =~ /drop|reject|deny/i && $proto =~ /all|tcp/ && $opt =~ /....l./) {
+					if (check_destination($dst, \@localips)) {
+						print STDOUT "*** Your firewall setup looks good.  Unauthorized tcp packets will be dropped and logged.\n";
+						return 1;
+					}
+				}
+			}
                 }
 		print STDOUT "*** Your firewall does not include rules that will log dropped/rejected packets.  Psad will not work with such a firewall setup.\n";
                 return 0;

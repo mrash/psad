@@ -89,7 +89,7 @@ if grep -q psadfifo /etc/syslog.conf; then
 		daemon /usr/local/bin/kmsgsd
 		echo
 		echo -n "Starting the psad daemon: "
-		daemon /usr/local/bin/psad -s /etc/psad/psad_signatures
+		daemon /usr/local/bin/psad -s /etc/psad/psad_signatures -a /etc/psad/psad_auto_ips 
 		echo
 		echo -n "Starting the disk monitoring daemon: "
 		daemon /usr/local/bin/diskmond

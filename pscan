@@ -4,6 +4,9 @@
 # open a socket to each of the ports in the range specified on
 # the command line.  You do not need to be root to execute this
 # script.
+#
+# TODO:  
+#	- use alarms to avoid hanging on closed ports
 
 use Socket;
 use Getopt::Long;

@@ -580,12 +580,15 @@ but a better way is on the TODO list.
 module is loaded (or compiled into the kernel) and the firewall has been
 configured to keep state of connections, occasionally packets that are supposed
 to be part of normal TCP traffic will not be correctly identified due to a bug
-in the firewall and hence dropped.  Such packets will then be interpreted as a
-scan by psad even though they are not part of any malicious activity.  Fortunately
-an interim fix for this problem is to simply extend the TCP_CONNTRACK_CLOSE_WAIT timeout
-value in linux/net/ipv4/netfilter/ip_conntrack_proto_tcp.c from 60 seconds to 2
-minutes, and a kernel patch "conntrack_patch" is included with the psad sources to
+in the firewall state timeouts and hence dropped.  Such packets will then be
+interpreted as a scan by psad even though they are not part of any malicious
+activity.  Fortunately, an interim fix for this problem is to simply extend the
+TCP_CONNTRACK_CLOSE_WAIT timeout value in
+linux/net/ipv4/netfilter/ip_conntrack_proto_tcp.c from 60 seconds to 2 minutes,
+and a kernel patch "conntrack_patch" is included with the psad sources to
 change this.  (Requires a kernel recompile of course, see the Kernel-HOWTO.)
+Also, by default the IGNORE_CONNTRACK_BUG_PKTS variable is set in psad.conf
+which causes psad to ignore all logged 
 
 .SH DISTRIBUTION
 .B psad

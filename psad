@@ -3921,7 +3921,7 @@ sub restart() {
 sub analysis_mode() {
 
     if (-d $config{'ANALYSIS_MODE_DIR'}) {
-        print " .. Removing old $config{'ANALYSIS_MODE_DIR'}\n";
+        print " .. Removing old $config{'ANALYSIS_MODE_DIR'} directory.\n";
         rmtree $config{'ANALYSIS_MODE_DIR'} or die " ** Could not ",
             "remove $config{'ANALYSIS_MODE_DIR'}\n";
     }
@@ -4248,7 +4248,7 @@ sub status_psad_daemon() {
             print "\n    Iptables prefix counters:\n";
             for my $prefix (keys %ipt_prefixes) {
                 my $count = $ipt_prefixes{$prefix};
-                print "        $prefix: $count\n";
+                print "        \"$prefix\": $count\n";
             }
         } else {
             print "        [NONE]\n";

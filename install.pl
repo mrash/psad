@@ -919,7 +919,7 @@ sub usage_and_exit() {
         print <<_HELP_;
 
 Usage: install.pl [-f] [-n] [-u] [-v] [-h]
-    
+
     -n  --no_preserve   - disable preservation of old configs.
     -u  --uninstall     - uninstall psad.
     -v  --verbose       - verbose mode.

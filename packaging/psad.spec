@@ -1,6 +1,6 @@
 %define name psad
-%define version 1.2.4
-%define release 2
+%define version 1.3
+%define release 1
 %define psadlibdir /usr/lib/psad
 %define psadlogdir /var/log/psad
 %define psadrundir /var/run/psad
@@ -25,23 +25,24 @@ Requires: iptables
 #Prereq: rpm-helper
 
 %description
-Port Scan Attack Detector (psad) is a collection of four lightweight
-system daemons written in Perl and C that are designed to work with
-Linux firewalling code (iptables in the 2.4.x kernels, and ipchains
-in the 2.2.x kernels) to detect port scans. It features a set of highly
-configurable danger thresholds (with sensible defaults provided),
-verbose alert messages that include the source, destination, scanned
-port range, begin and end times, TCP flags and corresponding nmap
-options (Linux 2.4.x kernels only), email alerting, and automatic
-blocking of offending IP addresses via dynamic configuration of
-ipchains/iptables firewall rulesets. In addition, for the 2.4.x kernels
-psad incorporates many of the TCP, UDP, and ICMP signatures included in
-Snort to detect highly suspect scans for various backdoor programs
-(e.g. EvilFTP, GirlFriend, SubSeven), DDoS tools (mstream, shaft), and
-advanced port scans (syn, fin, Xmas) which are easily leveraged against
-a machine via nmap. Psad also uses packet TTL, IP id, TOS, and TCP
-window sizes to passively fingerprint the remote operating system from
-which scans originate.
+Port Scan Attack Detector (psad) is a collection of three lightweight
+system daemons written in Perl and in C that are designed to work with Linux
+iptables firewalling code to detect port scans and other suspect traffic.  It
+features a set of highly configurable danger thresholds (with sensible
+defaults provided), verbose alert messages that include the source,
+destination, scanned port range, begin and end times, tcp flags and
+corresponding nmap options, reverse DNS info, email and syslog alerting,
+automatic blocking of offending ip addresses via dynamic configuration of
+iptables rulesets, and passive operating system fingerprinting.  In addition,
+psad incorporates many of the tcp, udp, and icmp signatures included in the
+snort intrusion detection system (http://www.snort.org) to detect highly
+suspect scans for various backdoor programs (e.g. EvilFTP, GirlFriend,
+SubSeven), DDoS tools (mstream, shaft), and advanced port scans (syn, fin,
+xmas) which are easily leveraged against a machine via nmap.  psad can also
+alert on snort signatures that are logged via fwsnort
+(http://www.cipherdyne.org/fwsnort/), which makes use of the
+iptables string match module to detect application layer signatures.
+
 
 %prep
 [ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
@@ -191,11 +192,15 @@ kill -HUP `cat /var/run/syslogd.pid`
 fi
 if grep -q "EMAIL.*root.*localhost" /etc/psad/psad.conf;
 then
-echo " .. You can edit the EMAIL_ADDRESSES variable in"
-echo "    /etc/psad/psad.conf and /etc/psad/psadwatchd.conf"
-echo "    to have email alerts sent to an address other than"
-echo "    root\@localhost"
+echo " .. You can edit the EMAIL_ADDRESSES variable in /etc/psad/psad.conf"
+echo "    /etc/psad/psadwatchd.conf to have email alerts sent to an address"
+echo "    other than root\@localhost"
+fi
 
+if grep -q "HOME_NET.*CHANGEME" /etc/psad/psad.conf;
+then
+echo " .. Be sure to edit the HOME_NET variable in /etc/psad/psad.conf"
+echo "    to define the internal network(s) attached to your machine."
 fi
 
 %preun
@@ -221,6 +226,11 @@ fi
 %_libdir/%name
 
 %changelog
+* Mon Oct 14 2003 Michael Rash <mbr@cipherydne.org>
+- Removed ipchains text from description.
+- Added test and config warning message for HOME_NET variable.
+- Updated to version 1.3
+
 * Mon Oct 14 2003 Michael Rash <mbr@cipherydne.org>
 - Removed diskmond since psad handles disk space thresholds
   directly.

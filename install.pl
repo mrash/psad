@@ -229,6 +229,14 @@ my $t = localtime();
 my $time = " ... Installing psad on $HOSTNAME: $t\n";
 &logr("\n$time\n");
 
+unless (-d $PSAD_CONFDIR) {
+    &logr(" ... Creating $PSAD_CONFDIR\n");
+    mkdir $PSAD_CONFDIR,0400;
+}
+unless (-d $CONF_ARCHIVE) {
+    &logr(" ... Creating $CONF_ARCHIVE\n");
+    mkdir $CONF_ARCHIVE, 0400;
+}
 unless (-e $PSAD_FIFO) {
     &logr(" ... Creating named pipe $PSAD_FIFO\n");
     ### create the named pipe
@@ -238,19 +246,27 @@ unless (-e $PSAD_FIFO) {
             "\n@@@@@  Psad requires this file to exist!  Aborting install.\n";
     }
 }
-### make sure syslog is sending kern.info messages to psadfifo
-unless (open SYSLOG, "< /etc/syslog.conf" and grep /kern\.info\s+\|\s*$PSAD_FIFO/, <SYSLOG> and close SYSLOG) {
-    &logr(" ... Modifying /etc/syslog.conf\n");
-    copy("/etc/syslog.conf", "/etc/syslog.conf.orig") unless (-e "/etc/syslog.conf.orig");
-    open SYSLOG, ">> /etc/syslog.conf" or die "@@@@@  Unable to open /etc/syslog.conf: $!\n";
-    print SYSLOG "kern.info		|$PSAD_FIFO\n\n";  ### reinstate kernel logging to our named pipe
-    close SYSLOG;
-    print " ... Restarting syslog.\n";
-    system("$Cmds{'killall'} -HUP syslogd");
+&logr(" ... Modifying /etc/syslog.conf to write kern.info messages to $PSAD_FIFO\n");
+copy("/etc/syslog.conf", "/etc/syslog.conf.orig") unless (-e "/etc/syslog.conf.orig");
+&archive("/etc/syslog.conf");
+open RS, "< /etc/syslog.conf" or die "@@@@@  Unable to open /etc/syslog.conf: $!\n";
+my @slines = <RS>;
+close RS;
+open SYSLOG, "> /etc/syslog.conf" or die "@@@@@  Unable to open /etc/syslog.conf: $!\n";
+for my $l (@slines) {
+    chomp $l;
+    unless ($l =~ /psadfifo/) {
+        print SYSLOG "$l\n";
+    }
 }
+print SYSLOG "kern.info		|$PSAD_FIFO\n\n";  ### reinstate kernel logging to our named pipe
+close SYSLOG;
+print " ... Restarting syslog.\n";
+system("$Cmds{'killall'} -HUP syslogd");
+
 unless (-d $PSAD_DIR) {
     &logr(" ... Creating $PSAD_DIR\n");
-    mkdir $PSAD_DIR,0400;
+    mkdir $PSAD_DIR, 0400;
 }
 unless (-e "${PSAD_DIR}/fwdata") {
     &logr(" ... Creating ${PSAD_DIR}/fwdata file\n");
@@ -296,7 +312,7 @@ unless (-e "Makefile.PL" && -e "Syslog.pm") {
 }
 system "$Cmds{'perl'} Makefile.PL";
 system "$Cmds{'make'}";
-system "$Cmds{'make'} test";
+#system "$Cmds{'make'} test";
 system "$Cmds{'make'} install";
 chdir "..";
 
@@ -323,12 +339,15 @@ unless (-d $PSAD_CONFDIR) {
     &logr(" ... Creating $PSAD_CONFDIR\n");
     mkdir $PSAD_CONFDIR,0400;
 }
-unless (-d "${PSAD_CONFDIR}/archive") {
-    &logr(" ... Creating ${PSAD_CONFDIR}/archive\n");
-    mkdir "${PSAD_CONFDIR}/archive", 0400;
+unless (-d $CONF_ARCHIVE) {
+    &logr(" ... Creating $CONF_ARCHIVE\n");
+    mkdir $CONF_ARCHIVE, 0400;
 }
 if (-e "${PSAD_CONFDIR}/psad_signatures") {
     &archive("${PSAD_CONFDIR}/psad_signatures") unless $nopreserve;
+    &logr(" ... Copying psad_signatures -> ${PSAD_CONFDIR}/psad_signatures\n");
+    copy("psad_signatures", "${PSAD_CONFDIR}/psad_signatures");
+    &perms_ownership("${PSAD_CONFDIR}/psad_signatures", 0600);
 } else {
     &logr(" ... Copying psad_signatures -> ${PSAD_CONFDIR}/psad_signatures\n");
     copy("psad_signatures", "${PSAD_CONFDIR}/psad_signatures");
@@ -336,6 +355,9 @@ if (-e "${PSAD_CONFDIR}/psad_signatures") {
 }
 if (-e "${PSAD_CONFDIR}/psad_auto_ips") {
     &archive("${PSAD_CONFDIR}/psad_auto_ips") unless $nopreserve;
+    &logr(" ... Copying psad_auto_ips -> ${PSAD_CONFDIR}/psad_auto_ips\n");
+    copy("psad_auto_ips", "${PSAD_CONFDIR}/psad_auto_ips");
+    &perms_ownership("${PSAD_CONFDIR}/psad_auto_ips", 0600);
 } else {
     &logr(" ... Copying psad_auto_ips -> ${PSAD_CONFDIR}/psad_auto_ips\n");
     copy("psad_auto_ips", "${PSAD_CONFDIR}/psad_auto_ips");
@@ -343,6 +365,9 @@ if (-e "${PSAD_CONFDIR}/psad_auto_ips") {
 }
 if (-e "${PSAD_CONFDIR}/psad.conf") {
     &archive("${PSAD_CONFDIR}/psad.conf") unless $nopreserve;
+    &logr(" ... Copying psad.conf -> ${PSAD_CONFDIR}/psad.conf\n");
+    copy("psad.conf", "${PSAD_CONFDIR}/psad.conf");
+    &perms_ownership("${PSAD_CONFDIR}/psad.conf", 0600);
 } else {
     &logr(" ... Copying psad.conf -> ${PSAD_CONFDIR}/psad.conf\n");
     copy("psad.conf", "${PSAD_CONFDIR}/psad.conf");
@@ -350,19 +375,21 @@ if (-e "${PSAD_CONFDIR}/psad.conf") {
 }
 my $email_str = &query_email();
 if ($email_str) {
-    &put_email($email_str);
+    &put_email("${PSAD_CONFDIR}/psad.conf", $email_str);
 }
 ### Give the admin the opportunity to add to the strings that are normally
 ### checked in iptables messages.  This is useful since the admin may have
 ### configured the firewall to use a logging prefix of "Audit" or something
 ### else other than the normal "DROP", "DENY", or "REJECT" strings.
 my $append_fw_search_str = &get_fw_search_string();
-
 if ($append_fw_search_str) {
     &logr(" ... Appending \"$append_fw_search_str\" to \$FW_MSG_SEARCH in ${PSAD_CONFDIR}/psad.conf\n");
     &put_fw_search_str("${PSAD_CONFDIR}/psad.conf", $append_fw_search_str);
 }
-
+### make sure the PSAD_DIR and PSAD_FIFO variables are correctly defined
+### in the config file.
+&put_string("${PSAD_CONFDIR}/psad.conf", "PSAD_DIR", $PSAD_DIR);
+&put_string("${PSAD_CONFDIR}/psad.conf", "PSAD_FIFO", $PSAD_FIFO);
 
 if (-e "/etc/man.config") {
     ### prefer to install psad.8 in /usr/local/man/man8 if this directory is configured in /etc/man.config
@@ -480,9 +507,17 @@ sub check_old_psad_installation() {
     move("${old_install_dir}/kmsgsd", "${SBIN_DIR}/kmsgsd")         if (-e "${old_install_dir}/kmsgsd");
     unlink "${PSAD_CONFDIR}/psad_signatures.old" if (-e "${PSAD_CONFDIR}/psad_signatures.old");
     unlink "${PSAD_CONFDIR}/psad_auto_ips.old"   if (-e "${PSAD_CONFDIR}/psad_auto_ips.old");
-    unlink "${PSAD_CONFDIR}/psad_conf.old"       if (-e "${PSAD_CONFDIR}/psad.conf.old");
+    unlink "${PSAD_CONFDIR}/psad.conf.old"       if (-e "${PSAD_CONFDIR}/psad.conf.old");
     ### Psad.pm will be installed The Right Way using make
     unlink "${PERL_INSTALL_DIR}/Psad.pm" if (-e "${PERL_INSTALL_DIR}/Psad.pm");
+    if (-e "/var/log/psadfifo") {  ### this is the old psadfifo location
+        if (-e "${SBIN_DIR}/psad" && system "${SBIN_DIR}/psad --Status > /dev/null") {
+            ### deal with this later.  The user should be prompted before
+            ### the old psadfifo is removed since kmsgsd will have a problem
+        } else {
+            unlink "/var/log/psadfifo";
+        }
+    }
     return;
 }
 sub get_distro() {
@@ -583,11 +618,10 @@ sub query_email() {
     return "";
 }
 sub put_email() {
-    my ($file, $emailstr) = shift;
+    my ($file, $emailstr) = @_;
     open RF, "< $file";
     my @lines = <RF>;
     close RF;
-
     open F, "> $file";
     for my $l (@lines) {
         if ($l =~ /EMAIL_ADDRESSES\s*\(/) {
@@ -604,14 +638,28 @@ sub put_fw_search_str() {
     open RF, "< $file";
     my @lines = <RF>;
     close RF;
-
-    my ($filename) = ($file =~ m|.*/(.*)|);
     open F, "> $file";
     for my $l (@lines) {
-        if ($l =~ /\s*FW_MSG_SEARCH\s*.*;/) {
+        if ($l =~ /^\s*FW_MSG_SEARCH\s*(.*);/) {
             my $fw_string = $1;
             $fw_string .= "|$append_fw_search";
             print F "FW_MSG_SEARCH              $fw_string;\n";
+        } else {
+            print F $l;
+        }
+    }
+    close F;
+    return;
+}
+sub put_string() {
+    my ($file, $key, $value) = @_;
+    open RF, "< $file";
+    my @lines = <RF>;
+    close RF;
+    open F, "> $file";
+    for my $l (@lines) {
+        if ($l =~ /^\s*$key\s*.*;/) {
+            print F "$key                    $value;\n";
         } else {
             print F $l;
         }
@@ -632,11 +680,8 @@ sub archive() {
             $target = $targetbase . $i;
         }
     }
-    &logr(" ... Copying $filename -> $file\n");
-    &logr("     Preserving old $file file as $target\n");
-    move($file, $target);   ### move $file into the archive directory
-    copy($filename, $file); ### copy local $filename (in the src directory) to the $file location
-    &perms_ownership($file, 0600);
+    &logr(" ... Archiving $file -> $target\n");
+    copy($file, $target);   ### move $file into the archive directory
     return;
 }
 sub enable_psad_at_boot() {

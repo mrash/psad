@@ -598,14 +598,14 @@ if ($config{'IMPORT_OLD_SCANS'} eq 'Y') {
     unless $fw_analyze;
 
 ### zero out prefix counters
-unless ($fw_analyze) {
+unless ($fw_analyze or $benchmark) {
     &write_prefix_counters() if %ipt_prefixes;
 }
 
 ### zero out dshield alert stats (note we do this here regardles of
 ### whether DShield alerting is enabled since if it isn't we will
 ### just zero out the counters).
-&write_dshield_stats() unless $fw_analyze;
+&write_dshield_stats() unless $fw_analyze or $benchmark;
 
 ### Get an open filehandle for the main firewall data file FW_DATA_FILE.
 ### All firewall drop/reject log messages are written to FW_DATA_FILE
@@ -701,10 +701,10 @@ for (;;) {
 
         ### Write the number of tcp/udp/icmp packets out
         ### to the global packet counters file
-        &write_global_packet_counters() unless $benchmark;
+        &write_global_packet_counters() unless $benchmark or $analyze_msgs;
 
         ### Write out log prefix counters
-        &write_prefix_counters() unless $benchmark;
+        &write_prefix_counters() unless $benchmark or $analyze_msgs;
     }
 
     ### Timeout any auto-blocked IPs that are past due (need to
@@ -2721,6 +2721,11 @@ sub scan_logr() {
                     $curr_scan_hr->{$src}->{$dst}->{'icmp'}->{'pkts'};
             }
 
+            if (($tcp_f and $udp_f) or ($tcp_f and $icmp_f) or
+                    ($udp_f and $icmp_f)) {
+                $scan{$src}{$dst}{'multiproto'} = '';
+            }
+
             ### write out the overall packet counters for $src.
             &write_src_packet_counters($scan{$src}{$dst}{'chain'},
                 $tcp_absrange, $udp_absrange, $pkt_ctr_file);
@@ -2781,14 +2786,20 @@ sub scan_logr() {
                 "-=-=-=-=\n",
                 " ** psad: Suspicious traffic detected against ",
                 "$dst\n\n\n";
-            if (defined $assigned_auto_dl{$src}) {
-                printf $fh "%${log_len}s%s\n\n", 'Danger level: ',
-                    "[$scan_dl{$src} auto-assigned] (out of 5)";
-                delete $assigned_auto_dl{$src};
-            } else {
-                printf $fh "%${log_len}s%s\n\n", 'Danger level: ',
-                    "[$scan_dl{$src}] (out of 5)";
+
+            printf $fh "%${log_len}s%s", 'Danger level: ',
+                "[$scan_dl{$src}] (out of 5) ";
+
+            if (defined $scan{$src}{$dst}{'multiproto'}) {
+                print $fh 'Multi-Protocol';
             }
+            print $fh "\n\n";
+
+            if (defined $assigned_auto_dl{$src}) {
+                printf $fh "%${log_len}s%s\n", ' ', 'Auto-assigned';
+                delete $assigned_auto_dl{$src};
+            }
+
             if ($tcp_f) {
                 printf $fh "%${log_len}s%s\n", 'Scanned tcp ports: ',
                     "[$tcp_newrange: $tcp_newpkts packets]";
@@ -5061,6 +5072,7 @@ sub required_vars() {
         DISK_MAX_RM_RETRIES ETC_HOSTS_DENY ETC_SYSLOG_CONF
         ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL ANALYSIS_MODE_DIR
         IMPORT_OLD_SCANS PSAD_ICMP_TYPES_FILE SHOW_ALL_SIGNATURES
+        IPT_PREFIX_COUNTER_FILE
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

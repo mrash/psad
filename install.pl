@@ -5,15 +5,16 @@ my $touchCmd = "/bin/touch";
 my $mknodCmd = "/bin/mknod";
 my $grepCmd = "/bin/grep";
 my $cpCmd = "/bin/cp";
+my $idCmd = "/usr/bin/id";
 my $unameCmd = "/bin/uname";
 my $ifconfigCmd = "/sbin/ifconfig";
 my $ipchainsCmd = "/sbin/ipchains";
 my $iptablesCmd = "/usr/local/bin/iptables";
 #============ end config ============
 
-if ((split /:/, `$grepCmd $ENV{'USER'} /etc/passwd`)[2] != 0) {
-	die "You need to be root (or equivalent UID 0 account) to install psad!\n";
-}
+my $uid = (split /\s+/, `$idCmd`)[0];
+($uid) = ($uid =~ /^uid\=(\d+)/);
+die "You need to be root (or equivalent UID 0 account) to install psad!\n" if $uid;
 unless (-e "/var/log/psadfifo") {
 	print "*** Creating named pipe /var/log/psadfifo\n";
 	# create the named pipe

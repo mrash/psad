@@ -58,10 +58,11 @@ my ($Config_href, $Cmds_href) = &Psad::buildconf($CONFIG_FILE);
 ### make sure the configuration is complete
 &check_config();
 
-my $FW_DATA       = $Config_href->{'FW_DATA'};
-my $FW_MSG_SEARCH = $Config_href->{'FW_MSG_SEARCH'};
-my $PSAD_FIFO     = $Config_href->{'PSAD_FIFO'};
-my $PIDFILE       = $Config_href->{'KMSGSD_PID_FILE'};
+my $FW_DATA        = $Config_href->{'FW_DATA'};
+my $FW_MSG_SEARCH1 = $Config_href->{'FW_MSG_SEARCH1'};
+my $FW_MSG_SEARCH2 = $Config_href->{'FW_MSG_SEARCH2'};
+my $PSAD_FIFO      = $Config_href->{'PSAD_FIFO'};
+my $PIDFILE        = $Config_href->{'KMSGSD_PID_FILE'};
 undef $Config_href;
 
 ### make sure there is not another kmsgsd already running
@@ -94,8 +95,8 @@ for (;;) {
     open FIFO, "< $PSAD_FIFO" or die "Can't open file : $!\n";
     my $service = <FIFO>;  ### don't chomp for better performance
     if (defined $service
-            && ($service =~ /Packet\slog/ || $service =~ /IN.+?OUT.+?MAC/)
-            && $service =~ /$FW_MSG_SEARCH/) {
+        && ($service =~ /Packet\slog/ || $service =~ /IN.+?OUT.+?MAC/)
+        && ($service =~ /$FW_MSG_SEARCH1/ || $service =~ /$FW_MSG_SEARCH2/) {
         ### log to the fwdata file
         my $old_fh = select LOG;
         $| = 1;
@@ -129,7 +130,8 @@ sub check_facility() {
     return 1;
 }
 sub check_config() {
-    my @required_vars = qw(KMSGSD_PID_FILE PSAD_FIFO FW_DATA FW_MSG_SEARCH);
+    my @required_vars = qw(KMSGSD_PID_FILE PSAD_FIFO FW_DATA
+    FW_MSG_SEARCH1 FW_MSG_SEARCH2);
     &Psad::validate_config($CONFIG_FILE, \@required_vars, $Config_href);
     return;
 }

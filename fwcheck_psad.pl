@@ -377,3 +377,25 @@ sub import_fw_search() {
     }
     return;
 }
+
+sub usage() {
+    my $exitcode = shift;
+    print <<_HELP_;
+
+Options:
+    --config <config_file>            - Specify path to configuration
+                                        file.
+    --alert-conf <alert_conf_file>    - Path to psad alert.conf file.
+    --fw-search  <fw_search_file>     - Specify path to fw_search.conf.
+    --fw-file    <fw_file>            - Analyze ruleset contained within
+                                        fw_file instead of a running
+                                        policy.
+    --fw-analyze                      - Analyze the local iptables
+                                        ruleset and exit.
+    --no-fw-search-all                - looking for specific log
+                                        prefixes
+    --help                            - Display help.
+
+_HELP_
+    exit $exitcode;
+}

@@ -82,9 +82,12 @@ my $Scan_href;  # contains ips, port ranges, tcp flags, and danger levels
 my $daemon = 0;
 my $output = 0;
 my $errors = 0;
+my $dnslookups = 0;
+my $dnsstring;
 
 use Getopt::Long;
 use Data::Dumper;
+use Socket;
 
 $SIG{USR1} = \&print_scan;  # install signal handler for debugging the %Scan hash with Data::Dumper
 
@@ -93,6 +96,7 @@ usage_and_exit(1) unless (GetOptions (
 	'output'	=> \$output,
 	'daemon'	=> \$daemon,
 	'config=s'	=> \$config,
+	'namelookups'	=> \$dnslookups,
 	'errors'	=> \$errors
 ));
 usage_and_exit(0) if ($help);
@@ -122,9 +126,9 @@ for (;;) {
 #		print "Number of lines to process: $#process_lines\n";  # this will be useful for the TODO
 		$Scan_href = check_scan(\@process_lines, $errors, $ERROR_LOG);
 		$Scan_href = assign_danger_level($Scan_href, $PORT_RANGE_SCAN_THRESHOLD, \%DANGER_LEVELS);
-		($Scan_href, $mesg, $flags_mesg) = logr($Scan_href, $PSAD_LOGFILE, $output);
+		($Scan_href, $mesg, $flags_mesg, $dnsstring) = logr($Scan_href, $PSAD_LOGFILE, $output, $dnslookups);
 		if ($ENABLE_EMAIL_ALERTS eq "Y") {
-			$Scan_href = email_alert($Scan_href, $mesg, $flags_mesg, $EMAIL_ALERT_DANGER_LEVEL, 
+			$Scan_href = email_alert($Scan_href, $mesg, $flags_mesg, $dnsstring, $EMAIL_ALERT_DANGER_LEVEL, 
 							$EMAIL_ALERTFILE, $EMAIL_ADDRESS, $mailCmd);	
 		}
 		if ($ENABLE_AUTO_IDS eq "Y") {
@@ -140,15 +144,15 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 		# include udp/icmp scans
 	my ($process_lines_aref, $errors, $error_log) = @_;
 	my @bad_packets;
-	my ($ip, $proto, $port, $flags);
+	my ($srcip, $dstip, $proto, $port, $flags);
 	# if necessary check which firewall (ipchains vs. iptables)
 	check_fw($process_lines_aref->[0]) unless ($USE_IPCHAINS || $USE_IPTABLES);
 	READPKT: foreach my $l (@$process_lines_aref) {
 		chomp $l;
 		if ($USE_IPTABLES) {
 			# sometimes the log entry is messed up by iptables so we right it to the error log
-			if ($l =~ /SRC\=(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s.+?PROTO\=(\w{3,4})\s.+?DPT\=(\d+)\s.+?RES\S+\s(.+?)\s+URGP/) {
-				 ($ip, $proto, $port, $flags) = ($1,$2,$3,$4);
+			if ($l =~ /SRC\=(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\sDST\=(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s.+?PROTO\=(\w{3,4})\s.+?DPT\=(\d+)\s.+?RES\S+\s(.+?)\s+URGP/) {
+				 ($srcip, $dstip, $proto, $port, $flags) = ($1,$2,$3,$4,$5);
 			} else {
 				push @bad_packets, $l;
 				next READPKT;
@@ -159,8 +163,9 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
                                 next READPKT;
                         }
 		} elsif ($USE_IPCHAINS) {
-			if ($l =~ /PROTO\=(\d+)\s\S+\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\:(\d+)/) {
-				($proto, $ip, $port) = ($1,$2,$3);
+			# could implement source port checking here
+			if ($l =~ /PROTO\=(\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\:\d+\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\:(\d+)/) {
+				($proto, $srcip, $dstip, $port) = ($1,$2,$3,$4);
 				$flags = "NONE";
 			} else {
 				push @bad_packets, $l;
@@ -168,19 +173,20 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
                         }
 		}
 		# hash initialization
-		$Scan{$ip}{'ABSNUM'} = 0 unless (defined $Scan{$ip});  # might need 'unless (defined $Scan{$ip}) 
-		$Scan{$ip}{'FLAGS'}{$flags} = 0 unless (defined $Scan{$ip}{'FLAGS'}{$flags});
-		$Scan{$ip}{'CURRENT_DANGER_LEVEL'} = 0 unless (defined $Scan{$ip}{'CURRENT_DANGER_LEVEL'});
-		unless (defined $Scan{$ip}{'SCAN_RANGE'}) {
-			$Scan{$ip}{'SCAN_RANGE'}{'START_PORT'} = 65535; # make sure the initial start port is not too low
-			$Scan{$ip}{'SCAN_RANGE'}{'END_PORT'} = 0; # make sure the initial end port is not too high
+		$Scan{$srcip}{'ABSNUM'} = 0 unless (defined $Scan{$srcip});
+		$Scan{$srcip}{'DSTIP'} = $dstip unless (defined $Scan{$srcip}{'DSTIP'});
+		$Scan{$srcip}{'FLAGS'}{$flags} = 0 unless (defined $Scan{$srcip}{'FLAGS'}{$flags});
+		$Scan{$srcip}{'CURRENT_DANGER_LEVEL'} = 0 unless (defined $Scan{$srcip}{'CURRENT_DANGER_LEVEL'});
+		unless (defined $Scan{$srcip}{'SCAN_RANGE'}) {
+			$Scan{$srcip}{'SCAN_RANGE'}{'START_PORT'} = 65535; # make sure the initial start port is not too low
+			$Scan{$srcip}{'SCAN_RANGE'}{'END_PORT'} = 0; # make sure the initial end port is not too high
 		}
 		# increment hash values
-		$Scan{$ip}{'ABSNUM'}++;
-		$Scan{$ip}{'FLAGS'}{$flags}++;
+		$Scan{$srcip}{'ABSNUM'}++;
+		$Scan{$srcip}{'FLAGS'}{$flags}++;
 		# see if this port lies outside our current range
-		($Scan{$ip}{'SCAN_RANGE'}{'START_PORT'}, $Scan{$ip}{'SCAN_RANGE'}{'END_PORT'}) = 
-				check_range($port, $Scan{$ip}{'SCAN_RANGE'}{'START_PORT'}, $Scan{$ip}{'SCAN_RANGE'}{'END_PORT'});
+		($Scan{$srcip}{'SCAN_RANGE'}{'START_PORT'}, $Scan{$srcip}{'SCAN_RANGE'}{'END_PORT'}) = 
+				check_range($port, $Scan{$srcip}{'SCAN_RANGE'}{'START_PORT'}, $Scan{$srcip}{'SCAN_RANGE'}{'END_PORT'});
 	}
 	collect_errors(\@bad_packets, $error_log) unless $errors;
 	return \%Scan;
@@ -214,10 +220,11 @@ sub collect_errors() {
 	close ERRORS;
 }
 sub logr() {
-	my ($Scan_href, $logfile, $output) = @_;
+	my ($Scan_href, $logfile, $output, $dnslookups) = @_;
 	my $mesg;
 	my $flags_mesg;
 	my $hndl;
+	my $dnsstring = 0;
        	if ($output) {
                 $hndl = "STDOUT";
        	} else {
@@ -228,11 +235,19 @@ sub logr() {
 		if ($Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} >= 1) {
 			my $start_range = $Scan_href->{$ip}->{'SCAN_RANGE'}->{'START_PORT'};
 			my $end_range = $Scan_href->{$ip}->{'SCAN_RANGE'}->{'END_PORT'};
+			my $dstip = $Scan_href->{$ip}->{'DSTIP'};
                         my @time = split / /, scalar localtime;   ### Get the current time as a nice ASCII string.
                         pop @time; shift @time;    ### Get rid of the day and the year to make the time consistent with syslog
                         my $time = join ' ', @time;
-			$mesg = join ' ', $time, "PORTSCAN DETECTED  Source: $ip  Port_Range: [$start_range-$end_range]  Total_Packets: $Scan_href->{$ip}->{'ABSNUM'}  Danger_Level: [$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} out of 5]";
+			$mesg = join ' ', $time, "PORTSCAN DETECTED  Source: $ip  Destination: $dstip  Port_Range: [$start_range-$end_range]  Total_Packets: $Scan_href->{$ip}->{'ABSNUM'}  Danger_Level: [$Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'} out of 5]";
 			print $hndl "$mesg\n";
+			unless ($dnslookups) {
+				my $ipaddr = gethostbyname($ip);
+				my $rdns = gethostbyaddr($ipaddr, AF_INET);
+				$rdns = "No reverse dns info available" unless $rdns;
+				$dnsstring = "DNS: $ip -> $rdns";
+				print $hndl "$dnsstring\n"
+			}
 			if ($USE_IPTABLES) {
 				print $hndl "   --- Scan Signature: ---\n";
 				$flags_mesg = "   --- Scan Signature: ---\n";
@@ -256,7 +271,7 @@ sub logr() {
 		}
 	}
 	close LOG unless $output;
-	return $Scan_href, $mesg, $flags_mesg;
+	return $Scan_href, $mesg, $flags_mesg, $dnsstring;
 }
 sub auto_psad_response(){
         my ($Scan_href, $auto_psad_level, $ipchainsCmd, $iptablesCmd) = @_;
@@ -296,7 +311,7 @@ sub get_input_chains() {
         return @chains;
 }
 sub email_alert(){
-        my ($Scan_href, $mesg, $flags_mesg, $email_danger_level, $email_alertfile, $email_address, $mailCmd) = @_;
+        my ($Scan_href, $mesg, $flags_mesg, $dnsstring, $email_danger_level, $email_alertfile, $email_address, $mailCmd) = @_;
 	foreach my $ip (keys %$Scan_href) {
 		my $current_danger_level = $Scan_href->{$ip}->{'CURRENT_DANGER_LEVEL'};
         	if ($current_danger_level >= $email_danger_level && 
@@ -305,6 +320,7 @@ sub email_alert(){
         		### than once.  The administrator should take appropriate action once an email has been sent.
                 	open EMAILALERT, "> $email_alertfile";
                 	print EMAILALERT "$mesg\n";
+			print EMAILALERT "$dnsstring\n" if $dnsstring;
 			print EMAILALERT "$flags_mesg\n" if $flags_mesg;
                 	close EMAILALERT;
         		system("$mailCmd $EMAIL_ADDRESS -s \"psad WARNING: You have been scanned!\" < $email_alertfile");
@@ -357,6 +373,8 @@ Usage: psad [-d] [-o] [-e] [-c <config file>] [-h]
 				  that are printed to the error log).
 	-config <config file>	- use config file instead of the values
 				  contained within the psad script.
+	-namelookups		- disable name resolution against
+				  scanning ips.
         -h                      - prints this help message.
 
 _HELP_

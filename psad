@@ -37,13 +37,13 @@
 # TODO: (see the TODO file bundled with the psad sources.)
 #
 # Default Command Line Arguments:  As of the 1.0.0-pre3 release, psad by
-#   by default will have the --signatures and --auto-ips options set even
+#   by default will have the --signatures and --auto-dl options set even
 #   if these options are not specified on the command line, and psad
-#   will use the default locations for the signatures and auto_ips files.
+#   will use the default locations for the signatures and auto_dl files.
 #   The default file locations can be changed by manually specifying the
-#   locations to these files with the --signatures and --auto-ips options.
-#   The signature matching and the auto_ips danger level assignments can
-#   be disabled by using the --no-signatures and --no-auto-ips options
+#   locations to these files with the --signatures and --auto-dl options.
+#   The signature matching and the auto_dl danger level assignments can
+#   be disabled by using the --no-signatures and --no-auto-dl options
 #   respectively.  In addition, psad adheres to the following defaults:
 #
 #       -passive OS fingerprinting            = yes
@@ -236,9 +236,9 @@ my $timezone;
 ### get the current year for dshield
 my $year;
 
-### %auto_ips holds all ip addresses that should automatically
+### %auto_dl holds all ip addresses that should automatically
 ### be assigned a danger level (or ignored).
-my %auto_ips = ();
+my %auto_dl = ();
 my %assigned_auto_dl = ();
 
 ### cache the source ips that we have automatically blocked
@@ -280,7 +280,7 @@ my %pidfiles;
 ### line args can override some default values)
 my $sigs_file        = '';
 my $posf_file        = '';
-my $autoips_file     = '';
+my $auto_dl_file     = '';
 my $snort_rules_dir  = '';
 my $srules_type      = '';
 my $cmdline_file     = '';
@@ -317,7 +317,7 @@ my $local_ips_lkup_ctr = 0;
 my $no_snort_sids = 0;
 my $no_signatures = 0;
 my $no_icmp_types = 0;
-my $no_auto_ips   = 0;
+my $no_auto_dl    = 0;
 my $no_posf       = 0;
 my $no_daemon     = 0;
 my $no_ipt_errors = 0;
@@ -362,7 +362,7 @@ Getopt::Long::Configure('no_ignore_case');
                                               # "backdoor").
     'snort-rdir=s'      => \$snort_rules_dir, # Specify a directory for snort
                                               # rules.
-    'auto-ips=s'        => \$autoips_file,    # Path to psad auto IPs file for
+    'auto-dl=s'         => \$auto_dl_file,    # Path to psad auto IPs file for
                                               # auto-setting IP danger level.
     'Analyze-msgs'      => \$analyze_msgs,    # Analysis mode for old iptables
                                               # messages in the psad fwdata file
@@ -413,7 +413,7 @@ Getopt::Long::Configure('no_ignore_case');
                                               # fingerprint the remote OS.
     'no-signatures'     => \$no_signatures,   # Disable signature processing.
     'no-icmp-types'     => \$no_icmp_types,   # Disable icmp type/code validation.
-    'no-auto-ips'       => \$no_auto_ips,     # Disable auto danger level
+    'no-auto-dl'        => \$no_auto_dl,      # Disable auto danger level
                                               # assignment.
     'no-daemon'         => \$no_daemon,       # Do not run as a daemon.
     'no-fwcheck'        => \$no_fwcheck,      # Do not check firewall rules.
@@ -461,7 +461,7 @@ $< == 0 && $> == 0 or
 
 ### Import all psad configuration and signatures files
 ### (psad.conf, psad_posf, psad_signatures, psad_icmp_types,
-### and psad_auto_ips).
+### and psad_auto_dl).
 &psad_init();
 
 ### check to make sure another psad process is not already running.
@@ -520,7 +520,7 @@ unless ($no_daemon or $debug or $benchmark) {
 
 ### write the command line args used to start psad to $cmdline_file
 &Psad::writecmdline(\@args_cp, $cmdline_file)
-    unless $benchmark;
+    unless $benchmark or $fw_analyze;
 
 ### psad _requires_ that kmsgsd is running to receive any data, so let's
 ### start it here for good measure (as of 0.9.2 it makes use of the pid
@@ -528,7 +528,7 @@ unless ($no_daemon or $debug or $benchmark) {
 ### duplicate copy).  While we're at it, start psadwatchd as well.
 ### Note that this is the best place to start the other daemons since we
 ### just wrote the psad pid to PSAD_PID_FILE above.
-unless ($benchmark) {
+unless ($benchmark or $fw_analyze) {
     system $cmds{'kmsgsd'} unless $no_kmsgsd;
     system $cmds{'psadwatchd'}
         unless $debug or $no_daemon;
@@ -589,10 +589,13 @@ if ($config{'IMPORT_OLD_SCANS'} eq 'Y') {
 }
 
 ### zero out the packet counter file (the counters
-### are all zero at this point anyway unless we are
-### importing old scans).
+### are all zero at this point anyway unless we
+### imported old scans).
 &write_global_packet_counters()
     unless $fw_analyze;
+
+### zero out prefix counters
+&write_prefix_counters() unless $fw_analyze;
 
 ### zero out dshield alert stats (note we do this here regardles of
 ### whether DShield alerting is enabled since if it isn't we will
@@ -621,7 +624,7 @@ for (;;) {
 
         my $orig_fwdata = $config{'FW_DATA_FILE'};
 
-        ### Re-import all used config files (psad.conf, psad_auto_ips,
+        ### Re-import all used config files (psad.conf, psad_auto_dl,
         ### psad_posf, psad_signatures) if we received a HUP signal.
         &psad_init();
 
@@ -694,6 +697,9 @@ for (;;) {
         ### Write the number of tcp/udp/icmp packets out
         ### to the global packet counters file
         &write_global_packet_counters() unless $benchmark;
+
+        ### Write out log prefix counters
+        &write_prefix_counters() unless $benchmark;
     }
 
     ### Timeout any auto-blocked IPs that are past due (need to
@@ -759,31 +765,36 @@ exit 0;
 #=================== BEGIN SUBROUTINES ========================
 
 ### Keeps track of scanning ip's, increments packet counters,
-### keep track of tcp flags for each scan, test for snort sid
+### keeps track of tcp flags for each scan, test for snort sid
 ### values in iptables packets (if fwsnort is being used).
 sub check_scan() {
     my $fw_packets_aref = shift;
 
-    my %current_scan = ();
-    my @err_pkts = ();
+    my %curr_scan = ();
+    my %curr_sigs_dl = ();
+    my %curr_sids_dl = ();
+    my @err_pkts     = ();
 
     my $pkt_ctr = 0;
     my $print_scale_factor = 0;
-    if ($#$fw_packets_aref < 100) {
-        $print_scale_factor = $#$fw_packets_aref;
-    } else {
-        $print_scale_factor = int($#$fw_packets_aref/10);
-        if ($print_scale_factor < 100) {
-            $print_scale_factor -= $print_scale_factor % 10;
-        } elsif ($print_scale_factor < 1000) {
-            $print_scale_factor -= $print_scale_factor % 100;
-        } elsif ($print_scale_factor < 10000) {
-            $print_scale_factor -= $print_scale_factor % 1000;
-        } elsif ($print_scale_factor < 100000) {
-            $print_scale_factor -= $print_scale_factor % 10000;
+
+    if ($analyze_msgs) {
+        if ($#$fw_packets_aref < 100) {
+            $print_scale_factor = $#$fw_packets_aref;
+        } else {
+            $print_scale_factor = int($#$fw_packets_aref/10);
+            if ($print_scale_factor < 100) {
+                $print_scale_factor -= $print_scale_factor % 10;
+            } elsif ($print_scale_factor < 1000) {
+                $print_scale_factor -= $print_scale_factor % 100;
+            } elsif ($print_scale_factor < 10000) {
+                $print_scale_factor -= $print_scale_factor % 1000;
+            } elsif ($print_scale_factor < 100000) {
+                $print_scale_factor -= $print_scale_factor % 10000;
+            }
         }
+        $print_scale_factor++ if $print_scale_factor == 0;
     }
-    $print_scale_factor++ if $print_scale_factor == 0;
 
     #  Mar 11 13:15:52 orthanc kernel: DROP IN=lo OUT= MAC=00:00:00:00:00:00:00:00:
     #  00:00:00:00:08:00 SRC=127.0.0.1 DST=127.0.0.1 LEN=60 TOS=0x00 PREC=0x00
@@ -886,7 +897,7 @@ sub check_scan() {
             if (!$sid && $config{'IGNORE_CONNTRACK_BUG_PKTS'} eq 'Y' &&
                     ($flags =~ /ACK/ || $flags =~ /RST/)) {
 #                    $dp > 1024 && ($flags =~ /ACK/ ||
-                ### XXX ignore TCP packets that have the ACK or RST
+                ### FIXME: ignore TCP packets that have the ACK or RST
                 ### bits set (unless we matched a snort sid) since
                 ### _usually_ we see these packets as a result of the
                 ### iptables connection tracking bug.  Also, note that
@@ -1041,27 +1052,27 @@ sub check_scan() {
         ### increment hash values
         $scan{$src}{$dst}{'absnum'}++;
         $scan{$src}{$dst}{'chain'}{$chain}{$intf}{$proto}++;
-        $current_scan{$src}{$dst}{$proto}{'pkts'}++;
-        $current_scan{$src}{$dst}{$proto}{'flags'}{$flags}++
+        $curr_scan{$src}{$dst}{$proto}{'pkts'}++;
+        $curr_scan{$src}{$dst}{$proto}{'flags'}{$flags}++
             if $flags;
 
         ### keep track of which syslog daemon reported the message.
-        $current_scan{$src}{$dst}{'syslog_host'}{$syslog_host} = ''
+        $curr_scan{$src}{$dst}{'syslog_host'}{$syslog_host} = ''
             if $syslog_host;
 
         ### keep track of iptables chain and logging prefix (if there
         ### was one)
         $log_prefix = '*noprfx*' unless $log_prefix;
-        $current_scan{$src}{$dst}{$proto}{'chain'}
+        $curr_scan{$src}{$dst}{$proto}{'chain'}
                 {$chain}{$log_prefix}++;
 
         unless ($proto eq 'icmp') {
             ### initialize the start and end port for the scanned port range
-            if (not defined $current_scan{$src}{$dst}{$proto}{'strtp'}) {
+            if (not defined $curr_scan{$src}{$dst}{$proto}{'strtp'}) {
                 ### make sure the initial start port is not too low
-                $current_scan{$src}{$dst}{$proto}{'strtp'} = 65535;
+                $curr_scan{$src}{$dst}{$proto}{'strtp'} = 65535;
                 ### make sure the initial end port is not too high
-                $current_scan{$src}{$dst}{$proto}{'endp'} = 0;
+                $curr_scan{$src}{$dst}{$proto}{'endp'} = 0;
             }
             if (not defined $scan{$src}{$dst}{$proto}{'abs_sp'}) {
                 ### This is the absolute starting port since the
@@ -1074,11 +1085,11 @@ sub check_scan() {
 
             ### see if the destination port lies outside our current range
             ### and change if needed
-            ($current_scan{$src}{$dst}{$proto}{'strtp'},
-                    $current_scan{$src}{$dst}{$proto}{'endp'}) =
+            ($curr_scan{$src}{$dst}{$proto}{'strtp'},
+                    $curr_scan{$src}{$dst}{$proto}{'endp'}) =
                 &check_range($dp,
-                    $current_scan{$src}{$dst}{$proto}{'strtp'},
-                    $current_scan{$src}{$dst}{$proto}{'endp'});
+                    $curr_scan{$src}{$dst}{$proto}{'strtp'},
+                    $curr_scan{$src}{$dst}{$proto}{'endp'});
             ($scan{$src}{$dst}{$proto}{'abs_sp'},
                     $scan{$src}{$dst}{$proto}{'abs_ep'}) =
                 &check_range($dp,
@@ -1107,13 +1118,17 @@ sub check_scan() {
 
         if ($sid and not $no_snort_sids) {
             ### found a snort sid in the packet log message
-            &add_snort_sid($src, $dst, $chain, $proto, $sid);
+            my $dl = &add_snort_sid($src, $dst,
+                $chain, $proto, $sid);
+            $curr_sids_dl{$src} = $dl if $dl;
         } else {
             ### attempt to match any tcp/udp/icmp signatures in the
             ### main signatures hash
             unless ($no_signatures) {
-                &match_sigs($src, $dst, $chain, $sp, $dp, $proto,
-                    $flags, $len, $ttl, $type, $code, $id, $seq)
+                my $dl = &match_sigs($src, $dst, $chain, $sp,
+                    $dp, $proto, $flags, $len, $ttl,
+                    $type, $code, $id, $seq);
+                $curr_sigs_dl{$src} = $dl if $dl;
             }
         }
     }
@@ -1127,7 +1142,7 @@ sub check_scan() {
 
     ### Assign a danger level to the scan
     print " .. Assigning danger levels.\n" if $analyze_msgs;
-    &assign_danger_level(\%current_scan);
+    &assign_danger_level(\%curr_scan, \%curr_sigs_dl, \%curr_sids_dl);
 
     ### Log and send email and syslog alerts
     if ($analyze_msgs) {
@@ -1139,14 +1154,14 @@ sub check_scan() {
             }
         }
     }
-    &scan_logr(\%current_scan);
+    &scan_logr(\%curr_scan);
 
     ### Don't manage the firewall or tcpwrapper rules if
     ### psad is running on a syslog server
     if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
             and not $syslog_server
             and not $analyze_msgs) {
-        &auto_psad_response(\%current_scan);
+        &auto_psad_response(\%curr_scan);
     }
     return;
 }
@@ -1155,10 +1170,11 @@ sub match_sigs() {
     my ($src, $dst, $chain, $sp, $dp, $proto,
         $flags, $len, $ttl, $type, $code, $id, $seq) = @_;
 
+    my $dl = 0;
     if ($proto eq 'tcp') {
         for my $sid (keys %{$sigs{'tcp'}}) {
-            print STDERR " .. match_sigs(): sid: $sid " .
-                "$sigs{'tcp'}{$sid}{'src'} -> " .
+            print STDERR " .. match_sigs(): sid: $sid ",
+                "$sigs{'tcp'}{$sid}{'src'} -> ",
                 "$sigs{'tcp'}{$sid}{'dst'}\n" if $debug;
             next unless defined $sigs{'tcp'}{$sid}{'flags'};
             if (&check_port($sp, $dp, $sigs{'tcp'}{$sid})
@@ -1170,10 +1186,8 @@ sub match_sigs() {
                 ### tripped a tcp signature
                 print STDERR " .. match_sigs(): matched tcp $dp,$sp,$flags, ",
                     "sid: $sid\n" if $debug;
-                if ($scan_dl{$src} < $sigs_attr{$sid}{'dlevel'}) {
-                    $scan_dl{$src} = $sigs_attr{$sid}{'dlevel'};
-                    $scan{$src}{$dst}{'alerted'} = 0
-                        if ($config{'ALERT_ALL'} eq 'N');
+                if ($dl < $sigs_attr{$sid}{'dl'}) {
+                    $dl = $sigs_attr{$sid}{'dl'};
                 }
                 $scan{$src}{$dst}{$proto}{'curr_sig'}
                     {$sid}{$chain}{'dp'}{$dp}++;
@@ -1190,10 +1204,8 @@ sub match_sigs() {
                 ### tripped a udp signature
                 print STDERR " .. match_sigs(): matched udp $dp,$sp, ",
                     "sid: $sid\n" if $debug;
-                if ($scan_dl{$src} < $sigs_attr{$sid}{'dlevel'}) {
-                    $scan_dl{$src} = $sigs_attr{$sid}{'dlevel'};
-                    $scan{$src}{$dst}{'alerted'} = 0
-                        if ($config{'ALERT_ALL'} eq 'N');
+                if ($dl < $sigs_attr{$sid}{'dl'}) {
+                    $dl = $sigs_attr{$sid}{'dl'};
                 }
                 $scan{$src}{$dst}{$proto}{'curr_sig'}
                     {$sid}{$chain}{'dp'}{$dp}++;
@@ -1205,18 +1217,14 @@ sub match_sigs() {
         ### message text and danger levels.
         my $type_code_rv = &check_icmp_type($type, $code);
         if ($type_code_rv == 1) {  ### bad type
-            if ($scan_dl{$src} < 2) {
-                $scan_dl{$src} = 2;  ### XXX hard-coded as dl 2 for now.
-                $scan{$src}{$dst}{'alerted'} = 0
-                    if ($config{'ALERT_ALL'} eq 'N');
+            if ($dl < 2) {
+                $dl = 2;  ### FIXME: hard-coded as dl 2 for now.
             }
             $scan{$src}{$dst}{'icmp'}{'invalid_type'}
                 {$type}{$chain}{'pkts'}++;
         } elsif ($type_code_rv == 2) {
-            if ($scan_dl{$src} < 2) {
-                $scan_dl{$src} = 2;  ### XXX hard-coded as dl 2 for now.
-                $scan{$src}{$dst}{'alerted'} = 0
-                    if ($config{'ALERT_ALL'} eq 'N');
+            if ($dl < 2) {
+                $dl = 2;  ### FIXME: hard-coded as dl 2 for now.
             }
             $scan{$src}{$dst}{'icmp'}{'invalid_code'}
                 {$type}{$code}{$chain}{'pkts'}++;
@@ -1228,17 +1236,15 @@ sub match_sigs() {
                         $id, $seq)) {
                 print STDERR " .. match_sigs(): matched icmp sid: $sid\n"
                     if $debug;
-                if ($scan_dl{$src} < $sigs_attr{$sid}{'dlevel'}) {
-                    $scan_dl{$src} = $sigs_attr{$sid}{'dlevel'};
-                    $scan{$src}{$dst}{'alerted'} = 0
-                        if ($config{'ALERT_ALL'} eq 'N');
+                if ($dl < $sigs_attr{$sid}{'dl'}) {
+                    $dl = $sigs_attr{$sid}{'dl'};
                 }
                 $scan{$src}{$dst}{'icmp'}{'curr_sig'}
                     {$sid}{$chain}{'pkts'}++;
             }
         }
     }
-    return;
+    return $dl;
 }
 
 sub posf() {
@@ -1301,16 +1307,12 @@ sub ttl_range() {
 sub add_snort_sid() {
     my ($src, $dst, $chain, $proto, $sid) = @_;
     if (defined $snort_msgs{$sid}) {
-        unless ($scan_dl{$src} >= 2) {
-            ### FIXME: for now hardcode snort sid matches at
-            ### a danger level of two
-            $scan_dl{$src} = 2;
-            $scan{$src}{$dst}{'alerted'} = 0
-                if ($config{'ALERT_ALL'} eq 'N');
-        }
         $scan{$src}{$dst}{$proto}{'sid'}{$sid}{$chain}++;
+        ### FIXME: for now hardcode snort sid matches at
+        ### a danger level of two
+        return 2;
     }
-    return;
+    return 0;
 }
 
 sub dshield_email_log() {
@@ -1670,7 +1672,7 @@ sub psad_init() {
 
     &Psad::psyslog('psad', '.. starting psad');
 
-    ### import psad signatures (XXX: these should be taken directly
+    ### import psad signatures (FIXME:: these should be taken directly
     ### from the snort signatures instead)
     &import_signatures() unless $no_signatures;
 
@@ -1682,9 +1684,9 @@ sub psad_init() {
     ### import passive OS fingerprinting signatures
     &import_posf_sigs() unless $no_posf;
 
-    ### import psad_auto_ips file for automatic ip/network danger
+    ### import psad_auto_dl file for automatic ip/network danger
     ### level assignment
-    &import_auto_ips() unless $no_auto_ips;
+    &import_auto_dl() unless $no_auto_dl;
 
     ### parse snort rules if we enable psad to match on iptables log
     ### messages that include snort SID's (see "fwsnort":
@@ -1848,7 +1850,7 @@ sub import_snort_rules() {
             chomp $line;
             my $msg;
             my $sid;     ### snort rule id
-#            my $psad_id; ### psad signature id   XXX not implemented yet.
+#            my $psad_id; ### psad signature id   FIXME: not implemented yet.
             my $classtype;
             my $content;
 
@@ -1972,7 +1974,7 @@ sub import_signatures() {
         }
 
         ### add the signature message string to the %sig_attr cache
-        $sigs_attr{$sid}{'dlevel'} = $dlevel;
+        $sigs_attr{$sid}{'dl'} = $dlevel;
         $sigs_attr{$sid}{'msg'}    = $msg;
 
         ### assign source and destination
@@ -2173,17 +2175,17 @@ sub build_sig_ports() {
     return;
 }
 
-sub import_auto_ips() {
-    %auto_ips = ();  ### undef so we don't leave old ips in %auto_ips
-    open A, "< $config{'PSAD_AUTO_IPS_FILE'}" or die ' ** Could not open ',
-        "$config{'PSAD_AUTO_IPS_FILE'}: $!";
+sub import_auto_dl() {
+    %auto_dl = ();  ### undef so we don't leave old ips in %auto_dl
+    open A, "< $config{'PSAD_AUTO_DL_FILE'}" or die ' ** Could not open ',
+        "$config{'PSAD_AUTO_DL_FILE'}: $!";
     my @lines = <A>;
     close A;
     my $i = 1;
     for my $line (@lines) {
         $i++;
-        next if ($line =~ /^\s*#/);
-        next unless ($line =~ /\S/);
+        next unless $line =~ /\S/;
+        next if $line =~ /^\s*#/;
         if ($line =~ m|^\s*($ip_re)\s+([0-5])|) {
             my $ip = $1;
             my $dl = $2;
@@ -2191,19 +2193,19 @@ sub import_auto_ips() {
             ### check for optional protocol (any combination of tcp, udp
             ### or icmp is allowed)
             if ($line =~ m|tcp|i) {
-                $auto_ips{'ip'}{$ip}{'tcp'} = $dl;
+                $auto_dl{'ip'}{$ip}{'tcp'} = $dl;
                 $all_proto = 0;
             }
             if ($line =~ m|udp|i) {
-                $auto_ips{'ip'}{$ip}{'udp'} = $dl;
+                $auto_dl{'ip'}{$ip}{'udp'} = $dl;
                 $all_proto = 0;
             }
             if ($line =~ m|icmp|i) {
-                $auto_ips{'ip'}{$ip}{'icmp'} = $dl;
+                $auto_dl{'ip'}{$ip}{'icmp'} = $dl;
                 $all_proto = 0;
             }
             if ($all_proto) {
-                $auto_ips{'ip'}{$ip}{'allproto'} = $dl;
+                $auto_dl{'ip'}{$ip}{'allproto'} = $dl;
             }
         } elsif ($line =~ m|^\s*($ip_re/\d+)\s+([0-5])|) {
             my $net = $1;
@@ -2212,34 +2214,34 @@ sub import_auto_ips() {
             ### check for optional protocol (any combination of tcp, udp
             ### or icmp is allowed)
             if ($line =~ m|tcp|i) {
-                $auto_ips{'net'}{$net}{'tcp'} = $dl;
+                $auto_dl{'net'}{$net}{'tcp'} = $dl;
                 $all_proto = 0;
             }
             if ($line =~ m|udp|i) {
-                $auto_ips{'net'}{$net}{'udp'} = $dl;
+                $auto_dl{'net'}{$net}{'udp'} = $dl;
                 $all_proto = 0;
             }
             if ($line =~ m|icmp|i) {
-                $auto_ips{'net'}{$net}{'icmp'} = $dl;
+                $auto_dl{'net'}{$net}{'icmp'} = $dl;
                 $all_proto = 0;
             }
             if ($all_proto) {
-                $auto_ips{'net'}{$net}{'allproto'} = $dl;
+                $auto_dl{'net'}{$net}{'allproto'} = $dl;
             }
         } else {
             my $subject = " ** psad import warning: " .
-                "$config{'PSAD_AUTO_IPS_FILE'} error on line: $i";
+                "$config{'PSAD_AUTO_DL_FILE'} error on line: $i";
             &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
                 $cmds{'mail'});
         }
     }
-    if (%auto_ips) {
+    if (%auto_dl) {
         my $ip_ctr = 0;
         my $net_ctr = 0;
-        $ip_ctr++ for keys %{$auto_ips{'ip'}};
-        $net_ctr++ for keys %{$auto_ips{'net'}};
+        $ip_ctr++ for keys %{$auto_dl{'ip'}};
+        $net_ctr++ for keys %{$auto_dl{'net'}};
         &Psad::psyslog('psad',
-            ".. imported psad_auto_ips, got $ip_ctr IPs and $net_ctr networks");
+            ".. imported psad_auto_dl, got $ip_ctr IPs and $net_ctr networks");
     }
     return;
 }
@@ -2332,22 +2334,64 @@ sub check_range() {
     return $start, $end;
 }
 
-### assign a danger level to a scan.  Note that match_sigs()
-### may also assign a danger level.
+### assign a danger level to each scan in the current interval.
 sub assign_danger_level() {
-    my $current_scan_href = shift;
+    my ($curr_scan_hr, $curr_sigs_dl_hr, $curr_sids_dl_hr) = @_;
 
-    ### assign auto danger level
-    &assign_auto_danger_level($current_scan_href) if %auto_ips;
+    SRC: for my $src (keys %$curr_scan_hr) {
 
-    SRC: for my $src (keys %$current_scan_href) {
+        my $changed_dl = 0;
+
         print STDERR " .. assign_danger_level(): source ip: $src\n"
             if $debug;
-        DST: for my $dst (keys %{$current_scan_href->{$src}}) {
+
+        ### get auto danger level
+        my $auto_dl = &get_auto_danger_level($src);
+
+        if ($auto_dl > -1) {  ### the source was auto-assigned some dl
+            if ($auto_dl == 0) {  ### ignore source
+                ### Note that we set the danger level to zero even if the
+                ### source previously had a higher danger level.  This
+                ### allows the admin to ignore IP's that have already
+                ### been assigned a danger level by editing auto_dl and
+                ### then executing "psad -HUP".
+                $scan_dl{$src} = 0;
+                next SRC;
+            } else {
+                if ($scan_dl{$src} < $auto_dl) {
+                    $scan_dl{$src} = $auto_dl;
+                    $assigned_auto_dl{$src} = '';
+                    &Psad::psyslog('psad',
+                        ".. auto-assigned dl: $auto_dl for IP: $src");
+                    $changed_dl = 1;
+                }
+            }
+        }
+
+        if (defined $curr_sigs_dl_hr->{$src}) {
+            if ($scan_dl{$src} < $curr_sigs_dl_hr->{$src}) {
+                $scan_dl{$src} = $curr_sigs_dl_hr->{$src};
+                $changed_dl = 1;
+            }
+        }
+
+        if (defined $curr_sids_dl_hr->{$src}) {
+            if ($scan_dl{$src} < $curr_sids_dl_hr->{$src}) {
+                $scan_dl{$src} = $curr_sids_dl_hr->{$src};
+                $changed_dl = 1;
+            }
+        }
+
+        DST: for my $dst (keys %{$curr_scan_hr->{$src}}) {
             my $absnum = $scan{$src}{$dst}{'absnum'};
             my $range;
             my $s_port = 65535;
             my $e_port = 0;
+
+            if (defined $changed_dl) {
+                $scan{$src}{$dst}{'alerted'} = 0
+                    if $config{'ALERT_ALL'} eq 'N';
+            }
 
             ### calculate the range over _both_ tcp and udp
             for my $proto qw(tcp udp) {
@@ -2376,30 +2420,30 @@ sub assign_danger_level() {
                 if ($absnum < $config{'DANGER_LEVEL2'}) {
                     if ($scan_dl{$src} < 1) {
                         $scan{$src}{$dst}{'alerted'} = 0
-                            if ($config{'ALERT_ALL'} eq 'N');
+                            if $config{'ALERT_ALL'} eq 'N';
                         $scan_dl{$src} = 1;
                     }
                 } elsif ($absnum < $config{'DANGER_LEVEL3'}) {
                     if ($scan_dl{$src} < 2) {
                         $scan{$src}{$dst}{'alerted'} = 0
-                            if ($config{'ALERT_ALL'} eq 'N');
+                            if $config{'ALERT_ALL'} eq 'N';
                         $scan_dl{$src} = 2;
                     }
                 } elsif ($absnum < $config{'DANGER_LEVEL4'}) {
                     if ($scan_dl{$src} < 3) {
                         $scan{$src}{$dst}{'alerted'} = 0
-                            if ($config{'ALERT_ALL'} eq 'N');
+                            if $config{'ALERT_ALL'} eq 'N';
                         $scan_dl{$src} = 3;
                     }
                 } elsif ($absnum < $config{'DANGER_LEVEL5'}) {
                     if ($scan_dl{$src} < 4) {
                         $scan{$src}{$dst}{'alerted'} = 0
-                            if ($config{'ALERT_ALL'} eq 'N');
+                            if $config{'ALERT_ALL'} eq 'N';
                         $scan_dl{$src} = 4;
                     }
                 } elsif ($scan_dl{$src} < 5) {
                     $scan{$src}{$dst}{'alerted'} = 0
-                            if ($config{'ALERT_ALL'} eq 'N');
+                            if $config{'ALERT_ALL'} eq 'N';
                     $scan_dl{$src} = 5;
                 }
             }
@@ -2410,58 +2454,42 @@ sub assign_danger_level() {
     return;
 }
 
-sub assign_auto_danger_level() {
-    my $current_scan_href = shift;
-    ### note that we only _increase_ danger levels (or ignore ips
-    ### altogether) here; we never decrease them.
-    SRC: for my $src (keys %$current_scan_href) {
-        if (defined $auto_ips{'ip'}{$src}) {
-            PR: for my $proto qw(allproto tcp udp icmp) {
-                next PR unless defined $auto_ips{'ip'}{$src}{$proto};
-                ### ignore $src if the auto danger level is zero
-                next SRC if $auto_ips{'ip'}{$src}{$proto} == 0;
-                next PR unless &check_scan_proto($proto, $current_scan_href->{$src});
-                if ($scan_dl{$src} < $auto_ips{'ip'}{$src}{$proto}) {
-                    $scan_dl{$src} = $auto_ips{'ip'}{$src}{$proto};
-                    $assigned_auto_dl{$src} = '';
-                    ### the danger level has increased so set the
-                    ### alerted flag to zero for all destinations
-                    &set_alerted_zero($scan{$src});
-                    &Psad::psyslog('psad',
-                        ".. auto-assigned dl: $auto_ips{'ip'}{$src}{$proto} " .
-                        "for IP: $src");
-                }
+sub get_auto_danger_level() {
+    my $src = shift;
+
+    my $dl = -1;
+
+    ### see if the source should automatically be assigned a
+    ### danger level
+    if (defined $auto_dl{'ip'}{$src}) {
+        if (defined $auto_dl{'ip'}{$src}{'allproto'}) {
+            if ($dl < $auto_dl{'ip'}{$src}{'allproto'}) {
+                $dl = $auto_dl{'ip'}{$src}{'allproto'};
             }
         } else {
-            NET: for my $net (keys %{$auto_ips{'net'}}) {
-                next NET unless ipv4_in_network($net, $src);
-                PR: for my $proto qw(allproto tcp udp icmp) {
-                    next PR unless defined $auto_ips{'net'}{$src}{$proto};
-                    ### ignore $src if the auto danger level is zero
-                    next SRC if $auto_ips{'net'}{$src}{$proto} == 0;
-                    next PR unless &check_scan_proto($proto,
-                        $current_scan_href->{$src});
-                    if ($scan_dl{$src} < $auto_ips{'net'}{$src}{$proto}) {
-                        $scan_dl{$src} = $auto_ips{'net'}{$src}{$proto};
-                        $assigned_auto_dl{$src} = '';
-                        &set_alerted_zero($scan{$src});
-                        &Psad::psyslog('psad',
-                            ".. auto-assigned dl: $auto_ips{'net'}{$src}{$proto} " .
-                            "for IP: $src");
+            for my $proto (keys %{$auto_dl{'ip'}{$src}}) {
+                if ($dl < $auto_dl{'ip'}{$src}{$proto}) {
+                    $dl = $auto_dl{'ip'}{$src}{$proto};
+                }
+            }
+        }
+    } else {
+        NET: for my $net (keys %{$auto_dl{'net'}}) {
+            next NET unless ipv4_in_network($net, $src);
+            if (defined $auto_dl{'net'}{$src}{'allproto'}) {
+                if ($dl < $auto_dl{'net'}{$src}{'allproto'}) {
+                    $dl = $auto_dl{'net'}{$src}{'allproto'};
+                }
+            } else {
+                for my $proto (keys %{$auto_dl{'net'}{$src}}) {
+                    if ($dl < $auto_dl{'net'}{$src}{'allproto'}) {
+                        $dl = $auto_dl{'net'}{$src}{'allproto'};
                     }
                 }
             }
         }
     }
-    return;
-}
-
-sub set_alerted_zero() {
-    my $scan_href = shift;
-    for my $dst (keys %$scan_href) {
-        $scan_href->{$dst}->{'alerted'} = 0;
-    }
-    return;
+    return $dl;
 }
 
 sub check_scan_proto() {
@@ -2479,6 +2507,10 @@ sub write_global_packet_counters() {
         "udp:  $udp_ctr\n",
         "icmp: $icmp_ctr\n";
     close P;
+    return;
+}
+
+sub write_prefix_counters() {
     return;
 }
 
@@ -2528,12 +2560,12 @@ sub collect_errors() {
 }
 
 sub scan_logr() {
-    my $current_scan_href = shift;
+    my $curr_scan_hr = shift;
 
     return if $benchmark;
-    for my $src (keys %$current_scan_href) {
+    for my $src (keys %$curr_scan_hr) {
         print STDERR " .. scan_logr(): source ip: $src\n" if $debug;
-        DST: for my $dst (keys %{$current_scan_href->{$src}}) {
+        DST: for my $dst (keys %{$curr_scan_hr->{$src}}) {
 
             ### see if we have already sent an alert for $src
             ### (against $dst) for this danger level.
@@ -2583,14 +2615,15 @@ sub scan_logr() {
             ### unless it already exists
             mkdir "$config{'PSAD_DIR'}/${src}", 0500
                 unless -d "$config{'PSAD_DIR'}/${src}";
-            my $ecount_file  = "$config{'PSAD_DIR'}/${src}/email_count";
-            my $dl_file      = "$config{'PSAD_DIR'}/${src}/danger_level";
-            my $posf_file    = "$config{'PSAD_DIR'}/${src}/os_guess";
-            my $whois_file   = "$config{'PSAD_DIR'}/${src}/whois";
-            my $email_file   = "$config{'PSAD_DIR'}/${src}/${dst}_email_alert";
-            my $log_sigs     = "$config{'PSAD_DIR'}/${src}/${dst}_signatures";
-            my $s_time_file  = "$config{'PSAD_DIR'}/${src}/${dst}_start_time";
-            my $pkt_ctr_file = "$config{'PSAD_DIR'}/${src}/${dst}_packet_ctr";
+            my $src_dir = "$config{'PSAD_DIR'}/${src}";
+            my $ecount_file  = "${src_dir}/email_count";
+            my $dl_file      = "${src_dir}/danger_level";
+            my $posf_file    = "${src_dir}/os_guess";
+            my $whois_file   = "${src_dir}/whois";
+            my $email_file   = "${src_dir}/${dst}_email_alert";
+            my $log_sigs     = "${src_dir}/${dst}_signatures";
+            my $s_time_file  = "${src_dir}/${dst}_start_time";
+            my $pkt_ctr_file = "${src_dir}/${dst}_packet_ctr";
 
             ### print the current danger level to the danger_level file.
             open DL, "> $dl_file" or die " ** Could not open $dl_file: $!";
@@ -2623,20 +2656,20 @@ sub scan_logr() {
                     $tcp_absrange = "$tcp_s_port-$tcp_e_port";
                 }
             }
-            if (defined $current_scan_href->{$src}->{$dst}->{'tcp'}
-                    and defined $current_scan_href->{$src}->{$dst}->{'tcp'}->{'strtp'}) {
+            if (defined $curr_scan_hr->{$src}->{$dst}->{'tcp'}
+                    and defined $curr_scan_hr->{$src}->{$dst}->{'tcp'}->{'strtp'}) {
                 $tcp_f = 1;
                 my $tcp_s_port
-                    = $current_scan_href->{$src}->{$dst}->{'tcp'}->{'strtp'};
+                    = $curr_scan_hr->{$src}->{$dst}->{'tcp'}->{'strtp'};
                 my $tcp_e_port
-                    = $current_scan_href->{$src}->{$dst}->{'tcp'}->{'endp'};
+                    = $curr_scan_hr->{$src}->{$dst}->{'tcp'}->{'endp'};
                 if ($tcp_s_port == $tcp_e_port) {
                     $tcp_newrange = $tcp_s_port;
                 } else {
                     $tcp_newrange = "$tcp_s_port-$tcp_e_port";
                 }
                 $tcp_newpkts =
-                    $current_scan_href->{$src}->{$dst}->{'tcp'}->{'pkts'};
+                    $curr_scan_hr->{$src}->{$dst}->{'tcp'}->{'pkts'};
             }
             if (defined $scan{$src}{$dst}{'udp'}
                     and $scan{$src}{$dst}{'udp'}{'abs_sp'}) {
@@ -2650,24 +2683,24 @@ sub scan_logr() {
                     $udp_absrange = "$udp_s_port-$udp_e_port";
                 }
             }
-            if (defined $current_scan_href->{$src}->{$dst}->{'udp'}
-                    and $current_scan_href->{$src}->{$dst}->{'udp'}->{'strtp'}) {
+            if (defined $curr_scan_hr->{$src}->{$dst}->{'udp'}
+                    and $curr_scan_hr->{$src}->{$dst}->{'udp'}->{'strtp'}) {
                 $udp_f = 1;
                 my $udp_s_port
-                    = $current_scan_href->{$src}->{$dst}->{'udp'}->{'strtp'};
+                    = $curr_scan_hr->{$src}->{$dst}->{'udp'}->{'strtp'};
                 my $udp_e_port
-                    = $current_scan_href->{$src}->{$dst}->{'udp'}->{'endp'};
+                    = $curr_scan_hr->{$src}->{$dst}->{'udp'}->{'endp'};
                 if ($udp_s_port == $udp_e_port) {
                     $udp_newrange = $udp_s_port;
                 } else {
                     $udp_newrange = "$udp_s_port-$udp_e_port";
                 }
-                $udp_newpkts = $current_scan_href->{$src}->{$dst}->{'udp'}->{'pkts'};
+                $udp_newpkts = $curr_scan_hr->{$src}->{$dst}->{'udp'}->{'pkts'};
             }
-            if (defined $current_scan_href->{$src}->{$dst}->{'icmp'}) {
+            if (defined $curr_scan_hr->{$src}->{$dst}->{'icmp'}) {
                 $icmp_f = 1;
                 $icmp_newpkts =
-                    $current_scan_href->{$src}->{$dst}->{'icmp'}->{'pkts'};
+                    $curr_scan_hr->{$src}->{$dst}->{'icmp'}->{'pkts'};
             }
 
             ### write out the overall packet counters for $src.
@@ -2742,11 +2775,11 @@ sub scan_logr() {
                 printf $fh "%${log_len}s%s\n", 'Scanned tcp ports: ',
                     "[$tcp_newrange: $tcp_newpkts packets]";
                 my $prefix = 'tcp flags: ';
-                for my $flags (keys %{$current_scan_href->{$src}->
+                for my $flags (keys %{$curr_scan_hr->{$src}->
                         {$dst}->{'tcp'}->{'flags'}}) {
                     my $nmap_opts;
                     $syslog_flags .= "$flags ";
-                    my $n_pkts = $current_scan_href->{$src}->{$dst}->
+                    my $n_pkts = $curr_scan_hr->{$src}->{$dst}->
                         {'tcp'}->{'flags'}->{$flags};
                     ### FUTURE: replace this with a simple hash lookup
                     if ($flags eq 'SYN') {
@@ -2769,9 +2802,9 @@ sub scan_logr() {
                     }
                     $prefix = '';
                 }
-                if (defined $current_scan_href->{$src}->{$dst}->{'tcp'}->{'chain'}) {
+                if (defined $curr_scan_hr->{$src}->{$dst}->{'tcp'}->{'chain'}) {
                     &print_chains_and_prefixes(
-                        $current_scan_href->{$src}->{$dst}->{'tcp'}->{'chain'},
+                        $curr_scan_hr->{$src}->{$dst}->{'tcp'}->{'chain'},
                         $fh
                     );
                 }
@@ -2781,9 +2814,9 @@ sub scan_logr() {
             if ($udp_f) {
                 printf $fh "%${log_len}s%s\n", 'Scanned udp ports: ',
                     "[$udp_newrange: $udp_newpkts packets, Nmap: -sU]";
-                if (defined $current_scan_href->{$src}->{$dst}->{'udp'}->{'chain'}) {
+                if (defined $curr_scan_hr->{$src}->{$dst}->{'udp'}->{'chain'}) {
                     &print_chains_and_prefixes(
-                        $current_scan_href->{$src}->{$dst}->{'udp'}->{'chain'},
+                        $curr_scan_hr->{$src}->{$dst}->{'udp'}->{'chain'},
                         $fh
                     );
                 }
@@ -2792,9 +2825,9 @@ sub scan_logr() {
             if ($icmp_f) {
                 printf $fh "%${log_len}s%s\n", 'icmp packets: ',
                     "[$icmp_newpkts]";
-                if (defined $current_scan_href->{$src}->{$dst}->{'icmp'}->{'chain'}) {
+                if (defined $curr_scan_hr->{$src}->{$dst}->{'icmp'}->{'chain'}) {
                     &print_chains_and_prefixes(
-                        $current_scan_href->{$src}->{$dst}->{'icmp'}->{'chain'},
+                        $curr_scan_hr->{$src}->{$dst}->{'icmp'}->{'chain'},
                         $fh
                     );
                 }
@@ -2809,10 +2842,10 @@ sub scan_logr() {
             printf $fh "\n%${log_len}s%s\n", 'Destination: ', $dst;
             printf $fh "%${log_len}s%s\n\n", 'DNS: ', $dst_dns_str;
 
-            if (defined $current_scan_href->{$src}->{$dst}->{'syslog_host'}) {
+            if (defined $curr_scan_hr->{$src}->{$dst}->{'syslog_host'}) {
                 my $syslog_hosts = '';
                 $syslog_hosts .= "$_, " for keys
-                    %{$current_scan_href->{$src}->{$dst}->{'syslog_host'}};
+                    %{$curr_scan_hr->{$src}->{$dst}->{'syslog_host'}};
                 $syslog_hosts =~ s/\,\s+$//;
                 if ($syslog_hosts =~ /\,/) {
                     printf $fh "%${log_len}s%s\n", 'Syslog hostnames: ',
@@ -3419,7 +3452,7 @@ sub tcpwr_remove_block() {
 }
 
 sub auto_psad_response() {
-    my $current_scan_href = shift;
+    my $curr_scan_hr = shift;
 
     print STDERR " .. auto_psad_response()\n" if $debug;
 
@@ -3429,7 +3462,7 @@ sub auto_psad_response() {
         &get_iptables_chains();
     }
 
-    for my $src (keys %$current_scan_href) {
+    for my $src (keys %$curr_scan_hr) {
         ### make sure we are not attempting to block 0.0.0.0
         ### or 127.0.0.1 or any of the interface ips.
         next if &auto_block_ignore_ip($src);
@@ -3520,19 +3553,19 @@ sub timeout_auto_blocked_ips() {
 
 sub exclude_auto_ignore_ip() {
     my $ip = shift;
-    if (defined $auto_ips{'ip'}{$ip}) {
+    if (defined $auto_dl{'ip'}{$ip}) {
         PR: for my $proto qw(allproto tcp udp icmp) {
-            next PR unless defined $auto_ips{'ip'}{$ip}{$proto};
+            next PR unless defined $auto_dl{'ip'}{$ip}{$proto};
             ### ignore $ip if the auto danger level is zero
-            return 1 if $auto_ips{'ip'}{$ip}{$proto} == 0;
+            return 1 if $auto_dl{'ip'}{$ip}{$proto} == 0;
         }
     } else {
-        NET: for my $net (keys %{$auto_ips{'net'}}) {
+        NET: for my $net (keys %{$auto_dl{'net'}}) {
             next NET unless ipv4_in_network($net, $ip);
             PR: for my $proto qw(allproto tcp udp icmp) {
-                next PR unless defined $auto_ips{'net'}{$ip}{$proto};
+                next PR unless defined $auto_dl{'net'}{$ip}{$proto};
                 ### ignore $ip if the auto danger level is zero
-                return 1 if $auto_ips{'net'}{$ip}{$proto} == 0;
+                return 1 if $auto_dl{'net'}{$ip}{$proto} == 0;
             }
         }
     }
@@ -3896,7 +3929,7 @@ sub status() {
             chomp $pid;
             if (kill 0, $pid) {
                 print " .. $pidname (pid: $pid)";
-                ### XXX should probably just parse /proc instead of
+                ### FIXME: should probably just parse /proc instead of
                 ### using ps
                 open PS, "$cmds{'ps'} auxww |" or die " ** Could not ",
                     "execute: $cmds{'ps'} auxww: $!";
@@ -4452,7 +4485,7 @@ sub hup() {
         chomp $pid;
         if (kill 0, $pid) {
             if (kill 'HUP', $pid) {
-                print " .. HUP sent to $pidname (pid: $pid)\n";
+                print " .. HUP signal sent to $pidname (pid: $pid)\n";
             } else {
                 print " ** Could not send $pidname ",
                     "(pid: $pid) a HUP signal.\n";
@@ -4572,7 +4605,7 @@ sub check_old_cmdargs() {
             "default (see the --no-snort-sids option).\n";
         &usage(1);
     }
-    &print_old_arg('auto_ips', 'auto-ips') if $oldarg_autoips;
+    &print_old_arg('auto-ips', 'auto-dl') if $oldarg_autoips;
     &print_old_arg('Logging_server', 'log-server') if $oldarg_logserv;
     &print_old_arg('no_errors', 'no-ipt-errors') if $oldarg_nerrs;
     &print_old_arg('no-errors', 'no-ipt-errors') if $oldarg_nerrs2;
@@ -4612,8 +4645,8 @@ sub handle_cmdline() {
     ### The --passive-os-file switch was given
     $config{'PSAD_POSD_FILE'} = $posf_file if $posf_file;
 
-    ### The --auto-ips switch was given
-    $config{'PSAD_AUTO_IPS_FILE'} = $autoips_file if $autoips_file;
+    ### The --auto-dl switch was given
+    $config{'PSAD_AUTO_DL_FILE'} = $auto_dl_file if $auto_dl_file;
 
     ### make sure to go into status display mode if any of the following
     ### args were given.
@@ -4815,9 +4848,9 @@ sub setup() {
     &file_permissions($config{'FW_DATA_FILE'});
     &file_permissions($config{'FW_ERROR_LOG'});
 
-    ### set the fwdata file as the default file to analyze if we are in
-    ### --Analyze mode.
-    $messages_file = $config{'FW_DATA_FILE'}
+    ### set the /var/log/messages file as the default file to
+    ### analyze if we are in --Analyze mode.
+    $messages_file = '/var/log/messages'
         if ($analyze_msgs and not $messages_file);
 
     return;
@@ -4956,7 +4989,7 @@ sub required_vars() {
         DNS_LOOKUP_THRESHOLD WHOIS_TIMEOUT SNORT_RULES_DIR HOSTNAME
         PACKET_COUNTER_FILE DSHIELD_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR
         PROC_FORWARD_FILE ENABLE_PERSISTENCE AUTO_BLOCK_IPT_FILE
-        AUTO_BLOCK_TCPWR_FILE PSAD_SIGS_FILE PSAD_AUTO_IPS_FILE
+        AUTO_BLOCK_TCPWR_FILE PSAD_SIGS_FILE PSAD_AUTO_DL_FILE
         AUTO_BLOCK_TIMEOUT EXTERNAL_SCRIPT ENABLE_EXT_SCRIPT_EXEC
         EXEC_EXT_SCRIPT_PER_ALERT ENABLE_DSHIELD_ALERTS
         DSHIELD_ALERT_INTERVAL DSHIELD_ALERT_EMAIL DSHIELD_USER_ID
@@ -4998,8 +5031,9 @@ Options:
     --interval                    - Configure the check interval from
                                     the command line to override the 15
                                     second default.
-    -a   --auto-ips <ips file>    - Import auto IPs file for automatic
-                                    IP danger level increases/decreses.
+    -a   --auto-dl <dl file>      - Import auto-danger level file for
+                                    automatic IP danger level
+                                    increases/decreses.
     -c   --config <config file>   - Use <config file> instead of the
                                     normal config file located at
                                     $config_file.
@@ -5016,6 +5050,7 @@ Options:
     --fw-file  <rules file>       - Analyze the iptables ruleset
                                     contained within <rules file>
                                     instead of a running policy.
+    -snort-rdir <rule dir>        - Path to snort rules directory.
     -d   --debug                  - Run psad in debugging mode.
     -D   --Dump-conf              - Dump psad configuration on STDOUT
                                     and exit.
@@ -5051,7 +5086,7 @@ Options:
     --no-signatures               - Disable psad signature processing
                                     (indendent of snort sid matching).
     --no-icmp-types               - Disable icmp type/code validation.
-    --no-auto-ips                 - Disable auto danger level assignment.
+    --no-auto-dl                  - Disable auto danger level assignment.
     --no-daemon                   - Do not run as a daemon.
     --no-ipt-errors               - Do not write errors to the error
                                     log.

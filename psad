@@ -4,12 +4,15 @@
 #
 # File: psad
 #
-# Purpose: psad makes use of ipchains/iptables logs to detect port
-#          scans.  Data is provided by kmsgsd which reads firewall
-#          messages out of the /var/lib/psad/psadfifo named pipe
+# Purpose: psad makes use of ipchains/iptables logs to detect port scans,
+#          probes for backdoors and DDoS tools, and other suspect traffic
+#          (many signatures were adapted from the snort intrusion
+#          detection system).  Data is provided by kmsgsd which reads
+#          firewall messages out of the /var/lib/psad/psadfifo named pipe
 #          (syslog is reconfigured to write kern.info messages there
-#          which include firewall messages).  For more information
-#          read the psad man page.
+#          which include firewall messages).  For more information read
+#          the psad man page or view the documentation provided at:
+#          http://www.cipherdyne.com.
 #
 # Author: Michael B. Rash (mbr@cipherdyne.com)
 #
@@ -36,6 +39,7 @@
 #     whether or not each ip has an auto-assigned danger level, etc.
 #   - Send psad alerts to network abuse alerting services such as
 #     abuse.net and dshield.org.
+#   - Packet grapher mode with annotated scan alerts.
 #   - Make use of other logging options available in iptables to detect
 #     more tcp signatures.  (E.g. --log-tcp-options, --log-ip-options,
 #     --log-tcp-sequence, etc.) for better signature recognition.
@@ -55,7 +59,8 @@
 #     packets that the client may generate after the ip_conntrack module
 #     is reloaded.  Without anticipating such packets psad will interpret
 #     them as a belonging to a port scan.  NOTE: This problem is mostly
-#     corrected by the conntrack patch to the kernel.
+#     corrected by the conntrack patch to the kernel.  Also, the
+#     IGNORE_CONNTRACK_BUG_PKTS variable was added.
 #   - Improve check_firewall_rules() to check for a state rule (iptables)
 #     since having such a rule greatly improves the quality of the data
 #     stream provided to psad by kmsgsd since more packet types will be
@@ -63,9 +68,8 @@
 #     odd tcp flag combinations.
 #   - Investigate the possibility of passive OS fingerprinting by looking
 #     at TTL and other fields in the headers (good idea Jay).
-#   - Handle various logging daemons other than syslog such as syslog-ng,
-#     msyslog, and metalog.
-#   - Add a "--Benchmark" mode to profile the time spent in check_scan().
+#   - Handle various logging daemons other than syslog such as msyslog,
+#     and metalog (syslog-ng support was added).
 #   - perldoc
 #
 # Default Command Line Arguments:  As of the 1.0.0-pre3 release, psad by
@@ -101,8 +105,7 @@
 #  Sample tcp packet (rejected by iptables... --log-prefix = "DROP ")
 #  Mar 11 13:15:52 orthanc kernel: DROP IN=lo OUT= MAC=00:00:00:00:00:00:00:00:
 #  00:00:00:00:08:00 SRC=127.0.0.1 DST=127.0.0.1 LEN=60 TOS=0x00 PREC=0x00
-#  TTL=64 ID=0 DF PROTO=TCP SPT=44847
-#  DPT=35 WINDOW=32304 RES=0x00 SYN URGP=0
+#  TTL=64 ID=0 DF PROTO=TCP SPT=44847 DPT=35 WINDOW=32304 RES=0x00 SYN URGP=0
 #
 #  Sample icmp packet rejected by iptables
 #  Nov 27 15:45:51 orthanc kernel: DROP IN=eth1 OUT= MAC=00:a0:cc:e2:1f:f2:00:
@@ -222,8 +225,9 @@ my $usr1              = 0;
 my $print_version     = 0;
 my $help              = 0;
 my $check_interval    = 0;
-my $netstat_lkup_cnt  = 0;
-my $log_len           = 29;
+my $netstat_lkup_ctr  = 0;
+my $log_len           = 29;  ### used in scan_logr()
+my $fw_analyze        = 0;
 
 ### these flags are used to disable several features
 ### in psad if specified from the command line
@@ -237,19 +241,25 @@ my $no_netstat    = 0;
 my $no_fwcheck    = 0;
 
 ### old command line options
-my $errors;
-my $dnslookups;
-my $whoislookups;
-my $netstat_lookup;
-my $fwcheck;
-my $daemon;
+my $oldarg_autoips;
+my $oldarg_errs;
+my $oldarg_nerrs;
+my $oldarg_rdns;
+my $oldarg_nrdns;
+my $oldarg_whois;
+my $oldarg_nwhois;
+my $oldarg_netstat;
+my $oldarg_nlport;
+my $oldarg_fwcheck;
+my $oldarg_nfwchk;
+my $oldarg_daemon;
+my $oldarg_logserv;
+
+### used in --Benchmark test
 my $b_time;
 
 ### get the hostname of the machine
 my $hostname = hostname;
-
-### turn off buffering
-$| = 1;
 
 ### save a copy of the command line arguments
 my @args_cp = @ARGV;
@@ -259,14 +269,16 @@ Getopt::Long::Configure('no_ignore_case');
 
 &usage(1) unless (GetOptions (
     'signatures=s'   => \$sigs_file,      # Path to psad signatures file.
-    'auto_ips=s'     => \$autoips_file,   # Path to psad auto ips file for
+    'auto-ips=s'     => \$autoips_file,   # Path to psad auto ips file for
                                           # auto-setting ip danger level.
     'output'         => \$output,         # Write scanlog messages to STDOUT.
     'debug'          => \$debug,          # Run in debug mode.
     'interval=s'     => \$check_interval, # Set $check_interval from the
                                           # command line.
     'config=s'       => \$config_file,    # Specify configuration file.
-    'Logging_server' => \$syslog_server,  # We are running psad on a syslog
+    'fw-check'       => \$fw_analyze,     # Analyze the firewall ruleset and
+                                          # exit.
+    'log-server'     => \$syslog_server,  # We are running psad on a syslog
                                           # logging server.
     'Kill'           => \$kill,           # Kill all running psad processes.
                                           # (psadwatchd, psad, kmsgsd,
@@ -282,33 +294,40 @@ Getopt::Long::Configure('no_ignore_case');
                                           # in benchmark test.
     'USR1'           => \$usr1,           # Send an existing psad process a
                                           # USR1 signal (useful for debugging).
-    'no_whois'       => \$no_whois,       # Do not issue whois lookups against
-    'no_signatures'  => \$no_signatures,  # Disable signature processing.
-    'no_auto_ips'    => \$no_auto_ips,    # Disable auto danger level
+    'no-whois'       => \$no_whois,       # Do not issue whois lookups against
+    'no-signatures'  => \$no_signatures,  # Disable signature processing.
+    'no-auto_ips'    => \$no_auto_ips,    # Disable auto danger level
                                           # assignment.
-    'no_daemon'      => \$no_daemon,      # Do not run as a daemon.
-    'no_fw_check'    => \$no_fwcheck,     # Do not check firewall rules.
-    'no_rdns'        => \$no_rdns,        # Do not issue dns lookups against
+    'no-daemon'      => \$no_daemon,      # Do not run as a daemon.
+    'no-fwcheck'     => \$no_fwcheck,     # Do not check firewall rules.
+    'no-rdns'        => \$no_rdns,        # Do not issue dns lookups against
                                           # Scanning ip address.
-    'no_localport'   => \$no_netstat,     # Do not check to see if the
+    'no-localport'   => \$no_netstat,     # Do not check to see if the
                                           # firewall is listening on localport
                                           # that has been scanned.
-    'no_errors'      => \$no_errors,      # Do not write malformed packet.
+    'no-errors'      => \$no_errors,      # Do not write malformed packet.
                                           # messages to error log.
     'Version'        => \$print_version,  # Print the psad version and exit.
-    'Daemon'         => \$daemon,         #    old command line arg
-    'firewallcheck'  => \$fwcheck,        #    old command line arg
-    'reversedns'     => \$dnslookups,     #    old command line arg
-    'localport'      => \$netstat_lookup, #    old command line arg
-    'errors'         => \$errors,         #    old command line arg
-    'whois'          => \$whoislookups,   #    old command line arg
     'help'           => \$help,           # Display help.
+    ### old args
+    'Logging_server' => \$oldarg_logserv, #    old command line arg
+    'Daemon'         => \$oldarg_daemon,  #    old command line arg
+    'firewallcheck'  => \$oldarg_fwcheck, #    old command line arg
+    'no_fw_check'    => \$oldarg_nfwchk,  #    old command line arg
+    'reversedns'     => \$oldarg_rdns,    #    old command line arg
+    'localport'      => \$oldarg_netstat, #    old command line arg
+    'errors'         => \$oldarg_errs,    #    old command line arg
+    'no_errors'      => \$oldarg_nerrs,   #    old command line arg
+    'whois'          => \$oldarg_whois,   #    old command line arg
+    'no_whois'       => \$oldarg_nwhois,  #    old command line arg
+    'no_rdns'        => \$oldarg_nrdns,   #    old command line arg
+    'no_localport'   => \$oldarg_nlport,  #    old command line arg
 ));
-&usage(0) if ($help);
+&usage(0) if $help;
 
 ### Print the version number and exit if -V given on the command line.
 if ($print_version) {
-    print " ... psad version $version, by Michael B. Rash " .
+    print " .. psad version $version, by Michael B. Rash " .
         "(mbr\@cipherdyne.com)\n";
     exit 0;
 }
@@ -318,8 +337,8 @@ if ($print_version) {
 
 ### Everthing after this point must be executed as root.
 $< == 0 && $> == 0 or
-    die "\n ... @@@  psad: You must be root (or equivalent " .
-        "UID 0 account) to execute psad!  Exiting.\n\n";
+    die " ** psad: You must be root (or equivalent " .
+        "UID 0 account) to execute psad!  Exiting.\n";
 
 ### read in configuration file
 my ($config_href, $cmds_href) = &Psad::buildconf($config_file);
@@ -357,11 +376,11 @@ if ($kill) {
 ### The --Flush command line switch was given.
 if ($flush_fw_rules) {
     if (-e $auto_blocked_file) {
-        print " ... Removing auto-generated block rules.\n";
+        print " .. Removing auto-generated block rules.\n";
         &old_auto_blocked_ips();
         unlink $auto_blocked_file;
     } else {
-        print " ... @@@ Currently there are no auto-generated ".
+        print " ** Currently there are no auto-generated ".
             "block rules in effect.\n";
     }
     exit 0;
@@ -415,7 +434,7 @@ my $local_ips_href = &get_local_ips();
 unless ($no_whois) {
     unless (defined $cmds{'whois'}
             && -x $cmds{'whois'}) {  ### we couldn't find whois.psad
-        warn " ... @@@ Could not locate whois.psad binary.  " .
+        warn " ** Could not locate whois.psad binary.  " .
             "Disabling whois lookups.\n";
         $no_whois = 1;
     }
@@ -424,20 +443,32 @@ unless ($no_whois) {
 ### if psad is running on a syslog server, don't check the firewall
 ### rules since they may not be local.
 unless ($no_fwcheck || $syslog_server) {
-    &Psad::check_firewall_rules(
+    my $rv = &Psad::check_firewall_rules(
         $config{'FW_MSG_SEARCH'},
         $config{'EMAIL_ADDRESSES'},
         "$config{'PSAD_DIR'}/fw_check.txt",
         \%cmds
     );
+    if ($fw_analyze) {
+        if ($rv) {
+            print localtime() . " .. Firewall config looks good.\n";
+            print localtime() . " .. Completed check of firewall ruleset.\n";
+        } else {
+            print localtime() . " ** Errors found in firewall config.\n";
+            print localtime() . " ** Results emailed to " .
+                "$config{'EMAIL_ADDRESSES'}\n";
+        }
+        print localtime() . " .. Exiting.\n";
+        exit 0;
+    }
 }
 
 ### daemonize psad unless running with --no_daemon or --debug
 unless ($no_daemon || $debug || $benchmark) {
     my $pid = fork();
     exit if $pid;
-    die " ... @@@  $0: Couldn't fork: $!" unless defined($pid);
-    POSIX::setsid() or die " ... @@@ $0: Can't start a new session: $!";
+    die " ** $0: Couldn't fork: $!" unless defined $pid;
+    POSIX::setsid() or die " ** $0: Can't start a new session: $!";
 }
 
 ### write the current pid associated with psad to the psad pid file
@@ -497,15 +528,15 @@ my $config_mtime   = stat($config_file)->mtime;
 &write_packet_counters();
 
 if ($benchmark) {
-    print localtime() . " ... Entering benchmark mode.\n";
+    print localtime() . " .. Entering benchmark mode.\n";
     $no_rdns  = 1;  ### turn off network related functions
     $no_whois = 1;
     if ($b_packets) {
-        print localtime() . " ... Executing a $b_packets packet test.\n";
+        print localtime() . " .. Executing a $b_packets packet test.\n";
     } else {
-        print localtime() . " ... The --packets command line " .
+        print localtime() . " .. The --packets command line " .
             "option was not specified.\n";
-        print localtime() . " ... Defaulting to a 10,000 packet test.\n";
+        print localtime() . " .. Defaulting to a 10,000 packet test.\n";
         $b_packets = 10000;
     }
 }
@@ -534,7 +565,7 @@ for (;;) {
     my @new_packets;
     if ($benchmark) {
         $b_time = time();
-        print localtime() . " ... Creating packet array.\n";
+        print localtime() . " .. Creating packet array.\n";
         my $dst_port = 1000;
         for (my $i=0; $i <= $b_packets; $i++) {
             push @new_packets, "Feb 15 16:42:58 orthanc kernel: DROP IN=eth0 " .
@@ -548,7 +579,7 @@ for (;;) {
         @new_packets = <FWDATA>;
     }
     if (@new_packets) {
-        print localtime() . " ... check_scan()\n" if $benchmark;
+        print localtime() . " .. check_scan()\n" if $benchmark;
 
         my $found_potential_scan = &check_scan(
             \@new_packets,
@@ -556,12 +587,12 @@ for (;;) {
         );
         if ($found_potential_scan) {
 
-            print localtime() . " ... assign_danger_level()\n"
+            print localtime() . " .. assign_danger_level()\n"
                 if $benchmark;
             ### Assign a danger level to the scan
             &assign_danger_level();
 
-            print localtime() . " ... scan_logr()\n" if $benchmark;
+            print localtime() . " .. scan_logr()\n" if $benchmark;
             ### Log and send email and syslog alerts
             &scan_logr();
 
@@ -584,9 +615,9 @@ for (;;) {
     }
 
     if ($benchmark) {
-        print localtime() . " ... Packet creation and processing time: ",
+        print localtime() . " .. Packet creation and processing time: ",
             time() - $b_time, " sec.\n";
-        print localtime() . " ... Exiting benchmark mode.\n";
+        print localtime() . " .. Exiting benchmark mode.\n";
         exit 0;
     }
 
@@ -625,13 +656,13 @@ sub check_scan() {
         &check_fw($fw_lines_aref->[0]);
     }
     unless ($no_netstat) {
-        if ($netstat_lkup_cnt == 10) {
+        if ($netstat_lkup_ctr == 10) {
             ### we don't expect the list of ports the machine is listening
             ### on to change very often.
             &get_listening_ports();
-            $netstat_lkup_cnt = 0;
+            $netstat_lkup_ctr = 0;
         } else {
-            $netstat_lkup_cnt++;
+            $netstat_lkup_ctr++;
         }
     }
     PKT: for my $line (@$fw_lines_aref) {
@@ -1104,7 +1135,7 @@ sub check_import_config() {
         ### kill kmsgsd since it does not have the capability of
         ### checking for a modified config file
         open K, "< $config{'KMSGSD_PID_FILE'}" or warn
-            " @@@ Could not open $config{'KMSGSD_PID_FILE'}";
+            " ** Could not open $config{'KMSGSD_PID_FILE'}";
         my $pid = <K>;
         close K;
         chomp $pid;
@@ -1121,7 +1152,7 @@ sub check_import_config() {
 sub import_signatures() {
     %sigs = ();  ### undef %sigs so don't leave old signatures around
     open SIGS, "< $sigs_file" or die
-        " ... @@@ Could not open the signatures file $sigs_file: $!";
+        " ** Could not open the signatures file $sigs_file: $!";
     my @lines = <SIGS>;
     close SIGS;
     SIG: for my $line (@lines) {
@@ -1202,16 +1233,16 @@ sub import_signatures() {
                 $sigs{'icmp'}{$sig_id}{'icmp_id'} = $1;
             }
         } else {  ### the signature line could not be recognized
-            warn " ... @@@ Bad signature in $sigs_file: $line\n";
+            warn " ** Bad signature in $sigs_file: $line\n";
             next SIG;
         }
     }
     if ($debug) {
-        print STDOUT " ... @@@ main signatures hash:\n";
+        print STDOUT " ** main signatures hash:\n";
         print STDOUT Dumper %sigs;
-        print STDOUT " ... @@@ fast lookup hash:\n";
+        print STDOUT " ** fast lookup hash:\n";
         print STDOUT Dumper %sigs_fast;
-        print STDOUT Dumper " ... @@@ signature attributes hash:\n";
+        print STDOUT Dumper " ** signature attributes hash:\n";
         print STDOUT Dumper %sigs_attr;
     }
     return;
@@ -1423,7 +1454,7 @@ sub assign_danger_level() {
 
 sub write_packet_counters() {
     open P, "> $config{'PACKET_COUNTER_FILE'}" or
-        die " ... @@@ Could not open $config{'PACKET_COUNTER_FILE'}: $!";
+        die " ** Could not open $config{'PACKET_COUNTER_FILE'}: $!";
     print P "tcp:  $tcp_ctr\n";
     print P "udp:  $udp_ctr\n";
     print P "icmp: $icmp_ctr\n";
@@ -1565,7 +1596,7 @@ sub scan_logr() {
             unless ($no_whois) {
                 $whois_info_aref = &get_whois_data($src, $whois_file);
             }
-            print STDOUT "scan_logr():  generating email......\n" if $debug;
+            print STDOUT "scan_logr():  generating email.....\n" if $debug;
 
             ### get the absolute starting time for the scan and the
             ### current time
@@ -1714,7 +1745,7 @@ sub scan_logr_signatures() {
                         $scan{$src}{$dst}{'PROTO'}{'TCP'}
                         {'CURR_SIG'}{$sig_id}{'LISTEN'}{$dp}{'PKTS'};
                     &Psad::logr("\"$msg\" dp=$dp flags=[$flags] packets=$pkts " .
-                        "@@@ Your machine is listening on TCP port: $dp!\n",
+                        "** Your machine is listening on TCP port: $dp!\n",
                         $print_hsh_href);
                 }
                 for my $dp (keys
@@ -1737,7 +1768,7 @@ sub scan_logr_signatures() {
                         $scan{$src}{$dst}{'PROTO'}{'UDP'}{'CURR_SIG'}
                         {$sig_id}{'LISTEN'}{$dp}{'PKTS'};
                     &Psad::logr("\"$msg\" dp=$dp packets=$pkts " .
-                        "@@@ Your machine is listening on UDP port: $dp!\n",
+                        "** Your machine is listening on UDP port: $dp!\n",
                         $print_hsh_href);
                 }
                 for my $dp (keys
@@ -1772,7 +1803,7 @@ sub scan_logr_signatures() {
 sub old_auto_blocked_ips() {
     if (-e $auto_blocked_file) {
         open B, "< $auto_blocked_file" or
-            warn " ... @@@ Could not open $auto_blocked_file\n" and return;
+            warn " ** Could not open $auto_blocked_file\n" and return;
         my @blines = <B>;
         close B;
         my $use_ipchains;
@@ -1793,7 +1824,7 @@ sub old_auto_blocked_ips() {
             &iptables_flags unless $checked_iptables_flags;
             for my $blockip (@block_ips) {
                 if ($flush_fw_rules) {
-                    print " ... Removing rules for: $blockip\n";
+                    print " .. Removing rules for: $blockip\n";
                 }
                 for my $table (keys %iptables_chains) {
                     for my $chain (keys %{$iptables_chains{$table}}) {
@@ -1822,7 +1853,7 @@ sub old_auto_blocked_ips() {
                             &iptables_block($table, $chain, $blockip);
                         }
                         if ($flush_fw_rules && ! $blocked) {
-                            print " ... Could not locate any $table $chain " .
+                            print " .. Could not locate any $table $chain " .
                                 "auto-generated rules for $blockip\n";
                         }
                     }
@@ -1836,7 +1867,7 @@ sub old_auto_blocked_ips() {
                     my $blocked = 0;
                     my $rulenum = 1;
                     if ($flush_fw_rules) {
-                        print " ... Removing rules for: $blockip\n";
+                        print " .. Removing rules for: $blockip\n";
                     }
                     RULE: for my $rule (@rules) {
                         chomp $rule;
@@ -1857,7 +1888,7 @@ sub old_auto_blocked_ips() {
                         &ipchains_block($chain, $blockip);
                     }
                     if ($flush_fw_rules && ! $blocked) {
-                        print " ... Could not locate any auto-generated " .
+                        print " .. Could not locate any auto-generated " .
                             "rules for: $blockip\n";
                     }
                 }
@@ -1985,12 +2016,12 @@ sub write_blocked_ip() {
     my $src = shift;
     if (-e $auto_blocked_file) {
         open B, ">> $auto_blocked_file" or warn
-                " @@@ Could not append to $auto_blocked_file\n" and return;
+                " ** Could not append to $auto_blocked_file\n" and return;
         print B "$src\n";
         close B;
     } else {
         open B, "> $auto_blocked_file" or warn
-                " @@@ Could not create $auto_blocked_file\n" and return;
+                " ** Could not create $auto_blocked_file\n" and return;
         print B "IPTABLES\n" if $use_iptables;
         print B "IPCHAINS\n" if $use_ipchains;
         print B "$src\n";
@@ -2013,7 +2044,7 @@ sub print_scan() {  ### this should primarily be used for debugging
     print PSCAN Dumper \%scan;
     close PSCAN;
     chmod 0600, $scanfile;
-    print STDOUT "\n ... Printing scan data structures to $scanfile\n\n";
+    print STDOUT " .. Printing scan data structures to $scanfile\n\n";
     return;
 }
 
@@ -2080,7 +2111,7 @@ sub get_whois_data() {
         }
     }
     open W, "< $whois_datafile" or
-        die " ... @@@ Could not open $whois_datafile: $!";
+        die " ** Could not open $whois_datafile: $!";
     @whois_data = <W>;
     close W;
     return \@whois_data;
@@ -2090,7 +2121,7 @@ sub REAPER {
     my $pid;
     $pid = waitpid(-1, WNOHANG);
 #   if (WIFEXITED($?)) {
-#       print STDERR " .. @@@  Process $pid exited.\n";
+#       print STDERR " .. **  Process $pid exited.\n";
 #   }
     $SIG{'CHLD'} = \&REAPER;
     return;
@@ -2122,14 +2153,16 @@ sub kill_psad() {
             close PIDFILE;
             chomp $pid;
             if (kill 0, $pid) {
-                print " ... Killing $pidname, pid: $pid\n";
-                kill 15, $pid or print " ... @@@  psad: Could not kill " .
-                    "$pidname, pid: $pid\n";
+                print " .. Killing $pidname, pid: $pid\n";
+                unless (kill 15, $pid) {
+                    kill 9, $pid or print " ** psad: Could not kill " .
+                        "$pidname, pid: $pid $!\n";
+                }
             } else {
-                print " ... @@@  psad: $pidname is not running on $hostname.\n";
+                print " ** psad: $pidname is not running on $hostname.\n";
             }
         } else {
-            print " ... @@@  psad: pid file $pidfile does not exist for " . 
+            print " ** psad: pid file $pidfile does not exist for " . 
                 "$pidname on $hostname\n";
         }
     }
@@ -2144,11 +2177,11 @@ sub restart() {
         close CMD;
         chomp $cmdline;
     } else {
-        die " ... @@@  psad:  No other psad process is " .
+        die " ** psad:  No other psad process is " .
             "running on $hostname!";
     }
     &kill_psad();
-    print " ... Restarting the psad daemons on $hostname\n";
+    print " .. Restarting the psad daemons on $hostname\n";
     system "$cmds{'psad'} $cmdline";
     return;
 }
@@ -2174,7 +2207,7 @@ sub status() {
             close PIDFILE;
             chomp $pid;
             if (kill 0, $pid) {
-                print " ... $pidname (pid: $pid)";
+                print " .. $pidname (pid: $pid)";
                 my @ps_out = `$cmds{'ps'} -auxww`;
                 PS: for my $line (@ps_out) {
                     chomp $line;
@@ -2192,27 +2225,27 @@ sub status() {
                             if (-e $config{'PACKET_COUNTER_FILE'}) {
                                 print "     Packets Counters:\n";
                                 open F, "< $config{'PACKET_COUNTER_FILE'}" or
-                                    die " ... $config{'PACKET_COUNTER_FILE'}: $!";
+                                    die " ** $config{'PACKET_COUNTER_FILE'}: $!";
                                 print STDOUT "        $_" while (<F>);
                                 close F;
                             }
                             ### sort and print the scan source ips
                             my %scan_source_ips;
                             chdir $config{'PSAD_DIR'} or
-                                die " ... @@@ Could not chdir $config{'PSAD_DIR'}: $!";
+                                die " ** Could not chdir $config{'PSAD_DIR'}: $!";
                             opendir D, $config{'PSAD_DIR'} or
-                                die " ... @@@ Could not open dir: $config{'PSAD_DIR'}: $!";
+                                die " ** Could not open dir: $config{'PSAD_DIR'}: $!";
                             my @files = readdir D;
                             closedir D;
                             shift @files; shift @files;
                             for my $file (@files) {
-                                if ($file =~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/
+                                if ($file =~ /(?:\d{1,3}\.){3}\d{1,3}/
                                     && -d $file) {
                                     ### $file is a current scan source ip
                                     my $src_ipdir = $file;
                                     if (-e "${src_ipdir}/danger_level") {
                                         open F, "< ${src_ipdir}/danger_level" or
-                                            die " ... @@@ Could not open " .
+                                            die " ** Could not open " .
                                                 "${src_ipdir}/danger_level\n";
                                         my $dl = <F>;
                                         close F;
@@ -2241,10 +2274,10 @@ sub status() {
                 print "\n";
                 $rv = 1;
             } else {
-                print " ... @@@  psad: $pidname is not running on $hostname\n";
+                print " ** psad: $pidname is not running on $hostname\n";
             }
         } else {
-            print " ... @@@  psad: pid file $pidfile does not exist for " .
+            print " ** psad: pid file $pidfile does not exist for " .
                 "$pidname on $hostname\n";
         }
     }
@@ -2256,7 +2289,7 @@ sub usr1() {
     my $psad_pidfile = $pidfiles[1];
     if (-e $psad_pidfile) {
         open PIDFILE, "< $psad_pidfile" or
-                die " ... @@@  Could not open $psad_pidfile: $!";
+                die " ** Could not open $psad_pidfile: $!";
         my $pid = <PIDFILE>;
         close PIDFILE;
         chomp $pid;
@@ -2267,42 +2300,42 @@ sub usr1() {
                 ### and for the file to be created.
                 sleep 1;
                 open U, "< $config{'PSAD_DIR'}/scan_hash.${pid}"
-                    or print " ... @@@  Sent psad pid $pid a USR1 " .
+                    or print " ** Sent psad pid $pid a USR1 " .
                         "signal, but could not open\n" .
                         "\"$config{'PSAD_DIR'}/scan_hash.${pid}\n\""
                     and return $rv;
                 print while(<U>);
                 close U;
             } else {
-                print " ... @@@  Could not send psad the USR1 signal on $hostname\n";
+                print " ** Could not send psad the USR1 signal on $hostname\n";
             }
         } else {
-            print " ... psad is not running on $hostname\n";
+            print " ** psad is not running on $hostname\n";
         }
     }
     return $rv;
 }
 
 sub archive_data() {
-    chdir $config{'PSAD_DIR'} or die " ... @@@ Could not chdir " .
+    chdir $config{'PSAD_DIR'} or die " ** Could not chdir " .
         "$config{'PSAD_DIR'}: $!";
     unless (-d $config{'SCAN_DATA_ARCHIVE_DIR'}) {
         mkdir $config{'SCAN_DATA_ARCHIVE_DIR'}, 0500 or
-            die " ... @@@ Could not create dir: " .
+            die " ** Could not create dir: " .
             "$config{'SCAN_DATA_ARCHIVE_DIR'}: $!";
     }
 
     ### archive all of the old ip address directories since
     ### we are restarting psad (should add a way to import
     ### these directories back into memory)
-    opendir D, $config{'PSAD_DIR'} or die " ... @@@ Could not open dir: " .
+    opendir D, $config{'PSAD_DIR'} or die " ** Could not open dir: " .
         "$config{'PSAD_DIR'}: $!";
     my @files = readdir D;
     closedir D;
     shift @files; shift @files;
 
     for my $file (@files) {
-        if ($file =~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/ && -d $file) {
+        if ($file =~ /(?:\d{1,3}\.){3}\d{1,3}/ && -d $file) {
             ### $file is an old scaning ip from a previous psad execution
             my $old_ipdir     = $file;
             my $archive_ipdir = "$config{'SCAN_DATA_ARCHIVE_DIR'}/$old_ipdir";
@@ -2338,40 +2371,34 @@ sub archive_data() {
 }
 
 sub check_old_cmdargs() {
-    if ($errors) {
-        print " ... @@@ The \"errors\" option has been changed to " .
-            "\"no_errors.\"\n";
-        &usage(1);
-    }
-    if ($errors) {
-        print " ... @@@ The \"reversedns\" option has been changed " .
-            "to \"no_rdns.\"\n";
-        &usage(1);
-    }
-    if ($errors) {
-        print " ... @@@ The \"whois\" option has been changed to " .
-            "\"no_whois.\"\n";
-        &usage(1);
-    }
-    if ($errors) {
-        print " ... @@@ The \"localport\" option has been changed " .
-            "to \"no_netstat.\"\n";
-        &usage(1);
-    }
-    if ($errors) {
-        print " ... @@@ The \"firewallcheck\" option has been changed " .
-            "to \"no_fwcheck.\"\n";
-        &usage(1);
-    }
-    if ($errors) {
-        print " ... @@@ The \"Daemon\" option has been changed to " .
-            "\"Daemon.\"\n";
-        &usage(1);
-    }
+    &print_old_arg('auto_ips', 'auto-ips') if $oldarg_autoips;
+    &print_old_arg('Logging_server', 'log-server') if $oldarg_logserv;
+    &print_old_arg('errors', 'no-errors') if $oldarg_errs;
+    &print_old_arg('no_errors', 'no-errors') if $oldarg_nerrs;
+    &print_old_arg('reversedns', 'no-rdns') if $oldarg_rdns;
+    &print_old_arg('no_rdns', 'no-rdns') if $oldarg_nrdns;
+    &print_old_arg('whois', 'no-whois') if $oldarg_whois;
+    &print_old_arg('no_whois', 'no-whois') if $oldarg_nwhois;
+    &print_old_arg('no_localport', 'no-localport') if $oldarg_nlport;
+    &print_old_arg('localport', 'no-netstat') if $oldarg_netstat;
+    &print_old_arg('firewallcheck', 'no-fwcheck') if $oldarg_fwcheck;
+    &print_old_arg('no_fw_check', 'no-fwcheck') if $oldarg_nfwchk;
+    &print_old_arg('Daemon', 'no-daemon') if $oldarg_daemon;
+    return;
+}
+
+sub print_old_arg() {
+    my ($oldarg, $newarg) = @_;
+    print " ** The \"$oldarg\" option has been changed to \"$newarg\"\n";
+    &usage(1);
     return;
 }
 
 sub setup() {
+
+    ### turn off buffering
+    $| = 1;
+
     unless (-d $config{'PSAD_DIR'}) {
         mkdir $config{'PSAD_DIR'}, 0500;
     }
@@ -2393,7 +2420,7 @@ sub setup() {
         copy('/etc/syslog.conf', '/etc/syslog.conf.orig');
     }
     open RS, '< /etc/syslog.conf' or
-        die " ... @@@  Unable to open /etc/syslog.conf: $!";
+        die " ** Unable to open /etc/syslog.conf: $!";
     my @slines = <RS>;
     close RS;
     my $found = 0;
@@ -2402,7 +2429,7 @@ sub setup() {
     }
     unless ($found) {
         open SYSLOG, '> /etc/syslog.conf' or
-            die " ... @@@  Unable to open /etc/syslog.conf: $!";
+            die " ** Unable to open /etc/syslog.conf: $!";
         for my $line (@slines) {
             unless ($line =~ /psadfifo/) {
                 print SYSLOG $line;
@@ -2417,7 +2444,7 @@ sub setup() {
     }
     if (-e '/etc/syslog-ng/syslog-ng.conf') {
         open RS, '< /etc/syslog-ng/syslog-ng.conf' or
-            die " ... @@@  Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
+            die " ** Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
         my @slines = <RS>;
         close RS;
 
@@ -2428,7 +2455,7 @@ sub setup() {
 
         unless ($found_fifo) {
             open SYSLOGNG, '>> /etc/syslog-ng/syslog-ng.conf' or
-                die " ... @@@ Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
+                die " ** Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
             print SYSLOGNG "\n";
             print SYSLOGNG "destination psadpipe { pipe(\"/var/run/psadfifo\"); };\n";
             print SYSLOGNG "filter f_kerninfo { facility(kern) and level(info); };\n";
@@ -2464,50 +2491,53 @@ psad; the Port Scan Attack Detector
 Version: $version
 By Michael B. Rash (mbr\@cipherdyne.com, http://www.cipherdyne.com)
 
-USAGE: psad [-s <signature file>] [-a <auto ips file>] [-c <config file>] [-o]
-       [-L] [-i <interval>] [-h] [-F] [-S] [-K] [-R] [-U] [-V] [--no_fwcheck]
-       [--no_daemon] [--no_rdns] [--no_whois] [--no_netstat] [--no_errors]
+Usage: psad [-s <signature file>] [-a <auto ips file>] [-c <config file>]
+       [-l] [-i <interval>] [-h] [-B] [-F] [-S] [-K] [-R] [-U] [-V] [-f] [-o]
+       [--no-fwcheck] [--no-daemon] [--no-rdns] [--no-whois] [--no-netstat]
+       [--no-errors]
 
-OPTIONS:
-      -s   --signatures <sig file>    - import scan signatures.
-      -a   --auto_ips <ips file>      - import auto ips file for automatic
+Options:
+      -s   --signatures <sig file>    - Import scan signatures.
+      -a   --auto-ips <ips file>      - Import auto ips file for automatic
                                         ip danger level increases/decreses.
-      -c   --config <config file>     - use config file instead of the
+      -c   --config <config file>     - Use config file instead of the
                                         values contained within the psad
                                         script.
-      -i   --interval                 - configure the check interval from
+      -f   --fw-check                 - Analyze the local firewall ruleset
+                                        and exit.
+      -i   --interval                 - Configure the check interval from
                                         the command line to override the 15
                                         second default.
-      -d   --debug                    - run psad in debugging mode.
-      -o   --output                   - print all messages to STDOUT (this
+      -d   --debug                    - Run psad in debugging mode.
+      -o   --output                   - Print all messages to STDOUT (this
                                         does not include bad packet messages
                                         that are printed to the error log).
-      -L   --Logging_server           - psad is being run on a syslog
+      -l   --log-server               - Psad is being run on a syslog
                                         logging server.
-      -F   --Flush                    - remove any auto-generated firewall
+      -F   --Flush                    - Remove any auto-generated firewall
                                         block rules.
-      -K   --Kill                     - kill all running psad processes.
-      -R   --Restart                  - restart all running psad processes.
-      -S   --Status                   - displays the status of any
+      -K   --Kill                     - Kill all running psad processes.
+      -R   --Restart                  - Restart all running psad processes.
+      -S   --Status                   - Displays the status of any
                                         currently running psad processes.
-      -B   --Benchmark                - Run psad in benchmark mode.
+      -B   --Benchmark                - run psad in benchmark mode.
       -p   --packets                  - Specify number of packets to use in
                                         benchmark test.
-      -U   --USR1                     - send a running psad process a USR1
+      -U   --USR1                     - Send a running psad process a USR1
                                         signal (generates a dump of psad
                                         data structures on STDOUT).
-      -V   --Version                  - print the psad version and exit.
+      -V   --Version                  - Print the psad version and exit.
 
-      --no_daemon                     - do not run as a daemon.
-      --no_errors                     - do not write errors to the error
+      --no-daemon                     - Do not run as a daemon.
+      --no-errors                     - Do not write errors to the error
                                         log.
-      --no_whois                      - disable whois lookups.
-      --no_fwcheck                    - disable firewall rules verification.
-      --no_rdns                       - disable name resolution against
+      --no-whois                      - Disable whois lookups.
+      --no-fwcheck                    - Disable firewall rules verification.
+      --no-rdns                       - Disable name resolution against
                                         scanning ips.
-      --no_netstat                    - disable local port lookups for scan
+      --no-netstat                    - Disable local port lookups for scan
                                         signatures.
-      -h   --help                     - prints this help message.
+      -h   --help                     - Prints this usage message.
 
 _HELP_
     exit $exitcode;

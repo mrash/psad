@@ -30,21 +30,21 @@ Snort (written by Marty Roesch, see http://www.snort.org).
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 DESCRIPTION:
 
-    The Port Scan Attack Detector (psad) is a program written in Perl
-that is designed to work with Linux firewalling code (iptables in the 2.4.x
-kernels, and ipchains in the 2.2.x kernels) to detect port scans.  It
-features a set of highly configurable danger thresholds (with sensible
-defaults provided), verbose alert messages that include the source,
-destination, scanned port range, begin and end times, tcp flags and
-corresponding nmap options (Linux 2.4.x kernels only), reverse DNS info,
-email and syslog alerting, and automatic blocking of offending ip addresses
-via dynamic configuration of ipchains/iptables firewall rulesets.  In
-addition, for the 2.4.x kernels psad incorporates many of the tcp, udp, and
-icmp signatures included in the Snort Intrusion Detection System
-(http://www.snort.org) to detect highly suspect scans for various backdoor
-programs (e.g. EvilFTP, GirlFriend, SubSeven), DDoS tools (mstream, shaft),
-and advanced port scans (syn, fin, xmas) which are easily leveraged against
-a machine via nmap.
+    The Port Scan Attack Detector (psad) is a collection of four lightweight
+system daemons written in Perl and in C that are designed to work with Linux
+firewalling code (iptables in the 2.4.x kernels, and ipchains in the 2.2.x
+kernels) to detect port scans and other suspect traffic.  It features a set of
+highly configurable danger thresholds (with sensible defaults provided),
+verbose alert messages that include the source, destination, scanned port
+range, begin and end times, tcp flags and corresponding nmap options (Linux
+2.4.x kernels only), reverse DNS info, email and syslog alerting, and
+automatic blocking of offending ip addresses via dynamic configuration of
+ipchains/iptables firewall rulesets.  In addition, for the 2.4.x kernels psad
+incorporates many of the tcp, udp, and icmp signatures included in the Snort
+intrusion detection system (http://www.snort.org) to detect highly suspect
+scans for various backdoor programs (e.g. EvilFTP, GirlFriend, SubSeven),
+DDoS tools (mstream, shaft), and advanced port scans (syn, fin, xmas) which
+are easily leveraged against a machine via nmap.
 
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 METHODOLOGY:
@@ -261,10 +261,10 @@ INSTALLATION:
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 PLATFORMS:
 
-    psad has been tested on RedHat 6.2 and 7.1 running kernels 2.2.14-5.0,
-2.2.18, 2.4.0, and 2.4.17, although it should work on any Linux system that
-has a properly configured firewall.  The only program that depends on the
-RedHat architecture is psad-init, which specifically depends on
+    psad has been tested on RedHat 6.2 and 7.3 running kernels 2.2.14-5.0,
+2.2.18, 2.4.0, 2.4.17, and 2.4.20, although it should work on any Linux system
+that has a properly configured firewall.  The only program that specifically
+depends on the RedHat architecture is psad-init, which specifically depends on
 /etc/rc.d/init.d/functions.  For non-RedHat systems a more generic init
 script is included called "psad-init.generic".  The psad init scripts are
 mostly included as a nicety; psad can be run from the command line like any

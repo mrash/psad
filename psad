@@ -482,9 +482,11 @@ unless ($no_whois) {
     }
 }
 
-### if psad is running on a syslog server, don't check the firewall
-### rules since they may not be local.
-unless ($no_fwcheck or $syslog_server or $benchmark) {
+### if psad is running on a syslog server, do not check the firewall
+### rules since they may not be local.  Also, do not check the
+### firewall if psad is configured to parse all iptables messages.
+unless ($config{'FW_SEARCH_ALL'} eq 'Y' or $no_fwcheck
+        or $syslog_server or $benchmark) {
     my $opts = "-c $config_file --fw-search $fw_search_file";
     $opts .= " --fw-analyze" if $fw_analyze;
     $opts .= " --fw-file $fw_file" if $fw_file;
@@ -845,7 +847,7 @@ sub check_scan() {
             }
         }
 
-        unless ($sid) {
+        unless ($sid or $config{'FW_SEARCH_ALL'} eq 'Y') {
             ### note that this is not _too_ strict since people
             ### have different ways of writing --log-prefix strings
             my $matched = 0;
@@ -1777,7 +1779,23 @@ sub import_fw_search() {
         next if $line =~ /^\s*#/;
         if ($line =~ /^\s*FW_MSG_SEARCH\s+(.*?);/) {
             push @fw_search, $1;
+        } elsif ($line =~ /^\s*FW_SEARCH_ALL\s+(\w+);/) {
+            my $strategy = $1;
+            if ($strategy eq 'Y' or $strategy eq 'N') {
+                $config{'FW_SEARCH_ALL'} = $strategy;
+            }
         }
+    }
+    unless (defined $config{'FW_SEARCH_ALL'}) {
+        &Psad::psyslog('psad', '** defaulting missing ' .
+            'FW_SEARCH_ALL variable in $fw_search_file to Y.');
+        $config{'FW_SEARCH_ALL'} = 'Y';
+    }
+
+    unless ($config{'FW_SEARCH_ALL'} eq 'Y' or
+            $config{'FW_SEARCH_ALL'} eq 'N') {
+        &Psad::psyslog('psad', '** setting FW_SEARCH_ALL to Y.');
+        $config{'FW_SEARCH_ALL'} = 'Y';
     }
     return;
 }
@@ -3410,11 +3428,14 @@ sub auto_psad_response() {
 
 sub auto_block_ignore_ip() {
     my $ip = shift;
-    return 1 if $ip eq '127.0.0.1';
-    return 1 if $ip eq '0.0.0.0';
     for my $local_ip (keys %local_ips) {
         return 1 if $ip eq $local_ip;
     }
+    ### matching the following two addresses is less likely (assuming
+    ### iptables is not logging traffic from localhost) than matching
+    ### a legitimate interface address
+    return 1 if $ip eq '127.0.0.1';
+    return 1 if $ip eq '0.0.0.0';
     return 0;
 }
 

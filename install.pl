@@ -510,7 +510,8 @@ sub install() {
         my $email_str = &query_email();
         if ($email_str) {
             for my $file qw(psad.conf psadwatchd.conf kmsgsd.conf) {
-                &put_email("${PSAD_CONFDIR}/$file", $email_str);
+                &put_string('EMAIL_ADDRESSES', $email_str,
+                    "${PSAD_CONFDIR}/$file");
             }
         }
         ### Give the admin the opportunity to add to the strings that are
@@ -554,7 +555,7 @@ sub install() {
                 ### default as of psad-1.3
                 if ($var eq 'HOME_NET') {
                     &logr(" ** HOME_NET is not defined in $file.\n");
-                    &set_home_net();
+                    &set_home_net("${PSAD_CONFDIR}/psad.conf");
                 }
                 if ($var eq 'HOSTNAME') {
                     &logr(" ** set_hostname() failed.  Edit the HOSTNAME " .
@@ -738,11 +739,9 @@ sub set_home_net() {
     my %connected_subnets;
     for my $line (@ifconfig_out) {
         if ($line =~ /^\s*lo\s+Link/) {
-            $intf_name = '';
             next;
         }
         if ($line =~ /^\s*dummy.*\s+Link/) {
-            $intf_name = '';
             next;
         }
         if ($line =~ /^(\w+)\s+Link/) {
@@ -1254,6 +1253,7 @@ sub query_email() {
             my @emails = split /\s+/, $emailstr;
             $correct = 1;
             for my $email (@emails) {
+                ### could be user@localhost
                 unless ($email =~ /\S+\@\S+/) {
                     $correct = 0;
                 }
@@ -1265,30 +1265,12 @@ sub query_email() {
     return '';
 }
 
-sub put_email() {
-    my ($file, $emailstr) = @_;
-    chomp $emailstr;
-    open RF, "< $file";
-    my @lines = <RF>;
-    close RF;
-    open F, "> $file";
-    for my $line (@lines) {
-        if ($line =~ /EMAIL_ADDRESSES\s+/) {
-            printf F "%-28s%s;\n", 'EMAIL_ADDRESSES', $emailstr;
-        } else {
-            print F $line;
-        }
-    }
-    close F;
-    return;
-}
-
 sub put_string() {
     my ($var, $value, $file) = @_;
     open RF, "< $file";
     my @lines = <RF>;
     close RF;
-    open F, "> $file";
+    open F, "> $file" or die " ** Could not open $file: $!";
     for my $line (@lines) {
         if ($line =~ /^\s*$var\s+.*;/) {
             printf F "%-28s%s;\n", $var, $value;

@@ -40,14 +40,16 @@ use Sys::Hostname;
 use strict;
 
 ### Note that Psad.pm is not included within the above list (installation
-### over existing psad install should not make use of an old Psad.pm).
+### over existing psad should not make use of an old Psad.pm).
 
 #============== config ===============
+my $PSAD_DIR    = "/var/log/psad";
+my $INSTALL_LOG = "${PSAD_DIR}/install.log";
+my $PSAD_FIFO   = "/var/run/psadfifo";
 my $INIT_DIR    = "/etc/rc.d/init.d";
 my $SBIN_DIR    = "/usr/sbin";  ### consistent with FHS (Filesystem Hierarchy Standard)
-my $INSTALL_LOG = "/var/log/psad/install.log";
 my @LOGR_FILES  = (*STDOUT, $INSTALL_LOG);
-my @EMAILS      = qw(root@localhost);
+my $RUNLEVEL;   ### This should only be set if install.pl cannot determine the correct runlevel
 
 ### system binaries ###
 my $chkconfigCmd = "/sbin/chkconfig";
@@ -57,7 +59,7 @@ my $findCmd      = "/usr/bin/find";
 my $killallCmd   = "/usr/bin/killall";
 my $perlCmd      = "/usr/bin/perl";
 my $ipchainsCmd  = "/sbin/ipchains";
-my $iptablesCmd  = "/usr/local/bin/iptables";
+my $iptablesCmd  = "/sbin/iptables";
 my $psadCmd      = "${SBIN_DIR}/psad";
 #============ end config ============
 
@@ -66,7 +68,6 @@ my $HOSTNAME = hostname;
 
 ### scope these vars
 my $PERL_INSTALL_DIR;  ### This is used to find pre-0.9.2 installations of psad
-my $RUNLEVEL;          ### This should only be set if install.pl cannot determine the correct runlevel
 
 ### set the install directory for the Psad.pm module
 my $found = 0;
@@ -110,26 +111,30 @@ my %Cmds = (
 
 my $distro = &get_distro();
 
+### add chkconfig only if we are runing on a redhat distro
 if ($distro =~ /redhat/) {
     $Cmds{'chkconfig'} = $chkconfigCmd;
 }
 
-### need to make sure this exists before attempting to write anything to the install log.
-&create_varlogpsad();
+### need to make sure this exists before attempting to
+### write anything to the install log.
+&create_psaddir();
 
-%Cmds = &check_commands(\%Cmds);
+&check_commands(\%Cmds);
 $Cmds{'psad'} = $psadCmd;
 
-$< == 0 && $> == 0 or die "You need to be root (or equivalent UID 0 account) to install/uninstall psad!\n";
+### check to make sure we are running as root
+$< == 0 && $> == 0 or die "You need to be root (or equivalent UID 0" .
+                          " account) to install/uninstall psad!\n";
 
 &check_old_psad_installation();  ### check for a pre-0.9.2 installation of psad.
 
 if ($uninstall) {
     my $t = localtime();
     my $time = " ... Uninstalling psad from $HOSTNAME: $t\n";
-    &logr("\n", \@LOGR_FILES);
+    &logr("\n",  \@LOGR_FILES);
     &logr($time, \@LOGR_FILES);
-    &logr("\n", \@LOGR_FILES);
+    &logr("\n",  \@LOGR_FILES);
 
     my $ans = "";
     while ($ans ne "y" && $ans ne "n") {
@@ -302,7 +307,7 @@ my $email_str = "";
 if ( -e "${SBIN_DIR}/psad" && (! $nopreserve)) {  # need to grab the old config
     &logr(" ... Copying psad -> ${SBIN_DIR}/psad\n", \@LOGR_FILES);
     &logr("     Preserving old config within ${SBIN_DIR}/psad\n", \@LOGR_FILES);
-    &preserve_config("psad", "${SBIN_DIR}/psad", \%Cmds);
+    &preserve_config("psad", "${SBIN_DIR}/psad");
     $email_str = &query_email("${SBIN_DIR}/psad");
     if ($email_str) {
         &put_email("${SBIN_DIR}/psad", $email_str);
@@ -328,7 +333,7 @@ if ( -e "${SBIN_DIR}/psad" && (! $nopreserve)) {  # need to grab the old config
 if ( -e "${SBIN_DIR}/psadwatchd" && (! $nopreserve)) {  # need to grab the old config
     &logr(" ... Copying psadwatchd -> ${SBIN_DIR}/psadwatchd\n", \@LOGR_FILES);
     &logr("     Preserving old config within ${SBIN_DIR}/psadwatchd\n", \@LOGR_FILES);
-    &preserve_config("psadwatchd", "${SBIN_DIR}/psadwatchd", \%Cmds);
+    &preserve_config("psadwatchd", "${SBIN_DIR}/psadwatchd");
     if ($email_str) {
         &put_email("${SBIN_DIR}/psadwatchd", $email_str);
     }
@@ -344,7 +349,7 @@ if ( -e "${SBIN_DIR}/psadwatchd" && (! $nopreserve)) {  # need to grab the old c
 if (-e "${SBIN_DIR}/kmsgsd" && (! $nopreserve)) { 
     &logr(" ... Copying kmsgsd -> ${SBIN_DIR}/kmsgsd\n", \@LOGR_FILES);
     &logr("     Preserving old config within ${SBIN_DIR}/kmsgsd\n", \@LOGR_FILES);
-    &preserve_config("kmsgsd", "${SBIN_DIR}/kmsgsd", \%Cmds);
+    &preserve_config("kmsgsd", "${SBIN_DIR}/kmsgsd");
     if ($append_fw_search_str) {
         &logr(" ... Appending \"$append_fw_search_str\" to \$FW_MSG_SEARCH in ${SBIN_DIR}/psad\n", \@LOGR_FILES);
         &put_fw_search_str("${SBIN_DIR}/kmsgsd", $append_fw_search_str);
@@ -362,7 +367,7 @@ if (-e "${SBIN_DIR}/kmsgsd" && (! $nopreserve)) {
 if (-e "${SBIN_DIR}/diskmond" && (! $nopreserve)) {
     &logr(" ... Copying diskmond -> ${SBIN_DIR}/diskmond\n", \@LOGR_FILES);
     &logr("     Preserving old config within ${SBIN_DIR}/diskmond\n", \@LOGR_FILES);
-    &preserve_config("diskmond", "${SBIN_DIR}/diskmond", \%Cmds);
+    &preserve_config("diskmond", "${SBIN_DIR}/diskmond");
     &perms_ownership("${SBIN_DIR}/diskmond", 0500);
 } else {
     &logr(" ... Copying diskmond -> ${SBIN_DIR}/diskmond\n", \@LOGR_FILES);
@@ -446,7 +451,7 @@ if ($distro =~ /redhat/) {
         &logr(" ... Copying psad-init -> ${INIT_DIR}/psad\n", \@LOGR_FILES);
         copy("psad-init", "${INIT_DIR}/psad");
         &perms_ownership("${INIT_DIR}/psad", 0744);
-        &enable_psad_at_boot($distro, $RUNLEVEL, \%Cmds);
+        &enable_psad_at_boot($distro);
         # remove signature checking from psad process if we are not running an iptables-enabled kernel
 #       system "$Cmds{'perl'} -p -i -e 's|\\-s\\s/etc/psad/psad_signatures||' ${INIT_DIR}/psad" if ($kernel !~ /^2.3/ && $kernel !~ /^2.4/);
     } else {
@@ -458,7 +463,7 @@ if ($distro =~ /redhat/) {
         &logr(" ... Copying psad-init.generic -> ${INIT_DIR}/psad\n", \@LOGR_FILES);
         copy("psad-init.generic", "${INIT_DIR}/psad");
         &perms_ownership("${INIT_DIR}/psad", 0744);
-        &enable_psad_at_boot($distro, $RUNLEVEL, \%Cmds);
+        &enable_psad_at_boot($distro);
         # remove signature checking from psad process if we are not running an iptables-enabled kernel
 #       system "$Cmds{'perl'} -p -i -e 's|\\-s\\s/etc/psad/psad_signatures||' ${INIT_DIR}/psad" if ($kernel !~ /^2.3/ && $kernel !~ /^2.4/);
     } else {
@@ -539,7 +544,7 @@ sub get_distro() {
     }
 }
 sub preserve_config() {
-    my ($srcfile, $productionfile, $Cmds_href) = @_;
+    my ($srcfile, $productionfile) = @_;
     my $start = 0;
     my @config = ();
     my @defconfig = ();
@@ -695,9 +700,9 @@ sub perms_ownership() {
     chown 0, 0, $file;  # chown uid, gid, $file
     return;
 }
-sub create_varlogpsad() {
-    unless (-d "/var/log/psad") {
-        mkdir "/var/log/psad", 0400;
+sub create_psaddir() {
+    unless (-d $PSAD_DIR) {
+        mkdir $PSAD_DIR, 0400;
     }
     return;
 }
@@ -826,7 +831,7 @@ sub put_fw_search_str() {
     return;
 }
 sub enable_psad_at_boot() {
-    my ($distro, $run_level, $Cmds_href) = @_;
+    my $distro = shift;
     my $ans = "";
     while ($ans ne "y" && $ans ne "n") {
         print " ... Enable psad at boot time (y/n)?  ";
@@ -835,30 +840,29 @@ sub enable_psad_at_boot() {
     }
     if ($ans eq "y") {
         if ($distro =~ /redhat/) {
-            system "$Cmds_href->{'chkconfig'} --add psad";
+            system "$Cmds{'chkconfig'} --add psad";
         } else {  ### it is a non-redhat distro, try to get the runlevel from /etc/inittab
-            if ($run_level) {
-                unless (-e "/etc/rc.d/rc${run_level}.d/S99psad") {  ### the link already exists, so don't re-create it
-                    symlink "/etc/rc.d/init.d/psad", "/etc/rc.d/rc${run_level}.d/S99psad";
+            if ($RUNLEVEL) {
+                unless (-e "/etc/rc.d/rc${RUNLEVEL}.d/S99psad") {  ### the link already exists, so don't re-create it
+                    symlink "/etc/rc.d/init.d/psad", "/etc/rc.d/rc${RUNLEVEL}.d/S99psad";
                 }
             } elsif (-e "/etc/inittab") {
-                my $runlevel;
                 open I, "< /etc/inittab";
                 my @ilines = <I>;
                 close I;
                 for my $l (@ilines) {
                     chomp $l;
                     if ($l =~ /^id\:(\d)\:initdefault/) {
-                        $runlevel = $1;
+                        $RUNLEVEL = $1;
                         last;
                     }
                 }
-                unless ($runlevel) {
+                unless ($RUNLEVEL) {
                     print "@@@@@  Could not determine the runlevel.  Set the runlevel\nmanually in the config section of install.pl\n";
                     return;
                 }
-                unless (-e "/etc/rc.d/rc${runlevel}.d/S99psad") {  ### the link already exists, so don't re-create it
-                    symlink "/etc/rc.d/init.d/psad", "/etc/rc.d/rc${runlevel}.d/S99psad";
+                unless (-e "/etc/rc.d/rc${RUNLEVEL}.d/S99psad") {  ### the link already exists, so don't re-create it
+                    symlink "/etc/rc.d/init.d/psad", "/etc/rc.d/rc${RUNLEVEL}.d/S99psad";
                 }
             } else {
                 print "@@@@@  /etc/inittab does not exist!  Set the runlevel\nmanually in the config section of install.pl.\n";
@@ -874,20 +878,30 @@ sub enable_psad_at_boot() {
 sub check_commands() {
     my $Cmds_href = shift;
     my $caller = $0;
+    my @path = qw(/bin /sbin /usr/bin /usr/sbin /usr/local/bin /usr/local/sbin);
     CMD: for my $cmd (keys %$Cmds_href) {
-        unless (-e $Cmds_href->{$cmd}) {
-            my $cmd_name = (split /\//, $Cmds_href->{$cmd})[$#_];
-            my $real_location = `which $cmd_name 2> /dev/null`;
-            chomp $real_location;
-            if ($real_location) {
-                $Cmds_href->{$cmd} = $real_location;
-            } else {
+        my $cmd_name = ($Cmds_href->{$cmd} =~ m|.*/(.*)|);
+        unless (-x $Cmds_href->{$cmd}) {
+            my $found = 0;
+            PATH: for my $dir (@path) {
+                if (-x "${dir}/${cmd}") {
+                    $Cmds_href->{$cmd} = "${dir}/${cmd}";
+                    $found = 1;
+                    last PATH;
+                }
+            }
+            unless ($found) {
                 next CMD if ($cmd eq "ipchains" || $cmd eq "iptables");
-                die "\n@@@@@  ($caller): Could not find $cmd anywhere!!!  Please edit the config section to include the path to $cmd.\n";
+                die "\n@@@@@  ($caller): Could not find $cmd anywhere!!!  Please" .
+                    " edit the config section to include the path to $cmd.\n";
             }
         }
+        unless (-x $Cmds_href->{$cmd}) {
+            die "\n@@@@@  ($caller):  $cmd_name is located at $Cmds_href->{$cmd}" .
+                                            " but is not executable by uid: $<\n";
+        }
     }
-return %$Cmds_href;
+    return;
 }
 ### logging subroutine that handles multiple filehandles
 sub logr() {

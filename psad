@@ -313,6 +313,8 @@ my $fw_file          = '';
 my $rm_data_ctr      = 0;
 my $analysis_emails  = 0;
 my $netstat_lkup_ctr = 0;
+my $warn_msg         = '';
+my $die_msg          = '';
 my $local_ips_lkup_ctr = 0;
 
 ### these flags are used to disable several features
@@ -447,7 +449,7 @@ Getopt::Long::Configure('no_ignore_case');
 
 ### Print the version number and exit if -V given on the command line.
 if ($ver) {
-    print " .. psad v$version, by Michael Rash ",
+    print "[+] psad v$version, by Michael Rash ",
         "<mbr\@cipherdyne.org>\n";
     exit 0;
 }
@@ -492,7 +494,7 @@ unless ($no_fwcheck or $syslog_server or $benchmark) {
     my $opts = "-c $config_file --fw-search $fw_search_file";
     $opts .= " --fw-analyze" if $fw_analyze;
     $opts .= " --fw-file $fw_file" if $fw_file;
-    $opts .= " --no-fw-search-all" if $config{'FW_SEARCH_ALL'} eq 'Y';
+    $opts .= " --no-fw-search-all" if $config{'FW_SEARCH_ALL'} eq 'N';
     my $es = (system "$cmds{'fwcheck_psad'} $opts") >> 8;
 
     exit $es if $fw_analyze;  ### finished analyzing ruleset so exit.
@@ -560,17 +562,17 @@ unless ($benchmark or $fw_analyze) {
 }
 
 if ($benchmark) {
-    print scalar localtime(), " .. Entering benchmark mode.\n";
+    print scalar localtime(), "[+] Entering benchmark mode.\n";
     $no_rdns  = 1;  ### turn off network related functions
     $no_whois = 1;
     if ($b_packets) {
         print scalar localtime(),
-            " .. Executing a $b_packets packet test.\n";
+            "[+] Executing a $b_packets packet test.\n";
     } else {
-        print scalar localtime(), ' .. The --packets command line ',
+        print scalar localtime(), '[+] The --packets command line ',
             "option was not specified.\n";
         print scalar localtime(),
-            " .. Defaulting to a 10,000 packet test.\n";
+            "[+] Defaulting to a 10,000 packet test.\n";
         $b_packets = 10000;
     }
 }
@@ -623,7 +625,7 @@ for (;;) {
     if ($hup_flag) {
         $hup_flag = 0;  ### clear the HUP flag
 
-        &Psad::psyslog('psad', '.. received HUP signal, ' .
+        &Psad::psyslog('psad', 'received HUP signal, ' .
             're-importing psad.conf');
 
         my $orig_fwdata = $config{'FW_DATA_FILE'};
@@ -650,7 +652,7 @@ for (;;) {
     if ($usr1_flag) {
         $usr1_flag = 0;  ### clear the USR1 flag
 
-        &Psad::psyslog('psad', '.. received USR1 signal, printing scan ' .
+        &Psad::psyslog('psad', 'received USR1 signal, printing scan ' .
             "hashes to $config{'PSAD_DIR'}/scan_hash.$$");
         &print_scan();
     }
@@ -659,7 +661,7 @@ for (;;) {
     ### FW_DATA_FILE by kmsgsd for psad analysis.
     if ($benchmark) {
         $b_time = time();
-        print scalar localtime(), " .. Creating packet array.\n";
+        print scalar localtime(), "[+] Creating packet array.\n";
         my $dp = 1000;
         for (my $i=0; $i <= $b_packets; $i++) {
             push @fw_packets, "$test_pkt DPT=$dp $test_pktend";
@@ -669,7 +671,7 @@ for (;;) {
         @fw_packets = <FWDATA>;
     }
     if (@fw_packets) {
-        print scalar localtime(), " .. check_scan()\n" if $benchmark;
+        print scalar localtime(), "[+] check_scan()\n" if $benchmark;
 
         if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y' and not $benchmark) {
             ### calculate the timezone offset
@@ -745,14 +747,24 @@ for (;;) {
     ### Print the number of new packets we saw in FW_DATA_FILE if we are
     ### running in debug mode
     if ($debug) {
-        print STDERR " .. MAIN: number of new packets: $#fw_packets\n";
+        print STDERR "[+] MAIN: number of new packets: $#fw_packets\n";
     }
 
     if ($benchmark) {
-        print scalar localtime(), " .. Packet creation and processing time: ",
+        print scalar localtime(), "[+] Packet creation and processing time: ",
             time() - $b_time, " sec.\n";
-        print scalar localtime(), " .. Exiting benchmark mode.\n";
+        print scalar localtime(), "[+] Exiting benchmark mode.\n";
         exit 0;
+    }
+
+    if ($die_msg) {
+        &Psad::print_msg($die_msg, "$config{'PSAD_DIR'}/errs/psad.die");
+        $die_msg = '';
+    }
+
+    if ($warn_msg) {
+        &Psad::print_msg($warn_msg, "$config{'PSAD_DIR'}/errs/psad.warn");
+        $warn_msg = '';
     }
 
     ### clearerr() on the FWDATA filehandle to be ready for new packets
@@ -836,7 +848,7 @@ sub check_scan() {
             $pkt_ctr++;
             if ($pkt_ctr % $print_scale_factor == 0) {
                 print "    ", scalar localtime(),
-                    " .. Processed $pkt_ctr packets.\n";
+                    "[+] Processed $pkt_ctr packets.\n";
             }
         }
 
@@ -1002,7 +1014,7 @@ sub check_scan() {
 
         ### If we made it here then we correctly matched packets
         ### that the firewall logged.
-        print STDERR " .. valid packet: $src -> $dst $proto\n" if $debug;
+        print STDERR "[+] valid packet: $src -> $dst $proto\n" if $debug;
 
         ### initialize the danger level to 0 if it is not already defined
         ### (note the same source address might have already scanned a
@@ -1145,22 +1157,22 @@ sub check_scan() {
 
     ### write bogus packets to the error log.
     if ($benchmark) {
-        print scalar localtime(), " .. Err packets: $#err_pkts.\n";
+        print scalar localtime(), "[+] Err packets: $#err_pkts.\n";
     } else {
         &collect_errors(\@err_pkts) unless $no_ipt_errors;
     }
 
     ### Assign a danger level to the scan
-    print " .. Assigning danger levels.\n" if $analyze_msgs;
+    print "[+] Assigning danger levels.\n" if $analyze_msgs;
     &assign_danger_level(\%curr_scan, \%curr_sigs_dl, \%curr_sids_dl);
 
     ### Log and send email and syslog alerts
     if ($analyze_msgs) {
-        print " .. Writing $config{'PSAD_DIR'}/<ip> directories.\n";
+        print "[+] Writing $config{'PSAD_DIR'}/<ip> directories.\n";
         if ($analysis_emails) {
-            print " .. Generating email alerts.\n";
+            print "[+] Generating email alerts.\n";
             unless ($no_whois) {
-                print " .. Issuing whois lookups (may take several seconds).\n";
+                print "[+] Issuing whois lookups (may take several seconds).\n";
             }
         }
     }
@@ -1183,7 +1195,7 @@ sub match_sigs() {
     my $dl = 0;
     if ($proto eq 'tcp') {
         for my $sid (keys %{$sigs{'tcp'}}) {
-            print STDERR " .. match_sigs(): sid: $sid ",
+            print STDERR "[+] match_sigs(): sid: $sid ",
                 "$sigs{'tcp'}{$sid}{'src'} -> ",
                 "$sigs{'tcp'}{$sid}{'dst'}\n" if $debug;
             next unless defined $sigs{'tcp'}{$sid}{'flags'};
@@ -1194,7 +1206,7 @@ sub match_sigs() {
                 ### future
 #               && &check_misc_fields($sid, $proto, $len, $ttl)) {
                 ### tripped a tcp signature
-                print STDERR " .. match_sigs(): matched tcp $dp,$sp,$flags, ",
+                print STDERR "[+] match_sigs(): matched tcp $dp,$sp,$flags, ",
                     "sid: $sid\n" if $debug;
                 if ($dl < $sigs_attr{$sid}{'dl'}) {
                     $dl = $sigs_attr{$sid}{'dl'};
@@ -1212,7 +1224,7 @@ sub match_sigs() {
                     and &check_port($sp, $dp, $sigs{'udp'}{$sid})) {
 #               && &check_misc_fields($sid, $proto, $len, $ttl)) {
                 ### tripped a udp signature
-                print STDERR " .. match_sigs(): matched udp $dp,$sp, ",
+                print STDERR "[+] match_sigs(): matched udp $dp,$sp, ",
                     "sid: $sid\n" if $debug;
                 if ($dl < $sigs_attr{$sid}{'dl'}) {
                     $dl = $sigs_attr{$sid}{'dl'};
@@ -1244,7 +1256,7 @@ sub match_sigs() {
                     and &check_dst($chain, $dst, $sigs{'icmp'}{$sid}{'dst'})
                     and &check_icmp_sig($sid, $ttl, $type, $code,
                         $id, $seq)) {
-                print STDERR " .. match_sigs(): matched icmp sid: $sid\n"
+                print STDERR "[+] match_sigs(): matched icmp sid: $sid\n"
                     if $debug;
                 if ($dl < $sigs_attr{$sid}{'dl'}) {
                     $dl = $sigs_attr{$sid}{'dl'};
@@ -1271,7 +1283,7 @@ sub posf() {
     $posf{$src}{'ctr'}++;
     push @{$posf{$src}{'id'}}, $id;  ### need to maintain ordering
 
-    print STDERR " .. posf():  $src  LEN: $len, TOS: $tos, TTL: $ttl, ",
+    print STDERR "[+] posf():  $src  LEN: $len, TOS: $tos, TTL: $ttl, ",
         "ID: $id, WIN: $win\n" if $debug;
 
     $id_str = &id_incr(\@{$posf{$src}{'id'}});
@@ -1285,7 +1297,7 @@ sub posf() {
                     and ($max_ttl <= $posf_sigs{$os}{'ttl'})
                     and $id_str eq $posf_sigs{$os}{'id'}) {
                 $posf{$src}{'guess'} = $os;
-                print STDERR " .. posf(): matched OS: $os\n" if $debug;
+                print STDERR "[+] posf(): matched OS: $os\n" if $debug;
                 return;
             }
         }
@@ -1372,7 +1384,7 @@ sub dshield_email_log() {
             close MAIL;
         }
 
-        &Psad::psyslog('psad', ".. sent $#dshield_data lines of log data to " .
+        &Psad::psyslog('psad', "sent $#dshield_data lines of log data to " .
             $config{'DSHIELD_ALERT_EMAIL'});
 
         ### store the current time
@@ -1505,21 +1517,21 @@ sub check_ip_in_network() {
             if ($n =~ m|($ip_re/$ip_re)|) {
                 my $str = $1;
                 if (ipv4_in_network($str, $ip)) {
-                    print STDERR " .. check_ip_in_network(): matched ",
+                    print STDERR "[+] check_ip_in_network(): matched ",
                         "ip: $ip to net: $n\n" if $debug;
                     return 1;
                 }
             } elsif ($n =~ m|($ip_re/\d+)|) {
                 my $str = $1;
                 if (ipv4_in_network($str, $ip)) {
-                    print STDERR " .. check_ip_in_network(): matched ",
+                    print STDERR "[+] check_ip_in_network(): matched ",
                         "ip: $ip to net: $n\n" if $debug;
                     return 1;
                 }
             } elsif ($n =~ m|($ip_re)|) {
                 my $str = $1;
                 if ($ip eq $str) {
-                    print STDERR " .. check_ip_in_network(): matched ",
+                    print STDERR "[+] check_ip_in_network(): matched ",
                         "ip: $ip to ip: $n\n" if $debug;
                     return 1;
                 }
@@ -1528,26 +1540,26 @@ sub check_ip_in_network() {
     } elsif ($net =~ m|($ip_re/$ip_re)|) {
         my $str = $1;
         if (ipv4_in_network($str, $ip)) {
-            print STDERR " .. check_ip_in_network(): matched ip: $ip ",
+            print STDERR "[+] check_ip_in_network(): matched ip: $ip ",
                 "to net: $net\n" if $debug;
             return 1;
         }
     } elsif ($net =~ m|($ip_re/\d+)|) {
         my $str = $1;
         if (ipv4_in_network($str, $ip)) {
-            print STDERR " .. check_ip_in_network(): matched ip: $ip ",
+            print STDERR "[+] check_ip_in_network(): matched ip: $ip ",
                 "to net: $net\n" if $debug;
             return 1;
         }
     } elsif ($net =~ /($ip_re)/) {
         my $str = $1;
         if ($ip eq $str) {
-            print STDERR " .. check_ip_in_network(): matched ",
+            print STDERR "[+] check_ip_in_network(): matched ",
                 "ip: $ip to ip: $net\n" if $debug;
             return 1;
         }
     }
-    print STDERR " .. check_ip_in_network(): Could not match ",
+    print STDERR "[+] check_ip_in_network(): Could not match ",
         "$ip within $net\n" if $debug;
     return 0;
 }
@@ -1700,7 +1712,7 @@ sub psad_init() {
     ### the --Restart command line switch was given
     exit &restart() if $restart;
 
-    &Psad::psyslog('psad', '.. starting psad');
+    &Psad::psyslog('psad', 'starting psad');
 
     ### import psad signatures (FIXME:: these should be taken directly
     ### from the snort signatures instead)
@@ -1749,7 +1761,7 @@ sub validate_config() {
     if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
             and $config{'IPTABLES_BLOCK_METHOD'} eq 'N'
             and $config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'N') {
-        &Psad::psyslog('psad', '.. config warning, ENABLE_AUTO_IDS=Y, but ' .
+        &Psad::psyslog('psad', 'config warning, ENABLE_AUTO_IDS=Y, but ' .
             'both IPTABLES_BLOCK_METHOD and TCPWRAPPERS_BLOCK_METHOD are ' .
             'set to N.');
     }
@@ -1791,14 +1803,14 @@ sub validate_home_net() {
     if ($config{'HOME_NET'} =~ /CHANGEME/) {
         if ($#connected_subnets >= 1) {
             ### so there are at least two interfaces
-            &Psad::psyslog('psad', '.. config warning; the HOME_NET ' .
+            &Psad::psyslog('psad', 'config warning; the HOME_NET ' .
                 'variable has not been set; defaulting to a single ' .
                 'interface config for signature matching.');
         } else {
             ### the HOME_NET variable has not been set (should be set
             ### to "NOT_USED" since there is only one interface on the
             ### box
-            &Psad::psyslog('psad', '.. config warning; the HOME_NET ' .
+            &Psad::psyslog('psad', 'config warning; the HOME_NET ' .
                 'variable has not been set; should probably be set to ' .
                 'NOT_USED since it appears there is only one interface.');
         }
@@ -1817,7 +1829,7 @@ sub validate_home_net() {
             ### note that this might be ok if psad is running on a syslog
             ### server, but the most likely explanation is that there was a
             ### typo in the HOME_NET variable defintion.
-            &Psad::psyslog('psad', '.. config warning; HOME_NET definition ' .
+            &Psad::psyslog('psad', 'config warning; HOME_NET definition ' .
                 "in psad.conf contains $home_net which does not appear to " .
                 "be directly connected to the local system.");
         }
@@ -1843,14 +1855,14 @@ sub import_fw_search() {
         }
     }
     unless (defined $config{'FW_SEARCH_ALL'}) {
-        &Psad::psyslog('psad', '** defaulting missing ' .
-            'FW_SEARCH_ALL variable in $fw_search_file to Y.');
+        &Psad::psyslog('psad', 'defaulting missing ' .
+            "FW_SEARCH_ALL variable in $fw_search_file to Y.");
         $config{'FW_SEARCH_ALL'} = 'Y';
     }
 
     unless ($config{'FW_SEARCH_ALL'} eq 'Y' or
             $config{'FW_SEARCH_ALL'} eq 'N') {
-        &Psad::psyslog('psad', '** setting FW_SEARCH_ALL to Y.');
+        &Psad::psyslog('psad', 'setting FW_SEARCH_ALL to Y.');
         $config{'FW_SEARCH_ALL'} = 'Y';
     }
     return;
@@ -1869,8 +1881,8 @@ sub import_snort_rules() {
             next FILE unless $rfile =~ /^${srules_type}\.rules$/;
         }
         my ($type) = ($rfile =~ /(\w+)\.rules/);
-#        printf("%-30s", " .. $rfile");
-#        &logr(" .. Parsing $rfile\n", $logfile);
+#        printf("%-30s", "[+] $rfile");
+#        &logr("[+] Parsing $rfile\n", $logfile);
         open R, "< ${config{'SNORT_RULES_DIR'}}/${rfile}" or
             die "[*] Could not open: ${srules_type}/${rfile}";
         my @lines = <R>;
@@ -1910,7 +1922,7 @@ sub import_snort_rules() {
         }
     }
     print STDERR Dumper %snort_msgs if $debug;
-    &Psad::psyslog('psad', '.. imported snort-2.1 signatures');
+    &Psad::psyslog('psad', 'imported snort-2.1 signatures');
     return;
 }
 
@@ -2110,7 +2122,7 @@ sub import_signatures() {
         print STDERR Dumper "[-] signature attributes hash:\n";
         print STDERR Dumper %sigs_attr;
     }
-    &Psad::psyslog('psad', '.. imported psad-1.3 signatures');
+    &Psad::psyslog('psad', 'imported psad-1.3 signatures');
     return;
 }
 
@@ -2144,7 +2156,7 @@ sub import_icmp_types() {
         }
     }
     print STDERR Dumper %valid_icmp_types if $debug;
-    &Psad::psyslog('psad', '.. imported valid icmp types and codes');
+    &Psad::psyslog('psad', 'imported valid icmp types and codes');
     return;
 }
 
@@ -2259,7 +2271,7 @@ sub import_auto_dl() {
                 $auto_dl{'net'}{$net}{'allproto'} = $dl;
             }
         } else {
-            my $subject = " ** psad import warning: " .
+            my $subject = "[-] psad import warning: " .
                 "$config{'PSAD_AUTO_DL_FILE'} error on line: $i";
             &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
                 $cmds{'mail'});
@@ -2271,7 +2283,7 @@ sub import_auto_dl() {
         $ip_ctr++ for keys %{$auto_dl{'ip'}};
         $net_ctr++ for keys %{$auto_dl{'net'}};
         &Psad::psyslog('psad',
-            ".. imported auto_dl, got $ip_ctr IPs and $net_ctr networks");
+            "imported auto_dl, got $ip_ctr IPs and $net_ctr networks");
     }
     return;
 }
@@ -2307,45 +2319,45 @@ sub import_posf_sigs() {
     ### make sure each of the os signatures has all fields defined
     OS: for my $os (keys %posf_sigs) {
         unless (defined $posf_sigs{$os}{'numpkts'}) {
-            &Psad::psyslog('psad', "** $posf_file: missing " .
+            &Psad::psyslog('psad', "$posf_file: missing " .
                 "NUMPKTS for os: $os");
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'tos'}) {
-            &Psad::psyslog('psad', "** $posf_file: missing " .
+            &Psad::psyslog('psad', "$posf_file: missing " .
                 "TOS for os: $os");
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'len'}) {
-            &Psad::psyslog('psad', "** $posf_file: missing " .
+            &Psad::psyslog('psad', "$posf_file: missing " .
                 "LEN for os: $os");
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'ttl'}) {
-            &Psad::psyslog('psad', "** $posf_file: missing " .
+            &Psad::psyslog('psad', "$posf_file: missing " .
                 "TTL for os: $os");
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'id'}) {
-            &Psad::psyslog('psad', "** $posf_file: missing " .
+            &Psad::psyslog('psad', "$posf_file: missing " .
                 "ID for os: $os");
             delete $posf_sigs{$os};
             next OS;
         } else {
             unless ($posf_sigs{$os}{'id'} eq 'SMALLINCR'
                     || $posf_sigs{$os}{'id'} eq 'RANDOM') {
-                &Psad::psyslog('psad', "** $posf_file: ID must " .
+                &Psad::psyslog('psad', "$posf_file: ID must " .
                     "be either SMALLINCR or RANDOM for os: $os");
                 delete $posf_sigs{$os};
                 next OS;
             }
         }
         unless (defined $posf_sigs{$os}{'win'}) {
-            &Psad::psyslog('psad', "** $posf_file: missing " .
+            &Psad::psyslog('psad', "$posf_file: missing " .
                 "WINDOW for os: $os");
             delete $posf_sigs{$os};
             next OS;
@@ -2353,7 +2365,7 @@ sub import_posf_sigs() {
     }
     print STDERR Dumper %posf_sigs if $debug;
     &Psad::psyslog('psad',
-        '.. imported passive OS fingerprinting signatures');
+        'imported passive OS fingerprinting signatures');
     return;
 }
 
@@ -2372,7 +2384,7 @@ sub assign_danger_level() {
 
         my $changed_dl = 0;
 
-        print STDERR " .. assign_danger_level(): source ip: $src\n"
+        print STDERR "[+] assign_danger_level(): source ip: $src\n"
             if $debug;
 
         ### get auto danger level
@@ -2392,7 +2404,7 @@ sub assign_danger_level() {
                     $scan_dl{$src} = $auto_dl;
                     $assigned_auto_dl{$src} = '';
                     &Psad::psyslog('psad',
-                        ".. auto-assigned dl: $auto_dl for IP: $src");
+                        " auto-assigned danger level: $auto_dl for IP: $src");
                     $changed_dl = 1;
                 }
             }
@@ -2477,7 +2489,7 @@ sub assign_danger_level() {
                     $scan_dl{$src} = 5;
                 }
             }
-            print STDERR ' .. assign_danger_level(): DL (after assignment) = ',
+            print STDERR '[+] assign_danger_level(): DL (after assignment) = ',
                 "$scan_dl{$src}\n" if $debug;
         }
     }
@@ -2601,7 +2613,7 @@ sub scan_logr() {
 
     return if $benchmark;
     for my $src (keys %$curr_scan_hr) {
-        print STDERR " .. scan_logr(): source ip: $src\n" if $debug;
+        print STDERR "[+] scan_logr(): source ip: $src\n" if $debug;
         DST: for my $dst (keys %{$curr_scan_hr->{$src}}) {
 
             ### see if we have already sent an alert for $src
@@ -2646,7 +2658,7 @@ sub scan_logr() {
                 }
                 next DST;
             }
-            print STDERR " .. scan_logr(): dst ip: $dst\n" if $debug;
+            print STDERR "[+] scan_logr(): dst ip: $dst\n" if $debug;
 
             ### make $src directory here in /var/log/psad
             ### unless it already exists
@@ -2768,7 +2780,7 @@ sub scan_logr() {
             unless ($no_whois) {
                 $whois_info_aref = &get_whois_info($src, $whois_file);
             }
-            print STDERR " .. scan_logr(): generating email.....\n"
+            print STDERR "[+] scan_logr(): generating email.....\n"
                 if $debug;
 
             ### get the absolute starting time for the scan and the
@@ -2803,7 +2815,7 @@ sub scan_logr() {
 
             print $fh "=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=",
                 "-=-=-=-=\n",
-                " ** psad: Suspicious traffic detected against ",
+                "[*] psad: Suspicious traffic detected against ",
                 "$dst\n\n\n";
 
             printf $fh "%${log_len}s%s", 'Danger level: ',
@@ -2944,12 +2956,12 @@ sub scan_logr() {
             &scan_logr_signatures($src, $dst, $fh, $log_sigs);
 
             ### write a scan message to syslog
-            &Psad::psyslog('psad', ".. scan detected: $src -> $dst " .
+            &Psad::psyslog('psad', "scan detected: $src -> $dst " .
                 "$syslog_range tcp=$tcp_newpkts udp=$udp_newpkts " .
                 "icmp=$icmp_newpkts dangerlevel: $curr_dl");
 
             unless ($no_whois) {
-                print $fh  "\n ** Whois Information: **\n";
+                print $fh  "\n[*] Whois Information:\n";
                 for my $line (@$whois_info_aref) {
                     print $fh $line;
                 }
@@ -2963,11 +2975,11 @@ sub scan_logr() {
                 unless ($analyze_msgs and not $analysis_emails) {
                     my $subject;
                     if ($analyze_msgs) {
-                        $subject = " ** psad (analysis mode): [DL$curr_dl] SCAN from: $src_subj";
+                        $subject = "[+] psad (analysis mode): [DL$curr_dl] SCAN from: $src_subj";
                     } else {
-                        $subject = " ** psad: [DL$curr_dl] SCAN from: $src_subj";
+                        $subject = "[+] psad: [DL$curr_dl] SCAN from: $src_subj";
                     }
-                    &Psad::psyslog('psad', ".. sending email alert to: " .
+                    &Psad::psyslog('psad', "sending email alert to: " .
                         "$config{'EMAIL_ADDRESSES'}\n");
                     &Psad::sendmail($subject, $email_file,
                         $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
@@ -3010,9 +3022,9 @@ sub scan_logr_signatures() {
             or defined $scan{$src}{$dst}{$proto}{'sid'}
             or defined $scan{$src}{$dst}{$proto}{'invalid_type'}
             or defined $scan{$src}{$dst}{$proto}{'invalid_code'});
-        print $email_fh "\n\n ** $proto scan signatures: **\n\n";
-        print LS "\n\n ** $proto scan signatures **\n\n";
-        print STDERR " .. scan_logr_signatures(): src: $src dst: $dst ",
+        print $email_fh "\n\n[*] $proto scan signatures:\n\n";
+        print LS "\n\n[*] $proto scan signatures\n\n";
+        print STDERR "[+] scan_logr_signatures(): src: $src dst: $dst ",
             "proto: $proto\n" if $debug;
         for my $sid (keys %{$scan{$src}{$dst}{$proto}{'sid'}}) {
             for my $chain (keys %{$scan{$src}{$dst}{$proto}{'sid'}{$sid}}) {
@@ -3224,7 +3236,7 @@ sub renew_auto_blocked_ips() {
                 ### add block rule for $ip unless it is already blocked
                 unless (&ipt_test_block($ip)) {
                     &ipt_block($ip);
-                    &Psad::sendmail(" ** psad: RENEWED iptables BLOCK against $ip" .
+                    &Psad::sendmail("[+] psad: RENEWED iptables BLOCK against $ip" .
                         $timeout_str, '', $config{'EMAIL_ADDRESSES'},
                         $cmds{'mail'});
                 }
@@ -3247,7 +3259,7 @@ sub renew_auto_blocked_ips() {
                 my $ip = $1;
                 unless (&tcpwr_test_block($ip)) {
                     &tcpwr_block($ip);
-                    &Psad::sendmail(" ** psad: RENEWED tcpwrappers BLOCK against $ip" .
+                    &Psad::sendmail("[+] psad: RENEWED tcpwrappers BLOCK against $ip" .
                         $timeout_str, '', $config{'EMAIL_ADDRESSES'},
                         $cmds{'mail'});
                 }
@@ -3262,7 +3274,7 @@ sub renew_auto_blocked_ips() {
 sub flush_auto_blocked_ips() {
     my $found_blocked = 0;
     if (-e $config{'AUTO_BLOCK_IPT_FILE'}) {
-        print " .. Removing iptables auto-generated block rules.\n";
+        print "[+] Removing iptables auto-generated block rules.\n";
         open B, "< $config{'AUTO_BLOCK_IPT_FILE'}" or
             die "[*] Could not open $config{'AUTO_BLOCK_IPT_FILE'}: $!";
         my @lines = <B>;
@@ -3282,7 +3294,7 @@ sub flush_auto_blocked_ips() {
         $found_blocked = 1;
     }
     if (-e $config{'AUTO_BLOCK_TCPWR_FILE'}) {
-        print " .. Removing tcpwrapper auto-generated block rules.\n";
+        print "[+] Removing tcpwrapper auto-generated block rules.\n";
         open B, "< $config{'AUTO_BLOCK_TCPWR_FILE'}" or
             die "[*] Could not open $config{'AUTO_BLOCK_TCPWR_FILE'}: $!";
         my @lines = <B>;
@@ -3302,7 +3314,7 @@ sub flush_auto_blocked_ips() {
         $found_blocked = 1;
     }
     unless ($found_blocked) {
-        print " ** Currently there are no auto-generated ".
+        print "[*] Currently there are no auto-generated ".
             "block rules in effect.\n";
     }
     exit $found_blocked;
@@ -3311,13 +3323,13 @@ sub flush_auto_blocked_ips() {
 sub ipt_test_block() {
     my $ip = shift;
 
-    print STDERR " .. ipt_test_block($ip)\n" if $debug;
+    print STDERR "[+] ipt_test_block($ip)\n" if $debug;
     ### get the active iptables chains
     &get_iptables_chains() unless $chk_ipt_chains;
 
     for my $table (keys %ipt_chains) {
         for my $chain (keys %{$ipt_chains{$table}}) {
-            print STDERR " .. ipt_test_block(): table: $table, chain: $chain\n"
+            print STDERR "[+] ipt_test_block(): table: $table, chain: $chain\n"
                 if $debug;
             open IPT, "$cmds{'iptables'} -t $table -nL $chain |" or next;
             my @rules = <IPT>;
@@ -3329,9 +3341,9 @@ sub ipt_test_block() {
                 ### DROP       all  --  1.1.1.1        0.0.0.0/0
                 if ($rule =~ /^DROP\s+all.*?$ip\s+0\.0\.0\.0\/0/) {
                     if ($debug) {
-                        print STDERR " .. ipt_test_block($ip): found ip: ",
+                        print STDERR "[+] ipt_test_block($ip): found ip: ",
                             "$ip\n";
-                        print STDERR " .. ipt_test_block($ip): matched ",
+                        print STDERR "[+] ipt_test_block($ip): matched ",
                             "rule: $rule\n";
                     }
                     return 1;
@@ -3348,14 +3360,14 @@ sub ipt_test_block() {
 sub ipt_block() {
     my $src = shift;
 
-    print STDERR " .. ipt_block($src)\n" if $debug;
+    print STDERR "[+] ipt_block($src)\n" if $debug;
     ### get the active iptables chains
     &get_iptables_chains() unless $chk_ipt_chains;
 
     my $block_success = 0;
     for my $table (keys %ipt_chains) {
         for my $chain (keys %{$ipt_chains{$table}}) {
-            print STDERR " .. ipt_block($src): table: $table, chain: $chain\n"
+            print STDERR "[+] ipt_block($src): table: $table, chain: $chain\n"
                 if $debug;
             my $rv = 1;
             eval {
@@ -3368,11 +3380,11 @@ sub ipt_block() {
     }
     if ($block_success) {
         ### write the ip out to the auto blocked file
-        print STDERR " .. ipt_block(): added block for $src\n"
+        print STDERR "[+] ipt_block(): added block for $src\n"
             if $debug;
         &write_blocked_ip($src, $config{'AUTO_BLOCK_IPT_FILE'});
     } else {
-        &Psad::psyslog('psad', "** could not add iptables " .
+        &Psad::psyslog('psad', "could not add iptables " .
             "block rule for: $src");
         print STDERR "[-] Could not add iptables block rule for: $src\n"
             if $debug;
@@ -3383,7 +3395,7 @@ sub ipt_block() {
 sub ipt_remove_block() {
     my $src = shift;
 
-    print STDERR " .. ipt_remove_block($src)\n" if $debug;
+    print STDERR "[+] ipt_remove_block($src)\n" if $debug;
 
     ### get the active iptables chains
     &get_iptables_chains() unless $chk_ipt_chains;
@@ -3391,7 +3403,7 @@ sub ipt_remove_block() {
     my $rm_block = 0;
     for my $table (keys %ipt_chains) {
         CHAIN: for my $chain (keys %{$ipt_chains{$table}}) {
-            print STDERR " .. ipt_remove_block($src): executing ",
+            print STDERR "[+] ipt_remove_block($src): executing ",
                 "$cmds{'iptables'} -t $table -nL $chain\n" if $debug;
             my @rules = ();
             eval {
@@ -3408,14 +3420,14 @@ sub ipt_remove_block() {
                 ### DROP       all  --  1.1.1.1        0.0.0.0/0
                 if ($rule =~ /^DROP\s+all.*?$src\s+0\.0\.0\.0\/0/) {
                     if ($flush_fw) {
-                        print " .. Deleting rule $rulenum for $src, $table ",
+                        print "[+] Deleting rule $rulenum for $src, $table ",
                             "table $chain chain:\n";
                         print "        $rule\n";
                     }
                     if ($debug) {
-                        print STDERR " .. ipt_remove_block($src) removing ",
+                        print STDERR "[+] ipt_remove_block($src) removing ",
                             "block in $table $chain\n";
-                        print STDERR " .. ipt_remove_block($src): matched ",
+                        print STDERR "[+] ipt_remove_block($src): matched ",
                             "rule: $rule\n";
                     }
                     my $rv = 1;
@@ -3435,15 +3447,15 @@ sub ipt_remove_block() {
         if (not $flush_fw) {
             ### don't send timeout email if we are manually flushing
             ### the auto-block rules from the command line with --Flush.
-            &Psad::sendmail(" ** psad: removed iptables block " .
+            &Psad::sendmail("[+] psad: removed iptables block " .
                 "against $src (timeout expired).", '',
                 $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         }
-        print STDERR " .. ipt_remove_block(): removed iptables block ",
+        print STDERR "[+] ipt_remove_block(): removed iptables block ",
             "against $src (timeout expired).\n" if $debug;
         &rm_blocked_ip($src, $config{'AUTO_BLOCK_IPT_FILE'});
     } else {
-        &Psad::psyslog('psad', "** could not locate iptables " .
+        &Psad::psyslog('psad', "could not locate iptables " .
             "block rule for $src") if $flush_fw;
         print STDERR "[-] Could not locate iptables block rule for $src.\n"
             if $debug;
@@ -3485,7 +3497,7 @@ sub tcpwr_remove_block() {
         chomp $line;
         if ($line =~ /ALL:\s+$ip$/) {
             &rm_blocked_ip($ip, $config{'AUTO_BLOCK_TCPWR_FILE'});
-            &Psad::sendmail(" ** psad: removed tcpwrappers block " .
+            &Psad::sendmail("[+] psad: removed tcpwrappers block " .
                 "against $ip (timeout expired).", '',
                 $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         } else {
@@ -3500,7 +3512,7 @@ sub tcpwr_remove_block() {
 sub auto_psad_response() {
     my $curr_scan_hr = shift;
 
-    print STDERR " .. auto_psad_response()\n" if $debug;
+    print STDERR "[+] auto_psad_response()\n" if $debug;
 
     if (not $chk_ipt_chains) {
         ### determine whether or not the NAT or mangle code has
@@ -3528,12 +3540,12 @@ sub auto_psad_response() {
             ### at this point
             if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
                 &ipt_block($src);
-                &Psad::sendmail(" ** psad: iptables AUTO-BLOCK against $src" .
+                &Psad::sendmail("[+] psad: iptables AUTO-BLOCK against $src" .
                     $timeout_str, '', $config{'EMAIL_ADDRESSES'},
                     $cmds{'mail'});
             }
             if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
-                &Psad::sendmail(" ** psad: tcpwrappers AUTO-BLOCK against $src" .
+                &Psad::sendmail("[+] psad: tcpwrappers AUTO-BLOCK against $src" .
                     $timeout_str, '', $config{'EMAIL_ADDRESSES'},
                     $cmds{'mail'});
                 my $found = 0;
@@ -3554,11 +3566,11 @@ sub auto_psad_response() {
                     &write_blocked_ip($src, $config{'AUTO_BLOCK_TCPWR_FILE'});
                 }
             }
-            print STDERR " .. setting blocked = 1 for $src\n" if $debug;
+            print STDERR "[+] setting blocked = 1 for $src\n" if $debug;
             ### don't try to block again
             $auto_blocked_ips{$src}{'blocked'} = 1;
         } elsif ($debug) {
-            print STDERR " .. blocked value for $src: ",
+            print STDERR "[+] blocked value for $src: ",
                 "$auto_blocked_ips{$src}{'blocked'}\n";
         }
     }
@@ -3579,7 +3591,7 @@ sub auto_block_ignore_ip() {
 }
 
 sub timeout_auto_blocked_ips() {
-    print STDERR " .. timeout_auto_block_ips()\n" if $debug;
+    print STDERR "[+] timeout_auto_block_ips()\n" if $debug;
     return if $config{'AUTO_BLOCK_TIMEOUT'} == 0;
     for my $ip (keys %auto_blocked_ips) {
         if ((time() - $auto_blocked_ips{$ip}{'time'})
@@ -3628,7 +3640,7 @@ sub exclude_auto_ignore_ip() {
 
 sub get_iptables_chains() {
 
-    print STDERR " .. get_iptables_chains()\n" if $debug;
+    print STDERR "[+] get_iptables_chains()\n" if $debug;
     my $nat_rv    = 1;
     my $mangle_rv = 1;
     my $filter_input_rv   = 1;
@@ -3671,7 +3683,7 @@ sub get_iptables_chains() {
                     $ipt_chains{$table}{$chain} = '';
                 }
             }
-            print STDERR " .. get_iptables_chains(): $table $chain rv: $rv\n"
+            print STDERR "[+] get_iptables_chains(): $table $chain rv: $rv\n"
                 if $debug;
         }
     }
@@ -3680,7 +3692,7 @@ sub get_iptables_chains() {
 
 sub write_blocked_ip() {
     my ($src, $file) = @_;
-    print STDERR " .. write_blocked_ip($src, $file)\n" if $debug;
+    print STDERR "[+] write_blocked_ip($src, $file)\n" if $debug;
     if (-e $file) {
         open F, "< $file" or die "[*] Could not open open ",
             "$file: $!";
@@ -3707,7 +3719,7 @@ sub write_blocked_ip() {
 
 sub rm_blocked_ip() {
     my ($src, $file) = @_;
-    print STDERR " .. rm_blocked_ip($src, $file)\n" if $debug;
+    print STDERR "[+] rm_blocked_ip($src, $file)\n" if $debug;
     if (-e $file) {
         open B, "< $file" or
             die "[*] Could not open $file: $!";
@@ -3727,8 +3739,8 @@ sub rm_blocked_ip() {
 
 sub email_limit_reached() {
     my ($src, $dst) = @_;
-    my $subject = " ** psad: email message limit for $src has " .
-        "been reached on $config{'HOSTNAME'} ($dst)!!!";
+    my $subject = "[-] psad: email message limit for $src has " .
+        "been reached on $config{'HOSTNAME'} ($dst)";
     &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
     $scan{$src}{$dst}{'stop_email'} = 1;
     return;
@@ -3738,11 +3750,11 @@ sub print_scan() {  ### this should primarily be used for debugging
     my $scanfile = "$config{'PRINT_SCAN_HASH'}.$$";
     open PSCAN, "> $scanfile" or warn '[-] Could not open ',
         "$scanfile: $!" and return;
-    print PSCAN " ** Passive OS fingerprinting hash:\n";
+    print PSCAN "[*] Passive OS fingerprinting hash:\n";
     print PSCAN Dumper \%posf;
-    print PSCAN " ** Scan danger level hash:\n";
+    print PSCAN "[*] Scan danger level hash:\n";
     print PSCAN Dumper %scan_dl;
-    print PSCAN " ** Main scan hash:\n";
+    print PSCAN "[*] Main scan hash:\n";
     print PSCAN Dumper \%scan;
     close PSCAN;
     chmod 0600, $scanfile;
@@ -3750,7 +3762,7 @@ sub print_scan() {  ### this should primarily be used for debugging
 }
 
 sub get_local_ips() {
-    print STDERR " .. get_local_ips()\n" if $debug;
+    print STDERR "[+] get_local_ips()\n" if $debug;
     open IFC, "$cmds{'ifconfig'} -a |" or die "[*] Could not execute ",
         "$cmds{'ifconfig'} -a: $!";
     my @ips = <IFC>;
@@ -3846,7 +3858,7 @@ sub REAPER {
     my $pid;
     $pid = waitpid(-1, WNOHANG);
 #   if (WIFEXITED($?)) {
-#       print STDERR " .. **  Process $pid exited.\n";
+#       print STDERR "[+] **  Process $pid exited.\n";
 #   }
     $SIG{'CHLD'} = \&REAPER;
     return;
@@ -3868,7 +3880,7 @@ sub file_permissions() {
 sub stop_psad() {
     my $rv = 0;
 
-    &Psad::psyslog('psad', '.. shutting down psad daemons');
+    &Psad::psyslog('psad', 'shutting down psad daemons');
     ### must kill psadwatchd first since if not, it might try to restart
     ### any of the other three daemons.
     for my $pidname qw(psadwatchd kmsgsd psad) {
@@ -3880,19 +3892,19 @@ sub stop_psad() {
             close PIDFILE;
             chomp $pid;
             if (kill 0, $pid) {
-                print " .. Stopping $pidname, pid: $pid\n";
+                print "[+] Stopping $pidname, pid: $pid\n";
                 unless (kill 15, $pid) {
-                    kill 9, $pid or print " ** psad: Could not kill ",
+                    kill 9, $pid or print "[*] psad: Could not kill ",
                         "$pidname, pid: $pid $!\n";
                     $rv = 1;
                 }
             } else {
-                print " ** psad: $pidname is not running on ",
+                print "[*] psad: $pidname is not running on ",
                     "$config{'HOSTNAME'}.\n";
                 $rv = 1;
             }
         } else {
-            print " ** psad: pid file $pidfile does not exist for ",
+            print "[*] psad: pid file $pidfile does not exist for ",
                 "$pidname on $config{'HOSTNAME'}\n";
             $rv = 1;
         }
@@ -3910,7 +3922,7 @@ sub restart() {
         chomp $cmdline;
     }
     &stop_psad();
-    print " .. Restarting psad daemons on $config{'HOSTNAME'}\n";
+    print "[+] Restarting psad daemons on $config{'HOSTNAME'}\n";
     if ($cmdline) {
         system "$cmds{'psad'} $cmdline";
     } else {
@@ -3922,7 +3934,7 @@ sub restart() {
 sub analysis_mode() {
 
     if (-d $config{'ANALYSIS_MODE_DIR'}) {
-        print " .. Removing old $config{'ANALYSIS_MODE_DIR'} directory.\n";
+        print "[+] Removing old $config{'ANALYSIS_MODE_DIR'} directory.\n";
         rmtree $config{'ANALYSIS_MODE_DIR'} or die "[*] Could not ",
             "remove $config{'ANALYSIS_MODE_DIR'}\n";
     }
@@ -3935,7 +3947,7 @@ sub analysis_mode() {
     ### work more easily).
     $config{'PSAD_DIR'} = $config{'ANALYSIS_MODE_DIR'};
 
-    print " .. Entering analysis mode.  Parsing $messages_file\n";
+    print "[+] Entering analysis mode.  Parsing $messages_file\n";
     open MSGS, "< $messages_file" or die "[*] Could not open ",
         "$messages_file: $!";
     my @lines = <MSGS>;
@@ -3958,10 +3970,10 @@ sub analysis_mode() {
             }
         }
     }
-    print " .. Found $#ipt_msgs iptables messages out of ",
+    print "[+] Found $#ipt_msgs iptables messages out of ",
         "$#lines total lines.\n";
     &check_scan(\@ipt_msgs);
-    print " .. Displaying status output.\n";
+    print "[+] Displaying status output.\n";
     &status_psad_daemon();
     print "\n.. Finished --Analyze cycle.\n";
     exit 0;
@@ -3983,7 +3995,7 @@ sub status() {
             close PIDFILE;
             chomp $pid;
             if (kill 0, $pid) {
-                print " .. $pidname (pid: $pid)";
+                print "[+] $pidname (pid: $pid)";
                 ### FIXME: should probably just parse /proc instead of
                 ### using ps
                 open PS, "$cmds{'ps'} auxww |" or die "[*] Could not ",
@@ -4003,11 +4015,11 @@ sub status() {
                 print "\n";
                 $rv = 1;
             } else {
-                print " ** psad: $pidname is not running on ",
+                print "[*] psad: $pidname is not running on ",
                     "$config{'HOSTNAME'}\n";
             }
         } else {
-            print " ** psad: pid file $pidfile does not exist for ",
+            print "[*] psad: pid file $pidfile does not exist for ",
                 "$pidname on $config{'HOSTNAME'}\n";
         }
     }
@@ -4332,9 +4344,9 @@ sub status_ip() {
     for (my $i=$#match_ip; $i>=$#match_ip-10; $i--) {
         print STDOUT $match_ip[$i] if defined $match_ip[$i];
     }
-    print STDOUT "\n .. The above packet output shows up to 10 of the ",
+    print STDOUT "\n[+] The above packet output shows up to 10 of the ",
         "most recently\n    logged packets for $status_ip.\n",
-        " .. All packets logged by iptables specifically ",
+        "[+] All packets logged by iptables specifically ",
         "for $status_ip\n    can be viewed here: ",
         "$config{'PSAD_DIR'}/$status_ip/fwdata\n";
 
@@ -4351,7 +4363,7 @@ sub status_ip() {
             next;
         }
         if (-e "$config{'PSAD_DIR'}/$status_ip/${dst}_packet_ctr") {
-            print STDOUT " .. Packet counters against dst: $dst:\n";
+            print STDOUT "[+] Packet counters against dst: $dst:\n";
             open F, "< $config{'PSAD_DIR'}/$status_ip/${dst}_packet_ctr" or
                 die "[*] Could not open $config{'PSAD_DIR'}/$status_ip/",
                     "${dst}_packet_ctr: $!";
@@ -4366,7 +4378,7 @@ sub status_ip() {
         my $ec = <F>;
         close F;
         chomp $ec;
-        print STDOUT " .. Email alerts sent: $ec\n";
+        print STDOUT "[+] Email alerts sent: $ec\n";
     }
     if (-e "$config{'PSAD_DIR'}/$status_ip/danger_level") {
         open F, "< $config{'PSAD_DIR'}/$status_ip/danger_level" or
@@ -4375,7 +4387,7 @@ sub status_ip() {
         my $dl = <F>;
         close F;
         chomp $dl;
-        print STDOUT " .. Current danger level: $dl\n";
+        print STDOUT "[+] Current danger level: $dl\n";
     }
     exit $rv;
 }
@@ -4534,7 +4546,7 @@ sub import_old_scans() {
     close FD;
     if ($import_ctr) {
         &Psad::psyslog('psad',
-            ".. imported $import_ctr scanning IPs from previous psad run");
+            "imported $import_ctr scanning IPs from previous psad run");
     }
     return;
 }
@@ -4551,30 +4563,30 @@ sub usr1() {
         if (kill 0, $pid) {  ### make sure psad is actually running
             if (kill 'USR1', $pid) {
                 $rv = 1;
-                print " .. USR1 signal sent to pid: $pid\n";
+                print "[+] USR1 signal sent to pid: $pid\n";
                 for (my $try=0; $try<=20; $try++) {  ### limit attempts to 20
                     sleep 1;
-                    print " .. Checking for file: ",
+                    print "[+] Checking for file: ",
                         "$config{'PSAD_DIR'}/scan_hash.${pid}\n";
                     if (-e "$config{'PSAD_DIR'}/scan_hash.${pid}") {
                         open U, "< $config{'PSAD_DIR'}/scan_hash.${pid}"
-                            or print " ** Sent psad pid $pid a USR1 ",
+                            or print "[*] Sent psad pid $pid a USR1 ",
                                 "signal, but could not open\n",
                                 "\"$config{'PSAD_DIR'}/scan_hash.${pid}\n\""
                             and return $rv;
                         print while(<U>);
                         close U;
-                        print " .. Results available here: ",
+                        print "[+] Results available here: ",
                             "$config{'PSAD_DIR'}/scan_hash.${pid}\n";
                         last;
                     }
                 }
             } else {
-                print " ** Could not send psad the USR1 signal on ",
+                print "[*] Could not send psad the USR1 signal on ",
                     "$config{'HOSTNAME'}\n";
             }
         } else {
-            print " ** psad is not running on $config{'HOSTNAME'}\n";
+            print "[*] psad is not running on $config{'HOSTNAME'}\n";
         }
     }
     return $rv;
@@ -4595,14 +4607,14 @@ sub hup() {
         chomp $pid;
         if (kill 0, $pid) {
             if (kill 'HUP', $pid) {
-                print " .. HUP signal sent to $pidname (pid: $pid)\n";
+                print "[+] HUP signal sent to $pidname (pid: $pid)\n";
             } else {
-                print " ** Could not send $pidname ",
+                print "[*] Could not send $pidname ",
                     "(pid: $pid) a HUP signal.\n";
                 $rv = 1;
             }
         } else {
-            print " ** $pidname daemon not running.\n";
+            print "[*] $pidname daemon not running.\n";
             $rv = 1;
         }
     }
@@ -4614,31 +4626,14 @@ sub hup_handler() {
     return;
 }
 
-### write all die messages to a logfile.  This routine and the
-### warn_handler routine seem a bit risky because of potentially
-### non-reentrant code executed from the signal handler, but it
-### seems to work.  If there is a better way to do this (by setting
-### a global flag for example) send me an email.  The main problem
-### is how to get access to the warn/die message so we can write
-### it out to disk.
 sub die_handler() {
-    my $msg = shift;
-    my $caller = $0;
-    $caller =~ s|^.*/||;
-    open D, ">> $config{'PSAD_DIR'}/errs/${caller}.die";
-    print D scalar localtime(), " .. $caller (pid: $$): $msg";
-    close D;
-    croak $!;
+    $die_msg = shift;
+    return;
 }
 
 ### write all warnings to a logfile
 sub warn_handler() {
-    my $msg = shift;
-    my $caller = $0;
-    $caller =~ s|^.*/||;
-    open W, ">> $config{'PSAD_DIR'}/errs/${caller}.warn";
-    print W scalar localtime(), " .. $caller (pid: $$): $msg";
-    close W;
+    $warn_msg = shift;
     return;
 }
 
@@ -4711,7 +4706,7 @@ sub archive_data() {
 
 sub check_old_cmdargs() {
     if ($oldarg_snort_sids) {
-        print " ** The --snort-sids capability is enabled by\n",
+        print "[*] The --snort-sids capability is enabled by\n",
             "default (see the --no-snort-sids option).\n";
         &usage(1);
     }
@@ -4731,14 +4726,14 @@ sub check_old_cmdargs() {
 
 sub print_old_arg() {
     my ($oldarg, $newarg) = @_;
-    print qq( ** The "$oldarg" option has been changed to "$newarg"\n);
+    print qq([*] The "$oldarg" option has been changed to "$newarg"\n);
     &usage(1);  ### this exits
 }
 
 sub handle_cmdline() {
 
     if ($analysis_emails and not $analyze_msgs) {
-        print " ** Can only specify --email-analysis flag ",
+        print "[*] Can only specify --email-analysis flag ",
             "when run in --Analyze mode.";
         &usage(1);
     }
@@ -4862,7 +4857,7 @@ sub setup() {
                 "analysis by kmsgsd\n";
             print SYSLOG "kern.info\t\t|$config{'PSAD_FIFO'}\n";
             close SYSLOG;
-            &Psad::psyslog('psad', '.. reconfiguring syslogd to write ' .
+            &Psad::psyslog('psad', 'reconfiguring syslogd to write ' .
                 "kern.info messages to $config{'PSAD_FIFO'}");
             system "$cmds{'killall'} -HUP $cmds{'syslogd'}";
         }
@@ -4901,7 +4896,7 @@ sub setup() {
                 'log { source(src); ',
                 "filter(f_kerninfo); destination(psadpipe); };\n";
             close SYSLOGNG;
-            &Psad::psyslog('psad', '.. reconfiguring syslog-ng to write ' .
+            &Psad::psyslog('psad', 'reconfiguring syslog-ng to write ' .
                 "kern.info messages to $config{'PSAD_FIFO'}");
             system "$cmds{'killall'} -HUP syslog-ng";
         }
@@ -4934,7 +4929,7 @@ sub setup() {
                 '  command  = ',
                 "\"/usr/sbin/psadpipe.sh\"\n";
             close METALOG;
-            &Psad::psyslog('psad', '.. reconfiguring metalog to write ' .
+            &Psad::psyslog('psad', 'reconfiguring metalog to write ' .
                     "kern-facility messages to /usr/sbin/psadpipe.sh");
 
             open PIPESCRIPT, '> /usr/sbin/psadpipe.sh' or
@@ -4943,7 +4938,7 @@ sub setup() {
                 "echo \"\$3\" >> $config{'PSAD_FIFO'}\n";
             close PIPESCRIPT;
             chmod 0700, '/usr/sbin/psadpipe.sh';
-            &Psad::psyslog('psad', '.. generated /usr/sbin/psadpipe.sh ' .
+            &Psad::psyslog('psad', 'generated /usr/sbin/psadpipe.sh ' .
                     "which writes to $config{'PSAD_FIFO'}");
 
             ### Metalog seems to simply die on SIGHUP and SIGALRM, and I
@@ -4978,19 +4973,19 @@ sub disk_space_exceeded() {
         ### need to remove data
         $rv = 1;
         $rm_data_ctr++;
-        &Psad::psyslog('psad', ".. disk partition associated with " .
+        &Psad::psyslog('psad', "disk partition associated with " .
             "$config{'PSAD_DIR'} exceeded " .
             "$config{'DISK_MAX_PERCENTAGE'} prct utilization.");
-        &Psad::sendmail(" ** psad: Exceeded max disk utilization for " .
+        &Psad::sendmail("[-] psad: Exceeded max disk utilization for " .
             "$config{'PSAD_DIR'} on $config{'HOSTNAME'}", '',
             $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
-        &Psad::psyslog('psad', ".. removing data in $config{'PSAD_DIR'}");
+        &Psad::psyslog('psad', "removing data in $config{'PSAD_DIR'}");
         if (-d $config{'SCAN_DATA_ARCHIVE_DIR'}) {
             ### remove the entire archive directory (we have run out of
             ### disk so keeping old scan directories around is the least
             ### of our worries).
             &Psad::psyslog('psad',
-                "** removing $config{'SCAN_DATA_ARCHIVE_DIR'} directory");
+                "removing $config{'SCAN_DATA_ARCHIVE_DIR'} directory");
             rmtree $config{'SCAN_DATA_ARCHIVE_DIR'};
             mkdir $config{'SCAN_DATA_ARCHIVE_DIR'}, 0500;
         }
@@ -5014,13 +5009,13 @@ sub disk_space_exceeded() {
             }
         }
         if ($rm_data_ctr > $config{'DISK_MAX_RM_RETRIES'}) {
-            &Psad::psyslog('psad', "** could not sufficiently reduce disk " .
+            &Psad::psyslog('psad', "could not sufficiently reduce disk " .
                 "utilization in $config{'PSAD_DIR'} partition.  " .
                 "Stopping psad!");
-            &Psad::sendmail(" ** psad: Could not reduce disk utilization on " .
+            &Psad::sendmail("[-] psad: Could not reduce disk utilization on " .
                 $config{'HOSTNAME'}, '', $config{'EMAIL_ADDRESSES'},
                 $cmds{'mail'});
-            &Psad::sendmail(" ** psad: Stopping psad on $config{'HOSTNAME'}!",
+            &Psad::sendmail("[*] psad: Stopping psad on $config{'HOSTNAME'}!",
                 '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
             for my $pidname qw(psadwatchd kmsgsd) {
                 my $pidfile = $pidfiles{$pidname};
@@ -5067,27 +5062,27 @@ sub stop_legacy_diskmond() {
 
 sub dump_conf() {
     if ($debug) {
-        print STDERR " .. Dumping psad config from: $config_file\n";
+        print STDERR "[+] Dumping psad config from: $config_file\n";
     } else {
-        print STDOUT " .. Dumping psad config from: $config_file\n";
+        print STDOUT "[+] Dumping psad config from: $config_file\n";
     }
     for my $var (sort keys %config) {
         if ($debug) {
-            printf STDERR "%-30s %s\n", " .. $var", $config{$var};
+            printf STDERR "%-30s %s\n", "[+] $var", $config{$var};
         } else {
-            printf STDOUT "%-30s %s\n", " .. $var", $config{$var};
+            printf STDOUT "%-30s %s\n", "[+] $var", $config{$var};
         }
     }
     if ($debug) {
-        print STDERR "\n .. Command paths:\n\n";
+        print STDERR "\n[+] Command paths:\n\n";
     } else {
-        print STDOUT "\n .. Command paths:\n\n";
+        print STDOUT "\n[+] Command paths:\n\n";
     }
     for my $var (sort keys %cmds) {
         if ($debug) {
-            printf STDERR "%-30s %s\n", " .. $var", $cmds{$var};
+            printf STDERR "%-30s %s\n", "[+] $var", $cmds{$var};
         } else {
-            printf STDOUT "%-30s %s\n", " .. $var", $cmds{$var};
+            printf STDOUT "%-30s %s\n", "[+] $var", $cmds{$var};
         }
     }
     return 0;

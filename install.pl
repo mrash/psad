@@ -1,6 +1,10 @@
 #!/usr/bin/perl -w
 
 #============== config ===============
+my $SYSLOG_INIT = "/etc/rc.d/init.d/syslog";
+
+my $killCmd = "/bin/kill";
+my $psCmd = "/bin/ps";
 my $touchCmd = "/bin/touch";
 my $mknodCmd = "/bin/mknod";
 my $grepCmd = "/bin/grep";
@@ -15,14 +19,18 @@ my $iptablesCmd = "/usr/local/bin/iptables";
 use Getopt::Long;
 
 my $fwcheck = 0;
+my $execute_psad = 0;
 
 usage_and_exit(1) unless (GetOptions (
         'help'          => \$help,              # display help
         'firewallcheck' => \$fwcheck,           # do not check firewall rules
+	'execpsad'	=> \$execute_psad
 ));
 usage_and_exit(0) if ($help);
 
 my %Cmds = (
+	"kill"		=> $killCmd,
+	"ps"		=> $psCmd,
 	"touch"		=> $touchCmd,
 	"mknod"         => $mknodCmd,
 	"grep"		=> $grepCmd,
@@ -50,7 +58,7 @@ unless (`$Cmds{'grep'} psadfifo /etc/syslog.conf`) {
 	print SYSLOG "kern.info  |/var/log/psadfifo\n\n";  #reinstate kernel logging to our named pipe
 	close SYSLOG;
 	print "*** Restarting syslog\n";
-	system("/etc/rc.d/init.d/syslog restart");      # restart syslog
+	system("$SYSLOG_INIT");      # restart syslog
 }
 unless (-e "/var/log/psad") {
 	print "*** Creating /var/log/psad/\n";
@@ -72,17 +80,88 @@ chmod 0500, "/usr/local/bin/psad";
 chmod 0500, "/usr/local/bin/kmsgsd";
 `$Cmds{'cp'} diskmond /usr/local/bin/diskmond`;
 chmod 0500, "/usr/local/bin/diskmond";
-print "*** Copying psad-init -> /etc/rc.d/init.d/psad-init\n";
-`$Cmds{'cp'} psad-init /etc/rc.d/init.d/psad-init`;
 print "*** Copying psad.conf,psad_signatures -> /etc/psad/\n";
 `$Cmds{'cp'} psad.conf /etc/psad/psad.conf`;
 chmod 0600, "/etc/psad/psad.conf";
 `$Cmds{'cp'} psad_signatures /etc/psad/psad_signatures`;
 chmod 0600, "/etc/psad/psad_signatures";
 
+my $distro = get_distro();
+my $kernel = get_kernel(\%Cmds);
+
+if ($distro eq "redhat61" || $distro eq "redhat62") {
+	print "*** Copying psad-init -> /etc/rc.d/init.d/psad-init\n";
+	`$Cmds{'cp'} psad-init /etc/rc.d/init.d/psad-init`;
+} 
+# need to put checks in here for redhat vs. other systems.
 unless($fwcheck) {
 	if(check_firewall_rules(\%Cmds)) {
-		print "*** To execute psad, run \"/etc/rc.d/init.d/psad-init start\"\n";
+		my $pidstatement = `$Cmds{'ps'} -auxw |$Cmds{'grep'} psad |$Cmds{'grep'} -v grep`;
+		if ($execute_psad) {
+			if ($distro eq "redhat61" || $distro eq "redhat62") {
+				if ($pidstatement) {
+					print "*** Restarting the psad daemons...\n";
+					system "/etc/rc.d/init.d/psad-init restart";
+				} else {
+					print "*** Starting the psad daemons...\n";
+					system "/etc/rc.d/init.d/psad-init start";
+				}
+			} else {
+				if ($pidstatement) {
+					print "*** Restarting the psad daemons...\n";
+					my $pid = (split /\s+/, $pidstatement)[1];
+					system "$Cmds{'kill'} $pid";
+					if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/) {
+                                                system "/usr/local/bin/psad -s /etc/psad/psad_signatures";
+                                        } elsif ($kernel =~ /^2.2/) {
+                                                system "/usr/local/bin/psad";
+                                        } else {
+                                                print "*** You are running kernel $kernel.  Assuming ipchains support.\n";
+                                                system "/usr/local/bin/psad";
+                                        }
+				} else {
+					print "*** Starting the psad daemons...\n";
+					if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/) {	
+                                        	system "/usr/local/bin/psad -s /etc/psad/psad_signatures";
+					} elsif ($kernel =~ /^2.2/) {
+						system "/usr/local/bin/psad";
+					} else {
+						print "*** You are running kernel $kernel.  Assuming ipchains support.\n";
+						system "/usr/local/bin/psad";
+					}
+				}
+			}
+		} else {
+			if ($distro eq "redhat61" || $distro eq "redhat62") {
+				if ($pidstatement) {
+					print "*** An older version of psad is already running.  To execute, run \"/etc/rc.d/init.d/psad-init restart\"\n";
+				} else {
+					print "*** To execute psad, run \"/etc/rc.d/init.d/psad-init start\"\n";
+				}
+			} else {
+				if ($pidstatement) {
+					my $pid = (split /\s+/, $pidstatement)[1];
+					print "*** An older version of psad is already running.  kill pid $pid, and then execute:\n";
+					if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/) {
+                                       		print "/usr/local/bin/psad -s /etc/psad/psad_signatures, /usr/local/bin/diskmond, and /usr/local/bin/kmsgsd\n"; 
+                                        } elsif ($kernel =~ /^2.2/) {
+						print "/usr/local/bin/psad, /usr/local/bin/diskmond, and /usr/local/bin/kmsgsd\n";
+                                        } else {
+						print "/usr/local/bin/psad (you are running kernel $kernel... assuming ipchains support),\n";
+						print "/usr/local/bin/diskmond, and /usr/local/bin/kmsgsd\n";
+                                        }
+				} else {
+                                	if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/) {
+                                                print "/usr/local/bin/psad -s /etc/psad/psad_signatures, /usr/local/bin/diskmond, and /usr/local/bin/kmsgsd\n";
+                                        } elsif ($kernel =~ /^2.2/) {
+                                                print "/usr/local/bin/psad, /usr/local/bin/diskmond, and /usr/local/bin/kmsgsd\n";
+                                        } else {
+                                                print "/usr/local/bin/psad (you are running kernel $kernel... assuming ipchains support),\n";
+                                                print "/usr/local/bin/diskmond, and /usr/local/bin/kmsgsd\n";
+					}
+				}
+			}	
+		}
 	} else {
 		print "*** After setting up your firewall per the above note, execute \"/etc/rc.d/init.d/psad-init start\" to start psad\n";
 	}
@@ -92,7 +171,8 @@ exit 0;
 sub check_firewall_rules() {
 	my $Cmds_href = shift;
 	my @localips;
-	my $kernel = (split /\s/, `$Cmds_href->{'uname'} -a`)[2];
+	my $kernel = get_kernel($Cmds_href);
+#	my $kernel = (split /\s/, `$Cmds_href->{'uname'} -a`)[2];
         my $iptables = 1 if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/);
         my $ipchains = 1 if ($kernel =~ /^2.2/); # and also 2.0.x ?
 	my @localips_tmp = `$Cmds_href->{'ifconfig'} -a |$Cmds_href->{'grep'} inet`;
@@ -159,6 +239,27 @@ sub check_destination() {
 	}
 	return 0;
 }
+sub get_distro() {
+	if (-e "/etc/issue") {
+		# Red Hat Linux release 6.2 (Zoot)
+		open ISSUE, "< /etc/issue";
+		while(<ISSUE>) {
+			my $l = $_;
+			chomp $l;
+			return "redhat61" if ($l =~ /Red\sHat.*?6\.2/);
+			return "redhat62" if ($l =~ /Red\sHat.*?6\.1/);
+		}
+		close ISSUE;
+		return "NA";
+	} else {
+		return "NA";
+	}
+}
+sub get_kernel() {
+	my $Cmds_href = shift;
+	my $kernel = (split /\s/, `$Cmds_href->{'uname'} -a`)[2];
+	return $kernel;
+}
 sub check_commands() {
 	my $Cmds_href = shift;
 	CMD: foreach my $cmd (keys %$Cmds_href) {
@@ -198,7 +299,8 @@ sub usage_and_exit() {
         print <<_HELP_;
 
 Usage: psad [-f] [-h]
-
+	
+	-execpsad		- execute psad after installing.
         -firewallcheck          - disable firewall rules verification.
         -h                      - prints this help message.
 

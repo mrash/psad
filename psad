@@ -119,7 +119,7 @@ my $VERSION           = '1.0.0-pre1';
 ### ========================== main =================================
 
 ### main psad data structure; contains ips, port ranges,
-### tcp flags, and danger levels
+### protocol info, tcp flags, etc.
 my %Scan;
 
 ### %Sigs holds all scan signatures (only initialized if
@@ -162,38 +162,38 @@ my @args_cp = @ARGV;
 Getopt::Long::Configure("no_ignore_case");  ### make Getopts case sensitive
 
 &usage_and_exit(1) unless (GetOptions (
-    'help'           => \$help,           ### Display help.
-    'auto_ips=s'     => \$AUTOIPS_FILE,   ### Enable automatic ip danger level
-                                          ### assignment.
-    'output'         => \$output,         ### Write scanlog messages to STDOUT.
-    'Daemon'         => \$daemon,         ### Do not run as a daemon.
-    'debug'          => \$DEBUG,          ### Run in debug mode.
-    'interval=s'     => \$check_interval, ### Set $CHECK_INTERVAL from the
-                                          ### command line.
-    'firewallcheck'  => \$fwcheck,        ### Do not check firewall rules.
-    'config=s'       => \$CONFIG_FILE,    ### Specify configuration file.
-    'reversedns'     => \$dnslookups,     ### Do not issue dns lookups against
-                                          ### scanning ip address.
-    'signatures=s'   => \$SIGS_FILE,      ### Scan signatures.
-    'localport'      => \$netstat_lookup, ### Do not check to see if the
-                                          ### firewall is listening on localport
-                                          ### that has been scanned.
-    'errors'         => \$errors,         ### Do not write malformed packet.
-                                          ### messages to error log.
-    'Logging_server' => \$Syslog_server,  ### We are running psad on a syslog
-                                          ### logging server.
-    'Kill'           => \$kill,           ### Kill all running psad processes.
-                                          ### (psadwatchd, psad, kmsgsd,
-                                          ### diskmond).
-    'Restart'        => \$restart,        ### Restart psad with all options of
-                                          ### the currently running psad process.
-    'Status'         => \$status,         ### Display status of any currently
-                                          ### running psad processes.
-    'USR1'           => \$usr1,           ### Send an existing psad process a
-                                          ### USR1 signal (useful for debugging).
-    'Version'        => \$print_version,  ### Print the psad version and exit.
-    'whois'          => \$whoislookups    ### Do not issue whois lookups against
-                                          ### the scanning ip.
+    'help'           => \$help,           # Display help.
+    'auto_ips=s'     => \$AUTOIPS_FILE,   # Enable automatic ip danger level
+                                          # assignment.
+    'output'         => \$output,         # Write scanlog messages to STDOUT.
+    'Daemon'         => \$daemon,         # Do not run as a daemon.
+    'debug'          => \$DEBUG,          # Run in debug mode.
+    'interval=s'     => \$check_interval, # Set $CHECK_INTERVAL from the
+                                          # command line.
+    'firewallcheck'  => \$fwcheck,        # Do not check firewall rules.
+    'config=s'       => \$CONFIG_FILE,    # Specify configuration file.
+    'reversedns'     => \$dnslookups,     # Do not issue dns lookups against
+                                          # scanning ip address.
+    'signatures=s'   => \$SIGS_FILE,      # Scan signatures.
+    'localport'      => \$netstat_lookup, # Do not check to see if the
+                                          # firewall is listening on localport
+                                          # that has been scanned.
+    'errors'         => \$errors,         # Do not write malformed packet.
+                                          # messages to error log.
+    'Logging_server' => \$Syslog_server,  # We are running psad on a syslog
+                                          # logging server.
+    'Kill'           => \$kill,           # Kill all running psad processes.
+                                          # (psadwatchd, psad, kmsgsd,
+                                          # diskmond).
+    'Restart'        => \$restart,        # Restart psad with all options of
+                                          # the currently running psad process.
+    'Status'         => \$status,         # Display status of any currently
+                                          # running psad processes.
+    'USR1'           => \$usr1,           # Send an existing psad process a
+                                          # USR1 signal (useful for debugging).
+    'Version'        => \$print_version,  # Print the psad version and exit.
+    'whois'          => \$whoislookups    # Do not issue whois lookups against
+                                          # the scanning ip.
 ));
 &usage_and_exit(0) if ($help);
 
@@ -331,7 +331,7 @@ if ($CONFIG_FILE eq '/etc/psad/psad.conf') {
 ### Check to see if psad automatically blocked some ips from
 ### a previous run.  This feature is most useful for preserving
 ### automatically blocked ips after a reboot.
-if ($Config{'ENABLE_AUTO_IDS'} eq 'Y') {
+if ($Config{'ENABLE_AUTO_IDS'}) {
     &check_auto_blocked();
 }
 
@@ -392,7 +392,7 @@ for (;;) {
 
             ### Don't manage the firewall rules if
             ### psad is running on a syslog server
-            if ($Config{'ENABLE_AUTO_IDS'} eq 'Y' && ! $Syslog_server) {
+            if ($Config{'ENABLE_AUTO_IDS'} && ! $Syslog_server) {
                 &auto_psad_response();
             }
         }
@@ -512,20 +512,20 @@ sub check_scan() {
                 next READPKT;
             }
         }
-        if ($Config{'ENABLE_PERSISTENCE'} eq 'N') {
+        unless ($Config{'ENABLE_PERSISTENCE'}) {
             my $currtime = time();
             if (defined $Scan{$src}{$dst}{'S_TIME'}{'EPOCH_SECONDS'}) {
-                my $tmp = $currtime - $Scan{$src}{$dst}{'S_TIME'}{'EPOCH_SECONDS'};
+                my $tmp = $currtime -
+                             $Scan{$src}{$dst}{'S_TIME'}{'EPOCH_SECONDS'};
                 if (($currtime - $Scan{$src}{$dst}{'S_TIME'}{'EPOCH_SECONDS'})
-                                                          >= $Config{'SCAN_TIMEOUT'}) {
+                                            >= $Config{'SCAN_TIMEOUT'}) {
                     delete $Scan{$src}{$dst};
                 }
             }
         }
         $matched_packet = 1;
         ### hash initialization
-        $Scan{$src}{$dst}{'LOGR'} = 'Y';
-        $Scan{$src}{$dst}{'AUTO'} = 'N' unless (defined $Scan{$src}{$dst}{'AUTO'});
+        $Scan{$src}{$dst}{'LOGR'} = 1;
         unless (defined $Scan{$src}{$dst}{'CURR_DL'}) {
             $Scan{$src}{$dst}{'CURR_DL'} = 0;
         }
@@ -538,7 +538,7 @@ sub check_scan() {
             ### make sure the initial end port is not too high
             $Scan{$src}{$dst}{'E_PORT'} = 0;
         }
-        my $epoch_seconds = time() if ($Config{'ENABLE_PERSISTENCE'} eq 'N');
+        my $epoch_seconds = time() unless ($Config{'ENABLE_PERSISTENCE'});
         ### Get the current time as a nice ASCII string.
         my @time = split /\s+/, scalar localtime;
         pop @time; shift @time; ### Get rid of the day and the year to make
@@ -560,13 +560,13 @@ sub check_scan() {
         }
         unless (defined $Scan{$src}{$dst}{'S_TIME'}{'READABLE'}) {
             $Scan{$src}{$dst}{'S_TIME'}{'READABLE'} = $time;
-            if ($Config{'ENABLE_PERSISTENCE'} eq 'N') {
+            unless ($Config{'ENABLE_PERSISTENCE'}) {
                 $Scan{$src}{$dst}{'S_TIME'}{'EPOCH_SECONDS'} = $epoch_seconds;
             }
         }
         $Scan{$src}{$dst}{$proto}{'CURR_INT'}{'PKTS'}++;
         $Scan{$src}{$dst}{'E_TIME'}{'READABLE'}= $time;
-        if ($Config{'ENABLE_PERSISTENCE'} eq 'N') {
+        unless ($Config{'ENABLE_PERSISTENCE'}) {
             $Scan{$src}{$dst}{'E_TIME'}{'EPOCH_SECONDS'} = $epoch_seconds;
         }
         ### increment hash values
@@ -597,11 +597,11 @@ sub check_scan() {
             print STDOUT "     Scan{src}{dst}{'S_PORT'} = $Scan{$src}{$dst}{'S_PORT'}\n" unless ($proto eq 'ICMP');
             print STDOUT "     Scan{src}{dst}{'E_PORT'} = $Scan{$src}{$dst}{'E_PORT'}\n" unless ($proto eq 'ICMP');
             print STDOUT "     Scan{src}{dst}{'S_TIME'}{'READABLE'} = $Scan{$src}{$dst}{'S_TIME'}{'READABLE'}\n";
-            if ($Config{'ENABLE_PERSISTENCE'} eq 'N') {
+            unless ($Config{'ENABLE_PERSISTENCE'}) {
                 print STDOUT "     Scan{src}{dst}{'S_TIME'}{'EPOCH_SECONDS'} = $Scan{$src}{$dst}{'S_TIME'}{'EPOCH_SECONDS'}\n";
             }
             print STDOUT "     Scan{src}{dst}{'E_TIME'}{'READABLE'} = $Scan{$src}{$dst}{'E_TIME'}{'READABLE'}\n";
-            if ($Config{'ENABLE_PERSISTENCE'} eq 'N') {
+            unless ($Config{'ENABLE_PERSISTENCE'}) {
                 print STDOUT "     Scan{src}{dst}{'E_TIME'}{'EPOCH_SECONDS'} = $Scan{$src}{$dst}{'E_TIME'}{'EPOCH_SECONDS'}\n";
             }
             unless ($proto eq 'ICMP') {
@@ -733,7 +733,7 @@ sub check_tcp_flags() {
 
 sub check_port() {
     my ( $msg, $srcport, $dstport, $proto) = @_;
-    print "check_port(): msg: $msg, srcport: $srcport, dstport: " . 
+    print "check_port(): msg: $msg, srcport: $srcport, dstport: " .
           "$dstport, proto: $proto\n" if $DEBUG;
     ### check dst port first
     if (defined $Sigs{$proto}{$msg}{'DSTPORT'}{'UNIQUE_OR_ANY'}) {
@@ -817,9 +817,6 @@ sub check_import() {
             &import_signatures($file);
         } else {
             &import_auto_ips($file);
-            ### need to set $Scan{$src}{$dst}{'AUTO'} = "N" foreach
-            ### src and dst since %Auto_ips was updated.
-            &reset_auto_tags();
         }
         for my $email_address (@$Emailaddrs_aref) {
             system "$Cmds{'mail'} $email_address -s \"psad: re-read $file" .
@@ -868,6 +865,7 @@ sub check_import_config() {
 }
 
 sub import_signatures() {
+    %Sigs = ();  ### undef %Sigs so don't leave old signatures around
     open SIGS, "< $SIGS_FILE" or die
             "Could not open the signatures file $SIGS_FILE: $!";
     my @sigs = <SIGS>;
@@ -977,22 +975,14 @@ sub get_signature_ports() {
 }
 
 sub import_auto_ips() {
-    open AUTO, "< $AUTOIPS_FILE";
-    my @lines = <AUTO>;
-    close AUTO;
+    %Auto_ips = ();  ### undef so we don't leave old ips in %Auto_ips
+    open A, "< $AUTOIPS_FILE";
+    my @lines = <A>;
+    close A;
     for my $l (@lines) {
         next if ($l =~ /^#/);
         if ($l =~ /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+([0-5]|\-1)/) {
             $Auto_ips{$1} = $2;
-        }
-    }
-    return;
-}
-
-sub reset_auto_tags() {
-    for my $src (keys %Scan) {
-        for my $dst (keys %{$Scan{$src}}) {
-            $Scan{$src}{$dst}{'AUTO'} = 'N';
         }
     }
     return;
@@ -1012,11 +1002,18 @@ sub assign_danger_level() {
             if (defined $Auto_ips{$src}) {
                 for my $dst (keys %{$Scan{$src}}) {
                     $Scan{$src}{$dst}{'CURR_DL'} = $Auto_ips{$src};
-                    $Scan{$src}{$dst}{'ALERTED'} = 'N';
-                    $Scan{$src}{$dst}{'AUTO'}    = 'Y';
+                    $Scan{$src}{$dst}{'ALERTED'} = 0;
+                    open T, ">> /tmp/psad.test";
+                    print T "assigned $src dl $Auto_ips{$src}\n";
+                    close T;
                 }
-                ### ignore $src if the auto danger level is one
-                return if $Auto_ips{$src} == 0;
+                ### ignore $src if the auto danger level is zero
+                if ($Auto_ips{$src} == 0) {
+                    open T, ">> /tmp/psad.test";
+                    print T "ignore $src\n";
+                    close T;
+                    return if $Auto_ips{$src} == 0;
+                }
             }
         }
         DST: for my $dst (keys %{$Scan{$src}}) {
@@ -1057,58 +1054,58 @@ sub assign_danger_level() {
                 print "assign_danger_level(): sigmatch = $sigmatch\n" if $DEBUG;
             }
             if ($sigmatch && $Scan{$src}{$dst}{'CURR_DL'} <
-                            $Scan{$src}{$dst}{$sigproto}{'SIGMATCH'}{'SIGDL'}) {
+                          $Scan{$src}{$dst}{$sigproto}{'SIGMATCH'}{'SIGDL'}) {
                 $Scan{$src}{$dst}{'CURR_DL'} =
-                                $Scan{$src}{$dst}{$sigproto}{'SIGMATCH'}{'SIGDL'};
-                $Scan{$src}{$dst}{'ALERTED'} = 'N';
+                              $Scan{$src}{$dst}{$sigproto}{'SIGMATCH'}{'SIGDL'};
+                $Scan{$src}{$dst}{'ALERTED'} = 0;
                 print "assign_danger_level(): danger level: "
                     . "$Scan{$src}{$dst}{'CURR_DL'}\n" if $DEBUG;
             }
-            ### if $PORT_RANGE_SCAN_THRESHOLD is >= 1, then psad will not assign a
-            ### danger level to repeated packets to the same port
+            ### if $PORT_RANGE_SCAN_THRESHOLD is >= 1, then psad will not assign
+            ### a danger level to repeated packets to the same port
             if ($absnum < $Config{'DANGER_LEVEL1'}) {
-                ### we don't have enough packets to even reach danger level 1 yet.
+                ### don't have enough packets to even reach danger level 1 yet.
                 next DST;
             } elsif ($absnum < $Config{'DANGER_LEVEL2'}
                         && $range >= $Config{'PORT_RANGE_SCAN_THRESHOLD'}) {
                 if ($Scan{$src}{$dst}{'CURR_DL'} < 1
                         && $Scan{$src}{$dst}{'CURR_DL'} != -1) {
-                    $Scan{$src}{$dst}{'ALERTED'} = 'N';
+                    $Scan{$src}{$dst}{'ALERTED'} = 0;
                     $Scan{$src}{$dst}{'CURR_DL'} = 1;
                 }
             } elsif ($absnum < $Config{'DANGER_LEVEL3'}
                         && $range >= $Config{'PORT_RANGE_SCAN_THRESHOLD'}) {
                 if ($Scan{$src}{$dst}{'CURR_DL'} < 2
                         && $Scan{$src}{$dst}{'CURR_DL'} != -1) {
-                    $Scan{$src}{$dst}{'ALERTED'} = 'N';
+                    $Scan{$src}{$dst}{'ALERTED'} = 0;
                     $Scan{$src}{$dst}{'CURR_DL'} = 2;
                 }
             } elsif ($absnum < $Config{'DANGER_LEVEL4'}
                         && $range >= $Config{'PORT_RANGE_SCAN_THRESHOLD'}) {
                 if ($Scan{$src}{$dst}{'CURR_DL'} < 3
                         && $Scan{$src}{$dst}{'CURR_DL'} != -1) {
-                    $Scan{$src}{$dst}{'ALERTED'} = 'N';
+                    $Scan{$src}{$dst}{'ALERTED'} = 0;
                     $Scan{$src}{$dst}{'CURR_DL'} = 3;
                 }
             } elsif ($absnum < $Config{'DANGER_LEVEL5'}
                         && $range >= $Config{'PORT_RANGE_SCAN_THRESHOLD'}) {
                 if ($Scan{$src}{$dst}{'CURR_DL'} < 4
                         && $Scan{$src}{$dst}{'CURR_DL'} != -1) {
-                    $Scan{$src}{$dst}{'ALERTED'} = 'N';
+                    $Scan{$src}{$dst}{'ALERTED'} = 0;
                     $Scan{$src}{$dst}{'CURR_DL'} = 4;
                 }
             } elsif ($range >= $Config{'PORT_RANGE_SCAN_THRESHOLD'}) {
                 if ($Scan{$src}{$dst}{'CURR_DL'} < 5
                         && $Scan{$src}{$dst}{'CURR_DL'} != -1) {
-                    $Scan{$src}{$dst}{'ALERTED'} = 'N';
+                    $Scan{$src}{$dst}{'ALERTED'} = 0;
                     $Scan{$src}{$dst}{'CURR_DL'} = 5;
                 }
             }
             ### we will always send an alert email for any new "bad" packet
             ### if $ALERT_ALL eq "Y"... Else email sent only if the scan
             ### increments its D.L.
-            if ($Config{'ALERT_ALL'} eq 'Y') {
-                $Scan{$src}{$dst}{'ALERTED'} = 'N';
+            if ($Config{'ALERT_ALL'} == 1) {
+                $Scan{$src}{$dst}{'ALERTED'} = 0;
             }
             print 'assign_danger_level(): CURR_DL (after assignment) = '
                 . "$Scan{$src}{$dst}{'CURR_DL'}\n" if $DEBUG;
@@ -1119,29 +1116,29 @@ sub assign_danger_level() {
 
 sub write_packet_counters() {
     open P, "> $Config{'PACKET_COUNTER_FILE'}" or die " ... @@@ Could not open $Config{'PACKET_COUNTER_FILE'}: $!";
-    print P "     tcp:  $tcp_ctr\n";
-    print P "     udp:  $udp_ctr\n";
-    print P "     icmp: $icmp_ctr\n";
+    print P "tcp:  $tcp_ctr\n";
+    print P "udp:  $udp_ctr\n";
+    print P "icmp: $icmp_ctr\n";
     close P;
     return;
 }
 
-sub automatic_ip_danger_assignment() {
-    for my $scan_ip (keys %Scan) {
-        for my $dst (keys %{$Scan{$scan_ip}}) {
-            for my $auto_ip (keys %Auto_ips) {
-                if ($scan_ip eq $auto_ip
-                        && $Scan{$scan_ip}{$dst}{'AUTO'} eq 'N') {
-                    $Scan{$scan_ip}{$dst}{'CURR_DL'}
-                                                    = $Auto_ips{$auto_ip};
-                    $Scan{$scan_ip}{$dst}{'ALERTED'} = 'N';
-                    $Scan{$scan_ip}{$dst}{'AUTO'} = 'Y';
-                }
-            }
-        }
-    }
-    return;
-}
+#sub automatic_ip_danger_assignment() {
+#    for my $scan_ip (keys %Scan) {
+#        for my $dst (keys %{$Scan{$scan_ip}}) {
+#            for my $auto_ip (keys %Auto_ips) {
+#                if ($scan_ip eq $auto_ip
+#                        && $Scan{$scan_ip}{$dst}{'AUTO'} eq 'N') {
+#                    $Scan{$scan_ip}{$dst}{'CURR_DL'}
+#                                                    = $Auto_ips{$auto_ip};
+#                    $Scan{$scan_ip}{$dst}{'ALERTED'} = 'N';
+#                    $Scan{$scan_ip}{$dst}{'AUTO'} = 'Y';
+#                }
+#            }
+#        }
+#    }
+#    return;
+#}
 
 sub collect_errors() {
     my ($bad_packets_aref) = @_;
@@ -1179,7 +1176,7 @@ sub scan_logr() {
             my $icmp = 0;
             my $current_danger_level
                     = $Scan{$src}{$dst}{'CURR_DL'};
-            if ($current_danger_level >= 1 && $Scan{$src}{$dst}{'LOGR'} eq 'Y') {
+            if ($current_danger_level >= 1 && $Scan{$src}{$dst}{'LOGR'} == 1) {
                 my $abs_start_range;
                 my $abs_end_range;
                 my $tcp_new_start_range;
@@ -1332,7 +1329,7 @@ sub scan_logr() {
                             ### need to delete the current interval so it won't show up in the next alert
                             delete $Scan{$src}{$dst}{$proto}{'CURR_SIG'};
                         }
-                        if (defined $Scan{$src}{$dst}{$proto}{'SIGMATCH'} && $Config{'SHOW_ALL_SIGNATURES'} eq 'Y') {
+                        if (defined $Scan{$src}{$dst}{$proto}{'SIGMATCH'} && $Config{'SHOW_ALL_SIGNATURES'} == 1) {
                             &Psad::logr("\n", \@print_array);
                             &Psad::logr("---- ALL $proto alert signatures found since [$start_time]\n", \@print_array);
                             for my $sigmatch (keys %{$Scan{$src}{$dst}{$proto}{'SIGMATCH'}}) {
@@ -1367,11 +1364,11 @@ sub scan_logr() {
                     &Psad::logr("\n", \@print_array);
                 }
                 &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=-=-=-=-=-=-=\n", \@print_array);
-                if ($Scan{$src}{$dst}{'ALERTED'} eq 'N'
+                if ($Scan{$src}{$dst}{'ALERTED'} == 0
                                         && $current_danger_level >= $Config{'EMAIL_ALERT_DANGER_LEVEL'}) {
                     &send_email_alert($src, $dst);
                 }
-                $Scan{$src}{$dst}{'LOGR'} = 'N';
+                $Scan{$src}{$dst}{'LOGR'} = 0;
                 $Scan{$src}{$dst}{'EMAIL_LIMIT'}++;
             }
         }
@@ -1458,14 +1455,14 @@ sub auto_psad_response(){
                 if ($USE_IPCHAINS) {
                     my $chains_aref = &get_input_chains($Cmds{'ipchains'});
                     my $blocked_str = '';
-                    if ($Config{'IPCHAINS_BLOCK_METHOD'} eq 'Y') {
+                    if ($Config{'IPCHAINS_BLOCK_METHOD'} == 1) {
                         for my $inchain (@$chains_aref) {
                             system "$Cmds{'ipchains'} -I $inchain 1 -s $src " .
                                    "-j DENY 2> /dev/null 1>&2";
                         }
                         $blocked_str = 'via ipchains';
                     }
-                    if ($Config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
+                    if ($Config{'TCPWRAPPERS_BLOCK_METHOD'} == 1) {
                         open H, ">> /etc/hosts.deny" or die
                                 "Could not open /etc/hosts.deny: $!";
                         print H "ALL: $src\n";
@@ -1473,9 +1470,9 @@ sub auto_psad_response(){
                         $blocked_str = 'via tcp wrappers';
                     }
                     for my $dst (keys %{$Scan{$src}}) {
-                        $Scan{$src}{$dst}{'BLOCKED'} = 'Y';
+                        $Scan{$src}{$dst}{'BLOCKED'} = 1;
                     }
-                    if ($Config{'ALERT_AUTO_BLOCKED'} eq 'Y' && $blocked_str) {
+                    if ($Config{'ALERT_AUTO_BLOCKED'} && $blocked_str) {
                         for my $email_address (@$Emailaddrs_aref) {
                             system "$Cmds{'mail'} $email_address -s \"psad: All traffic from $src" .
                                    " has been BLOCKED $blocked_str on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
@@ -1487,22 +1484,22 @@ sub auto_psad_response(){
                 } elsif ($USE_IPTABLES) {
                     my $chains_aref = &get_input_chains($Cmds{'iptables'});
                     my $blocked_str = '';
-                    if ($Config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
+                    if ($Config{'IPTABLES_BLOCK_METHOD'}) {
                         for my $inchain (@$chains_aref) {
                             system "$Cmds{'iptables'} -I $inchain 1 -s $src -j DROP 2> /dev/null 1>&2";
                         }
                         $blocked_str = 'via iptables';
                     }
-                    if ($Config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
+                    if ($Config{'TCPWRAPPERS_BLOCK_METHOD'}) {
                         open H, '>> /etc/hosts.deny' or die "Could not open /etc/hosts.deny: $!";
                         print H "ALL: $src\n";
                         close H;
                         $blocked_str = 'via tcp wrappers';
                     }
                     for my $dst (keys %{$Scan{$src}}) {
-                        $Scan{$src}{$dst}{'BLOCKED'} = 'Y';
+                        $Scan{$src}{$dst}{'BLOCKED'} = 1;
                     }
-                    if ($Config{'ALERT_AUTO_BLOCKED'} eq 'Y' && $blocked_str) {
+                    if ($Config{'ALERT_AUTO_BLOCKED'} && $blocked_str) {
                         for my $email_address (@$Emailaddrs_aref) {
                             system "$Cmds{'mail'} $email_address -s \"psad: All traffic from $src" .
                                    " has been BLOCKED $blocked_str on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
@@ -1567,7 +1564,7 @@ sub send_email_alert() {
         system "$Cmds{'mail'} $email_address -s \"psad WARNING: $HOSTNAME ($dst)" .
                        " has been scanned!\" < $Config{'EMAIL_ALERTFILE'} > /dev/null 2>&1";
     }
-    $Scan{$src}{$dst}{'ALERTED'} = 'Y';
+    $Scan{$src}{$dst}{'ALERTED'} = 1;
     return;
 }
 
@@ -1750,11 +1747,11 @@ sub psad_status() {
             close PIDFILE;
             chomp $pid;
             if (kill 0, $pid) {
-                printf "%-16s %s", " ... $pidname ", "is running on $HOSTNAME as pid: $pid\n";
+                print " ... $pidname (pid: $pid)";
                 my @grep_output = `$Cmds{'ps'} -auxww |$Cmds{'grep'} $pid`;
                 GP: for my $g (@grep_output) {
                     if ($g =~ /^\S+\s+$pid\s+(\S+)\s+(\S+)/) {
-                        print "     %CPU: $1  %MEM: $2\n";
+                        print "  %CPU: $1  %MEM: $2\n";
                         if ($pidname eq 'psad' && $cmdline) {
                             if ($cmdline) {
                                 print "     Command line arguments: $cmdline\n";
@@ -1764,7 +1761,7 @@ sub psad_status() {
                             if (-e $Config{'PACKET_COUNTER_FILE'}) {
                                 print "     Packets Counters (packets blocked by the firewall and processed by psad):\n";
                                 open F, "< $Config{'PACKET_COUNTER_FILE'}" or die " ... $Config{'PACKET_COUNTER_FILE'}: $!";
-                                print STDOUT "  $_" while (<F>);
+                                print STDOUT "        $_" while (<F>);
                                 close F;
                             }
                         }

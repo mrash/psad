@@ -160,6 +160,12 @@ my $config_file  = '/etc/psad/psad.conf';
 ### psad.conf and kmsgsd.conf.
 my $fw_search_file = '/etc/psad/fw_search.conf';
 
+### default config file for ALERTING_METHODS keyword, which
+### is referenced by both psad and psadwatchd.  This keyword
+### allows email alerting or syslog alerting (or both) to be
+### disabled.
+my $alerting_config_file = '/etc/psad/alerts.conf';
+
 ### disable debugging by default
 my $debug = 0;
 
@@ -347,6 +353,10 @@ my $no_netstat    = 0;
 my $no_fwcheck    = 0;
 my $no_kmsgsd     = 0;
 
+### these vars are controled by the alert.conf file
+my $no_email_alerts  = 0;
+my $no_syslog_alerts = 0;
+
 ### old command line options
 my $oldarg_snort_sids;
 my $oldarg_autoips;
@@ -381,6 +391,11 @@ my %tcp_p0f_opt_types = (
     'S' => $tcp_sack_type,
     'T' => $tcp_timestamp_type
 );
+
+my $mail_status_prefix = '[psad-status]';
+my $mail_error_prefix  = '[psad-error]';
+my $mail_fatal_prefix  = '[psad-fatal]';
+my $mail_alert_prefix  = '[psad-alert]';
 
 ### save a copy of the command line arguments
 my @args_cp = @ARGV;
@@ -670,7 +685,7 @@ for (;;) {
         $hup_flag = 0;  ### clear the HUP flag
 
         &Psad::psyslog('psad', 'received HUP signal, ' .
-            're-importing psad.conf');
+            're-importing psad.conf') unless $no_syslog_alerts;
 
         my $orig_fwdata = $config{'FW_DATA_FILE'};
 
@@ -698,7 +713,9 @@ for (;;) {
         $usr1_flag = 0;  ### clear the USR1 flag
 
         &Psad::psyslog('psad', 'received USR1 signal, printing scan ' .
-            "hashes to $config{'PSAD_DIR'}/scan_hash.$$");
+            "hashes to $config{'PSAD_DIR'}/scan_hash.$$")
+            unless $no_syslog_alerts;
+
         &print_scan();
     }
 
@@ -1701,7 +1718,7 @@ sub dshield_email_log() {
         }
 
         &Psad::psyslog('psad', "sent $#dshield_data lines of log data to " .
-            $config{'DSHIELD_ALERT_EMAIL'});
+            $config{'DSHIELD_ALERT_EMAIL'}) unless $no_syslog_alerts;
 
         ### store the current time
         $last_dshield_alert = time();
@@ -1990,6 +2007,9 @@ sub psad_init() {
     ### import psad.conf
     &Psad::buildconf(\%config, \%cmds, $config_file);
 
+    ### import alerting config (psadwatchd also references this file
+    &Psad::buildconf(\%config, \%cmds, $alerting_config_file);
+
     ### make sure all necessary configuration variables
     ### are defined
     &required_vars();
@@ -2013,6 +2033,13 @@ sub psad_init() {
     ### check to make sure the commands specified in the config section
     ### are in the right place, and attempt to correct automatically if not.
     &Psad::check_commands(\%cmds);
+
+    ### the usage of the mail and sendmail commands depends on the reporting
+    ### config.  I.e., we don't require that the mail command is installed
+    ### if "nomail" is set in the ALERTING_METHODS keyword, and we only need
+    ### sendmail if DShield alerting is enabled and there is a custom
+    ### DShield user email.
+    &check_mail_commands();
 
     ### set some config variables based on command line input
     &handle_cmdline();
@@ -2129,7 +2156,7 @@ sub validate_config() {
             and $config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'N') {
         &Psad::psyslog('psad', 'config warning, ENABLE_AUTO_IDS=Y, but ' .
             'both IPTABLES_BLOCK_METHOD and TCPWRAPPERS_BLOCK_METHOD are ' .
-            'set to N.');
+            'set to N.') unless $no_syslog_alerts;
     }
     if ($status_dl and $status_dl > 5) {
         die '[*] The --status-dl must be between 1 and 5.';
@@ -2152,6 +2179,50 @@ sub validate_config() {
         }
     }
 
+    return;
+}
+
+sub check_mail_commands() {
+    my @paths = qw(
+        /bin
+        /sbin
+        /usr/bin
+        /usr/sbin
+        /usr/local/bin
+        /usr/local/sbin
+    );
+    unless ($config{'ALERTING_METHODS'} =~ /no?email/i) {
+        ### make sure the mailCmd is executable
+        my $found = 0;
+        if (defined $cmds{'mail'}) {
+            if (-x $cmds{'mail'}) {
+                $found = 1;
+            } else {
+                for my $dir (@paths) {
+                    $found = 1 if -x "$dir/$cmds{'mail'}";
+                }
+            }
+        }
+        die "[*] Cound not find the mail command anywhere. ",
+            "Please edit $config_file" unless $found;
+    }
+
+    if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
+            and $config{'DSHIELD_ALERT_EMAIL'} ne 'NONE') {
+        my $found = 0;
+        ### make sure the sendmailCmd is executable
+        if (defined $cmds{'sendmail'}) {
+            if (-x $cmds{'sendmail'}) {
+                $found = 1;
+            } else {
+                for my $dir (@paths) {
+                    $found = 1 if -x "$dir/$cmds{'sendmail'}";
+                }
+            }
+        }
+        die "[*] Cound not find the sendmail command anywhere. ",
+            "Please edit $config_file" unless $found;
+    }
     return;
 }
 
@@ -2184,14 +2255,16 @@ sub validate_home_net() {
             ### so there are at least two interfaces
             &Psad::psyslog('psad', 'config warning; the HOME_NET ' .
                 'variable has not been set; defaulting to a single ' .
-                'interface config for signature matching.');
+                'interface config for signature matching.')
+                unless $no_syslog_alerts;
         } else {
             ### the HOME_NET variable has not been set (should be set
             ### to "NOT_USED" since there is only one interface on the
             ### box
             &Psad::psyslog('psad', 'config warning; the HOME_NET ' .
                 'variable has not been set; should probably be set to ' .
-                'NOT_USED since it appears there is only one interface.');
+                'NOT_USED since it appears there is only one interface.')
+                unless $no_syslog_alerts;
         }
         return;
     }
@@ -2210,7 +2283,8 @@ sub validate_home_net() {
             ### typo in the HOME_NET variable defintion.
             &Psad::psyslog('psad', 'config warning; HOME_NET definition ' .
                 "in psad.conf contains $home_net which does not appear to " .
-                "be directly connected to the local system.");
+                "be directly connected to the local system.")
+                unless $no_syslog_alerts;
         }
     }
     return;
@@ -2235,13 +2309,15 @@ sub import_fw_search() {
     }
     unless (defined $config{'FW_SEARCH_ALL'}) {
         &Psad::psyslog('psad', 'defaulting missing ' .
-            "FW_SEARCH_ALL variable in $fw_search_file to Y.");
+            "FW_SEARCH_ALL variable in $fw_search_file to Y.")
+            unless $no_syslog_alerts;
         $config{'FW_SEARCH_ALL'} = 'Y';
     }
 
     unless ($config{'FW_SEARCH_ALL'} eq 'Y' or
             $config{'FW_SEARCH_ALL'} eq 'N') {
-        &Psad::psyslog('psad', 'setting FW_SEARCH_ALL to Y.');
+        &Psad::psyslog('psad', 'setting FW_SEARCH_ALL to Y.')
+            unless $no_syslog_alerts;
         $config{'FW_SEARCH_ALL'} = 'Y';
     }
     return;
@@ -2294,7 +2370,8 @@ sub parse_ignore_protocols() {
     my @protos = split /\s*,\s*/, $config{'IGNORE_PROTOCOLS'};
     for my $proto (@protos) {
         if ($proto =~ /\W/) {
-            &Psad::psyslog('psad', 'invalid protocol in IGNORE_PROTOCOLS var');
+            &Psad::psyslog('psad', 'invalid protocol in IGNORE_PROTOCOLS var')
+                unless $no_syslog_alerts;
         } else {
             if ($proto =~ /^\d+$/) {
                 $ignore_protocols{$proto} = '';
@@ -2316,7 +2393,8 @@ sub parse_ignore_interfaces() {
     my @interfaces = split /\s*,\s*/, $config{'IGNORE_INTERFACES'};
     for my $intf (@interfaces) {
         if ($intf =~ /\W/) {
-            &Psad::psyslog('psad', 'invalid interface in IGNORE_INTERFACES var');
+            &Psad::psyslog('psad', 'invalid interface in IGNORE_INTERFACES var')
+                unless $no_syslog_alerts;
         } else {
             $ignore_interfaces{$intf} = '';
         }
@@ -2366,7 +2444,8 @@ sub import_snort_rules() {
         }
     }
     print STDERR Dumper %snort_msgs if $debug and $verbose;
-    &Psad::psyslog('psad', 'imported Snort rules');
+    &Psad::psyslog('psad', 'imported Snort rules')
+        unless $no_syslog_alerts;
     return;
 }
 
@@ -2566,7 +2645,8 @@ sub import_signatures() {
         print STDERR Dumper "[-] signature attributes hash:\n";
         print STDERR Dumper %sigs_attr if $verbose;
     }
-    &Psad::psyslog('psad', 'imported psad-1.3 signatures');
+    &Psad::psyslog('psad', 'imported psad-1.3 signatures')
+        unless $no_syslog_alerts;
     return;
 }
 
@@ -2600,7 +2680,8 @@ sub import_icmp_types() {
         }
     }
     print STDERR Dumper %valid_icmp_types if $debug and $verbose;
-    &Psad::psyslog('psad', 'imported valid icmp types and codes');
+    &Psad::psyslog('psad', 'imported valid icmp types and codes')
+        unless $no_syslog_alerts;
     return;
 }
 
@@ -2705,10 +2786,10 @@ sub import_auto_dl() {
         }
         unless ($ip and $mask) {
             unless ($fw_block_ip) {
-                my $subject = "[psad-error] import warning: " .
+                my $subject = "$mail_error_prefix import warning: " .
                     "$config{'AUTO_DL_FILE'} error on line: $i";
                 &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
-                    $cmds{'mail'});
+                    $cmds{'mail'}) unless $no_email_alerts;
             }
         }
     }
@@ -2727,7 +2808,8 @@ sub import_auto_dl() {
         ### mode
         unless ($fw_block_ip) {
             &Psad::psyslog('psad', "imported auto_dl, got $ip_ctr " .
-                "IP addresses and $net_ctr networks");
+                "IP addresses and $net_ctr networks")
+                unless $no_syslog_alerts;
         }
     }
     return;
@@ -2768,7 +2850,8 @@ sub import_p0f_sigs() {
 
     print STDERR Dumper %p0f_sigs if $debug and $verbose;
     &Psad::psyslog('psad',
-        'imported p0f-based passive OS fingerprinting signatures');
+        'imported p0f-based passive OS fingerprinting signatures')
+        unless $no_syslog_alerts;
     return;
 }
 
@@ -2804,52 +2887,54 @@ sub import_posf_sigs() {
     OS: for my $os (keys %posf_sigs) {
         unless (defined $posf_sigs{$os}{'numpkts'}) {
             &Psad::psyslog('psad', "$posf_file: missing " .
-                "NUMPKTS for os: $os");
+                "NUMPKTS for os: $os") unless $no_syslog_alerts;
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'tos'}) {
             &Psad::psyslog('psad', "$posf_file: missing " .
-                "TOS for os: $os");
+                "TOS for os: $os") unless $no_syslog_alerts;
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'len'}) {
             &Psad::psyslog('psad', "$posf_file: missing " .
-                "LEN for os: $os");
+                "LEN for os: $os") unless $no_syslog_alerts;
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'ttl'}) {
             &Psad::psyslog('psad', "$posf_file: missing " .
-                "TTL for os: $os");
+                "TTL for os: $os") unless $no_syslog_alerts;
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'id'}) {
             &Psad::psyslog('psad', "$posf_file: missing " .
-                "ID for os: $os");
+                "ID for os: $os") unless $no_syslog_alerts;
             delete $posf_sigs{$os};
             next OS;
         } else {
             unless ($posf_sigs{$os}{'id'} eq 'SMALLINCR'
                     || $posf_sigs{$os}{'id'} eq 'RANDOM') {
                 &Psad::psyslog('psad', "$posf_file: ID must " .
-                    "be either SMALLINCR or RANDOM for os: $os");
+                    "be either SMALLINCR or RANDOM for os: $os")
+                    unless $no_syslog_alerts;
                 delete $posf_sigs{$os};
                 next OS;
             }
         }
         unless (defined $posf_sigs{$os}{'win'}) {
             &Psad::psyslog('psad', "$posf_file: missing " .
-                "WINDOW for os: $os");
+                "WINDOW for os: $os") unless $no_syslog_alerts;
             delete $posf_sigs{$os};
             next OS;
         }
     }
     print STDERR Dumper %posf_sigs if $debug and $verbose;
     &Psad::psyslog('psad',
-        'imported TOS-based passive OS fingerprinting signatures');
+        'imported TOS-based passive OS fingerprinting signatures')
+        unless $no_syslog_alerts;
     return;
 }
 
@@ -2977,14 +3062,15 @@ sub assign_auto_danger_level() {
                 ### all protocols are applicable
                 $scan_dl{$src} = $dl;
                 &Psad::psyslog('psad', 'auto-assigned danger level: ' .
-                    "$dl for IP: $src");
+                    "$dl for IP: $src") unless $no_syslog_alerts;
                 return $dl;
             } else {
                 for my $proto (@{$auto_dl{$net}{'proto'}}) {
                     if ($scan_proto eq $proto) {
                         $scan_dl{$src} = $dl;
                         &Psad::psyslog('psad', 'auto-assigned danger ' .
-                            "level: $dl for IP: $src");
+                            "level: $dl for IP: $src")
+                            unless $no_syslog_alerts;
                         return $dl;
                     }
                 }
@@ -3475,7 +3561,8 @@ sub scan_logr() {
             ### write a scan message to syslog
             &Psad::psyslog('psad', "scan detected: $src -> $dst " .
                 "$syslog_range tcp=$tcp_newpkts udp=$udp_newpkts " .
-                "icmp=$icmp_newpkts dangerlevel: $curr_dl");
+                "icmp=$icmp_newpkts dangerlevel: $curr_dl")
+                unless $no_syslog_alerts;
 
             unless ($no_whois) {
                 print $fh  "\n[+] Whois Information:\n";
@@ -3491,16 +3578,18 @@ sub scan_logr() {
                 unless ($analyze_msgs and not $analysis_emails) {
                     my $subject;
                     if ($analyze_msgs) {
-                        $subject = "[psad-alert] DL$curr_dl (analysis mode) " .
-                            "src: $src_subj dst: $dst_subj";
+                        $subject = "$mail_alert_prefix DL$curr_dl (analysis " .
+                            "mode) src: $src_subj dst: $dst_subj";
                     } else {
-                        $subject = "[psad-alert] DL$curr_dl src: " .
+                        $subject = "$mail_alert_prefix DL$curr_dl src: " .
                             "$src_subj dst: $dst_subj";
                     }
                     &Psad::psyslog('psad', "sending email alert to: " .
-                        "$config{'EMAIL_ADDRESSES'}\n");
+                        "$config{'EMAIL_ADDRESSES'}\n")
+                        unless $no_syslog_alerts;
                     &Psad::sendmail($subject, $email_file,
-                        $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+                        $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+                        unless $no_email_alerts;
                     $scan{$src}{$dst}{'email_ctr'}++;
 
                     ### print the number of email alerts we have sent
@@ -3779,11 +3868,13 @@ sub renew_auto_blocked_ips() {
                 my $ip = $1;
                 unless (&tcpwr_test_block($ip)) {
                     &Psad::psyslog('psad', "renewing tcpwrappers auto-block " .
-                        "against $ip $timeout_str");
+                        "against $ip $timeout_str")
+                        unless $no_syslog_alerts;
                     &tcpwr_block($ip);
-                    &Psad::sendmail("[psad-status] RENEWED tcpwrappers " .
+                    &Psad::sendmail("$mail_status_prefix RENEWED tcpwrappers " .
                         "BLOCK against $ip $timeout_str", '',
-                        $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+                        $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+                        unless $no_email_alerts;
                 }
                 $auto_blocked_ips{$ip}{'time'}    = time();
                 $auto_blocked_ips{$ip}{'blocked'} = 1;
@@ -3904,7 +3995,7 @@ sub ipt_block() {
         my ($rv, $status_msg) = $ipt->create_chain($table, $to_chain);
 
         unless ($rv) {
-            &Psad::psyslog('psad', $status_msg);
+            &Psad::psyslog('psad', $status_msg) unless $no_syslog_alerts;
             print STDERR "[-] ipt_block(): $status_msg\n" if $debug;
             next;
         }
@@ -3914,7 +4005,7 @@ sub ipt_block() {
             $from_chain, $to_chain);
 
         unless ($rv) {
-            &Psad::psyslog('psad', $status_msg);
+            &Psad::psyslog('psad', $status_msg) unless $no_syslog_alerts;
             print STDERR "[-] ipt_block(): $status_msg\n" if $debug;
             next;
         }
@@ -3938,7 +4029,8 @@ sub ipt_block() {
                 if ($rv) {
                     $block_success = 1;
                 } else {
-                    &Psad::psyslog('psad', $status_msg);
+                    &Psad::psyslog('psad', $status_msg)
+                        unless $no_syslog_alerts;
                     print STDERR "[-] ipt_block(): $status_msg\n" if $debug;
                 }
             }
@@ -3959,7 +4051,8 @@ sub ipt_block() {
                 if ($rv) {
                     $block_success = 1;
                 } else {
-                    &Psad::psyslog('psad', $status_msg);
+                    &Psad::psyslog('psad', $status_msg)
+                        unless $no_syslog_alerts;
                     print STDERR "[-] ipt_block(): $status_msg\n" if $debug;
                 }
             }
@@ -3982,9 +4075,10 @@ sub ipt_block() {
             $mail_msg = "added $mail_msg";
         }
 
-        &Psad::sendmail("[psad-status] $mail_msg", '',
-            $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
-        &Psad::psyslog('psad', $mail_msg);
+        &Psad::sendmail("$mail_status_prefix $mail_msg", '',
+            $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+            unless $no_email_alerts;
+        &Psad::psyslog('psad', $mail_msg) unless $no_syslog_alerts;
 
         ### write the ip out to the auto blocked file
         print STDERR "[+] ipt_block(): added block for $ip\n"
@@ -3992,7 +4086,7 @@ sub ipt_block() {
         &cache_file_write_blocked_ip($ip, $config{'AUTO_BLOCK_IPT_FILE'});
     } else {
         &Psad::psyslog('psad', "could not add iptables " .
-            "block rule for: $ip");
+            "block rule for: $ip") unless $no_syslog_alerts;
         print STDERR "[-] Could not add iptables block rule for: $ip\n"
             if $debug;
     }
@@ -4014,7 +4108,6 @@ sub ipt_rm_block() {
         my $target     = $block_hr->{'target'};
         my $direction  = $block_hr->{'direction'};
         my $table      = $block_hr->{'table'};
-        my $from_chain = $block_hr->{'from_chain'};
         my $to_chain   = $block_hr->{'to_chain'};
 
         my $src = '';
@@ -4034,7 +4127,8 @@ sub ipt_rm_block() {
                 if ($rv) {
                     $rm_block = 1;
                 } else {
-                    &Psad::psyslog('psad', $status_msg);
+                    &Psad::psyslog('psad', $status_msg)
+                        unless $no_syslog_alerts;
                     print STDERR "[-] ipt_rm_block(): $status_msg\n" if $debug;
                 }
             }
@@ -4052,7 +4146,8 @@ sub ipt_rm_block() {
                 if ($rv) {
                     $rm_block = 1;
                 } else {
-                    &Psad::psyslog('psad', $status_msg);
+                    &Psad::psyslog('psad', $status_msg)
+                        unless $no_syslog_alerts;
                     print STDERR "[-] ipt_rm_block(): $status_msg\n" if $debug;
                 }
             }
@@ -4064,17 +4159,20 @@ sub ipt_rm_block() {
             ### don't send timeout email if we are manually flushing
             ### the auto-block rules from the command line with --Flush.
             &Psad::psyslog('psad', "removed iptables auto-block against " .
-                "$ip (timeout expired).");
-            &Psad::sendmail('[psad-status] removed iptables block ' .
+                "$ip (timeout expired).") unless $no_syslog_alerts;
+            &Psad::sendmail("$mail_status_prefix removed iptables block " .
                 "against $ip (timeout expired).", '',
-                $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+                $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+                unless $no_email_alerts;
         }
         print STDERR "[+] ipt_rm_block(): removed iptables block ",
             "against $ip (timeout expired).\n" if $debug;
         &cache_file_rm_blocked_ip($ip, $config{'AUTO_BLOCK_IPT_FILE'});
     } else {
-        &Psad::psyslog('psad', 'could not remove iptables ' .
-            "block rule for $ip") if $flush_fw;
+        if ($flush_fw) {
+            &Psad::psyslog('psad', 'could not remove iptables ' .
+                "block rule for $ip") unless $no_syslog_alerts;
+        }
         print STDERR "[-] Could not remove iptables block rule for $ip.\n"
             if $debug;
     }
@@ -4131,7 +4229,8 @@ sub check_ipt_add_ip() {
                 or $ip =~ m|^\s*$ip_re/$ip_re\s*$|) {
 
                 &Psad::psyslog('psad',
-                    "adding $ip from cache file to psad chains");
+                    "adding $ip from cache file to psad chains")
+                    unless $no_syslog_alerts;
 
                 ### instantiate the blocking rule
                 &ipt_block($ip, '');
@@ -4231,9 +4330,10 @@ sub tcpwr_remove_block() {
         chomp $line;
         if ($line =~ /ALL:\s+$ip$/) {
             &cache_file_rm_blocked_ip($ip, $config{'AUTO_BLOCK_TCPWR_FILE'});
-            &Psad::sendmail("[psad-status] removed tcpwrappers block " .
+            &Psad::sendmail("$mail_status_prefix removed tcpwrappers block " .
                 "against $ip (timeout expired).", '',
-                $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+                $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+                unless $no_email_alerts;
         } else {
             print T "$line\n";
         }
@@ -4275,10 +4375,11 @@ sub auto_psad_response() {
             }
             if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
                 &Psad::psyslog('psad', 'initiating tcpwrappers auto-block ' .
-                    "against $src $timeout_str");
-                &Psad::sendmail("[psad-status] tcpwrappers AUTO-BLOCK " .
+                    "against $src $timeout_str") unless $no_syslog_alerts;
+                &Psad::sendmail("$mail_status_prefix tcpwrappers AUTO-BLOCK " .
                     "against $src $timeout_str", '',
-                    $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+                    $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+                    unless $no_email_alerts;
                 my $found = 0;
                 open H, "< $config{'ETC_HOSTS_DENY'}" or die
                     "[*] Could not open $config{'ETC_HOSTS_DENY'}: $!";
@@ -4374,7 +4475,7 @@ sub build_ipt_block_config() {
                         $hsh{'direction'} eq 'both') {
                 my $msg = "invalid direction $hsh{'direction'} " .
                     "in IPT_AUTO_CHAIN$ctr keyword";
-                &Psad::psyslog('psad', $msg);
+                &Psad::psyslog('psad', $msg) unless $no_syslog_alerts;
                 print STDERR "[-] build_ipt_block_config(): $msg\n"
                     if $debug;
                 next VAR;
@@ -4384,13 +4485,13 @@ sub build_ipt_block_config() {
             } else {
                 my $msg = "invalid IPT_AUTO_CHAIN$ctr keyword, " .
                     "$hsh{'from_chain'} chain does not exist.";
-                &Psad::psyslog('psad', $msg);
+                &Psad::psyslog('psad', $msg) unless $no_syslog_alerts;
                 print STDERR "[-] build_ipt_block_config(): $msg\n"
                     if $debug;
             }
         } else {
             my $msg = "invalid IPT_AUTO_CHAIN$ctr variable: $value";
-            &Psad::psyslog('psad', $msg);
+            &Psad::psyslog('psad', $msg) unless $no_syslog_alerts;
             print STDERR "[-] build_ipt_block_config(): $msg\n" if $debug;
         }
         $ctr++;
@@ -4448,9 +4549,10 @@ sub cache_file_rm_blocked_ip() {
 
 sub email_limit_reached() {
     my ($src, $dst) = @_;
-    my $subject = "[psad-status] email message limit for $src has " .
+    my $subject = "$mail_status_prefix email message limit for $src has " .
         "been reached on $config{'HOSTNAME'} ($dst)";
-    &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+    &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+        unless $no_email_alerts;
     $scan{$src}{$dst}{'stop_email'} = 1;
     return;
 }
@@ -4578,7 +4680,8 @@ sub REAPER {
 sub stop_psad() {
     my $rv = 0;
 
-    &Psad::psyslog('psad', 'shutting down psad daemons');
+    &Psad::psyslog('psad', 'shutting down psad daemons')
+        unless $no_syslog_alerts;
     ### must kill psadwatchd first since if not, it might try to restart
     ### any of the other two daemons.
     for my $pidname qw(psadwatchd kmsgsd psad) {
@@ -5303,7 +5406,8 @@ sub import_old_scans() {
 
     if ($import_ctr) {
         &Psad::psyslog('psad',
-            "imported $import_ctr scanning IP addresses from previous psad run");
+            "imported $import_ctr scanning IP addresses from previous psad run")
+            unless $no_syslog_alerts;
     }
     return;
 }
@@ -5570,6 +5674,9 @@ sub setup() {
             "move /usr/bin/whois.psad -> $cmds{'whois'}";
     }
 
+    $no_email_alerts = 1 if $config{'ALERTING_METHODS'} =~ /no?email/i;
+    $no_syslog_alerts = 1 if $config{'ALERTING_METHODS'} =~ /no?syslog/i;
+
     die '[*] No system logger config file could be found.'
         unless (-e $config{'ETC_SYSLOG_CONF'}
                 or -e $config{'ETC_SYSLOGNG_CONF'}
@@ -5611,13 +5718,15 @@ sub setup() {
                 print SYSLOG "kern.info\t\t|$config{'PSAD_FIFO'}\n";
                 close SYSLOG;
                 &Psad::psyslog('psad', 'reconfiguring syslogd to write ' .
-                    "kern.info messages to $config{'PSAD_FIFO'}");
+                    "kern.info messages to $config{'PSAD_FIFO'}")
+                    unless $no_syslog_alerts;
                 system "$cmds{'killall'} -HUP syslogd";
             }
         } else {
-            &Psad::sendmail("[psad-error] $config{'ETC_SYSLOG_CONF'} does not " .
+            &Psad::sendmail("$mail_error_prefix $config{'ETC_SYSLOG_CONF'} does not " .
                 "exist, check SYSLOG_DAEMON setting on $config{'HOSTNAME'}",
-                '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+                '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+                unless $no_email_alerts;
         }
     }
     if ($config{'SYSLOG_DAEMON'} eq 'syslog-ng') {
@@ -5659,13 +5768,15 @@ sub setup() {
                     "filter(f_kerninfo); destination(psadpipe); };\n";
                 close SYSLOGNG;
                 &Psad::psyslog('psad', 'reconfiguring syslog-ng to write ' .
-                    "kern.info messages to $config{'PSAD_FIFO'}");
+                    "kern.info messages to $config{'PSAD_FIFO'}")
+                    unless $no_syslog_alerts;
                 system "$cmds{'killall'} -HUP syslog-ng";
             }
         } else {
-            &Psad::sendmail("[psad-error] $config{'ETC_SYSLOGNG_CONF'} does not " .
+            &Psad::sendmail("$mail_error_prefix $config{'ETC_SYSLOGNG_CONF'} does not " .
                 "exist, check SYSLOG_DAEMON setting on $config{'HOSTNAME'}",
-                '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+                '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+                unless $no_email_alerts;
         }
     }
     ### Metalog support added by Dennis Freise <cat@final-frontier.ath.cx>
@@ -5699,7 +5810,8 @@ sub setup() {
                     "\"/usr/sbin/psadpipe.sh\"\n";
                 close METALOG;
                 &Psad::psyslog('psad', 'reconfiguring metalog to write ' .
-                        "kern-facility messages to /usr/sbin/psadpipe.sh");
+                        "kern-facility messages to /usr/sbin/psadpipe.sh")
+                    unless $no_syslog_alerts;
 
                 open PIPESCRIPT, '> /usr/sbin/psadpipe.sh' or
                     die "[*] Unable to open /usr/sbin/psadpipe.sh: $!";
@@ -5708,7 +5820,8 @@ sub setup() {
                 close PIPESCRIPT;
                 chmod 0700, '/usr/sbin/psadpipe.sh';
                 &Psad::psyslog('psad', 'generated /usr/sbin/psadpipe.sh ' .
-                        "which writes to $config{'PSAD_FIFO'}");
+                        "which writes to $config{'PSAD_FIFO'}")
+                    unless $no_syslog_alerts;
 
                 ### Metalog seems to simply die on SIGHUP and SIGALRM, and I
                 ### found no signal or option to reload it's config... :-(
@@ -5717,9 +5830,10 @@ sub setup() {
 #          system "$cmds{'killall'} -HUP metalog";
             }
         } else {
-            &Psad::sendmail("[psad-error] $config{'ETC_METALOG_CONF'} does not " .
+            &Psad::sendmail("$mail_error_prefix $config{'ETC_METALOG_CONF'} does not " .
                 "exist, check SYSLOG_DAEMON setting on $config{'HOSTNAME'}",
-                '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+                '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+                unless $no_email_alerts;
         }
     }
 
@@ -5746,17 +5860,21 @@ sub disk_space_exceeded() {
         $rm_data_ctr++;
         &Psad::psyslog('psad', "disk partition associated with " .
             "$config{'PSAD_DIR'} exceeded " .
-            "$config{'DISK_MAX_PERCENTAGE'} prct utilization.");
-        &Psad::sendmail("[psad-error] Exceeded max disk utilization for " .
+            "$config{'DISK_MAX_PERCENTAGE'} prct utilization.")
+            unless $no_syslog_alerts;
+        &Psad::sendmail("$mail_error_prefix Exceeded max disk utilization for " .
             "$config{'PSAD_DIR'} on $config{'HOSTNAME'}", '',
-            $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
-        &Psad::psyslog('psad', "removing data in $config{'PSAD_DIR'}");
+            $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+            unless $no_email_alerts;
+        &Psad::psyslog('psad', "removing data in $config{'PSAD_DIR'}")
+            unless $no_syslog_alerts;
         if (-d $config{'SCAN_DATA_ARCHIVE_DIR'}) {
             ### remove the entire archive directory (we have run out of
             ### disk so keeping old scan directories around is the least
             ### of our worries).
             &Psad::psyslog('psad',
-                "removing $config{'SCAN_DATA_ARCHIVE_DIR'} directory");
+                "removing $config{'SCAN_DATA_ARCHIVE_DIR'} directory")
+                unless $no_syslog_alerts;
             rmtree $config{'SCAN_DATA_ARCHIVE_DIR'};
             mkdir $config{'SCAN_DATA_ARCHIVE_DIR'}, 0500;
         }
@@ -5782,12 +5900,12 @@ sub disk_space_exceeded() {
         if ($rm_data_ctr > $config{'DISK_MAX_RM_RETRIES'}) {
             &Psad::psyslog('psad', "could not sufficiently reduce disk " .
                 "utilization in $config{'PSAD_DIR'} partition.  " .
-                "Stopping psad!");
-            &Psad::sendmail("[psad-error] Could not reduce disk utilization on " .
+                "Stopping psad!") unless $no_syslog_alerts;
+            &Psad::sendmail("$mail_error_prefix Could not reduce disk utilization on " .
                 $config{'HOSTNAME'}, '', $config{'EMAIL_ADDRESSES'},
-                $cmds{'mail'});
-            &Psad::sendmail("[psad-fatal] Stopping psad on $config{'HOSTNAME'}!",
-                '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+                $cmds{'mail'}) unless $no_email_alerts;
+            &Psad::sendmail("$mail_fatal_prefix Stopping psad on $config{'HOSTNAME'}!",
+                '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'}) unless $no_email_alerts;
             for my $pidname qw(psadwatchd kmsgsd) {
                 my $pidfile = $pidfiles{$pidname};
                 my $pid = &Psad::pidrunning($pidfile);
@@ -5855,7 +5973,7 @@ sub required_vars() {
         IMPORT_OLD_SCANS ICMP_TYPES_FILE SHOW_ALL_SIGNATURES
         IPT_PREFIX_COUNTER_FILE IGNORE_PORTS ENABLE_SCAN_ARCHIVE
         EMAIL_LIMIT_STATUS_MSG P0F_FILE IGNORE_PROTOCOLS IPT_AUTO_CHAIN1
-        AUTO_IPT_ADD_IP_FILE IGNORE_INTERFACES
+        AUTO_IPT_ADD_IP_FILE IGNORE_INTERFACES ALERTING_METHODS
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

@@ -143,7 +143,7 @@ my %Cmds = (
 
 my $distro = &get_distro();
 
-if ($distro eq 'redhat') {
+if ($distro eq 'redhat' or $distro eq 'fedora') {
     ### add chkconfig only if we are runing on a redhat distro
     $Cmds{'chkconfig'} = $chkconfigCmd;
 } elsif ($distro eq 'gentoo') {
@@ -474,7 +474,6 @@ sub install() {
     ### deal with auto_dl, signatures, icmp_types, and posf files
     for my $file qw(signatures icmp_types posf auto_dl) {
         if (-e "${PSAD_CONFDIR}/$file") {
-            &archive("${PSAD_CONFDIR}/$file") unless $noarchive;
             unless (&query_preserve_sigs_autodl("${PSAD_CONFDIR}/$file")) {
                 ### keep the installed file intact (the user must have
                 ### modified it).
@@ -483,6 +482,7 @@ sub install() {
                     "copy $file -> ${PSAD_CONFDIR}/$file: $!";
                 &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
             }
+            &archive("${PSAD_CONFDIR}/$file") unless $noarchive;
         } else {
             &logr("[+] Copying $file -> ${PSAD_CONFDIR}/$file\n");
             copy $file, "${PSAD_CONFDIR}/$file" or die "[*] Could not copy ",
@@ -610,6 +610,8 @@ sub install() {
     my $init_file = '';
     if ($distro eq 'redhat') {
         $init_file = 'init-scripts/psad-init.redhat';
+    } elsif ($distro eq 'fedora') {
+        $init_file = 'init-scripts/psad-init.fedora';
     } elsif ($distro eq 'gentoo') {
         $init_file = 'init-scripts/psad-init.gentoo';
     } else {
@@ -1035,12 +1037,9 @@ sub query_preserve_sigs_autodl() {
     my $ans = '';
     while ($ans ne 'y' && $ans ne 'n') {
         &logr("\n");
-        &logr("[+] Preserve the existing $file file?\n");
-        &logr('    (NOTE: This is only recommended if you have manually ' .
-            "edited\n");
-        &logr("    $file)  (y/[n])?  ");
+        &logr("[+] Preserve the existing $file file ([y]/n)?  ");
         $ans = <STDIN>;
-        $ans = 'n' if $ans eq "\n";
+        $ans = 'y' if $ans eq "\n";
         chomp $ans;
     }
     if ($ans eq 'y') {
@@ -1389,6 +1388,7 @@ sub get_distro() {
         for my $line (@lines) {
             chomp $line;
             return 'redhat' if $line =~ /red\s*hat/i;
+            return 'fedora' if $line =~ /fedora/i;
         }
     }
     return 'NA';
@@ -1615,7 +1615,7 @@ sub enable_psad_at_boot() {
         chomp $ans;
     }
     if ($ans eq 'y') {
-        if ($distro eq 'redhat') {
+        if ($distro eq 'redhat' or $distro eq 'fedora') {
             system "$Cmds{'chkconfig'} --add psad";
         } elsif ($distro eq 'gentoo') {
             system "$Cmds{'rc-update'} add psad default";

@@ -38,6 +38,9 @@
 #include <dirent.h>
 #include <ctype.h>   /* isdigit() */
 
+/* DEFINES *****************************************************************/
+#define DISKMOND_CONF "/etc/psad/diskmond.conf"
+
 /* GLOBALS ******************************************************************/
 short int email_ctr = 0;
 const char mail_redr[] = " < /dev/null > /dev/null 2>&1";
@@ -88,7 +91,7 @@ int main(int argc, char *argv[]) {
     /* handle command line arguments */
     if (argc == 1) {  /* nothing but the program name was
                          specified on the command line */
-        strlcpy(config_file, CONFIG_FILE, MAX_PATH_LEN);
+        strlcpy(config_file, DISKMOND_CONF, MAX_PATH_LEN);
     } else if (argc == 2) {  /* the path to the config file was
                                 supplied on the command line */
         strlcpy(config_file, argv[1], MAX_PATH_LEN);

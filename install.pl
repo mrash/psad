@@ -85,8 +85,6 @@ my $iptablesCmd  = '/sbin/iptables';
 my $psadCmd      = "${USRSBIN_DIR}/psad";
 #============ end config ============
 
-my $preserved_config = 0;
-
 ### get the hostname of the system
 my $HOSTNAME = hostname;
 
@@ -114,13 +112,13 @@ unless ($found) {
 
 ### set the default execution flags
 my $SUB_TAB = '    ';
-my $nopreserve   = 0;
+my $noarchive    = 0;
 my $uninstall    = 0;
 my $verbose      = 0;
 my $help         = 0;
 
 &usage(1) unless (GetOptions(
-    'no-preserve' => \$nopreserve,    # don't preserve existing configs
+    'no-preserve' => \$noarchive,    # don't preserve existing configs
     'uninstall'   => \$uninstall,
     'verbose'     => \$verbose,
     'help'        => \$help           # display help
@@ -451,7 +449,7 @@ sub install() {
         mkdir $CONF_ARCHIVE, 0500;
     }
     if (-e "${PSAD_CONFDIR}/psad_signatures") {
-        &archive("${PSAD_CONFDIR}/psad_signatures") unless $nopreserve;
+        &archive("${PSAD_CONFDIR}/psad_signatures") unless $noarchive;
         &logr(" .. Copying psad_signatures -> " .
             "${PSAD_CONFDIR}/psad_signatures\n");
         copy 'psad_signatures', "${PSAD_CONFDIR}/psad_signatures";
@@ -463,7 +461,7 @@ sub install() {
         &perms_ownership("${PSAD_CONFDIR}/psad_signatures", 0600);
     }
     if (-e "${PSAD_CONFDIR}/psad_posf") {
-        &archive("${PSAD_CONFDIR}/psad_posf") unless $nopreserve;
+        &archive("${PSAD_CONFDIR}/psad_posf") unless $noarchive;
         &logr(" .. Copying psad_posf -> " .
             "${PSAD_CONFDIR}/psad_posf\n");
         copy 'psad_posf', "${PSAD_CONFDIR}/psad_posf";
@@ -475,7 +473,7 @@ sub install() {
         &perms_ownership("${PSAD_CONFDIR}/psad_posf", 0600);
     }
     if (-e "${PSAD_CONFDIR}/psad_auto_ips") {
-        &archive("${PSAD_CONFDIR}/psad_auto_ips") unless $nopreserve;
+        &archive("${PSAD_CONFDIR}/psad_auto_ips") unless $noarchive;
         &logr(" .. Copying psad_auto_ips -> " .
             "${PSAD_CONFDIR}/psad_auto_ips\n");
         copy 'psad_auto_ips', "${PSAD_CONFDIR}/psad_auto_ips";
@@ -486,19 +484,26 @@ sub install() {
         copy 'psad_auto_ips', "${PSAD_CONFDIR}/psad_auto_ips";
         &perms_ownership("${PSAD_CONFDIR}/psad_auto_ips", 0600);
     }
+    my $query_rv = 0;
     if (-e "${PSAD_CONFDIR}/psad.conf") {
-        &archive("${PSAD_CONFDIR}/psad.conf") unless $nopreserve;
-        if (&query_preserve_config()) {
-            &preserve_config();
+        $query_rv = &query_preserve_config();
+    }
+
+    for my $file qw(psad.conf psadwatchd.conf kmsgsd.conf diskmond.conf) {
+        if (-e "${PSAD_CONFDIR}/$file") {
+            &archive("${PSAD_CONFDIR}/$file") unless $noarchive;
+            if ($query_rv) {
+                &preserve_config($file);
+            } else {
+                &logr(" .. Copying $file -> ${PSAD_CONFDIR}/$file\n");
+                copy $file, "${PSAD_CONFDIR}/$file";
+                &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
+            }
         } else {
-            &logr(" .. Copying psad.conf -> ${PSAD_CONFDIR}/psad.conf\n");
-            copy 'psad.conf', "${PSAD_CONFDIR}/psad.conf";
-            &perms_ownership("${PSAD_CONFDIR}/psad.conf", 0600);
+            &logr(" .. Copying $file -> ${PSAD_CONFDIR}/$file\n");
+            copy $file, "${PSAD_CONFDIR}/$file";
+            &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
         }
-    } else {
-        &logr(" .. Copying psad.conf -> ${PSAD_CONFDIR}/psad.conf\n");
-        copy 'psad.conf', "${PSAD_CONFDIR}/psad.conf";
-        &perms_ownership("${PSAD_CONFDIR}/psad.conf", 0600);
     }
 
     if ($Cmds{'iptables'} && -x $Cmds{'iptables'}) {
@@ -508,27 +513,33 @@ sub install() {
         &test_syslog_config();
     }
 
-    unless ($preserved_config) {  ### we preserved the existing config
-        my $email_str = &query_email();
-        if ($email_str) {
-            &put_email("${PSAD_CONFDIR}/psad.conf", $email_str);
+    my $email_str = '';
+    unless ($query_rv) {  ### we preserved the existing config
+        $email_str = &query_email();
+    }
+    if ($email_str) {
+        for my $file qw(psad.conf psadwatchd.conf kmsgsd.conf diskmond.conf) {
+            &put_email("${PSAD_CONFDIR}/$file", $email_str);
         }
-        ### Give the admin the opportunity to add to the strings that are normally
-        ### checked in iptables messages.  This is useful since the admin may have
-        ### configured the firewall to use a logging prefix of "Audit" or something
-        ### else other than the normal "DROP", "DENY", or "REJECT" strings.
-        my $custom_fw_search_str = &get_fw_search_string();
-        if ($custom_fw_search_str) {
-            &logr(" .. Setting \$FW_MSG_SEARCH to \"$custom_fw_search_str\" " .
-                "in ${PSAD_CONFDIR}/psad.conf\n");
-            &put_custom_fw_search_str("${PSAD_CONFDIR}/psad.conf",
+    }
+    ### Give the admin the opportunity to add to the strings that are normally
+    ### checked in iptables messages.  This is useful since the admin may have
+    ### configured the firewall to use a logging prefix of "Audit" or something
+    ### else other than the normal "DROP", "DENY", or "REJECT" strings.
+    my $custom_fw_search_str = &get_fw_search_string();
+    if ($custom_fw_search_str) {
+        for my $file qw(psad.conf kmsgsd.conf) {
+            &logr(qq{ .. Setting \$FW_MSG_SEARCH to "$custom_fw_search_str" } .
+                "in ${PSAD_CONFDIR}/$file\n");
+            &put_custom_fw_search_str("${PSAD_CONFDIR}/$file",
                 $custom_fw_search_str);
         }
     }
     ### make sure the PSAD_DIR and PSAD_FIFO variables are correctly defined
     ### in the config file.
     &put_string("${PSAD_CONFDIR}/psad.conf", 'PSAD_DIR', $PSAD_DIR);
-    &put_string("${PSAD_CONFDIR}/psad.conf", 'PSAD_FIFO', $PSAD_FIFO);
+    &put_string("${PSAD_CONFDIR}/diskmond.conf", 'PSAD_DIR', $PSAD_DIR);
+    &put_string("${PSAD_CONFDIR}/kmsgsd.conf", 'PSAD_FIFO', $PSAD_FIFO);
 
     &install_manpage('psad.8');
     &install_manpage('psadwatchd.8');
@@ -576,7 +587,7 @@ sub install() {
     } else {
         &logr(" .. To execute psad, run \"${INIT_DIR}/psad start\"\n");
     }
-    if ($preserved_config) {
+    if ($query_rv) {
         &logr("\n .. Psad has been installed (with your original config)!\n");
     } else {
         &logr("\n .. Psad has been installed!\n");
@@ -728,8 +739,8 @@ sub append_fifo_syslog_ng() {
 sub query_preserve_config() {
     my $ans = '';
     while ($ans ne 'y' && $ans ne 'n') {
-        &logr(" .. Would you like to preserve the config from the " .
-            "existing psad installation ([y]/n)?  ");
+        &logr(' .. Would you like to preserve the config from the ' .
+            'existing psad installation ([y]/n)?  ');
         $ans = <STDIN>;
         return 1 if $ans eq "\n";
         chomp $ans;
@@ -774,7 +785,6 @@ sub preserve_config() {
     }
     close CONF;
     move "${PSAD_CONFDIR}/psad.conf.new", "${PSAD_CONFDIR}/psad.conf";
-    $preserved_config = 1;
     return;
 }
 

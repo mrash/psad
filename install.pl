@@ -296,6 +296,22 @@ sub install() {
     chdir '..';
     print "\n\n";
 
+    ### installing Date::Calc
+    &logr(" .. Installing the Date::Calc (5.3) perl module\n");
+    chdir 'Date-Calc' or die " ** Could not chdir to ",
+        "Date-Calc: $!";
+    unless (-e 'Makefile.PL') {
+        die " ** Your source directory appears to be incomplete!  Date::Calc " .
+            "is missing.\n    Download the latest sources from " .
+            "http://www.cipherdyne.com\n";
+    }
+    system "$Cmds{'perl'} Makefile.PL";
+    system "$Cmds{'make'}";
+#    system "$Cmds{'make'} test";
+    system "$Cmds{'make'} install";
+    chdir '..';
+    print "\n\n";
+
     ### installing Net::IPv4Addr
     &logr(" .. Installing the Net::IPv4Addr (0.10) perl module\n");
     chdir 'Net-IPv4Addr' or die " ** Could not chdir to ",

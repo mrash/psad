@@ -240,7 +240,7 @@ my %Cmds = (
 );
 
 ### check to make sure the commands specified in the config section are in the right place, and attempt to correct automatically if not.
-%Cmds = &check_commands(\%Cmds);
+%Cmds = &Psad::check_commands(\%Cmds);
 
 ### the --Restart command line switch was given
 if ($restart) {
@@ -249,7 +249,7 @@ if ($restart) {
 }
 
 ### check to make sure another psad process is not already running.
-&unique_pid($PIDFILES[1]);
+&Psad::unique_pid($PIDFILES[1]);
 
 ### make sure the permissions on these files is 0600
 &check_permissions($PSAD_LOGFILE, $FW_DATA, $ERROR_LOG, $EMAIL_ALERTFILE);
@@ -266,7 +266,7 @@ $SIG{USR1} = \&print_scan;
 ### if psad is running on a syslog server, don't check the firewall rules since they may not be local.
 unless ($fwcheck || $Syslog_server) {
 	unlink "/var/log/psad/fw_check.txt";
-	&check_firewall_rules(\@EMAIL_ADDRESSES, ["/var/log/psad/fw_check.txt"], \%Cmds);
+	&Psad::check_firewall_rules(\@EMAIL_ADDRESSES, ["/var/log/psad/fw_check.txt"], \%Cmds);
 }
 
 ### daemonize psad unless running with --Daemon or --debug
@@ -278,10 +278,10 @@ unless ($daemon || $DEBUG) {
 }
 
 ### write the current pid associated with psad to the psad pid file
-&writepid($PIDFILES[1]);
+&Psad::writepid($PIDFILES[1]);
 
 ### write the command line args used to start psad to $cmdline_file
-&writecmdline(\@args_cp, $cmdline_file);
+&Psad::writecmdline(\@args_cp, $cmdline_file);
 
 ### psad _requires_ that kmsgsd is running to receive any data, so let's start it here for good measure (as of 0.9.2 it
 ### makes use of the pid files and unique_pid(), so we don't have to worry about starting a duplicate copy).  While we're at

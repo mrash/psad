@@ -42,10 +42,20 @@ use strict;
 
 ### establish the default path to the config file (can be
 ### over-ridden with the -c <file> command line option.
-my $CONFIG_FILE = '/etc/psad/psadwatchd.conf';
+my $config_file = '/etc/psad/psadwatchd.conf';
+
+### default config file for ALERTING_METHODS keyword, which
+#### is referenced by both psad and psadwatchd.  This keyword
+#### allows email alerting or syslog alerting (or both) to be
+#### disabled.
+my $alerting_config_file = '/etc/psad/alert.conf';
 
 my $warn_msg = '';
 my $die_msg  = '';
+
+### these vars are controled by the alert.conf file
+my $no_email_alerts  = 0;
+my $no_syslog_alerts = 0;
 
 ### configuration hash
 my %config;
@@ -57,9 +67,9 @@ my %cmds;
 my $hup_flag = 0;
 
 ### handle command line arguments
-die " ** Specify the path to the psad.conf file with " .
+die "[*] Specify the path to the psad.conf file with " .
     "\"-c <file>\".\n\n" unless (GetOptions (
-    'config=s' => \$CONFIG_FILE
+    'config=s' => \$config_file
 ));
 
 ### import config
@@ -80,8 +90,8 @@ $SIG{'HUP'}  = \&hup_sig;
 
 my $pid = fork;
 exit if $pid;
-die " ** $0: Couldn't fork: $!" unless defined($pid);
-POSIX::setsid() or die " ** $0: Can't start a new session: $!\n";
+die "[*] $0: Couldn't fork: $!" unless defined($pid);
+POSIX::setsid() or die "[*] $0: Can't start a new session: $!\n";
 
 ### write the pid to the pid file
 &Psad::writepid($config{'PSADWATCHD_PID_FILE'});
@@ -102,7 +112,7 @@ for (;;) {
         $hup_flag = 0;
         &import_config();
         &Psad::psyslog('psad(psadwatchd)', 'received HUP signal, ' .
-            're-importing psadwatchd.conf');
+            're-importing psadwatchd.conf') unless $no_syslog_alerts;
     }
 
     &check_process('psad', $psad_Cmdline,
@@ -111,12 +121,12 @@ for (;;) {
         $config{'KMSGSD_PID_FILE'}, \$k_emails);
 
     if ($die_msg) {
-        &Psad::print_msg($die_msg, "$config{'PSAD_DIR'}/errs/psadwatchd.die");
+        &Psad::print_sys_msg($die_msg, "$config{'PSAD_DIR'}/errs/psadwatchd.die");
         $die_msg = '';
     }
 
     if ($warn_msg) {
-        &Psad::print_msg($warn_msg, "$config{'PSAD_DIR'}/errs/psadwatchd.warn");
+        &Psad::print_sys_msg($warn_msg, "$config{'PSAD_DIR'}/errs/psadwatchd.warn");
         $warn_msg = '';
     }
 
@@ -137,9 +147,9 @@ sub check_process() {
             }
             ### should check the rv of this system() call
             system "$cmds{$pidname} $pidcmdline";
-            my $subject = " ** psadwatchd: restarted $pidname on $HOSTNAME";
+            my $subject = "[*] psadwatchd: restarted $pidname on $HOSTNAME";
             &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
-                $cmds{'mail'});
+                $cmds{'mail'}) unless $no_email_alerts;
             $$email_count_ref++;
             return;
         } else {
@@ -147,10 +157,10 @@ sub check_process() {
             $$email_count_ref = 0;
         }
     } else {
-        my $subject = " ** psadwatchd: pid file $pidfile\" does not exist " .
+        my $subject = "[*] psadwatchd: pid file $pidfile\" does not exist " .
             "for $pidname.  Starting $pidname daemon.";
         &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
-            $cmds{'mail'});
+            $cmds{'mail'}) unless $no_email_alerts;
         ### start $pidname
         system "$cmds{$pidname} $pidcmdline";
     }
@@ -172,9 +182,10 @@ sub get_psad_Cmdline() {
         }
         sleep 1;
     }
-    my $subject = " ** psadwatchd: psad is not running on $HOSTNAME.  " .
+    my $subject = "[*] psadwatchd: psad is not running on $HOSTNAME.  " .
         "Please start it.";
-    &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+    &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+        unless $no_email_alerts;
     exit 0;
 }
 
@@ -182,16 +193,24 @@ sub give_up() {
     my $pidname = shift;
     my $subject = "psadwatchd: restart limit reached for $pidname " .
                   "on $HOSTNAME!!!  Exiting.";
-    &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+    &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+        unless $no_email_alerts;
     exit 0;
 }
 
 sub import_config() {
+
     ### read in the configuration file
-    &Psad::buildconf(\%config, \%cmds, $CONFIG_FILE);
+    &Psad::buildconf(\%config, \%cmds, $config_file);
+
+    ### import alerting config (psadwatchd also references this file
+    &Psad::buildconf(\%config, \%cmds, $alerting_config_file);
 
     ### make sure the configuration is complete
     &required_vars();
+
+    $no_email_alerts = 1 if $config{'ALERTING_METHODS'} =~ /no?email/i;
+    $no_syslog_alerts = 1 if $config{'ALERTING_METHODS'} =~ /no?syslog/i;
 
     ### Check to make sure the commands specified in the config section
     ### are in the right place, and attempt to correct automatically if not.
@@ -208,7 +227,7 @@ sub required_vars() {
         PSADWATCHD_CHECK_INTERVAL
         PSADWATCHD_MAX_RETRIES
     );
-    &Psad::defined_vars($CONFIG_FILE, \@required_vars, \%config);
+    &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;
 }
 

@@ -111,56 +111,58 @@ void write_pid(const char *pid_file, const pid_t pid)
     return;
 }
 
-void find_char_var(char *search_str, char *charvar, char *line)
+int find_char_var(char *search_str, char *charvar, char *line)
 {
     char *index_tmp;
-    int char_ctr = 0;
+    int char_ctr = 0, i;
 
     index_tmp = line;
 
     /* look for specific variables in the config
      * file that match the search_str */
-    if (strstr(index_tmp, search_str) != NULL) {
+
+    for (i=0; i < strlen(search_str); i++)
+        if (index_tmp[i] != search_str[i])
+            return 0;
 
 #ifdef DEBUG
-        fprintf(stderr, " .. find_char_var(): found %s in line: %s",
-                search_str, line);
+    fprintf(stderr, " .. find_char_var(): found %s in line: %s",
+            search_str, line);
 #endif
 
-        /* increment the pointer past the variable name */
-        while (*index_tmp != ' ') index_tmp++;
+    /* increment the pointer past the variable name */
+    while (*index_tmp != ' ') index_tmp++;
 
-        /* increment the pointer past the whitespace
-         * before the variable value */
-        while (*index_tmp == ' ') index_tmp++;
+    /* increment the pointer past the whitespace
+     * before the variable value */
+    while (*index_tmp == ' ') index_tmp++;
 
-        /* make sure that the variable has a semicolon
-         * at the end of the line */
+    /* make sure that the variable has a semicolon
+     * at the end of the line */
 
-        /* get the number of characters in the variable
-         * before the ending semicolon */
-        while (index_tmp[char_ctr] != ';' && index_tmp[char_ctr] != '\0' &&
-               index_tmp[char_ctr] != '\n')
-            char_ctr++;
+    /* get the number of characters in the variable
+     * before the ending semicolon */
+    while (index_tmp[char_ctr] != ';' && index_tmp[char_ctr] != '\0' &&
+           index_tmp[char_ctr] != '\n')
+        char_ctr++;
 
-        if (index_tmp[char_ctr] != ';') {
-            fprintf(stderr,
-                " ** find_char_var(): No ending semicolon found for: %s.\n",
-                search_str);
-            exit(EXIT_FAILURE);
-        }
-
-        if (char_ctr > MAX_GEN_LEN-1) {
-            fprintf(stderr,
-                    " ** find_char_var(): the config line for %s is too long.  Exiting.\n",
-                    search_str);
-            exit(EXIT_FAILURE);
-        }
-
-        strncpy(charvar, index_tmp, char_ctr);
-        charvar[char_ctr] = '\0';  /* replace the ';' with the NULL character */
+    if (index_tmp[char_ctr] != ';') {
+        fprintf(stderr,
+            " ** find_char_var(): No ending semicolon found for: %s.\n",
+            search_str);
+        exit(EXIT_FAILURE);
     }
-    return;
+
+    if (char_ctr > MAX_GEN_LEN-1) {
+        fprintf(stderr,
+                " ** find_char_var(): the config line for %s is too long.  Exiting.\n",
+                search_str);
+        exit(EXIT_FAILURE);
+    }
+
+    strncpy(charvar, index_tmp, char_ctr);
+    charvar[char_ctr] = '\0';  /* replace the ';' with the NULL character */
+    return 1;
 }
 
 /*

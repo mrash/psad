@@ -967,7 +967,8 @@ sub check_scan() {
                 ### $auto_block_ips{$src} may be zero if $src has been
                 ### timed out
                 $auto_blocked_ips{$src} = 0;
-            } elsif ((time() - $auto_blocked_ips{$src})
+            } elsif ($auto_blocked_ips{$src} != 0 and
+                    (time() - $auto_blocked_ips{$src})
                     > $config{'AUTO_BLOCK_TIMEOUT'}) {
                 ### the timeout for $src has expired, but we have seen
                 ### new packets from the ip so setup to renew the
@@ -2684,6 +2685,8 @@ sub ipt_test_block() {
                 next RULE if $rule =~ /^\s*target\s/;
                 ### DROP       all  --  1.1.1.1        0.0.0.0/0
                 if ($rule =~ /^DROP\s+all.*?$ip\s+0\.0\.0\.0\/0/) {
+                    print " .. ipt_test_block($ip): found ip: $ip\n"
+                        if $debug;
                     return 1;
                 }
             }
@@ -2702,7 +2705,7 @@ sub ipt_block() {
 
     for my $table (keys %ipt_chains) {
         for my $chain (keys %{$ipt_chains{$table}}) {
-            print " .. ipt_block(): table: $table, chain: $chain\n"
+            print " .. ipt_block($src): table: $table, chain: $chain\n"
                 if $debug;
             system "$cmds{'iptables'} -t $table -I $chain " .
                 "$config{'IPTABLES_AUTO_RULENUM'} -s $src -j " .
@@ -2738,6 +2741,8 @@ sub ipt_remove_block() {
                             "table $chain chain:\n";
                         print "        $rule\n";
                     }
+                    print " .. ipt_remove_block($src) removing block in ",
+                        "$table $chain\n" if $debug;
                     system "$cmds{'iptables'} -t $table -D $chain $rulenum";
                     $rm_block = 1;
                     last RULE;  ### there should only be one auto-blocked rule
@@ -2751,6 +2756,8 @@ sub ipt_remove_block() {
     } else {
         &Psad::psyslog('psad', "** could not locate iptables " .
             "block rule for $src.") if $flush_fw;
+        print " ** Could not locate iptables block rule for $src."
+            if $debug;
     }
     return $rm_block;
 }
@@ -2822,7 +2829,7 @@ sub auto_psad_response() {
         ### protected by the firewall if the ip trips the $auto_psad_level
         ### threshold for _any_ destination.
         if ($dl >= $config{'AUTO_IDS_DANGER_LEVEL'}
-                and not $auto_blocked_ips{$src}) {
+                and $auto_blocked_ips{$src} == 0) {
             my $timeout_str = '.';
             if ($config{'AUTO_BLOCK_TIMEOUT'} > 0) {
                 $timeout_str = " for $config{'AUTO_BLOCK_TIMEOUT'} seconds.";
@@ -2876,7 +2883,9 @@ sub auto_block_ignore_ip() {
 
 sub timeout_auto_blocked_ips() {
     print " .. timeout_auto_block_ips()\n" if $debug;
+    return if $config{'AUTO_BLOCK_TIMEOUT'} == 0;
     for my $ip (keys %auto_blocked_ips) {
+        next unless $auto_blocked_ips{$ip} > 0;  ### might just be zero
         if ((time() - $auto_blocked_ips{$ip})
                 > $config{'AUTO_BLOCK_TIMEOUT'}) {
             if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {

@@ -302,7 +302,8 @@ my $status           = 0;
 my $status_ip        = '';
 my $status_sort_dl   = 0;
 my $status_dl        = 0;
-my $fw_auto_list     = 0;
+my $fw_list_auto     = 0;
+my $fw_block_ip      = '';
 my $benchmark        = 0;
 my $b_packets        = 0;
 my $usr1             = 0;
@@ -386,82 +387,89 @@ Getopt::Long::Configure('no_ignore_case');
 &usage(1) unless (GetOptions(
     'signatures=s'      => \$sigs_file,       # Path to psad signatures file.
     'passive-os-sigs=s' => \$posf_file,       # Path to passive os fingerprinting
-                                              # signatures.
+                                              #   signatures.
     'snort-type=s'      => \$srules_type,     # Only process snort rules of
-                                              # this type (e.g. "ddos" or
-                                              # "backdoor").
+                                              #   this type (e.g. "ddos" or
+                                              #   "backdoor").
     'snort-rdir=s'      => \$snort_rules_dir, # Specify a directory for snort
-                                              # rules.
+                                              #   rules.
     'auto-dl=s'         => \$auto_dl_file,    # Path to psad auto IPs file for
-                                              # auto-setting IP danger level.
+                                              #   auto-setting IP danger level.
     'Analyze-msgs'      => \$analyze_msgs,    # Analysis mode for old iptables
-                                              # messages in the psad fwdata file
-                                              # (or messages file; see --messages).
+                                              #   messages in the psad fwdata file
+                                              #   (or messages file; see
+                                              #   --messages).
     'whois-analysis'    => \$analysis_whois,  # Issue whois lookups in analysis
-                                              # mode.
+                                              #   mode.
     'email-analysis'    => \$analysis_emails, # Send analysis mode emails.
     'messages-file=s'   => \$messages_file,   # Specify the path to file containing
-                                              # old iptables messages (fwdata by
-                                              # default).
+                                              #   old iptables messages (fwdata by
+                                              #   default).
     'debug'             => \$debug,           # Run in debug mode.
     'Dump-conf'         => \$dump_conf,       # Dump config and exit.
     'interval=i'        => \$chk_interval,    # Set $chk_interval from the
-                                              # command line.
+                                              #   command line.
     'config=s'          => \$config_file,     # Specify path to configuration file.
     'fw-search=s'       => \$fw_search_file,  # Specify path to fw_search.conf.
     'fw-analyze'        => \$fw_analyze,      # Analyze the firewall ruleset and
-                                              # exit.
+                                              #   exit.
     'fw-file=s'         => \$fw_file,         # Analyze ruleset contained within
-                                              # $fw_file instead of a running
-                                              # policy.
-    'fw-auto-list'      => \$fw_auto_list,    # Display Netfilter chains used by
-                                              # psad in auto blocking code.
+                                              #   $fw_file instead of a running
+                                              #   policy.
+    'fw-list-auto'      => \$fw_list_auto,    # Display Netfilter chains used by
+                                              #   psad in auto blocking code.
+    'fw-block-ip=s'     => \$fw_block_ip,     # Add an IP/net to the psad auto-
+                                              #   blocking chains.  Then psad can
+                                              #   manage timeouts, etc.
     'log-server'        => \$syslog_server,   # We are running psad on a syslog
-                                              # logging server.
+                                              #   logging server.
     'Kill'              => \$kill,            # Kill all running psad processes.
-                                              # (psadwatchd, psad, kmsgsd)
+                                              #   (psadwatchd, psad, kmsgsd)
     'Restart'           => \$restart,         # Restart psad with all options of
-                                              # the currently running psad process.
+                                              #   the currently running psad
+                                              #   process.
     'Flush'             => \$flush_fw,        # Flush any rules that psad previously
-                                              # added via the auto blocking code.
+                                              #   added via the auto blocking code.
     'Status'            => \$status,          # Display status of any currently
-                                              # running psad processes.
+                                              #   running psad processes.
     'status-ip=s'       => \$status_ip,       # Display status for a specific IP.
     'status-sort-dl'    => \$status_sort_dl,  # Sort by danger level instead of by
-                                              # IP address in --Status output.
+                                              #   IP address in --Status output.
     'status-dl=i'       => \$status_dl,       # Display status for scans that have
-                                              # reached at least this danger level.
+                                              #   reached at least this danger
+                                              #   level.
     'status-brief'      => \$status_brief,    # Do not include number of email
-                                              # alerts or os guess in status output.
+                                              #   alerts or os guess in status
+                                              #   output.
     'Benchmark'         => \$benchmark,       # Run in benchmark mode.
     'packets=i'         => \$b_packets,       # Specify number of packets to use
-                                              # in benchmark test.
+                                              #   in benchmark test.
     'USR1'              => \$usr1,            # Send an existing psad process a
                                               # USR1 signal (useful for debugging).
     'HUP'               => \$hup,             # Send psad processes a HUP signal
-                                              # to re-import config.
+                                              #   to re-import config.
     'no-snort-sids'     => \$no_snort_sids,   # Disable search for snort SID's
-                                              # in iptables messages.
+                                              #   in iptables messages.
     'no-whois'          => \$no_whois,        # Do not issue whois lookups against
     'no-passiveos'      => \$no_posf,         # Do not attempt to passively
-                                              # fingerprint the remote OS.
+                                              #   fingerprint the remote OS.
     'no-signatures'     => \$no_signatures,   # Disable signature processing.
     'no-icmp-types'     => \$no_icmp_types,   # Disable icmp type/code validation.
     'no-auto-dl'        => \$no_auto_dl,      # Disable auto danger level
-                                              # assignment.
+                                              #   assignment.
     'no-daemon'         => \$no_daemon,       # Do not run as a daemon.
     'no-fwcheck'        => \$no_fwcheck,      # Do not check firewall rules.
     'no-rdns'           => \$no_rdns,         # Do not issue dns lookups against
-                                              # Scanning IP address.
+                                              #   scanning IP address.
     'no-netstat'        => \$no_netstat,      # Do not check to see if the
-                                              # firewall is listening on localport
-                                              # that has been scanned.
+                                              #   firewall is listening on
+                                              #   localport that has been scanned.
     'no-ipt-errors'     => \$no_ipt_errors,   # Do not write malformed packet.
-                                              # messages to error log.
+                                              #   messages to error log.
     'no-kmsgsd'         => \$no_kmsgsd,       # Do not start kmsgsd (used for
-                                              # debugging).
+                                              #   debugging).
     'verbose'           => \$verbose,         # Verbose output (for both alerts
-                                              # and debug info).
+                                              #   and debug info).
     'Version'           => \$ver,             # Print the psad version and exit.
     'help'              => \$help,            # Display help.
     ### old args
@@ -744,13 +752,17 @@ for (;;) {
         }
     }
 
-    ### Timeout any auto-blocked IPs that are past due (need to
-    ### check the timeouts against existing IPs in the scan hash
-    ### even if new packets are not found).
-    if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
-            and $config{'AUTO_BLOCK_TIMEOUT'} > 0
-            and not $benchmark) {
-        &timeout_auto_blocked_ips();
+    if ($config{'ENABLE_AUTO_IDS'} eq 'Y' and not $benchmark) {
+        ### Timeout any auto-blocked IPs that are past due (need to
+        ### check the timeouts against existing IPs in the scan hash
+        ### even if new packets are not found).
+        if ($config{'AUTO_BLOCK_TIMEOUT'} > 0) {
+            &timeout_auto_blocked_ips();
+        }
+
+        ### see if we need to add any IP address from the Netfilter cache
+        ### file.
+        &check_ipt_add_ip();
     }
 
     ### Send logs to dshield in dshield format
@@ -2023,7 +2035,7 @@ sub psad_init() {
     exit &restart() if $restart;
 
     ### list any existing Netfilter IPT_AUTO_CHAIN chains
-    exit &ipt_list_auto_chains() if $fw_auto_list;
+    exit &ipt_list_auto_chains() if $fw_list_auto;
 
     ### import psad signatures (note that these signatures have been
     ### adapted from the Snort IDS and contain several keywords that
@@ -2044,6 +2056,12 @@ sub psad_init() {
     ### import auto_dl file for automatic ip/network danger
     ### level assignment
     &import_auto_dl() unless $no_auto_dl;
+
+    ### add an IP/network to the cache file used by a running psad
+    ### process (note we call it here after &import_auto_dl()
+    ### because any ignored IP/network in this file should take
+    ### precedence).
+    exit &cache_file_add_ipt_block_ip() if $fw_block_ip;
 
     ### parse snort rules if we enable psad to match on iptables log
     ### messages that include snort SID's (see "fwsnort":
@@ -2108,6 +2126,15 @@ sub validate_config() {
     if ($no_kmsgsd and not $debug) {
         die '[*] The --no-kmsgsd option can only be used with ',
             '--debug.  Exiting.';
+    }
+
+    if ($fw_block_ip) {
+        unless ($fw_block_ip =~ m|^\s*$ip_re\s*$|
+                or $fw_block_ip =~ m|^\s*$ip_re/\d+\s*$|
+                or $fw_block_ip =~ m|^\s*$ip_re/$ip_re\s*$|) {
+            die '[-] The --fw-block-ip argument accepts ' .
+                'an IP address or network.';
+        }
     }
 
     return;
@@ -3752,9 +3779,6 @@ sub flush_auto_blocked_ips() {
                 print "[-] $status_msg\n";
             }
         }
-        unless ($flushed_chain) {
-            print "[-] Could not flush any IPT_AUTO_CHAIN chains.\n";
-        }
     } else {
         print "[-] No valid IPT_AUTO_CHAIN keywords.\n";
     }
@@ -3857,15 +3881,6 @@ sub ipt_block() {
                     $config{'IPTABLES_AUTO_RULENUM'}, $table,
                     $to_chain, $target);
                 if ($rv) {
-                    my $msg = "iptables auto-block against $ip $timeout_str";
-                    if ($renewed_status) {
-                        $msg = "renewed $msg";
-                    } else {
-                        $msg = "added $msg";
-                    }
-                    &Psad::psyslog('psad', $msg);
-                    &Psad::sendmail("[psad-status] $msg", '',
-                        $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
                     $block_success = 1;
                 } else {
                     &Psad::psyslog('psad', $status_msg);
@@ -3886,11 +3901,25 @@ sub ipt_block() {
                 ($rv, $status_msg) = $ipt->add_ip_rule($src2, $dst2,
                     $config{'IPTABLES_AUTO_RULENUM'}, $table,
                     $to_chain, $target);
-                $block_success = 1 if $rv;
+                if ($rv) {
+                    $block_success = 1;
+                } else {
+                    &Psad::psyslog('psad', $status_msg);
+                    print STDERR "[-] ipt_block(): $status_msg\n" if $debug;
+                }
             }
         }
     }
     if ($block_success) {
+        my $mail_msg = "iptables auto-block against $ip $timeout_str";
+        if ($renewed_status) {
+            $mail_msg = "renewed $mail_msg";
+        } else {
+            $mail_msg = "added $mail_msg";
+        }
+        &Psad::sendmail("[psad-status] $mail_msg", '',
+            $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+        &Psad::psyslog('psad', $mail_msg);
         ### write the ip out to the auto blocked file
         print STDERR "[+] ipt_block(): added block for $ip\n"
             if $debug;
@@ -3904,14 +3933,14 @@ sub ipt_block() {
     return;
 }
 
-sub ipt_remove_block() {
+sub ipt_rm_block() {
     my $ip = shift;
 
     my $ipt = new IPTables::ChainMgr(
         'iptables' => $cmds{'iptables'}
     ) or die "[*] Could not acquire IPTables::ChainMgr object.";
 
-    print STDERR "[+] ipt_remove_block($ip)\n" if $debug;
+    print STDERR "[+] ipt_rm_block($ip)\n" if $debug;
 
     ### delete block rule for $ip
     my $rm_block = 0;
@@ -3924,7 +3953,7 @@ sub ipt_remove_block() {
 
         my $src = '';
         my $dst = '';
-        if ($direction eq 'src') {
+        if ($direction eq 'src' or $direction eq 'both') {
             $src = $ip;
             $dst = '0.0.0.0/0';
         } elsif ($direction eq 'dst') {
@@ -3935,7 +3964,12 @@ sub ipt_remove_block() {
         if ($src and $dst) {
             my ($rv, $status_msg) = $ipt->delete_ip_rule($src, $dst,
                 $table, $to_chain, $target);
-            $rm_block = 1 if $rv;
+            if ($rv) {
+                $rm_block = 1;
+            } else {
+                &Psad::psyslog('psad', $status_msg);
+                print STDERR "[-] ipt_rm_block(): $status_msg\n" if $debug;
+            }
         } else {
             next;
         }
@@ -3946,7 +3980,12 @@ sub ipt_remove_block() {
             my $dst2 = $src;
             my ($rv, $status_msg) = $ipt->delete_ip_rule($src, $dst,
                 $table, $to_chain, $target);
-            $rm_block = 1 if $rv;
+            if ($rv) {
+                $rm_block = 1;
+            } else {
+                &Psad::psyslog('psad', $status_msg);
+                print STDERR "[-] ipt_rm_block(): $status_msg\n" if $debug;
+            }
         }
     }
 
@@ -3960,13 +3999,13 @@ sub ipt_remove_block() {
                 "against $ip (timeout expired).", '',
                 $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         }
-        print STDERR "[+] ipt_remove_block(): removed iptables block ",
+        print STDERR "[+] ipt_rm_block(): removed iptables block ",
             "against $ip (timeout expired).\n" if $debug;
         &cache_file_rm_blocked_ip($ip, $config{'AUTO_BLOCK_IPT_FILE'});
     } else {
-        &Psad::psyslog('psad', 'could not locate iptables ' .
+        &Psad::psyslog('psad', 'could not remove iptables ' .
             "block rule for $ip") if $flush_fw;
-        print STDERR "[-] Could not locate iptables block rule for $ip.\n"
+        print STDERR "[-] Could not remove iptables block rule for $ip.\n"
             if $debug;
     }
     return;
@@ -3983,14 +4022,79 @@ sub ipt_list_auto_chains() {
         my $table      = $block_hr->{'table'};
         my $to_chain   = $block_hr->{'to_chain'};
 
-        my ($rv, $output_aref) =
-            $ipt->run_ipt_cmd_output("$cmds{'iptables'} -t " .
-                "$table -n -L $to_chain -v");
+        if ($ipt->chain_exists($table, $to_chain)) {
+            my ($rv, $output_aref) =
+                $ipt->run_ipt_cmd_output("$cmds{'iptables'} -t " .
+                    "$table -n -L $to_chain -v");
 
-        if ($rv and $output_aref) {
-            print for @$output_aref;
+            if ($rv and $output_aref) {
+                print for @$output_aref;
+            }
+            print "\n";
+        } else {
+            print "[-] Table: $table, chain: $to_chain, does not exist\n";
         }
-        print "\n";
+    }
+    return 0;
+}
+
+sub check_ipt_add_ip() {
+    if (-e $config{'AUTO_IPT_ADD_IP_FILE'}) {
+        open F, "< $config{'AUTO_IPT_ADD_IP_FILE'}" or die "[*] Could ",
+            "not open $config{'AUTO_IPT_ADD_IP_FILE'}: $!";
+        my @lines = <F>;
+        close F;
+
+        my $ipt = new IPTables::ChainMgr(
+            'iptables' => $cmds{'iptables'}
+        ) or die "[*] Could not acquire IPTables::ChainMgr object.";
+
+        for my $ip (@lines) {
+            chomp $ip;
+            if ($ip =~ m|^\s*$ip_re\s*$|
+                or $ip =~ m|^\s*$ip_re/\d+\s*$|
+                or $ip =~ m|^\s*$ip_re/$ip_re\s*$|) {
+
+                &Psad::psyslog('psad',
+                    "adding $ip from cache file to psad chains");
+
+                ### instantiate the blocking rule
+                &ipt_block($ip, '');
+            }
+        }
+        unlink $config{'AUTO_IPT_ADD_IP_FILE'} or die $!;
+    }
+    return;
+}
+
+sub cache_file_add_ipt_block_ip() {
+    unless ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
+        print "[-] ENABLE_AUTO_IDS is not enabled. Exiting.";
+        return 0;
+    }
+    if (-e $config{'PID_FILE'}) {
+        open PIDFILE, "< $config{'PID_FILE'}" or die '[*] Could not open ',
+        "$config{'PID_FILE'}: $!";
+        my $pid = <PIDFILE>;
+        close PIDFILE;
+        chomp $pid;
+        if (kill 0, $pid) {
+            print "[+] Writing $fw_block_ip to cache file. Psad will add the IP\n",
+                "    within $config{'CHECK_INTERVAL'} seconds.\n";
+            open F, "> $config{'AUTO_IPT_ADD_IP_FILE'}.tmp" or die "[*] Could ",
+                "not open $config{'AUTO_IPT_ADD_IP_FILE'}.tmp: $!";
+            print F $fw_block_ip, "\n";
+            close F;
+            if (-e $config{'AUTO_IPT_ADD_IP_FILE'}) {
+                unlink $config{'AUTO_IPT_ADD_IP_FILE'} or die $!;
+            }
+            move "$config{'AUTO_IPT_ADD_IP_FILE'}.tmp",
+                $config{'AUTO_IPT_ADD_IP_FILE'} or die $!;
+        } else {
+            print '[-] There is no running psad process. Exiting.'
+        }
+    } else {
+        print '[-] There is no running psad process. Exiting.'
     }
     return 0;
 }
@@ -4126,7 +4230,7 @@ sub timeout_auto_blocked_ips() {
     for my $ip (keys %auto_blocked_ips) {
         if ((time() - $auto_blocked_ips{$ip}{'time'})
                 > $config{'AUTO_BLOCK_TIMEOUT'}) {
-            &ipt_remove_block($ip)
+            &ipt_rm_block($ip)
                 if $config{'IPTABLES_BLOCK_METHOD'} eq 'Y';
             &tcpwr_remove_block($ip)
                 if $config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y';
@@ -5686,6 +5790,7 @@ sub required_vars() {
         IMPORT_OLD_SCANS ICMP_TYPES_FILE SHOW_ALL_SIGNATURES
         IPT_PREFIX_COUNTER_FILE IGNORE_PORTS ENABLE_SCAN_ARCHIVE
         EMAIL_LIMIT_STATUS_MSG P0F_FILE IGNORE_PROTOCOLS IPT_AUTO_CHAIN1
+        AUTO_IPT_ADD_IP_FILE
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;
@@ -5703,10 +5808,11 @@ Usage: psad [-a <auto ips file>] [-c <config file>] [-l] [-i <interval>]
        [-h] [-B] [-A] [-F] [-S] [-K] [-R] [-U] [-v] [-V] [-o] [-p] [-D]
        [-d] [--signatures <sig file>] [--passive-os-sigs <posf file>]
        [--snort-type <type>] [--snort-rdir <rules dir>] [--fw-analyze]
-       [--fw-file <file>] [--fw-search <file>] [-m <messages file>]
-       [--interval <seconds>] [--status-brief] [--status-ip <ip>]
-       [--status-sort-dl] [--no-fwcheck] [--no-daemon] [--no-rdns]
-       [--no-whois] [--no-netstat] [--no-ipt-errors] [--no-passiveos]
+       [--fw-file <file>] [--fw-search <file>] [--fw-list-auto]
+       [--fw-block-ip <ip] [-m <messages file>] [--interval <seconds>]
+       [--status-brief] [--status-ip <ip>] [--status-sort-dl]
+       [--no-fwcheck] [--no-daemon] [--no-rdns] [--no-whois]
+       [--no-netstat] [--no-ipt-errors] [--no-passiveos]
        [--no-snort-sids] [--no-signatures] [--no-kmsgsd]
 
 Options:
@@ -5738,7 +5844,11 @@ Options:
                                     fw-search file: $fw_search_file.
     --fw-analyze                  - Analyze the local iptables ruleset
                                     and exit.
-    --fw-file  <rules file>       - Analyze the iptables ruleset
+    --fw-list-auto                - List the contents of any Netfilter
+                                    chains use for auto-blocking rules.
+    --fw-block-ip  <ip>           - Add an IP/network to the auto-
+                                    blocking chains.
+    --fw-file <rules file>        - Analyze the iptables ruleset
                                     contained within <rules file>
                                     instead of a running policy.
     -snort-rdir <rule dir>        - Path to snort rules directory.

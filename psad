@@ -75,6 +75,7 @@
 ### modules used by psad
 use Psad;
 use File::stat "stat";
+use File::Copy;
 use Getopt::Long "GetOptions";
 use autouse 'Data::Dumper' => "Dumper";  ### this one is not used very much so don't load immediately
 use autouse 'Socket';       ### not used until a scan is detected so don't load until it is needed
@@ -137,6 +138,7 @@ my $tailCmd = "/usr/bin/tail";
 my $mailCmd = "/bin/mail";
 my $ifconfigCmd = "/sbin/ifconfig";
 my $grepCmd = "/bin/grep";
+my $sysloginitCmd = "/etc/rc.d/init.d/syslog";
 my $netstatCmd = "/bin/netstat";
 my $unameCmd = "/bin/uname";
 my $whoisCmd = "/usr/bin/whois.psad";
@@ -241,6 +243,7 @@ my %Cmds = (
 	"mail"		=> $mailCmd,
 	"ifconfig"	=> $ifconfigCmd,
 	"grep"		=> $grepCmd,
+	"syslog_init"	=> $sysloginitCmd,
 	"netstat"	=> $netstatCmd,
 	"uname"		=> $unameCmd,
 	"whois"		=> $whoisCmd,
@@ -260,29 +263,9 @@ if ($status) {
         exit $rv;
 }
 
-### make sure $PSAD_DIR, $FW_DATA, and /var/log/psadfifo actually exist
-unless (-d $PSAD_DIR) {
-	mkdir $PSAD_DIR, 400;
-}
-unless (-e $FW_DATA) {
-	open F, "> $FW_DATA";
-	close F;
-}
-unless (-e $PSAD_LOGFILE) {
-	open L, "> $PSAD_LOGFILE";
-	close L;
-}
-unless (-e $ERROR_LOG) {
-	open E, "> $ERROR_LOG";
-	close E;
-}
-unless (-e $EMAIL_ALERTFILE) {
-	open E, "> $EMAIL_ALERTFILE";
-	close E;
-}
-unless (-e "/var/log/psadfifo") {
-	`$Cmds{'mknod'} -m 600 /var/log/psadfifo p`;
-}
+
+### make sure $PSAD_DIR, $FW_DATA, and /var/log/psadfifo, etc. actually exist
+&psad_setup($PSAD_DIR, $FW_DATA, $PSAD_LOGFILE, $ERROR_LOG, \%Cmds);
 
 ### the --Restart command line switch was given
 if ($restart) {
@@ -1499,6 +1482,35 @@ sub psad_usr1() {
 		}
 	}
 	return $rv;
+}
+sub psad_setup() {
+	my ($psad_dir, $fw_data, $psad_logfile, $error_log, $Cmds_href) = @_;
+	unless (-d $psad_dir) {
+		mkdir $psad_dir, 400;
+	}
+	unless (-e $fw_data) {
+		open F, "> $fw_data";
+		close F;
+	}
+	unless (-e $psad_logfile) {
+		open L, "> $psad_logfile";
+		close L;
+	}
+	unless (-e $error_log) {
+		open E, "> $error_log";
+		close E;
+	}
+	unless (-e "/var/log/psadfifo") {
+		`$Cmds_href->{'mknod'} -m 600 /var/log/psadfifo p`;
+	}
+	unless (`$Cmds_href->{'grep'} psadfifo /etc/syslog.conf`) {
+		copy("/etc/syslog.conf", "/etc/syslog.conf.orig") unless (-e "/etc/syslog.conf.orig");
+		open SYSLOG, ">> /etc/syslog.conf" or die "@@@@@  Unable to open /etc/syslog.conf: $!\n";
+		print SYSLOG "kern.info  |/var/log/psadfifo\n\n";  #reinstate kernel logging to our named pipe
+		close SYSLOG;
+		system("$Cmds_href->{'syslog_init'} restart");
+	}
+	return;
 }
 sub markerline() {
         my $hndl = shift;

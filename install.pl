@@ -125,14 +125,14 @@ my %Cmds = (
 my $distro = &get_distro();
 
 ### add chkconfig only if we are runing on a redhat distro
-if ($distro =~ /redhat/) {
+if ($distro =~ /redhat/i) {
     $Cmds{'chkconfig'} = $chkconfigCmd;
 }
 
 ### need to make sure this exists before attempting to
 ### write anything to the install log.
 unless (-d $PSAD_DIR) {
-    mkdir $PSAD_DIR, 0400;
+    mkdir $PSAD_DIR, 0500;
 }
 
 &check_commands(\%Cmds);
@@ -164,23 +164,23 @@ sub install() {
 
     unless (-d $RUNDIR) {
         &logr(" ... Creating $RUNDIR\n");
-        mkdir $RUNDIR,0400;
+        mkdir $RUNDIR,0500;
     }
     unless (-d $VARLIBDIR) {
         &logr(" ... Creating $VARLIBDIR\n");
-        mkdir $VARLIBDIR,0400;
+        mkdir $VARLIBDIR,0500;
     }
     unless (-d $LIBDIR) {
         &logr(" ... Creating $LIBDIR\n");
-        mkdir $LIBDIR,0400;
+        mkdir $LIBDIR,0500;
     }
     unless (-d $PSAD_CONFDIR) {
         &logr(" ... Creating $PSAD_CONFDIR\n");
-        mkdir $PSAD_CONFDIR,0400;
+        mkdir $PSAD_CONFDIR,0500;
     }
     unless (-d $CONF_ARCHIVE) {
         &logr(" ... Creating $CONF_ARCHIVE\n");
-        mkdir $CONF_ARCHIVE, 0400;
+        mkdir $CONF_ARCHIVE, 0500;
     }
     unless (-e $PSAD_FIFO) {
         &logr(" ... Creating named pipe $PSAD_FIFO\n");
@@ -222,7 +222,7 @@ sub install() {
 
     unless (-d $PSAD_DIR) {
         &logr(" ... Creating $PSAD_DIR\n");
-        mkdir $PSAD_DIR, 0400;
+        mkdir $PSAD_DIR, 0500;
     }
     unless (-e "${PSAD_DIR}/fwdata") {
         &logr(" ... Creating ${PSAD_DIR}/fwdata file\n");
@@ -333,11 +333,11 @@ sub install() {
 
     unless (-d $PSAD_CONFDIR) {
         &logr(" ... Creating $PSAD_CONFDIR\n");
-        mkdir $PSAD_CONFDIR,0400;
+        mkdir $PSAD_CONFDIR,0500;
     }
     unless (-d $CONF_ARCHIVE) {
         &logr(" ... Creating $CONF_ARCHIVE\n");
-        mkdir $CONF_ARCHIVE, 0400;
+        mkdir $CONF_ARCHIVE, 0500;
     }
     if (-e "${PSAD_CONFDIR}/psad_signatures") {
         &archive("${PSAD_CONFDIR}/psad_signatures") unless $nopreserve;
@@ -437,7 +437,7 @@ sub install() {
             }
         }
     }
-    mkdir $mpath unless -d $mpath;
+    mkdir $mpath, 0755 unless -d $mpath;
     my $mfile = "${mpath}/psad.8";
     &logr(" ... Installing psad(8) man page as $mfile\n");
     copy('psad.8', $mfile);
@@ -650,10 +650,9 @@ sub get_fw_search_string() {
     print " ... psad checks the firewall configuration on the underlying machine\n"
         . "     to see if packets will be logged and dropped that have not\n"
         . "     explicitly allowed through.  By default psad looks for the\n"
-        . "     strings \"DENY\", \"DROP\", or \"REJECT\". However, if your\n"
-        . "     particular firewall configuration logs blocked packets with the\n"
-        . "     string \"Audit\" for example, psad can be configured to look for this\n"
-        . "     string.\n\n";
+        . "     string \"DROP\". However, if your particular firewall configuration\n"
+        . "     logs blocked packets with the string \"Audit\" for example, psad\n"
+        . "     be configured here to look for this string.\n\n";
     my $ans = '';
     while ($ans ne 'y' && $ans ne 'n') {
         print "     Would you like to add a new string that will be used to analyze\n"
@@ -682,7 +681,7 @@ sub query_email() {
     my $email_addresses;
     for my $line (@clines) {
         chomp $line;
-        if ($line =~ /^\s*EMAIL_ADDRESSES\s+\((.+)\)/) {
+        if ($line =~ /^\s*EMAIL_ADDRESSES\s+(.+);/) {
             $email_addresses = $1;
             last;
         }
@@ -733,13 +732,14 @@ sub query_email() {
 }
 sub put_email() {
     my ($file, $emailstr) = @_;
+    chomp $emailstr;
     open RF, "< $file";
     my @lines = <RF>;
     close RF;
     open F, "> $file";
     for my $line (@lines) {
-        if ($line =~ /EMAIL_ADDRESSES\s*\(/) {
-            print F "EMAIL_ADDRESSES            ($emailstr);\n";
+        if ($line =~ /EMAIL_ADDRESSES\s+/) {
+            print F "EMAIL_ADDRESSES            $emailstr;\n";
         } else {
             print F $line;
         }

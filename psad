@@ -1551,7 +1551,7 @@ sub assign_danger_level() {
                     if (defined $scan{$src}{$dst}{$proto}{'S_PORT'}) {
                         print "assign_danger_level(): S_PORT: ",
                             "$scan{$src}{$dst}{$proto}{'S_PORT'}, E_PORT: ",
-                            "$scan{$src}{$dst}{'E_PORT'}\n";
+                            "$scan{$src}{$dst}{$proto}{'E_PORT'}\n";
                     }
                 }
                 print 'assign_danger_level(): DL (before assignment) = ',
@@ -2318,7 +2318,7 @@ sub get_whois_data() {
         eval {
             local $SIG{'ALRM'} = sub {die "whois alarm\n"};
             alarm $config{'WHOIS_TIMEOUT'};
-            system "$cmds{'whois'} $ip > $whois_datafile";
+            system "$cmds{'whois'} $ip > $whois_datafile 2> /dev/null";
             alarm 0;
         };
         if ($@) {

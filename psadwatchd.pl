@@ -97,6 +97,8 @@ for (;;) {
         ### clear the HUP flag
         $hup_flag = 0;
         &import_config();
+        &Psad::psyslog('psad(psadwatchd)', 'Received HUP signal, ' .
+            're-importing psadwatchd.conf');
     }
 
     &check_process('psad', $psad_Cmdline,

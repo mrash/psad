@@ -51,10 +51,10 @@
 #	- Enhance the check_firewall_rules() routine to correct any problems
 #	  with the firewall ruleset.  This is part of the integration of psad 
 #	  with Bastille Linux.
-#	- Better formatting of print statements throughout (maybe use 'here'
-#	  docs.)
 #	- (psad-init) make sure the init script will work on different Linux
 #	  distros.
+#	- Threshold-based rate limiting for email messages.
+#	- perldoc
 #
 # Sample packet (rejected by ipchains)
 # Dec 19 11:54:07 orthanc kernel: Packet log: input REJECT lo PROTO=1
@@ -1199,7 +1199,7 @@ sub psad_status() {
 			close PIDFILE;
 			chomp $pid;
 			if (kill 0, $pid) {
-				print " ----  $pidname is currently running on $HOSTNAME as pid: $pid\n";
+				print " ----  $pidname is running on $HOSTNAME as pid: $pid\n";
 				$rv = 1;
 			} else {
 				print " ----  $pidname is not currently running on $HOSTNAME  ----\n";

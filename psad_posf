@@ -16,19 +16,19 @@ TTL       64;
 ID        RANDOM;
 WINDOW    5840;
 
-### Windows 2000
-OS        Windows 2000;
+### FreeBSD
+OS        FreeBSD 4.5;
 NUMPKTS   3;
-TOS       0x00;
-LEN       48;
-TTL       128;
+TOS       0x10;
+LEN       60;
+TTL       64;
 ID        SMALLINCR;
-WINDOW    16384;
+#WINDOW    65535;
 
 ### OpenBSD
 OS        OpenBSD;
 NUMPKTS   6;
-#TOS       0x00
+#TOS       0x00;
 LEN       64;
 TTL       64;
 ID        RANDOM;
@@ -37,7 +37,7 @@ WINDOW    16384;
 ### Solaris 7
 OS        Solaris 7;
 NUMPKTS   3;
-#TOS       0x00
+TOS       0x00;
 LEN       44;
 TTL       255;
 ID        SMALLINCR;
@@ -53,9 +53,57 @@ ID        SMALLINCR;
 WINDOW    33360;
 
 ### AIX 4.3
-OS       AIX 4.3;
-WINDOW   16384;
-TOS      0x00;
-LEN      48;
-TTL      128;
-ID       SMALLINCR;
+OS        AIX 4.3;
+NUMPKTS   3;
+WINDOW    16384;
+TOS       0x00;
+LEN       48;
+TTL       128;
+ID        SMALLINCR;
+
+### HPUX 10
+OS        HPUX 10.x
+NUMPKTS   3;
+WINDOW    32768;
+TOS       0x00;
+LEN       44;
+TTL       64;
+ID        SMALLINCR;
+
+### HPUX 11
+OS        HPUX 11.x
+NUMPKTS   3;
+WINDOW    32768;
+TOS       0x00;
+LEN       48;
+TTL       64;
+ID        SMALLINCR;
+
+### Nokia IPSO 3.4
+OS        Nokia IPSO 3.4
+NUMPKTS   3;
+WINDOW    16384;
+TOS       0x10;
+LEN       68;
+TTL       64
+ID        SMALLINCR;
+
+### Windows 2000
+OS        Windows 2000;
+NUMPKTS   3;
+TOS       0x00;
+LEN       48;
+TTL       128;
+ID        SMALLINCR;
+WINDOW    16384;
+
+### Windows NT
+OS        Windows NT;
+NUMPKTS   3;
+TOS       0x00;
+LEN       44;
+TTL       128;
+ID        RANDOM;
+WINDOW    8192;
+
+

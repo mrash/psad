@@ -568,6 +568,8 @@ unless ($benchmark) {
 ### archive old firewall and scan data
 &archive_data() unless $benchmark;
 
+&dump_conf() if $debug;
+
 ### Install signal handlers for debugging %scan with Data::Dumper,
 ### and for reaping zombie whois processes.  Only install signal
 ### handlers if we are not running in benchmark mode
@@ -2673,6 +2675,7 @@ sub flush_auto_blocked_ips() {
 sub ipt_test_block() {
     my $ip = shift;
 
+    print " .. ipt_test_block($ip)\n" if $debug;
     ### get the active iptables chains
     &get_iptables_chains() unless $chk_ipt_chains;
 
@@ -2699,6 +2702,7 @@ sub ipt_test_block() {
 sub ipt_block() {
     my $src = shift;
 
+    print " .. ipt_block($src)\n" if $debug;
     ### get the active iptables chains
     &get_iptables_chains() unless $chk_ipt_chains;
 
@@ -2718,6 +2722,8 @@ sub ipt_block() {
 
 sub ipt_remove_block() {
     my $src = shift;
+
+    print " .. ipt_remove_block($src)\n" if $debug;
 
     ### get the active iptables chains
     &get_iptables_chains() unless $chk_ipt_chains;
@@ -2803,6 +2809,8 @@ sub tcpwr_remove_block() {
 sub auto_psad_response() {
     my $current_scan_href = shift;
 
+    print " .. auto_psad_response()\n" if $debug;
+
     if (not $chk_ipt_chains) {
         ### determine whether or not the NAT or mangle code has
         ### been compiled into iptables
@@ -2873,6 +2881,7 @@ sub auto_block_ignore_ip() {
 }
 
 sub timeout_auto_blocked_ips() {
+    print " .. timeout_auto_block_ips()\n" if $debug;
     for my $ip (keys %auto_blocked_ips) {
         if ((time() - $auto_blocked_ips{$ip})
                 > $config{'AUTO_BLOCK_TIMEOUT'}) {
@@ -2897,6 +2906,7 @@ sub timeout_auto_blocked_ips() {
 
 sub get_iptables_chains() {
 
+    print " .. get_iptables_chains()\n" if $debug;
     my $nat_rv    = 1;
     my $mangle_rv = 1;
     my $filter_input_rv   = 1;
@@ -2948,6 +2958,7 @@ sub get_iptables_chains() {
 
 sub write_blocked_ip() {
     my ($src, $file) = @_;
+    print " .. write_blocked_ip($src, $file)\n" if $debug;
     if (-e $file) {
         open F, "< $file" or die " ** Could not open open ",
             "$file: $!";
@@ -2974,6 +2985,7 @@ sub write_blocked_ip() {
 
 sub rm_blocked_ip() {
     my ($src, $file) = @_;
+    print " .. rm_blocked_ip($src, $file)\n" if $debug;
     if (-e $file) {
         open B, "< $file" or
             die " ** Could not open $file: $!";
@@ -3016,6 +3028,7 @@ sub print_scan() {  ### this should primarily be used for debugging
 }
 
 sub get_local_ips() {
+    print " .. get_local_ips()\n" if $debug;
     my @ips = `$cmds{'ifconfig'} -a`;
     for my $line (@ips) {
         if ($line =~ /inet\s+addr:($ip_re)\s/) {
@@ -3031,7 +3044,7 @@ sub get_listening_ports() {
     for my $line (@lines) {
         chomp $line;
         if ($line =~ m/^\s*(tcp|udp)\s+\d+\s+\d+\s+\S+:(\d+)\s/) {
-            ### $1 == protoco (tcp/udp), $2 == port number
+            ### $1 == protocol (tcp/udp), $2 == port number
             $local_ports{$1}{$2} = '';
         }
     }
@@ -3042,8 +3055,8 @@ sub get_whois_data() {
     my ($ip, $whois_datafile) = @_;
     my @whois_data;
     if (defined $whois_cache{$ip}
-            && $whois_cache{$ip} < $config{'WHOIS_THRESHOLD'}
-            && -e $whois_datafile) {
+            and $whois_cache{$ip} < $config{'WHOIS_THRESHOLD'}
+            and -e $whois_datafile) {
         $whois_cache{$ip}++;
     } else {
         $whois_cache{$ip} = 0;
@@ -3896,6 +3909,8 @@ sub check_forwarding() {
 sub ipt_chk_chain() {
     my $chain = shift;
 
+    print " .. ipt_chk_chain($chain)\n" if $debug;
+
     my $ipt = new IPTables::Parse 'iptables' => $cmds{'iptables'};
 
     if ($fw_analyze) {
@@ -3919,10 +3934,8 @@ sub ipt_chk_chain() {
     if (defined $ld_hr && keys %$ld_hr) {
         $num_keys++;
         my @protos;
-        my $found_all = 0;
         if (defined $ld_hr->{'all'}) {
             @protos = qw(all);
-            $found_all = 1;
         } else {
             @protos = qw(tcp udp icmp);
         }

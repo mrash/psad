@@ -51,8 +51,10 @@ iptables string match module to detect application layer signatures.
 
 cd Psad && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
 cd ..
-cd IPTables/Parse && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
-cd ../..
+cd IPTables-Parse && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
+cd ..
+cd IPTables-ChainMgr && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
+cd ..
 cd Bit-Vector && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
 cd ..
 cd Net-IPv4Addr && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
@@ -71,7 +73,8 @@ make OPTS="$RPM_OPT_FLAGS" -C whois
 
 ### build perl modules used by psad
 make OPTS="$RPM_OPT_FLAGS" -C Psad
-make OPTS="$RPM_OPT_FLAGS" -C IPTables/Parse
+make OPTS="$RPM_OPT_FLAGS" -C IPTables-Parse
+make OPTS="$RPM_OPT_FLAGS" -C IPTables-ChainMgr
 make OPTS="$RPM_OPT_FLAGS" -C Bit-Vector
 make OPTS="$RPM_OPT_FLAGS" -C Net-IPv4Addr
 make OPTS="$RPM_OPT_FLAGS" -C Unix-Syslog
@@ -95,6 +98,7 @@ mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Unix/Syslog
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Date/Calc
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Net/IPv4Addr
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/IPTables/Parse
+mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/IPTables/ChainMgr
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Unix
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Carp
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Date/Calc
@@ -116,7 +120,7 @@ install -m 500 {psad,kmsgsd,psadwatchd} $RPM_BUILD_ROOT%_sbindir/
 install -m 500 fwcheck_psad.pl $RPM_BUILD_ROOT%_sbindir/fwcheck_psad
 install -m 755 whois/whois $RPM_BUILD_ROOT/usr/bin/whois_psad
 install -m 755 init-scripts/psad-init.redhat $RPM_BUILD_ROOT/etc/rc.d/init.d/psad
-install -m 644 {psad.conf,kmsgsd.conf,psadwatchd.conf,fw_search.conf} $RPM_BUILD_ROOT%_sysconfdir/%name/
+install -m 644 {psad.conf,kmsgsd.conf,psadwatchd.conf,fw_search.conf,alert.conf} $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 {signatures,icmp_types,auto_dl,posf,pf.os} $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 *.8 $RPM_BUILD_ROOT%{_mandir}/man8/
 
@@ -144,7 +148,8 @@ install -m 444 Date-Calc/blib/lib/Date/Calendar/Profiles.pm $RPM_BUILD_ROOT%psad
 install -m 444 Date-Calc/blib/lib/Date/Calendar/Year.pod $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Date/Calendar/Year.pod
 install -m 444 Net-IPv4Addr/blib/lib/auto/Net/IPv4Addr/autosplit.ix $RPM_BUILD_ROOT%psadlibdir/auto/Net/IPv4Addr/autosplit.ix
 install -m 444 Net-IPv4Addr/blib/lib/Net/IPv4Addr.pm $RPM_BUILD_ROOT%psadlibdir/Net/IPv4Addr.pm
-install -m 444 IPTables/Parse/Parse.pm $RPM_BUILD_ROOT%psadlibdir/IPTables/Parse.pm
+install -m 444 IPTables-Parse/blib/lib/IPTables/Parse.pm $RPM_BUILD_ROOT%psadlibdir/IPTables/Parse.pm
+install -m 444 IPTables-ChainMgr/blib/lib/IPTables/ChainMgr.pm $RPM_BUILD_ROOT%psadlibdir/IPTables/ChainMgr.pm
 install -m 444 Psad/Psad.pm $RPM_BUILD_ROOT%psadlibdir/Psad.pm
 
 ### install snort rules files
@@ -183,24 +188,24 @@ chmod 0600 %psadvarlibdir/psadfifo
 [ -f /etc/syslog.conf.orig ] || cp -p /etc/syslog.conf /etc/syslog.conf.orig
 ### add the psadfifo line to /etc/syslog.conf if necessary
 if ! grep -v "#" /etc/syslog.conf | grep -q psadfifo;
-then echo " .. Adding psadfifo line to /etc/syslog.conf"
+then echo "[+] Adding psadfifo line to /etc/syslog.conf"
 echo "kern.info |/var/lib/psad/psadfifo" >> /etc/syslog.conf
 fi
 if [ -e /var/run/syslogd.pid ];
 then
-echo " .. Restarting syslogd "
+echo "[+] Restarting syslogd "
 kill -HUP `cat /var/run/syslogd.pid`
 fi
 if grep -q "EMAIL.*root.*localhost" /etc/psad/psad.conf;
 then
-echo " .. You can edit the EMAIL_ADDRESSES variable in /etc/psad/psad.conf"
+echo "[+] You can edit the EMAIL_ADDRESSES variable in /etc/psad/psad.conf"
 echo "    /etc/psad/psadwatchd.conf to have email alerts sent to an address"
 echo "    other than root\@localhost"
 fi
 
 if grep -q "HOME_NET.*CHANGEME" /etc/psad/psad.conf;
 then
-echo " .. Be sure to edit the HOME_NET variable in /etc/psad/psad.conf"
+echo "[+] Be sure to edit the HOME_NET variable in /etc/psad/psad.conf"
 echo "    to define the internal network(s) attached to your machine."
 fi
 
@@ -231,6 +236,10 @@ fi
 %_libdir/%name
 
 %changelog
+* Thu Mar 10 2005 Michael Rash <mbr@cipherydne.org>
+- Updated to new IPTables-Parse and IPTables-ChainMgr modules.
+- psad-1.4.1 release.
+
 * Fri Nov 26 2004 Michael Rash <mbr@cipherydne.org>
 - Added ps.os file.
 - psad-1.4.0 release.

@@ -755,7 +755,7 @@ sub test_syslog_config() {
         if ($line =~ /inet\s+addr:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s/) {
             $lo_ip = $1;  ### this should always be 127.0.0.1
             &logr(" ** loopback interface ip is not 127.0.0.1.  Continuing ".
-                "anyway.\n");
+                "anyway.\n") unless $lo_ip eq '127.0.0.1';
         }
     }
 

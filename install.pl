@@ -460,6 +460,18 @@ sub install() {
         copy 'psad_signatures', "${PSAD_CONFDIR}/psad_signatures";
         &perms_ownership("${PSAD_CONFDIR}/psad_signatures", 0600);
     }
+    if (-e "${PSAD_CONFDIR}/psad_posf") {
+        &archive("${PSAD_CONFDIR}/psad_posf") unless $nopreserve;
+        &logr(" .. Copying psad_posf -> " .
+            "${PSAD_CONFDIR}/psad_posf\n");
+        copy 'psad_posf', "${PSAD_CONFDIR}/psad_posf";
+        &perms_ownership("${PSAD_CONFDIR}/psad_posf", 0600);
+    } else {
+        &logr(" .. Copying psad_posf -> " .
+            "${PSAD_CONFDIR}/psad_posf\n");
+        copy 'psad_posf', "${PSAD_CONFDIR}/psad_posf";
+        &perms_ownership("${PSAD_CONFDIR}/psad_posf", 0600);
+    }
     if (-e "${PSAD_CONFDIR}/psad_auto_ips") {
         &archive("${PSAD_CONFDIR}/psad_auto_ips") unless $nopreserve;
         &logr(" .. Copying psad_auto_ips -> " .

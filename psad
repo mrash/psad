@@ -598,6 +598,13 @@ sub check_scan() {
                         $flags = $1;
                         $flags = 'NULL' unless ($flags =~ /\S/);
                     }
+
+                    if ($config{'CONNTRACK_BUG'} eq 'Y') {
+                        ### XXX ignore TCP packet that have the ACK bit set
+                        ### since _usually_ we see these packets as a result
+                        ### of the iptables connection tracking bug.
+                        next PKT if $flags =~ /ACK/;
+                    }
                     ### per page 595 of the Camel book, "if /blah1|blah2/"
                     ### can be slower than "if /blah1/ || /blah2/
                     unless ($flags =~ /URG/ ||
@@ -652,7 +659,6 @@ sub check_scan() {
                 next PKT;
             }
         }
-### best place for buggy iptables state tracking exceptions
 
         ### see if we need to timeout any old scans
         if ($config{'ENABLE_PERSISTENCE'} eq 'N') {
@@ -2365,11 +2371,11 @@ sub setup() {
 
 sub check_config() {
     my @required_vars = qw(
-        EMAIL_ADDRESSES  PSAD_CHECK_INTERVAL
-        FW_DATA ERROR_LOG  FW_MSG_SEARCH ENABLE_AUTO_IDS
-        SCAN_TIMEOUT DANGER_LEVEL1 DANGER_LEVEL2 DANGER_LEVEL3
-        DANGER_LEVEL4 DANGER_LEVEL5 PORT_RANGE_SCAN_THRESHOLD
-        ALERT_ALL PSAD_EMAIL_LIMIT IPTABLES_BLOCK_METHOD
+        EMAIL_ADDRESSES  PSAD_CHECK_INTERVAL FW_DATA ERROR_LOG
+        FW_MSG_SEARCH ENABLE_AUTO_IDS CONNTRACK_BUG SCAN_TIMEOUT
+        DANGER_LEVEL1 DANGER_LEVEL2 DANGER_LEVEL3 DANGER_LEVEL4
+        DANGER_LEVEL5 PORT_RANGE_SCAN_THRESHOLD ALERT_ALL
+        PSAD_EMAIL_LIMIT IPTABLES_BLOCK_METHOD
         IPCHAINS_BLOCK_METHOD TCPWRAPPERS_BLOCK_METHOD
         EMAIL_ALERT_DANGER_LEVEL PSAD_FIFO WHOIS_THRESHOLD
         WHOIS_TIMEOUT PACKET_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR

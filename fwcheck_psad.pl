@@ -178,10 +178,10 @@ sub print_fw_help() {
 "    not been accepted by previous rules ";
     if ($no_fw_search_all) {
         print FWCHECK "(this rule should have a logging\n",
-"   prefix of one of the search strings mentioned above), and a final rule\n";
+"    prefix of one of the search strings mentioned above), and a final rule\n";
     } else {
         print FWCHECK "(this rule can have a logging\n",
-"   prefix such as \"DROP\" or \"REJECT\"), and a final rule\n";
+"    prefix such as \"DROP\" or \"REJECT\"), and a final rule\n";
     }
     print FWCHECK
 "    that drops any unwanted packets.\n\n",

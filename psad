@@ -75,6 +75,7 @@
 #################################################################################################
 
 ### modules used by psad
+use Psad;
 use File::stat "stat";
 use Getopt::Long "GetOptions";
 use autouse 'Data::Dumper' => "Dumper";  ### this one is not used very much so don't load immediately
@@ -86,7 +87,7 @@ use POSIX "setsid";
 ### psad does not yet support 'strict refs' since several hashes have $hsh{key} = "someval" and $hsh{key1}{key2} = "anotherval"... should probably fix this.
 # no strict "refs";
 
-### these are globals
+### globals
 use vars qw($VERSION %Scan $PRINT_SCAN_HASH $USE_IPCHAINS $USE_IPTABLES $DEBUG $HOSTNAME);
 
 #==================== config ======================= ## do not remove this line (used by install.pl to preserve configs) ##
@@ -175,7 +176,7 @@ my @args_cp = @ARGV;
 
 Getopt::Long::Configure("no_ignore_case");  # make Getopts case sensitive
 
-usage_and_exit(1) unless (GetOptions (
+&usage_and_exit(1) unless (GetOptions (
         'help'           => \$help,             # display help
         'auto_ips=s'     => \$auto_ips,         # enable automatic ip danger level assignment
         'output'         => \$output,           # write scanlog messages to STDOUT
@@ -195,7 +196,7 @@ usage_and_exit(1) unless (GetOptions (
         'Version'        => \$print_version,    # print the psad version and exit
         'whois'          => \$whoislookups      # do not issue whois lookups against the scanning ip
 ));
-usage_and_exit(0) if ($help);
+&usage_and_exit(0) if ($help);
 
 ### print the version number and exit if -V given on the command line
 print "psad version $VERSION, by Michael B. Rash (mbr\@cipherdyne.com)\n" and exit 0 if $print_version;
@@ -205,13 +206,13 @@ $< == 0 && $> == 0 or die "\n@@@@@  (psad): You must be root (or equivalent UID 
 
 ### the --Kill command line switch was given
 if ($kill) {
-        kill_psad(\@PIDFILES);
+        &kill_psad(\@PIDFILES);
         exit 0;
 }
 
 ### the --Status command line switch was given
 if ($status) {
-        psad_status(\@PIDFILES);
+        &psad_status(\@PIDFILES);
         exit 0;
 }
 
@@ -233,22 +234,22 @@ my %Cmds = (
 );
 
 ### check to make sure the commands specified in the config section are in the right place, and attempt to correct automatically if not.
-%Cmds = check_commands(\%Cmds);
+%Cmds = &check_commands(\%Cmds);
 
 ### the --Restart command line switch was given
 if ($restart) {
-	restart_psad(\@PIDFILES, $cmdline_file, \%Cmds);
+	&restart_psad(\@PIDFILES, $cmdline_file, \%Cmds);
 	exit 0;
 }
 
 ### check to make sure another psad process is not already running.
-unique_pid($PIDFILES[1]);
+&unique_pid($PIDFILES[1]);
 
 ### make sure the permissions on these files is 0600
-check_permissions($PSAD_LOGFILE, $FW_DATA, $ERROR_LOG, $EMAIL_ALERTFILE);
+&check_permissions($PSAD_LOGFILE, $FW_DATA, $ERROR_LOG, $EMAIL_ALERTFILE);
 
 ### get the ip addresses that are local to this machine
-my $local_ips_href = get_local_ips(\%Cmds);
+my $local_ips_href = &get_local_ips(\%Cmds);
 
 ### disable whois lookups if for some reason the whois client that is bundled with psad can't be found
 $whoislookups = 1 if ($Cmds{'whois'} !~ /psad/); 
@@ -258,21 +259,22 @@ $SIG{USR1} = \&print_scan;
 
 ### if psad is running on a syslog server, don't check the firewall rules since they may not be local.
 unless ($fwcheck || $Syslog_server) {
-	unless (check_firewall_rules(\%Cmds)) {
-        	die "*** After setting up your firewall per the above note, execute \"/etc/rc.d/init.d/psad-init start\" to start psad\n";
-	}
+	&check_firewall_rules(\@EMAIL_ADDRESSES, ["/tmp/psad_fw_check.txt"], \%Cmds);
 }
 
 ### daemonize psad unless running with --Daemon or --debug
-fork and exit unless ($daemon || $DEBUG);
-
-POSIX::setsid() or die "@@@@@  (psad): Can't start a new session: $!\n";
+unless ($daemon || $DEBUG) {
+	my $pid = fork;
+	exit if $pid;
+	die "@@@@@  $0: Couldn't fork: $!" unless defined($pid);
+	POSIX::setsid() or die "@@@@@  $0: Can't start a new session: $!\n";
+}
 
 ### write the current pid associated with psad to the psad pid file
-writepid($PIDFILES[1]);
+&writepid($PIDFILES[1]);
 
 ### write the command line args used to start psad to $cmdline_file
-writecmdline(\@args_cp, $cmdline_file);
+&writecmdline(\@args_cp, $cmdline_file);
 
 ### psad _requires_ that kmsgsd is running to receive any data, so let's start it here for good measure (as of 0.9.2 it
 ### makes use of the pid files and unique_pid(), so we don't have to worry about starting a duplicate copy).  While we're at
@@ -302,10 +304,10 @@ unless (-e $FW_DATA) {
 	open F, ">> $FW_DATA";
 	close F;
 }
-my $Sigs_href = import_signatures($signatures) if $signatures;
+my $Sigs_href = &import_signatures($signatures) if $signatures;
 my $Auto_ips_href;
 if ($auto_ips) {  # support automatic ip danger level increases/decreases.
-	$Auto_ips_href = import_auto_ips($auto_ips);
+	$Auto_ips_href = &import_auto_ips($auto_ips);
 } else {
 	$Auto_ips_href = 0;
 }
@@ -321,7 +323,7 @@ for (;;) {
 	if ($signatures) {  # scan $signatures for any signature updates
 		my $sigs_mtime_end = stat($signatures)->mtime;
 		if ($sigs_mtime_start != $sigs_mtime_end) {  # the signatures were updated... import the new signatures.
-			$Sigs_href = import_signatures($signatures);
+			$Sigs_href = &import_signatures($signatures);
                 	foreach my $email_address (@EMAIL_ADDRESSES) {
                         	system "$Cmds{'mail'} $email_address -s \"psad: re-read $signatures file on $HOSTNAME\" < /dev/null";
                 	}
@@ -330,8 +332,8 @@ for (;;) {
 	if ($auto_ips) {  # scan $auto_ips for any ips that should automatically have a certain danger threshold set.
 		my $auto_ips_mtime_end = stat($auto_ips)->mtime;
 		if ($auto_ips_mtime_start != $auto_ips_mtime_end) {  # the auto ips file was updated... import the new ip/danger level pairs.
-			$Auto_ips_href = import_auto_ips($auto_ips);
-			$Scan_href = reset_auto_tags($Scan_href);  # need to set $Scan_href->{$srcip}->{$dstip}->{'AUTO'} = "N" since $Auto_ips_href was updated.
+			$Auto_ips_href = &import_auto_ips($auto_ips);
+			$Scan_href = &reset_auto_tags($Scan_href);  # need to set $Scan_href->{$srcip}->{$dstip}->{'AUTO'} = "N" since $Auto_ips_href was updated.
 			foreach my $email_address (@EMAIL_ADDRESSES) {
                                 system "$Cmds{'mail'} $email_address -s \"psad: re-read $auto_ips file on $HOSTNAME\" < /dev/null";
                         }
@@ -341,15 +343,15 @@ for (;;) {
 		my $grabnum = $fwdata_end_lines - $fwdata_start_lines;
 		my @process_lines = `$Cmds{'tail'} -$grabnum $FW_DATA`;
 		print "MAIN: calling check_scan()\n" if $DEBUG;
-		$Scan_href = check_scan(\@process_lines, $Sigs_href, $signatures, $netstat_lookup, $local_ips_href, $errors, 
+		$Scan_href = &check_scan(\@process_lines, $Sigs_href, $signatures, $netstat_lookup, $local_ips_href, $errors, 
 									$ERROR_LOG, $ENABLE_PERSISTENCE, $SCAN_TIMEOUT, \%Cmds);
 		print "MAIN: calling assign_danger_level()\n" if $DEBUG;
-		$Scan_href = assign_danger_level($Scan_href, $Auto_ips_href, $PORT_RANGE_SCAN_THRESHOLD, $ALERT_ALL, \%DANGER_LEVELS);
-		print "MAIN: calling logr()\n" if $DEBUG;
-		$Scan_href = logr($Scan_href, $PSAD_LOGFILE, $output, $dnslookups, $whoislookups, $WHOIS_TIMEOUT, $ENABLE_EMAIL_ALERTS,
+		$Scan_href = &assign_danger_level($Scan_href, $Auto_ips_href, $PORT_RANGE_SCAN_THRESHOLD, $ALERT_ALL, \%DANGER_LEVELS);
+		print "MAIN: calling scan_logr()\n" if $DEBUG;
+		$Scan_href = &scan_logr($Scan_href, $PSAD_LOGFILE, $output, $dnslookups, $whoislookups, $WHOIS_TIMEOUT, $ENABLE_EMAIL_ALERTS,
 					$EMAIL_ALERT_DANGER_LEVEL, $EMAIL_ALERTFILE, \@EMAIL_ADDRESSES, $SHOW_ALL_SIGNATURES, \%Cmds);
 		if ($ENABLE_AUTO_IDS eq "Y" && ! $Syslog_server) {  # don't manage the firewall rules if psad is running on a syslog server.
-			$Scan_href = auto_psad_response($Scan_href, $AUTO_IDS_DANGER_LEVEL, \%Cmds, \@EMAIL_ADDRESSES);
+			$Scan_href = &auto_psad_response($Scan_href, $AUTO_IDS_DANGER_LEVEL, \%Cmds, \@EMAIL_ADDRESSES);
 		}
 	}
 	print "MAIN: number of lines in $FW_DATA: $fwdata_end_lines\n" if $DEBUG;
@@ -803,7 +805,7 @@ sub collect_errors() {
 	}
 	close ERRORS;
 }
-sub logr() {
+sub scan_logr() {
 	my ($Scan_href, $logfile, $output, $dnslookups, $whoislookups, $whois_timeout, $enable_email_alerts, $email_alert_danger_level,
 					$email_alertfile, $email_addresses_aref, $show_all_signatures, $Cmds_href) = @_;
 	my $flags_mesg;
@@ -820,9 +822,9 @@ sub logr() {
 		open $hndl, ">> $logfile";
        	}
 	foreach my $srcip (keys %$Scan_href) {
-		print "logr(): source ip: $srcip\n" if $DEBUG;
+		print "scan_logr(): source ip: $srcip\n" if $DEBUG;
 		foreach my $dstip (keys %{$Scan_href->{$srcip}}) {
-			print "logr(): dst ip: $dstip\n" if $DEBUG;
+			print "scan_logr(): dst ip: $dstip\n" if $DEBUG;
 			my ($tcp, $udp) = (0,0);
 			my $current_danger_level = $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'};
 			if ($current_danger_level >= 1 && $Scan_href->{$srcip}->{$dstip}->{'LOGR'} eq "Y") {
@@ -878,7 +880,7 @@ sub logr() {
 					undef $Scan_href->{$srcip}->{$dstip}->{'UDP'}->{'CURRENT_INTERVAL'};
 				}
 #				undef $Scan_href->{$srcip}->{$dstip}->{'CURRENT_INTERVAL'};  # get rid of the current range to make room for a new one.
-				print STDOUT "logr():  gernerating email......\n" if $DEBUG;
+				print STDOUT "scan_logr():  gernerating email......\n" if $DEBUG;
 		        	open EMAILALERT, "> $email_alertfile";
 				&markerline($hndl);
 				print $hndl "$time:     Portscan Detected by psad (pid $$) on $HOSTNAME.\n";
@@ -922,7 +924,7 @@ sub logr() {
 #				syslog("warning", "Port scan detected: src: $srcip, dst: $dstip, $syslog_print_range, pkts: $syslog_num_pkts, dangerlevel: $syslog_danger_level");
 #				closelog();
 				if ($DEBUG) {
-					print STDOUT "logr(): printing email..................\n";
+					print STDOUT "scan_logr(): printing email..................\n";
 					print STDOUT "     $time: Portscan Detected by psad (pid $$) on $HOSTNAME.\n";
                                        	print STDOUT "     Source:                   $srcip\n";
                                        	print STDOUT "     Destination:              $dstip\n";
@@ -1133,116 +1135,6 @@ sub get_whois_data() {
 		return \@whois_data;
 	}
 }
-sub check_firewall_rules() {
-	my $Cmds_href = shift;
-        my @localips;
-        my $kernel = (split /\s/, `$Cmds_href->{'uname'} -a`)[2];
-        my @localips_tmp = `$Cmds_href->{'ifconfig'} -a |$Cmds_href->{'grep'} inet`;
-        push @localips, (split /:/, (split /\s+/, $_)[2])[1] foreach (@localips_tmp);
-        my $iptables = 1 if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/);
-        my $ipchains = 1 if ($kernel =~ /^2.2/); # and also 2.0.x ?
-        if ($iptables) {
-# target     prot opt source               destination
-# LOG        tcp  --  anywhere             anywhere           tcp flags:SYN,RST,ACK/SYN LOG level warning prefix `DENY '
-# DROP       tcp  --  anywhere             anywhere           tcp flags:SYN,RST,ACK/SYN
-
-# ACCEPT     tcp  --  0.0.0.0/0            64.44.21.15        tcp dpt:80 flags:0x0216/0x022
-# LOG        tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0216/0x022 LOG flags 0 level 4 prefix `DENY '
-# DROP       tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0216/0x022
-                my @rules = `$Cmds_href->{'iptables'} -nL`;
-                my $drop_rule = 0;
-                FWPARSE: foreach my $rule (@rules) {
-                        next FWPARSE if ($rule =~ /^Chain/ || $rule =~ /^target/);
-                        if ($rule =~ /^(LOG)\s+(\w+)\s+\S+\s+\S+\s+(\S+)\s.+prefix\s\`(.+)\'/) {
-                                my ($target, $proto, $dst, $prefix) = ($1, $2, $3, $4);
-                                if ($target eq "LOG" && $proto =~ /all|tcp|udp/ && $prefix =~ /drop|reject|deny/i) {
-                                # this needs work... see above _two_ rules.
-                                        if (check_destination($dst, \@localips)) {
-                                                return 1;
-                                        }
-                                }
-                        }
-                }
-                print STDERR "*** Your firewall does not include rules that will log dropped/rejected packets.  Psad will not work with such a firewall setup.\n";
-                return 0;
-        } elsif ($ipchains) {
-# target     prot opt     source                destination           ports
-# DENY       tcp  ----l-  anywhere             anywhere              any ->   telnet
-
-#Chain input (policy ACCEPT):
-#target     prot opt     source                destination           ports
-#ACCEPT     tcp  ------  0.0.0.0/0            0.0.0.0/0             * ->   22
-#DENY       tcp  ----l-  0.0.0.0/0            0.0.0.0/0             * ->   *
-                my @rules = `$Cmds_href->{'ipchains'} -nL`;
-                FWPARSE: foreach my $rule (@rules) {
-                        chomp $rule;
-                        next FWPARSE if ($rule =~ /^Chain/ || $rule =~ /^target/);
-                        if ($rule =~ /^(\w+)\s+(\w+)\s+(\S+)\s+\S+\s+(\S+)\s+(\*)\s+\-\>\s+(\*)/) {
-                                my ($target, $proto, $opt, $dst, $srcpt, $dstpt) = ($1, $2, $3, $4, $5, $6);
-                                if ($target =~ /drop|reject|deny/i && $proto =~ /all|tcp|udp/ && $opt =~ /....l./) {
-                                        if (check_destination($dst, \@localips)) {
-                                                return 1;
-                                        }
-				}		
-                        } elsif ($rule =~ /^(\w+)\s+(\w+)\s+(\S+)\s+\S+\s+(\S+)\s+(n\/a)/) {
-                                my ($target, $proto, $opt, $dst, $srcpt, $dstpt) = ($1, $2, $3, $4, $5);
-                                if ($target =~ /drop|reject|deny/i && $proto =~ /all|tcp|udp/ && $opt =~ /....l./) {
-                                        if (check_destination($dst, \@localips)) {
-						return 1;
-					}
-				}
-			}
-                }
-                print STDERR "*** Your firewall does not include rules that will log dropped/rejected packets.  Psad will not work with such a firewall setup.\n";
-                return 0;
-        } else {
-                die "*** The linux kernel version you are currently running (v $kernel) does not seem to support ipchains or iptables.  psad will not run!\n";
-        }
-}
-sub check_destination() {
-        my ($dst, $localips_aref) = @_;
-        return 1 if ($dst =~ /0\.0\.0\.0\/0/);
-        foreach my $ip (@$localips_aref) {
-                my ($oct) = ($ip =~ /^(\d{1,3}\.\d{1,3})/);
-                return 1 if ($dst =~ /^$oct/);
-        }
-        return 0;
-}
-sub check_commands() {
-        my $Cmds_href = shift;
-        CMD: foreach my $cmd (keys %$Cmds_href) {
-                unless (-e $Cmds_href->{$cmd}) {
-                        my $real_location = `which $cmd 2> /dev/null`;
-                        chomp $real_location;
-                        if ($real_location) {
-                                $Cmds_href->{$cmd} = $real_location;
-                        } else {
-                                if ($cmd ne "ipchains" && $cmd ne "iptables") {
-                                        die "Could not find $cmd anywhere!!!  Please edit the config section to include the path to $cmd.\n";
-                                } elsif (defined $Cmds_href->{'uname'}) {
-                                        my $kernel = (split /\s+/, `$Cmds_href->{'uname'} -a`)[2];
-                                        if ($kernel =~ /^2.3/ || $kernel =~ /^2.4/) {
-						if ($cmd eq "ipchains") {
-							next CMD;
-						} else {
-                                                	die "*** You appear to be running kernel $kernel so you should be running iptables but iptables is not\nlocated at $Cmds_href->{'iptables'
-}.  Please edit the config section to include the path to iptables.\n";
-						}
-                                        }
-                                        if ($kernel =~ /^2.2/) { # and also 2.0.x ?
-						if ($cmd eq "iptables") {
-							next CMD;
-						} else {
-                                                	die "*** You appear to be running kernel $kernel so you should be running ipchains but ipchains is not\nlocated at $Cmds_href->{'ipchains'
-}.  Please edit the config section to include the path to ipchains.\n";
-						}
-                                        }
-                                }
-                        }
-                }
-        }
-        return %$Cmds_href;
-}
 sub check_permissions() {
 	my @files = @_;
 	for my $f (@files) {
@@ -1316,38 +1208,6 @@ sub psad_status() {
 		}
 	}
 	return;
-}
-sub writepid() {
-	my $pidfile = shift;
-	open PIDFILE, "> $pidfile";
-	print PIDFILE "$$\n";
-	close PIDFILE;
-	chmod 0600, $pidfile;
-	return;
-}
-sub writecmdline() {
-	my ($args_aref, $cmdline_file) = @_;
-	open CMD, "> $cmdline_file";
-	print CMD "@$args_aref\n";
-	close CMD;
-	chmod 0600, $cmdline_file;
-	return;
-}
-sub unique_pid() {
-	my $pidfile = shift;
-	### $pid_file exists, so psad must have been executed before on this machine
-	### If it doesn't exist, then either it is being run for the first time, or
-	### an older version is running which does not use pid files in /var/log/psad 
-	if (-e $pidfile) {
-		my $pidname = (split /\./, $pidfile)[1];
-		open PIDFILE, "< $pidfile";
-		my $pid = <PIDFILE>;
-		close PIDFILE;
-		chomp $pid;
-		if (kill 0, $pid) {  # psad is already running
-			die "\n@@@@@  (psad): $pidname (pid: $pid) is already running!  Exiting.\n\n";
-		}
-	}
 }
 sub markerline() {
         my $hndl = shift;

@@ -1,3 +1,21 @@
+psad-1.3.2 (05//2003):
+    - Removed FW_MSG_SEARCH from psad.conf, and created a new config
+      file "fw_search.conf" that both psad and kmsgsd use to get the
+      FW_MSG_SEARCH definition(s).
+    - Updated psad and kmsgsd so that multiple firewall search strings
+      can be specified through multiple FW_MSG_SEARCH variables in
+      fw_search.conf.
+    - Added protocol-specific auto-danger level assignments.
+    - Added total scan source and destination IP address counters in
+      --Status output.
+    - Added number of email alerts sent and OS guess in default
+      --Status output.  The output is getting wide now, so there is
+      also a new option --status-brief that will remove the alerts
+      sent and OS guess columns.
+    - Added getopt() command line arg parsing to kmsgsd with two new
+      options "-c" (for config file path) and "-k" (for fw_search.conf
+      path).
+
 psad-1.3.1 (12/25/2003):
     - Added the ability to import /var/log/psad/<ip> directories
       back into memory so scan data remains persistent across

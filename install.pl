@@ -297,7 +297,7 @@ sub install() {
             " latest sources from:\n\nhttp://www.cipherdyne.com\n";
     }
     unless ((system "$Cmds{'perl'} -c diskmond") == 0) {
-        die " ... @@@ diskmond does not compile with \"perl -c\".  Download "
+        die " ... @@@ diskmond does not compile with \"perl -c\".  Download " .
             "the latest sources from:\n\nhttp://www.cipherdyne.com\n";
     }
     print "\n";
@@ -579,7 +579,7 @@ sub uninstall() {
             for my $line (@sys) {
             chomp $line;
             ### don't print the psadfifo line
-            print CSYS "$s\n" if ($line !~ /psadfifo/);
+            print CSYS "$line\n" if ($line !~ /psadfifo/);
         }
         close CSYS;
     }
@@ -682,7 +682,7 @@ sub query_email() {
     close F;
     my $email_addresses;
     for my $line (@clines) {
-        chomp $l;
+        chomp $line;
         if ($line =~ /^\s*EMAIL_ADDRESSES\s+\((.+)\)/) {
             $email_addresses = $1;
             last;
@@ -742,7 +742,7 @@ sub put_email() {
         if ($line =~ /EMAIL_ADDRESSES\s*\(/) {
             print F "EMAIL_ADDRESSES            ($emailstr);\n";
         } else {
-            print F $l;
+            print F $line;
         }
     }
     close F;
@@ -760,7 +760,7 @@ sub put_fw_search_str() {
             $fw_string .= "|$append_fw_search";
             print F "FW_MSG_SEARCH              $fw_string;\n";
         } else {
-            print F $l;
+            print F $line;
         }
     }
     close F;
@@ -776,7 +776,7 @@ sub put_string() {
         if ($line =~ /^\s*$key\s*.*;/) {
             print F "$key                    $value;\n";
         } else {
-            print F $l;
+            print F $line;
         }
     }
     close F;
@@ -828,7 +828,7 @@ sub enable_psad_at_boot() {
                 my @ilines = <I>;
                 close I;
                 for my $line (@ilines) {
-                    chomp $l;
+                    chomp $line;
                     if ($line =~ /^id\:(\d)\:initdefault/) {
                         $RUNLEVEL = $1;
                         last;

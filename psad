@@ -252,9 +252,11 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 					next READPKT;
 				}
 				if ($proto eq "TCP") {
-					if ($l =~ /RES\S+\s(.+?)\s+URGP/) {   # FIXME:  an nmap NULL scan (-sN) will generate _no_ flags output from iptables
+					if ($l =~ /RES\S+\s(.*?)URGP/ || $l =~ /RES(\s)URGP/) {
 						$flags = $1;
-					        unless ($flags =~ /SYN|FIN|URG|PSH|ACK|RST/ && $flags !~ /LEN|TOS|PREC|PROTO|WINDOW|RES/) {
+						chop $flags;
+						$flags = "NULL" if ($flags eq ""); 
+					        unless ($flags =~ /SYN|FIN|URG|PSH|ACK|RST|NULL/ && $flags !~ /LEN|TOS|PREC|PROTO|WINDOW|RES/) {
                                 			push @bad_packets, $l;
                                 			next READPKT;
                         			}
@@ -408,6 +410,7 @@ sub check_flags() {
 	return 1 if ($msgflags eq "F" && $flags_to_check eq "FIN");		# fin scan
 	return 1 if ($msgflags =~ /SF/o && $flags_to_check eq "SYN FIN"); 	# "syn/fin" scan
 	return 1 if ($msgflags =~ /UPF/o && $flags_to_check eq "URG PSH FIN");  # nmap Xmas scan
+	return 1 if ($msgflags =~ /NULL/o && $flags_to_check eq "NULL");	# nmap NULL scan
 	return 1 if ($msgflags =~ /UPSF/o && $flags_to_check eq "URG PSH SYN FIN");  # nmap finger print scan
 	return 1 if ($msgflags =~ /AP/o && $flags_to_check eq "ACK PSH");
 	return 1 if ($msgflags =~ /AS/o && $flags_to_check eq "ACK SYN");

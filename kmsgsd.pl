@@ -44,7 +44,16 @@ use strict;
 
 ### establish the default path to the config file (can be
 ### over-ridden with the -c <file> command line option.
-my $CONFIG_FILE = '/etc/psad/psad.conf';
+my $CONFIG_FILE = '/etc/psad/kmsgsd.conf';
+
+### configuration hash
+my %config;
+
+### commands hash
+my %cmds;
+
+### flag used for HUP signal
+my $hup_flag = 0;
 
 ### syslog config file
 my $syslog = '/etc/syslog.conf';
@@ -55,25 +64,18 @@ die " ** Specify the path to the psad.conf file with " .
     'config=s' => \$CONFIG_FILE
 ));
 
-### read in the configuration file
-my ($Config_href, $Cmds_href) = &Psad::buildconf($CONFIG_FILE);
-
-### make sure the configuration is complete
-&check_config();
-
-my $FW_DATA        = $Config_href->{'FW_DATA_FILE'};
-my $FW_MSG_SEARCH = $Config_href->{'FW_MSG_SEARCH'};
-my $SNORT_SID_STR = $Config_href->{'SNORT_SID_STR'};
-my $PSAD_FIFO     = $Config_href->{'PSAD_FIFO'};
-my $PIDFILE       = $Config_href->{'KMSGSD_PID_FILE'};
-undef $Config_href;
+### import config
+&import_config();
 
 ### make sure there is not another kmsgsd already running
-&Psad::unique_pid($PIDFILE);
+&Psad::unique_pid($config{'KMSGSD_PID_FILE'});
 
 ### install WARN and DIE handlers
 $SIG{'__WARN__'} = \&Psad::warn_handler;
 $SIG{'__DIE__'}  = \&Psad::die_handler;
+
+### install HUP handler so config can be re-imported
+$SIG{'HUP'}  = \&hup_sig;
 
 my $pid = fork;
 exit if $pid;
@@ -81,59 +83,64 @@ die " ** $0: Couldn't fork: $!" unless defined($pid);
 POSIX::setsid() or die " ** $0: Can't start a new session: $!\n";
 
 ### write the pid to the pid file
-&Psad::writepid($PIDFILE);
-
-my $append_other = &check_facility();
-if ($append_other) {
-    open MESSAGES, '>> /var/log/messages' or die
-        "Could not open /var/log/messages: $!\n";
-}
+&Psad::writepid($config{'KMSGSD_PID_FILE'});
 
 ### open the fwdata file
-open LOG, ">> $FW_DATA" or die "Could not open $FW_DATA: $!\n";
+open LOG, ">> $config{'FW_DATA_FILE'}" or
+    die "Could not open $config{'FW_DATA_FILE'}: $!\n";
 
 #===================== main =======================
 ### main loop
 for (;;) {
-    open FIFO, "< $PSAD_FIFO" or die "Can't open file : $!\n";
+    open FIFO, "< $config{'PSAD_FIFO'}" or die "Can't open file : $!\n";
     my $service = <FIFO>;  ### don't chomp for better performance
     if (defined $service
         && ($service =~ /Packet\slog/ || $service =~ /IN.+?OUT/)
-        && ($service =~ /$FW_MSG_SEARCH/ || $service =~ /$SNORT_SID_STR/)) {
+        && ($service =~ /$config{'FW_MSG_SEARCH'}/
+        || $service =~ /$config{'SNORT_SID_STR'}/)) {
         ### log to the fwdata file
         my $old_fh = select LOG;
         $| = 1;
         print $service;
         select $old_fh;
-    } elsif ($append_other) {
-        ### it wasn't a packet so write it to /var/log/messages
-        my $old_fh2 = select MESSAGES;
-        $| = 1;
-        print $service;
-        select $old_fh2;
+    }
+    if ($hup_flag) {
+        ### clear the HUP flag and re-import the config
+        $hup_flag = 0;
+        &import_config();
+        ### XXX close filehandles?
     }
 }
 ### These statements don't get executed, but for completeness...
 close LOG;
-close MESSAGES if ($append_other);
 close FIFO;
 exit 0;
 #==================== end main =====================
-sub check_facility() {
-    open SYS, "< $syslog";
-    while(<SYS>) {
-        next if (/^#/);
-        ### this next line should also include a test for $_ =~ /\*.info/...
-        return 0 if ($_ =~ /kern.info/ && $_ =~ /psadfifo/);
-        ### syslog is logging kern.info to an additional
-        ### place instead of just to psadfifo
-    }
-    close SYS;
-    return 1;
+sub import_config() {
+
+    ### read in the configuration file
+    &Psad::buildconf(\%config, \%cmds, $CONFIG_FILE);
+
+    ### make sure the configuration is complete
+    &required_vars();
+
+    ### Check to make sure the commands specified in the config section
+    ### are in the right place, and attempt to correct automatically if not.
+    &Psad::check_commands(\%cmds);
+
+    return;
 }
-sub check_config() {
-    my @required_vars = qw(KMSGSD_PID_FILE PSAD_FIFO FW_DATA_FILE
-    FW_MSG_SEARCH SNORT_SID_STR);
-    &Psad::defined_vars($CONFIG_FILE, \@required_vars, $Config_href);
+
+sub required_vars() {
+    my @required_vars = qw(
+        KMSGSD_PID_FILE PSAD_FIFO FW_DATA_FILE
+        FW_MSG_SEARCH SNORT_SID_STR
+    );
+    &Psad::defined_vars($CONFIG_FILE, \@required_vars, \%config);
+    return;
+}
+
+sub hup_sig() {
+    $hup_flag = 1;
     return;
 }

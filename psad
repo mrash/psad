@@ -1652,8 +1652,8 @@ sub validate_home_net() {
         for my $net (@connected_subnets_cidr) {
             $found = 1 if $home_net eq $net;
         }
-        unless ($found) {
-            ### note that this might be ok if psad is being run on a syslog
+        if ($home_net ne 'NOT_USED' and not $found) {
+            ### note that this might be ok if psad is running on a syslog
             ### server, but the most likely explanation is that there was a
             ### typo in the HOME_NET variable defintion.
             &Psad::psyslog('psad', '.. config warning; HOME_NET definition ' .

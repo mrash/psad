@@ -664,8 +664,8 @@ for (;;) {
     if ($usr1_flag) {
         $usr1_flag = 0;  ### clear the USR1 flag
 
-        &Psad::psyslog('psad', '.. received USR1 signal, printing scan hashes ' .
-            "to $config{'PSAD_DIR'}/scan_hash.$$");
+        &Psad::psyslog('psad', '.. received USR1 signal, printing scan ' .
+            "hashes to $config{'PSAD_DIR'}/scan_hash.$$");
         &print_scan();
     }
 
@@ -714,7 +714,7 @@ for (;;) {
 
         ### Write the number of tcp/udp/icmp packets out
         ### to the global packet counters file
-        &write_global_packet_counters();
+        &write_global_packet_counters() unless $benchmark;
     }
 
     ### Timeout any auto-blocked ips that are past due (need to
@@ -2382,6 +2382,7 @@ sub collect_errors() {
 sub scan_logr() {
     my $current_scan_href = shift;
 
+    return if $benchmark;
     for my $src (keys %$current_scan_href) {
         print STDERR " .. scan_logr(): source ip: $src\n" if $debug;
         DST: for my $dst (keys %{$current_scan_href->{$src}}) {
@@ -2432,8 +2433,8 @@ sub scan_logr() {
 
             ### make $src directory here in /var/log/psad
             ### unless it already exists
-            mkdir "$config{'PSAD_DIR'}/${src}", 0500 unless
-                -d "$config{'PSAD_DIR'}/${src}";
+            mkdir "$config{'PSAD_DIR'}/${src}", 0500
+                unless -d "$config{'PSAD_DIR'}/${src}";
             my $ecount_file  = "$config{'PSAD_DIR'}/${src}/email_count";
             my $dl_file      = "$config{'PSAD_DIR'}/${src}/danger_level";
             my $posf_file    = "$config{'PSAD_DIR'}/${src}/os_guess";
@@ -2700,12 +2701,7 @@ sub scan_logr() {
             close $fh unless $no_daemon;
             if ($curr_dl >= $config{'EMAIL_ALERT_DANGER_LEVEL'}
                     and not $no_daemon) {
-                my $subject;
-                if ($benchmark) {
-                    $subject = " ** psad: BENCHMARK SCAN from: $src_subj";
-                } else {
-                    $subject = " ** psad: [DL$curr_dl] SCAN from: $src_subj";
-                }
+                my $subject = " ** psad: [DL$curr_dl] SCAN from: $src_subj";
                 &Psad::psyslog('psad', ".. sending email alert to: " .
                     "$config{'EMAIL_ADDRESSES'}\n");
                 &Psad::sendmail($subject, $email_file,

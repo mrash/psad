@@ -1236,29 +1236,19 @@ sub scan_logr() {
                         $tcp_newrange = "$tcp_new_start_range-$tcp_new_end_range";
                     }
                     $syslog_print_flags = 'flags=[';
-                    my %individual_flags_tmp;
                     for my $flags (keys %{$Scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'FLAGS'}}) {
                         my $nmapOpts = '';
-                        $nmapOpts = '-sT or -sS' if ($flags eq 'SYN');
-                        $nmapOpts = '-sF' if ($flags eq 'FIN');
-                        $nmapOpts = '-sX' if ($flags eq 'URG PSH FIN');
-                        $nmapOpts = '-O' if ($flags eq 'URG PSH SYN FIN');
-                        if ($nmapOpts) {
-                            $nmapOpts = "  Nmap: [$nmapOpts]";
-                        }
+                        $nmapOpts = '  Nmap: [-sT or -sS]' if ($flags eq 'SYN');
+                        $nmapOpts = '  Nmap: [-sF]' if ($flags eq 'FIN');
+                        $nmapOpts = '  Nmap: [-sX]' if ($flags eq 'URG PSH FIN');
+                        $nmapOpts = '  Nmap: [-O]'  if ($flags eq 'URG PSH SYN FIN');
                         my $num_pkts
                             = $Scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'FLAGS'}{$flags};
                         push @tcp_flags, "TCP flags:                   [$flags: " .
                                          "$num_pkts packets]${nmapOpts}\n";
-                        my @flags_tmp = split /\s+/, $flags;
-                        for my $f (@flags_tmp) {
-                            $individual_flags_tmp{$f} = '';
-                        }
+                        $syslog_print_flags .= "$flags ";
                     }
-                    for my $f (keys %individual_flags_tmp) {
-                        $syslog_print_flags .= "$f ";
-                    }
-                    $syslog_print_flags =~ s/\s+$//;
+                    $syslog_print_flags =~ s/\s$//;
                     $syslog_print_flags .= ']';
                     ### need to delete the current interval so
                     ### it won't show up in the next alert

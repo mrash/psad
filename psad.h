@@ -45,6 +45,7 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <signal.h>
+#include <syslog.h>
 
 /* DEFINES ********************************************************************/
 #define HOSTNAME "HOSTNAME"
@@ -58,6 +59,7 @@
 #define MAX_NUM_LEN 6
 
 /* PROTOTYPES *****************************************************************/
+void slogr(const char *, const char *);
 void check_unique_pid(const char *, const char *);
 void write_pid(const char *, pid_t);
 void daemonize_process(const char *);

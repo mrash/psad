@@ -90,6 +90,7 @@
 
 ### modules used by psad
 use lib '/usr/lib/psad';
+use lib '/usr/lib/psad/i386-linux';  ### Syslog.pm is arch-dependent
 use Psad;
 use File::stat 'stat';
 use File::Copy;
@@ -832,11 +833,9 @@ sub check_import_config() {
         close K;
         if (kill 0, $pid) {
             kill 15, $pid;
-            if ($file eq '/etc/psad/psad.conf') {
-                system "$Cmds{'kmsgsd'}";
-            } else {
-                system "$Cmds{'kmsgsd'} -c $file";
-            }
+            ### NOTE: we are not restarting kmsgsd here since we
+            ###       don't want to create a race condition between
+            ###       psad and psadwatchd both starting kmsgsd
         }
     }
     return;

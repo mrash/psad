@@ -1,0 +1,143 @@
+*** EXAMPLE 1. ***
+
+Here is an example of psad (version 0.9.7) output for a scan for the
+SubSeven backdoor against my Linux box (running kernel 2.4.17).  Note
+the whois output:
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-= Apr 4 17:52:38 =-=-=-=-=-=-=-=-=-=-=-=-=-=
+psad: Portscan Detected on orthanc.cipherdyne.com (192.168.20.1).
+
+Source:                      192.168.20.25
+Destination:                 192.168.20.1
+Newly scanned TCP ports:     [6776]   (since: Apr 4 17:52:38)
+Newly Blocked TCP packets:   [1]   (since: Apr 4 17:52:38)
+TCP flags:                   [SYN: 1 packets]  Nmap: [-sT or -sS]
+Complete TCP/UDP port range: [6776]  (since: Apr 4 17:52:38)
+Total blocked packets:       1
+Start time:                  Apr 4 17:52:38
+End time:                    Apr 4 17:52:38
+Danger level:                2 out of 5
+DNS info:                    192.168.20.25 -> minastirith
+
+---- TCP alert signatures found since [Apr 4 17:52:38]
+"Possible SubSeven access"   dp=6776, flags=SYN. There is no server
+    listening on tcp port 6776  Packets=1
+
+
+---- Whois Information: ----
+IANA (IANA-CBLK-RESERVED)
+   Internet Assigned Numbers Authority
+   4676 Admiralty Way, Suite 330
+   Marina del Rey, CA 90292-6695
+   US
+
+   Netname: IANA-CBLK1
+   Netblock: 192.168.0.0 - 192.168.255.255
+
+   Coordinator:
+      Internet Corporation for Assigned Names and Numbers  (IANA-ARIN)
+    res-ip@iana.org
+      (310) 823-9358
+
+   Domain System inverse mapping provided by:
+
+   BLACKHOLE-1.IANA.ORG         192.0.32.18
+   BLACKHOLE-2.IANA.ORG         192.0.32.19
+
+   These blocks are reserved for special purposes.
+   Please see RFC 1918 for additional information.
+
+   Record last updated on 12-Oct-2001.
+   Database last updated on  3-Apr-2002 19:59:39 EDT.
+
+The ARIN Registration Services Host contains ONLY Internet
+Network Information: Networks, ASN's, and related POC's.
+Please use the whois server at rs.internic.net for DOMAIN related
+Information and whois.nic.mil for NIPRNET Information.
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-= Apr 4 17:52:38 =-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+
+PSAD also writes syslog messages, and the scan in EXAMPLE 1 above
+resulted in the following syslog message:
+
+Apr  4 17:52:48 orthanc psad: port scan detected: 192.168.20.25 -> 192.168.20.1
+tcp=[6776] flags=[SYN] pkts=1 dangerlevel: 2
+
+
+*** EXAMPLE 2. ***
+
+Below is a FIN scan against port 53 (dns) of my webserver, which is running
+an iptables firewall on Linux kernel 2.4.0.  Note that the signature is 
+displayed at the bottom of the log message.  Also, note that psad attempts 
+to do a reverse lookup against the ip address (which has been obscured to 
+protect the innocent) but in this case is not able to determine any reverse 
+dns information:
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+Apr 16 18:03:41:     Portscan Detected by psad (pid 16083).
+
+Source:                   213.xxx.xxx.xxx
+Destination:              64.44.21.15
+Complete port range:      [53]  (since:  Apr 16 18:03:41)
+Newly scanned ports:      [53]  (since:  Apr 16 18:03:41)
+Number of packets:        1
+Start time:               Apr 16 18:03:41
+End time:                 Apr 16 18:03:41
+Danger level:             1 out of 5
+DNS info:                 213.xxx.xxx.xxx - No reverse dns info available
+TCP flags:                [FIN: 1 packets]  Nmap: [-sF]
+
+---- TCP alert signatures found since [Apr 16 18:03:41]
+"IDS027 - SCAN-FIN"  dp=53, flags=FIN.  There is no server listening on port 53
+Packets=1
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+
+
+*** EXAMPLE 3. ***
+
+Below is an example of a more comprehensive scan of over 1000 ports with both
+FIN packets and normal tcp connect() attempts.  This was a scan that I ran
+against my own machine.
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+Apr 16 21:25:47:     Portscan Detected by psad (pid 16083).
+
+Source:                   127.0.0.1
+Destination:              127.0.0.1
+Complete port range:      [10-2000]  (since:  Apr 16 21:22:55)
+Newly scanned ports:      [1302-1500]  (since:  Apr 16 21:25:43)
+Number of packets:        1127
+Start time:               Apr 16 21:22:55
+End time:                 Apr 16 21:25:47
+Danger level:             3 out of 5
+DNS info:                 127.0.0.1 -> localhost.cipherdyne.com
+TCP flags:                [SYN: 957 packets]  Nmap: [-sT or -sS]
+TCP flags:                [FIN: 170 packets]  Nmap: [-sF]
+
+---- TCP alert signatures found since [Apr 16 21:25:43]
+"IDS027 - SCAN-FIN"  dp=1356, flags=FIN.  There is no server listening on port 1356  Packets=1
+"IDS027 - SCAN-FIN"  dp=1437, flags=FIN.  There is no server listening on port 1437  Packets=2
+"IDS027 - SCAN-FIN"  dp=1374, flags=FIN.  There is no server listening on port 1374  Packets=2
+"IDS027 - SCAN-FIN"  dp=1419, flags=FIN.  There is no server listening on port 1419  Packets=2
+"IDS027 - SCAN-FIN"  dp=1482, flags=FIN.  There is no server listening on port 1482  Packets=2
+"IDS027 - SCAN-FIN"  dp=1491, flags=FIN.  There is no server listening on port 1491  Packets=2
+"IDS027 - SCAN-FIN"  dp=1347, flags=FIN.  There is no server listening on port 1347  Packets=2
+"IDS027 - SCAN-FIN"  dp=1394, flags=FIN.  There is no server listening on port 1394  Packets=1
+"IDS027 - SCAN-FIN"  dp=1385, flags=FIN.  There is no server listening on port 1385  Packets=2
+"IDS027 - SCAN-FIN"  dp=1466, flags=FIN.  There is no server listening on port 1466  Packets=2
+"IDS027 - SCAN-FIN"  dp=1367, flags=FIN.  There is no server listening on port 1367  Packets=2
+"IDS027 - SCAN-FIN"  dp=1475, flags=FIN.  There is no server listening on port 1475  Packets=2
+"IDS027 - SCAN-FIN"  dp=1493, flags=FIN.  There is no server listening on port 1493  Packets=2
+"IDS027 - SCAN-FIN"  dp=1448, flags=FIN.  There is no server listening on port 1448  Packets=2
+"IDS027 - SCAN-FIN"  dp=1387, flags=FIN.  There is no server listening on port 1387  Packets=2
+"IDS027 - SCAN-FIN"  dp=1396, flags=FIN.  There is no server listening on port 1396  Packets=2
+"IDS027 - SCAN-FIN"  dp=1495, flags=FIN.  There is no server listening on port 1495  Packets=2
+"IDS027 - SCAN-FIN"  dp=1389, flags=FIN.  There is no server listening on port 1389  Packets=2
+"IDS027 - SCAN-FIN"  dp=1488, flags=FIN.  There is no server listening on port 1488  Packets=2
+"IDS027 - SCAN-FIN"  dp=1479, flags=FIN.  There is no server listening on port 1479  Packets=2
+"IDS027 - SCAN-FIN"  dp=1500, flags=FIN.  There is no server listening on port 1500  Packets=2
+"IDS027 - SCAN-FIN"  dp=1410, flags=FIN.  There is no server listening on port 1410  Packets=2
+"IDS027 - SCAN-FIN"  dp=1302, flags=FIN.  There is no server listening on port 1302  Packets=2
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

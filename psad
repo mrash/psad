@@ -1226,17 +1226,16 @@ sub match_fastsigs_udp() {
 sub match_sigs() {
     my ($src, $dst, $chain, $sp, $dp, $proto,
         $flags, $len, $ttl, $type, $code, $id, $seq) = @_;
-    print "match_sigs() call\n" if $debug;
-    for my $sid (keys %{$sigs{$proto}}) {
-        ### need to iterate through all signatures
-        ### since a packet may match several
-        if ($proto eq 'tcp') {
+
+    if ($proto eq 'tcp') {
+        for my $sid (keys %{$sigs{'tcp'}}) {
+            next unless defined $sigs{'tcp'}{$sid}{'flags'};
             if ($flags eq $sigs{'tcp'}{$sid}{'flags'}
-                    && &check_port($sp, $dp,
-                    $sigs{'tcp'}{$sid})) {  ### tripped a tcp signature
+                    and &check_port($sp, $dp, $sigs{'tcp'}{$sid})) {
                 ### future
 #               && &check_misc_fields($sid, $proto, $len, $ttl)) {
-                print "main sigs matched $dp,$sp,$flags, ",
+                ### tripped a tcp signature
+                print " .. match_sigs(): matched udp $dp,$sp,$flags, ",
                     "sid: $sid\n" if $debug;
                 unless ($scan_dl{$src} >= $sigs_attr{$sid}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sid}{'dlevel'};
@@ -1248,10 +1247,14 @@ sub match_sigs() {
                 $scan{$src}{$dst}{$proto}{'curr_sig'}
                     {$sid}{$chain}{'flags'}{$dp} = $flags;
             }
-        } elsif ($proto eq 'udp') {
+        }
+    } elsif ($proto eq 'udp') {
+        for my $sid (keys %{$sigs{'udp'}}) {
             if (&check_port($sp, $dp, $sigs{'udp'}{$sid})) {
 #               && &check_misc_fields($sid, $proto, $len, $ttl)) {
                 ### tripped a udp signature
+                print " .. match_sigs(): matched udp $dp,$sp,$flags, ",
+                    "sid: $sid\n" if $debug;
                 unless ($scan_dl{$src} >= $sigs_attr{$sid}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sid}{'dlevel'};
                     $scan{$src}{$dst}{'alerted'} = 0
@@ -1260,8 +1263,12 @@ sub match_sigs() {
                 $scan{$src}{$dst}{$proto}{'curr_sig'}
                     {$sid}{$chain}{'dp'}{$dp}++;
             }
-        } elsif ($proto eq 'icmp') {
+        }
+    } elsif ($proto eq 'icmp') {
+        for my $sid (keys %{$sigs{'icmp'}}) {
             if (&check_icmp_sigs($sid, $ttl, $type, $code, $id, $seq)) {
+                print " .. match_sigs(): matched icmp sid: $sid\n"
+                    if $debug;
                 unless ($scan_dl{$src} >= $sigs_attr{$sid}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sid}{'dlevel'};
                     $scan{$src}{$dst}{'alerted'} = 0
@@ -1642,7 +1649,7 @@ sub import_snort_rules() {
         }
     }
     print Dumper %snort_msgs if $debug;
-    &Psad::psyslog('psad', '.. imported Snort-2.0 signatures');
+    &Psad::psyslog('psad', '.. imported snort-2.0 signatures');
     return;
 }
 

@@ -559,8 +559,10 @@ unless ($benchmark) {
 ### psad.
 &renew_auto_blocked_ips() if $config{'ENABLE_AUTO_IDS'} eq 'Y';
 
-### archive old firewall and scan data
-&archive_data() unless $benchmark;
+unless ($config{'IMPORT_OLD_SCANS'} eq 'Y' or $benchmark) {
+    ### archive old firewall and scan data
+    &archive_data();
+}
 
 ### Install signal handlers for debugging %scan with Data::Dumper,
 ### and for reaping zombie whois processes.  Only install signal
@@ -572,11 +574,6 @@ unless ($benchmark or $fw_analyze) {
     $SIG{'USR1'}     = \&usr1_handler;
     $SIG{'HUP'}      = \&hup_handler;
 }
-
-### zero out the packet counter file (the counters
-### are all zero at this point anyway).
-&write_global_packet_counters()
-    unless $fw_analyze;
 
 if ($benchmark) {
     print scalar localtime(), " .. Entering benchmark mode.\n";
@@ -604,6 +601,17 @@ if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
 
 ### Initialize current time for disk space checking.
 my $last_disk_check = time();
+
+if ($config{'IMPORT_OLD_SCANS'} eq 'Y') {
+    ### import old scans from /var/log/psad/<ip> directories
+    &import_old_scans();
+}
+
+### zero out the packet counter file (the counters
+### are all zero at this point anyway unless we are
+### importing old scans).
+&write_global_packet_counters()
+    unless $fw_analyze;
 
 ### Get an open filehandle for the main firewall data file FW_DATA_FILE.
 ### All firewall drop/reject log messages are written to FW_DATA_FILE
@@ -2254,15 +2262,23 @@ sub write_global_packet_counters() {
 }
 
 sub write_src_packet_counters() {
-    my ($hr, $file) = @_;
+    my ($hr, $tcp_absrange, $udp_absrange, $file) = @_;
     open P, "> $file" or
         die " ** Could not open $file: $!";
     for my $chain (keys %$hr) {
         for my $intf (keys %{$hr->{$chain}}) {
             for my $proto qw(tcp udp icmp) {
-            next unless defined $hr->{$chain}->{$intf}->{$proto};
-                print P "${chain}_${intf}_${proto}:  ",
-                    "$hr->{$chain}->{$intf}->{$proto}\n";
+                next unless defined $hr->{$chain}->{$intf}->{$proto};
+                if ($proto eq 'tcp' and $tcp_absrange) {
+                    print P "${chain}_${intf}_${proto}:  ",
+                        "$hr->{$chain}->{$intf}->{$proto} [$tcp_absrange]\n";
+                } elsif ($proto eq 'udp' and $udp_absrange) {
+                    print P "${chain}_${intf}_${proto}:  ",
+                        "$hr->{$chain}->{$intf}->{$proto} [$udp_absrange]\n";
+                } else {
+                    print P "${chain}_${intf}_${proto}:  ",
+                        "$hr->{$chain}->{$intf}->{$proto}\n";
+                }
             }
         }
     }
@@ -2338,17 +2354,23 @@ sub scan_logr() {
                 -d "$config{'PSAD_DIR'}/${src}";
             my $ecount_file  = "$config{'PSAD_DIR'}/${src}/email_count";
             my $dl_file      = "$config{'PSAD_DIR'}/${src}/danger_level";
+            my $posf_file    = "$config{'PSAD_DIR'}/${src}/os_guess";
             my $whois_file   = "$config{'PSAD_DIR'}/${src}/whois";
             my $email_file   = "$config{'PSAD_DIR'}/${src}/${dst}_email_alert";
             my $log_sigs     = "$config{'PSAD_DIR'}/${src}/${dst}_signatures";
+            my $s_time_file  = "$config{'PSAD_DIR'}/${src}/${dst}_start_time";
             my $pkt_ctr_file = "$config{'PSAD_DIR'}/${src}/${dst}_packet_ctr";
 
-            ### print the current danger level to the danger_level file
+            ### print the current danger level to the danger_level file.
             &Psad::logr("$curr_dl\n", {$dl_file => 0});
 
-            ### write out the overall packet counters for $src
-            &write_src_packet_counters($scan{$src}{$dst}{'chain'},
-                $pkt_ctr_file);
+            ### write out the os guess (if there is one).
+            if (defined $posf{$src} and defined $posf{$src}{'guess'}) {
+                &Psad::logr("$posf{$src}{'guess'}\n", {$posf_file => 0});
+            }
+
+            ### write out the start time.
+            &Psad::logr("$scan{$src}{$dst}{'s_time'}\n", {$s_time_file => 0});
 
             if (defined $scan{$src}{$dst}{'tcp'}
                     and defined $scan{$src}{$dst}{'tcp'}{'abs_sp'}) {
@@ -2408,6 +2430,10 @@ sub scan_logr() {
                 $icmp_newpkts =
                     $current_scan_href->{$src}->{$dst}->{'icmp'}->{'pkts'};
             }
+
+            ### write out the overall packet counters for $src.
+            &write_src_packet_counters($scan{$src}{$dst}{'chain'},
+                $tcp_absrange, $udp_absrange, $pkt_ctr_file);
 
             ### get reverse dns info
             unless ($no_rdns) {
@@ -3571,7 +3597,7 @@ sub status_psad_daemon() {
     closedir D;
     shift @files; shift @files;
     for my $file (@files) {
-        if ($file =~ /$ip_re/ && -d $file) {
+        if ($file =~ /$ip_re/ and -d $file) {
             ### $file is a current scan source ip
             my $src_ipdir = $file;
             my $dl = 0;
@@ -3793,6 +3819,117 @@ sub status_ip() {
         print STDOUT " .. Current danger level: $dl\n";
     }
     exit $rv;
+}
+
+sub import_old_scans() {
+    &Psad::psyslog('psad', '.. importing scan data from previous run');
+    opendir D, $config{'PSAD_DIR'} or
+        die " ** Could not open dir: $config{'PSAD_DIR'}: $!";
+    my @files = readdir D;
+    closedir D;
+    shift @files; shift @files;
+    my $import_ctr = 0;
+    chdir $config{'PSAD_DIR'} or die $!;
+    SRCIP: for my $file (@files) {
+        next SRCIP unless ($file =~ /$ip_re/ and -d $file);
+        ### $file is a current scan source ip
+        my $src = $file;
+        ### define as many hash keys as we can (older versions
+        ### of psad don't include several of these files).
+        if (-e "${src}/danger_level") {
+            open F, "< ${src}/danger_level" or next SRCIP;
+            my $dl = <F>;
+            close F;
+            chomp $dl;
+            $scan_dl{$src} = $dl;  ### set the dl for $src
+        }
+        if (-e "${src}/os_guess") {
+            open F, "< ${src}/os_guess" or next SRCIP;
+            my $os_guess = <F>;
+            close F;
+            chomp $os_guess;
+            ### set the os guess for $src
+            $posf{$src}{'guess'} = $os_guess;
+        }
+        opendir F, "$config{'PSAD_DIR'}/$src" or next SRCIP;
+        my @scan_files = readdir F;
+        closedir F;
+        shift @scan_files; shift @scan_files;
+        ### get all of the destination ip addresses
+        my %dst_ips;
+        for my $scan_file (@scan_files) {
+            if ($scan_file =~ /($ip_re)/) {
+                $dst_ips{$1} = ''
+            }
+        }
+        for my $dst (keys %dst_ips) {
+            ### we have probably already sent alerts for these
+            ### ips since we are importing data from a previous run.
+            $scan{$src}{$dst}{'alerted'} = 1;
+            if (-e "${src}/${dst}_packet_ctr") {
+                open F, "< ${src}/${dst}_packet_ctr" or next SRCIP;
+                my @lines = <F>;
+                close F;
+                for my $line (@lines) {
+                    my $chain;
+                    my $intf;
+                    my $pkts;
+                    my $proto;
+                    if ($line =~ /^(\w+)_(\w+)_icmp:\s+(\d+)/) {
+                        $chain = $1;
+                        $intf  = $2;
+                        $pkts  = $3;
+                        $proto = 'icmp';
+                    } elsif ($line =~ /^(\w+)_(\w+)_(tcp|udp):
+                            \s+(\d+)\s+\[(\S+)\]/x) {
+                        $chain = $1;
+                        $intf  = $2;
+                        $proto = $3;
+                        $pkts  = $4;
+                        my $port_rng = $5;
+                        if ($port_rng =~ /(\d+)\-(\d+)/) {
+                            $scan{$src}{$dst}{$proto}{'abs_sp'} = $1;
+                            $scan{$src}{$dst}{$proto}{'abs_ep'} = $2;
+                        } elsif ($port_rng =~ /(\d+)/) {
+                            $scan{$src}{$dst}{$proto}{'abs_sp'} = $1;
+                            $scan{$src}{$dst}{$proto}{'abs_ep'} = $1;
+                        }
+                    }
+                    $scan{$src}{$dst}{'chain'}{$chain}{$intf}{$proto}
+                        += $pkts;
+                    $scan{$src}{$dst}{'absnum'} += $pkts;
+                }
+            }
+            if (-e "${src}/${dst}_start_time") {
+                open F, "< ${src}/${dst}_start_time" or next SRCIP;
+                my $s_time = <F>;
+                close F;
+                chomp $s_time;
+                $scan{$src}{$dst}{'s_time'} = $s_time;
+            }
+        }
+    }
+    ### increment global packet counters
+    if (-e $config{'PACKET_COUNTER_FILE'}) {
+        open F, "< $config{'PACKET_COUNTER_FILE'}" or die " ** Could not ",
+            "open $config{'PACKET_COUNTER_FILE'}";
+        my @lines = <F>;
+        close F;
+        for my $line (@lines) {
+            if ($line =~ /tcp:\s+(\d+)/) {
+                $tcp_ctr = $1;
+            } elsif ($line =~ /udp:\s+(\d+)/) {
+                $udp_ctr = $1;
+            } elsif ($line =~ /icmp:\s+(\d+)/) {
+                $icmp_ctr = $1;
+            }
+        }
+    }
+    ### zero out $FW_DATA_FILE
+    open F, "> $config{'FW_DATA_FILE'}" or die ' ** Could not open ',
+        "$config{'FW_DATA_FILE'}: $!";
+    close F;
+    return;
 }
 
 sub usr1() {
@@ -4540,6 +4677,7 @@ sub required_vars() {
         DSHIELD_USER_EMAIL DISK_CHECK_INTERVAL DISK_MAX_PERCENTAGE
         DISK_MAX_RM_RETRIES ETC_HOSTS_DENY ETC_SYSLOG_CONF
         ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL ANALYSIS_DIR
+        IMPORT_OLD_SCANS
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;
@@ -4554,13 +4692,13 @@ psad; the Port Scan Attack Detector
  .. By Michael Rash (mbr\@cipherdyne.org, http://www.cipherdyne.org)
 
 Usage: psad [-a <auto ips file>] [-c <config file>] [-l] [-i <interval>]
-       [-h] [-B] [-F] [-S] [-K] [-R] [-U] [-V] [-o] [-p] [-D] [-d]
+       [-h] [-B] [-A] [-F] [-S] [-K] [-R] [-U] [-V] [-o] [-p] [-D] [-d]
        [--signatures <sig file>] [--passive-os-sigs <posf file>]
        [--snort-type <type>] [--snort-rdir <rules dir>] [--fw-check]
-       [--fw-file <file>] [--interval <seconds>] [--status-ip <ip>]
-       [--status-sort-dl] [--no-fwcheck] [--no-daemon] [--no-rdns]
-       [--no-whois] [--no-netstat] [--no-ipt-errors] [--no-passiveos]
-       [--no-snort-sids] [--no-kmsgsd]
+       [--fw-file <file>] [-m <messages file>] [--interval <seconds>]
+       [--status-ip <ip>] [--status-sort-dl] [--no-fwcheck] [--no-daemon]
+       [--no-rdns] [--no-whois] [--no-netstat] [--no-ipt-errors]
+       [--no-passiveos] [--no-snort-sids] [--no-kmsgsd]
 
 Options:
     --signatures <sigs file>      - Manually specify the path to the
@@ -4573,11 +4711,15 @@ Options:
     --interval                    - Configure the check interval from
                                     the command line to override the 15
                                     second default.
+    -A   --Analyze-msgs           - Analyze iptables logfile and exit.
     -a   --auto-ips <ips file>    - Import auto ips file for automatic
                                     ip danger level increases/decreses.
     -c   --config <config file>   - Use <config file> instead of the
                                     normal config file located at
                                     $config_file.
+    -m   --messages-file <file>   - Specify the path to the iptables
+                                    logfile (use in conjunction with
+                                    --Analyze-msgs).
     --fw-check                    - Analyze the local iptables ruleset
                                     and exit.
     --fw-file  <rules file>       - Analyze the iptables ruleset

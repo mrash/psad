@@ -34,7 +34,7 @@ write all kern.info messages to a named pipe
 .B /var/lib/psad/psadfifo
 and then reads all messages out of the pipe that are matched by a regular
 expression designed to catch any packets that have been
-dropped/denied/rejected by the firewall.  In this way psad is supplied
+logged (and possibly dropped) by the firewall.  In this way psad is supplied
 with a pure data stream that exclusively contains packets that the
 firewall has deemed unfit to enter the network.  For iptables
 firewalls in the 2.4.x series kernels, psad analyzes the tcp flags
@@ -60,7 +60,7 @@ to passively fingerprint remote operating systems from which scans originate.
 .B psad
 consists of four daemons: psad, kmsgsd, psadwatchd, and diskmond.
 .B psad
-is responsible for processing all packets that have been denied by the
+is responsible for processing all packets that have been logged by the
 firewall and applying the signature logic in order to determine what type
 of scan has been leveraged against the machine and/or network.
 .B kmsgsd
@@ -201,7 +201,7 @@ discovered, and then exit.
 
 .BI \-\^\-interval "  seconds"
 Specify the interval (in seconds) that psad should use to
-check whether or not packets have been denied by the
+check whether or not packets have been logged by the
 firewall.  Psad will use the default of 15 seconds unless a
 different value is specified.
 .TP
@@ -325,7 +325,7 @@ commmand line argument is given.
 .B /etc/psad/psad_auto_ips
 .RS
 Contains a listing of any ip addresses that should be assigned
-a danger level based on any traffic that is denied/rejected by the
+a danger level based on any traffic that is logged by the
 firewall.  The syntax is "<ip address> <danger level>" where
 <danger level> is an integer from 0 to 5, with 0 meaning to ignore
 all traffic from <ip address>, and 5 is to assign the highest danger

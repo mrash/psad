@@ -87,6 +87,8 @@ my $psadCmd      = "${USRSBIN_DIR}/psad";
 ### get the hostname of the system
 my $HOSTNAME = hostname();
 
+my $ip_re = '(?:\d{1,3}\.){3}\d{1,3}';
+
 if (-e $INSTALL_LOG) {
     open INSTALL, "> $INSTALL_LOG" or
         die " ** Could not open $INSTALL_LOG: $!";
@@ -267,7 +269,7 @@ sub install() {
         mkdir $USRSBIN_DIR,0755;
     }
     if (-d 'whois') {
-        &logr(" .. Compiling Marco d'Itri's whois-4.6.3 client\n");
+        &logr(" .. Compiling Marco d'Itri's whois client\n");
         system "$Cmds{'make'} -C whois";
         if (-e 'whois/whois') {
             &logr(" .. Copying whois binary to $WHOIS_PSAD\n");
@@ -471,6 +473,7 @@ sub install() {
             &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
         }
     }
+
     ### deal with any legacy diskmond.conf file
     if (-e "${PSAD_CONFDIR}/diskmond.conf") {
         &archive("${PSAD_CONFDIR}/diskmond.conf") unless $noarchive;
@@ -503,26 +506,28 @@ sub install() {
         &test_syslog_config();
     }
 
-    unless ($preserve_rv) {  ### we preserved the existing config
+    unless ($preserve_rv) {  ### we want to preserve the existing config
         my $email_str = &query_email();
         if ($email_str) {
             for my $file qw(psad.conf psadwatchd.conf kmsgsd.conf) {
                 &put_email("${PSAD_CONFDIR}/$file", $email_str);
             }
         }
-        ### Give the admin the opportunity to add to the strings that are normally
-        ### checked in iptables messages.  This is useful since the admin may have
-        ### configured the firewall to use a logging prefix of "Audit" or something
-        ### else other than the normal "DROP", "DENY", or "REJECT" strings.
+        ### Give the admin the opportunity to add to the strings that are
+        ### normally checked in iptables messages.  This is useful since the
+        ### admin may have configured the firewall to use a logging prefix
+        ### of "Audit" or something else other than "DROP".
         my $custom_fw_search_str = &get_fw_search_string();
         if ($custom_fw_search_str) {
             for my $file qw(psad.conf kmsgsd.conf) {
                 &logr(qq{ .. Setting \$FW_MSG_SEARCH to "$custom_fw_search_str" } .
                     "in ${PSAD_CONFDIR}/$file\n");
-                &put_custom_fw_search_str("${PSAD_CONFDIR}/$file",
-                    $custom_fw_search_str);
+                &put_string('FW_MSG_SEARCH', $custom_fw_search_str,
+                    "${PSAD_CONFDIR}/$file");
             }
         }
+        ### Give the admin the opportunity to set the HOME_NET variable.
+        &set_home_net("${PSAD_CONFDIR}/psad.conf");
     }
     for my $file ("${PSAD_CONFDIR}/psad.conf",
             "${PSAD_CONFDIR}/kmsgsd.conf",
@@ -531,10 +536,38 @@ sub install() {
         &set_hostname($file);
     }
 
+    ### see if there are any "_CHANGEME_" strings left and give the
+    ### admin a chance to correct (this can happen if a new config
+    ### variable is introduced in a new version of psad but the
+    ### admin chose to preserve the old config).
+    for my $file ("${PSAD_CONFDIR}/psad.conf",
+            "${PSAD_CONFDIR}/kmsgsd.conf",
+            "${PSAD_CONFDIR}/psadwatchd.conf") {
+        open F, "< $file" or die " ** Could not open file: $file\n";
+        my @lines = <F>;
+        close F;
+        for my $line (@lines) {
+            next if $line =~ /^\s*#/;
+            if ($line =~ /^\s*(\S+)\s+_?CHANGE.?ME_?\;/) {
+                my $var = $1;
+                ### only two possible vars are set to _CHANGEME_ by
+                ### default as of psad-1.3
+                if ($var eq 'HOME_NET') {
+                    &logr(" ** HOME_NET is not defined in $file.\n");
+                    &set_home_net();
+                }
+                if ($var eq 'HOSTNAME') {
+                    &logr(" ** set_hostname() failed.  Edit the HOSTNAME " .
+                        " variable in $file\n");
+                }
+            }
+        }
+    }
+
     ### make sure the PSAD_DIR and PSAD_FIFO variables are correctly defined
     ### in the config file.
-    &put_string("${PSAD_CONFDIR}/psad.conf", 'PSAD_DIR', $PSAD_DIR);
-    &put_string("${PSAD_CONFDIR}/kmsgsd.conf", 'PSAD_FIFO', $PSAD_FIFO);
+    &put_string('PSAD_DIR', $PSAD_DIR, "${PSAD_CONFDIR}/psad.conf");
+    &put_string('PSAD_FIFO', $PSAD_FIFO, "${PSAD_CONFDIR}/kmsgsd.conf");
 
     &install_manpage('psad.8');
     &install_manpage('psadwatchd.8');
@@ -693,6 +726,81 @@ sub uninstall() {
     print "\n";
     print " .. Psad has been uninstalled!\n";
 
+    return;
+}
+
+sub set_home_net() {
+    my $file = shift;
+    my @ifconfig_out = `$Cmds{'ifconfig'} -a`;
+    my $home_net_str = '';
+    my $intf_name = '';
+    my $net_ctr = 0;
+    my %connected_subnets;
+    for my $line (@ifconfig_out) {
+        if ($line =~ /^\s*lo\s+Link/) {
+            $intf_name = '';
+            next;
+        }
+        if ($line =~ /^\s*dummy.*\s+Link/) {
+            $intf_name = '';
+            next;
+        }
+        if ($line =~ /^(\w+)\s+Link/) {
+            $intf_name = $1;
+            next;
+        }
+        if ($intf_name and
+                $line =~ /^\s+inet\s+addr:($ip_re).*Mask:($ip_re)/) {
+            $connected_subnets{$intf_name} = "$1/$2";
+            $net_ctr++;
+        }
+    }
+    if ($net_ctr > 0) {
+        ### found two or more subnets, so forwarding traffic becomes
+        ### possible through the box.
+        &logr(" .. It appears your machine is connected to " .
+            "$net_ctr subnets:\n");
+        for my $intf (keys %connected_subnets) {
+            &logr("      $intf -> $connected_subnets{$intf}\n");
+        }
+        &logr("\n");
+        &logr("    Specify which subnets are part of your internal network.\n");
+        &logr("    Note that you can correct anything you enter here by " .
+            "editing\n");
+        &logr("    the HOME_NET variable in: $file.\n");
+        &logr("    Enter each of the subnets (except for the external " .
+            "subnet)\n");
+        &logr("    on a line by itself.\n");
+        &logr("    Each of the subnets should be in the form <net>/<mask.\n");
+        &logr("    E.g. in CIDR notation: 192.168.10.0/24, or regularly: " .
+            "192.168.10.0/255.255.255.0\n");
+        &logr("    End with a \".\" on a line by itself.\n");
+        my $ans = '';
+        while ($ans ne '.') {
+            &logr("Subnet: ");
+            $ans = <STDIN>;
+            chomp $ans;
+            if ($ans =~ m|^\s*($ip_re/\d+)\s*$|) {
+                ### hard to test this directly without ipv4_network()
+                ### and this module may not be installed, so just use it.
+                $home_net_str .= "$1,";
+            } elsif ($ans =~ m|^\s*($ip_re/$ip_re)\s*$|) {
+                $home_net_str .= "$1,";
+            } elsif ($ans ne '.') {
+                &logr(" ** Invalid subnet \"$ans\"\n");
+            }
+        }
+    } else {
+        ### forwarding is not possible, so set HOME_NET to a dummy
+        ### value.
+        $home_net_str = 'NOT_USED';
+    }
+    if ($home_net_str) {
+        $home_net_str =~ s/\,$//;
+        &put_string('HOME_NET', $home_net_str, $file);
+    } else {
+        &put_string('HOME_NET', 'NOT_USED', $file);
+    }
     return;
 }
 
@@ -904,7 +1012,7 @@ sub test_syslog_config() {
     my $lo_ip = '127.0.0.1';
     my $found_ip = 0;
     for my $line (@if_out) {
-        if ($line =~ /inet\s+addr:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s/) {
+        if ($line =~ /inet\s+addr:($ip_re)\s/) {
             $lo_ip = $1;  ### this should always be 127.0.0.1
             &logr(" ** loopback interface ip is not 127.0.0.1.  Continuing ".
                 "anyway.\n") unless $lo_ip eq '127.0.0.1';
@@ -1120,7 +1228,7 @@ sub query_email() {
     &logr(" .. psad alerts will be sent to:\n\n");
     &logr("       $email_addresses\n\n");
     my $ans = '';
-    while ($ans ne 'y' && $ans ne 'n') {
+    while ($ans ne 'y' and $ans ne 'n') {
         &logr(" .. Would you like alerts sent to a different address ([y]/n)?  ");
         $ans = <STDIN>;
         if ($ans eq "\n") {  ### allow the default of "y" to take over
@@ -1175,32 +1283,15 @@ sub put_email() {
     return;
 }
 
-sub put_custom_fw_search_str() {
-    my ($file, $custom_fw_search) = @_;
-    open RF, "< $file";
-    my @lines = <RF>;
-    close RF;
-    open F, "> $file";
-    for my $line (@lines) {
-        if ($line =~ /^\s*FW_MSG_SEARCH\s/) {
-            print F "FW_MSG_SEARCH              $custom_fw_search;\n";
-        } else {
-            print F $line;
-        }
-    }
-    close F;
-    return;
-}
-
 sub put_string() {
-    my ($file, $key, $value) = @_;
+    my ($var, $value, $file) = @_;
     open RF, "< $file";
     my @lines = <RF>;
     close RF;
     open F, "> $file";
     for my $line (@lines) {
-        if ($line =~ /^\s*$key\s+.*;/) {
-            printf F "%-28s%s;\n", $key, $value;
+        if ($line =~ /^\s*$var\s+.*;/) {
+            printf F "%-28s%s;\n", $var, $value;
         } else {
             print F $line;
         }

@@ -65,9 +65,10 @@ $< == 0 && $> == 0 or
 ### import FW_MSG_SEARCH strings
 &import_fw_search();
 
+open FWCHECK, "> $config{'FW_CHECK_FILE'}" or die " ** Could not ",
+    "open $config{'FW_CHECK_FILE'}: $!";
+
 unless ($no_fw_search_all) {
-    open FWCHECK, "> $config{'FW_CHECK_FILE'}" or die " ** Could not ",
-        "open $config{'FW_CHECK_FILE'}: $!";
     print FWCHECK " .. Available search strings in $fw_search_file:\n\n";
     print FWCHECK "        $_\n" for @fw_search;
     print FWCHECK
@@ -76,11 +77,11 @@ unless ($no_fw_search_all) {
 }
 
 ### check the iptables policy
-&fw_check();
+my $rv = &fw_check();
 
 close FWCHECK;
 
-exit 0;
+exit $rv;
 
 #========================== end main =========================
 
@@ -137,9 +138,8 @@ sub fw_check() {
     }
     if ($fw_analyze) {
         print scalar localtime(), " .. Exiting.\n";
-        exit 0;
     }
-    return;
+    return $forward_chain_rv && $input_chain_rv;
 }
 
 sub print_fw_help() {
@@ -148,14 +148,28 @@ sub print_fw_help() {
 " ** The $chain chain in the iptables ruleset on $config{'HOSTNAME'} does not\n",
 "    appear to include default rules that will log and drop unwanted packets.\n",
 "    You need to include two default rules; one that logs packets that have\n",
-"    not been accepted by previous rules (this rule should have a logging\n",
-"    prefix of one of the search string mentioned above), and a final rule\n",
+"    not been accepted by previous rules ";
+    if ($no_fw_search_all) {
+        print FWCHECK "(this rule should have a logging\n",
+"   prefix of one of the search strings mentioned above), and a final rule\n";
+    } else {
+        print FWCHECK "(this rule can have a logging\n",
+"   prefix such as \"DROP\" or \"REJECT\"), and a final rule\n";
+    }
+    print FWCHECK
 "    that drops any unwanted packets.\n\n",
 "    FOR EXAMPLE:  Assuming you have already setup iptables rules to accept\n",
 "    traffic you want to allow, you can probably execute the following two\n",
 "    commandsto have iptables log and drop unwanted packets in the $chain\n",
-"    chain by default.\n\n",
-"              iptables -A $chain -j LOG --log-prefix \"$fw_search[0] \"\n",
+"    chain by default.\n\n";
+    if ($no_fw_search_all) {
+        print FWCHECK
+"              iptables -A $chain -j LOG --log-prefix \"$fw_search[0] \"\n";
+    } else {
+        print FWCHECK
+"              iptables -A $chain -j LOG\n";
+    }
+        print FWCHECK
 "              iptables -A $chain -j DROP\n\n",
 " ** Psad will not detect in the iptables $chain chain scans without an\n",
 "    iptables ruleset that includes rules similar to the two rules above.\n\n";
@@ -219,7 +233,17 @@ sub ipt_chk_chain() {
             ### found real default logging rule (assuming it is above a default
             ### drop rule, which we are not actually checking here).
             return 1;
+        } elsif (defined $ipt_log->{'all'}) {
+            print FWCHECK
+" ** Indeterminate firewall logging config for chain $chain on $config{'HOSTNAME'}. ",
+"    There are logging rules however, so at least psad will be able to analyze ",
+"    packets logged through these rules.\n\n";
+            return 1;
         } else {
+            print FWCHECK
+" ** Your firewall config no $config{'HOSTNAME'} does not include any logging ",
+"    rules at all in the $chain chain.\n\n";
+            return 0;
         }
     } else {  ### we are looking for specific log prefixes.
         ### for now we are only looking at the filter table, so if
@@ -295,7 +319,6 @@ sub ipt_chk_chain() {
                     print FWCHECK
 " ** The $chain chain in the iptables ruleset on $config{'HOSTNAME'} does not\n",
 "    appear to include a default DROP rule $str1.\n\n";
-
                     $rv = 0;
                 }
             }

@@ -196,7 +196,7 @@ sub install() {
         die "[*] install.pl can only be executed from the directory\n",
             "    that contains the psad sources!  Exiting.";
     }
-    &logr("\n[+] " . localtime() . " Installing psad on hostname: $HOSTNAME\n");
+    &logr('[+] ' . localtime() . " Installing psad on hostname: $HOSTNAME\n");
 
     ### make sure another psad process is not running
     if (&ask_to_stop_psad()) {

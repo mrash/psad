@@ -871,7 +871,7 @@ sub set_home_net() {
         &logr("    or regularly: 192.168.10.0/255.255.255.0\n\n");
         &logr("    End with a \".\" on a line by itself.\n\n");
         my $ans = '';
-        while ($ans ne '.') {
+        while ($ans !~ /^\s*\.\s*$/) {
             &logr("    Subnet: ");
             $ans = <STDIN>;
             chomp $ans;
@@ -881,7 +881,7 @@ sub set_home_net() {
                 $home_net_str .= "$1, ";
             } elsif ($ans =~ m|^\s*($ip_re/$ip_re)\s*$|) {
                 $home_net_str .= "$1, ";
-            } elsif ($ans ne '.') {
+            } elsif ($ans !~ /^\s*\.\s*$/) {
                 &logr(" ** Invalid subnet \"$ans\"\n");
             }
         }
@@ -1415,6 +1415,10 @@ sub get_fw_search_strings() {
     print "\n";
 
     if ($ans eq 'y') {
+
+        ### we are only searching for specific iptables log prefixes
+        &put_string('FW_SEARCH_ALL', 'N', "${PSAD_CONFDIR}/fw_search.conf");
+
         print
 "\n .. psad checks the firewall configuration on the underlying machine\n",
 "    to see if packets will be logged and dropped that have not\n",
@@ -1425,38 +1429,25 @@ sub get_fw_search_strings() {
 "    be configured here to look for multiple strings if needed.  Remember,\n",
 "    whatever string you configure psad to look for must be logged via the\n",
 "    --log-prefix option in iptables.\n\n";
-        $ans = '';
-        while ($ans ne 'y' and $ans ne 'n') {
-            print
-"    Would you like to add custom strings that will be used to analyze",
-"    firewall log messages?\n",
-"    (y/[n])?  ";
-            $ans = <STDIN>;
-            if ($ans eq "\n") {  ### allow the default answer to take over
-                $ans = 'n';
-            }
-            chomp $ans;
-        }
         print "\n";
-        if ($ans eq 'y') {
-            print "\n";
-            &logr(" .. Add as many search strings as you like; " .
-                "each on its own line.\n\n");
-            &logr("    End with a \".\" on a line by itself.\n\n");
-            my $ans = '';
-            while ($ans ne '.') {
-                &logr("    String (i.e. \"Audit\"):  ");
-                $ans = <STDIN>;
-                chomp $ans;
-                if ($ans =~ /\"/) {
-                    &logr(" ** Quotes will be removed from FW search string: $ans\n");
-                    $ans =~ s/\"//g;
-                }
-                if ($ans =~ /\S/) {
+        &logr(" .. Add as many search strings as you like; " .
+            "each on its own line.\n\n");
+        &logr("    End with a \".\" on a line by itself.\n\n");
+        my $ans = '';
+        while ($ans !~ /^\s*\.\s*$/) {
+            &logr("    String (i.e. \"Audit\"):  ");
+            $ans = <STDIN>;
+            chomp $ans;
+            if ($ans =~ /\"/) {
+                &logr(" ** Quotes will be removed from FW search string: $ans\n");
+                $ans =~ s/\"//g;
+            }
+            if ($ans =~ /\S/) {
+                if ($ans !~ /^\s*\.\s*$/) {
                     push @fw_search_strings, $ans;
-                } else {
-                    &logr(" ** Invalid string **\n");
                 }
+            } else {
+                &logr(" ** Invalid string **\n");
             }
         }
         &logr("    All firewall search strings used by psad are located " .
@@ -1532,13 +1523,13 @@ sub query_email() {
             "each on its own line.\n\n");
         &logr("    End with a \".\" on a line by itself.\n\n");
         my $ans = '';
-        while ($ans ne '.') {
+        while ($ans !~ /^\s*\.\s*$/) {
             &logr("    Email Address: ");
             $ans = <STDIN>;
             chomp $ans;
             if ($ans =~ m|^\s*(\S+\@\S+)$|) {
                 $email_str .= "$1, ";
-            } elsif ($ans ne '.') {
+            } elsif ($ans !~ /^\s*\.\s*$/) {
                 &logr(" ** Invalid email address \"$ans\"\n");
             }
         }

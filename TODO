@@ -1,7 +1,17 @@
     - Automated tests to verify correct behavior for command line
       options (and potentially other things such as correctness of
       psad alerts).
+    - Take into account whether a destination port is in /etc/services for
+      the danger level calculaion.  A SYN packet to tcp/22 is worse than
+      a stray SYN packet to an arbitrary high port (as long as there isn't
+      a backdoor, etc.).  There are (probably) historically more
+      vulnerabilities in sshd than for some service that isn't even listed
+      in /etc/services.
+    - Idle scan detection through seeing combination of SYN/ACK and RST
+      packets (i.e. the iptables box was used as a zombie host).
     - XML logging format.
+    - HTML output mode, and ability to create IP directories/pages under a
+      web root directory.
     - Add the ability to install.pl to restore the "latest" syslog config
       backup file (fwknop may have been installed for example) at uninstall
       time.

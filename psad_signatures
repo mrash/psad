@@ -1,0 +1,64 @@
+# Backdoor signatures
+tcp any -> 1524 msg: "default Backdoor access!"; flags: S;
+tcp any -> 12345 msg:"Netbus/GabanBus"; flags: S;
+tcp any -> 12346 msg:"Netbus/GabanBus"; flags: S;
+tcp any -> 12361 msg:"Whack-a-mole"; flags: S;
+tcp any -> 12362 msg:"Whack-a-mole"; flags: S;
+tcp any -> 31337 msg:"BIND Shell"; flags: S;
+tcp any -> 30100 msg:"Possible NetSphere access"; flags:S;
+tcp any -> 30102 msg:"Possible NetSphere FTP acces"; flags: S;
+tcp any -> 21554 msg:"Possible GirlFriend access"; flags: S;
+tcp any -> 23456 msg:"Possible EvilFTP access"; flags: S;
+tcp any -> 1243 msg:"Possible SubSeven access"; flags: S;
+tcp any -> 6776 msg:"Possible SubSeven access"; flags: S;
+
+# testing
+tcp any -> 515 msg:"testing 515 signature"; flags: S;
+
+# DDoS signatures
+tcp any -> any 15104 msg: "IDS111 - DDoS - mstream client to handler"; flags: S; 
+tcp any -> 20432 msg:"IDS254 - DDoS shaft client to handler"; flags: AP; 
+# tcp :1024 -> any msg:"IDS253 - DDoS shaft synflood outgoing"; flags: S; seq: 674711609; 
+# tcp :1024 -> any msg:"IDS252 - DDoS shaft synflood incoming"; flags: S; seq: 674711609; 
+
+# Miscellaneous signatures
+tcp 53 -> :1023 msg:"IDS007 - MISC-Source Port Traffic 53 TCP"; flags: S; 
+tcp 20 -> :1023 msg:"IDS006 - MISC-Source Port Traffic 20 TCP"; flags: S;  
+# tcp any -> any msg:"MISC-Traceroute TCP"; ttl:"1"; 
+tcp !53 -> 1080 msg:"MISC-WinGate-1080-Attempt"; flags: S; 
+tcp 6000:6005 ->  any msg:"IDS126 - Outgoing Xterm"; flags: SA; 
+tcp !53 -> 8080 msg:"MISC-WinGate-8080-Attempt"; flags: S; 
+tcp any -> 32771 msg:"MISC-Attempted Sun RPC high port access"; 
+# tcp any -> any ipopts: lsrr; msg: "Source routed packet"; 
+# tcp any -> 617 msg:"MISC Knox Arkeia DOS"; flags:PA; dsize:>1445; 
+# tcp any -> any ipopts: ssrr; msg: "Source routed packet"; 
+# tcp any -> 617 msg:"IDS261 - MISC DoS arkiea backup"; flags: AP; dsize: >1445; 
+tcp 7161 -> any msg:"IDS129 - CVE-1999-0430 - Cisco Catalyst Remote Access"; flags: SA; 
+
+# "tcp ping" signature
+# tcp any -> any msg:"IDS028 - PING NMAP TCP"; flags:A; ack:0; 
+
+# DNS probe
+tcp any -> 53 msg:"DNS tcp probe"; flags:SF;
+
+# oddball scans OS fingerprinting, SYN-FIN, etc...
+# tcp any -> any flags: A; ack: 0; msg:"NMAP TCP ping!";
+tcp any -> any msg:"Possible NMAP Fingerprint attempt"; flags: SFPU;
+# tcp any -> any msg:"Possible Queso Fingerprint attempt"; flags: S12;
+tcp any -> 1080 msg:"WinGate 1080 Attempt"; flags: S;
+tcp any -> 8080 msg:"WinGate 8080 Attempt"; flags: S;
+tcp any -> any msg:"IDS005 - SCAN-Possible NMAP Fingerprint attempt"; flags:SFPU; 
+# tcp any -> any msg:"IDS236 - SCAN-IP Eye SYN Scan"; flags: S; seq: 1958810375; 
+# tcp any -> any msg:"IDS004 - SCAN-NULL Scan"; flags:0; seq:0; ack:0; 
+# tcp any -> any msg:"IDS029 - SCAN-Possible Queso Fingerprint attempt"; flags:S12; 
+tcp any -> any msg:"SCAN-SYN FIN"; flags:SF; 
+tcp any -> any msg:"NMAP XMAS scan"; flags: FPU;
+# tcp any -> 80 msg:"IDS146 - SCAN-Cybercop OS Probe sf12"; flags: SF12; dsize: 0; 
+tcp any -> any msg:"IDS027 - SCAN-FIN"; flags: F; 
+
+# IIS scans ha, ha, we are not vulnerable, but don't you want to know when someone is trying these?
+tcp 1024: -> 1031:1035 msg:"IIS - Possible Attempt at NT INETINFO.EXE 100% CPU Utilization"; flags:S; 
+tcp 1024: -> 1029 msg:"IIS - Possible Attempt at NT DNS.EXE 100% CPU Utilization"; flags:S; 
+tcp 1024: -> 1091 msg:"IIS - Possible Attempt at NT DNS.EXE 100% CPU Utilization"; flags:S; 
+tcp 1024: -> 1043 msg:"IIS - Possible Attempt at NT WINS.EXE 100% CPU Utilization"; flags:S; 
+tcp 1024: -> 1038 msg:"IIS - Possible Attempt at NT TCPSVCS.EXE 100% CPU Utilization"; flags:S; 

@@ -485,8 +485,7 @@ unless ($no_whois) {
 ### if psad is running on a syslog server, do not check the firewall
 ### rules since they may not be local.  Also, do not check the
 ### firewall if psad is configured to parse all iptables messages.
-#unless ($no_fwcheck or $syslog_server or $benchmark) {
-if (0) {
+unless ($no_fwcheck or $syslog_server or $benchmark) {
     my $opts = "-c $config_file --fw-search $fw_search_file";
     $opts .= " --fw-analyze" if $fw_analyze;
     $opts .= " --fw-file $fw_file" if $fw_file;
@@ -595,11 +594,10 @@ if ($config{'IMPORT_OLD_SCANS'} eq 'Y') {
 &write_global_packet_counters()
     unless $fw_analyze;
 
-### zero out dshield alert stats
-if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
-        and not $fw_analyze) {
-    &write_dshield_stats();
-}
+### zero out dshield alert stats (note we do this here regardles of
+### whether DShield alerting is enabled since if it isn't we will
+### just zero out the counters).
+&write_dshield_stats() unless $fw_analyze;
 
 ### Get an open filehandle for the main firewall data file FW_DATA_FILE.
 ### All firewall drop/reject log messages are written to FW_DATA_FILE
@@ -2767,7 +2765,7 @@ sub scan_logr() {
                             "[$flags: $n_pkts packets, Nmap: $nmap_opts]";
                     } else {
                         printf $fh "%${log_len}s%s\n", $prefix,
-                            "[$flags: $n_pkts pkts]";
+                            "[$flags: $n_pkts packets]";
                     }
                     $prefix = '';
                 }
@@ -2782,7 +2780,7 @@ sub scan_logr() {
             }
             if ($udp_f) {
                 printf $fh "%${log_len}s%s\n", 'Scanned udp ports: ',
-                    "[$udp_newrange: $udp_newpkts pkts, Nmap: -sU]";
+                    "[$udp_newrange: $udp_newpkts packets, Nmap: -sU]";
                 if (defined $current_scan_href->{$src}->{$dst}->{'udp'}->{'chain'}) {
                     &print_chains_and_prefixes(
                         $current_scan_href->{$src}->{$dst}->{'udp'}->{'chain'},
@@ -3857,12 +3855,16 @@ sub analysis_mode() {
     my @ipt_msgs;
     for my $line (@lines) {
         if ($line =~ /IN.*OUT/) {
-            if ($line =~ /$config{'SNORT_SID_STR'}/) {
+            if ($config{'FW_SEARCH_ALL'} eq 'Y') {
                 push @ipt_msgs, $line;
             } else {
-                for my $fw_search_str (@fw_search) {
-                    if ($line =~ /$fw_search_str/) {
-                        push @ipt_msgs, $line;
+                if ($line =~ /$config{'SNORT_SID_STR'}/) {
+                    push @ipt_msgs, $line;
+                } else {
+                    for my $fw_search_str (@fw_search) {
+                        if ($line =~ /$fw_search_str/) {
+                            push @ipt_msgs, $line;
+                        }
                     }
                 }
             }
@@ -4071,8 +4073,8 @@ sub status_psad_daemon() {
                                         $src, $dst, $chain, $intf, $tcp_ctr,
                                         $udp_ctr, $icmp_ctr, $dl;
                                 } else {
-                                    my $alerts   = '';
-                                    my $os_guess = '';
+                                    my $alerts   = 0;
+                                    my $os_guess = '-';
                                     $alerts = $scan_alerts{$src}
                                         if defined $scan_alerts{$src};
                                     $os_guess = $scan_os{$src}
@@ -4125,8 +4127,8 @@ sub status_psad_daemon() {
                                     $src, $dst, $chain, $intf, $tcp_ctr,
                                     $udp_ctr, $icmp_ctr, $dl;
                             } else {
-                                my $alerts   = '';
-                                my $os_guess = '';
+                                my $alerts   = 0;
+                                my $os_guess = '-';
                                 $alerts = $scan_alerts{$src}
                                     if defined $scan_alerts{$src};
                                 $os_guess = $scan_os{$src}

@@ -339,7 +339,7 @@ Getopt::Long::Configure('no_ignore_case');
 
 ### Print the version number and exit if -V given on the command line.
 if ($ver) {
-    print " .. psad v$version, by Michael Rash " .
+    print " .. psad v$version, by Michael Rash ",
         "(mbr\@cipherdyne.com)\n";
     exit 0;
 }
@@ -474,7 +474,7 @@ unless ($no_fwcheck || $syslog_server) {
     } else {
         if ($fw_analyze) {
             print localtime() . " ** Errors found in firewall config.\n";
-            print localtime() . " ** Results emailed to " .
+            print localtime() . " ** Results emailed to ",
                 "$config{'EMAIL_ADDRESSES'}\n";
         }
     }
@@ -555,7 +555,7 @@ if ($benchmark) {
     if ($b_packets) {
         print localtime() . " .. Executing a $b_packets packet test.\n";
     } else {
-        print localtime() . " .. The --packets command line " .
+        print localtime() . " .. The --packets command line ",
             "option was not specified.\n";
         print localtime() . " .. Defaulting to a 10,000 packet test.\n";
         $b_packets = 10000;
@@ -878,7 +878,7 @@ sub match_fastsigs() {
         if (defined $sigs_fast{'TCP'}{$dstport}{$srcport}{$flags}) {
             for my $sig_id (keys
                 %{$sigs_fast{'TCP'}{$dstport}{$srcport}{$flags}}) {
-                print "matched: $dstport,$srcport,$flags, " .
+                print "matched: $dstport,$srcport,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan{$src}{$dst}{'CURR_DL'}
                     >= $sigs_attr{$sig_id}{'dlevel'}) {
@@ -894,7 +894,7 @@ sub match_fastsigs() {
         if (defined $sigs_fast{'TCP'}{$dstport}{'any_src_port'}{$flags}) {
             for my $sig_id (keys
                 %{$sigs_fast{'TCP'}{$dstport}{'any_src_port'}{$flags}}) {
-                print "matched $dstport,any_src_port,$flags, " .
+                print "matched $dstport,any_src_port,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan{$src}{$dst}{'CURR_DL'}
                     >= $sigs_attr{$sig_id}{'dlevel'}) {
@@ -909,7 +909,7 @@ sub match_fastsigs() {
         if (defined $sigs_fast{'TCP'}{'any_dst_port'}{$srcport}{$flags}) {
             for my $sig_id (keys
                 %{$sigs_fast{'TCP'}{'any_dst_port'}{$srcport}{$flags}}) {
-                print "matched any_dst_port,$srcport,$flags, " .
+                print "matched any_dst_port,$srcport,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan{$src}{$dst}{'CURR_DL'}
                     >= $sigs_attr{$sig_id}{'dlevel'}) {
@@ -924,7 +924,7 @@ sub match_fastsigs() {
         if (defined $sigs_fast{'TCP'}{'any_dst_port'}{'any_src_port'}{$flags}) {
             for my $sig_id (keys
                 %{$sigs_fast{'TCP'}{'any_dst_port'}{'any_src_port'}{$flags}}) {
-                print "matched any_dst_port,any_src_port,$flags, " .
+                print "matched any_dst_port,any_src_port,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan{$src}{$dst}{'CURR_DL'}
                     >= $sigs_attr{$sig_id}{'dlevel'}) {
@@ -968,7 +968,7 @@ sub match_sigs() {
                 $dstport, $proto)) {  ### tripped a tcp signature
                 ### future
 #               && &check_misc_fields($sig_id, $proto, $len, $ttl)) {
-                print "main sigs matched $dstport,$srcport,$flags, " .
+                print "main sigs matched $dstport,$srcport,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan{$src}{$dst}{'CURR_DL'}
                     >= $sigs_attr{$sig_id}{'dlevel'}) {
@@ -1423,14 +1423,14 @@ sub assign_danger_level() {
             }
             if ($debug) {
                 print "assign_danger_level(): destination ip: $dst\n";
-                print "assign_danger_level(): ABSNUM: " .
+                print "assign_danger_level(): ABSNUM: ",
                     "$scan{$src}{$dst}{'ABSNUM'}\n";
                 if (defined $scan{$src}{$dst}{'S_PORT'}) {
-                    print "assign_danger_level(): S_PORT: " .
-                        "$scan{$src}{$dst}{'S_PORT'}, E_PORT: " .
+                    print "assign_danger_level(): S_PORT: ",
+                        "$scan{$src}{$dst}{'S_PORT'}, E_PORT: ",
                         "$scan{$src}{$dst}{'E_PORT'}\n";
                 }
-                print 'assign_danger_level(): CURR_DL (before assignment) = ' .
+                print 'assign_danger_level(): CURR_DL (before assignment) = ',
                     "$scan{$src}{$dst}{'CURR_DL'}\n";
             }
 
@@ -1467,7 +1467,7 @@ sub assign_danger_level() {
                     $scan{$src}{$dst}{'CURR_DL'} = 5;
                 }
             }
-            print 'assign_danger_level(): CURR_DL (after assignment) = ' .
+            print 'assign_danger_level(): CURR_DL (after assignment) = ',
                 "$scan{$src}{$dst}{'CURR_DL'}\n" if $debug;
         }
     }
@@ -1875,7 +1875,7 @@ sub old_auto_blocked_ips() {
                             &iptables_block($table, $chain, $blockip);
                         }
                         if ($flush_fw_rules && ! $blocked) {
-                            print " .. Could not locate any $table $chain " .
+                            print " .. Could not locate any $table $chain ",
                                 "auto-generated rules for $blockip\n";
                         }
                     }
@@ -1910,7 +1910,7 @@ sub old_auto_blocked_ips() {
                         &ipchains_block($chain, $blockip);
                     }
                     if ($flush_fw_rules && ! $blocked) {
-                        print " .. Could not locate any auto-generated " .
+                        print " .. Could not locate any auto-generated ",
                             "rules for: $blockip\n";
                     }
                 }
@@ -2177,14 +2177,14 @@ sub kill_psad() {
             if (kill 0, $pid) {
                 print " .. Killing $pidname, pid: $pid\n";
                 unless (kill 15, $pid) {
-                    kill 9, $pid or print " ** psad: Could not kill " .
+                    kill 9, $pid or print " ** psad: Could not kill ",
                         "$pidname, pid: $pid $!\n";
                 }
             } else {
                 print " ** psad: $pidname is not running on $hostname.\n";
             }
         } else {
-            print " ** psad: pid file $pidfile does not exist for " . 
+            print " ** psad: pid file $pidfile does not exist for ",
                 "$pidname on $hostname\n";
         }
     }
@@ -2282,8 +2282,8 @@ sub status() {
                             if (%scan_source_ips) {
                                 for my $dl (sort {$b <=> $a} keys %scan_source_ips) {
                                     for my $src (keys %{$scan_source_ips{$dl}}) {
-                                        print STDOUT "                  $dl   " .
-                                            sprintf("%16s", $src) . "\n";
+                                        print STDOUT "                  $dl   ",
+                                            sprintf("%16s\n", $src);
                                     }
                                 }
                             } else {
@@ -2299,7 +2299,7 @@ sub status() {
                 print " ** psad: $pidname is not running on $hostname\n";
             }
         } else {
-            print " ** psad: pid file $pidfile does not exist for " .
+            print " ** psad: pid file $pidfile does not exist for ",
                 "$pidname on $hostname\n";
         }
     }
@@ -2322,8 +2322,8 @@ sub usr1() {
                 ### and for the file to be created.
                 sleep 1;
                 open U, "< $config{'PSAD_DIR'}/scan_hash.${pid}"
-                    or print " ** Sent psad pid $pid a USR1 " .
-                        "signal, but could not open\n" .
+                    or print " ** Sent psad pid $pid a USR1 ",
+                        "signal, but could not open\n",
                         "\"$config{'PSAD_DIR'}/scan_hash.${pid}\n\""
                     and return $rv;
                 print while(<U>);
@@ -2458,7 +2458,7 @@ sub setup() {
             }
         }
         ### reinstate kernel logging to our named pipe
-        print SYSLOG "### Send kern.info messages to psadfifo for " .
+        print SYSLOG "### Send kern.info messages to psadfifo for ",
             "analysis by kmsgsd\n";
         print SYSLOG "kern.info\t\t|$config{'PSAD_FIFO'}\n";
         close SYSLOG;
@@ -2479,9 +2479,12 @@ sub setup() {
             open SYSLOGNG, '>> /etc/syslog-ng/syslog-ng.conf' or
                 die " ** Unable to open /etc/syslog-ng/syslog-ng.conf: $!\n";
             print SYSLOGNG "\n";
-            print SYSLOGNG "destination psadpipe { pipe(\"/var/run/psadfifo\"); };\n";
-            print SYSLOGNG "filter f_kerninfo { facility(kern) and level(info); };\n";
-            print SYSLOGNG "log { source(src); filter(f_kerninfo); destination(psadpipe); };\n";
+            print SYSLOGNG "destination psadpipe { pipe(",
+                "\"/var/run/psadfifo\"); };\n";
+            print SYSLOGNG "filter f_kerninfo { facility(kern) ",
+                "and level(info); };\n";
+            print SYSLOGNG "log { source(src); ",
+                "filter(f_kerninfo); destination(psadpipe); };\n";
             close SYSLOGNG;
             system "$cmds{'killall'} -HUP syslog-ng";
         }
@@ -2508,7 +2511,7 @@ sub check_config() {
 
 sub dump_conf() {
     for my $var (keys %config) {
-        printf("%30s%s\n", " .. $var", $config{$var});
+        printf("%-30s %s\n", " .. $var", $config{$var});
     }
     exit 0;
 }

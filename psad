@@ -1067,9 +1067,12 @@ sub match_sigs() {
 
     if ($proto eq 'tcp') {
         for my $sid (keys %{$sigs{'tcp'}}) {
-            print " .. match_sigs(): sid: $sid\n" if $debug;
+            print " .. match_sigs(): sid: $sid " .
+                "$sigs{'tcp'}{$sid}{'src'} -> " .
+                "$sigs{'tcp'}{$sid}{'dst'}\n" if $debug;
             next unless defined $sigs{'tcp'}{$sid}{'flags'};
-            if (&check_src_dst($chain, $src, $dst, $sigs{'tcp'}{$sid})
+            if (&check_src($chain, $src, $sigs{'tcp'}{$sid}{'src'})
+                    and &check_dst($chain, $dst, $sigs{'tcp'}{$sid}{'dst'})
                     and &check_port($sp, $dp, $sigs{'tcp'}{$sid})
                     and $flags eq $sigs{'tcp'}{$sid}{'flags'}) {
                 ### future
@@ -1090,7 +1093,8 @@ sub match_sigs() {
         }
     } elsif ($proto eq 'udp') {
         for my $sid (keys %{$sigs{'udp'}}) {
-            if (&check_src_dst($chain, $src, $dst, $sigs{'tcp'}{$sid})
+            if (&check_src($chain, $src, $sigs{'udp'}{$sid}{'src'})
+                    and &check_dst($chain, $dst, $sigs{'udp'}{$sid}{'dst'})
                     and &check_port($sp, $dp, $sigs{'udp'}{$sid})) {
 #               && &check_misc_fields($sid, $proto, $len, $ttl)) {
                 ### tripped a udp signature
@@ -1107,9 +1111,10 @@ sub match_sigs() {
         }
     } elsif ($proto eq 'icmp') {
         for my $sid (keys %{$sigs{'icmp'}}) {
-            if (&check_src_dst($chain, $src, $dst, $sigs{'tcp'}{$sid})
+            if (&check_src($chain, $src, $sigs{'icmp'}{$sid}{'src'})
+                    and &check_dst($chain, $dst, $sigs{'icmp'}{$sid}{'dst'})
                     and &check_icmp_sig($sid, $ttl, $type, $code,
-                    $id, $seq)) {
+                        $id, $seq)) {
                 print " .. match_sigs(): matched icmp sid: $sid\n"
                     if $debug;
                 unless ($scan_dl{$src} >= $sigs_attr{$sid}{'dlevel'}) {
@@ -1237,85 +1242,104 @@ sub dshield_email_log() {
     return;
 }
 
-sub check_src_dst() {
-    my ($chain, $src, $dst, $sig_href) = @_;
-
+sub check_src() {
+    my ($chain, $src, $sig_src) = @_;
+    return 1 if $sig_src eq 'any';
     if ($chain eq 'input') {
-        if ($sig_href->{'dst'} eq 'HOME_NET') {
-            if ($sig_href->{'src'} eq 'EXTERNAL_NET') {
-                return 1;
-            } elsif (&check_ip_in_network($src, $sig_href->{'src'})) {
-                return 1;
-            }
-        } elsif ($sig_href->{'dst'} eq 'EXTERNAL_NET') {
-            if ($sig_href->{'src'} eq 'HOME_NET') {
-                return 1;
-            } elsif (&check_ip_in_network($src, $sig_href->{'src'})) {
+        if ($sig_src eq 'EXTERNAL_NET') {
+            ### scans that originate from the HOME_NET are
+            ### included here if they are directed at the
+            ### firewall itself.
+            return 1;
+        } elsif ($sig_src eq 'HOME_NET') {
+            if (&check_ip_in_network($src, $config{'HOME_NET'})) {
                 return 1;
             }
-        } elsif (&check_ip_in_network($dst, $sig_href->{'dst'})) {
-            if ($sig_href->{'src'} eq 'EXTERNAL_NET') {
-                return 1;
-            } elsif (&check_ip_in_network($src, $sig_href->{'src'})) {
-                return 1;
-            }
+        } elsif (&check_ip_in_network($src, $sig_src)) {
+            return 1;
         }
     } elsif ($chain eq 'forward') {
-        if ($sig_href->{'dst'} eq 'HOME_NET') {
-            if (&check_ip_in_network($dst, $config{'HOME_NET'})) {
-                if ($sig_href->{'src'} eq 'EXTERNAL_NET') {
-                    return 1;
-                } elsif (&check_ip_in_network($src, $sig_href->{'src'})) {
-                    return 1;
-                }
-            }
-        } elsif ($sig_href->{'dst'} eq 'EXTERNAL_NET') {
-            if (not &check_ip_in_network($dst, $config{'HOME_NET'})) {
-                if ($sig_href->{'src'} eq 'HOME_NET') {
-                    if (&check_ip_in_network($src, $config{'HOME_NET'})) {
-                        return 1;
-                    }
-                } elsif (&check_ip_in_network($src, $sig_href->{'src'})) {
+        if (&check_ip_in_network($src, $config{'HOME_NET'})) {
+            if ($sig_src eq 'HOME_NET') {
+                return 1;
+            } elsif ($sig_src ne 'EXTERNAL_NET') {
+                if (&check_ip_in_network($src, $sig_src)) {
                     return 1;
                 }
             }
-        } elsif (&check_ip_in_network($dst, $sig_href->{'dst'})) {
-            if ($sig_href->{'src'} eq 'HOME_NET') {
-                if (&check_ip_in_network($src, $config{'HOME_NET'})) {
-                    return 1;
-                }
-            } elsif (&check_ip_in_network($src, $sig_href->{'src'})) {
+        } else {
+            if ($sig_src eq 'EXTERNAL_NET') {
+                return 1;
+            } elsif ($sig_src eq 'HOME_NET') {
+                return 0;
+            } elsif (&check_ip_in_network($src, $sig_src)) {
                 return 1;
             }
         }
     } elsif ($chain eq 'output') {
-        if ($sig_href->{'src'} eq 'HOME_NET') {
-            if ($sig_href->{'dst'} eq 'EXTERNAL_NET') {
-                return 1;
-            } elsif (&check_ip_in_network($dst, $sig_href->{'dst'})) {
-                return 1;
-            }
-        } elsif ($sig_href->{'src'} eq 'EXTERNAL_NET') {
-            if ($sig_href->{'dst'} eq 'HOME_NET') {
-                return 1;
-            } elsif (&check_ip_in_network($dst, $sig_href->{'dst'})) {
-                return 1;
-            }
-        } elsif (&check_ip_in_network($src, $sig_href->{'src'})) {
-            if ($sig_href->{'dst'} eq 'EXTERNAL_NET') {
-                return 1;
-            } elsif (&check_ip_in_network($dst, $sig_href->{'dst'})) {
+        if ($sig_src eq 'HOME_NET') {
+            ### if we are in the output chain then the packet
+            ### was generated by the firewall and hence by
+            ### definition part of the "home network".
+            return 1;
+        } elsif ($sig_src ne 'EXTERNAL_NET') {
+            if (&check_ip_in_network($src, $sig_src)) {
                 return 1;
             }
         }
     }
-    ### we should have returned before this point
+    return 0;
+}
+
+sub check_dst() {
+    my ($chain, $dst, $sig_dst) = @_;
+    return 1 if $sig_dst eq 'any';
+    if ($chain eq 'input') {
+        if ($sig_dst eq 'HOME_NET') {
+            ### scans that appear on the external interface are
+            ### included here since the firewall is considered
+            ### part of the HOME_NET
+            return 1;
+        } elsif ($sig_dst eq 'EXTERNAL_NET') {
+            if (not &check_ip_in_network($dst, $config{'HOME_NET'})) {
+                return 1;
+            }
+        } elsif (&check_ip_in_network($dst, $sig_dst)) {
+            return 1;
+        }
+    } elsif ($chain eq 'forward') {
+        if (&check_ip_in_network($dst, $config{'HOME_NET'})) {
+            if ($sig_dst eq 'HOME_NET') {
+                return 1;
+            } elsif ($sig_dst ne 'EXTERNAL_NET') {
+                if (&check_ip_in_network($dst, $sig_dst)) {
+                    return 1;
+                }
+            }
+        } else {
+            if ($sig_dst eq 'EXTERNAL_NET') {
+                return 1;
+            } elsif ($sig_dst eq 'HOME_NET') {
+                return 0;
+            } elsif (&check_ip_in_network($dst, $sig_dst)) {
+                return 1;
+            }
+        }
+    } elsif ($chain eq 'output') {
+        if ($sig_dst eq 'HOME_NET') {
+            if (&check_ip_in_network($dst, $config{'HOME_NET'})) {
+                return 1;
+            }
+        } elsif ($sig_dst eq 'EXTERNAL_NET') {
+            return 1;
+        }
+    }
     return 0;
 }
 
 sub check_ip_in_network() {
     my ($ip, $net) = @_;
-    unless ($net =~ /$ip_re/) {
+    unless (defined $net and $net =~ /$ip_re/) {
         print STDERR " ** check_ip_in_network(): bad network \"$net\".\n",
             if $debug;
         return 0;
@@ -1325,35 +1349,55 @@ sub check_ip_in_network() {
     if ($net =~ /\,/) {
         my @nets = split /\s*\,\s*/, $net;
         for my $n (@nets) {
-            ### check if we have a cidr subnet or if it is
-            ### just a single ip address
-            if ($n =~ m|($ip_re/\d+)|) {
-                if (ipv4_in_network($1, $ip)) {
+            ### check if we have a normal subnet, a cidr subnet or if
+            ### it is just a single ip address
+            if ($n =~ m|($ip_re/$ip_re)|) {
+                my $str = $1;
+                if (ipv4_in_network($str, $ip)) {
+                    print STDERR " .. check_ip_in_network(): matched ",
+                        "ip: $ip to net: $n\n" if $debug;
+                    return 1;
+                }
+            } elsif ($n =~ m|($ip_re/\d+)|) {
+                my $str = $1;
+                if (ipv4_in_network($str, $ip)) {
                     print STDERR " .. check_ip_in_network(): matched ",
                         "ip: $ip to net: $n\n" if $debug;
                     return 1;
                 }
             } elsif ($n =~ m|($ip_re)|) {
-                if ($ip eq $1) {
+                my $str = $1;
+                if ($ip eq $str) {
                     print STDERR " .. check_ip_in_network(): matched ",
                         "ip: $ip to ip: $n\n" if $debug;
                     return 1;
                 }
             }
         }
+    } elsif ($net =~ m|($ip_re/$ip_re)|) {
+        my $str = $1;
+        if (ipv4_in_network($str, $ip)) {
+            print STDERR " .. check_ip_in_network(): matched ip: $ip ",
+                "to net: $net\n" if $debug;
+            return 1;
+        }
     } elsif ($net =~ m|($ip_re/\d+)|) {
-        if (ipv4_in_network($1, $ip)) {
+        my $str = $1;
+        if (ipv4_in_network($str, $ip)) {
             print STDERR " .. check_ip_in_network(): matched ip: $ip ",
                 "to net: $net\n" if $debug;
             return 1;
         }
     } elsif ($net =~ /($ip_re)/) {
-        if ($ip eq $1) {
+        my $str = $1;
+        if ($ip eq $str) {
             print STDERR " .. check_ip_in_network(): matched ",
                 "ip: $ip to ip: $net\n" if $debug;
             return 1;
         }
     }
+    print STDERR " .. check_ip_in_network(): Could not match ",
+        "$ip within $net\n" if $debug;
     return 0;
 }
 
@@ -1757,7 +1801,7 @@ sub import_signatures() {
                         $flags .= 'URG ';
                     }
                 }
-                if ($flags =~ /A/ and $flags !~ /ACK/) {
+                if ($sig_flags =~ /A/ and $flags !~ /ACK/) {
                     $flags .= 'ACK ';
                 }
                 $flags .= 'PSH ' if $sig_flags =~ /P/;
@@ -1771,17 +1815,30 @@ sub import_signatures() {
             }
             $flags =~ s/\s*$// if $flags;
 
-            $sigs{$proto}{$sid}{'flags'} = $flags
+            $sigs{'tcp'}{$sid}{'flags'} = $flags
                 if $flags;
 
             ### assign the source and destination port ranges
             &build_sig_ports($sid, 'tcp', $sp, $dp);
 
+            unless (defined $sigs{'tcp'}{$sid}{'flags'}
+                    and defined $sigs{'tcp'}{$sid}{'src'}
+                    and defined $sigs{'tcp'}{$sid}{'dst'}) {
+                delete $sigs_attr{$sid} if defined $sigs_attr{$sid};
+                delete $sigs{'tcp'}{$sid} if defined $sigs{'tcp'}{$sid};
+                next SIG;
+            }
         } elsif ($proto eq 'udp') {
 
             ### assign the source and destination port ranges
             &build_sig_ports($sid, 'udp', $sp, $dp);
 
+            unless (defined $sigs{'udp'}{$sid}{'src'}
+                    and defined $sigs{'udp'}{$sid}{'dst'}) {
+                delete $sigs_attr{$sid} if defined $sigs_attr{$sid};
+                delete $sigs{'udp'}{$sid} if defined $sigs{'udp'}{$sid};
+                next SIG;
+            }
         } elsif ($proto eq 'icmp') {
             if ($rule_options =~ /ttl:\s*(\d+)/i) {
                 $sigs{'icmp'}{$sid}{'ttl'} = $1;
@@ -1801,6 +1858,8 @@ sub import_signatures() {
         } else {
             print " ** import_signatures(): bad protocol: $line\n"
                 if $debug;
+            delete $sigs_attr{$sid} if defined $sigs_attr{$sid};
+            delete $sigs{$proto}{$sid} if defined $sigs{$proto}{$sid};
             next SIG;
         }
     }
@@ -2278,7 +2337,7 @@ sub scan_logr() {
             print E "=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=",
                 "-=-=-=-=\n";
             print E " ** psad: Suspicious traffic detected against ",
-                "$config{'HOSTNAME'} ($dst).\n\n\n";
+                "$dst\n\n\n";
             printf E "%${log_len}s%s", 'Danger level: ',
                 "[$scan_dl{$src}] (out of 5)\n\n";
             if ($tcp_f) {
@@ -2431,7 +2490,7 @@ sub scan_logr_signatures() {
     open LS, ">> $log_sigs" or die " ** Could not open $log_sigs: $!";
     for my $proto qw(tcp udp icmp) {
         next unless (defined $scan{$src}{$dst}{$proto}{'curr_sig'}
-            || defined $scan{$src}{$dst}{$proto}{'snort_sid'});
+            or defined $scan{$src}{$dst}{$proto}{'snort_sid'});
         print $email_fh "\n\n ** $proto scan signatures: **\n\n";
         print LS "\n\n ** $proto scan signatures **\n\n";
         print "scan_logr_signatures(): src: $src dst: $dst proto: $proto\n"
@@ -2484,47 +2543,47 @@ sub scan_logr_signatures() {
                             if (defined $local_ports{$proto}{$dp}) {
                                 if ($flags) {
                                     print $email_fh "   \"$msg\"\n",
-                                        "      chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
+                                        "        chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
                                         "** Your machine is listening on $proto port: $dp!\n";
                                     print LS "   \"$msg\"\n",
-                                        "      chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
+                                        "        chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
                                         "** Your machine is listening on $proto port: $dp!\n";
                                 } else {
                                     print $email_fh "   \"$msg\"\n",
-                                        "      chain=$chain packets=$pkts dp=$dp ",
+                                        "        chain=$chain packets=$pkts dp=$dp ",
                                         "** Your machine is listening on $proto port: $dp!\n";
                                     print LS "   \"$msg\"\n",
-                                        "      chain=$chain packets=$pkts dp=$dp ",
+                                        "        chain=$chain packets=$pkts dp=$dp ",
                                         "** Your machine is listening on $proto port: $dp!\n";
                                 }
                             } else {
                                 if ($flags) {
                                     print $email_fh "   \"$msg\"\n",
-                                        "      chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
+                                        "        chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
                                         "No local server on $proto/$dp\n";
                                     print LS "   \"$msg\"\n",
-                                        "      chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
+                                        "        chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
                                         "No local server on $proto/$dp\n";
                                 } else {
                                     print $email_fh "   \"$msg\"\n",
-                                        "      chain=$chain packets=$pkts dp=$dp No local ",
+                                        "        chain=$chain packets=$pkts dp=$dp No local ",
                                         "server on $proto/$dp\n";
                                     print LS "   \"$msg\"\n",
-                                        "      chain=$chain packets=$pkts dp=$dp No local ",
+                                        "        chain=$chain packets=$pkts dp=$dp No local ",
                                         "server on $proto/$dp\n";
                                 }
                             }
                         } else {
                             if ($flags) {
                                 print $email_fh "   \"$msg\"\n",
-                                    "     chain=$chain packets=$pkts dp=$dp flags=[$flags]\n";
+                                    "       chain=$chain packets=$pkts dp=$dp flags=[$flags]\n";
                                 print LS "   \"$msg\"\n",
-                                    "     chain=$chain packets=$pkts dp=$dp flags=[$flags]\n";
+                                    "       chain=$chain packets=$pkts dp=$dp flags=[$flags]\n";
                             } else {
                                 print $email_fh "   \"$msg\"\n",
-                                    "     chain=$chain packets=$pkts dp=$dp\n";
+                                    "       chain=$chain packets=$pkts dp=$dp\n";
                                 print LS "   \"$msg\"\n",
-                                    "     chain=$chain packets=$pkts dp=$dp\n";
+                                    "       chain=$chain packets=$pkts dp=$dp\n";
                             }
                         }
                     }
@@ -3098,7 +3157,7 @@ sub get_whois_info() {
     my ($ip, $whois_datafile) = @_;
     my @whois_data;
     if (defined $whois_cache{$ip}
-            and $whois_cache{$ip} < $config{'WHOIS_THRESHOLD'}
+            and $whois_cache{$ip} < $config{'WHOIS_LOOKUP_THRESHOLD'}
             and -e $whois_datafile) {
         $whois_cache{$ip}++;
     } else {

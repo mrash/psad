@@ -85,7 +85,10 @@ src_install() {
 
 	insinto /etc/psad
 	doins *.conf
-	doins psad_*
+	doins signatures
+	doins auto_dl
+	doins posf
+	doins icmp_types
 
 	insinto /etc/init.d
 	newins psad-init.gentoo psad

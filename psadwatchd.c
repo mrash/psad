@@ -45,8 +45,9 @@ short int kmsgsd_syscalls_ctr   = 0;
 short int diskmond_syscalls_ctr = 0;
 
 /* PROTOTYPES ***************************************************************/
-static void parse_config(char *
-static void check_process(const char *pid_name, const char *pid_file, const char *binary_path);
+static void parse_config(const char *config_file);
+static void check_process(const char *pid_name, const char *pid_file,
+    const char *binary_path);
 static void incr_syscall_ctr(const char *pid_name);
 static void reset_syscall_ctr(const char *pid_name);
 static void give_up(const char *pid_name);

@@ -831,6 +831,7 @@ sub install_perl_module() {
             "    Download the latest sources from ",
             "http://www.cipherdyne.org\n";
     }
+    system "$Cmds{'make'} clean" if -e 'Makefile';
     system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
     system $Cmds{'make'};
 #    system "$Cmds{'make'} test";

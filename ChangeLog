@@ -10,6 +10,8 @@ psad-1.4.1 (02//2005):
     - Bugfix for distinguishing OPT field associated with --log-tcp-options
       vs. --log-ip-options.
     - Bugfix for syslog format that may not include the "kernel:" tag.
+    - Applied patch to only install perl modules that are not already
+      installed (Blair Zajac).
 
 psad-1.4.0 (11/26/2004):
     - Added p0f-style passive OS fingerprinting through the use of the OPT

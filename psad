@@ -403,7 +403,7 @@ unless ($no_daemon || $debug) {
     my $pid = fork();
     exit if $pid;
     die " ... @@@  $0: Couldn't fork: $!" unless defined($pid);
-    POSIX::setsid() or die " ... @@@  $0: Can't start a new session: $!";
+    POSIX::setsid() or die " ... @@@ $0: Can't start a new session: $!";
 }
 
 ### write the current pid associated with psad to the psad pid file
@@ -423,9 +423,9 @@ if ($config_file eq '/etc/psad/psad.conf') {
     system "$cmds{'diskmond'}";
     system "$cmds{'psadwatchd'}" unless ($debug);
 } else {  ### start the other daemons with the new (non-default) config file
-    system "$cmds{'kmsgsd'} -c $config_file";
+    system "$cmds{'kmsgsd'} $config_file";
     system "$cmds{'diskmond'} -c $config_file";
-    system "$cmds{'psadwatchd'} -c $config_file" unless ($debug);
+    system "$cmds{'psadwatchd'} $config_file" unless ($debug);
 }
 
 ### import the scan signatures and auto ips file
@@ -934,7 +934,7 @@ sub check_import_config() {
         &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         $$mtime_ref = $mtime_tmp;
 
-        ### restart kmsgsd since it does not have the capability of
+        ### kill kmsgsd since it does not have the capability of
         ### checking for a modified config file
         open K, "< $config{'KMSGSD_PID_FILE'}" or warn
             " @@@ Could not open $config{'KMSGSD_PID_FILE'}";

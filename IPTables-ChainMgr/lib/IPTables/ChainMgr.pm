@@ -5,7 +5,8 @@
 #
 # Purpose: Perl interface to add and delete rules to an iptables chain.  The
 #          most common application of this module is to create a custom chain
-#          and then add blocking rules to it.
+#          and then add blocking rules to it.  Rule additions are (mostly)
+#          guaranteed to be unique.
 #
 # Author: Michael Rash (mbr@cipherdyne.org)
 #
@@ -16,11 +17,12 @@
 # $Id$
 #
 
-
 package IPTables::ChainMgr;
 
 use 5.006;
 use Carp;
+use IPTables::Parse;
+use Net::IPv4Addr 'ipv4_network';
 use strict;
 use warnings;
 use vars qw($VERSION);
@@ -33,26 +35,20 @@ sub new() {
 
     my $self = {
         _iptables => $args{'iptables'} || '/sbin/iptables',
-        _table    => $args{'table'}    || '',
-        _chain    => $args{'chain'}    || '',
         _debug    => $args{'debug'}    || 0
     };
     croak "[*] $self->{'_iptables'} incorrect path.\n"
         unless -e $self->{'_iptables'};
     croak "[*] $self->{'_iptables'} not executable.\n"
         unless -x $self->{'_iptables'};
-    croak "[*] Must specify a table to which to add/delete rules.\n"
-        unless $self->{'_table'};
-    croak "[*] Must specify a chain to which to add/delete rules.\n"
-        unless $self->{'_chain'};
     bless $self, $class;
 }
 
 sub create_chain() {
     my $self = shift;
-    my $iptables = $self->{'iptables'};
-    my $table    = $self->{'_table'};
-    my $chain    = $self->{'_chain'};
+    my $table = shift || croak '[*] Must specify a table, e.g. "filter".';
+    my $chain = shift || croak '[*] Must specify a chain to create.';
+    my $iptables = $self->{'_iptables'};
 
     if (&run_ipt_cmd($iptables, "-t $table -nL $chain") == 0) {
         ### the chain already exists
@@ -70,15 +66,21 @@ sub create_chain() {
 
 sub delete_chain() {
     my $self = shift;
+    my $table = shift || croak '[*] Must specify a table, e.g. "filter".';
+    my $chain = shift || croak '[*] Must specify a chain to create.';
     my $iptables = $self->{'_iptables'};
-    my $table    = $self->{'_table'};
-    my $chain    = $self->{'_chain'};
 
-    if(&run_ipt_cmd($iptables, "-t $table -nL $chain") == 0) {
-        if (&run_ipt_cmd($iptables, "-t $table -X $chain") == 0) {
-            return 1, "[+] $chain chain deleted.";
+    ### see if the chain exists first
+    if (&run_ipt_cmd($iptables, "-t $table -nL $chain") == 0) {
+        ### flush the chain first
+        if (&run_ipt_cmd($iptables, "-t $table -F $chain") == 0) {
+            if (&run_ipt_cmd($iptables, "-t $table -X $chain") == 0) {
+                return 1, "[+] $chain chain deleted.";
+            } else {
+                return 0, "[-] Could not delete $chain chain.";
+            }
         } else {
-            return 0, "[-] Could not delete $chain chain.";
+            return 0, "[-] Could not flush $chain chain.";
         }
     } else {
         return 1, "[+] $chain chain does not exist";
@@ -88,34 +90,71 @@ sub delete_chain() {
 sub add_rule() {
     my $self = shift;
     my $src = shift || croak '[-] Must specify a src address/network.';
+    my $table = shift || croak '[-] Must specify a table, e.g. "filter".';
+    my $chain = shift || croak '[-] Must specify a chain.';
     my $target = shift ||
         croak '[-] Must specify a Netfilter target, e.g. "DROP"';
     my $iptables = $self->{'_iptables'};
-    my $table    = $self->{'_table'};
-    my $chain    = $self->{'_chain'};
+
+    ### regex to match an ip address
+    my $ip_re = '(?:\d{1,3}\.){3}\d{1,3}';
+
+    ### normalize src network if necessary; this is because Netfilter
+    ### always reports network address for subnets
+    my $normalized_src = '';
+    if ($src =~ m|($ip_re)/($ip_re)|) {
+        my ($net_addr, $cidr) = ipv4_network($1, $2);
+        $normalized_src = "$net_addr/$cidr";
+    } elsif ($src =~ m|($ip_re)/(\d+)|) {
+        my ($net_addr, $cidr) = ipv4_network($1, $2);
+        $normalized_src = "$net_addr/$cidr";
+    } else {
+        ### it is a hostname or an individual IP
+        $normalized_src = $src;
+    }
 
     ### first check to see if this rule already exists
-    my ($rv, $chain_lines_aref) =
-        &run_ipt_cmd_output($iptables, "-t $table -nL $chain");
-
-    if (&find_rule($chain_lines_aref)) {
+    if (&find_rule($normalized_src, $table, $chain, $target, $iptables)) {
         return 1, '[-] Rule already exists.';
     } else {
         ### we need to add the rule
         if (&run_ipt_cmd($iptables,
-            "-t $table -I $chain 1 -s $src -j $target") == 0) {
+            "-t $table -I $chain 1 -s $normalized_src -j $target") == 0) {
+            return 1, '[+] Added rule.';
+        } else {
+            return 0, "[+] Could not add $target rule for $normalized_src.";
         }
     }
+}
+
+sub find_rule() {
+    my ($src, $table, $chain, $target, $iptables) = @_;
+
+    my $ipt_parse = new IPTables::Parse 'iptables' => $iptables;
+
+    my $chain_href = $ipt_parse->chain_action_rules($table, $chain);
+
+    if (defined $chain_href->{$target}) {
+        if (defined $chain_href->{$target}->{'all'}) {
+            ### all protocols
+            if (defined $chain_href->{$target}->{'all'}->{$src}) {
+                ### src
+                if (defined $chain_href->{$target}->{'all'}
+                        ->{$src}->{'0.0.0.0/0'}) {
+                    ### any source
+                    return 1;
+                }
+            }
+        }
+    }
+    return 0;
 }
 
 sub run_ipt_cmd() {
     my ($iptables, $cmd) = @_;
     croak "[*] Must specify an iptables command to run unless $cmd"
         unless $cmd;
-    open IPT, "$iptables $cmd |"
-        or croak "[*] Could not execute $iptables $cmd: $!";
-    close IPT;
-    return $?;
+    return (system "$iptables $cmd > /dev/null 2>&1") >> 8;
 }
 
 sub run_ipt_cmd_output() {
@@ -123,11 +162,15 @@ sub run_ipt_cmd_output() {
     croak "[*] Must specify an iptables command to run unless $cmd"
         unless $cmd;
     my @output = ();
-    open IPT, "$iptables $cmd |"
-        or croak "[*] Could not execute $iptables $cmd: $!";
-    @output = <IPT>;
-    close IPT;
-    return $?, \@output;
+    my $rv = 0;
+    eval {
+        open IPT, "$iptables $cmd |"
+            or croak "[*] Could not execute $iptables $cmd: $!";
+        @output = <IPT>;
+        close IPT or croak "[*] Could not close command $iptables $cmd: $!";
+        $rv = $?;
+    };
+    return $rv, \@output;
 }
 
 1;

@@ -217,22 +217,26 @@ sub install() {
     ### deal with old psad_auto_ips path
     if (-e "${PSAD_CONFDIR}/psad_auto_ips") {
         move "${PSAD_CONFDIR}/psad_auto_ips",
-            "${PSAD_CONFDIR}/auto_dl";
+            "${PSAD_CONFDIR}/auto_dl" or die "[*] Could not move ",
+            "${PSAD_CONFDIR}/psad_auto_ips -> ${PSAD_CONFDIR}/auto_dl: $!";
     }
     ### deal with old psad_signatures path
     if (-e "${PSAD_CONFDIR}/psad_signatures") {
         move "${PSAD_CONFDIR}/psad_signatures",
-            "${PSAD_CONFDIR}/signatures";
+            "${PSAD_CONFDIR}/signatures" or die "[*] Could not move ",
+            "${PSAD_CONFDIR}/psad_signatures -> ${PSAD_CONFDIR}/signatures: $!";
     }
     ### deal with old psad_posf path
     if (-e "${PSAD_CONFDIR}/psad_posf") {
         move "${PSAD_CONFDIR}/psad_posf",
-            "${PSAD_CONFDIR}/posf";
+            "${PSAD_CONFDIR}/posf" or die "[*] Could not move ",
+            "${PSAD_CONFDIR}/psad_posf -> ${PSAD_CONFDIR}/posf: $!";
     }
     ### deal with old psad_icmp_types path
     if (-e "${PSAD_CONFDIR}/psad_icmp_types") {
         move "${PSAD_CONFDIR}/psad_icmp_types",
-            "${PSAD_CONFDIR}/icmp_types";
+            "${PSAD_CONFDIR}/icmp_types" or die "[*] Could not move ",
+            "${PSAD_CONFDIR}/psad_icmp_types -> ${PSAD_CONFDIR}/icmp_types: $!";
     }
 
     ### change any existing psad module directory to allow anyone to execute
@@ -603,7 +607,9 @@ sub install() {
             }
             close T;
             move "${PSAD_CONFDIR}/fw_search.conf.tmp",
-                "${PSAD_CONFDIR}/fw_search.conf";
+                "${PSAD_CONFDIR}/fw_search.conf" or die "[*] Could not move ",
+                "${PSAD_CONFDIR}/fw_search.conf.tmp -> ",
+                "${PSAD_CONFDIR}/fw_search.conf: $!";
         }
         ### Give the admin the opportunity to set the HOME_NET variable.
         &set_home_net("${PSAD_CONFDIR}/psad.conf");
@@ -781,7 +787,8 @@ sub uninstall() {
     }
     print "[+] Restoring /etc/syslog.conf.orig -> /etc/syslog.conf\n";
     if (-e '/etc/syslog.conf.orig') {
-        move('/etc/syslog.conf.orig', '/etc/syslog.conf');
+        move '/etc/syslog.conf.orig', '/etc/syslog.conf' or die "[*] Could not ",
+            "move /etc/syslog.conf.orig -> /etc/syslog.conf: $!";
     } else {
         print "[+] /etc/syslog.conf.orig does not exist. ",
             " Editing /etc/syslog.conf directly.\n";
@@ -1096,7 +1103,9 @@ sub preserve_old_fw_msg_search() {
         }
     }
     close CONF;
-    move "${PSAD_CONFDIR}/fw_search.conf.new", "${PSAD_CONFDIR}/fw_search.conf";
+    move "${PSAD_CONFDIR}/fw_search.conf.new", "${PSAD_CONFDIR}/fw_search.conf"
+        or die "[*] Could not move ${PSAD_CONFDIR}/fw_search.conf.new -> ",
+        "${PSAD_CONFDIR}/fw_search.conf: $!";
     return;
 }
 
@@ -1153,7 +1162,9 @@ sub preserve_config() {
         }
     }
     close CONF;
-    move "${PSAD_CONFDIR}/${file}.new", "${PSAD_CONFDIR}/$file";
+    move "${PSAD_CONFDIR}/${file}.new", "${PSAD_CONFDIR}/$file" or die "[*] ",
+        "Could not move ${PSAD_CONFDIR}/${file}.new -> ",
+        "${PSAD_CONFDIR}/$file: $!";
     return;
 }
 
@@ -1358,13 +1369,19 @@ sub scrub_prefix_ctr() {
 sub check_old_psad_installation() {
     my $old_install_dir = '/usr/local/bin';
     if (-e "${old_install_dir}/psad") {
-        move "${old_install_dir}/psad", "${USRSBIN_DIR}/psad";
+        move "${old_install_dir}/psad", "${USRSBIN_DIR}/psad" or die "[*] ",
+            "Could not move ${old_install_dir}/psad -> ",
+            "${USRSBIN_DIR}/psad: $!";
     }
     if (-e "${old_install_dir}/psadwatchd") {
-        move "${old_install_dir}/psadwatchd", "${USRSBIN_DIR}/psadwatchd";
+        move "${old_install_dir}/psadwatchd", "${USRSBIN_DIR}/psadwatchd"
+            or die "[*] Could not move ${old_install_dir}/psadwatchd -> ",
+            "${USRSBIN_DIR}/psadwatchd: $!";
     }
     if (-e "${old_install_dir}/kmsgsd") {
-        move "${old_install_dir}/kmsgsd", "${USRSBIN_DIR}/kmsgsd";
+        move "${old_install_dir}/kmsgsd", "${USRSBIN_DIR}/kmsgsd" or die
+            "[*] Could not move ${old_install_dir}/kmsgsd -> ",
+            "${USRSBIN_DIR}/kmsgsd: $!";
     }
     if (-e "${PSAD_CONFDIR}/psad_signatures.old") {
         unlink "${PSAD_CONFDIR}/psad_signatures.old";
@@ -1586,7 +1603,10 @@ sub archive() {
     for (my $i = 5; $i > 1; $i--) {  ### keep five copies of old config files
         my $j = $i - 1;
         unlink "${base}${i}.gz" if -e "${base}${i}.gz";
-        move "${base}${j}.gz", "${base}${i}.gz" if -e "${base}${j}.gz";
+        if (-e "${base}${j}.gz") {
+            move "${base}${j}.gz", "${base}${i}.gz" or die "[*] Could not ",
+                "move ${base}${j}.gz -> ${base}${i}.gz: $!";
+        }
     }
     &logr("[+] Archiving $file -> ${base}1\n");
     unlink "${base}1.gz" if -e "${base}1.gz";

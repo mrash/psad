@@ -50,7 +50,8 @@ void check_unique_pid(const char *pid_file, const char *prog_name)
     char pid_line[MAX_PID_SIZE+1];
 
 #ifdef DEBUG
-    printf(" .. check_unique_pid(): opening pid file %s\n", pid_file);
+    fprintf(stderr,
+        " .. check_unique_pid(): opening pid file %s\n", pid_file);
 #endif
 
     if ((pidfile_ptr = fopen(pid_file, "r")) == NULL) {
@@ -72,11 +73,13 @@ void check_unique_pid(const char *pid_file, const char *prog_name)
     fclose(pidfile_ptr);
 
 #ifdef DEBUG
-    printf(" .. check_unique_pid(): checking pid: %d with kill 0\n", pid);
+    fprintf(stderr,
+        " .. check_unique_pid(): checking pid: %d with kill 0\n", pid);
 #endif
 
-    if (kill(pid, 0) == 0) {  /* another kmsgsd is already running */
-        printf(" ** %s is already running as pid: %d\n", prog_name, pid);
+    if (kill(pid, 0) == 0) {  /* another prog_name is already running */
+        fprintf(stderr, " ** %s is already running as pid: %d\n",
+            prog_name, pid);
         exit(EXIT_FAILURE);
     } else {
         return;
@@ -120,7 +123,7 @@ void find_char_var(char *search_str, char *charvar, char *line)
     if (strstr(index_tmp, search_str) != NULL) {
 
 #ifdef DEBUG
-        printf(" .. find_char_var(): found %s in line: %s",
+        fprintf(stderr, " .. find_char_var(): found %s in line: %s",
                 search_str, line);
 #endif
 
@@ -141,13 +144,15 @@ void find_char_var(char *search_str, char *charvar, char *line)
             char_ctr++;
 
         if (index_tmp[char_ctr] != ';') {
-            printf(" ** find_char_var(): No ending semicolon found for: %s.\n",
+            fprintf(stderr,
+                " ** find_char_var(): No ending semicolon found for: %s.\n",
                 search_str);
             exit(EXIT_FAILURE);
         }
 
         if (char_ctr > MAX_GEN_LEN-1) {
-            printf(" ** find_char_var(): the config line for %s is too long.  Exiting.\n",
+            fprintf(stderr,
+                    " ** find_char_var(): the config line for %s is too long.  Exiting.\n",
                     search_str);
             exit(EXIT_FAILURE);
         }
@@ -173,7 +178,7 @@ void daemonize_process(const char *pid_file)
 
     if (child_pid > 0) {
 #ifdef DEBUG
-        printf(" .. writing pid: %d to pid file: %s\n",
+        fprintf(stderr, " .. writing pid: %d to pid file: %s\n",
                 child_pid, pid_file);
 #endif
         write_pid(pid_file, child_pid);

@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
     unsigned int psadwatchd_max_retries = 10; /* default to 10 tries */
 
 #ifdef DEBUG
-    printf(" .. Entering DEBUG mode ..\n");
+    fprintf(stderr, " .. Entering DEBUG mode ..\n");
     sleep(1);
 #endif
 
@@ -110,7 +110,7 @@ int main(int argc, char *argv[]) {
     }
 
 #ifdef DEBUG
-    printf(" .. parsing config_file: %s\n", config_file);
+    fprintf(stderr, " .. parsing config_file: %s\n", config_file);
 #endif
 
     /* parse the config file */
@@ -159,7 +159,7 @@ int main(int argc, char *argv[]) {
         if (received_sighup) {
             received_sighup = 0;
 #ifdef DEBUG
-    printf(" .. re-parsing config file: %s\n", config_file);
+    fprintf(stderr, " .. re-parsing config file: %s\n", config_file);
 #endif
             /* reparse the config file since we received a
              * HUP signal */
@@ -203,7 +203,7 @@ static void check_process(
 
     if ((pidfile_ptr = fopen(pid_file, "r")) == NULL) {
 #ifdef DEBUG
-    printf(" .. Could not open pid_file: %s\n", pid_file);
+    fprintf(stderr, " .. Could not open pid_file: %s\n", pid_file);
 #endif
         /* the pid file must not exist (or we can't read it), so
          * setup to start the appropriate process */
@@ -215,7 +215,7 @@ static void check_process(
      * process id of any running pid_name process. */
     if (fgets(pid_line, MAX_PID_SIZE, pidfile_ptr) == NULL) {
 #ifdef DEBUG
-    printf(" .. Could not read the pid_file: %s\n", pid_file);
+    fprintf(stderr, " .. Could not read the pid_file: %s\n", pid_file);
 #endif
         /* see if we need to give up */
         incr_syscall_ctr(pid_name, max_retries);
@@ -237,7 +237,7 @@ static void check_process(
 
     if (restart) {
 #ifdef DEBUG
-        printf(" .. executing exec_binary(%s)\n", binary_path);
+        fprintf(stderr, " .. executing exec_binary(%s)\n", binary_path);
 #endif
         //strlcat(mail_str, mailCmd, MAX_MSG_LEN);
         strlcat(mail_str, " -s \" ** psadwatchd: Restarting ", MAX_MSG_LEN);
@@ -249,7 +249,7 @@ static void check_process(
         strlcat(mail_str, mail_redr, MAX_MSG_LEN);
 
 #ifdef DEBUG
-    // printf("sending mail:  %s\n", mail_str);
+        fprintf(stderr, "sending mail:  %s\n", mail_str);
 #endif
         /* send the email */
         send_alert_email(shCmd, mailCmd, mail_str);
@@ -261,7 +261,7 @@ static void check_process(
         incr_syscall_ctr(pid_name, max_retries);
     } else {
 #ifdef DEBUG
-        printf(" .. %s is running.\n", pid_name);
+        fprintf(stderr, " .. %s is running.\n", pid_name);
 #endif
         /* reset the syscall counter since the process is successfully
          * running. */
@@ -275,7 +275,8 @@ static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries)
     if (strcmp("psad", pid_name) == 0) {
         psad_syscalls_ctr++;
 #ifdef DEBUG
-        printf(" .. %s not running.  Trying to restart (%d tries so far).\n",
+        fprintf(stderr,
+            " .. %s not running.  Trying to restart (%d tries so far).\n",
             pid_name, psad_syscalls_ctr);
 #endif
         if (psad_syscalls_ctr >= max_retries)
@@ -283,7 +284,8 @@ static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries)
     } else if (strcmp("kmsgsd", pid_name) == 0) {
         kmsgsd_syscalls_ctr++;
 #ifdef DEBUG
-        printf(" .. %s not running.  Trying to restart (%d tries so far).\n",
+        fprintf(stderr,
+            " .. %s not running.  Trying to restart (%d tries so far).\n",
             pid_name, kmsgsd_syscalls_ctr);
 #endif
         if (kmsgsd_syscalls_ctr >= max_retries)
@@ -306,7 +308,7 @@ static void give_up(const char *pid_name)
 {
     char mail_str[MAX_MSG_LEN] = "";
 #ifdef DEBUG
-    printf(" ** Could not restart %s process.  Exiting.\n", pid_name);
+    fprintf(stderr, " ** Could not restart %s process.  Exiting.\n", pid_name);
 #endif
     strlcat(mail_str, " -s \"** psadwatchd: Could not restart ", MAX_MSG_LEN);
     strlcat(mail_str, pid_name, MAX_MSG_LEN);
@@ -392,7 +394,7 @@ static void exec_binary(const char *binary, const char *cmdlinefile)
         }
     } else {
 #ifdef DEBUG
-        printf(" .. restarting %s\n", binary);
+        fprintf(stderr, " .. restarting %s\n", binary);
 #endif
         execve(binary, prog_argv, NULL);  /* don't use environment */
     }

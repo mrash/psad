@@ -71,9 +71,9 @@ int main(int argc, char *argv[]) {
 #endif
 
 #ifdef DEBUG
-    printf(" .. Entering DEBUG mode ..\n");
-    printf(" .. Firewall messages will be written to both ");
-    printf("STDOUT _and_ to fwdata.\n\n");
+    fprintf(stderr, " .. Entering DEBUG mode ..\n");
+    fprintf(stderr, " .. Firewall messages will be written to both ");
+    fprintf(stderr, "STDOUT _and_ to fwdata.\n\n");
 #endif
 
     /* handle command line arguments */
@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
     }
 
 #ifdef DEBUG
-    printf(" .. parsing config_file: %s\n", config_file);
+    fprintf(stderr, " .. parsing config_file: %s\n", config_file);
 #endif
     /* parse the config file */
     parse_config(config_file, psadfifo_file,
@@ -140,7 +140,8 @@ int main(int argc, char *argv[]) {
     while ((numbytes = read(fifo_fd, buf, MAX_LINE_BUF-1)) >= 0) {
 
 #ifdef DEBUG
-        printf("read %d bytes from %s fifo.\n", numbytes, psadfifo_file);
+        fprintf(stderr,
+            "read %d bytes from %s fifo.\n", numbytes, psadfifo_file);
 #endif
 
         /* make sure the buf contents qualifies as a string */
@@ -187,10 +188,11 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_FAILURE);  /* could not write to the fwdata file */
 #ifdef DEBUG
             puts(buf);
-            printf(" ** Line matched search strings.\n");
+            fprintf(stderr, " ** Line matched search strings.\n");
             fwlinectr++;
             if (fwlinectr % 50 == 0)
-                printf(" .. Processed %d firewall lines.\n", fwlinectr);
+                fprintf(stderr,
+                    " .. Processed %d firewall lines.\n", fwlinectr);
         } else {
             puts(buf);
             printf(" ** Line did not match search strings.\n");
@@ -244,11 +246,11 @@ static void parse_config(char *config_file, char *psadfifo_file,
     }
     fclose(config_ptr);
 #ifdef DEBUG
-    printf(" .. PSAD_FIFO: %s\n", psadfifo_file);
-    printf(" .. FW_DATA_FILE: %s\n", fwdata_file);
-    printf(" .. FW_MSG_SEARCH: %s\n", fw_msg_search);
-    printf(" .. SNORT_SID_STR: %s\n", snort_sid_str);
-    printf(" .. KMSGSD_PID_FILE: %s\n", kmsgsd_pid_file);
+    fprintf(stderr, " .. PSAD_FIFO: %s\n", psadfifo_file);
+    fprintf(stderr, " .. FW_DATA_FILE: %s\n", fwdata_file);
+    fprintf(stderr, " .. FW_MSG_SEARCH: %s\n", fw_msg_search);
+    fprintf(stderr, " .. SNORT_SID_STR: %s\n", snort_sid_str);
+    fprintf(stderr, " .. KMSGSD_PID_FILE: %s\n", kmsgsd_pid_file);
 #endif
     return;
 }

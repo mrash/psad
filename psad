@@ -397,9 +397,6 @@ my %cmds   = %$cmds_href;
 ### store the psad command line.
 my $cmdline_file = $config{'PSAD_CMDLINE_FILE'};
 
-### define the path to the auto_blocked_ips file
-my $auto_blocked_file = "$config{'PSAD_DIR'}/auto_blocked_ips";
-
 ### pid file array
 my @pidfiles = (
     $config{'PSADWATCHD_PID_FILE'},
@@ -612,7 +609,6 @@ for (;;) {
             $config{'PSAD_SIGS_FILE'},
         );
         if ($found_potential_scan) {
-
             print localtime() . " .. assign_danger_level()\n"
                 if $benchmark;
             ### Assign a danger level to the scan
@@ -629,13 +625,18 @@ for (;;) {
                 &auto_psad_response();
             }
         }
-
         ### write the number of tcp/udp/icmp packets out
         ### to the global packet counters file
         &write_global_packet_counters();
     }
-    ### Print how many new packets we got in $FW_DATA if we are
-    ### running in $debug mode
+    ### timeout any auto-blocked ips that are past due
+    if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
+            && $config{'AUTO_BLOCK_TIMEOUT'} > 0) {
+        &timeout_auto_blocked_ips();
+    }
+
+    ### Print the number of new packets we saw in FW_DATA if we are
+    ### running in debug mode
     if ($debug) {
         print "MAIN: number of new packets: $#new_packets\n";
     }
@@ -721,7 +722,7 @@ sub check_scan() {
 
                     if (!$sid && $config{'IGNORE_CONNTRACK_BUG_PKTS'} eq 'Y' &&
 #                        $dstport > 1024 && ($flags =~ /ACK/ ||
-                        ($flags =~ /ACK/ || $flags =~ /RST/)) {
+                            ($flags =~ /ACK/ || $flags =~ /RST/)) {
                         ### XXX ignore TCP packets that have the ACK or RST
                         ### bits set (unless we matched a snort sid) since
                         ### _usually_ we see these packets as a result of the
@@ -793,7 +794,7 @@ sub check_scan() {
         if ($config{'ENABLE_PERSISTENCE'} eq 'N') {
             if (defined $scan{$src}{$dst}{'S_TIME'}) {
                 if ((time() - $scan{$src}{$dst}{'S_TIME'})
-                    >= $config{'SCAN_TIMEOUT'}) {
+                        >= $config{'SCAN_TIMEOUT'}) {
                     delete $scan{$src}{$dst};
                 }
             }
@@ -830,7 +831,7 @@ sub check_scan() {
 
         ### initialize the start and end port for the scanned port range
         unless ($proto eq 'ICMP' ||
-            defined $scan{$src}{$dst}{$proto}{'ABS_SP'}) {
+                defined $scan{$src}{$dst}{$proto}{'ABS_SP'}) {
             ### This is the absolute starting port since the
             ### first packet was detected.  Make sure the initial
             ### start port is not too low
@@ -841,7 +842,7 @@ sub check_scan() {
 
         ### initialize values for the current interval
         unless ($proto eq 'ICMP' ||
-            defined $scan{$src}{$dst}{$proto}{'CURR_INT'}{'SP'}) {
+                defined $scan{$src}{$dst}{$proto}{'CURR_INT'}{'SP'}) {
             ### make sure the initial start port is not too low
             $scan{$src}{$dst}{$proto}{'CURR_INT'}{'SP'} = 65535;
             ### make sure the initial end port is not too high
@@ -894,11 +895,11 @@ sub match_fastsigs() {
     if ($proto eq 'TCP') {
         if (defined $sigs_fast{'TCP'}{$dstport}{$srcport}{$flags}) {
             for my $sig_id (keys
-                %{$sigs_fast{'TCP'}{$dstport}{$srcport}{$flags}}) {
+                    %{$sigs_fast{'TCP'}{$dstport}{$srcport}{$flags}}) {
                 print "matched: $dstport,$srcport,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan{$src}{$dst}{'DL'}
-                    >= $sigs_attr{$sig_id}{'dlevel'}) {
+                        >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan{$src}{$dst}{'DL'}
                         = $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
@@ -910,11 +911,11 @@ sub match_fastsigs() {
         }
         if (defined $sigs_fast{'TCP'}{$dstport}{'any_src_port'}{$flags}) {
             for my $sig_id (keys
-                %{$sigs_fast{'TCP'}{$dstport}{'any_src_port'}{$flags}}) {
+                    %{$sigs_fast{'TCP'}{$dstport}{'any_src_port'}{$flags}}) {
                 print "matched $dstport,any_src_port,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan{$src}{$dst}{'DL'}
-                    >= $sigs_attr{$sig_id}{'dlevel'}) {
+                        >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan{$src}{$dst}{'DL'}
                         = $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
@@ -925,11 +926,11 @@ sub match_fastsigs() {
         }
         if (defined $sigs_fast{'TCP'}{'any_dst_port'}{$srcport}{$flags}) {
             for my $sig_id (keys
-                %{$sigs_fast{'TCP'}{'any_dst_port'}{$srcport}{$flags}}) {
+                    %{$sigs_fast{'TCP'}{'any_dst_port'}{$srcport}{$flags}}) {
                 print "matched any_dst_port,$srcport,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan{$src}{$dst}{'DL'}
-                    >= $sigs_attr{$sig_id}{'dlevel'}) {
+                        >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan{$src}{$dst}{'DL'}
                         = $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
@@ -940,11 +941,11 @@ sub match_fastsigs() {
         }
         if (defined $sigs_fast{'TCP'}{'any_dst_port'}{'any_src_port'}{$flags}) {
             for my $sig_id (keys
-                %{$sigs_fast{'TCP'}{'any_dst_port'}{'any_src_port'}{$flags}}) {
+                    %{$sigs_fast{'TCP'}{'any_dst_port'}{'any_src_port'}{$flags}}) {
                 print "matched any_dst_port,any_src_port,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan{$src}{$dst}{'DL'}
-                    >= $sigs_attr{$sig_id}{'dlevel'}) {
+                        >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan{$src}{$dst}{'DL'}
                         = $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
@@ -957,7 +958,7 @@ sub match_fastsigs() {
         if (defined $sigs_fast{'UDP'}{$dstport}{$srcport}) {
             for my $sig_id (keys %{$sigs_fast{'UDP'}{$dstport}{$srcport}}) {
                 unless ($scan{$src}{$dst}{'DL'}
-                    >= $sigs_attr{$sig_id}{'dlevel'}) {
+                        >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan{$src}{$dst}{'DL'} =
                         $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
@@ -981,14 +982,14 @@ sub match_sigs() {
         my $matched_sig      = 0;
         if ($proto eq 'TCP') {
             if ($flags eq $sigs{'TCP'}{$sig_id}{'flags'}
-                && &check_port_range($sig_id, $srcport,
+                    && &check_port_range($sig_id, $srcport,
                 $dstport, $proto)) {  ### tripped a tcp signature
                 ### future
 #               && &check_misc_fields($sig_id, $proto, $len, $ttl)) {
                 print "main sigs matched $dstport,$srcport,$flags, ",
                     "sig_id: $sig_id\n" if $debug;
                 unless ($scan{$src}{$dst}{'DL'}
-                    >= $sigs_attr{$sig_id}{'dlevel'}) {
+                        >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan{$src}{$dst}{'DL'} =
                         $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
@@ -1000,7 +1001,7 @@ sub match_sigs() {
 #               && &check_misc_fields($sig_id, $proto, $len, $ttl)) {
                 ### tripped a udp signature
                 unless ($scan{$src}{$dst}{'DL'}
-                    >= $sigs_attr{$sig_id}{'dlevel'}) {
+                        >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan{$src}{$dst}{'DL'}
                         = $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
@@ -1010,7 +1011,7 @@ sub match_sigs() {
         } elsif ($proto eq 'ICMP') {
             if (&check_icmp_sigs($sig_id, $ttl, $type, $code, $id, $seq)) {
                 unless ($scan{$src}{$dst}{'DL'}
-                    >= $sigs_attr{$sig_id}{'dlevel'}) {
+                        >= $sigs_attr{$sig_id}{'dlevel'}) {
                     $scan{$src}{$dst}{'DL'} =
                         $sigs_attr{$sig_id}{'dlevel'};
                     $scan{$src}{$dst}{'ALERTED'} = 0;
@@ -1647,8 +1648,8 @@ sub scan_logr() {
             unless (defined $scan{$src}{$dst}{'EMAIL_COUNT'}) {
                 $scan{$src}{$dst}{'EMAIL_COUNT'} = 0;
             } elsif ($config{'PSAD_EMAIL_LIMIT'} > 0
-                && $scan{$src}{$dst}{'EMAIL_COUNT'}
-                > $config{'PSAD_EMAIL_LIMIT'}) {
+                    && $scan{$src}{$dst}{'EMAIL_COUNT'}
+                    > $config{'PSAD_EMAIL_LIMIT'}) {
                 ### ignore PSAD_EMAIL_LIMIT if it is zero
                 unless (defined $scan{$src}{$dst}{'EMAIL_STOPPED'}) {
                     &email_limit_reached($src, $dst);
@@ -1809,7 +1810,7 @@ sub scan_logr() {
                     "[$tcp_newrange: $tcp_newpkts packets]\n"), \%print_hsh);
                 my $prefix = 'TCP flags: ';
                 for my $flags (keys
-                    %{$scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'FLAGS'}}) {
+                        %{$scan{$src}{$dst}{'TCP'}{'CURR_INT'}{'FLAGS'}}) {
                     my $nmap_opts;
                     $syslog_flags .= "$flags ";
                     my $n_pkts = $scan{$src}{$dst}{'TCP'}
@@ -1953,8 +1954,8 @@ sub scan_logr_signatures() {
             my $msg = $sigs_attr{$sig_id}{'msg'};
             if ($proto eq 'TCP') {
                 for my $dp (keys
-                    %{$scan{$src}{$dst}{'TCP'}{'CURR_SIG'}
-                    {$sig_id}{'LISTEN'}}) {
+                        %{$scan{$src}{$dst}{'TCP'}{'CURR_SIG'}
+                        {$sig_id}{'LISTEN'}}) {
                     my $flags =
                         $scan{$src}{$dst}{'TCP'}
                         {'CURR_SIG'}{$sig_id}{'LISTEN'}{$dp}{'FLAGS'};
@@ -1967,8 +1968,8 @@ sub scan_logr_signatures() {
                         $print_hr);
                 }
                 for my $dp (keys
-                    %{$scan{$src}{$dst}{'TCP'}
-                    {'CURR_SIG'}{$sig_id}{'NO_LISTEN'}}) {
+                        %{$scan{$src}{$dst}{'TCP'}
+                        {'CURR_SIG'}{$sig_id}{'NO_LISTEN'}}) {
                     my $flags =
                         $scan{$src}{$dst}{'TCP'}{'CURR_SIG'}
                         {$sig_id}{'NO_LISTEN'}{$dp}{'FLAGS'};
@@ -1981,8 +1982,8 @@ sub scan_logr_signatures() {
                 }
             } elsif ($proto eq 'UDP') {
                 for my $dp (keys
-                    %{$scan{$src}{$dst}{'UDP'}{'CURR_SIG'}
-                    {$sig_id}{'LISTEN'}}) {
+                        %{$scan{$src}{$dst}{'UDP'}{'CURR_SIG'}
+                        {$sig_id}{'LISTEN'}}) {
                     my $pkts =
                         $scan{$src}{$dst}{'UDP'}{'CURR_SIG'}
                         {$sig_id}{'LISTEN'}{$dp}{'PKTS'};
@@ -1991,8 +1992,8 @@ sub scan_logr_signatures() {
                         $print_hr);
                 }
                 for my $dp (keys
-                    %{$scan{$src}{$dst}{'UDP'}{'CURR_SIG'}
-                    {$sig_id}{'NO_LISTEN'}}) {
+                        %{$scan{$src}{$dst}{'UDP'}{'CURR_SIG'}
+                        {$sig_id}{'NO_LISTEN'}}) {
                     my $pkts =
                         $scan{$src}{$dst}{'UDP'}{'CURR_SIG'}
                         {$sig_id}{'NO_LISTEN'}{$dp}{'PKTS'};
@@ -2024,99 +2025,103 @@ sub scan_logr_signatures() {
 
 sub renew_auto_blocked_ips() {
     my $timeout_str = '.';
-    if ($config{'AUTO_BLOCKED_TIMEOUT'} > 0) {
-        $timeout_str = " for $config{'AUTO_BLOCKED_TIMEOUT'} seconds.";
+    if ($config{'AUTO_BLOCK_TIMEOUT'} > 0) {
+        $timeout_str = " for $config{'AUTO_BLOCK_TIMEOUT'} seconds.";
     }
     if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y'
-        && -e $config{'AUTO_BLOCKED_IPTABLES'}) {
+            && -e $config{'AUTO_BLOCK_IPT_FILE'}) {
 
         ### get the active iptables chains
         &get_iptables_chains() unless $chk_ipt_chains;
 
-        open B, "< $config{'AUTO_BLOCKED_IPTABLES'}" or
-            die " ** Could not open $config{'AUTO_BLOCKED_IPTABLES'}: $!";
+        open B, "< $config{'AUTO_BLOCK_IPT_FILE'}" or
+            die " ** Could not open $config{'AUTO_BLOCK_IPT_FILE'}: $!";
         my @lines = <B>;
         close B;
         for my $line (@lines) {
             if ($line =~ /($ip_re)/) {
                 my $ip = $1;
                 ### add block rule for $ip unless it is already blocked
-                unless (&ipt_test_blocked($ip)) {
+                unless (&ipt_test_block($ip)) {
                     &ipt_block($ip);
                     &Psad::sendmail(" ** psad: RENEWED iptables BLOCK against $ip" .
                         $timeout_str, '', $config{'EMAIL_ADDRESSES'},
                         $cmds{'mail'});
                 }
-                $auto_blocked_ips{$ip} = '';
+                $auto_blocked_ips{$ip} = time();
             }
         }
     } elsif ($config{'IPCHAINS_BLOCK_METHOD'} eq 'Y'
-        && -e $config{'AUTO_BLOCKED_IPCHAINS'}) {
-        open B, "< $config{'AUTO_BLOCKED_IPCHAINS'}" or
-            die " ** Could not open $config{'AUTO_BLOCKED_IPCHAINS'}: $!";
+            && -e $config{'AUTO_BLOCK_IPCH_FILE'}) {
+        open B, "< $config{'AUTO_BLOCK_IPCH_FILE'}" or
+            die " ** Could not open $config{'AUTO_BLOCK_IPCH_FILE'}: $!";
         my @lines = <B>;
         close B;
         for my $line (@lines) {
             if ($line =~ /($ip_re)/) {
                 my $ip = $1;
                 ### add block rule for $ip unless it is already blocked
-                unless (&ipch_test_blocked($ip)) {
-                    &ipchains_block($ip);
+                unless (&ipch_test_block($ip)) {
+                    &ipch_block($ip);
                     &Psad::sendmail(" ** psad: RENEWED ipchains BLOCK against $ip" .
                         $timeout_str, '', $config{'EMAIL_ADDRESSES'},
                         $cmds{'mail'});
                 }
-                $auto_blocked_ips{$ip} = '';
+                $auto_blocked_ips{$ip} = time();
             }
         }
     }
+    ### XXX future
+#    if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y'
+#            && -e $config{'TCPWRAPPERS_BLOCK_METHOD'}) {
+#    }
     return;
 }
 
 sub flush_auto_blocked_ips() {
     my $found_blocked = 0;
     my $rv = 0;
-    if (-e $config{'AUTO_BLOCKED_IPTABLES'}) {
+    if (-e $config{'AUTO_BLOCK_IPT_FILE'}) {
         print " .. Removing iptables auto-generated block rules.\n";
-        open B, "< $config{'AUTO_BLOCKED_IPTABLES'}" or
-            die " ** Could not open $config{'AUTO_BLOCKED_IPTABLES'}: $!";
+        open B, "< $config{'AUTO_BLOCK_IPT_FILE'}" or
+            die " ** Could not open $config{'AUTO_BLOCK_IPT_FILE'}: $!";
         my @lines = <B>;
         close B;
         for my $line (@lines) {
             if ($line =~ /($ip_re)/) {
                 my $ip = $1;
                 ### remove block rules for $ip if it has been blocked
-                &ipt_remove_block($ip) if &ipt_test_blocked($ip);
+                &ipt_remove_block($ip) if &ipt_test_block($ip);
             }
         }
         ### we have removed the iptables block rules, so remove
         ### the cache file.
-        unlink $config{'AUTO_BLOCKED_IPTABLES'};
+        unlink $config{'AUTO_BLOCK_IPT_FILE'};
         $found_blocked = 1;
     }
-    if (-e $config{'AUTO_BLOCKED_IPCHAINS'}) {
+    if (-e $config{'AUTO_BLOCK_IPCH_FILE'}) {
         print " .. Removing ipchains auto-generated block rules.\n";
-        open B, "< $config{'AUTO_BLOCKED_IPCHAINS'}" or
-            die " ** Could not open $config{'AUTO_BLOCKED_IPCHAINS'}: $!";
+        open B, "< $config{'AUTO_BLOCK_IPCH_FILE'}" or
+            die " ** Could not open $config{'AUTO_BLOCK_IPCH_FILE'}: $!";
         my @lines = <B>;
         close B;
         for my $line (@lines) {
             if ($line =~ /($ip_re)/) {
                 my $ip = $1;
                 ### remove block rules for $ip if it has been blocked
-                &ipch_remove_block($ip) if &ipch_test_blocked($ip);
+                &ipch_remove_block($ip) if &ipch_test_block($ip);
             }
         }
-        unlink $config{'AUTO_BLOCKED_IPCHAINS'};
+        unlink $config{'AUTO_BLOCK_IPCH_FILE'};
         $found_blocked = 1;
     }
-    if (-e $config{'AUTO_BLOCKED_TCPWR'}) {
+    if (-e $config{'AUTO_BLOCK_TCPWR_FILE'}) {
         print " .. Removing tcpwrapper auto-generated block rules.\n";
-        open B, "< $config{'AUTO_BLOCKED_TCPWR'}" or
-            die " ** Could not open $config{'AUTO_BLOCKED_TCPWR'}: $!";
+        open B, "< $config{'AUTO_BLOCK_TCPWR_FILE'}" or
+            die " ** Could not open $config{'AUTO_BLOCK_TCPWR_FILE'}: $!";
         my @lines = <B>;
         close B;
-        unlink $config{'AUTO_BLOCKED_TCPWR'};
+        unlink $config{'AUTO_BLOCK_TCPWR_FILE'};
         $found_blocked = 1;
     }
     unless ($found_blocked) {
@@ -2126,7 +2131,7 @@ sub flush_auto_blocked_ips() {
     exit $rv;
 }
 
-sub ipt_test_blocked() {
+sub ipt_test_block() {
     my $ip = shift;
 
     ### get the active iptables chains
@@ -2150,8 +2155,21 @@ sub ipt_test_blocked() {
     return 0;
 }
 
+sub ipt_block() {
+    my $src = shift;
+    for my $table (keys %ipt_chains) {
+        for my $chain (keys %{$ipt_chains{$table}}) {
+            system "$cmds{'iptables'} -t $table -I $chain 1 " .
+                "-s $src -j DROP 2> /dev/null 1>&2";
+        }
+    }
+    ### write the ip out to the auto blocked file
+    &write_blocked_ip($src, $config{'AUTO_BLOCK_IPT_FILE'});
+    return;
+}
+
 sub ipt_remove_block() {
-    my $ip = shift;
+    my $src = shift;
 
     ### get the active iptables chains
     &get_iptables_chains() unless $chk_ipt_chains;
@@ -2165,10 +2183,12 @@ sub ipt_remove_block() {
                 next RULE if $rule =~ /^\s*Chain\s/;
                 next RULE if $rule =~ /^\s*target\s/;
                 ### DROP       all  --  1.1.1.1        0.0.0.0/0
-                if ($rule =~ /^DROP\s+all.*?$ip\s+0\.0\.0\.0\/0/) {
-                    print " .. Deleting rule $rulenum for $ip, $table ",
-                        "table $chain chain:\n";
-                    print "        $rule\n";
+                if ($rule =~ /^DROP\s+all.*?$src\s+0\.0\.0\.0\/0/) {
+                    if ($flush_fw) {
+                        print " .. Deleting rule $rulenum for $src, $table ",
+                            "table $chain chain:\n";
+                        print "        $rule\n";
+                    }
                     system "$cmds{'iptables'} -t $table -D $chain $rulenum";
                     $rm_block = 1;
                     last RULE;  ### there should only be one auto-blocked rule
@@ -2177,13 +2197,16 @@ sub ipt_remove_block() {
             }
         }
     }
-    unless ($rm_block) {
-        print " ** Could not locate iptables block rule for $ip.\n";
+    if ($rm_block) {
+        &rm_blocked_ip($src, $config{'AUTO_BLOCK_IPT_FILE'});
+    } else {
+        print " ** Could not locate iptables block rule for $src.\n"
+            if $flush_fw;
     }
     return;
 }
 
-sub ipch_test_blocked() {
+sub ipch_test_block() {
     my $ip = shift;
     for my $chain (@ipchains_chains) {
         my @rules = `$cmds{'ipchains'} -nL $chain`;
@@ -2198,8 +2221,19 @@ sub ipch_test_blocked() {
     return 0;
 }
 
+sub ipch_block() {
+    my $src = shift;
+    for my $chain (@ipchains_chains) {
+        system "$cmds{'ipchains'} -I $chain 1 -s $src " .
+            "-j DENY 2> /dev/null 1>&2";
+    }
+    ### write the ip out to the auto blocked file
+    &write_blocked_ip($src, $config{'AUTO_BLOCK_IPCH_FILE'});
+    return;
+}
+
 sub ipch_remove_block() {
-    my $ip = shift;
+    my $src = shift;
     my $rm_block = 0;
     for my $chain (@ipchains_chains) {
         my @rules = `$cmds{'ipchains'} -nL $chain`;
@@ -2207,9 +2241,11 @@ sub ipch_remove_block() {
         RULE: for my $rule (@rules) {
             chomp $rule;
             ### DENY   udp  ------  0.0.0.0/0   0.0.0.0/0   * -> *
-            if ($rule =~ /^DENY\s+all.*?$ip.*0\.0\.0\.0\/0\s+\*\s+\-\>\s+\*/) {
-                print " .. Deleting rule $rulenum for $ip, $chain chain:\n";
-                print "        $rule\n";
+            if ($rule =~ /^DENY\s+all.*?$src.*0\.0\.0\.0\/0\s+\*\s+\-\>\s+\*/) {
+                if ($flush_fw) {
+                    print " .. Deleting rule $rulenum for $src, $chain chain:\n";
+                    print "        $rule\n";
+                }
                 system "$cmds{'ipchains'} -D $chain $rulenum";
                 $rm_block = 1;
                 last RULE;
@@ -2217,8 +2253,11 @@ sub ipch_remove_block() {
             $rulenum++;
         }
     }
-    unless ($rm_block) {
-        print " ** Could not locate ipchains block rule for $ip.\n";
+    if ($rm_block) {
+        &rm_blocked_ip($src, $config{'AUTO_BLOCK_IPCH_FILE'});
+    } else {
+        print " ** Could not locate ipchains block rule for $src.\n"
+            if $flush_fw;
     }
     return;
 }
@@ -2241,11 +2280,11 @@ sub auto_psad_response() {
         ### protected by the firewall if the ip trips the $auto_psad_level
         ### threshold for _any_ destination.
         if ($max_dl >= $config{'AUTO_IDS_DANGER_LEVEL'}
-            && ! defined $auto_blocked_ips{$src}) {
+                && ! defined $auto_blocked_ips{$src}) {
 
             my $timeout_str = '.';
-            if ($config{'AUTO_BLOCKED_TIMEOUT'} > 0) {
-                $timeout_str = " for $config{'AUTO_BLOCKED_TIMEOUT'} seconds.";
+            if ($config{'AUTO_BLOCK_TIMEOUT'} > 0) {
+                $timeout_str = " for $config{'AUTO_BLOCK_TIMEOUT'} seconds.";
             }
             ### we have seen at least one packet logged by the firewall
             ### at this point
@@ -2254,30 +2293,55 @@ sub auto_psad_response() {
                 &Psad::sendmail(" ** psad: iptables AUTO-BLOCK against $src" .
                     $timeout_str, '', $config{'EMAIL_ADDRESSES'},
                     $cmds{'mail'});
-                ### write the ip out to the auto blocked file
-                &write_blocked_ip($src, $config{'AUTO_BLOCKED_IPTABLES'});
             }
             if ($use_ipchains && $config{'IPCHAINS_BLOCK_METHOD'} eq 'Y') {
-                &ipchains_block($src);
+                &ipch_block($src);
                 &Psad::sendmail(" ** psad: ipchains AUTO-BLOCK against $src" .
                     $timeout_str, '', $config{'EMAIL_ADDRESSES'},
                     $cmds{'mail'});
-                ### write the ip out to the auto blocked file
-                &write_blocked_ip($src, $config{'AUTO_BLOCKED_IPCHAINS'});
             }
             if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
                 &Psad::sendmail(" ** psad: tcpwrappers AUTO-BLOCK against $src" .
                     $timeout_str, '', $config{'EMAIL_ADDRESSES'},
                     $cmds{'mail'});
+                ### XXX this needs to be smarter
                 open H, ">> /etc/hosts.deny" or die
                     "Could not open /etc/hosts.deny: $!";
                 print H "ALL: $src\n";
                 close H;
                 ### write the ip out to the auto blocked file
-                &write_blocked_ip($src, $config{'AUTO_BLOCKED_TCPWR'});
+                &write_blocked_ip($src, $config{'AUTO_BLOCK_TCPWR_FILE'});
             }
             ### keep track of when we blocked the ip
             $auto_blocked_ips{$src} = time();
+        }
+    }
+    return;
+}
+
+sub timeout_auto_blocked_ips() {
+    for my $ip (keys %auto_blocked_ips) {
+        if ((time() - $auto_blocked_ips{$ip})
+                > $config{'AUTO_BLOCK_TIMEOUT'}) {
+            if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
+                &Psad::sendmail(" ** psad: removed iptables block " .
+                    "against $ip (timeout expired).", '',
+                    $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+                &ipt_remove_block($ip);
+            }
+            if ($config{'IPCHAINS_BLOCK_METHOD'} eq 'Y') {
+                &Psad::sendmail(" ** psad: removed ipchains block " .
+                    "against $ip (timeout expired)", '',
+                    $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+                &ipch_remove_block($ip);
+            }
+            if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
+#                &Psad::sendmail(" ** psad: removed tcpwrappers block " .
+#                    "against $ip (timeout expired).", '',
+#                    $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+#                &tcpwr_remove_block($ip);
+            }
+            delete $auto_blocked_ips{$ip};
         }
     }
     return;
@@ -2300,26 +2364,6 @@ sub get_iptables_chains() {
     return;
 }
 
-sub ipt_block() {
-    my $src = shift;
-    for my $table (keys %ipt_chains) {
-        for my $chain (keys %{$ipt_chains{$table}}) {
-            system "$cmds{'iptables'} -t $table -I $chain 1 " .
-                "-s $src -j DROP 2> /dev/null 1>&2";
-        }
-    }
-    return;
-}
-
-sub ipchains_block() {
-    my $src = shift;
-    for my $chain (@ipchains_chains) {
-        system "$cmds{'ipchains'} -I $chain 1 -s $src " .
-            "-j DENY 2> /dev/null 1>&2";
-    }
-    return;
-}
-
 sub write_blocked_ip() {
     my ($src, $file) = @_;
     if (-e $file) {
@@ -2336,9 +2380,27 @@ sub write_blocked_ip() {
     return;
 }
 
+sub rm_blocked_ip() {
+    my ($src, $file) = @_;
+    if (-e $file) {
+        open B, "< $file" or
+            die " ** Could not open $file: $!";
+        my @lines = <B>;
+        close B;
+        open W, "> $file" or
+            die " ** Could not open $file: $!";
+        for my $line (@lines) {
+            chomp $line;
+            print W $line, "\n" unless $line eq $src;
+        }
+        close W;
+    }
+    return;
+}
+
 sub email_limit_reached() {
     my ($src, $dst) = @_;
-    my $subject = " ** psad: Email message limit for $src has " .
+    my $subject = " ** psad: email message limit for $src has " .
         "been reached on $hostname ($dst)!!!";
     &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
     return;
@@ -2395,8 +2457,8 @@ sub get_whois_data() {
     my ($ip, $whois_datafile) = @_;
     my @whois_data;
     if (defined $whois_cache{$ip}
-        && $whois_cache{$ip} < $config{'WHOIS_THRESHOLD'}
-        && -e $whois_datafile) {
+            && $whois_cache{$ip} < $config{'WHOIS_THRESHOLD'}
+            && -e $whois_datafile) {
         $whois_cache{$ip}++;
     } else {
         $whois_cache{$ip} = 0;
@@ -2775,7 +2837,7 @@ sub setup() {
     }
     ### make sure the new whois path exists
     if (-x '/usr/bin/whois.psad' && ! -x $cmds{'whois'}
-        && '/usr/bin/whois.psad' ne $cmds{'whois'}) {
+            && '/usr/bin/whois.psad' ne $cmds{'whois'}) {
         move '/usr/bin/whois.psad', $cmds{'whois'};
     }
     unless (-e '/etc/syslog.conf.orig') {
@@ -2847,9 +2909,9 @@ sub check_config() {
         TCPWRAPPERS_BLOCK_METHOD EMAIL_ALERT_DANGER_LEVEL
         PSAD_FIFO WHOIS_THRESHOLD WHOIS_TIMEOUT SNORT_RULES_DIR
         PACKET_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR
-        PROC_FORWARD_FILE ENABLE_PERSISTENCE AUTO_BLOCKED_IPTABLES
-        AUTO_BLOCKED_IPCHAINS AUTO_BLOCKED_TCPWR PSAD_SIGS_FILE
-        PSAD_AUTO_IPS_FILE AUTO_BLOCKED_TIMEOUT
+        PROC_FORWARD_FILE ENABLE_PERSISTENCE AUTO_BLOCK_IPT_FILE
+        AUTO_BLOCK_IPCH_FILE AUTO_BLOCK_TCPWR_FILE PSAD_SIGS_FILE
+        PSAD_AUTO_IPS_FILE AUTO_BLOCK_TIMEOUT
     );
     &Psad::validate_config($config_file, \@required_vars, $config_href);
     return;
@@ -2988,8 +3050,8 @@ sub ipt_chk_chain() {
                 $rv = 0;
             }
             if (defined $ld_hr->{$proto}->{'LOG'}->{'prefix'}
-                && $ld_hr->{$proto}->{'LOG'}->{'prefix'}
-                !~ /$config{'FW_MSG_SEARCH'}/) {
+                    && $ld_hr->{$proto}->{'LOG'}->{'prefix'}
+                    !~ /$config{'FW_MSG_SEARCH'}/) {
                 if ($proto eq 'all') {
                     $str1 = " ** The $chain chain in the iptables ruleset " .
                     "on $hostname includes a default LOG rule for all " .

@@ -759,7 +759,7 @@ sub check_scan() {
                         ### server is listening on the DSTPORT by parsing
                         ### netstat output.  If not, psad would have to connect
                         ### to the destination port on the remote machine, but
-                        ### it should not do this so it is not implemented.
+                        ### it should not do this so it is not implemented. :)
                         if (defined $local_ips_href->{$dst}) {
                             if (defined
                                 $local_listening_ports_href->{$lprot}->{$dstport}) {
@@ -948,6 +948,7 @@ sub check_import_config() {
             " @@@ Could not open $config{'KMSGSD_PID_FILE'}";
         my $pid = <K>;
         close K;
+        chomp $pid;
         if (kill 0, $pid) {
             kill 15, $pid;
             ### NOTE: we are not restarting kmsgsd here since we
@@ -1029,16 +1030,16 @@ sub get_signature_ports() {
     } else {
         return;
     }
-    if ($srcport =~ /\:/ && $srcport !~ /\!/) {
+    if ($srcport =~ /:/ && $srcport !~ /!/) {
         ($start, $end) = split /:/, $srcport;
         $start = 1   if ($start eq '');
         $end = 65535 if ($end   eq '');
         $sigs{$proto}{$msg}{'SRCPORT'}{'START'} = $start;
         $sigs{$proto}{$msg}{'SRCPORT'}{'END'}   = $end;
-    } elsif ($srcport =~ /\!/ && $srcport !~ /\:/) {
-        $tmpport = (split /\!/, $srcport)[1];
+    } elsif ($srcport =~ /!/ && $srcport !~ /:/) {
+        $tmpport = (split /!/, $srcport)[1];
         $sigs{$proto}{$msg}{'SRCPORT'}{'NOT'} = $tmpport;
-    } elsif ($srcport =~ /\:/ && $srcport =~ /\!/) {
+    } elsif ($srcport =~ /:/ && $srcport =~ /!/) {
         ($start, $end) = split /:/, $srcport;
         $start = 1   if ($start !~ /\d/);
         $end = 65535 if ($end   !~ /\d/);
@@ -1047,16 +1048,16 @@ sub get_signature_ports() {
     } else {
         $sigs{$proto}{$msg}{'SRCPORT'}{'UNIQUE_OR_ANY'} = $srcport;
     }
-    if ($dstport =~ /\:/ && $dstport !~ /\!/) {
+    if ($dstport =~ /:/ && $dstport !~ /!/) {
         ($start, $end) = split /:/, $dstport;
         $start = 1   if ($start eq '');
         $end = 65535 if ($end   eq '');
         $sigs{$proto}{$msg}{'DSTPORT'}{'START'} = $start;
         $sigs{$proto}{$msg}{'DSTPORT'}{'END'}   = $end;
-    } elsif ($dstport =~ /\!/ && $dstport !~ /\:/) {
-        $tmpport = (split /\!/, $dstport)[1];
+    } elsif ($dstport =~ /!/ && $dstport !~ /:/) {
+        $tmpport = (split /!/, $dstport)[1];
         $sigs{$proto}{$msg}{'DSTPORT'}{'NOT'} = $tmpport;
-    } elsif ($dstport =~ /\:/ && $dstport =~ /\!/) {
+    } elsif ($dstport =~ /:/ && $dstport =~ /!/) {
         ($start, $end) = split /:/, $dstport;
         $start = 1   if ($start !~ /\d/);
         $end = 65535 if ($end   !~ /\d/);
@@ -1098,7 +1099,7 @@ sub check_range() {
 }
 
 sub assign_danger_level() {
-    for my $src (keys %scan) {
+    SRC: for my $src (keys %scan) {
         print "assign_danger_level(): source ip: $src\n" if $debug;
         if (%auto_ips) {
             if (defined $auto_ips{$src}) {
@@ -1107,23 +1108,26 @@ sub assign_danger_level() {
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                 }
                 ### ignore $src if the auto danger level is zero
-                return if $auto_ips{$src} == 0;
+                next SRC if $auto_ips{$src} == 0;
             }
         }
         DST: for my $dst (keys %{$scan{$src}}) {
             my $absnum = $scan{$src}{$dst}{'ABSNUM'};
             my $range;
             if (defined $scan{$src}{$dst}{'S_PORT'}) {
-                $range = $scan{$src}{$dst}{'E_PORT'} - $scan{$src}{$dst}{'S_PORT'};
+                $range = $scan{$src}{$dst}{'E_PORT'} -
+                    $scan{$src}{$dst}{'S_PORT'};
             } else {
                 $range = $absnum;
             }
             if ($debug) {
                 print "assign_danger_level(): destination ip: $dst\n";
-                print "assign_danger_level(): ABSNUM: $scan{$src}{$dst}{'ABSNUM'}\n";
+                print "assign_danger_level(): ABSNUM: " .
+                    "$scan{$src}{$dst}{'ABSNUM'}\n";
                 if (defined $scan{$src}{$dst}{'S_PORT'}) {
-                    print "assign_danger_level(): S_PORT: $scan{$src}{$dst}{'S_PORT'}, " .
-                        "E_PORT: $scan{$src}{$dst}{'E_PORT'}\n";
+                    print "assign_danger_level(): S_PORT: " .
+                        "$scan{$src}{$dst}{'S_PORT'}, E_PORT: " .
+                        "$scan{$src}{$dst}{'E_PORT'}\n";
                 }
                 print 'assign_danger_level(): CURR_DL (before assignment) = ' .
                     "$scan{$src}{$dst}{'CURR_DL'}\n";
@@ -1160,37 +1164,30 @@ sub assign_danger_level() {
             if ($absnum < $config{'DANGER_LEVEL1'}) {
                 ### don't have enough packets to even reach danger level 1 yet.
                 next DST;
-            } elsif ($absnum < $config{'DANGER_LEVEL2'}
-                        && $range >= $config{'PORT_RANGE_SCAN_THRESHOLD'}) {
-                if ($scan{$src}{$dst}{'CURR_DL'} < 1
-                        && $scan{$src}{$dst}{'CURR_DL'} != -1) {
-                    $scan{$src}{$dst}{'ALERTED'} = 0;
-                    $scan{$src}{$dst}{'CURR_DL'} = 1;
-                }
-            } elsif ($absnum < $config{'DANGER_LEVEL3'}
-                        && $range >= $config{'PORT_RANGE_SCAN_THRESHOLD'}) {
-                if ($scan{$src}{$dst}{'CURR_DL'} < 2
-                        && $scan{$src}{$dst}{'CURR_DL'} != -1) {
-                    $scan{$src}{$dst}{'ALERTED'} = 0;
-                    $scan{$src}{$dst}{'CURR_DL'} = 2;
-                }
-            } elsif ($absnum < $config{'DANGER_LEVEL4'}
-                        && $range >= $config{'PORT_RANGE_SCAN_THRESHOLD'}) {
-                if ($scan{$src}{$dst}{'CURR_DL'} < 3
-                        && $scan{$src}{$dst}{'CURR_DL'} != -1) {
-                    $scan{$src}{$dst}{'ALERTED'} = 0;
-                    $scan{$src}{$dst}{'CURR_DL'} = 3;
-                }
-            } elsif ($absnum < $config{'DANGER_LEVEL5'}
-                        && $range >= $config{'PORT_RANGE_SCAN_THRESHOLD'}) {
-                if ($scan{$src}{$dst}{'CURR_DL'} < 4
-                        && $scan{$src}{$dst}{'CURR_DL'} != -1) {
-                    $scan{$src}{$dst}{'ALERTED'} = 0;
-                    $scan{$src}{$dst}{'CURR_DL'} = 4;
-                }
-            } elsif ($range >= $config{'PORT_RANGE_SCAN_THRESHOLD'}) {
-                if ($scan{$src}{$dst}{'CURR_DL'} < 5
-                        && $scan{$src}{$dst}{'CURR_DL'} != -1) {
+            }
+            if ($range >= $config{'PORT_RANGE_SCAN_THRESHOLD'}) {
+#                && $scan{$src}{$dst}{'CURR_DL'} != -1) {
+                if ($absnum < $config{'DANGER_LEVEL2'}) {
+                    if ($scan{$src}{$dst}{'CURR_DL'} < 1) {
+                        $scan{$src}{$dst}{'ALERTED'} = 0;
+                        $scan{$src}{$dst}{'CURR_DL'} = 1;
+                    }
+                } elsif ($absnum < $config{'DANGER_LEVEL3'}) {
+                    if ($scan{$src}{$dst}{'CURR_DL'} < 2) {
+                        $scan{$src}{$dst}{'ALERTED'} = 0;
+                        $scan{$src}{$dst}{'CURR_DL'} = 2;
+                    }
+                } elsif ($absnum < $config{'DANGER_LEVEL4'}) {
+                    if ($scan{$src}{$dst}{'CURR_DL'} < 3) {
+                        $scan{$src}{$dst}{'ALERTED'} = 0;
+                        $scan{$src}{$dst}{'CURR_DL'} = 3;
+                    }
+                } elsif ($absnum < $config{'DANGER_LEVEL5'}) {
+                    if ($scan{$src}{$dst}{'CURR_DL'} < 4) {
+                        $scan{$src}{$dst}{'ALERTED'} = 0;
+                        $scan{$src}{$dst}{'CURR_DL'} = 4;
+                    }
+                } elsif ($scan{$src}{$dst}{'CURR_DL'} < 5) {
                     $scan{$src}{$dst}{'ALERTED'} = 0;
                     $scan{$src}{$dst}{'CURR_DL'} = 5;
                 }
@@ -2097,12 +2094,9 @@ sub archive_data() {
     my $fwarchive = "$config{'SCAN_DATA_ARCHIVE_DIR'}/fwdata_archive";
     ### first see how big the archive file is and zero out if
     ### it is larger than about 10,000 lines
-    if (-e $fwarchive) {
-        my $size = -s $fwarchive;
-        if ($size > 2367766) {  ### about 10,000 lines
-            open F, "> $fwarchive";
-            close F;
-        }
+    if ((-s $fwarchive) > 2367766) {  ### about 10,000 lines
+        open F, "> $fwarchive";
+        close F;
     }
     unless (-e $fwdata) {
         return;
@@ -2121,27 +2115,33 @@ sub archive_data() {
 
 sub check_old_cmdargs() {
     if ($errors) {
-        print " ... @@@ The \"errors\" option has been changed to \"no_errors.\"\n";
+        print " ... @@@ The \"errors\" option has been changed to " .
+            "\"no_errors.\"\n";
         &usage(1);
     }
     if ($errors) {
-        print " ... @@@ The \"reversedns\" option has been changed to \"no_rdns.\"\n";
+        print " ... @@@ The \"reversedns\" option has been changed " .
+            "to \"no_rdns.\"\n";
         &usage(1);
     }
     if ($errors) {
-        print " ... @@@ The \"whois\" option has been changed to \"no_whois.\"\n";
+        print " ... @@@ The \"whois\" option has been changed to " .
+            "\"no_whois.\"\n";
         &usage(1);
     }
     if ($errors) {
-        print " ... @@@ The \"localport\" option has been changed to \"no_netstat.\"\n";
+        print " ... @@@ The \"localport\" option has been changed " .
+            "to \"no_netstat.\"\n";
         &usage(1);
     }
     if ($errors) {
-        print " ... @@@ The \"firewallcheck\" option has been changed to \"no_fwcheck.\"\n";
+        print " ... @@@ The \"firewallcheck\" option has been changed " .
+            "to \"no_fwcheck.\"\n";
         &usage(1);
     }
     if ($errors) {
-        print " ... @@@ The \"Daemon\" option has been changed to \"Daemon.\"\n";
+        print " ... @@@ The \"Daemon\" option has been changed to " .
+            "\"Daemon.\"\n";
         &usage(1);
     }
     return;

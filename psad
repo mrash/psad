@@ -2190,7 +2190,7 @@ sub check_mail_commands() {
         /usr/local/bin
         /usr/local/sbin
     );
-    unless ($config{'ALERTING_METHODS'} =~ /no?email/i) {
+    unless ($config{'ALERTING_METHODS'} =~ /noe?mail/i) {
         ### make sure the mailCmd is executable
         my $found = 0;
         if (defined $cmds{'mail'}) {

@@ -20,7 +20,7 @@ unless (-e "/var/log/psadfifo") {
 	# create the named pipe
 	`$mknodCmd -m 600 /var/log/psadfifo p`;	# die does not seem to work right here.
 }
-unless (`$grepCmd -q psadfifo /etc/syslog.conf`) {
+unless (`$grepCmd psadfifo /etc/syslog.conf`) {
 	print "*** Modifying /etc/syslog.conf\n";
 	open SYSLOG, ">> /etc/syslog.conf";
 	print SYSLOG "kern.info  |/var/log/psadfifo\n\n";  #reinstate kernel logging to our named pipe

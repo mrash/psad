@@ -146,7 +146,6 @@ my $psadCmd       = "/usr/sbin/psad";
 #================== end config ==================== ## do not remove this line (used by install.pl to preserve configs) ##
 #===================== main =======================
 
-
 ### A few more configuration variables that should not really be in the config section.
 my $VERSION = "0.9.6";
 
@@ -164,6 +163,10 @@ my $USE_IPCHAINS = 0;
 my $USE_IPTABLES = 0;
 my $DEBUG        = 0;
 my $HOSTNAME     = hostname;  ### Calculate hostname of the machine on which psad is running.
+
+### The /etc/psad configuration directory is created by install.pl (not configurable)
+### and so $AUTO_BLOCKED_FILE should be assigned here instead of in the config section.
+my $AUTO_BLOCKED_FILE = "/etc/psad/psad_auto_blocked_ips";
 
 ### main psad data structure; contains ips, port ranges, tcp flags, and danger levels
 my %Scan;
@@ -334,7 +337,14 @@ if ($auto_ips) {  ### support automatic ip danger level increases/decreases.
     $Auto_ips_href = 0;
 }
 
-### install signal handlers for debugging %Scan with Data::Dumper,
+### Check to see if psad automatically blocked some ips from
+### a previous run.  This feature is most useful for preserving
+### automatically blocked ips after a reboot.
+if ($ENABLE_AUTO_IDS eq "Y") {
+    &check_auto_blocked(\%Cmds);
+}
+
+### Install signal handlers for debugging %Scan with Data::Dumper,
 ### and for reaping zombie whois processes
 #$SIG{'SEGV'} = \&print_scan_and_exit;
 $SIG{'__WARN__'} = \&Psad::warn_handler;
@@ -1089,7 +1099,7 @@ sub scan_logr() {
                 print STDOUT "scan_logr():  generating email......\n" if $DEBUG;
                 unlink $EMAIL_ALERTFILE;  ### remove $EMAIL_ALERTFILE so we don't send old alert info
                 &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=-=-=-=-=-=-=\n", \@print_array);
-                &Psad::logr("psad: Portscan Detected on $HOSTNAME ($dst).\n", \@print_array);
+                &Psad::logr("psad: portscan detected against $HOSTNAME ($dst).\n", \@print_array);
                 &Psad::logr("\n", [$PSAD_LOGFILE, $EMAIL_ALERTFILE]);
                 &Psad::logr("Source:                      $src\n", \@print_array);
                 &Psad::logr("Destination:                 $dst\n", \@print_array);
@@ -1174,18 +1184,82 @@ sub scan_logr() {
     }
     return;
 }
+sub check_auto_blocked() {
+    my $Cmds_href = shift;
+    if (-e $AUTO_BLOCKED_FILE) {
+        open B, "< $AUTO_BLOCKED_FILE" or warn " @@@ Could not open $AUTO_BLOCKED_FILE\n" and return;
+        my @blines = <B>;
+        close B;
+        my $use_ipchains;
+        my $use_iptables;
+        my @block_ips;
+        for my $l (@blines) {
+            chomp $l;
+            if ($l =~ /IPTABLES/) {
+                $use_iptables = 1;
+            } elsif ($l =~ /IPCHAINS/) {
+                $use_ipchains = 1;
+            }
+            if ($l =~ /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/) {
+                push @block_ips, $1;
+            }
+        }
+        if ($use_iptables) {
+            my $inchains_aref = &get_input_chains($Cmds_href->{'iptables'});
+            for my $inchain (@$inchains_aref) {
+                my @rules = `$Cmds_href->{'iptables'} -nL $inchain`;
+                for my $blockip (@block_ips) {
+                    my $blocked = 0;
+                    RULE: for my $rule (@rules) {
+                        ### DROP       all  --  1.1.1.1        0.0.0.0/0
+                        if ($rule =~ /^DROP\s+all.*?$blockip\s+0\.0\.0\.0\/0/) {
+                            ### all traffic from $blockup is being blocked
+                            $blocked = 1;
+                            last RULE;
+                        }
+                    }
+                    unless ($blocked) {
+                        `$Cmds_href->{'iptables'} -I $inchain 1 -s $blockip -j DROP`;
+                    }
+                }
+            }
+        } elsif ($use_ipchains) {
+            my $inchains_aref = &get_input_chains($Cmds_href->{'ipchains'});
+            for my $inchain (@$inchains_aref) {
+                my @rules = `$Cmds_href->{'ipchains'} -nL $inchain`;
+                for my $blockip (@block_ips) {
+                    my $blocked = 0;
+                    RULE: for my $rule (@rules) {
+                        ### DENY       udp  ------  0.0.0.0/0      0.0.0.0/0      * ->   *
+                        if ($rule =~ /^DENY\s+all.*?$blockip.*0\.0\.0\.0\/0\s+\*\s+\-\>\s+\*/) {
+                            ### all traffic from $blockup is being blocked
+                            $blocked = 1;
+                            last RULE;
+                        }
+                    }
+                    unless ($blocked) {
+                        `$Cmds_href->{'ipchains'} -I $inchain 1 -s $blockip -j DENY`;
+                    }
+                }
+            }
+        }
+    }
+    return;
+}
 sub auto_psad_response(){
     my ($Scan_href, $Cmds_href, $email_addresses_aref) = @_;
     SOURCE: for my $src (keys %$Scan_href) {
         for my $dst (keys %{$Scan_href->{$src}}) {
             my $current_danger_level = $Scan_href->{$src}->{$dst}->{'CURRENT_DANGER_LEVEL'};
-            ### We only want to block the IP once.  Currently this will block all traffic from the host to _all_ destinations
-            ### that are protected by the firewall if the ip trips the $auto_psad_level threshold for _any_ destination. 
+            ### We only want to block the IP once.  Currently this will block
+            ### all traffic from the host to _all_ destinations that are protected
+            ### by the firewall if the ip trips the $auto_psad_level threshold for
+            ### _any_ destination. 
             if ($current_danger_level >= $AUTO_IDS_DANGER_LEVEL && !(defined $Scan_href->{$src}->{$dst}->{'BLOCKED'})) {
                 if ($USE_IPCHAINS) {
-                    my @chains = &get_input_chains($Cmds_href->{'ipchains'});
-                    for my $inchain (@chains) {
-                        `$Cmds_href->{'ipchains'} -I $inchain 1 -s $src -l -j DENY`;
+                    my $chains_aref = &get_input_chains($Cmds_href->{'ipchains'});
+                    for my $inchain (@$chains_aref) {
+                        `$Cmds_href->{'ipchains'} -I $inchain 1 -s $src -j DENY`;
                     }
                     for my $dst (keys %{$Scan_href->{$src}}) {
                         $Scan_href->{$src}->{$dst}->{'BLOCKED'} = "Y";
@@ -1193,10 +1267,12 @@ sub auto_psad_response(){
                     for my $email_address (@$email_addresses_aref) {
                         system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $src has been BLOCKED on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
                     }
+                    ### write the $src ip to the $AUTO_BLOCKED_FILE
+                    &write_blocked_ip($src);
                     next SOURCE;
                 } elsif ($USE_IPTABLES) {
-                    my @chains = &get_input_chains($Cmds_href->{'iptables'});
-                    for my $inchain (@chains) {
+                    my $chains_aref = &get_input_chains($Cmds_href->{'iptables'});
+                    for my $inchain (@$chains_aref) {
                         `$Cmds_href->{'iptables'} -I $inchain 1 -s $src -j DROP`;
                     }
                     for my $dst (keys %{$Scan_href->{$src}}) {
@@ -1205,10 +1281,27 @@ sub auto_psad_response(){
                     for my $email_address (@$email_addresses_aref) {
                         system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $src has been BLOCKED on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
                     }
+                    ### write the $src ip to the $AUTO_BLOCKED_FILE
+                    &write_blocked_ip($src);
                     next SOURCE;
                 }
             }
         }
+    }
+    return;
+}
+sub write_blocked_ip() {
+    my $src = shift;
+    if (-e $AUTO_BLOCKED_FILE) {
+        open B, ">> $AUTO_BLOCKED_FILE" or warn " @@@ Could not append to $AUTO_BLOCKED_FILE\n" and return;
+        print B "$src\n";
+        close B;
+    } else {
+        open B, "> $AUTO_BLOCKED_FILE" or warn " @@@ Could not create $AUTO_BLOCKED_FILE\n" and return;
+        print B "IPTABLES\n" if $USE_IPTABLES;
+        print B "IPCHAINS\n" if $USE_IPCHAINS;
+        print B "$src\n";
+        close B;
     }
     return;
 }
@@ -1223,14 +1316,14 @@ sub get_input_chains() {
     my $fwCmd = shift;
     my @rules;
     my @chains;
-    @rules = `$fwCmd -L`;
+    @rules = `$fwCmd -nL`;
     for my $r (@rules) {
         next unless ($r =~ /Chain/);
         my ($cname) = ($r =~ /Chain\s(\w+)/);
         next unless ($cname =~ /in/i);  # we don't have an input chain
         push @chains, $cname;
     }
-    return @chains;
+    return \@chains;
 }
 sub send_email_alert() {
     my ($Scan_href, $src, $dst, $email_addresses_aref, $Cmds_href) = @_;

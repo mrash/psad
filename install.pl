@@ -341,6 +341,7 @@ sub install() {
         copy "snort_rules/${rfile}", "${SNORT_DIR}/${rfile}" or
             die "[*] Could not copy snort_rules/${rfile} -> ",
                 "${SNORT_DIR}/${rfile}: $!";
+        &perms_ownership("${SNORT_DIR}/${rfile}", 0600);
     }
     print "\n\n";
 
@@ -440,7 +441,6 @@ sub install() {
                 &logr("[+] Copying $file -> ${PSAD_CONFDIR}/$file\n");
                 copy $file, "${PSAD_CONFDIR}/$file" or die "[*] Could not ",
                     "copy $file -> ${PSAD_CONFDIR}/$file: $!";
-                &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
             }
             if ($file eq 'fw_search.conf' and @old_fw_msg_search) {
                 &logr("[-] Warning: psad.conf contains FW_MSG_SEARCH vars, " .
@@ -450,7 +450,6 @@ sub install() {
             &logr("[+] Copying $file -> ${PSAD_CONFDIR}/$file\n");
             copy $file, "${PSAD_CONFDIR}/$file" or die "[*] Could not copy ",
                 "$file -> ${PSAD_CONFDIR}/$file: $!";
-            &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
 
             ### Deal with legacy FW_MSG_SEARCH in psad.conf.  Note that
             ### this will only preserve old search strings if 1) they already
@@ -460,6 +459,7 @@ sub install() {
                 &preserve_old_fw_msg_search();
             }
         }
+        &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
     }
 
     ### deal with any legacy diskmond.conf file

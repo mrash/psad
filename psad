@@ -1067,6 +1067,7 @@ sub match_sigs() {
 
     if ($proto eq 'tcp') {
         for my $sid (keys %{$sigs{'tcp'}}) {
+            print " .. match_sigs(): sid: $sid\n" if $debug;
             next unless defined $sigs{'tcp'}{$sid}{'flags'};
             if (&check_src_dst($chain, $src, $dst, $sigs{'tcp'}{$sid})
                     and &check_port($sp, $dp, $sigs{'tcp'}{$sid})
@@ -1246,6 +1247,12 @@ sub check_src_dst() {
             } elsif (&check_ip_in_network($src, $sig_href->{'src'})) {
                 return 1;
             }
+        } elsif ($sig_href->{'dst'} eq 'EXTERNAL_NET') {
+            if ($sig_href->{'src'} eq 'HOME_NET') {
+                return 1;
+            } elsif (&check_ip_in_network($src, $sig_href->{'src'})) {
+                return 1;
+            }
         } elsif (&check_ip_in_network($dst, $sig_href->{'dst'})) {
             if ($sig_href->{'src'} eq 'EXTERNAL_NET') {
                 return 1;
@@ -1284,6 +1291,12 @@ sub check_src_dst() {
     } elsif ($chain eq 'output') {
         if ($sig_href->{'src'} eq 'HOME_NET') {
             if ($sig_href->{'dst'} eq 'EXTERNAL_NET') {
+                return 1;
+            } elsif (&check_ip_in_network($dst, $sig_href->{'dst'})) {
+                return 1;
+            }
+        } elsif ($sig_href->{'src'} eq 'EXTERNAL_NET') {
+            if ($sig_href->{'dst'} eq 'HOME_NET') {
                 return 1;
             } elsif (&check_ip_in_network($dst, $sig_href->{'dst'})) {
                 return 1;
@@ -1724,19 +1737,27 @@ sub import_signatures() {
             my $sig_flags;
             my $sig_flow = '';
 
-            if ($rule_options =~ /flow:\s*(.*?)\s*;/i) {
+            if ($rule_options =~ /flow:\s*(.*?)\s*\;/i) {
                 $sig_flow = $1;
+                ### flags can also be deduced from the "flow" field in
+                ### snort signatures.
+                if ($sig_flow =~ /established/) {
+                    $flags .= 'ACK ';
+                }
             }
 
             if ($rule_options =~ /[\s;]flags:\s*(.*?)\s*;/) {
                 $sig_flags = $1;
                 ### make flags identical to what iptables log messages
                 ### would report (check in iptables flag reporting order).
-                $flags .= 'URG ' if $sig_flags =~ /U/;
-                $flags .= 'ACK ' if $sig_flags =~ /A/;
-                ### flags can also be deduced from the "flow" field in
-                ### snort signatures.
-                if ($sig_flow =~ /established/ and $flags !~ /ACK/) {
+                if ($sig_flags =~ /U/) {
+                    if ($flags) {
+                        $flags = 'URG ' . $flags;
+                    } else {
+                        $flags .= 'URG ';
+                    }
+                }
+                if ($flags =~ /A/ and $flags !~ /ACK/) {
                     $flags .= 'ACK ';
                 }
                 $flags .= 'PSH ' if $sig_flags =~ /P/;
@@ -1747,8 +1768,8 @@ sub import_signatures() {
                 ### if no flags are set iptables simply reports no flags
                 ### at all instead of reporting "NULL".
                 $flags .= 'NULL ' if $sig_flags =~ /N/;
-                $flags =~ s/\s*$//;
             }
+            $flags =~ s/\s*$// if $flags;
 
             $sigs{$proto}{$sid}{'flags'} = $flags
                 if $flags;
@@ -2411,7 +2432,7 @@ sub scan_logr_signatures() {
     for my $proto qw(tcp udp icmp) {
         next unless (defined $scan{$src}{$dst}{$proto}{'curr_sig'}
             || defined $scan{$src}{$dst}{$proto}{'snort_sid'});
-        print $email_fh "\n\n ** $proto scan signatures **\n\n";
+        print $email_fh "\n\n ** $proto scan signatures: **\n\n";
         print LS "\n\n ** $proto scan signatures **\n\n";
         print "scan_logr_signatures(): src: $src dst: $dst proto: $proto\n"
             if $debug;

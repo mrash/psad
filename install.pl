@@ -155,7 +155,7 @@ if ($uninstall) {
 		my @sys = <ESYS>;
 		close ESYS;
 		open CSYS, "> /etc/syslog.conf";
-		foreach my $s (@sys) {
+		for my $s (@sys) {
 			chomp $s;
 			print CSYS "$s\n" if ($s !~ /psadfifo/);
 		}
@@ -258,14 +258,18 @@ print "\n\n";
 ### else other than the normal "DROP", "DENY", or "REJECT" strings.
 # $append_fw_search_str = &get_fw_search_string();
 
+my $email_str = "";
 if ( -e "${INSTALL_DIR}/psad" && (! $nopreserve)) {  # need to grab the old config
 	&logr(" ----  Copying psad -> ${INSTALL_DIR}/psad  ----\n", \@LOGR_FILES);
 	&logr("       Preserving old config within ${INSTALL_DIR}/psad\n", \@LOGR_FILES);
 	&preserve_config("psad", "${INSTALL_DIR}/psad", \%Cmds);
 	### we don't need to run with -w for production code, and they are daemons so nothing would see warnings anyway if there are any.
-        if (&query_email("${INSTALL_DIR}/psad")) {
-                &put_email("${INSTALL_DIR}/psad");
-        }
+	$email_str = &query_email("${INSTALL_DIR}/psad");
+	if ($email_str) {
+                &put_email("${INSTALL_DIR}/psad", $email_str);
+	}
+	### might enable this in the future, but for now the configuration variable
+	### is enough in the config section of kmsgsd and psad.
 #	if ($append_fw_search_str) {
 		### the second input is the variable name that will be altered
 #		&put_fw_search_str("${INSTALL_DIR}/psad", "IPTABLES_MSG_SEARCH");
@@ -275,8 +279,9 @@ if ( -e "${INSTALL_DIR}/psad" && (! $nopreserve)) {  # need to grab the old conf
 } else {
 	&logr(" ----  Copying psad -> ${INSTALL_DIR}/  ----\n", \@LOGR_FILES);
 	copy("psad", "${INSTALL_DIR}/psad");
-        if (&query_email("${INSTALL_DIR}/psad")) {
-                &put_email("${INSTALL_DIR}/psad");
+	$email_str = &query_email("${INSTALL_DIR}/psad");
+        if ($email_str) {
+                &put_email("${INSTALL_DIR}/psad", $email_str);
         }
 	&rm_perl_options("${INSTALL_DIR}/psad", \%Cmds);
 	&perms_ownership("${INSTALL_DIR}/psad", 0500);
@@ -285,16 +290,16 @@ if ( -e "${INSTALL_DIR}/psadwatchd" && (! $nopreserve)) {  # need to grab the ol
         &logr(" ----  Copying psadwatchd -> ${INSTALL_DIR}/psadwatchd  ----\n", \@LOGR_FILES);
         &logr("       Preserving old config within ${INSTALL_DIR}/psadwatchd\n", \@LOGR_FILES);
         &preserve_config("psadwatchd", "${INSTALL_DIR}/psadwatchd", \%Cmds);
-        if (&query_email("${INSTALL_DIR}/psadwatchd")) {
-                &put_email("${INSTALL_DIR}/psadwatchd");
+        if ($email_str) {
+                &put_email("${INSTALL_DIR}/psadwatchd", $email_str);
         }
 	&rm_perl_options("${INSTALL_DIR}/psadwatchd", \%Cmds);
         &perms_ownership("${INSTALL_DIR}/psadwatchd", 0500);
 } else {
         &logr(" ----  Copying psadwatchd -> ${INSTALL_DIR}/  ----\n", \@LOGR_FILES);
 	copy("psadwatchd", "${INSTALL_DIR}/psadwatchd");
-	if (&query_email("${INSTALL_DIR}/psadwatchd")) {
-		&put_email("${INSTALL_DIR}/psadwatchd");
+	if ($email_str) {
+		&put_email("${INSTALL_DIR}/psadwatchd", $email_str);
 	}
 	&rm_perl_options("${INSTALL_DIR}/psadwatchd", \%Cmds);
         &perms_ownership("${INSTALL_DIR}/psadwatchd", 0500);
@@ -534,7 +539,7 @@ sub preserve_config() {
 	my %srcvars;
 	undef %prodvars;
 	undef %srcvars;
-	foreach my $p (@config) {
+	for my $p (@config) {
 		if ($p =~ /(\S+)\s+=\s+(.*?)\;/) {
 			my ($varname, $value) = ($1, $2);
 			my $type;
@@ -560,7 +565,7 @@ sub preserve_config() {
 		$start = 1 if ($l =~ /\=\=\=\=\=\s+config\s+\=\=\=\=\=/);
 		print TMP "$l\n" unless $start;   # print the "======= config =======" line
 		if ($start && $print) {
-			PDEF: foreach my $defc (@defconfig) {
+			PDEF: for my $defc (@defconfig) {
 				if ($defc =~ /^\s*#/) {   ### found a comment
 					print TMP "$defc\n";
 					next PDEF;
@@ -602,8 +607,8 @@ sub preserve_config() {
 					print TMP "$defc\n";  # it is some other non-variable-assignment line so print it from the $srcfile
 				}
 			}
-			foreach my $type (keys %prodvars) {
-				foreach my $varname (keys %{$prodvars{$type}}) {
+			for my $type (keys %prodvars) {
+				for my $varname (keys %{$prodvars{$type}}) {
 					next if ($varname =~ /EMAIL_ADDRESS/);
 					unless ($prodvars{$type}{$varname}{'FOUND'} eq "Y") {
 						&logr("-----  Removing depreciated $type variable: \"$varname\" not needed in this version of psad.\n", \@LOGR_FILES);
@@ -681,7 +686,7 @@ sub get_fw_search_string() {
 	my $ans = "";
 	while ($ans ne "y" && $ans ne "n") {
 		print "       Would you like to add a string that will be used to analyze firewall\n";
-		print "       log messages (y/n)?\n";	
+		print "       log messages (y/n)?\n";
 		$ans = <STDIN>;
 		chomp $ans;
 	}
@@ -701,7 +706,6 @@ sub query_email() {
 	my $email_address;
 	for my $l (@lines) {
 		chomp $l;
-#		if ($l =~ /my\s*\@EMAIL_ADDRESSES\s*=\s*qw\(\s*(\S+)/) {
 		if ($l =~ /my\s*\@EMAIL_ADDRESSES\s*=\s*qw\s*\((.+)\)/) {
 			$email_address = $1;
 			last;
@@ -720,39 +724,41 @@ sub query_email() {
 		chomp $ans;
 	}
 	if ($ans eq "y") {
-		return 1;
+		print "\n";
+		print " ----  To which email address(es) would you like $filename alerts to be sent?\n";
+		print " ----  You can enter as many email addresses as you like separated by spaces.\n";
+		my $emailstr = "";
+		my $correct = 0;
+		while (! $correct) {
+			print "Email addresses: ";
+			$emailstr = <STDIN>;
+			$emailstr =~ s/\,//g;
+			chomp $emailstr;
+			my @emails = split /\s+/, $emailstr;
+			$correct = 1;
+			for my $email (@emails) {
+				unless ($email =~ /\S+\@\S+/) {
+					$correct = 0;
+				}
+			}
+			$correct = 0 unless @emails;
+		}
+		return $emailstr;
+	} else {
+		return "";
 	}
-	return 0;
+	return "";
 }
 sub put_email() {
-	my $file = shift;
+	my ($file, $emailstr) = @_;
 	my $tmp = $file . ".tmp";
 	move($file, $tmp);
 	open TMP, "< $tmp";
 	my @lines = <TMP>;
 	close TMP;
 	unlink $tmp;
-        my @ftmp = split /\//, $file;
-        my $filename = $ftmp[$#ftmp];
-	print "\n";
-	print " ----  To which email address(es) would you like $filename alerts to be sent?\n";
-	print " ----  You can enter as many email addresses as you like separated by spaces.\n";
-	my $emailstr = "";
-	my $correct = 0;
-	while (! $correct) {
-		print "Email addresses: ";
-		$emailstr = <STDIN>;
-		$emailstr =~ s/\,//g;
-		chomp $emailstr;
-		my @emails = split /\s+/, $emailstr;
-		$correct = 1;
-		for my $email (@emails) {
-			unless ($email =~ /\S+\@\S+/) {
-				$correct = 0;
-			}
-		}
-		$correct = 0 unless @emails;
-	}
+	my @ftmp = split /\//, $file;
+	my $filename = $ftmp[$#ftmp];
 	
 	open F, "> $file";
 	for my $l (@lines) {
@@ -784,7 +790,7 @@ sub enable_psad_at_boot() {
 sub check_commands() {
         my $Cmds_href = shift;
         my $caller = $0;
-        CMD: foreach my $cmd (keys %$Cmds_href) {
+        CMD: for my $cmd (keys %$Cmds_href) {
                 unless (-e $Cmds_href->{$cmd}) {
                         my $cmd_name = (split /\//, $Cmds_href->{$cmd})[$#_];
                         my $real_location = `which $cmd_name 2> /dev/null`;

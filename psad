@@ -3288,8 +3288,20 @@ sub scan_logr() {
 
             unless ($no_posf) {
                 if (defined $p0f{$src}) {  ### prefer p0f-based fingerprinting
+                    ### any p0f fingerprint that contains a "@" is an
+                    ### approximate match
+                    my $found_exact_match = 0;
+                    for my $os (keys %{$p0f{$src}}) {
+                        if ($os !~ /\@/) {
+                            $found_exact_match = 1;
+                            last;
+                        }
+                    }
                     my $printed_guess_line = 0;
                     for my $os (keys %{$p0f{$src}}) {
+                        if ($found_exact_match) {
+                            next if $os =~ /\@/;
+                        }
                         if ($printed_guess_line) {
                             printf $fh "%${log_len}s%s\n", ' ', $os;
                         } else {

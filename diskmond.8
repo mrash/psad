@@ -1,0 +1,19 @@
+.\"
+.TH DISKMOND 8 "November 2002" "Debian/GNU Linux"
+.SH NAME
+diskmond \- checks disk space for "fwdata".
+.SH SYNOPSIS
+diskmond
+.SH DESCRIPTION
+.B diskmond
+checks every 60 seconds to make sure that the disk utilization for the partition that holds the psad "fwdata" file is not beyond a threshold that the administrator defines.
+.SH SEE ALSO
+.BR psad (8),
+.BR psadwatchd (8),
+.BR pscan (8),
+.BR kmsgsd (8)
+.SH AUTHOR
+Michael B. Rash (mbr@cipherdyne.com)
+
+This manual page was written by Daniel Gubser <daniel.gubser@gutreu.ch> for the Debian GNU/Linux system (but may be used by others).
+

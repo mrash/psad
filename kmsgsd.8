@@ -1,0 +1,20 @@
+.\"
+.TH KMSGSD 8 "November 2002" "Debian/GNU Linux"
+.SH NAME
+kmsgsd \- separates ipchains/iptables messages from all other kernel messages.
+.SH SYNOPSIS
+kmsgsd
+.SH DESCRIPTION
+.B kmsgsd
+read message from the /var/log/psadfifo named pipe and print any firewall related dop/reject/deny messages to the psad data file "/var/log/psad/fwdata".
+
+.SH SEE ALSO
+.BR psad (8),
+.BR psadwatchd (8),
+.BR pscan (8),
+.BR diskmond (8)
+.SH AUTHOR
+Michael B. Rash (mbr@cipherdyne.com)
+
+This manual page was written by Daniel Gubser <daniel.gubser@gutreu.ch> for the Debian GNU/Linux system (but may be used by others).
+

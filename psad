@@ -247,6 +247,9 @@ my %posf_sigs = ();
 ### cache all scan signatures (initialized by default)
 my %sigs = ();
 
+### cache valid icmp types and corresponding codes
+my %valid_icmp_types = ();
+
 ### Cache snort rule messages if --snort-sids switch was
 ### given.  This is only useful if iptables includes rule
 ### that log things like "SID123".  "fwsnort"
@@ -352,6 +355,7 @@ my $local_ips_lkup_ctr = 0;
 ### in psad if specified from the command line
 my $no_snort_sids = 0;
 my $no_signatures = 0;
+my $no_icmp_types = 0;
 my $no_auto_ips   = 0;
 my $no_posf       = 0;
 my $no_daemon     = 0;
@@ -445,6 +449,7 @@ Getopt::Long::Configure('no_ignore_case');
     'no-passiveos'      => \$no_posf,         # Do not attempt to passively
                                               # fingerprint the remote OS.
     'no-signatures'     => \$no_signatures,   # Disable signature processing.
+    'no-icmp-types'     => \$no_icmp_types,   # Disable icmp type/code validation.
     'no-auto-ips'       => \$no_auto_ips,     # Disable auto danger level
                                               # assignment.
     'no-daemon'         => \$no_daemon,       # Do not run as a daemon.
@@ -1089,8 +1094,10 @@ sub check_scan() {
         } else {
             ### attempt to match any tcp/udp/icmp signatures in the
             ### main signatures hash
-            &match_sigs($src, $dst, $chain, $sp, $dp, $proto,
-                $flags, $len, $ttl, $type, $code, $id, $seq);
+            unless ($no_signatures) {
+                &match_sigs($src, $dst, $chain, $sp, $dp, $proto,
+                    $flags, $len, $ttl, $type, $code, $id, $seq)
+            }
         }
     }
 
@@ -1146,7 +1153,7 @@ sub match_sigs() {
                 ### tripped a tcp signature
                 print STDERR " .. match_sigs(): matched tcp $dp,$sp,$flags, ",
                     "sid: $sid\n" if $debug;
-                unless ($scan_dl{$src} >= $sigs_attr{$sid}{'dlevel'}) {
+                if ($scan_dl{$src} < $sigs_attr{$sid}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sid}{'dlevel'};
                     $scan{$src}{$dst}{'alerted'} = 0
                         if ($config{'ALERT_ALL'} eq 'N');
@@ -1166,7 +1173,7 @@ sub match_sigs() {
                 ### tripped a udp signature
                 print STDERR " .. match_sigs(): matched udp $dp,$sp, ",
                     "sid: $sid\n" if $debug;
-                unless ($scan_dl{$src} >= $sigs_attr{$sid}{'dlevel'}) {
+                if ($scan_dl{$src} < $sigs_attr{$sid}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sid}{'dlevel'};
                     $scan{$src}{$dst}{'alerted'} = 0
                         if ($config{'ALERT_ALL'} eq 'N');
@@ -1176,6 +1183,27 @@ sub match_sigs() {
             }
         }
     } elsif ($proto eq 'icmp') {
+        ### check icmp type and code fields against the official values
+        ### in RFC 792.  See %inval_type_code for corresponding signature
+        ### message text and danger levels.
+        my $type_code_rv = &check_icmp_type($type, $code);
+        if ($type_code_rv == 1) {  ### bad type
+            if ($scan_dl{$src} < 2) {
+                $scan_dl{$src} = 2;  ### XXX hard-coded as dl 2 for now.
+                $scan{$src}{$dst}{'alerted'} = 0
+                    if ($config{'ALERT_ALL'} eq 'N');
+            }
+            $scan{$src}{$dst}{'icmp'}{'invalid_type'}
+                {$type}{$chain}{'pkts'}++;
+        } elsif ($type_code_rv == 2) {
+            if ($scan_dl{$src} < 2) {
+                $scan_dl{$src} = 2;  ### XXX hard-coded as dl 2 for now.
+                $scan{$src}{$dst}{'alerted'} = 0
+                    if ($config{'ALERT_ALL'} eq 'N');
+            }
+            $scan{$src}{$dst}{'icmp'}{'invalid_code'}
+                {$type}{$code}{$chain}{'pkts'}++;
+        }
         for my $sid (keys %{$sigs{'icmp'}}) {
             if (&check_src($chain, $src, $sigs{'icmp'}{$sid}{'src'})
                     and &check_dst($chain, $dst, $sigs{'icmp'}{$sid}{'dst'})
@@ -1183,7 +1211,7 @@ sub match_sigs() {
                         $id, $seq)) {
                 print STDERR " .. match_sigs(): matched icmp sid: $sid\n"
                     if $debug;
-                unless ($scan_dl{$src} >= $sigs_attr{$sid}{'dlevel'}) {
+                if ($scan_dl{$src} < $sigs_attr{$sid}{'dlevel'}) {
                     $scan_dl{$src} = $sigs_attr{$sid}{'dlevel'};
                     $scan{$src}{$dst}{'alerted'} = 0
                         if ($config{'ALERT_ALL'} eq 'N');
@@ -1522,8 +1550,7 @@ sub check_port() {
             }
         }
     }
-
-    ### if we made it to here, then we matched both
+    ### if we made it here, then we matched both
     ### the src and dst port criteria
     return 1;
 }
@@ -1546,7 +1573,15 @@ sub check_icmp_sig() {
     if (defined $sigs{'icmp'}{$sid}{'seq'}) {
         return 0 if ($sigs{'icmp'}{$sid}{'icmp_seq'} != $icmp_seq);
     }
-    return 1;  ### if we got to this point, then we matched the signature
+    ### if we got to this point then we matched the signature
+    return 1;
+}
+
+sub check_icmp_type() {
+    my ($type, $code) = @_;
+    return 1 if not defined $valid_icmp_types{$type};
+    return 2 if not defined $valid_icmp_types{$type}{'codes'}{$code};
+    return 0;
 }
 
 sub check_misc_fields() {
@@ -1611,6 +1646,11 @@ sub import_configs() {
     ### import psad signatures (XXX: these should be taken directly
     ### from the snort signatures instead)
     &import_signatures() unless $no_signatures;
+
+    ### import icmp types and codes from psad_icmp_types; icmp "type"
+    ### and "code" fields will be validated against the values in this
+    ### file.
+    &import_icmp_types() unless $no_icmp_types;
 
     ### import passive OS fingerprinting signatures
     &import_posf_sigs() unless $no_posf;
@@ -1980,6 +2020,40 @@ sub import_signatures() {
         print STDERR Dumper %sigs_attr;
     }
     &Psad::psyslog('psad', '.. imported psad-1.3 signatures');
+    return;
+}
+
+sub import_icmp_types() {
+    %valid_icmp_types = ();
+    open TYPES, "< $config{'PSAD_ICMP_TYPES_FILE'}" or die
+        " ** Could not open $config{'PSAD_ICMP_TYPES_FILE'}: $!";
+    my @lines = <TYPES>;
+    close TYPES;
+    my $icmp_type = -1;
+    for my $line (@lines) {
+        next if $line =~ /^\s*#/;
+        if ($line =~ /^(\d+)\s+(.*)/) {
+            $icmp_type      = $1;
+            my $icmp_type_text = $2;
+            if ($icmp_type_text =~ /unassigned/i) {
+                $icmp_type = -1;
+            }
+            $valid_icmp_types{$icmp_type}{'text'} = $icmp_type_text;
+            next;
+        }
+        if ($icmp_type > -1 and $line =~ /^\s+(\d+)\s+(.*)/) {
+            my $icmp_code      = $1;
+            my $icmp_code_text = $2;
+            next if $icmp_code_text =~ /unassigned/i;
+            ### don't really need to add the icmp code text here since
+            ### we validate against the icmp type first (i.e. an invalid
+            ### icmp code is meaningless unless we first have a valid
+            ### icmp type).
+            $valid_icmp_types{$icmp_type}{'codes'}{$icmp_code} = '';
+        }
+    }
+    print STDERR Dumper %valid_icmp_types if $debug;
+    &Psad::psyslog('psad', '.. imported valid icmp types and codes');
     return;
 }
 
@@ -2593,7 +2667,7 @@ sub scan_logr() {
                         if defined $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'udp'};
                     $tot_icmp = $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'icmp'}
                         if defined $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'icmp'};
-                    printf $fh "    %-9s%-13s%-7s%-7s%-7s\n", $chain,
+                    printf $fh "   %-9s%-13s%-7s%-7s%-7s\n", $chain,
                         $intf, $tot_tcp, $tot_udp, $tot_icmp;
                 }
             }
@@ -2659,8 +2733,11 @@ sub scan_logr_signatures() {
     $dst_ip_is_local = 1 if defined $local_ips{$dst};
     open LS, ">> $log_sigs" or die " ** Could not open $log_sigs: $!";
     for my $proto qw(tcp udp icmp) {
+        next unless defined $scan{$src}{$dst}{$proto};
         next unless (defined $scan{$src}{$dst}{$proto}{'curr_sig'}
-            or defined $scan{$src}{$dst}{$proto}{'sid'});
+            or defined $scan{$src}{$dst}{$proto}{'sid'}
+            or defined $scan{$src}{$dst}{$proto}{'invalid_type'}
+            or defined $scan{$src}{$dst}{$proto}{'invalid_code'});
         print $email_fh "\n\n ** $proto scan signatures: **\n\n";
         print LS "\n\n ** $proto scan signatures **\n\n";
         print STDERR " .. scan_logr_signatures(): src: $src dst: $dst ",
@@ -2688,6 +2765,37 @@ sub scan_logr_signatures() {
                 print LS "       chain:     $chain\n";
                 print $email_fh "       packets:   $pkts\n\n";
                 print LS "       packets:   $pkts\n\n";
+            }
+        }
+        if (defined $scan{$src}{$dst}{$proto}{'invalid_type'}) {
+            for my $type (keys %{$scan{$src}{$dst}{$proto}{'invalid_type'}}) {
+                for my $chain (keys %{$scan{$src}{$dst}{$proto}
+                        {'invalid_type'}{$type}}) {
+                    my $pkts = $scan{$src}{$dst}{$proto}
+                        {'invalid_type'}{$type}{$chain}{'pkts'};
+                    print $email_fh
+                        qq(   Invalid ICMP type "$type" chain=$chain packets=$pkts\n);
+                    print LS
+                        qq(   Invalid ICMP type "$type" chain=$chain packets=$pkts\n);
+                }
+            }
+        }
+        if (defined $scan{$src}{$dst}{$proto}{'invalid_code'}) {
+            for my $type (keys %{$scan{$src}{$dst}{$proto}{'invalid_code'}}) {
+                for my $code (keys %{$scan{$src}{$dst}
+                        {$proto}{'invalid_code'}{$type}}) {
+                    for my $chain (keys %{$scan{$src}{$dst}{$proto}
+                            {'invalid_code'}{$type}{$code}}) {
+                        my $pkts = $scan{$src}{$dst}{$proto}{'invalid_code'}
+                            {$type}{$code}{$chain}{'pkts'};
+                        print $email_fh "   Invalid ICMP code \"$code\" for ICMP ",
+                            "\"$valid_icmp_types{$type}{'text'}\" packet\n",
+                            "       chain=$chain packets=$pkts\n";
+                        print LS "   Invalid ICMP code \"$code\" for ICMP ",
+                            "\"$valid_icmp_types{$type}{'text'}\" packet\n",
+                            "       chain=$chain packets=$pkts\n";
+                    }
+                }
             }
         }
         for my $sid (keys %{$scan{$src}{$dst}{$proto}{'curr_sig'}}) {
@@ -2772,10 +2880,16 @@ sub scan_logr_signatures() {
         }
         ### need to delete the current signature so it
         ### won't show up in the next alert
-        delete $scan{$src}{$dst}{$proto}{'curr_sig'}
-            unless $config{'SHOW_ALL_SIGNATURES'} eq 'Y';
-        delete $scan{$src}{$dst}{$proto}{'sid'}
-            unless $config{'SHOW_ALL_SIGNATURES'} eq 'Y';
+        unless ($config{'SHOW_ALL_SIGNATURES'} eq 'Y') {
+            delete $scan{$src}{$dst}{$proto}{'curr_sig'}
+                if defined $scan{$src}{$dst}{$proto}{'curr_sig'};
+            delete $scan{$src}{$dst}{$proto}{'sid'}
+                if defined $scan{$src}{$dst}{$proto}{'sid'};
+            delete $scan{$src}{$dst}{$proto}{'invalid_type'}
+                if defined $scan{$src}{$dst}{$proto}{'invalid_type'};
+            delete $scan{$src}{$dst}{$proto}{'invalid_code'}
+                if defined $scan{$src}{$dst}{$proto}{'invalid_code'};
+        }
     }
     close LS;
     return;
@@ -3830,30 +3944,28 @@ sub import_old_scans() {
     shift @files; shift @files;
     my $import_ctr = 0;
     chdir $config{'PSAD_DIR'} or die $!;
-    SRCIP: for my $file (@files) {
-        next SRCIP unless ($file =~ /$ip_re/ and -d $file);
-        ### $file is a current scan source ip
-        my $src = $file;
+    SRCIP: for my $src (@files) {
+        next SRCIP unless ($src =~ /$ip_re/ and -d $src);
         ### define as many hash keys as we can (older versions
         ### of psad don't include several of these files).
         if (-e "${src}/danger_level") {
-            open F, "< ${src}/danger_level" or next SRCIP;
-            my $dl = <F>;
-            close F;
+            open DL, "< ${src}/danger_level" or next SRCIP;
+            my $dl = <DL>;
+            close DL;
             chomp $dl;
             $scan_dl{$src} = $dl;  ### set the dl for $src
         }
         if (-e "${src}/os_guess") {
-            open F, "< ${src}/os_guess" or next SRCIP;
-            my $os_guess = <F>;
-            close F;
+            open OS, "< ${src}/os_guess" or next SRCIP;
+            my $os_guess = <OS>;
+            close OS;
             chomp $os_guess;
             ### set the os guess for $src
             $posf{$src}{'guess'} = $os_guess;
         }
-        opendir F, "$config{'PSAD_DIR'}/$src" or next SRCIP;
-        my @scan_files = readdir F;
-        closedir F;
+        opendir IPDIR, $src or next SRCIP;
+        my @scan_files = readdir IPDIR;
+        closedir IPDIR;
         shift @scan_files; shift @scan_files;
         ### get all of the destination ip addresses
         my %dst_ips;
@@ -3867,9 +3979,9 @@ sub import_old_scans() {
             ### ips since we are importing data from a previous run.
             $scan{$src}{$dst}{'alerted'} = 1;
             if (-e "${src}/${dst}_packet_ctr") {
-                open F, "< ${src}/${dst}_packet_ctr" or next SRCIP;
-                my @lines = <F>;
-                close F;
+                open PKTS, "< ${src}/${dst}_packet_ctr" or next SRCIP;
+                my @lines = <PKTS>;
+                close PKTS;
                 for my $line (@lines) {
                     my $chain;
                     my $intf;
@@ -3901,9 +4013,9 @@ sub import_old_scans() {
                 }
             }
             if (-e "${src}/${dst}_start_time") {
-                open F, "< ${src}/${dst}_start_time" or next SRCIP;
-                my $s_time = <F>;
-                close F;
+                open ST, "< ${src}/${dst}_start_time" or next SRCIP;
+                my $s_time = <ST>;
+                close ST;
                 chomp $s_time;
                 $scan{$src}{$dst}{'s_time'} = $s_time;
             }
@@ -3911,10 +4023,10 @@ sub import_old_scans() {
     }
     ### increment global packet counters
     if (-e $config{'PACKET_COUNTER_FILE'}) {
-        open F, "< $config{'PACKET_COUNTER_FILE'}" or die " ** Could not ",
+        open CF, "< $config{'PACKET_COUNTER_FILE'}" or die " ** Could not ",
             "open $config{'PACKET_COUNTER_FILE'}";
-        my @lines = <F>;
-        close F;
+        my @lines = <CF>;
+        close CF;
         for my $line (@lines) {
             if ($line =~ /tcp:\s+(\d+)/) {
                 $tcp_ctr = $1;
@@ -3926,9 +4038,9 @@ sub import_old_scans() {
         }
     }
     ### zero out $FW_DATA_FILE
-    open F, "> $config{'FW_DATA_FILE'}" or die ' ** Could not open ',
+    open FD, "> $config{'FW_DATA_FILE'}" or die ' ** Could not open ',
         "$config{'FW_DATA_FILE'}: $!";
-    close F;
+    close FD;
     return;
 }
 
@@ -4551,8 +4663,9 @@ sub disk_space_exceeded() {
     close DF;
     my ($prcnt) = ($df_data[$#df_data] =~ /(\d+)%/);
     my $rv = 0;
-    if ($config{'DISK_MAX_PERCENTAGE'} > 0 and
-            $prcnt > $config{'DISK_MAX_PERCENTAGE'}) {  ### need to remove data
+    if ($config{'DISK_MAX_PERCENTAGE'} > 0
+            and $prcnt > $config{'DISK_MAX_PERCENTAGE'}) {
+        ### need to remove data
         $rv = 1;
         $rm_data_ctr++;
         &Psad::psyslog('psad', ".. disk partition associated with " .
@@ -4677,7 +4790,7 @@ sub required_vars() {
         DSHIELD_USER_EMAIL DISK_CHECK_INTERVAL DISK_MAX_PERCENTAGE
         DISK_MAX_RM_RETRIES ETC_HOSTS_DENY ETC_SYSLOG_CONF
         ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL ANALYSIS_DIR
-        IMPORT_OLD_SCANS
+        IMPORT_OLD_SCANS PSAD_ICMP_TYPES_FILE
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;
@@ -4698,7 +4811,7 @@ Usage: psad [-a <auto ips file>] [-c <config file>] [-l] [-i <interval>]
        [--fw-file <file>] [-m <messages file>] [--interval <seconds>]
        [--status-ip <ip>] [--status-sort-dl] [--no-fwcheck] [--no-daemon]
        [--no-rdns] [--no-whois] [--no-netstat] [--no-ipt-errors]
-       [--no-passiveos] [--no-snort-sids] [--no-kmsgsd]
+       [--no-passiveos] [--no-snort-sids] [--no-signatures] [--no-kmsgsd]
 
 Options:
     --signatures <sigs file>      - Manually specify the path to the
@@ -4758,7 +4871,9 @@ Options:
     --no-snort-sids               - Disable examination for snort sids
                                     (such as those generated by fwsnort)
                                     in iptables messages.
-    --no-signatures               - Disable signature processing.
+    --no-signatures               - Disable psad signature processing
+                                    (indendent of snort sid matching).
+    --no-icmp-types               - Disable icmp type/code validation.
     --no-auto-ips                 - Disable auto danger level assignment.
     --no-daemon                   - Do not run as a daemon.
     --no-ipt-errors               - Do not write errors to the error

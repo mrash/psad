@@ -1,6 +1,12 @@
     - Automated tests to verify correct behavior for command line
       options (and potentially other things such as correctness of
       psad alerts).
+    - XML logging format.
+    - Add the ability to install.pl to restore the "latest" syslog config
+      backup file (fwknop may have been installed for example) at uninstall
+      time.
+    - Infer NMAP scan if OPT does not exist in the iptables log (because
+      tcp options are missing)?
     - Play with SHOW_ALL_SIGNATURES = "Y" since this may not really cause
       hugely long email alerts.  This trick would be to perhaps associate
       a "last seen" timestamp with each old signature.

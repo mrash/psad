@@ -1,3 +1,10 @@
+psad-1.4.1 (12//2004):
+    - Updated to version 4.6.23 of the whois client.
+    - Re-worked syslog installation portion of install.pl.  The user will
+      always be prompted to enter the syslog daemon now, and also added
+      the --syslog-conf arg to allow the config file path to be specified
+      on the install.pl command line.
+
 psad-1.4.0 (11/26/2004):
     - Added p0f-style passive OS fingerprinting through the use of the OPT
       field in iptables log messages (which is only logged through the use

@@ -178,7 +178,8 @@ $Cmds{'psad'} = $psadCmd;
 $< == 0 && $> == 0 or die "You need to be root (or equivalent UID 0",
     " account) to install/uninstall psad!\n";
 
-### check for a pre-0.9.2 installation of psad.
+### occasionally things from old psad installations need to be
+### dealt with separately.
 &check_old_psad_installation();
 
 if ($uninstall) {
@@ -208,6 +209,13 @@ sub install() {
         &logr(" .. Creating $LIBDIR\n");
         mkdir $LIBDIR, 0755;
     }
+
+    ### deal with old psad_auto_ips path
+    if (-e "${PSAD_CONFDIR}/psad_auto_ips") {
+        move "${PSAD_CONFDIR}/psad_auto_ips",
+            "${PSAD_CONFDIR}/psad_auto_dl";
+    }
+
     ### change any existing psad module directory to allow anyone to execute
     chmod 0755, $LIBDIR;
     unless (-d $PSAD_CONFDIR) {
@@ -514,13 +522,13 @@ sub install() {
         unlink "${PSAD_CONFDIR}/diskmond.conf";
     }
 
-    ### deal with psad_auto_ips, psad_signatures,
+    ### deal with psad_auto_dl, psad_signatures,
     ### psad_icmp_types, and psad_posf
     for my $file qw(psad_signatures psad_icmp_types
-            psad_posf psad_auto_ips) {
+            psad_posf psad_auto_dl) {
         if (-e "${PSAD_CONFDIR}/$file") {
             &archive("${PSAD_CONFDIR}/$file") unless $noarchive;
-            unless (&query_preserve_sigs_autoips("${PSAD_CONFDIR}/$file")) {
+            unless (&query_preserve_sigs_autodl("${PSAD_CONFDIR}/$file")) {
                 ### keep the installed file intact (the user must have
                 ### modified it).
                 &logr(" .. Copying $file -> ${PSAD_CONFDIR}/$file\n");
@@ -978,7 +986,7 @@ sub query_preserve_config() {
     return 0;
 }
 
-sub query_preserve_sigs_autoips() {
+sub query_preserve_sigs_autodl() {
     my $file = shift;
     my $ans = '';
     while ($ans ne 'y' && $ans ne 'n') {

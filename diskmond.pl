@@ -144,6 +144,10 @@ sub rm_data() {
     }
     open F, "> $Config{'FW_DATA'}";
     close F;
+    if (-d $Config{'SCAN_DATA_ARCHIVE_DIR'}) {
+        rmtree $Config{'SCAN_DATA_ARCHIVE_DIR'};
+        mkdir $Config{'SCAN_DATA_ARCHIVE_DIR'}, 0500;
+    }
     return;
 }
 
@@ -168,7 +172,7 @@ sub check_config() {
     my @required_vars = qw(
         FW_DATA DISKMOND_CHECK_INTERVAL
         MAX_DISK_PERCENTAGE DISKMOND_PID_FILE
-        PSAD_DIR
+        PSAD_DIR SCAN_DATA_ARCHIVE_DIR
     );
     &Psad::validate_config($CONFIG_FILE, \@required_vars, $Config_href);
     return;

@@ -2,13 +2,13 @@
 .TH PSADWATCHD 8 "November 2002" "Debian/GNU Linux"
 .SH NAME
 .B psadwatchd
-\- checks to make sure kmsgsd, diskmond, and psad are running.
+\- checks to make sure kmsgsd and psad are running.
 .SH SYNOPSIS
 .B psadwatchd [<config file>]
 .SH DESCRIPTION
 .B psadwatchd
-checks on an interval of every five seconds to make sure that kmsgsd,
-diskmond, and psad are running on the box.  If any of the three daemons
+checks on an interval of every five seconds to make sure that kmsgsd
+and psad are running on the box.  If any of the three daemons
 have died, psadwatchd will restart the daemon and notify each
 email address listed in the EMAIL_ADDRESSES variable (see
 /etc/psad/psad.conf) that the daemon has been restarted.
@@ -19,8 +19,7 @@ on the command line.
 
 .SH SEE ALSO
 .BR psad (8),
-.BR diskmond (8),
-.BR kmsgd (8),
+.BR kmsgsd (8),
 .SH AUTHOR
 Michael Rash (mbr@cipherdyne.org)
 

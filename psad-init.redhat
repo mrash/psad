@@ -49,15 +49,11 @@ stop)
     echo -n "Shutting down the psad kmsgsd daemon: "
     killproc kmsgsd
     echo
-    echo -n "Shutting down the psad diskmond daemon: "
-    killproc diskmond
-    echo
     ;;
 status)
     status kmsgsd
     status psad
     status psadwatchd
-    status diskmond
     ;;
 restart|reload)
     restart

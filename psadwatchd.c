@@ -43,7 +43,6 @@
 /* globals */
 short int psad_syscalls_ctr     = 0;
 short int kmsgsd_syscalls_ctr   = 0;
-short int diskmond_syscalls_ctr = 0;
 const char mail_redr[] = " < /dev/null > /dev/null 2>&1";
 char hostname[MAX_GEN_LEN];
 char mail_addrs[MAX_GEN_LEN];
@@ -60,8 +59,6 @@ static void parse_config(
     char *psad_cmdline_file,
     char *kmsgsd_binary,
     char *kmsgsd_pid_file,
-    char *diskmond_binary,
-    char *diskmond_pid_file,
     char *shCmd,
     char *mailCmd,
     char *mail_addrs,
@@ -90,8 +87,6 @@ int main(int argc, char *argv[]) {
     char psad_cmdline_file[MAX_PATH_LEN];
     char kmsgsdCmd[MAX_PATH_LEN];
     char kmsgsd_pid_file[MAX_PATH_LEN];
-    char diskmondCmd[MAX_PATH_LEN];
-    char diskmond_pid_file[MAX_PATH_LEN];
     char psadwatchd_pid_file[MAX_PATH_LEN];
     unsigned int psadwatchd_check_interval = 5;  /* default to 5 seconds */
     unsigned int psadwatchd_max_retries = 10; /* default to 10 tries */
@@ -127,8 +122,6 @@ int main(int argc, char *argv[]) {
         psad_cmdline_file,
         kmsgsdCmd,
         kmsgsd_pid_file,
-        diskmondCmd,
-        diskmond_pid_file,
         shCmd,
         mailCmd,
         mail_addrs,
@@ -158,8 +151,6 @@ int main(int argc, char *argv[]) {
             psadCmd, psadwatchd_max_retries);
         check_process("kmsgsd", kmsgsd_pid_file, NULL,
             kmsgsdCmd, psadwatchd_max_retries);
-        check_process("diskmond", diskmond_pid_file, NULL,
-            diskmondCmd, psadwatchd_max_retries);
 
         /* sleep and then check to see if we received any signals */
         sleep(psadwatchd_check_interval);
@@ -180,8 +171,6 @@ int main(int argc, char *argv[]) {
                 psad_cmdline_file,
                 kmsgsdCmd,
                 kmsgsd_pid_file,
-                diskmondCmd,
-                diskmond_pid_file,
                 shCmd,
                 mailCmd,
                 mail_addrs,
@@ -291,14 +280,6 @@ static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries)
 #endif
         if (psad_syscalls_ctr >= max_retries)
             give_up(pid_name);
-    } else if (strcmp("diskmond", pid_name) == 0) {
-        diskmond_syscalls_ctr++;
-#ifdef DEBUG
-        printf(" .. %s not running.  Trying to restart (%d tries so far).\n",
-            pid_name, diskmond_syscalls_ctr);
-#endif
-        if (diskmond_syscalls_ctr >= max_retries)
-            give_up(pid_name);
     } else if (strcmp("kmsgsd", pid_name) == 0) {
         kmsgsd_syscalls_ctr++;
 #ifdef DEBUG
@@ -315,8 +296,6 @@ static void reset_syscall_ctr(const char *pid_name)
 {
     if (strcmp("psad", pid_name) == 0) {
         psad_syscalls_ctr = 0;
-    } else if (strcmp("diskmond", pid_name) == 0) {
-        diskmond_syscalls_ctr = 0;
     } else if (strcmp("kmsgsd", pid_name) == 0) {
         kmsgsd_syscalls_ctr = 0;
     }
@@ -428,8 +407,6 @@ static void parse_config(
     char *psad_cmdline_file,
     char *kmsgsdCmd,
     char *kmsgsd_pid_file,
-    char *diskmondCmd,
-    char *diskmond_pid_file,
     char *shCmd,
     char *mailCmd,
     char *mail_addrs,
@@ -469,8 +446,6 @@ static void parse_config(
             find_char_var("PSAD_CMDLINE_FILE ", psad_cmdline_file, index);
             find_char_var("kmsgsdCmd ", kmsgsdCmd, index);
             find_char_var("KMSGSD_PID_FILE ", kmsgsd_pid_file, index);
-            find_char_var("diskmondCmd ", diskmondCmd, index);
-            find_char_var("DISKMOND_PID_FILE ", diskmond_pid_file, index);
             find_char_var("shCmd ", shCmd, index);
             find_char_var("mailCmd ", mailCmd, index);
             find_char_var("EMAIL_ADDRESSES ", mail_addrs, index);

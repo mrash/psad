@@ -105,8 +105,6 @@ for (;;) {
         $config{'PSAD_PID_FILE'}, \$p_emails);
     &check_process('kmsgsd', '',
         $config{'KMSGSD_PID_FILE'}, \$k_emails);
-    &check_process('diskmond', '',
-        $config{'DISKMOND_PID_FILE'}, \$d_emails);
 
     sleep $config{'PSADWATCHD_CHECK_INTERVAL'};
 }

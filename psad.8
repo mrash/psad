@@ -1,7 +1,7 @@
 .\" Process this file with
 .\" groff -man -Tascii foo.1
 .\"
-.TH PSAD 8 "September, 2002" Linux
+.TH PSAD 8 "Oct, 2003" Linux
 .SH NAME
 .B psad
 \- The Port Scan Attack Detector
@@ -60,7 +60,7 @@ makes use of packet length, ttl, tos, ip id, and tcp window sizes
 to passively fingerprint remote operating systems from which scans originate.
 
 .B psad
-consists of four daemons: psad, kmsgsd, psadwatchd, and diskmond.
+consists of three daemons: psad, kmsgsd, and psadwatchd.
 .B psad
 is responsible for processing all packets that have been logged by the
 firewall and applying the signature logic in order to determine what type
@@ -74,20 +74,13 @@ expression (or string) to
 .B psadwatchd
 is a software watchdog that will restart any of the other three daemons should
 a daemon die for any reason.
-.B diskmond
-is responsible for keeping track of the disk space utilization on the partition
-that contains the firewall data and scanning ip directories.
-.B diskmond
-will remove these directories as necessary if the available space becomes
-less than a threshold defined by the administrator (the default is 95%).
 .SH OPTIONS
 .PP
 .PD 0
 .TP
 
 .BI \-c "\fR,\fP " \-\^\-config "  configuration-file"
-By default all of the psad daemons (psad, psadwatchd, kmsgsd,
-and diskmond) make use of the configuration file 
+By default all of the psad makes use of the configuration file
 .B /etc/psad/psad.conf
 for almost all configuration parameters.  psad can be made to
 override this path by specifying a different file on the command
@@ -178,10 +171,9 @@ network in an easily readable format.
 .TP
 
 .BR \-K ", " \-\^\-Kill
-Kill the current psad process along with psadwatchd, kmsgsd,
-and diskmond.  This provides a quick and easy way to kill
-all psad processes without having to look in the process table or
-appeal to the psad-init script.
+Kill the current psad process along with psadwatchd and kmsgsd.
+This provides a quick and easy way to kill all psad processes without
+having to look in the process table or appeal to the psad-init script.
 .TP
 
 .BR \-R ", " \-\^\-Restart

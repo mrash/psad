@@ -29,6 +29,11 @@ psad-1.4.1 (02//2005):
     - Added the ability to ignore packets based on input interface with
       IGNORE_INTERFACES in psad.conf.
     - Re-worked auto_dl code, better hash design and searching function.
+    - Removed dependency on sendmail command unless DShield alerting is
+      enabled and a DShield user id is specified.
+    - Added ALERTING_METHODS keyword in the file alert.conf to allow either
+      syslog or email alerts (or both) to be disabled.  Psad and psadwatchd
+      reference this file.
 
 psad-1.4.0 (11/26/2004):
     - Added p0f-style passive OS fingerprinting through the use of the OPT

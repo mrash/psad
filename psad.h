@@ -58,7 +58,6 @@
 #define MAX_GEN_LEN 80
 #define MAX_NUM_LEN 5
 
-
 /* PROTOTYPES *****************************************************************/
 void check_unique_pid(const char *, const char *);
 void write_pid(const char *, pid_t);

@@ -1,231 +1,259 @@
-Manual Caphina          Greatly assisting in the first version of
-                        Bastille-NIDS which eventually became psad.
+Manual Caphina
+    - Greatly assisting in the first version of Bastille-NIDS which
+      eventually became psad.
 
-Tim Schaller            Identifying and submitting a patch for a
-                        particularly nasty bug for multiple scanned
-                        ips.
+Tim Schaller
+    - Identifying and submitting a patch for a particularly nasty bug for
+      multiple scanned IPs.
 
-Bruce Meyer             Psad testing and suggestions.
+Bruce Meyer
+    - Psad testing and suggestions.
 
-Peter Watkins           (Bastille Linux) psad/iptables interaction.
+Peter Watkins
+    - (Bastille Linux) psad/iptables interaction.
 
-Sweth Chandramouli      (Bastille Linux) Various suggestions for psad
-                        and install.pl, including help with various
-                        Perl vagaries.
+Sweth Chandramouli
+    - (Bastille Linux) Various suggestions for psad and install.pl,
+      including help with various Perl vagaries.
 
-Jay Beale                (Bastille Linux) Excellent suggestions for
-<jay@bastille-linux.org> psad reporting and enhanced security, and
-                         also for integrating psad with Bastille.
+Jay Beale
+    - (Bastille Linux) Excellent suggestions for psad reporting and enhanced
+      security, and also for integrating psad with Bastille.
 
-Ramiro Morales          Developed all rpm packages of psad (see:
-<rmrpms@usa.net>        http://rmrpms.tripod.com/psad/). Various
-                        suggestions for psad installation (such as
-                        FHS compatibility); implemented init script
-                        patches.
+Ramiro Morales
+    - Developed all pre-1.0 rpm packages of psad (see:
+      http://rmrpms.tripod.com/psad/).
+    - Various suggestions for psad installation (such as FHS compatibility).
+    - Implemented init script patches.
 
-Alexander Hoff          Psad stress testing for kmsgsd.
+Alexander Hoff
+    - Psad stress testing for kmsgsd.
 
-Ryan Delany             diskmond testing to help track down the
-                        "rdev" bug.
+Ryan Delany
+    - diskmond testing to help track down the "rdev" bug.
 
-Damien Stuart           Suggested the zombie reaper code for whois
-                        processes, and uid/gid check.  Excellent
-                        suggestions for coding practices and
-                        strategies.
+Damien Stuart
+    - Suggested the zombie reaper code for whois processes, and uid/gid
+      check.
+    - Excellent suggestions for coding practices and strategies.
 
-Donnie Armstrong        Suggested fix for incorrectly parsing
-                        ifconfig output (might have previously
-                        included ipv6 interfaces).
+Donnie Armstrong
+    - Suggested fix for incorrectly parsing ifconfig output (might have
+      previously included ipv6 interfaces).
 
-Ryan Bebeau             Suggested fix for AF_INET protocol error.
+Ryan Bebeau
+    - Suggested fix for AF_INET protocol error.
 
-Cliff Rayman            Helped track down a nasty bug in which psad would
-                        parse iptables messages that included a dns name
-                        instead of just an ip address for the src and dst.
-                        Performed lots of excellent testing and
-                        troubleshooting.
+Cliff Rayman
+    - Helped track down a nasty bug in which psad would parse iptables
+      messages that included a dns name instead of just an ip address for
+      the src and dst.
+    - Performed lots of excellent testing and
+      troubleshooting.
 
-Henry Jobst             Bugfix in install.pl for chomp error.
+Henry Jobst
+    - Bugfix in install.pl for chomp error.
 
-Ray Curtis              Found bug in kmsgsd for undefined $service lines.
-                        Comprehensive testing to help remove bugs
-                        including a difficult one in which psad gets
-                        periodically restarted.
+Ray Curtis
+    - Found bug in kmsgsd for undefined $service lines.
+    - Comprehensive testing to help remove bugs including a difficult one in
+      which psad gets periodically restarted.
 
-Manuel Santos           Contributed the first bug report to help
-                        troublehshoot a potential bug in psad/whois
-                        interaction.  Suggested the auto blocking code
-                        should include support for tcp wrappers, and that
-                        the auto-blocking alerts should be configurable.
+Manuel Santos
+    - Contributed the first bug report to help troublehshoot a potential bug
+      in psad/whois interaction.
+    - Suggested the auto blocking code should include support for tcp
+      wrappers, and that the auto-blocking alerts should be configurable.
 
-L-P Sundqvist           Suggested fix for tab vs. space bug in install.pl
-                        for /etc/syslog.conf, contributed design ideas to
-                        make psad run on linux distros that use BSD-style
-                        init scripts.
+L-P Sundqvist
+    - Suggested fix for tab vs. space bug in install.pl for
+      /etc/syslog.conf.
+    - Contributed design ideas to make psad run on linux distros that use
+      BSD-style init scripts.
 
-Eric Sawler             Suggested the ability to retain auto-blocked ips
-                        even after a reboot.
+Eric Sawler
+    - Suggested the ability to retain auto-blocked IPs even after a reboot.
 
-C.Holman                Found, reported, and helped troubleshoot a bug in
-                        the ipchains protocol number to name mapping.
+C.Holman
+    - Found, reported, and helped troubleshoot a bug in the ipchains
+      protocol number to name mapping.
 
-Mike McCandless         Asked whether or not there is documentation for
-                        the various psad configuration variables in
-                        psad.conf.  The "PSAD CONFIGURATION VARIABLES"
-                        section of the man page was the result.
+Mike McCandless
+    - Asked whether or not there is documentation for the various psad
+      configuration variables in psad.conf.  The "PSAD CONFIGURATION
+      VARIABLES" section of the man page was the result.
 
-Jason Czerak            Found and submitted a fix for a bug in which an
-                        ip would not be ignored even if it was given a
-                        0 danger level in psad_auto_ips.  Also suggested
-                        using the PREROUTING iptables chain along with
-                        "-t mangle" for the auto-blocking code.
+Jason Czerak
+    - Found and submitted a fix for a bug in which an IP would not be
+      ignored even if it was given a 0 danger level in psad_auto_ips.
+    - Suggested using the PREROUTING iptables chain along with "-t mangle"
+      for the auto-blocking code.
 
-Colin Rose              Discovered and helped troubleshoot a bug
-                        introduced when psad and bastille are installed
-                        on the same machine (bastille installs an older
-                        version of psad).
+Colin Rose
+    - Discovered and helped troubleshoot a bug introduced when psad and
+      bastille are installed on the same machine (bastille installs an older
+      version of psad).
 
-Ugo Viti                Discovered bug in auto-blocking code where the
-                        subject line would incorrectly identify the
-                        action that had been taken.  Discovered bug in
-                        subject line for alert emails not including the
-                        source ip if reverse dns did not work.  Suggested
-                        adding the FORWARD chain to the auto blocking
-                        code.  Found bug for email alert being reached
-                        prematurely.
+Ugo Viti
+    - Discovered bug in auto-blocking code where the subject line would
+      incorrectly identify the action that had been taken.
+    - Discovered bug in subject line for alert emails not including the
+      source IP if reverse dns did not work.
+    - Suggested adding the FORWARD chain to the auto blocking code.
+    - Found bug for email alert being reached prematurely.
 
-Leif Westlye            Discovered a bug where psad would not allow
-                        commands to be different than the <cmd>Cmd name.
-                        The bugfix allows someone to specify
-                        "/usr/bin/mailto" for the mailCmd for example.
+Leif Westlye
+    - Discovered a bug where psad would not allow commands to be different
+      than the <cmd>Cmd name.  The bugfix allows someone to specify
+      "/usr/bin/mailto" for the mailCmd for example.
 
-Daniel Gubser           Wrote the diskmond, kmsgsd, and psadwatchd man
-                        pages.  Suggested compatibility mods for
-                        syslog-ng.  Maintains Debian builds.
+Daniel Gubser
+    - Wrote the diskmond, kmsgsd, and psadwatchd man pages.
+    - Suggested compatibility mods for syslog-ng.
+    - Develops and maintains Debian builds.
 
-Amelia Lewis            Provided information on syslog-ng configs.
+Amelia Lewis
+    - Provided information on syslog-ng configs.
 
-Nick Temple             Suggested sending alerts to abuse.net.
+Nick Temple
+    - Suggested sending alerts to abuse.net.
 
-James N. Winner         Discovered bug that prevented psad from detecting
-                        scans through the iptables FORWARD chain.
+James N. Winner
+    - Discovered bug that prevented psad from detecting scans through the
+      iptables FORWARD chain.
 
-Albert E. Whale         Discovered bug in 1.1 that made fw_check() too
-                        strict with looking for precisely FW_MSG_SEARCH
-                        in a logging prefix instead of just looking for
-                        FW_MSG_SEARCH _within_ the logging prefix.
-                        Suggested use of CPAN downloads of perl modules
-                        in install.pl.  Bugfix for "-" character missing
-                        from Mandrake version of ps.  Bugfix for
-                        duplicate lines for tcpwrapper auto block ips
-                        in /etc/hosts.deny.  Lots of great testing and
-                        feedback on new versions and -pre releases.
-                        Suggested the ability to re-import scanning ip
-                        directories.  Bugfix for zero print_scale_factor
-                        in --Analyze-msgs mode.  Bugfix for auto-ignored
-                        addresses appearing in DShield alerts.
+Albert E. Whale
+    - Discovered bug in 1.1 that made fw_check() too strict with looking for
+      precisely FW_MSG_SEARCH in a logging prefix instead of just looking
+      for FW_MSG_SEARCH _within_ the logging prefix.
+    - Suggested use of CPAN downloads of perl modules in install.pl.
+    - Bugfix for "-" character missing from Mandrake version of ps.
+    - Bugfix for duplicate lines for tcpwrapper auto block IPs in
+      /etc/hosts.deny.
+    - Lots of great testing and feedback on new versions and -pre releases.
+    - Suggested the ability to re-import scanning IP directories.
+    - Bugfix for zero print_scale_factor in --Analyze-msgs mode.
+    - Bugfix for auto-ignored addresses appearing in DShield alerts.
 
-David Krider            Discovered iptables path bug on SuSE 8.2.
+David Krider
+    - Discovered iptables path bug on SuSE 8.2.
 
-Ciapato Manfredi        Reported psadwatchd bug where multiple useless
-                        processes were being spawned.
+Ciapato Manfredi
+    - Reported psadwatchd bug where multiple useless processes were being
+      spawned.
 
-Ben Alcala              Helped troubleshoot diskmond utilization bug.
+Ben Alcala
+    - Helped troubleshoot diskmond utilization bug.
 
-Sebastian Mastropiero   Suggested bugfix for missing pipe character in
-                        psad man page for psadfifo line in syslog.conf.
+Sebastian Mastropiero
+    - Suggested bugfix for missing pipe character in psad man page for
+      psadfifo line in syslog.conf.
 
-Jeff Lunglhofer         Suggested bugfix for packet counters and multiple
-                        scan destinations, bugfix for duplicate lines in
-                        auto-blocking files, and suggested feature by
-                        which psad can add auto blocking firewall rules
-                        at arbitrary points within a policy.
+Jeff Lunglhofer
+    - Suggested bugfix for packet counters and multiple scan destinations,
+      bugfix for duplicate lines in auto-blocking files, and suggested
+      feature by which psad can add auto blocking firewall rules at
+      arbitrary points within a policy.
 
-Ruben Vanhoutte         Bugfix for incorrect path to psadfifo in syslog.ng
-                        config.
+Ruben Vanhoutte
+    - Bugfix for incorrect path to psadfifo in syslog.ng config.
 
-Stefan Divjak           Suggested that psad ignore addresses such as
-                        0.0.0.0, 127.0.0.1, and local interface ips from
-                        auto blocking routines.  Suggested a generic way
-                        to (un)block addresses using an external script.
-                        Suggested psad offer analysis capabilities for
-                        snort alert files.
+Stefan Divjak
+    - Suggested that psad ignore addresses such as 0.0.0.0, 127.0.0.1, and
+      local interface ips from auto blocking routines.
+    - Suggested a generic way to (un)block addresses using an external
+      script.
+    - Suggested psad offer analysis capabilities for snort alert files.
 
-Martijn Kruissen        Suggested putting danger levels into psad email
-                        alert subjects.  Suggested custom logging line that
-                        that will trigger psad to auto block an ip.
+Martijn Kruissen
+    - Suggested putting danger levels into psad email alert subjects.
+    - Suggested custom logging line that that will trigger psad to auto
+      block an IP.
 
-Jeffrey Sofferin        Lots of great testing for conditions that might
-                        cause psad to die.  Bugfix in man page for -HUP
-                        option.  Suggested the --status-dl option.
-                        Suggested MIN_ARCHIVE_DANGER_LEVEL.  Found bug for
-                        24 hour dshield alerting interval.
+Jeffrey Sofferin
+    - Lots of great testing for conditions that might cause psad to die.
+    - Bugfix in man page for -HUP option.
+    - Suggested the --status-dl option.
+    - Suggested MIN_ARCHIVE_DANGER_LEVEL.
+    - Found bug for 24 hour dshield alerting interval.
 
-Kenneth Grande          Suggested protocol-specific thresholds for email
-                        alerts.
+Kenneth Grande
+    - Suggested protocol-specific thresholds for email alerts.
 
-Lenny Cartier           Wrote a spec file for Mandrake Linux.  An rpm built
-                        from this spec file is in the user contribs section
-                        of the Mandrake site now.
+Lenny Cartier
+    - Wrote a spec file for Mandrake Linux.  An rpm built from this spec
+      file is in the user contribs section of the Mandrake site now.
 
-Bryan Stine             Wrote a psad ebuild script for inclusion in Gentoo
-                        Linux.  As of the 1.2.4 release psad is included in
-                        the portage tree.  Wrote a much-improved init script
-                        for Gentoo systems.
+Bryan Stine
+    - Wrote a psad ebuild script for inclusion in Gentoo Linux.  As of the
+      1.2.4 release psad is included in the portage tree.
+    - Wrote a much-improved init script for Gentoo systems.
 
-Zenon Panoussis         Submitted patch for rpm spec that replaced the
-                        "Requires: sendmail" line with "Requires:
-                        smtpdaemon".
+Zenon Panoussis
+    - Submitted patch for rpm spec that replaced the "Requires: sendmail"
+      line with "Requires: smtpdaemon".
 
-Dennis Freise           Submitted a patch to add metalog support to psad.
-                        Helped find kmsgsd bug for missing null string in
-                        buffer read from psadfifo.  Submitted patch for
-                        kmsgsd to open psadfifo in O_RDWR mode to fix a
-                        bug where kmsgsd would spike the cpu if the system
-                        logger did not keep the psadfifo open.  Found and
-                        submitted patch for buffer overflow in kmsgsd.
+Dennis Freise
+    - Submitted a patch to add metalog support to psad.
+    - Helped find kmsgsd bug for missing null string in buffer read from
+      psadfifo.
+    - Submitted patch for kmsgsd to open psadfifo in O_RDWR mode to fix a
+      bug where kmsgsd would spike the cpu if the system logger did not keep
+      the psadfifo open.
+    - Found and submitted patch for improper bounds checking in kmsgsd.c.
 
-Richard K. Szabo        Discovered and helped test a bug where psad was not
-                        honoring IP's/net auto danger level assignments of
-                        0 (ignore).
+Richard K. Szabo
+    - Discovered and helped test a bug where psad was not honoring IP's/net
+      auto danger level assignments of 0 (ignore).
 
-Stefan Rydberg          Discovered a perl internal pp_match bug with psad-
-                        1.3.1 on SuSE 8.  Helped troubleshoot -pre
-                        releases of psad-1.3.2.  Provided a system on which
-                        to troubleshoot psad-1.3.3 (this facilitated the
-                        isolation of the pp_match bug to an older version
-                        perl on SuSE 8).
+Stefan Rydberg
+    - Discovered a perl internal pp_match bug with psad-1.3.1 on SuSE 8.
+    - Helped troubleshoot -pre releases of psad-1.3.2.
+    - Provided a system on which to troubleshoot psad-1.3.3 (this
+      facilitated the isolation of the pp_match bug to an older version perl
+      on SuSE 8).
 
-Joshua Jensen           Found bug with the manner in which fwcheck_psad.pl
-                        was being called from psad (improperly passing
-                        --no-fw-search-all option even if FW_SEARCH_ALL
-                        was set to "Y").
+Joshua Jensen
+    - Found bug with the manner in which fwcheck_psad.pl was being called
+      from psad (improperly passing --no-fw-search-all option even if
+      FW_SEARCH_ALL was set to "Y").
 
-Mate Wierdl             Found bug in EMAIL_ADDRESSES format (psad needed to
-                        allow addressed separated by commas).  Submitted
-                        patch for new init-scripts directory for psad.spec
-                        file.
+Mate Wierdl
+    - Found bug in EMAIL_ADDRESSES format (psad needed to allow addressed
+      separated by commas).
+    - Submitted patch for new init-scripts directory for psad.spec file.
 
-Stefan <unknown>        Sugggested permissions fix for world readable files
-                        in /var/log/psad.
+Stefan <unknown>
+    - Sugggested permissions fix for world readable files in /var/log/psad.
 
-David Jacobs            Troubleshooting firewall parsing code, lots of great
-                        beta testing (see: http://www.kungfulinux.com).
+David Jacobs
+    - Troubleshooting firewall parsing code, lots of great beta testing
+      (see: http://www.kungfulinux.com).
 
-Lucas                   Suggested fix for init script directory for Slackware
-                        Linux systems.
+Lucas <unknown>
+    - Suggested fix for init script directory for Slackware Linux systems.
 
-Peter Abraham           Help testing bugfix for auto_dl code.  Suggested
-                        EMAIL_LIMIT_STATUS_MSG variable to make email limit
-                        status messages optional.
+Peter Abraham
+    - Help testing bugfix for auto_dl code.
+    - Suggested EMAIL_LIMIT_STATUS_MSG variable to make email limit status
+      messages optional.
 
-James Lay               Suggested support for OUTPUT chain in auto-blocking
-                        mode.
+James Lay
+    - Suggested support for OUTPUT chain in auto-blocking mode.
 
-Yuen Boon Jee           Found bug in psad init scripts for requiring syslogd
-                        config file even if syslog-ng is installed.
+Yuen Boon Jee
+    - Found bug in psad init scripts for requiring syslogd config file even
+      if syslog-ng is installed.
 
-Michael S. Zick         Bugfix for O_RDONLY open flag when kmsgsd receives a
-                        HUP signal.  Bugfix for psad validation routine that
-                        did not accept "0" for a PORT_RANGE_SCAN_THRESHOLD
-                        value.
+Michael S. Zick
+    - Bugfix for O_RDONLY open flag when kmsgsd receives a HUP signal.
+    - Bugfix for psad validation routine that did not accept "0" for a
+      PORT_RANGE_SCAN_THRESHOLD value.
+
+Nerijus Baliuna
+    - Suggested ability to ignore entire protocols.  The IGNORE_PROTOCOLS
+      keyword was the result.
+    - Suggested adding various psad docs (CREDITS, ChangeLog, INSTALL,
+      etc.) to be installed by the psad rpm
+    - Suggested the ability to have psadwatchd not send emails even if psad
+      dies and has to be restarted.

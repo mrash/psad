@@ -216,6 +216,9 @@ my %sigs_attr = ();
 ### cache iptables prefixes
 my %ipt_prefixes = ();
 
+### ignore ports
+my %ignore_ports = ();
+
 ### data array used for dshield.org logs
 my @dshield_data;
 
@@ -560,17 +563,17 @@ unless ($benchmark or $fw_analyze) {
 }
 
 if ($benchmark) {
-    print scalar localtime(), "[+] Entering benchmark mode.\n";
+    print scalar localtime(), " [+] Entering benchmark mode.\n";
     $no_rdns  = 1;  ### turn off network related functions
     $no_whois = 1;
     if ($b_packets) {
         print scalar localtime(),
-            "[+] Executing a $b_packets packet test.\n";
+            " [+] Executing a $b_packets packet test.\n";
     } else {
-        print scalar localtime(), '[+] The --packets command line ',
+        print scalar localtime(), ' [+] The --packets command line ',
             "option was not specified.\n";
         print scalar localtime(),
-            "[+] Defaulting to a 10,000 packet test.\n";
+            " [+] Defaulting to a 10,000 packet test.\n";
         $b_packets = 10000;
     }
 }
@@ -659,7 +662,7 @@ for (;;) {
     ### FW_DATA_FILE by kmsgsd for psad analysis.
     if ($benchmark) {
         $b_time = time();
-        print scalar localtime(), "[+] Creating packet array.\n";
+        print scalar localtime(), " [+] Creating packet array.\n";
         my $dp = 1000;
         for (my $i=0; $i <= $b_packets; $i++) {
             push @fw_packets, "$test_pkt DPT=$dp $test_pktend";
@@ -669,7 +672,7 @@ for (;;) {
         @fw_packets = <FWDATA>;
     }
     if (@fw_packets) {
-        print scalar localtime(), "[+] check_scan()\n" if $benchmark;
+        print scalar localtime(), " [+] check_scan()\n" if $benchmark;
 
         if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y' and not $benchmark) {
             ### calculate the timezone offset
@@ -751,9 +754,9 @@ for (;;) {
     }
 
     if ($benchmark) {
-        print scalar localtime(), "[+] Packet creation and processing time: ",
+        print scalar localtime(), " [+] Packet creation and processing time: ",
             time() - $b_time, " sec.\n";
-        print scalar localtime(), "[+] Exiting benchmark mode.\n";
+        print scalar localtime(), " [+] Exiting benchmark mode.\n";
         exit 0;
     }
 
@@ -1038,6 +1041,10 @@ sub check_scan() {
             }
         }
 
+        if (%ignore_ports and $proto ne 'icmp') {
+            next PKT if &ignore_port($dp, $proto);
+        }
+
         if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
                 and not $benchmark
                 and not $analyze_msgs
@@ -1169,7 +1176,7 @@ sub check_scan() {
 
     ### write bogus packets to the error log.
     if ($benchmark) {
-        print scalar localtime(), "[+] Err packets: $#err_pkts.\n";
+        print scalar localtime(), " [+] Err packets: $#err_pkts.\n";
     } else {
         &collect_errors(\@err_pkts) unless $no_ipt_errors;
     }
@@ -1279,6 +1286,21 @@ sub match_sigs() {
         }
     }
     return $dl;
+}
+
+sub ignore_port() {
+    my ($port, $proto) = @_;
+    return 0 unless defined $ignore_ports{$proto};
+    if (defined $ignore_ports{$proto}{'port'}) {
+        return 1 if defined $ignore_ports{$proto}{'port'}{$port};
+    }
+    if (defined $ignore_ports{$proto}{'range'}) {
+        for my $low_port (keys %{$ignore_ports{$proto}{'range'}}) {
+            my $high_port = $ignore_ports{$proto}{'range'}{$low_port};
+            return 1 if ($port >= $low_port and $port <= $high_port);
+        }
+    }
+    return 0;
 }
 
 sub posf() {
@@ -1752,6 +1774,9 @@ sub psad_init() {
     ### the local system.
     &validate_home_net();
 
+    ### there is a set of ports that should be ignored
+    &parse_ignore_ports() if $config{'IGNORE_PORTS'} ne 'NONE';
+
     ### enter iptables analysis mode.
     &analysis_mode() if $analyze_msgs;
 
@@ -1880,6 +1905,37 @@ sub import_fw_search() {
             $config{'FW_SEARCH_ALL'} eq 'N') {
         &Psad::psyslog('psad', 'setting FW_SEARCH_ALL to Y.');
         $config{'FW_SEARCH_ALL'} = 'Y';
+    }
+    return;
+}
+
+sub parse_ignore_ports() {
+    my @fields = split /\s*,\s*/, $config{'IGNORE_PORTS'};
+    for my $field (@fields) {
+        if ($field =~ m/(tcp|udp)\/(\d+)\s*-\s*(\d+)/) {
+            my $proto = $1;
+            my $low   = $2;
+            my $high  = $3;
+            if ($low < $high) {
+                my $existing_high = 0;
+                if (defined $ignore_ports{$proto}
+                        and defined $ignore_ports{$proto}{'range'}
+                        and defined $ignore_ports{$proto}{'range'}{$low}) {
+                    $existing_high = $ignore_ports{$proto}{'range'}{$low};
+                }
+                if ($existing_high) {
+                    if ($high > $existing_high) {
+                        $ignore_ports{$proto}{'range'}{$low} = $high;
+                    }
+                } else {
+                    $ignore_ports{$proto}{'range'}{$low} = $high;
+                }
+            }
+        } elsif ($field =~ m/(tcp|udp)\/(\d+)/) {
+            my $proto = $1;
+            my $port  = $2;
+            $ignore_ports{$proto}{'port'}{$port} = '';
+        }
     }
     return;
 }
@@ -5140,7 +5196,7 @@ sub required_vars() {
         DISK_MAX_PERCENTAGE DISK_MAX_RM_RETRIES ETC_HOSTS_DENY
         ETC_SYSLOG_CONF ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL
         ANALYSIS_MODE_DIR IMPORT_OLD_SCANS PSAD_ICMP_TYPES_FILE
-        SHOW_ALL_SIGNATURES IPT_PREFIX_COUNTER_FILE
+        SHOW_ALL_SIGNATURES IPT_PREFIX_COUNTER_FILE IGNORE_PORTS
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

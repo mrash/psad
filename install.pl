@@ -16,9 +16,8 @@ my $mknodCmd = "/bin/mknod";
 my $grepCmd = "/bin/grep";
 my $makeCmd = "/usr/bin/make";
 my $cpCmd = "/bin/cp";
-my $rmCmd = "/bin/rm";
-my $idCmd = "/usr/bin/id";
 my $mvCmd = "/bin/mv";
+my $rmCmd = "/bin/rm";
 my $unameCmd = "/bin/uname";
 my $ifconfigCmd = "/sbin/ifconfig";
 my $ipchainsCmd = "/sbin/ipchains";
@@ -49,9 +48,8 @@ my %Cmds = (
 	"mknod"         => $mknodCmd,
 	"grep"		=> $grepCmd,
 	"cp"		=> $cpCmd,
-	"rm"		=> $rmCmd,
-	"id"		=> $idCmd,
 	"mv"		=> $mvCmd,
+	"rm" 		=> $rmCmd,
 	"uname"		=> $unameCmd,
 	"make"		=> $makeCmd,
 	"ifconfig"	=> $ifconfigCmd,
@@ -61,31 +59,32 @@ my %Cmds = (
 
 %Cmds = check_commands(\%Cmds);
 
-my $uid = (split /\s+/, `$Cmds{'id'}`)[0];
-($uid) = ($uid =~ /^uid\=(\d+)/);
-die "You need to be root (or equivalent UID 0 account) to install psad!\n" if $uid;
+$< == 0 && $> == 0 or die "You need to be root (or equivalent UID 0 account) to install psad!\n";
 
 if ($uninstall) {
-	print "=-=-=  This will completely remove psad from your system.  Are you sure (y/n)?  ";
-	my $ans = <STDIN>;
-	chomp $ans;
+	my $ans = "";
 	while ($ans ne "y" && $ans ne "n") {
-		print "=-=-=  This will remove psad from your system.  Are you sure (y/n)?  ";
+		print "=-=-=  This will completely psad from your system.  Are you sure (y/n)?  ";
 		$ans = <STDIN>;
+		chomp $ans;
 	}
 	exit 0 if ($ans eq "n");
 	if (-e "/etc/rc.d/init.d/psad-init") {
 		print "=-=-=  Stopping psad daemons\n";
-		system("/etc/rc.d/init.d/psad-init stop") or warn "-=-  Could not stop psad daemons\n";
+		system("/etc/rc.d/init.d/psad-init stop") or warn "=-=-=  Could not stop psad daemons!\n";
 		print "=-=-=  Removing /etc/rc.d/init.d/psad-init\n";
-		`$Cmds{'rm'} /etc/rc.d/init.d/psad-init`;
+		unlink "/etc/rc.d/init.d/psad-init";
 	}	
 	if (-e "/usr/local/bin/psad") {
 		print "=-=-=  Removing psad daemons: /usr/local/bin/(psad, psadwatchd, kmsgsd, diskmond)\n";
-		`$Cmds{'rm'} /usr/local/bin/psad /usr/local/bin/kmsgsd /usr/local/bin/diskmond`;
+		unlink "/usr/local/bin/psad" or warn "=-=-=  Could not remove /usr/local/bin/psad!!!\n";
+		unlink "/usr/local/bin/psadwatchd" or warn "=-=-=  Could not remove /usr/local/bin/psadwatchd!!!\n";
+		unlink "/usr/local/bin/kmsgsd" or warn "=-=-=  Could not remove /usr/local/bin/kmsgsd!!!\n";
+		unlink "/usr/local/bin/diskmond" or warn "=-=-=  Could not remove /usr/local/bin/diskmond!!!\n";
 	}
 	if (-e "/etc/psad") {
 		print "=-=-=  Removing configuration directory: /etc/psad\n";
+		# "rm -rf" is easier than checking to make sure the directory is empty and then using perl's rmdir
 		`$Cmds{'rm'} -rf /etc/psad`;
 	}
 	if (-e "/var/log/psad") {
@@ -94,11 +93,11 @@ if ($uninstall) {
 	}
 	if (-e "/var/log/psadfifo") {
 		print "=-=-=  Removing named pipe: /var/log/psadfifo\n";
-		`$Cmds{'rm'} -rf /var/log/psadfifo`;
+		unlink "/var/log/psadfifo";
 	}
 	if (-e "/usr/local/bin/whois.psad") {
 		print "=-=-=  Removing /usr/local/bin/whois.psad\n";
-		`$Cmds{'rm'} /usr/local/bin/whois.psad`;
+		unlink "/usr/local/bin/whois.psad";
 	}
 	print "=-=-=  Restoring /etc/syslog.conf.orig -> /etc/syslog.conf\n";
 	if (-e "/etc/syslog.conf.orig") {
@@ -661,12 +660,13 @@ sub usage_and_exit() {
         my $exitcode = shift;
         print <<_HELP_;
 
-Usage: psad [-f] [-n] [-e] [-u] [-h]
+Usage: psad [-f] [-n] [-e] [-u] [-v] [-h]
 	
 	-no_preserve		- disable preservation of old configs.
 	-exec_psad		- execute psad after installing.
         -firewall_check         - disable firewall rules verification.
 	-uninstall		- uninstall psad.
+	-verbose		- verbose mode.
         -h                      - prints this help message.
 
 _HELP_

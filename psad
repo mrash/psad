@@ -110,7 +110,6 @@ my $ifconfigCmd = "/sbin/ifconfig";
 my $grepCmd = "/bin/grep";
 my $netstatCmd = "/bin/netstat";
 my $unameCmd = "/bin/uname";
-my $hostnameCmd = "/bin/hostname";
 my $whoisCmd = "/usr/local/bin/whois.psad";
 my $psadwatchdCmd = "/usr/local/bin/psadwatchd";
 my $kmsgsdCmd = "/usr/local/bin/kmsgsd";
@@ -122,11 +121,13 @@ my $psadCmd = "/usr/local/bin/psad";
 ### modules used by psad
 use File::stat;
 use Getopt::Long;
-use Data::Dumper;
-use Socket;
+use autouse 'Data::Dumper' => "Dumper";  ### this one is not used very much so don't load immediately
+use autouse 'Socket' => "AF_INET";       ### not used until a scan is detected so don't load until it is needed
+use Sys::Hostname;
+use POSIX;
 
 ### a few more configuration variables that should not really be in the config section
-my $Version = "0.9.1";
+my $VERSION = "0.9.1";
 
 ### pid files
 my @PIDFILES = qw(/var/log/psad/pid.psadwatchd
@@ -135,15 +136,16 @@ my @PIDFILES = qw(/var/log/psad/pid.psadwatchd
 		  /var/log/psad/pid.diskmond);
 
 ### file used to store the psad command line
-my $psad_cmdline = "/var/log/psad/cmd.psad";
+my $cmdline_file = "/var/log/psad/cmd.psad";
 
-### these three are global variables
+### these are global variables
 $USE_IPCHAINS = 0;
 $USE_IPTABLES = 0;
 $DEBUG = 0;
+$HOSTNAME = hostname;
 
 ### initialize some default values (command line args can override some default values)
-my $Scan_href;  # main psad hash; contains ips, port ranges, tcp flags, and danger levels
+my $Scan_href;  # main psad data structure; contains ips, port ranges, tcp flags, and danger levels
 my $daemon = 0;
 my $output = 0;
 my $errors = 0;
@@ -156,6 +158,7 @@ my $fwcheck = 0;
 my $Syslog_server = 0;
 my $kill = 0;
 my $restart = 0;
+my $status = 0;
 my $print_version = 0;
 
 ### save a copy of the command line arguments
@@ -164,28 +167,30 @@ my @args_cp = @ARGV;
 Getopt::Long::Configure("no_ignore_case");  # make Getopts case sensitive
 
 usage_and_exit(1) unless (GetOptions (
-        'help'          => \$help,              # display help
-        'auto_ips=s'    => \$auto_ips,          # enable automatic ip danger level assignment
-        'output'        => \$output,            # write scanlog messages to STDOUT
-        'Daemon'        => \$daemon,            # do not run as a daemon
-        'debug'         => \$DEBUG,             # run in debug mode
-        'interval=s'    => \$CHECK_INTERVAL,    # set $CHECK_INTERVAL from the command line
-        'firewallcheck' => \$fwcheck,           # do not check firewall rules
-        'config=s'      => \$config,            # specify configuration file
-        'reversedns'    => \$dnslookups,        # do not issue dns lookups against scanning ip address
-        'signatures=s'  => \$signatures,        # scan signatures
-        'localport'     => \$netstat_lookup,    # do not check to see if the firewall is listening on localport that has been scanned
-        'errors'        => \$errors,            # do not write malformed packet messages to error log
-        'Syslog_server' => \$Syslog_server,     # we are running psad on a syslog logging server
-        'Kill'          => \$kill,              # kill all running psad processes (psadwatchd, psad, kmsgsd, diskmond)
-	'Restart'	=> \$restart,		# restart psad with all options of the currently running psad process
-        'Version'       => \$print_version,     # print the psad version and exit
-        'whois'         => \$whoislookups       # do not issue whois lookups against the scanning ip
+        'help'           => \$help,             # display help
+        'auto_ips=s'     => \$auto_ips,         # enable automatic ip danger level assignment
+        'output'         => \$output,           # write scanlog messages to STDOUT
+        'Daemon'         => \$daemon,           # do not run as a daemon
+        'debug'          => \$DEBUG,            # run in debug mode
+        'interval=s'     => \$CHECK_INTERVAL,   # set $CHECK_INTERVAL from the command line
+        'firewallcheck'  => \$fwcheck,          # do not check firewall rules
+        'config=s'       => \$config,           # specify configuration file
+        'reversedns'     => \$dnslookups,       # do not issue dns lookups against scanning ip address
+        'signatures=s'   => \$signatures,       # scan signatures
+        'localport'      => \$netstat_lookup,   # do not check to see if the firewall is listening on localport that has been scanned
+        'errors'         => \$errors,           # do not write malformed packet messages to error log
+        'Logging_server' => \$Syslog_server,    # we are running psad on a syslog logging server
+        'Kill'           => \$kill,             # kill all running psad processes (psadwatchd, psad, kmsgsd, diskmond)
+	'Restart'	 => \$restart,		# restart psad with all options of the currently running psad process
+	'Status'	 => \$status,		# display status of any currently running psad processes
+        'Version'        => \$print_version,    # print the psad version and exit
+        'whois'          => \$whoislookups      # do not issue whois lookups against the scanning ip
 ));
 usage_and_exit(0) if ($help);
 
 ### print the version number and exit if -V given on the command line
-print "psad version $Version, by Michael B. Rash (mbr\@cipherdyne.com)\n" and exit 0 if $print_version;
+print "psad version $VERSION, by Michael B. Rash (mbr\@cipherdyne.com)\n" and exit 0 if $print_version;
+
 ### everthing after this point must be executed as root.
 $< == 0 && $> == 0 or die "\n@@@@@  (psad): You must be root (or equivalent UID 0 account) to execute psad!  Exiting.\n\n";
 
@@ -199,7 +204,6 @@ my %Cmds = (
 	"grep"		=> $grepCmd,
 	"netstat"	=> $netstatCmd,
 	"uname"		=> $unameCmd,
-	"hostname"	=> $hostnameCmd,
 	"whois"		=> $whoisCmd,
 	"psadwatchd"	=> $psadwatchdCmd,
 	"kmsgsd"	=> $kmsgsdCmd,
@@ -210,27 +214,22 @@ my %Cmds = (
 ### check to make sure the commands specified in the config section are in the right place, and attempt to correct automatically if not.
 %Cmds = check_commands(\%Cmds);
 
-### the -k command line argument was given
+### the --Kill command line switch was given
 if ($kill) {
-        kill_psad_processes(\@PIDFILES);
-        exit 0;
+	kill_psad(\@PIDFILES);
+	exit 0;
 }
 
-### the -r command line argument was given
+### the --Restart command line switch was given
 if ($restart) {
-	my $cmdline;
-	if (-e $psad_cmdline) {
-        	open CMD, "< $psad_cmdline";
-        	$cmdline = <CMD>;
-        	close CMD;
-        	chomp $cmdline;
-	} else {
-		die "@@@@@  (psad):  No other psad process is currenly running!\n";
-	}
-        kill_psad_processes(\@PIDFILES);
-	print "=-=-=  Restarting the psad daemons.\n";
-        system "$Cmds{'psad'} $cmdline";
-        exit 0;
+	restart_psad(\@PIDFILES, $cmdline_file, \%Cmds);
+	exit 0;
+}
+
+### the --Status command line switch was given
+if ($status) {
+	psad_status(\@PIDFILES);
+	exit 0;
 }
 
 ### check to make sure another psad process is not already running.
@@ -258,17 +257,13 @@ unless ($fwcheck || $Syslog_server) {
 ### daemonize psad unless running with --Daemon or --debug
 fork and exit unless ($daemon || $DEBUG);
 
-### write the current pid associated with psad to the psad pid file
-open PIDFILE, "> $PIDFILES[1]";
-print PIDFILE "$$\n";
-close PIDFILE;
-chmod 0600, $PIDFILES[1];
+POSIX::setsid() or die "@@@@@  (psad) Can't start a new session: $!\n";
 
-### write the command line args used to start psad to $psad_cmdline
-open CMD, "> $psad_cmdline";
-print CMD "@args_cp\n";
-close CMD;
-chmod 0600, $psad_cmdline;
+### write the current pid associated with psad to the psad pid file
+writepid($PIDFILES[1]);
+
+### write the command line args used to start psad to $cmdline_file
+writecmdline(\@args_cp, $cmdline_file);
 
 ### psad _requires_ that kmsgsd is running to receive any data, so let's start it here for good measure (as of 0.9.2 it
 ### makes use of the pid files and unique_pid(), so we don't have to worry about starting a duplicate copy).  While we're at
@@ -317,10 +312,8 @@ for (;;) {
 		my $sigs_mtime_end = stat($signatures)->mtime;
 		if ($sigs_mtime_start != $sigs_mtime_end) {  # the signatures were updated... import the new signatures.
 			$Sigs_href = import_signatures($signatures);
-			my $hostname = `$Cmds{'hostname'}`;
-                	chomp $hostname;
                 	foreach my $email_address (@EMAIL_ADDRESSES) {
-                        	system "$Cmds{'mail'} $email_address -s \"psad: re-read $signatures file on $hostname\" < /dev/null";
+                        	system "$Cmds{'mail'} $email_address -s \"psad: re-read $signatures file on $HOSTNAME\" < /dev/null";
                 	}
 		}
 	}
@@ -329,10 +322,8 @@ for (;;) {
 		if ($auto_ips_mtime_start != $auto_ips_mtime_end) {  # the auto ips file was updated... import the new ip/danger level pairs.
 			$Auto_ips_href = import_auto_ips($auto_ips);
 			$Scan_href = reset_auto_tags($Scan_href);  # need to set $Scan_href->{$srcip}->{$dstip}->{'AUTO'} = "N" since $Auto_ips_href was updated.
-                        my $hostname = `$Cmds{'hostname'}`;
-                        chomp $hostname;
 			foreach my $email_address (@EMAIL_ADDRESSES) {
-                                system "$Cmds{'mail'} $email_address -s \"psad: re-read $auto_ips file on $hostname\" < /dev/null";
+                                system "$Cmds{'mail'} $email_address -s \"psad: re-read $auto_ips file on $HOSTNAME\" < /dev/null";
                         }
 		}
 	}
@@ -810,7 +801,6 @@ sub logr() {
 	my ($tcp_new_start_time, $udp_new_start_time);
 	my $dnsstring = "";
 	my $whois_info_aref;
-	my $hostname = `$Cmds_href->{'hostname'}`;
        	if ($output || $DEBUG) {
                 $hndl = "STDOUT";
        	} else {
@@ -879,7 +869,7 @@ sub logr() {
 				print STDOUT "logr():  gernerating email......\n" if $DEBUG;
 		        	open EMAILALERT, "> $email_alertfile";
 				print $hndl "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
-				print $hndl "$time:     Portscan Detected by psad (pid $$) on $hostname.\n";
+				print $hndl "$time:     Portscan Detected by psad (pid $$) on $HOSTNAME.\n";
 				print $hndl "\n";
 				print $hndl "Source:                     $srcip\n";
 				print $hndl "Destination:                $dstip\n";
@@ -892,7 +882,7 @@ sub logr() {
 				print $hndl "Danger level:               $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} out of 5\n";
 				print $hndl "DNS info:                   $dnsstring\n" unless $dnslookups;
 				print EMAILALERT "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
-                               	print EMAILALERT "$time:     Portscan Detected by psad (pid $$) on $hostname.\n";
+                               	print EMAILALERT "$time:     Portscan Detected by psad (pid $$) on $HOSTNAME.\n";
 				print EMAILALERT "\n";
                                	print EMAILALERT "Source:                     $srcip\n";
                                	print EMAILALERT "Destination:                $dstip\n";
@@ -906,7 +896,7 @@ sub logr() {
                                	print EMAILALERT "DNS info:                   $dnsstring\n" unless $dnslookups;
 				if ($DEBUG) {
 					print STDOUT "logr(): printing email..................\n";
-					print STDOUT "     $time: Portscan Detected by psad (pid $$) on $hostname.\n";
+					print STDOUT "     $time: Portscan Detected by psad (pid $$) on $HOSTNAME.\n";
                                        	print STDOUT "     Source:                   $srcip\n";
                                        	print STDOUT "     Destination:              $dstip\n";
 					print STDOUT "     Newly scanned TCP ports:  [$tcp_newrange]  (since: $tcp_new_start_time)\n" if ($tcp);
@@ -1016,10 +1006,8 @@ sub auto_psad_response(){
 					foreach my $dst (keys %{$Scan_href->{$srcip}}) {
 						$Scan_href->{$srcip}->{$dst}->{'BLOCKED'} = "Y";
 					}
-                			my $hostname = `$Cmds_href->{'hostname'}`;
-                			chomp $hostname;
                 			foreach my $email_address (@$email_addresses_aref) {
-                        			system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $srcip has been BLOCKED on $hostname\" < /dev/null";
+                        			system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $srcip has been BLOCKED on $HOSTNAME\" < /dev/null";
                 			}
 					next SOURCEIP; 
                 		} elsif ($USE_IPTABLES) {
@@ -1030,10 +1018,8 @@ sub auto_psad_response(){
 					foreach my $dst (keys %{$Scan_href->{$srcip}}) {
                                                 $Scan_href->{$srcip}->{$dst}->{'BLOCKED'} = "Y";
                                         }
-                                        my $hostname = `$Cmds_href->{'hostname'}`;
-                                        chomp $hostname;
                                         foreach my $email_address (@$email_addresses_aref) {
-                                                system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $srcip has been BLOCKED on $hostname\" < /dev/null";
+                                                system "$Cmds_href->{'mail'} $email_address -s \"psad: All traffic from $srcip has been BLOCKED on $HOSTNAME\" < /dev/null";
                                         }
                                         next SOURCEIP;
                 		}
@@ -1057,11 +1043,9 @@ sub get_input_chains() {
 }
 sub send_email_alert() {
         my ($Scan_href, $srcip, $dstip, $flags_mesg, $email_alertfile, $email_addresses_aref, $Cmds_href) = @_;
-	my $hostname = `$Cmds_href->{'hostname'}`;
-	chomp $hostname;
 	foreach my $email_address (@$email_addresses_aref) {
 		print "send_email_alert(): sending scan alert email to: $email_address\n" if $DEBUG;
-		system("$Cmds_href->{'mail'} $email_address -s \"psad WARNING: $hostname has been scanned!\" < $email_alertfile");
+		system("$Cmds_href->{'mail'} $email_address -s \"psad WARNING: $HOSTNAME has been scanned!\" < $email_alertfile");
 	}
 	$Scan_href->{$srcip}->{$dstip}->{'ALERTED'} = "Y";
 	return $Scan_href;
@@ -1245,11 +1229,11 @@ sub check_permissions() {
 	}
 	return;
 }
-sub kill_psad_processes() {
+sub kill_psad() {
 	my $pidfiles_aref = shift;
 
-	### must kill psadwatchd first since if not, it might try to restart any of the other tree daemons; 
-	### (it's the first element of $pidsfiles_aref)
+	### must kill psadwatchd first since if not, it might try to restart any of the other three daemons; 
+	### (it's the first element of $pidfiles_aref)
 	for my $pidfile (@$pidfiles_aref) {
 		my $pidname = (split /\./, $pidfile)[1];
 		if (-e $pidfile) {
@@ -1261,12 +1245,64 @@ sub kill_psad_processes() {
 				print "=-=-=  Killing $pidname, pid: $pid\n";
 				kill 15, $pid or print "@@@@@  (psad): Could not kill $pidname, pid: $pid\n";
 			} else {
-				print "@@@@@  (psad): $pidname is not running.\n";
+				print "@@@@@  (psad): $pidname is not running on $HOSTNAME.\n";
 			}
 		} else {
-			print "@@@@@  (psad): pid file $pidfile does not exist for $pidname\n";
+			print "@@@@@  (psad): pid file $pidfile does not exist for $pidname on $HOSTNAME\n";
 		}
 	}
+	return;
+}
+sub restart_psad() {
+	my ($pidfiles_aref, $cmdline_file, $Cmds_href) = @_;
+        my $cmdline;
+        if (-e $cmdline_file) {
+                open CMD, "< $cmdline_file";
+                $cmdline = <CMD>;
+                close CMD;
+                chomp $cmdline;
+        } else {
+                die "@@@@@  (psad):  No other psad process is currently running on $HOSTNAME!\n";
+        }
+        &kill_psad($pidfiles_aref);
+        print "=-=-=  Restarting the psad daemons on $HOSTNAME.\n";
+        system "$Cmds_href->{'psad'} $cmdline";
+	return;
+}
+sub psad_status() {
+	my $pidfiles_aref = shift;
+	for my $pidfile (@$pidfiles_aref) {
+		my $pidname = (split /\./, $pidfile)[1];
+		if (-e $pidfile) {
+			open PIDFILE, "< $pidfile";
+			my $pid = <PIDFILE>;
+			close PIDFILE;
+			chomp $pid;
+			if (kill 0, $pid) {
+				print "=-=-=  $pidname is currently running on $HOSTNAME as pid: $pid\n";
+			} else {
+				print "=-=-=  $pidname is not currently running on $HOSTNAME\n";
+			}
+		} else {
+			print "@@@@@  (psad): pid file $pidfile does not exist for $pidname on $HOSTNAME\n";
+		}
+	}
+	return;
+}
+sub writepid() {
+	my $pidfile = shift;
+	open PIDFILE, "> $pidfile";
+	print PIDFILE "$$\n";
+	close PIDFILE;
+	chmod 0600, $pidfile;
+	return;
+}
+sub writecmdline() {
+	my ($args_aref, $cmdline_file) = @_;
+	open CMD, "> $cmdline_file";
+	print CMD "@$args_aref\n";
+	close CMD;
+	chmod 0600, $cmdline_file;
 	return;
 }
 sub unique_pid() {
@@ -1308,8 +1344,8 @@ Usage: psad [-D] [-d] [-o] [-e] [-S] [-f] [-r] [-w] [-l] [-i <interval>] [-h]
         -c   --config <config file>     - use config file instead of the
                                           values contained within the psad
                                           script.
-	-S   --Syslog_server		- psad is being run on a syslog
-					  server.
+	-L   --Logging_server		- psad is being run on a syslog
+					  logging server.
         -r   --reversedns               - disable name resolution against
                                           scanning ips.
         -s   --signatures <sig file>    - import scan signatures.
@@ -1319,6 +1355,8 @@ Usage: psad [-D] [-d] [-o] [-e] [-S] [-f] [-r] [-w] [-l] [-i <interval>] [-h]
                                           signatures.
 	-K   --Kill			- kill all running psad processes.
 	-R   --Restart			- restart all running psad processes.
+	-S   --Status			- displays the status of any
+					  currently running psad processes.
 	-V   --Version			- print the psad version and exit.
         -h   --help                     - prints this help message.
 

@@ -7,47 +7,25 @@ logged, at which time these messages will be written to the
 /var/lib/psad/psadfifo named pipe and analyzed by psad.
 
 
-### iptables ###
+### iptables:
 
 Chain INPUT (policy ACCEPT)
 target     prot opt source               destination
 ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0          state RELATED,ESTABLISHED
-ACCEPT     tcp  --  129.xx.xx.xx         64.44.21.15        tcp dpt:22 flags:0x0216/0x022
-ACCEPT     tcp  --  208.xx.xx.xx         64.44.21.15        tcp dpt:22 flags:0x0216/0x022
-ACCEPT     tcp  --  24.xx.xx.xx          64.44.21.15        tcp dpt:22 flags:0x0216/0x022
-ACCEPT     tcp  --  208.xx.xx.xx         64.44.21.15        tcp dpt:22 flags:0x0216/0x022
-ACCEPT     tcp  --  0.0.0.0/0            64.44.21.15        tcp dpt:25 flags:0x0216/0x022
-ACCEPT     tcp  --  0.0.0.0/0            64.44.21.15        tcp dpt:80 flags:0x0216/0x022
-LOG        tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0216/0x022 LOG flags 0 level 4 prefix `DENY ' 
-DROP       tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0216/0x022
-LOG        tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0211/0x021 LOG flags 0 level 4 prefix `DENY ' 
-DROP       tcp  --  0.0.0.0/0            0.0.0.0/0          tcp flags:0x0211/0x021
-ACCEPT     udp  --  209.xx.xx.xx         0.0.0.0/0          udp spt:53
-ACCEPT     udp  --  208.xx.xx.xx         0.0.0.0/0          udp spt:53
-DROP       udp  --  0.0.0.0/0            0.0.0.0/0
-LOG        icmp --  0.0.0.0/0            0.0.0.0/0          limit: avg 1/sec burst 5 LOG flags 0 level 4
+ACCEPT     tcp  --  129.xx.xx.xx         64.44.21.15        tcp dpt:22 flags:SYN,RST,ACK/SYN
+ACCEPT     tcp  --  208.xx.xx.xx         64.44.21.15        tcp dpt:22 flags:SYN,RST,ACK/SYN
+ACCEPT     tcp  --  24.xx.xx.xx          64.44.21.15        tcp dpt:22 flags:SYN,RST,ACK/SYN
+ACCEPT     tcp  --  208.xx.xx.xx         64.44.21.15        tcp dpt:22 flags:SYN,RST,ACK/SYN
+ACCEPT     tcp  --  0.0.0.0/0            64.44.21.15        tcp dpt:25 flags:SYN,RST,ACK/SYN
+ACCEPT     tcp  --  0.0.0.0/0            64.44.21.15        tcp dpt:80 flags:SYN,RST,ACK/SYN
+LOG        all  --  0.0.0.0/0            0.0.0.0/0          LOG level warning prefix `DROP '
+DROP       all  --  0.0.0.0/0            0.0.0.0/0
 
 Chain FORWARD (policy ACCEPT)
 target     prot opt source               destination
 ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0          state RELATED,ESTABLISHED
-LOG        all  --  0.0.0.0/0            0.0.0.0/0          LOG flags 0 level 4 prefix `DROP '
+LOG        all  --  0.0.0.0/0            0.0.0.0/0          LOG level warning prefix `DROP '
 DROP       all  --  0.0.0.0/0            0.0.0.0/0
 
 Chain OUTPUT (policy ACCEPT)
 target     prot opt source               destination
-
-
-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-### ipchains ###
-
-Chain input (policy ACCEPT):
-target     prot opt     source                destination           ports
-ACCEPT     tcp  ------  10.40.1.116          0.0.0.0/0             * ->   22
-ACCEPT     tcp  ------  10.40.1.122          0.0.0.0/0             * ->   22
-DENY       tcp  -y--l-  0.0.0.0/0            0.0.0.0/0             * ->   *
-ACCEPT     icmp ----l-  0.0.0.0/0            0.0.0.0/0             * ->   *
-ACCEPT     udp  ------  0.0.0.0/0            0.0.0.0/0             53 ->   *
-DENY       udp  ------  0.0.0.0/0            0.0.0.0/0             * ->   *
-Chain forward (policy ACCEPT):
-Chain output (policy ACCEPT):

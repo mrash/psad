@@ -34,13 +34,13 @@
 *  $Id$
 */
 
-/* INCLUDES *****************************************************************/
+/* includes */
 #include "psad.h"
 
-/* DEFINES *****************************************************************/
+/* defines */
 #define PSADWATCHD_CONF "/etc/psad/psadwatchd.conf"
 
-/* GLOBALS ******************************************************************/
+/* globals */
 short int psad_syscalls_ctr     = 0;
 short int kmsgsd_syscalls_ctr   = 0;
 short int diskmond_syscalls_ctr = 0;
@@ -49,8 +49,9 @@ const char hostname[] = HOSTNAME;
 char mail_addrs[MAX_GEN_LEN];
 char shCmd[MAX_GEN_LEN];
 char mailCmd[MAX_GEN_LEN];
+static sig_atomic_t received_sighup = 0;
 
-/* PROTOTYPES ***************************************************************/
+/* prototypes */
 static void parse_config(
     char *config_file,
     char *psad_binary,
@@ -78,8 +79,9 @@ static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries);
 static void reset_syscall_ctr(const char *pid_name);
 static void give_up(const char *pid_name);
 static void exec_binary(const char *binary_path, const char *cmdline_file);
+static void sighup_handler(int sig);
 
-/* MAIN *********************************************************************/
+/* main */
 int main(int argc, char *argv[]) {
     char config_file[MAX_PATH_LEN];
     char psadCmd[MAX_PATH_LEN];
@@ -92,8 +94,6 @@ int main(int argc, char *argv[]) {
     char psadwatchd_pid_file[MAX_PATH_LEN];
     unsigned int psadwatchd_check_interval = 5;  /* default to 5 seconds */
     unsigned int psadwatchd_max_retries = 10; /* default to 10 tries */
-    time_t config_mtime;
-    struct stat statbuf;
 
 #ifdef DEBUG
     printf(" .. Entering DEBUG mode ..n");
@@ -112,15 +112,6 @@ int main(int argc, char *argv[]) {
         printf("Usage:  psadwatchd <configfile>\n");
         exit(EXIT_FAILURE);
     }
-
-    if (stat(config_file, &statbuf)) {
-        printf(" ** Could not get mtime for config file: %s\n",
-            config_file);
-        exit(EXIT_FAILURE);
-    }
-
-    /* initialize config_mtime */
-    config_mtime = statbuf.st_mtime;
 
 #ifdef DEBUG
     printf(" .. parsing config_file: %s\n", config_file);
@@ -152,6 +143,9 @@ int main(int argc, char *argv[]) {
     daemonize_process(psadwatchd_pid_file);
 #endif
 
+    /* install signal handler for HUP signals */
+    signal(SIGHUP, sighup_handler);
+
     /* start doing the real work now that the daemon is running and
      * the config file has been processed */
 
@@ -164,12 +158,13 @@ int main(int argc, char *argv[]) {
         check_process("diskmond", diskmond_pid_file, NULL,
             diskmondCmd, psadwatchd_max_retries);
 
-        /* check to see if we need to re-import the config file */
-        if (check_import_config(&config_mtime, config_file)) {
+        if (received_sighup) {
+            received_sighup = 0;
 #ifdef DEBUG
     printf(" .. re-parsing config file: %s\n", config_file);
 #endif
-            /* reparse the config file since it was updated */
+            /* reparse the config file since we received a
+             * HUP signal */
             parse_config(
                 config_file,
                 psadCmd,
@@ -486,4 +481,9 @@ static void parse_config(
     *psadwatchd_max_retries    = atoi(char_psadwatchd_max_retries);
     fclose(config_ptr);
     return;
+}
+
+static void sighup_handler(int sig)
+{
+    received_sighup = 1;
 }

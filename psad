@@ -7,12 +7,7 @@
 # version 0.9.0
 # Copyright (C) 1999-2001 Michael B. Rash (mbr@cipherdyne.com)
 #
-# Credits:
-#	Manual Caphina--  Greatly assisting in the original version.
-#	Tim Schaller--    Identifying and submitting a patch for a particularly
-#			  nasty bug for multiple scanned ips.
-# 	Peter Watkins--   (Bastille Linux) Excellent ideas for psad/iptables
-#			  interaction.
+# Credits:  (see the CREDITS file)
 #
 #    This program is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -26,42 +21,37 @@
 # TODO: 
 #	- Make use of other logging options available in iptables to detect
 #	  more tcp signatures.  (E.g. --log-tcp-options, --log-ip-options,
-#	  --log-tcp-sequence, etc.).
+#	  --log-tcp-sequence, etc.) for better signature recognition.
 #	- Allow ipchains to use udp signatures as well as tcp signatures that
 #	  only require a syn packet to a port.
 #	- Put source and destination ip addresses back into psad_signatures.
-#	- Make line counts of fwdata file take high-rate scans into
-#	  account.
 #	- Ipfilter support on *BSD platforms.
 #	- Icmp support.
-#	- Use umask for newly created files.
-#	- Make CHECK_INTERVAL configurable from the command line.
 #	- Man page.
-#	- Support for more packet fields (ttl, udp len, etc.) for better
-#	  signature recognition.	
 #	- Re-write significant components (kmsgsd, diskmond, psadwatchd) in C.
 #	- Add a new "minimal execution mode" to psad in which several of the 
 #	  "use <blah>" statements are taken out (not eval'ed or something).
-#	- Possibly add a daemon to take into account ACK PSH and ACK FIN, etc.
-#	  Packets that the client may generate after the ip_conntrack module
+#	- Possibly add a daemon to take into account ACK PSH, ACK FIN, RST etc.
+#	  packets that the client may generate after the ip_conntrack module
 #	  is reloaded.  Without anticipating such packets psad will interpret
 # 	  them as a belonging to a port scan.
-#	- Improve check_firewall_rules() to check for a state rule since having
-#	  such a rule greatly improves the quality of the data stream provided
-#	  to psad by kmsgsd since more packet types will be denied without 
-#	  requiring overly complicated firewall rules to detect odd tcp flag
-#	  combinations.
+#	- Improve check_firewall_rules() to check for a state rule (iptables) 
+#	  since having such a rule greatly improves the quality of the data 
+# 	  stream provided to psad by kmsgsd since more packet types will be 
+#	  denied without requiring overly complicated firewall rules to detect 
+#	  odd tcp flag combinations.
 #	- Sometimes packets (particularly ACK and RST packets) seem to not
 #	  recognized by ipt_state/ip_conntrack, so such packets get denied and
 #	  hence are picked up by psad.  Solution: parse /proc/net/ip_conntrack
-#	  for existing sessions and don't alert on these packets, etc.
+#	  for existing sessions and don't alert on these packets.
 #	- Enhance the check_firewall_rules() routine to correct any problems
 #	  with the firewall ruleset.  This is part of the integration of psad 
 #	  with Bastille Linux.
 #	- Include an installation log.
-#	- Make sure autovivication does not mess up the Scan hash
 #	- Better formatting of print statements throughout (maybe use 'here'
 #	  docs.)
+#	- Set an alarm for whois lookups since they may hang depending on
+#	  network accessibility of the whois databases.
 #
 # Sample packet (rejected by ipchains)
 # Dec 19 11:54:07 orthanc kernel: Packet log: input REJECT lo PROTO=1
@@ -160,6 +150,8 @@ my %Cmds = (
 );
 
 %Cmds = check_commands(\%Cmds);
+check_permissions($PSAD_LOGFILE, $FW_DATA, $ERROR_LOG, $EMAIL_ALERTFILE);
+my $local_ips_href = get_local_ips(\%Cmds);
 
 $whoislookups = 1 if ($Cmds{'whois'} !~ /psad/);  # don't use the normal whois binary.
 
@@ -171,11 +163,12 @@ usage_and_exit(1) unless (GetOptions (
 	'output'	=> \$output,		# write scanlog messages to STDOUT
 	'daemon'	=> \$daemon,		# do not run as a daemon
 	'debug'		=> \$DEBUG, 		# run in debug mode
+	'checkint=s'	=> \$CHECK_INTERVAL,	# set $CHECK_INTERVAL from the command line
 	'firewallcheck'	=> \$fwcheck,		# do not check firewall rules
 	'config=s'	=> \$config,		# specify configuration file
-	'namelookups'	=> \$dnslookups,	# dns lookup against scanning ip address
+	'namelookups'	=> \$dnslookups,	# do not issue dns lookups against scanning ip address
 	'signatures=s'	=> \$signatures,	# scan signatures
-	'localport'	=> \$netstat_lookup,	# listening on localport that has been scanned?
+	'localport'	=> \$netstat_lookup,	# do not check to see if the firewall is listening on localport that has been scanned
 	'errors'	=> \$errors,		# do not write malformed packet messages to error log
 	'whois'		=> \$whoislookups	# do not issue whois lookups against the scanning ip
 ));
@@ -191,7 +184,15 @@ fork and exit unless ($daemon || $DEBUG);
 
 if ($config) {
 	open CONF, "< $config";
-	eval $_ while(<CONF>);
+	while(<CONF>) {
+		# don't allow system calls and other mischief in the config file... just variable assignments.  Thanks Jay Beale (Bastille Linux).
+		next and print $_ if ($_ =~ /system/ && $_ !~ /\#.*?system/);
+		next if ($_ =~ /\`.*?\`/);
+		next if ($_ =~ /open/ && $_ !~ /\#.*?open/);
+		next if ($_ =~ /qx/);
+		next unless ($_ =~ /my\s+\$|\@|\%.*?\=.*?\;/ || $_ =~ /\$|\@|\%.*?\=.*?\;/);
+		eval $_;
+	}
 	close CONF;
 }	
 unless ($errors || $DEBUG) {
@@ -207,12 +208,11 @@ if ($auto_ips) {  # support automatic ip danger level increases/decreases.
 } else {
 	$Auto_ips_href = 0;
 }
+my $fwdata_start_lines = (split /\s+/, `$Cmds{'wc'} -l $FW_DATA`)[1];  # initialize fwdata_start_lines
 #=================================== main loop ======================================
 for (;;) {
 	my $auto_ips_mtime_start = stat($auto_ips)->mtime if $auto_ips;
 	my $sigs_mtime_start = stat($signatures)->mtime if $signatures;
-	my $fwdata_start_lines = (split /\s+/, `$Cmds{'wc'} -l $FW_DATA`)[1];
-#	print "Current number of lines: $fwdata_start_lines\n";   # this will be useful for the TODO
 	sleep $CHECK_INTERVAL;
 	my $fwdata_end_lines = (split /\s+/, `$Cmds{'wc'} -l $FW_DATA`)[1];
 	if ($signatures) {  # scan $signatures for any signature updates
@@ -241,9 +241,8 @@ for (;;) {
 	if ($fwdata_end_lines - $fwdata_start_lines > 0) {   # new packets have been written to $FW_DATA by kmsgsd for psad analysis
 		my $grabnum = $fwdata_end_lines - $fwdata_start_lines;
 		my @process_lines = `$Cmds{'tail'} -$grabnum $FW_DATA`;
-#		print "Number of lines to process: $#process_lines\n";  # this will be useful for the TODO
 		print "MAIN: calling check_scan()\n" if $DEBUG;
-		$Scan_href = check_scan(\@process_lines, $Sigs_href, $signatures, $netstat_lookup, $errors, 
+		$Scan_href = check_scan(\@process_lines, $Sigs_href, $signatures, $netstat_lookup, $local_ips_href, $errors, 
 									$ERROR_LOG, $ENABLE_PERSISTENCE, $SCAN_TIMEOUT, \%Cmds);
 		print "MAIN: calling assign_danger_level()\n" if $DEBUG;
 		$Scan_href = assign_danger_level($Scan_href, $Auto_ips_href, $PORT_RANGE_SCAN_THRESHOLD, $ALERT_ALL, \%DANGER_LEVELS);
@@ -254,23 +253,30 @@ for (;;) {
 			$Scan_href = auto_psad_response($Scan_href, $AUTO_IDS_DANGER_LEVEL, \%Cmds, \@EMAIL_ADDRESSES);
 		}
 	}
+	print "Number of lines in $FW_DATA: $fwdata_end_lines\n" if $DEBUG;
+	$fwdata_start_lines = $fwdata_end_lines; # reset fwdata_start_lines to where we just left off so that we don't miss any packets
 }
 
 #==================================== end main =========================================
 sub check_scan() {  # keeps track of scanning ip's, increments packet counters, keep track of tcp flags for each
 		    # scan (iptables only)
-	my ($process_lines_aref, $sigs_href, $signatures, $netstat_lookup, $errors, $error_log, $enable_persistence, $scan_timeout, $Cmds_href) = @_;
+	my ($process_lines_aref, $sigs_href, $signatures, $netstat_lookup, $local_ips_href, $errors, 
+							$error_log, $enable_persistence, $scan_timeout, $Cmds_href) = @_;
 	my @bad_packets;
+	my $local_listening_ports_href;
 	my ($srcip, $dstip, $proto, $srcport, $dstport, $flags);
 	# if necessary check which firewall (ipchains vs. iptables)
 	check_fw($process_lines_aref->[0]) unless ($USE_IPCHAINS || $USE_IPTABLES);
+	unless ($netstat_lookup) {
+		$local_listening_ports_href = get_listening_ports($Cmds_href);
+	}
 	READPKT: foreach my $l (@$process_lines_aref) {
 		chomp $l;
 		if ($USE_IPTABLES) {
 			# sometimes the log entry is messed up by iptables so we write it to the error log
 			if ($l =~ /SRC\=(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\sDST\=(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s.+?PROTO\=(\w{3,4})\sSPT\=(\d+)\sDPT\=(\d+)/) {
 				($srcip, $dstip, $proto, $srcport, $dstport) = ($1,$2,$3,$4,$5);
-				if ($proto ne "TCP" && $proto ne "UDP") {  # psad does not yet support any protocols other tcp and udp....
+				if ($proto ne "TCP" && $proto ne "UDP") {  # psad does not yet support any protocols other than tcp and udp....
 					push @bad_packets, $l;
 					next READPKT;
 				}
@@ -279,12 +285,17 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 						$flags = $1;
 						chop $flags;
 						$flags = "NULL" if ($flags eq ""); 
-					        unless ($flags =~ /SYN|FIN|URG|PSH|ACK|RST|NULL/ && $flags !~ /LEN|TOS|PREC|PROTO|WINDOW|RES/) {
+						# per page 595 of the Camel book, if /blah1|blah2/ can be slower than if /blah1/ || /blah2/
+					        unless (($flags =~ /SYN/ || $flags =~ /FIN/ || $flags =~ /URG/ || $flags =~ /PSH/ || $flags =~ /ACK/ 
+							  		 || $flags =~ /RST/ || $flags =~ /NULL/) && ($flags !~ /LEN/ || $flags !~ /TOS/
+									 || $flags !~ /PREC/ || $flags !~ /PROTO/ || $flags !~ /WINDOW/ ||
+									    $flags !~ /RES/)) {
                                 			push @bad_packets, $l;
                                 			next READPKT;
                         			}
 					} else {
 						push @bad_packets, $l;
+						next READPKT;
 					}
 				}	
 			} else {
@@ -305,7 +316,6 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 			$currtime = time();
 			if (defined $Scan{$srcip}{$dstip}{'START_TIME'}{'EPOCH_SECONDS'}) {
 				my $tmp = $currtime - $Scan{$srcip}{$dstip}{'START_TIME'}{'EPOCH_SECONDS'};
-#  debug				print "$currtime - $Scan{$srcip}{$dstip}{'START_TIME'}{'EPOCH_SECONDS'} = $tmp >= $scan_timeout\n";
 				if (($currtime - $Scan{$srcip}{$dstip}{'START_TIME'}{'EPOCH_SECONDS'}) >= $scan_timeout) {
 					undef $Scan{$srcip}{$dstip};
 				}
@@ -323,8 +333,8 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 			$Scan{$srcip}{$dstip}{'END_PORT'} = 0; # make sure the initial end port is not too high
 		}
 		my $epoch_seconds = time() if ($enable_persistence eq "N");
-		my @time = split / /, scalar localtime;   ### Get the current time as a nice ASCII string.
-		pop @time; shift @time;    ### Get rid of the day and the year to make the time consistent with syslog
+		my @time = split / /, scalar localtime;   # Get the current time as a nice ASCII string.
+		pop @time; shift @time;    # Get rid of the day and the year to make the time consistent with syslog
 		my $time = join ' ', @time;
 		unless (defined $Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'START_PORT'}) {  # this is the current starting port since $CHECK_INTERVAL
 			$Scan{$srcip}{$dstip}{$proto}{'CURRENT_INTERVAL'}{'START_TIME'} = $time;
@@ -393,16 +403,23 @@ sub check_scan() {  # keeps track of scanning ip's, increments packet counters, 
 						my $lprot;
 						$lprot = "tcp" if ($proto eq "TCP");
 						$lprot = "udp" if ($proto eq "UDP");
-						if (`$Cmds_href->{'netstat'} -an |$Cmds_href->{'grep'} \"$lprot\" | $Cmds_href->{'grep'} \"LISTEN\\b\" |$Cmds_href->{'grep'} \"\\:$dstport\\b\"`) {
-							$listening_port = "YOUR MACHINE IS LISTENING ON ($lprot) PORT: $dstport";
-						} else {
-							$listening_port = "There is no server listening on $lprot port $dstport";
-						}
+						my $dstip_is_local = 0;
+						# check to see if the scan destination ip is directed at the firewall.  If yes, then check to see if
+						# a server is listening on the DSTPORT by parsing netstat output.  If not, psad would have to connect
+						# to the deestination port on the remote machine, but it should not do this so it is not implemented.
+						$dstip_is_local = 1 if defined $local_ips_href->{$dstip};
+						if ($dstip_is_local) {
+							my $key = $lprot . $dstport;
+							if (defined $local_listening_ports_href->{$key}) {
+								$listening_port = "YOUR MACHINE IS LISTENING ON ($lprot) PORT: $dstport";
+							} else {
+								$listening_port = "There is no server listening on $lprot port $dstport";
+							}
+						} # else $listening_port is already ""
 					}
 # including sp almost always changes the hash key: 	my $alert_string = "$msg  sp=$srcport, dp=$dstport, flags=$flags.  $listening_port";
 					my $alert_string;
-					$alert_string = "$msg  dp=$dstport, flags=$flags. $listening_port/tcp" if ($proto eq "TCP");
-					$alert_string = "$msg  dp=$dstport. $listening_port/udp" if ($proto eq "UDP");
+					$alert_string = "$msg  dp=$dstport, flags=$flags. $listening_port";
 					if (defined $Scan{$srcip}{$dstip}{$proto}{'SIGMATCH'}{$alert_string}) {
 						$Scan{$srcip}{$dstip}{$proto}{'SIGMATCH'}{$alert_string}++;
 					} else {
@@ -955,6 +972,7 @@ sub print_scan() {  # this should primarily be used for debugging
 	open PSCAN, "> $PRINT_SCAN_HASH";
 	print PSCAN Dumper $Scan_href;
 	close PSCAN;
+	chmod 0600, $PRINT_SCAN_HASH;
 	return;
 }
 sub check_fw() {
@@ -964,6 +982,28 @@ sub check_fw() {
 	} else {
 		$USE_IPTABLES = 1;
 	}
+}
+sub get_local_ips() {
+	my $Cmds_href = shift;
+        my %localips;
+        my @ips = `$Cmds_href->{'ifconfig'} -a |$Cmds_href->{'grep'} inet`;
+	for my $iptmp (@ips) {
+		my $ip = (split /:/, (split /\s+/, $iptmp)[2])[1];
+		$localips{$ip} = "";
+	}
+	return \%localips;
+}
+sub get_listening_ports() {
+	my $Cmds_href = shift;
+	my %listening_ports;
+	my @ports = `$Cmds_href->{'netstat'} -an |$Cmds_href->{'grep'} \"LISTEN\\b\"`;
+	for my $port_tmp (@ports) {
+		my ($proto, $p_tmp) = (split /\s+/, $port_tmp)[0,3];
+		$port = (split /:/, $p_tmp)[1];
+		my $key = $proto . $port;
+		$listening_ports{$key} = "";
+	}
+	return \%listening_ports;
 }
 sub check_firewall_rules() {
 	my $Cmds_href = shift;
@@ -1075,6 +1115,20 @@ sub check_commands() {
         }
         return %$Cmds_href;
 }
+sub check_permissions() {
+	my @files = @_;
+	for $f (@files) {
+		if (-e $f) {
+			chmod 0600, $f;
+		} else {
+			open T, "> $f";
+			close T;
+			chmod 0600, $f;
+		}
+	}
+	return;
+}
+	
 sub usage_and_exit() {
         my $exitcode = shift;
         print <<_HELP_;

@@ -9,7 +9,7 @@
 #
 # Credits:  (see the CREDITS file)
 #
-# Version: 0.9.9
+# Version: 1.0.0-pre1
 #
 # Copyright (C) 1999-2002 Michael B. Rash (mbr@cipherdyne.com)
 #

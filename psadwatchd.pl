@@ -209,8 +209,8 @@ sub import_config() {
     ### make sure the configuration is complete
     &required_vars();
 
-    $no_email_alerts = 1 if $config{'ALERTING_METHODS'} =~ /no?email/i;
-    $no_syslog_alerts = 1 if $config{'ALERTING_METHODS'} =~ /no?syslog/i;
+    $no_email_alerts = 1 if $config{'ALERTING_METHODS'} =~ /no.?e?mail/i;
+    $no_syslog_alerts = 1 if $config{'ALERTING_METHODS'} =~ /no.?syslog/i;
 
     ### Check to make sure the commands specified in the config section
     ### are in the right place, and attempt to correct automatically if not.

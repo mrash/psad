@@ -42,7 +42,8 @@ static void parse_config(
     char *config_file,
     char *psadfifo_file,
     char *fwdata_file,
-    char *fw_msg_search,
+    char *fw_msg_search1,
+    char *fw_msg_search2,
     char *kmsgsd_pid_file
 );
 
@@ -51,7 +52,8 @@ int main(int argc, char *argv[]) {
     char psadfifo_file[MAX_PATH_LEN+1];
     char fwdata_file[MAX_PATH_LEN+1];
     char config_file[MAX_PATH_LEN+1];
-    char fw_msg_search[MAX_PATH_LEN+1];
+    char fw_msg_search1[MAX_PATH_LEN+1];
+    char fw_msg_search2[MAX_PATH_LEN+1];
     char kmsgsd_pid_file[MAX_PATH_LEN+1];
     int fifo_fd, fwdata_fd;  /* file descriptors */
     char buf[MAX_LINE_BUF+1];
@@ -84,7 +86,7 @@ int main(int argc, char *argv[]) {
 #endif
     /* parse the config file */
     parse_config(config_file, psadfifo_file,
-        fwdata_file, fw_msg_search, kmsgsd_pid_file);
+        fwdata_file, fw_msg_search1, fw_msg_search2, kmsgsd_pid_file);
 
     /* make sure there isn't another kmsgsd already running */
     check_unique_pid(kmsgsd_pid_file, "kmsgsd");
@@ -117,9 +119,9 @@ int main(int argc, char *argv[]) {
      * O_NONBLOCK) and write it to the fwdata file if it is a firewall message
      */
     while ((numbytes = read(fifo_fd, buf, MAX_LINE_BUF)) >= 0) {
-        if ((strstr(buf, "Packet log") != NULL
-            || (strstr(buf, "MAC") != NULL && strstr(buf, "IN") != NULL))
-            && (strstr(buf, fw_msg_search) != NULL)) {
+        if (((strstr(buf, "MAC") != NULL && strstr(buf, "IN") != NULL)
+            && (strstr(buf, fw_msg_search1) != NULL || strstr(buf, fw_msg_search2)))
+            || (strstr(buf, "Packet log") != NULL)) {
 
             if (write(fwdata_fd, buf, numbytes) < 0)
                 exit(EXIT_FAILURE);  /* could not write to the fwdata file */
@@ -142,7 +144,8 @@ int main(int argc, char *argv[]) {
 /******************** end main ********************/
 
 static void parse_config(char *config_file, char *psadfifo_file,
-    char *fwdata_file, char *fw_msg_search, char *kmsgsd_pid_file)
+    char *fwdata_file, char *fw_msg_search1, char *fw_msg_search2,
+    char *kmsgsd_pid_file)
 {
     FILE *config_ptr;         /* FILE pointer to the config file */
     int linectr = 0;
@@ -170,7 +173,8 @@ static void parse_config(char *config_file, char *psadfifo_file,
 
             find_char_var("PSAD_FIFO ", psadfifo_file, index);
             find_char_var("FW_DATA ", fwdata_file, index);
-            find_char_var("FW_MSG_SEARCH ", fw_msg_search, index);
+            find_char_var("FW_MSG_SEARCH1 ", fw_msg_search1, index);
+            find_char_var("FW_MSG_SEARCH2 ", fw_msg_search2, index);
             find_char_var("KMSGSD_PID_FILE ", kmsgsd_pid_file, index);
         }
     }
@@ -178,7 +182,8 @@ static void parse_config(char *config_file, char *psadfifo_file,
 #ifdef DEBUG
     printf(" .. PSAD_FIFO: %s\n", psadfifo_file);
     printf(" .. FW_DATA: %s\n", fwdata_file);
-    printf(" .. FW_MSG_SEARCH: %s\n", fw_msg_search);
+    printf(" .. FW_MSG_SEARCH1: %s\n", fw_msg_search1);
+    printf(" .. FW_MSG_SEARCH2: %s\n", fw_msg_search2);
     printf(" .. KMSGSD_PID_FILE: %s\n", kmsgsd_pid_file);
 #endif
     return;

@@ -1794,8 +1794,8 @@ sub check_fw() {
 sub get_local_ips() {
     my @ips = `$cmds{'ifconfig'} -a`;
     my %local_ips;
-    for my $ipline (@ips) {
-        if ($ipline =~ /inet\s+addr:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s/) {
+    for my $line (@ips) {
+        if ($line =~ /inet\s+addr:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s/) {
             $local_ips{$1} = '';
         }
     }

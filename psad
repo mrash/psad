@@ -678,7 +678,7 @@ exit 0;
 ### is being used).
 sub check_scan() {
     my @bad_packets;
-    my $flags;
+    my $flags = 'NULL';
     my $src;
     my $dst;
     my $len;
@@ -716,6 +716,8 @@ sub check_scan() {
     PKT: for my $pkt (@fw_packets) {
         chomp $pkt;
         my $sid = 0;
+        my $dshield_str = '';
+        print STDOUT $pkt, "\n" if $debug;
         if ($use_iptables) {
             if ($snort_sids) {
                 if ($pkt =~ /$config{'SNORT_SID_STR'}(\d+)\s+IN/) {
@@ -727,75 +729,63 @@ sub check_scan() {
             ### DST=192.168.20.1 LEN=60 TOS=0x10 PREC=0x00 TTL=64 ID=47300 DF
             ### PROTO=TCP SPT=34111 DPT=6345 WINDOW=5840 RES=0x00 SYN URGP=0
             if ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+)\s+TOS=(\S+)
-                        \s.*\sTTL=(\d+)\s+ID=(\d+)\s.*\sPROTO=(\S+)\s+
-                        SPT=(\d+)\s+DPT=(\d+)\s+WINDOW=(\d+)/x) {
-                ($src, $dst, $len, $tos, $ttl, $id, $proto, $sp, $dp, $win) =
+                        \s.*TTL=(\d+)\s+ID=(\d+)\s+PROTO=TCP\s+
+                        SPT=(\d+)\s+DPT=(\d+)\s+WINDOW=(\d+)\s+
+                        RES=\S+\s*(.*)\s+URGP=/x) {
+                ($src, $dst, $len, $tos, $ttl, $id, $sp, $dp, $win, $flags) =
                     ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
-                if ($proto ne 'TCP' && $proto ne 'UDP') {
-                    ### it was some weird non-tcp/udp packet
-                    ### with source and destination ports
+                $proto = 'TCP';
+                $flags = 'NULL' unless $flags;  ### default to NULL
+                print STDOUT " .. matched packet: src: $src, dst: $dst, " .
+                    "len: $len\n    sp: $sp dp: $dp, proto: $proto, flags: " .
+                    "$flags\n" if $debug;
+                if (!$sid && $config{'IGNORE_CONNTRACK_BUG_PKTS'} eq 'Y' &&
+#                    $dp > 1024 && ($flags =~ /ACK/ ||
+                        ($flags =~ /ACK/ || $flags =~ /RST/)) {
+                    ### XXX ignore TCP packets that have the ACK or RST
+                    ### bits set (unless we matched a snort sid) since
+                    ### _usually_ we see these packets as a result of the
+                    ### iptables connection tracking bug.  Also, note that
+                    ### no signatures make use of the RST flag and very
+                    ### few that use the ACK flag (need to add code back
+                    ### in for these signatures).
+                    next PKT;
+                }
+                ### per page 595 of the Camel book, "if /blah1|blah2/"
+                ### can be slower than "if /blah1/ || /blah2/
+                unless ($flags !~ /WIN/ &&
+                        $flags =~ /URG/ ||
+                        $flags =~ /ACK/ ||
+                        $flags =~ /PSH/ ||
+                        $flags =~ /RST/ ||
+                        $flags =~ /SYN/ ||
+                        $flags =~ /FIN/ ||
+                        $flags eq 'NULL') {
                     push @bad_packets, $pkt;
                     next PKT;
                 }
-                if ($proto eq 'TCP') {
-                    $flags = 'NULL';  ### default to NULL
-                    if ($pkt =~ /RES=\S+\s+(.*)\s+URGP=/) {
-                        $flags = $1;
-                    }
-
-                    if (!$sid && $config{'IGNORE_CONNTRACK_BUG_PKTS'} eq 'Y' &&
-#                        $dp > 1024 && ($flags =~ /ACK/ ||
-                            ($flags =~ /ACK/ || $flags =~ /RST/)) {
-                        ### XXX ignore TCP packets that have the ACK or RST
-                        ### bits set (unless we matched a snort sid) since
-                        ### _usually_ we see these packets as a result of the
-                        ### iptables connection tracking bug.  Also, note that
-                        ### no signatures make use of the RST flag and very
-                        ### few that use the ACK flag (need to add code back
-                        ### in for these signatures).
-                        next PKT;
-                    }
-                    ### per page 595 of the Camel book, "if /blah1|blah2/"
-                    ### can be slower than "if /blah1/ || /blah2/
-                    unless ($flags !~ /WIN/ &&
-                            $flags =~ /URG/ ||
-                            $flags =~ /ACK/ ||
-                            $flags =~ /PSH/ ||
-                            $flags =~ /RST/ ||
-                            $flags =~ /SYN/ ||
-                            $flags =~ /FIN/ ||
-                            $flags eq 'NULL') {
-                        push @bad_packets, $pkt;
-                        next PKT;
-                    }
-                    $tcp_ctr++;
-                    if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
-                        my $dflags = $flags;
-                        $dflags =~ s/\s/,/g;
-                        if ($pkt =~ /^\s*(\w+)\s+(\d+)\s+(\S+)/) {
-                            my $month   = Decode_Month($1);
-                            my $day     = sprintf("%.2d", $2);
-                            my $time_24 = $3;
-                            push @dshield_data, "$year-$month-$day $time_24 " .
-                                "$timezone\t$config{'DSHIELD_USER_ID'}\t1" .
-                                "\t$src\t$sp\t$dst\t$dp\t$proto\t$dflags\n";
-                        }
-                    }
-                } else {
-                    ### it is UDP, but there are no more fields we need to
-                    ### define since we already have the ports, etc.
-                    $udp_ctr++;
-                    if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
-                        if ($pkt =~ /^\s*(\w+)\s+(\d+)\s+(\S+)/) {
-                            my $month   = Decode_Month($1);
-                            my $day     = sprintf("%.2d", $2);
-                            my $time_24 = $3;
-                            push @dshield_data, "$year-$month-$day $time_24 " .
-                                "$timezone\t$config{'DSHIELD_USER_ID'}\t1" .
-                                "\t$src\t$sp\t$dst\t$dp\t$proto\n";
-                        }
-                    }
+                if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
+                    my $dflags = $flags;
+                    $dflags =~ s/\s/,/g;
+                    $dshield_str = "$src\t$sp\t$dst\t$dp\t$proto\t$dflags";
                 }
+                $tcp_ctr++;
+            ### May 18 22:21:26 orthanc kernel: DROP IN=eth2 OUT=
+            ### MAC=00:60:1d:23:d0:01:00:60:1d:23:d3:0e:08:00
+            ### SRC=192.168.20.25 DST=192.168.20.1 LEN=28 TOS=0x00 PREC=0x00
+            ### TTL=40 ID=47523 PROTO=UDP SPT=57339 DPT=305 LEN=8
+            } elsif ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+)\s+TOS=(\S+)
+                              \s.*TTL=(\d+)\s+ID=(\d+)\s+PROTO=UDP\s+
+                              SPT=(\d+)\s+DPT=(\d+)/x) {
+                ($src, $dst, $len, $tos, $ttl, $id, $sp, $dp) =
+                    ($1,$2,$3,$4,$5,$6,$7,$8);
+                $proto = 'UDP';
+                print STDOUT "matched packet: src: $src, dst: $dst, len: " .
+                    "$len, sp: $sp\n    dp: $dp, proto: $proto\n" if $debug;
+                if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
+                    $dshield_str = "$src\t$type\t$dst\t$code\t$proto";
+                }
+                $udp_ctr++;
             } elsif ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+).*
                               TTL=(\d+).*PROTO=ICMP\s+TYPE=(\d+)\s+
                               CODE=(\d+)\s+ID=(\d+)\s+SEQ=(\d+)/x) {
@@ -804,20 +794,25 @@ sub check_scan() {
                 $proto = 'ICMP';
                 $icmp_ctr++;
                 if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
-                    if ($pkt =~ /^\s*(\w+)\s+(\d+)\s+(\S+)/) {
-                        my $month   = Decode_Month($1);
-                        my $day     = sprintf("%.2d", $2);
-                        my $time_24 = $3;
-                        push @dshield_data, "$year-$month-$day $time_24 " .
-                            "$timezone\t$config{'DSHIELD_USER_ID'}\t1" .
-                            "\t$src\t$type\t$dst\t$code\t$proto\n";
-                    }
+                    $dshield_str = "$src\t$type\t$dst\t$code\t$proto";
                 }
+                print STDOUT "matched patcket: src: $src, dst: $dst, len: " .
+                    "proto: $proto\n" if $debug;
             } else {
                 ### Sometimes the iptables log entry gets messed up due to
                 ### buffering issues so we write it to the error log.
                 push @bad_packets, $pkt;
                 next PKT;
+            }
+            if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
+                if ($pkt =~ /^\s*(\w+)\s+(\d+)\s+(\S+)/) {
+                    my $month   = Decode_Month($1);
+                    my $day     = sprintf("%.2d", $2);
+                    my $time_24 = $3;
+                    push @dshield_data, "$year-$month-$day $time_24 " .
+                        "$timezone\t$config{'DSHIELD_USER_ID'}\t1" .
+                        "\t$dshield_str\n";
+                }
             }
         } elsif ($use_ipchains) {
             ### could implement source port checking here
@@ -2719,11 +2714,13 @@ sub print_scan() {  ### this should primarily be used for debugging
 
 sub get_fw_type() {
     my $line = shift;
-    ### ipchains log messages do not have a MAC address field
-    if ($line !~ /IN=.*OUT=/) {
-        $use_ipchains = 1;
-    } else {
+    if ($line =~ /IN=.+OUT=/) {
+        print STDOUT " .. get_fw_type(): firewall is iptables\n" if $debug;
         $use_iptables = 1;
+        ### ipchains log messages do not have a MAC address field
+    } else {
+        print STDOUT " .. get_fw_type(): firewall is ipchains\n" if $debug;
+        $use_ipchains = 1;
     }
 }
 

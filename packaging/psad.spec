@@ -230,6 +230,10 @@ fi
 %_libdir/%name
 
 %changelog
+* Thu Jun 24 2004 Michael Rash <mbr@cipherydne.org>
+- Updated to psad-1.3.2 (added fwcheck_psad.pl and fw_search.conf
+  installation).
+
 * Mon Oct 14 2003 Michael Rash <mbr@cipherydne.org>
 - Removed ipchains text from description.
 - Added test and config warning message for HOME_NET variable.

@@ -3,7 +3,7 @@
 *
 *  File: psad.h
 *
-*  Author: Michael Rash (mbr@cipherdyne.com)
+*  Author: Michael Rash (mbr@cipherdyne.org)
 *
 *  Purpose: psad.h include appropriate system header files, and defines file
 *           paths, function prototypes, and constants that are needed by
@@ -13,7 +13,7 @@
 *
 *  Version: 1.1.1
 *
-*  Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.com)
+*  Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.org)
 *
 *  License (GNU Public License):
 *

@@ -12,15 +12,15 @@
 #          (syslog is reconfigured to write kern.info messages there
 #          which include firewall messages).  For more information read
 #          the psad man page or view the documentation provided at:
-#          http://www.cipherdyne.com.
+#          http://www.cipherdyne.org.
 #
-# Author: Michael Rash (mbr@cipherdyne.com)
+# Author: Michael Rash (mbr@cipherdyne.org)
 #
 # Credits:  (see the CREDITS file)
 #
 # Version: 1.1.1
 #
-# Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.com)
+# Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.org)
 #
 # License (GNU Public License):
 #
@@ -215,7 +215,7 @@ my %sigs;
 ### Cache snort rule messages if --snort-sids switch was
 ### given.  This is only useful if iptables includes rule
 ### that log things like "SID123".  "fwsnort"
-### (http://www.cipherdyne.com/fwsnort/) will automatically
+### (http://www.cipherdyne.org/fwsnort/) will automatically
 ### build such a ruleset from snort signatures.
 my %snort_msgs;
 
@@ -429,7 +429,7 @@ Getopt::Long::Configure('no_ignore_case');
 ### Print the version number and exit if -V given on the command line.
 if ($ver) {
     print " .. psad v$version, by Michael Rash ",
-        "<mbr\@cipherdyne.com>\n";
+        "<mbr\@cipherdyne.org>\n";
     exit 0;
 }
 
@@ -3574,7 +3574,7 @@ sub usage() {
 
 psad; the Port Scan Attack Detector
  .. Version: $version
- .. By Michael Rash (mbr\@cipherdyne.com, http://www.cipherdyne.com)
+ .. By Michael Rash (mbr\@cipherdyne.org, http://www.cipherdyne.org)
 
 Usage: psad [-a <auto ips file>] [-c <config file>] [-l] [-i <interval>]
        [-h] [-B] [-F] [-S] [-K] [-R] [-U] [-V] [-f] [-o] [-p] [-D] [-d]

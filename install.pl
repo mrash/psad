@@ -13,7 +13,7 @@
 #
 # Version: 1.1.1
 #
-# Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.com)
+# Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.org)
 #
 # License (GNU Public License):
 #
@@ -270,7 +270,7 @@ sub install() {
     unless (-e 'Makefile.PL' && -e 'Psad.pm') {
         die " ** Your source distribution appears to be incomplete!  " .
             "Psad.pm is missing.\n    Download the latest sources from " .
-            "http://www.cipherdyne.com\n";
+            "http://www.cipherdyne.org\n";
     }
     system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
     system  $Cmds{'make'};
@@ -287,7 +287,7 @@ sub install() {
     unless (-e 'Makefile.PL' && -e 'Syslog.pm') {
         die " ** Your source directory appears to be incomplete!  Syslog.pm " .
             "is missing.\n    Download the latest sources from " .
-            "http://www.cipherdyne.com\n";
+            "http://www.cipherdyne.org\n";
     }
     system "$Cmds{'perl'} Makefile.PL";
     system "$Cmds{'make'}";
@@ -303,7 +303,7 @@ sub install() {
     unless (-e 'Makefile.PL') {
         die " ** Your source directory appears to be incomplete!  Date::Calc " .
             "is missing.\n    Download the latest sources from " .
-            "http://www.cipherdyne.com\n";
+            "http://www.cipherdyne.org\n";
     }
     system "$Cmds{'perl'} Makefile.PL";
     system "$Cmds{'make'}";
@@ -319,7 +319,7 @@ sub install() {
     unless (-e 'Makefile.PL') {
         die " ** Your source directory appears to be incomplete!  " .
             "Net::IPv4Addr is missing.\n    Download the latest sources " .
-            "from http://www.cipherdyne.com\n";
+            "from http://www.cipherdyne.org\n";
     }
     system "$Cmds{'perl'} Makefile.PL";
     system "$Cmds{'make'}";
@@ -335,7 +335,7 @@ sub install() {
     unless (-e 'Makefile.PL') {
         die " ** Your source directory appears to be incomplete!  " .
             "IPTables::Parse is missing.\n    Download the latest sources " .
-            "from http://www.cipherdyne.com\n";
+            "from http://www.cipherdyne.org\n";
     }
     system "$Cmds{'perl'} Makefile.PL";
     system "$Cmds{'make'}";
@@ -379,7 +379,7 @@ sub install() {
     } else {
         die " ** Your source directory appears to be incomplete!  psad.h " .
             "is missing.\n    Download the latest sources from " .
-            "http://www.cipherdyne.com\n";
+            "http://www.cipherdyne.org\n";
     }
 
     &logr(" .. Compiling kmsgsd, psadwatchd, and diskmond:\n");
@@ -400,7 +400,7 @@ sub install() {
         unless (((system "$Cmds{'perl'} -c kmsgsd.pl")>>8) == 0) {
             die " ** kmsgsd.pl does not compile with \"perl -c\".  " .
                 "Download the latest sources " .
-                "from:\n\nhttp://www.cipherdyne.com\n";
+                "from:\n\nhttp://www.cipherdyne.org\n";
         }
         copy 'kmsgsd.pl', 'kmsgsd';
     }
@@ -410,7 +410,7 @@ sub install() {
         unless (((system "$Cmds{'perl'} -c psadwatchd.pl")>>8) == 0) {
             die " ** psadwatchd.pl does not compile with \"perl -c\".  " .
                 "Download the latest sources " .
-                "from:\n\nhttp://www.cipherdyne.com\n";
+                "from:\n\nhttp://www.cipherdyne.org\n";
         }
         copy 'psadwatchd.pl', 'psadwatchd';
     }
@@ -421,7 +421,7 @@ sub install() {
         unless (((system "$Cmds{'perl'} -c diskmond.pl")>>8) == 0) {
             die " ** diskmond.pl does not compile with \"perl -c\".  " .
                 "Download the latest sources " .
-                "from:\n\nhttp://www.cipherdyne.com\n";
+                "from:\n\nhttp://www.cipherdyne.org\n";
         }
         copy 'diskmond.pl', 'diskmond';
     }
@@ -432,7 +432,7 @@ sub install() {
     &logr(" .. Verifying compilation of psad perl daemon:\n");
     unless (((system "$Cmds{'perl'} -c psad")>>8) == 0) {
         die " ** psad does not compile with \"perl -c\".  Download the" .
-            " latest sources from:\n\nhttp://www.cipherdyne.com\n";
+            " latest sources from:\n\nhttp://www.cipherdyne.org\n";
     }
     print "\n";
     print "\n";
@@ -918,7 +918,7 @@ sub test_syslog_config() {
         ### with a packet to port 5000 (or higher).
         unless (((system "${USRSBIN_DIR}/kmsgsd")>>8) == 0) {
             &logr(" ** Could not start kmsgsd to test syslog.\n" .
-                "    Send email to Michael Rash (mbr\@cipherdyne.com)\n");
+                "    Send email to Michael Rash (mbr\@cipherdyne.org)\n");
             return;
         }
     }

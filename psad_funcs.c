@@ -7,13 +7,13 @@
 *           the all of the psad daemons, so putting these functions in
 *           a single file make sense.
 *
-*  Author: Michael Rash (mbr@cipherdyne.com)
+*  Author: Michael Rash (mbr@cipherdyne.org)
 *
 *  Credits:  (see the CREDITS file)
 *
 *  Version: 1.1.1
 *
-*  Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.com)
+*  Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.org)
 *
 *  License (GNU Public License):
 *

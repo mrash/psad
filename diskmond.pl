@@ -9,13 +9,13 @@
 #          file is not beyond a threshold that the administrator
 #          defines.
 #
-# Author: Michael Rash (mbr@cipherdyne.com)
+# Author: Michael Rash (mbr@cipherdyne.org)
 #
 # Credits:  (see the CREDITS file)
 #
 # Version: 1.1.1
 #
-# Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.com)
+# Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.org)
 #
 # License (GNU Public License):
 #

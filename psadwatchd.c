@@ -9,13 +9,13 @@
 *           each email address in @email_addresses that the daemon has been
 *           restarted.
 *
-*  Author: Michael Rash (mbr@cipherdyne.com)
+*  Author: Michael Rash (mbr@cipherdyne.org)
 *
 *  Credits:  (see the CREDITS file)
 *
 *  Version: 1.1.1
 *
-*  Copyright (C) 1999-2001 Michael Rash (mbr@cipherdyne.com)
+*  Copyright (C) 1999-2001 Michael Rash (mbr@cipherdyne.org)
 *
 *  License (GNU Public License):
 *

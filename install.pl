@@ -174,7 +174,7 @@ unless (-e "psad" && -e "Psad.pm/Psad.pm") {
 }
 
 my $t = localtime();
-my $time = " ----  Installing psad on $HOSTNAME: $t  ----\n";
+my $time = " ----  Installing psad on $HOSTNAME: $t\n";
 &logr("\n", \@LOGR_FILES);
 &logr($time, \@LOGR_FILES);
 &logr("\n", \@LOGR_FILES);
@@ -252,11 +252,17 @@ if ( -e "${INSTALL_DIR}/psad" && (! $nopreserve)) {  # need to grab the old conf
 	&logr("       Preserving old config within ${INSTALL_DIR}/psad\n", \@LOGR_FILES);
 	&preserve_config("psad", "${INSTALL_DIR}/psad", \%Cmds);
 	### we don't need to run with -w for production code, and they are daemons so nothing would see warnings anyway if there are any.
+        if (&default_email("${INSTALL_DIR}/psad")) {
+                &put_email("${INSTALL_DIR}/psad");
+        }
 	&rm_perl_options("${INSTALL_DIR}/psad", \%Cmds);
 	&perms_ownership("${INSTALL_DIR}/psad", 0500)
 } else {
 	&logr(" ----  Copying psad -> ${INSTALL_DIR}/  ----\n", \@LOGR_FILES);
 	copy("psad", "${INSTALL_DIR}/psad");
+        if (&default_email("${INSTALL_DIR}/psad")) {
+                &put_email("${INSTALL_DIR}/psad");
+        }
 	&rm_perl_options("${INSTALL_DIR}/psad", \%Cmds);
 	&perms_ownership("${INSTALL_DIR}/psad", 0500);
 }
@@ -264,11 +270,17 @@ if ( -e "${INSTALL_DIR}/psadwatchd" && (! $nopreserve)) {  # need to grab the ol
         &logr(" ----  Copying psadwatchd -> ${INSTALL_DIR}/psadwatchd  ----\n", \@LOGR_FILES);
         &logr("       Preserving old config within ${INSTALL_DIR}/psadwatchd\n", \@LOGR_FILES);
         &preserve_config("psadwatchd", "${INSTALL_DIR}/psadwatchd", \%Cmds);
+        if (&default_email("${INSTALL_DIR}/psadwatchd")) {
+                &put_email("${INSTALL_DIR}/psadwatchd");
+        }
 	&rm_perl_options("${INSTALL_DIR}/psadwatchd", \%Cmds);
         &perms_ownership("${INSTALL_DIR}/psadwatchd", 0500);
 } else {
         &logr(" ----  Copying psadwatchd -> ${INSTALL_DIR}/  ----\n", \@LOGR_FILES);
 	copy("psadwatchd", "${INSTALL_DIR}/psadwatchd");
+	if (&default_email("${INSTALL_DIR}/psadwatchd")) {
+		&put_email("${INSTALL_DIR}/psadwatchd");
+	}
 	&rm_perl_options("${INSTALL_DIR}/psadwatchd", \%Cmds);
         &perms_ownership("${INSTALL_DIR}/psadwatchd", 0500);
 }
@@ -370,7 +382,7 @@ if (-e "/etc/man.config") {
 
 my $distro = &get_distro();
 
-if ($distro eq "redhat61" || "redhat62" || "redhat70" || "redhat71") {
+if ($distro eq "redhat61" || "redhat62" || "redhat70" || "redhat71" || "redhat72") {
 	if (-e $INIT_DIR) {
 		&logr(" ----  Copying psad-init -> ${INIT_DIR}/psad  ----\n", \@LOGR_FILES);
 		copy("psad-init", "${INIT_DIR}/psad");
@@ -629,6 +641,66 @@ sub rm_perl_options() {
 	open F, "> $file";
 	print F "#!$Cmds_href->{'perl'}\n";  ### put "#!/path/to/perl" line in with no perl options.
 	print F $_ for (@lines);
+	close F;
+	return;
+}
+sub default_email() {
+	my $file = shift;
+	open F, "< $file";
+	my @lines = <F>;
+	close F;
+	my $email_address;
+	for my $l (@lines) {
+		chomp $l;
+		if ($l =~ /my\s*\@EMAIL_ADDRESSES\s*=\s*qw\(\s*(\S+)/) {
+			$email_address = $1;
+			last;
+		}
+	}
+	unless ($email_address) {
+		return 0;
+	}
+	if ($email_address =~ /root\@localhost/) {
+		return 1;
+	}
+	return 0;
+}
+sub put_email() {
+	my $file = shift;
+	my $tmp = $file . ".tmp";
+	move($file, $tmp);
+	open TMP, "< $tmp";
+	my @lines = <TMP>;
+	close TMP;
+	unlink $tmp;
+	print "\n";
+	print " ----  To which email address(es) would you like $file alerts to be sent?\n";
+	print " ----  You can enter as many email addresses as you like separated by spaces.\n";
+	my $emailstr = "";
+	my $correct = 0;
+	while (! $correct) {
+		print "Email addresses: ";
+		$emailstr = <STDIN>;
+		$emailstr =~ s/\,//g;
+		chomp $emailstr;
+		my @emails = split /\s+/, $emailstr;
+		$correct = 1;
+		for my $email (@emails) {
+			unless ($email =~ /\S+\@\S+/) {
+				$correct = 0;
+			}
+		}
+		$correct = 0 unless @emails;
+	}
+	
+	open F, "> $file";
+	for my $l (@lines) {
+		if ($l =~ /my\s*\@EMAIL_ADDRESSES\s*=\s*qw\(\s*(\S+)/) {
+			print F "my \@EMAIL_ADDRESSES = qw($emailstr);\n";
+		} else {
+			print F $l;
+		}
+	}
 	close F;
 	return;
 }

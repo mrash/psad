@@ -3192,7 +3192,7 @@ sub status_psad_ips() {
         }
     }
     print STDOUT "\n";
-    printf "    %-18s%-18s%-9s%-6s%-6s%-7s%-6s\n", 'SRC:', 'DST:', 'CHAIN:',
+    printf "    %-18s%-18s%-11s%-7s%-7s%-7s%-7s\n", 'SRC:', 'DST:', 'CHAIN:',
         'TCP:', 'UDP:', 'ICMP:', 'DL:';
     if (%scan_source_ips) {
         if ($status_sort_dl) {
@@ -3211,10 +3211,10 @@ sub status_psad_ips() {
                             = $scan_source_ips{$dl}{$src}{$dst}{'udp'}{'forward'};
                         my $forward_icmp
                             = $scan_source_ips{$dl}{$src}{$dst}{'icmp'}{'forward'};
-                        printf "    %-18s%-18s%-9s%-6s%-6s%-7s%-6s\n",
+                        printf "    %-18s%-18s%-11s%-7s%-7s%-7s%-7s\n",
                             $src, $dst, 'input', $input_tcp, $input_udp,
                             $input_icmp, $dl;
-                        printf "    %-18s%-18s%-9s%-6s%-6s%-7s%-6s\n",
+                        printf "    %-18s%-18s%-11s%-7s%-7s%-7s%-7s\n",
                             $src, $dst, 'forward', $forward_tcp,
                             $forward_udp, $forward_icmp, $dl;
                     }
@@ -3236,10 +3236,10 @@ sub status_psad_ips() {
                         = $scan_source_ips{$src}{$dst}{'udp'}{'forward'};
                     my $forward_icmp
                         = $scan_source_ips{$src}{$dst}{'icmp'}{'forward'};
-                    printf "    %-18s%-18s%-9s%-6s%-6s%-7s%-6s\n",
+                    printf "    %-18s%-18s%-11s%-7s%-7s%-7s%-7s\n",
                         $src, $dst, 'input', $input_tcp, $input_udp,
                         $input_icmp, $dl;
-                    printf "    %-18s%-18s%-9s%-6s%-6s%-7s%-6s\n",
+                    printf "    %-18s%-18s%-11s%-7s%-7s%-7s%-7s\n",
                         $src, $dst, 'forward', $forward_tcp,
                         $forward_udp, $forward_icmp, $dl;
                 }

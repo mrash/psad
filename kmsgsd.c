@@ -48,6 +48,7 @@ extern char *optarg; /* for getopt */
 extern int   optind; /* for getopt */
 char *fw_msg_search[MAX_GEN_LEN];
 int num_fw_search_strings = 0;
+int fw_search_all_flag = 1;  /* default to parse all iptables messages */
 
 /* prototypes */
 static void parse_config(
@@ -75,6 +76,7 @@ int main(int argc, char *argv[]) {
     int fifo_fd, fwdata_fd;  /* file descriptors */
     int cmdlopt, numbytes;
 #ifdef DEBUG
+    int matched_ipt_log_msg = 0;
     int fwlinectr = 0;
 #endif
 
@@ -199,19 +201,32 @@ int main(int argc, char *argv[]) {
         /* see if we matched a firewall message and write it to the
          * fwdata file */
         if ((strstr(buf, "OUT") != NULL
-                && strstr(buf, "IN") != NULL)
-                && (match_fw_msg(buf)
-                || strstr(buf, snort_sid_str) != NULL)) {
-
-            if (write(fwdata_fd, buf, numbytes) < 0)
-                exit(EXIT_FAILURE);  /* could not write to the fwdata file */
+                && strstr(buf, "IN") != NULL)) {
+            if (! fw_search_all_flag) {  /* we are looking for specific log prefixes */
+                if (match_fw_msg(buf) || strstr(buf, snort_sid_str) != NULL) {
+                    if (write(fwdata_fd, buf, numbytes) < 0) {
+                        exit(EXIT_FAILURE);  /* could not write to the fwdata file */
+                    }
 #ifdef DEBUG
+                    matched_ipt_log_msg = 1;
+#endif
+                }
+            } else {
+                if (write(fwdata_fd, buf, numbytes) < 0)
+                    exit(EXIT_FAILURE);  /* could not write to the fwdata file */
+#ifdef DEBUG
+                matched_ipt_log_msg = 1;
+#endif
+            }
+#ifdef DEBUG
+        if (matched_ipt_log_msg) {
             puts(buf);
             fprintf(stderr, " ** Line matched search strings.\n");
             fwlinectr++;
             if (fwlinectr % 50 == 0)
                 fprintf(stderr,
                     " .. Processed %d firewall lines.\n", fwlinectr);
+            matched_ipt_log_msg = 0;
         } else {
             puts(buf);
             printf(" ** Line did not match search strings.\n");
@@ -319,6 +334,10 @@ static void parse_fw_search_file(char *fw_search_file)
                 strlcpy(fw_msg_search[num_fw_search_strings],
                     tmp_fw_search_buf, MAX_GEN_LEN);
                 num_fw_search_strings++;
+            }
+            if (find_char_var("FW_SEARCH_ALL", tmp_fw_search_buf, index)) {
+                if (tmp_fw_search_buf[0] == 'N')
+                    fw_search_all_flag = 0;
             }
         }
     }

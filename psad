@@ -714,7 +714,7 @@ sub assign_danger_level() {
 			my $range = $Scan_href->{$srcip}->{$dstip}->{'END_PORT'} - $Scan_href->{$srcip}->{$dstip}->{'START_PORT'};
 			if ($DEBUG) {
 				print "assign_danger_level(): destination ip: $dstip\n";
-				print "assign_danger_level(): ABSNUM: $Scan_href->{$srcip}->{$dstip}->{'ABSNUM'}\n";	
+				print "assign_danger_level(): ABSNUM: $Scan_href->{$srcip}->{$dstip}->{'ABSNUM'}\n";
 				print "assign_danger_level(): START_PORT: $Scan_href->{$srcip}->{$dstip}->{'START_PORT'}, END_PORT: $Scan_href->{$srcip}->{$dstip}->{'END_PORT'}\n";
 				print "assign_danger_level(): CURRENT_DANGER_LEVEL (before assignment) = $Scan_href->{$srcip}->{$dstip}->{'CURRENT_DANGER_LEVEL'}\n";
 			}
@@ -785,7 +785,6 @@ sub automatic_ip_danger_assignment() {
 			foreach my $auto_ip (keys %$Auto_ips_href) {
 				if ($scan_ip eq $auto_ip && $Scan_href->{$scan_ip}->{$dstip}->{'AUTO'} eq "N") {
 					$Scan_href->{$scan_ip}->{$dstip}->{'CURRENT_DANGER_LEVEL'} = $Auto_ips_href->{$auto_ip};
-#					print "Assigning $scan_ip danger level: $Auto_ips_href->{$auto_ip}\n";
 					$Scan_href->{$scan_ip}->{$dstip}->{'ALERTED'} = "N";
 					$Scan_href->{$scan_ip}->{$dstip}->{'AUTO'} = "Y";
 				}
@@ -880,6 +879,7 @@ sub scan_logr() {
 				print STDOUT "scan_logr():  gernerating email......\n" if $DEBUG;
 		        	open EMAILALERT, "> $email_alertfile";
 				&markerline($hndl);
+				### could use logr() here, but perhaps the subroutine call is slower?
 				print $hndl "$time:     Portscan Detected by psad (pid $$) on $HOSTNAME.\n";
 				print $hndl "\n";
 				print $hndl "Source:                     $srcip\n";

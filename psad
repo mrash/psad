@@ -909,8 +909,8 @@ sub check_scan() {
         ### on the paper "Passive OS Fingerprinting: Details
         ### and Techniques" by Toby Miller).
         unless ($no_posf) {
-#            &posf($src, $len, $tos, $ttl, $id, $win)
-#                if ($proto eq 'TCP' && $flags =~ /SYN/);
+            &posf($src, $len, $tos, $ttl, $id, $win)
+                if ($proto eq 'TCP' && $flags =~ /SYN/);
         }
 
         ### might try to match signatures against ipchains messages
@@ -1060,6 +1060,8 @@ sub match_sigs() {
 
 sub posf() {
     my ($src, $len, $tos, $ttl, $id, $win) = @_;
+    print STDOUT " .. posf():  $src  LEN: $len, TOS: $tos, TTL: $ttl, ",
+        "ID: $id, WIN: $win\n" if $debug;
     return if defined $posf{$src}{'guess'};
     $posf{$src}{'len'}{$len}++;
     $posf{$src}{'tos'}{$tos}++;
@@ -1069,7 +1071,7 @@ sub posf() {
     $posf{$src}{'ctr'}++;
     ### Require at least three packets before making an OS guess
     if ($posf{$src}{'ctr'} == 4) {
-        my $id_incr_rv = &id_incr(\@{$posf{$src}{'len'}});
+        my $id_incr_rv = &id_incr(\@{$posf{$src}{'id'}});
         my ($min_ttl, $max_ttl) = &ttl_range($posf{$src}{'ttl'});
         ### Windows 2000
         if (defined $posf{$src}{'win'}{'16384'}
@@ -1103,7 +1105,7 @@ sub posf() {
     return;
 }
 
-sub ip_incr() {
+sub id_incr() {
     my $aref = shift;
     my $rv = 1;
     for (my $i=0; $i<=$#$aref; $i++) {
@@ -1145,7 +1147,8 @@ sub chk_local_port() {
     ### server is listening on the DSTPORT by parsing
     ### netstat output.  If not, psad would have to connect
     ### to the destination port on the remote machine, but
-    ### it should not do this so it is not implemented. :)
+    ### of course it should not do this so it is not
+    ### implemented. :)
     if (defined $local_ips_href->{$dst}) {
         if (defined $local_ports{$proto}{$dp}) {
             $scan{$src}{$dst}{$proto}{'CURR_SIG'}
@@ -1213,8 +1216,9 @@ sub check_port_range() {
         my $end   = $sigs{$proto}{$sig_id}{'sp'}{'negend'};
         return 0 if ($sp > $start || $sp < $end);
     }
-    return 1;   ### if we made it to here, then we matched both
-                ### the src and dst port criteria
+    ### if we made it to here, then we matched both
+    ### the src and dst port criteria
+    return 1;
 }
 
 sub check_icmp_sigs() {
@@ -1315,8 +1319,8 @@ sub import_snort_rules() {
         my ($type) = ($rfile =~ /(\w+)\.rules/);
 #        printf("%-30s", " .. $rfile");
 #        &logr(" .. Parsing $rfile\n", $logfile);
-        open R, "< ${config{'SNORT_RULES_DIR'}}/${rfile}" or die " ** Could not " .
-            "open: ${srules_type}/${rfile}";
+        open R, "< ${config{'SNORT_RULES_DIR'}}/${rfile}" or
+            die " ** Could not open: ${srules_type}/${rfile}";
         my @lines = <R>;
         close R;
         RULE: for my $line (@lines) {
@@ -1390,9 +1394,8 @@ sub import_signatures() {
                 $flags .= 'SYN ' if $sig_flags =~ /S/;
                 $flags .= 'FIN ' if $sig_flags =~ /F/;
 
-                ### iptables does not report "NULL" for no flags set
-                ### (it does not report anything), but put NULL to make it
-                ### so we have something to match against.
+                ### iptables simply reports no flags set at all instead
+                ### of reporting "NULL", so put NULL anyway.
                 $flags .= 'NULL ' if $sig_flags =~ /N/;
                 $flags =~ s/\s*$//;
             }
@@ -1563,8 +1566,8 @@ sub import_auto_ips() {
         } elsif ($line =~ m|^\s*($ip_re/\d+)\s+([0-5])|) {
             $auto_ips{'net'}{$1} = $2;
         } else {
-            my $subject = " ** psad import warning: $config{'PSAD_AUTO_IPS_FILE'} " .
-                "error on line: $i";
+            my $subject = " ** psad import warning: " .
+                "$config{'PSAD_AUTO_IPS_FILE'} error on line: $i";
             &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
                 $cmds{'mail'});
         }
@@ -1893,6 +1896,10 @@ sub scan_logr() {
                 \%print_hsh);
             &Psad::logr(sprintf("%${log_len}s%s", 'Source DNS: ',
                 "$dns_str\n"), \%print_hsh) unless $no_rdns;
+            if (!$no_posf && defined $posf{$src}{'guess'}) {
+                &Psad::logr(sprintf("%${log_len}s%s", 'Source OS guess: ',
+                    "$posf{$src}{'guess'}\n\n"), \%print_hsh);
+            }
             &Psad::logr(sprintf("%${log_len}s%s", 'Destination: ', "$dst\n"),
                 \%print_hsh);
             &Psad::logr(sprintf("%${log_len}s%s", 'Danger level: ',
@@ -2534,6 +2541,11 @@ sub print_scan() {  ### this should primarily be used for debugging
     my $scanfile = $config{'PRINT_SCAN_HASH'} . ".$$";
     open PSCAN, "> $scanfile" or warn ' ** Could not open ',
         "$scanfile: $!" and return;
+    print PSCAN " ** Passive OS fingerprinting hash:\n";
+    print PSCAN Dumper \%posf;
+    print PSCAN " ** Scan danger level hash:\n";
+    print PSCAN Dumper %scan_dl;
+    print PSCAN " ** Main scan hash:\n";
     print PSCAN Dumper \%scan;
     close PSCAN;
     chmod 0600, $scanfile;

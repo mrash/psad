@@ -46,16 +46,16 @@ stop)
     RETVAL=$?
     [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/psad
     echo
-    echo -n "Shutting down the kmsgs daemon: "
+    echo -n "Shutting down the kmsgsd daemon: "
     killproc kmsgsd
     echo
-    echo -n "Shutting down the disk monitoring daemon: "
+    echo -n "Shutting down the diskmond monitoring daemon: "
     killproc diskmond
     echo
     ;;
 status)
     status kmsgsd
-    status psad 
+    status psad
     status psadwatchd
     status diskmond
     ;;

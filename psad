@@ -1232,16 +1232,26 @@ sub auto_psad_response(){
             if ($current_danger_level >= $Config{'AUTO_IDS_DANGER_LEVEL'} && !(defined $Scan{$src}{$dst}{'BLOCKED'})) {
                 if ($USE_IPCHAINS) {
                     my $chains_aref = &get_input_chains($Cmds{'ipchains'});
-                    for my $inchain (@$chains_aref) {
-                        system "$Cmds{'ipchains'} -I $inchain 1 -s $src -j DENY 2> /dev/null 1>&2";
+                    my $blocked_str = "";
+                    if ($Config{'IPTABLES_BLOCK_METHOD'} eq "Y") {
+                        for my $inchain (@$chains_aref) {
+                            system "$Cmds{'ipchains'} -I $inchain 1 -s $src -j DENY 2> /dev/null 1>&2";
+                        }
+                        $blocked_str = "via ipchains";
+                    }
+                    if ($Config{'TCPWRAPPERS_BLOCK_METHOD'} eq "Y") {
+                        open H, ">> /etc/hosts.deny" or die "Could not open /etc/hosts.deny: $!";
+                        print H "ALL: $src";
+                        close H;
+                        $blocked_str = "via tcp wrappers";
                     }
                     for my $dst (keys %{$Scan{$src}}) {
                         $Scan{$src}{$dst}{'BLOCKED'} = "Y";
                     }
-                    if ($Config{'ALERT_BLOCKED_ALERT'} eq "Y") {
+                    if ($Config{'ALERT_AUTO_BLOCKED'} eq "Y" && $blocked_str) {
                         for my $email_address (@$Emailaddrs_aref) {
                             system "$Cmds{'mail'} $email_address -s \"psad: All traffic from $src" .
-                                   " has been BLOCKED on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
+                                   " has been BLOCKED $blocked_str on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
                         }
                     }
                     ### write the $src ip to the $AUTO_BLOCKED_FILE
@@ -1249,16 +1259,26 @@ sub auto_psad_response(){
                     next SOURCE;
                 } elsif ($USE_IPTABLES) {
                     my $chains_aref = &get_input_chains($Cmds{'iptables'});
-                    for my $inchain (@$chains_aref) {
-                        system "$Cmds{'iptables'} -I $inchain 1 -s $src -j DROP 2> /dev/null 1>&2";
+                    my $blocked_str = "";
+                    if ($Config{'IPTABLES_BLOCK_METHOD'} eq "Y") {
+                        for my $inchain (@$chains_aref) {
+                            system "$Cmds{'iptables'} -I $inchain 1 -s $src -j DROP 2> /dev/null 1>&2";
+                        }
+                        $blocked_str = "via iptables";
+                    }
+                    if ($Config{'TCPWRAPPERS_BLOCK_METHOD'} eq "Y") {
+                        open H, ">> /etc/hosts.deny" or die "Could not open /etc/hosts.deny: $!";
+                        print H "ALL: $src";
+                        close H;
+                        $blocked_str = "via tcp wrappers";
                     }
                     for my $dst (keys %{$Scan{$src}}) {
                         $Scan{$src}{$dst}{'BLOCKED'} = "Y";
                     }
-                    if ($Config{'AUTO_BLOCKED_ALERT'} eq "Y") {
+                    if ($Config{'ALERT_AUTO_BLOCKED'} eq "Y" && $blocked_str) {
                         for my $email_address (@$Emailaddrs_aref) {
                             system "$Cmds{'mail'} $email_address -s \"psad: All traffic from $src" .
-                                   " has been BLOCKED on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
+                                   " has been BLOCKED $blocked_str on $HOSTNAME ($dst)\" < /dev/null > /dev/null 2>&1";
                         }
                     }
                     ### write the $src ip to the $AUTO_BLOCKED_FILE
@@ -1572,8 +1592,8 @@ sub check_config() {
                            ENABLE_AUTO_IDS  ENABLE_PERSISTENCE   SCAN_TIMEOUT
                            DANGER_LEVEL1     DANGER_LEVEL2      DANGER_LEVEL3
                            DANGER_LEVEL4 DANGER_LEVEL5 PORT_RANGE_SCAN_THRESHOLD
-                           ALERT_ALL       PSAD_EMAIL_LIMIT
-                           EMAIL_ALERT_DANGER_LEVEL);
+                           ALERT_ALL    PSAD_EMAIL_LIMIT   IPTABLES_BLOCK_METHOD
+                           TCPWRAPPERS_BLOCK_METHOD EMAIL_ALERT_DANGER_LEVEL);
     &Psad::validate_config($CONFIG_FILE, \@required_vars, $Config_href);
     return;
 }

@@ -195,6 +195,9 @@ my %scan_dl;
 ### ENABLE_EXT_SCRIPT_EXEC is set to 'Y');
 my %scan_ext_exec;
 
+### cache passive os fingerprinting information
+my %posf;
+
 ### cache all scan signatures (initialized by default)
 my %sigs;
 
@@ -231,6 +234,12 @@ my %local_ports;
 ### regex to match an ip address
 my $ip_re = '(?:\d{1,3}\.){3}\d{1,3}';
 
+### ttl values are decremented depending on the number of hops
+### the packet has taken before it hits the firewall.  We will
+### assume packets will not jump through more than 30 hops on
+### average.
+my $max_hops = 30;
+
 ### packet counters
 my $tcp_ctr  = 0;
 my $udp_ctr  = 0;
@@ -265,6 +274,7 @@ my $fw_analyze       = 0;
 ### in psad if specified from the command line
 my $no_signatures = 0;
 my $no_auto_ips   = 0;
+my $no_posf       = 0;
 my $no_daemon     = 0;
 my $no_ipt_errors = 0;
 my $no_rdns       = 0;
@@ -339,6 +349,8 @@ Getopt::Long::Configure('no_ignore_case');
     'USR1'          => \$usr1,            # Send an existing psad process a
                                           # USR1 signal (useful for debugging).
     'no-whois'      => \$no_whois,        # Do not issue whois lookups against
+    'no-passiveos'  => \$no_posf,         # Do not attempt to passively
+                                          # fingerprint the remote OS.
     'no-signatures' => \$no_signatures,   # Disable signature processing.
     'no-auto-ips'   => \$no_auto_ips,     # Disable auto danger level
                                           # assignment.

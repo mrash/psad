@@ -97,10 +97,10 @@ open FWCHECK, "> $config{'FW_CHECK_FILE'}" or die "[*] Could not ",
     "open $config{'FW_CHECK_FILE'}: $!";
 
 unless ($fw_search_all) {
-    print FWCHECK " .. Available search strings in $fw_search_file:\n\n";
+    print FWCHECK "[+] Available search strings in $fw_search_file:\n\n";
     print FWCHECK "        $_\n" for @fw_search;
     print FWCHECK
-"\n .. Additional search strings can be added be specifying more\n",
+"\n[+] Additional search strings can be added be specifying more\n",
     "    FW_MSG_SEARCH lines in $fw_search_file\n\n";
 }
 
@@ -139,7 +139,7 @@ sub fw_check() {
 
     if ($send_alert) {
         print FWCHECK
-"\n .. NOTE: IPTables::Parse does not yet parse user defined chains and so\n",
+"\n[+] NOTE: IPTables::Parse does not yet parse user defined chains and so\n",
 "    it is possible your firewall config is compatible with psad anyway.\n";
 
         &Psad::sendmail("[-] psad: firewall setup warning on " .
@@ -148,24 +148,24 @@ sub fw_check() {
             $cmds{'mail'}
         );
         if ($fw_analyze) {
-            print scalar localtime(), "[-] Errors found in firewall config.\n";
-            print scalar localtime(), "[-] Results in ",
+            print "[-] Errors found in firewall config.\n";
+            print "[-] Results in ",
                 "$config{'FW_CHECK_FILE'}\n";
-            print scalar localtime(), "    emailed to ",
+            print "    emailed to ",
                 "$config{'EMAIL_ADDRESSES'}\n";
         }
     } else {
         print FWCHECK
-" .. The iptables ruleset on $config{'HOSTNAME'} will log and block unwanted\n",
+"[+] The iptables ruleset on $config{'HOSTNAME'} will log and block unwanted\n",
 "    packets in both the INPUT and FORWARD chains.  Firewall config success!\n";
 
         if ($fw_analyze) {
-            print scalar localtime(), " .. Firewall config looks good.\n";
-            print scalar localtime(), " .. Completed check of firewall ruleset.\n";
+            print "[+] Firewall config looks good.\n";
+            print "[+] Completed check of firewall ruleset.\n";
         }
     }
     if ($fw_analyze) {
-        print scalar localtime(), " .. Exiting.\n";
+        print "[+] Exiting.\n";
     }
     return $forward_chain_rv && $input_chain_rv;
 }
@@ -247,8 +247,7 @@ sub ipt_chk_chain() {
     my $ipt = new IPTables::Parse 'iptables' => $cmds{'iptables'};
 
     if ($fw_analyze) {
-        print scalar localtime(),
-            " .. Parsing iptables $chain chain rules.\n";
+        print "[+] Parsing iptables $chain chain rules.\n";
     }
 
     if ($fw_search_all) {

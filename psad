@@ -695,13 +695,15 @@ sub check_scan() {
     my $src;
     my $dst;
     my $len;
+    my $tos;
     my $ttl;
+    my $id;
     my $proto;
     my $sp;
     my $dp;
+    my $win;
     my $type;
     my $code;
-    my $id;
     my $seq;
     my $matched_packet = 0;
 
@@ -728,11 +730,20 @@ sub check_scan() {
                     $sid = $1;
                 }
             }
-            if ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+
-                         LEN=(\d+).*TTL=(\d+).*PROTO=(\S+)\s+
-                         SPT=(\d+)\s+DPT=(\d+)/x) {
-                ($src, $dst, $len, $ttl, $proto, $sp, $dp) =
-                    ($1,$2,$3,$4,$5,$6,$7,$8);
+#            if ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+
+#                         LEN=(\d+).*TTL=(\d+).*PROTO=(\S+)\s+
+#                         SPT=(\d+)\s+DPT=(\d+)/x) {
+#                ($src, $dst, $len, $ttl, $proto, $sp, $dp) =
+#                    ($1,$2,$3,$4,$5,$6,$7,$8);
+        ### May 18 22:21:26 orthanc kernel: DROP IN=eth2 OUT=
+        ### MAC=00:60:1d:23:d0:01:00:60:1d:23:d3:0e:08:00 SRC=192.168.20.25
+        ### DST=192.168.20.1 LEN=60 TOS=0x10 PREC=0x00 TTL=64 ID=47300 DF
+        ### PROTO=TCP SPT=34111 DPT=6345 WINDOW=5840 RES=0x00 SYN URGP=0 
+            if ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+)\s+TOS=(\S+)
+                        \s.*\sTTL=(\d+)\s+ID=(\d+)\s.*\sPROTO=(\S+)\s+
+                        SPT=(\d+)\s+DPT=(\d+)\s+WINDOW=(\d+)/x) {
+                ($src, $dst, $len, $tos, $ttl, $id, $proto, $sp, $dp, $win) =
+                    ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
                 if ($proto ne 'TCP' && $proto ne 'UDP') {
                     ### it was some weird non-tcp/udp packet
                     ### with source and destination ports
@@ -891,6 +902,17 @@ sub check_scan() {
             print STDOUT "check_scan(): src: $src, dst: $dst\n";
             print STDOUT Dumper $scan{$src}{$dst};
         }
+
+        ### attempt to passively guess the remote operating
+        ### system based on the ttl, id, len, window, and tos
+        ### fields in tcp syn packets (this technique is based
+        ### on the paper "Passive OS Fingerprinting: Details
+        ### and Techniques" by Toby Miller).
+        unless ($no_posf) {
+#            &posf($src, $len, $tos, $ttl, $id, $win)
+#                if ($proto eq 'TCP' && $flags =~ /SYN/);
+        }
+
         ### might try to match signatures against ipchains messages
         ### also, but then cannot use tcp flags except for -y -l rules
         next PKT unless ($signatures && $use_iptables);
@@ -1034,6 +1056,72 @@ sub match_sigs() {
         }
     }
     return;
+}
+
+sub posf() {
+    my ($src, $len, $tos, $ttl, $id, $win) = @_;
+    return if defined $posf{$src}{'guess'};
+    $posf{$src}{'len'}{$len}++;
+    $posf{$src}{'tos'}{$tos}++;
+    $posf{$src}{'ttl'}{$ttl}++;
+    push @{$posf{$src}{'id'}}, $id;  ### need to maintain ordering
+    $posf{$src}{'win'}{$win}++;
+    $posf{$src}{'ctr'}++;
+    ### Require at least three packets before making an OS guess
+    if ($posf{$src}{'ctr'} == 4) {
+        my $id_incr_rv = &id_incr(\@{$posf{$src}{'len'}});
+        my ($min_ttl, $max_ttl) = &ttl_range($posf{$src}{'ttl'});
+        ### Windows 2000
+        if (defined $posf{$src}{'win'}{'16384'}
+                && (defined $posf{$src}{'tos'}{'0x00'})
+                && (defined $posf{$src}{'len'}{'48'})
+                && ($min_ttl > (128-$max_hops))
+                && ($max_ttl <= 128)
+                && $id_incr_rv) {
+            $posf{$src}{'guess'} = 'Windows 2000';
+        }
+        ### Linux 2.2
+        if (defined $posf{$src}{'win'}{'32120'}
+                && (defined $posf{$src}{'tos'}{'0x10'})
+                && (defined $posf{$src}{'len'}{'60'})
+                && ($min_ttl > (64-$max_hops))
+                && ($max_ttl <= 64)
+                && ! $id_incr_rv) {  ### assume sessions are not established
+            $posf{$src}{'guess'} = 'Linux (2.2.x kernel)';
+        }
+        ### Linux 2.4
+        if (defined $posf{$src}{'win'}{'5840'}
+                && (defined $posf{$src}{'tos'}{'0x10'})
+                && (defined $posf{$src}{'len'}{'60'})
+                && ($min_ttl > (64-$max_hops))
+                && ($max_ttl <= 64)
+                && ! $id_incr_rv) {  ### assume sessions are not established
+            $posf{$src}{'guess'} = 'Linux (2.4.x kernel)';
+        }
+        return;
+    }
+    return;
+}
+
+sub ip_incr() {
+    my $aref = shift;
+    my $rv = 1;
+    for (my $i=0; $i<=$#$aref; $i++) {
+        $rv = 0 unless ($aref->[$i] < $aref->[$i+1]
+            && ($aref->[$i+1] - $aref->[$i]) < 1000);
+    }
+    return $rv;
+}
+
+sub ttl_range() {
+    my $href = shift;
+    my $min_ttl = 256;
+    my $max_ttl = 0;
+    for my $ttl (keys %$href) {
+        $min_ttl = $ttl if $ttl < $min_ttl;
+        $max_ttl = $ttl if $ttl > $max_ttl;
+    }
+    return $min_ttl, $max_ttl;
 }
 
 sub add_snort_sid() {

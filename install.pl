@@ -273,7 +273,7 @@ sub install() {
             "is missing.\n       Download the latest sources from " .
             "http://www.cipherdyne.com\n";
     }
-    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
+    system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR INST_ARCHLIB=$LIBDIR LIB=$LIBDIR";
     system "$Cmds{'make'}";
 #    system "$Cmds{'make'} test";
     system "$Cmds{'make'} install";

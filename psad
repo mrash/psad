@@ -118,7 +118,6 @@
 
 ### modules used by psad
 use lib '/usr/lib/psad';
-use lib '/usr/lib/psad/i386-linux';  ### Syslog.pm is arch-dependent
 use Psad;
 use File::stat 'stat';
 use File::Copy;

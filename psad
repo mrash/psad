@@ -489,7 +489,7 @@ if ($status_dl and $status_dl > 5) {
 }
 
 if ($no_kmsgsd and not $debug) {
-    die ' ** The --no-kmsgsd option can only be used with ' .
+    die ' ** The --no-kmsgsd option can only be used with ',
         '--debug.  Exiting.';
 }
 
@@ -1011,16 +1011,16 @@ sub check_scan() {
 
         if ($sid and ! $no_snort_sids) {
             ### found a snort sid in the packet log message
-            &add_snort_sid($src, $dst, $proto, $sid);
+            &add_snort_sid($src, $dst, $chain, $proto, $sid);
         } else {
             ### attempt to match any tcp/udp/icmp signatures in the
             ### %sigs_fast hash
-            &match_fastsigs($src, $dst, $sp, $dp, $proto,
+            &match_fastsigs($src, $dst, $chain, $sp, $dp, $proto,
                 $flags, $len, $ttl);
 
             ### attempt to match any tcp/udp/icmp signatures in the
             ### main signatures hash
-            &match_sigs($src, $dst, $sp, $dp, $proto,
+            &match_sigs($src, $dst, $chain, $sp, $dp, $proto,
                 $flags, $len, $ttl, $type, $code, $id, $seq);
         }
     }
@@ -1044,76 +1044,78 @@ sub check_scan() {
 }
 
 sub match_fastsigs() {
-    my ($src, $dst, $sp, $dp, $proto,
+    my ($src, $dst, $chain, $sp, $dp, $proto,
         $flags, $len, $ttl) = @_;
     print "match_fastsigs() call\n" if $debug;
-    if ($proto eq 'tcp') {
-        if (defined $sigs_fast{'tcp'}{$dp}{$sp}{$flags}) {
-            for my $sig_id (keys
-                    %{$sigs_fast{'tcp'}{$dp}{$sp}{$flags}}) {
-                print "match_fastsigs(): matched: $dp,$sp,$flags, ",
-                    "sig_id: $sig_id\n" if $debug;
-                unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
-                    $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
-                    $scan{$src}{$dst}{'alerted'} = 0
-                        if ($config{'ALERT_ALL'} eq 'N');
-                }
-                &chk_local_port($src, $dst, 'tcp', $dp, $flags, $sig_id)
-                    unless $no_netstat;
+    if (defined $sigs_fast{$proto}{$dp}{$sp}{$flags}) {
+        for my $sig_id (keys
+                %{$sigs_fast{$proto}{$dp}{$sp}{$flags}}) {
+            print "match_fastsigs(): matched: $dp,$sp,$flags, ",
+                "sig_id: $sig_id\n" if $debug;
+            unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
+                $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
+                $scan{$src}{$dst}{'alerted'} = 0
+                    if ($config{'ALERT_ALL'} eq 'N');
+            }
+            $scan{$src}{$dst}{$proto}{'curr_sig'}
+                {$sig_id}{$chain}{'dp'}{$dp}++;
+            if ($proto eq 'tcp') {
+                $scan{$src}{$dst}{$proto}{'curr_sig'}
+                    {$sig_id}{$chain}{'flags'}{$dp} = $flags;
             }
         }
-        if (defined $sigs_fast{'tcp'}{$dp}{'any_sp'}{$flags}) {
-            for my $sig_id (keys
-                    %{$sigs_fast{'tcp'}{$dp}{'any_sp'}{$flags}}) {
-                print "matched $dp,any_sp,$flags, ",
-                    "sig_id: $sig_id\n" if $debug;
-                unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
-                    $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
-                    $scan{$src}{$dst}{'alerted'} = 0
-                        if ($config{'ALERT_ALL'} eq 'N');
-                }
-                &chk_local_port($src, $dst, 'tcp', $dp, $flags, $sig_id)
-                    unless $no_netstat;
+    }
+    if (defined $sigs_fast{$proto}{$dp}{'any_sp'}{$flags}) {
+        for my $sig_id (keys
+                %{$sigs_fast{$proto}{$dp}{'any_sp'}{$flags}}) {
+            print "matched $dp,any_sp,$flags, ",
+                "sig_id: $sig_id\n" if $debug;
+            unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
+                $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
+                $scan{$src}{$dst}{'alerted'} = 0
+                    if ($config{'ALERT_ALL'} eq 'N');
+            }
+            $scan{$src}{$dst}{$proto}{'curr_sig'}
+                {$sig_id}{$chain}{'dp'}{$dp}++;
+            if ($proto eq 'tcp') {
+                $scan{$src}{$dst}{$proto}{'curr_sig'}
+                    {$sig_id}{$chain}{'flags'}{$dp} = $flags;
             }
         }
-        if (defined $sigs_fast{'tcp'}{'any_dp'}{$sp}{$flags}) {
-            for my $sig_id (keys
-                    %{$sigs_fast{'tcp'}{'any_dp'}{$sp}{$flags}}) {
-                print "matched any_dp,$sp,$flags, ",
-                    "sig_id: $sig_id\n" if $debug;
-                unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
-                    $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
-                    $scan{$src}{$dst}{'alerted'} = 0
-                        if ($config{'ALERT_ALL'} eq 'N');
-                }
-                &chk_local_port($src, $dst, 'tcp', $dp, $flags, $sig_id)
-                    unless $no_netstat;
+    }
+    if (defined $sigs_fast{$proto}{'any_dp'}{$sp}{$flags}) {
+        for my $sig_id (keys
+                %{$sigs_fast{$proto}{'any_dp'}{$sp}{$flags}}) {
+            print "matched any_dp,$sp,$flags, ",
+                "sig_id: $sig_id\n" if $debug;
+            unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
+                $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
+                $scan{$src}{$dst}{'alerted'} = 0
+                    if ($config{'ALERT_ALL'} eq 'N');
+            }
+            $scan{$src}{$dst}{$proto}{'curr_sig'}
+                {$sig_id}{$chain}{'dp'}{$dp}++;
+            if ($proto eq 'tcp') {
+                $scan{$src}{$dst}{$proto}{'curr_sig'}
+                    {$sig_id}{$chain}{'flags'}{$dp} = $flags;
             }
         }
-        if (defined $sigs_fast{'tcp'}{'any_dp'}{'any_sp'}{$flags}) {
-            for my $sig_id (keys
-                    %{$sigs_fast{'tcp'}{'any_dp'}{'any_sp'}{$flags}}) {
-                print "matched any_dp,any_sp,$flags, ",
-                    "sig_id: $sig_id\n" if $debug;
-                unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
-                    $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
-                    $scan{$src}{$dst}{'alerted'} = 0
-                        if ($config{'ALERT_ALL'} eq 'N');
-                }
-                &chk_local_port($src, $dst, 'tcp', $dp, $flags, $sig_id)
-                    unless $no_netstat;
+    }
+    if (defined $sigs_fast{$proto}{'any_dp'}{'any_sp'}{$flags}) {
+        for my $sig_id (keys
+                %{$sigs_fast{$proto}{'any_dp'}{'any_sp'}{$flags}}) {
+            print "matched any_dp,any_sp,$flags, ",
+                "sig_id: $sig_id\n" if $debug;
+            unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
+                $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
+                $scan{$src}{$dst}{'alerted'} = 0
+                    if ($config{'ALERT_ALL'} eq 'N');
             }
-        }
-    } elsif ($proto eq 'udp') {
-        if (defined $sigs_fast{'udp'}{$dp}{$sp}) {
-            for my $sig_id (keys %{$sigs_fast{'udp'}{$dp}{$sp}}) {
-                unless ($scan_dl{$src} >= $sigs_attr{$sig_id}{'dlevel'}) {
-                    $scan_dl{$src} = $sigs_attr{$sig_id}{'dlevel'};
-                    $scan{$src}{$dst}{'alerted'} = 0
-                        if ($config{'ALERT_ALL'} eq 'N');
-                }
-                &chk_local_port($src, $dst, 'udp', $dp, '', $sig_id)
-                    unless $no_netstat;
+            $scan{$src}{$dst}{$proto}{'curr_sig'}
+                {$sig_id}{$chain}{'dp'}{$dp}++;
+            if ($proto eq 'tcp') {
+                $scan{$src}{$dst}{$proto}{'curr_sig'}
+                    {$sig_id}{$chain}{'flags'}{$dp} = $flags;
             }
         }
     }
@@ -1121,15 +1123,12 @@ sub match_fastsigs() {
 }
 
 sub match_sigs() {
-    my ($src, $dst, $sp, $dp, $proto,
+    my ($src, $dst, $chain, $sp, $dp, $proto,
         $flags, $len, $ttl, $type, $code, $id, $seq) = @_;
     print "match_sigs() call\n" if $debug;
     for my $sig_id (keys %{$sigs{$proto}}) {
         ### need to iterate through all signatures
         ### since a packet may match several
-        my $dp_criteria = 0;
-        my $sp_criteria = 0;
-        my $matched_sig      = 0;
         if ($proto eq 'tcp') {
             if ($flags eq $sigs{'tcp'}{$sig_id}{'flags'}
                     && &check_port_range($sig_id, $sp,
@@ -1143,7 +1142,10 @@ sub match_sigs() {
                     $scan{$src}{$dst}{'alerted'} = 0
                         if ($config{'ALERT_ALL'} eq 'N');
                 }
-                $matched_sig = 1;
+                $scan{$src}{$dst}{$proto}{'curr_sig'}
+                    {$sig_id}{$chain}{'dp'}{$dp}++;
+                $scan{$src}{$dst}{$proto}{'curr_sig'}
+                    {$sig_id}{$chain}{'flags'}{$dp} = $flags;
             }
         } elsif ($proto eq 'udp') {
             if (&check_port_range($sig_id, $sp, $dp, $proto)) {
@@ -1154,7 +1156,8 @@ sub match_sigs() {
                     $scan{$src}{$dst}{'alerted'} = 0
                         if ($config{'ALERT_ALL'} eq 'N');
                 }
-                $matched_sig = 1;
+                $scan{$src}{$dst}{$proto}{'curr_sig'}
+                    {$sig_id}{$chain}{'dp'}{$dp}++;
             }
         } elsif ($proto eq 'icmp') {
             if (&check_icmp_sigs($sig_id, $ttl, $type, $code, $id, $seq)) {
@@ -1164,11 +1167,8 @@ sub match_sigs() {
                         if ($config{'ALERT_ALL'} eq 'N');
                 }
                 $scan{$src}{$dst}{'icmp'}{'curr_sig'}
-                {$sig_id}{'pkts'}++;
+                    {$sig_id}{$chain}{'pkts'}++;
             }
-        }
-        if ($matched_sig && !$no_netstat) {
-            &chk_local_port($src, $dst, $proto, $dp, $flags, $sig_id);
         }
     }
     return;
@@ -1232,7 +1232,7 @@ sub ttl_range() {
 }
 
 sub add_snort_sid() {
-    my ($src, $dst, $proto, $sid) = @_;
+    my ($src, $dst, $chain, $proto, $sid) = @_;
     if (defined $snort_msgs{$sid}) {
         unless ($scan_dl{$src} >= 2) {
             ### FIXME: for now hardcode snort sid matches at
@@ -1241,7 +1241,7 @@ sub add_snort_sid() {
             $scan{$src}{$dst}{'alerted'} = 0
                 if ($config{'ALERT_ALL'} eq 'N');
         }
-        $scan{$src}{$dst}{$proto}{'SNORT_SID'}{$sid}++;
+        $scan{$src}{$dst}{$proto}{'snort_sid'}{$sid}{$chain}++;
     }
     return;
 }
@@ -2066,7 +2066,8 @@ sub scan_logr() {
                 } else {
                     $tcp_newrange = "$tcp_s_port-$tcp_e_port";
                 }
-                $tcp_newpkts = $current_scan_href->{$src}->{$dst}->{'tcp'}->{'pkts'};
+                $tcp_newpkts =
+                    $current_scan_href->{$src}->{$dst}->{'tcp'}->{'pkts'};
             }
             if (defined $scan{$src}{$dst}{'udp'}{'abs_sp'}) {
                 my $udp_s_port
@@ -2094,7 +2095,8 @@ sub scan_logr() {
             }
             if (defined $current_scan_href->{$src}->{$dst}->{'icmp'}) {
                 $icmp_f = 1;
-                $icmp_newpkts = $current_scan_href->{$src}->{$dst}->{'icmp'}->{'pkts'};
+                $icmp_newpkts =
+                    $current_scan_href->{$src}->{$dst}->{'icmp'}->{'pkts'};
             }
 
             ### get reverse dns info
@@ -2159,11 +2161,12 @@ sub scan_logr() {
                 printf E "%${log_len}s%s", 'Scanned tcp ports: ',
                     "[$tcp_newrange: $tcp_newpkts packets]\n";
                 my $prefix = 'tcp flags: ';
-                for my $flags (keys
-                        %{$current_scan_href->{$src}->{$dst}->{'tcp'}->{'flags'}}) {
+                for my $flags (keys %{$current_scan_href->{$src}->
+                        {$dst}->{'tcp'}->{'flags'}}) {
                     my $nmap_opts;
                     $syslog_flags .= "$flags ";
-                    my $n_pkts = $current_scan_href->{$src}->{$dst}->{'tcp'}->{'flags'}->{$flags};
+                    my $n_pkts = $current_scan_href->{$src}->{$dst}->
+                        {'tcp'}->{'flags'}->{$flags};
                     ### FUTURE: replace this with a simple hash lookup
                     if ($flags eq 'SYN') {
                         $nmap_opts = '-sT or -sS';
@@ -2212,12 +2215,7 @@ sub scan_logr() {
             print E "\n";
             printf E "    %-9s%-13s%-7s%-7s%-7s\n", 'chain:', 'interface:',
                 'tcp:', 'udp:', 'icmp:';
-            for my $chain qw(input forward output) {
-#            for my $chain qw(input forward output) {
-#                if (!defined $scan{$src}{$dst}{$chain}) {
-#                    printf E "    %-11%s\n", $chain, '[No packets]';
-#                    next;
-#                }
+            for my $chain (keys %{$scan{$src}{$dst}{'chain'}}) {
                 for my $intf (keys %{$scan{$src}{$dst}{'chain'}{$chain}}) {
                     my $tot_tcp  = 0;
                     my $tot_udp  = 0;
@@ -2299,111 +2297,128 @@ sub scan_logr() {
 
 sub scan_logr_signatures() {
     my ($src, $dst, $email_fh, $log_sigs) = @_;
+    my $dst_ip_is_local = 0;
+    $dst_ip_is_local = 1 if defined $local_ips{$dst};
     open LS, ">> $log_sigs" or die " ** Could not open $log_sigs: $!";
     for my $proto qw(tcp udp icmp) {
         next unless (defined $scan{$src}{$dst}{$proto}{'curr_sig'}
-            || defined $scan{$src}{$dst}{$proto}{'SNORT_SID'});
+            || defined $scan{$src}{$dst}{$proto}{'snort_sid'});
         print $email_fh "\n";
         print LS "\n";
         print $email_fh "---- $proto scan signatures ----\n";
         print LS "---- $proto scan signatures ----\n";
         print "scan_logr_signatures(): src: $src dst: $dst proto: $proto\n"
             if $debug;
-        for my $sid (keys %{$scan{$src}{$dst}{$proto}{'SNORT_SID'}}) {
-            my $msg = $snort_msgs{$sid}{'msg'};
-            my $classtype = $snort_msgs{$sid}{'classtype'};
-            my $pkts = $scan{$src}{$dst}{$proto}{'SNORT_SID'}{$sid};
-            my $content;
-            if (defined $snort_msgs{$sid}{'content'}) {
-                $content = $snort_msgs{$sid}{'content'};
+        for my $sid (keys %{$scan{$src}{$dst}{$proto}{'snort_sid'}}) {
+            for my $chain (keys %{$scan{$src}{$dst}{$proto}{'snort_sid'}{$sid}}) {
+                my $msg = $snort_msgs{$sid}{'msg'};
+                my $classtype = $snort_msgs{$sid}{'classtype'};
+                my $pkts = $scan{$src}{$dst}{$proto}{'snort_sid'}{$sid}{$chain};
+                my $content;
+                if (defined $snort_msgs{$sid}{'content'}) {
+                    $content = $snort_msgs{$sid}{'content'};
+                }
+                print $email_fh qq("$msg"\n);
+                print LS qq("$msg"\n);
+                print $email_fh "       classtype: $classtype\n";
+                print LS "       classtype: $classtype\n";
+                print $email_fh "       sid:       $sid\n";
+                print LS "       sid:       $sid\n";
+                if ($content) {
+                    print $email_fh qq(       content:   "$content"\n);
+                    print LS qq(       content:   "$content"\n);
+                }
+                print $email_fh "       chain:   $chain\n";
+                print LS "       chain:   $chain\n";
+                print $email_fh "       packets:   $pkts\n\n";
+                print LS "       packets:   $pkts\n\n";
             }
-            print $email_fh qq("$msg"\n);
-            print LS qq("$msg"\n);
-            print $email_fh "       classtype: $classtype\n";
-            print LS "       classtype: $classtype\n";
-            print $email_fh "       sid:       $sid\n";
-            print LS "       sid:       $sid\n";
-            if ($content) {
-                print $email_fh qq(       content:   "$content"\n);
-                print LS qq(       content:   "$content"\n);
-            }
-            print $email_fh "       packets:   $pkts\n\n";
-            print LS "       packets:   $pkts\n\n";
         }
         for my $sig_id (keys %{$scan{$src}{$dst}{$proto}{'curr_sig'}}) {
             my $msg = $sigs_attr{$sig_id}{'msg'};
-            if ($proto eq 'tcp') {
-                for my $dp (keys
-                        %{$scan{$src}{$dst}{'tcp'}{'curr_sig'}
-                        {$sig_id}{'listen'}}) {
-                    my $flags =
-                        $scan{$src}{$dst}{'tcp'}
-                        {'curr_sig'}{$sig_id}{'listen'}{$dp}{'flags'};
-                    my $pkts =
-                        $scan{$src}{$dst}{'tcp'}
-                        {'curr_sig'}{$sig_id}{'listen'}{$dp}{'pkts'};
-                    print $email_fh "\"$msg\" dp=$dp flags=[$flags] packets=$pkts ",
-                        "** Your machine is listening on tcp port: $dp!\n";
-                    print LS "\"$msg\" dp=$dp flags=[$flags] packets=$pkts ",
-                        "** Your machine is listening on tcp port: $dp!\n";
-                }
-                for my $dp (keys
-                        %{$scan{$src}{$dst}{'tcp'}
-                        {'curr_sig'}{$sig_id}{'no_listen'}}) {
-                    my $flags =
-                        $scan{$src}{$dst}{'tcp'}{'curr_sig'}
-                        {$sig_id}{'no_listen'}{$dp}{'flags'};
-                    my $pkts =
-                        $scan{$src}{$dst}{'tcp'}{'curr_sig'}
-                        {$sig_id}{'no_listen'}{$dp}{'pkts'};
-                    print $email_fh "\"$msg\" dp=$dp ",
-                        "flags=[$flags] packets=$pkts No server ",
-                        "on tcp port: $dp\n";
-                    print LS "\"$msg\" dp=$dp ",
-                        "flags=[$flags] packets=$pkts No server ",
-                        "on tcp port: $dp\n";
-                }
-            } elsif ($proto eq 'udp') {
-                for my $dp (keys
-                        %{$scan{$src}{$dst}{'udp'}{'curr_sig'}
-                        {$sig_id}{'listen'}}) {
-                    my $pkts =
-                        $scan{$src}{$dst}{'udp'}{'curr_sig'}
-                        {$sig_id}{'listen'}{$dp}{'pkts'};
-                    print $email_fh qq("$msg" dp=$dp packets=$pkts ** Your ",
-                        "machine is listening on udp port: $dp!\n);
-                    print LS qq("$msg" dp=$dp packets=$pkts ** Your ",
-                        "machine is listening on udp port: $dp!\n);
-                }
-                for my $dp (keys
-                        %{$scan{$src}{$dst}{'udp'}{'curr_sig'}
-                        {$sig_id}{'no_listen'}}) {
-                    my $pkts =
-                        $scan{$src}{$dst}{'udp'}{'curr_sig'}
-                        {$sig_id}{'no_listen'}{$dp}{'pkts'};
-                    print $email_fh qq("$msg" dp=$dp packets=$pkts No ",
-                        "server on udp port: $dp\n");
-                    print LS qq("$msg" dp=$dp packets=$pkts No ",
-                        "server on udp port: $dp\n");
-                }
-            } else {
-                my $pkts = $scan{$src}{$dst}{'icmp'}
-                    {'curr_sig'}{$sig_id}{'pkts'};
-                print $email_fh qq("$msg" packets=$pkts\n);
-                print LS qq("$msg" packets=$pkts\n);
-            }
 
-            ### signature logging with syslog is not yet supported
-            ### (requires a message for each matched signature).
+            for my $chain (keys %{$scan{$src}{$dst}{$proto}{'curr_sig'}{$sig_id}}) {
+                if ($proto eq 'tcp' or $proto eq 'udp') {
+                    for my $dp (keys %{$scan{$src}{$dst}{$proto}{'curr_sig'}
+                            {$sig_id}{$chain}{'dp'}}) {
+                        my $flags = '';
+                        my $pkts = $scan{$src}{$dst}{$proto}{'curr_sig'}
+                            {$sig_id}{$chain}{'dp'}{$dp};
+                        if (defined $scan{$src}{$dst}{$proto}{'curr_sig'}
+                                {$sig_id}{$chain}{'flags'} and defined $scan{$src}{$dst}
+                                    {$proto}{'curr_sig'}{$sig_id}{$chain}{'flags'}{$dp}) {
+                            $flags = $scan{$src}{$dst}{$proto}{'curr_sig'}
+                                        {$sig_id}{$chain}{'flags'}{$dp};
+                        }
+
+                        if ($dst_ip_is_local) {
+                            ### check local ports here since we know the
+                            ### destination is a local ip address
+                            if (defined $local_ports{$proto}{$dp}) {
+                                if ($flags) {
+                                    print $email_fh "\"$msg\"\n",
+                                        "     chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
+                                        "** Your machine is listening on $proto port: $dp!\n";
+                                    print LS "\"$msg\"\n",
+                                        "     chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
+                                        "** Your machine is listening on $proto port: $dp!\n";
+                                } else {
+                                    print $email_fh "\"$msg\"\n",
+                                        "     chain=$chain packets=$pkts dp=$dp ",
+                                        "** Your machine is listening on $proto port: $dp!\n";
+                                    print LS "\"$msg\"\n",
+                                        "     chain=$chain packets=$pkts dp=$dp ",
+                                        "** Your machine is listening on $proto port: $dp!\n";
+                                }
+                            } else {
+                                if ($flags) {
+                                    print $email_fh "\"$msg\"\n",
+                                        "     chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
+                                        "No local server on $proto/$dp\n";
+                                    print LS "\"$msg\"\n",
+                                        "     chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
+                                        "No local server on $proto/$dp\n";
+                                } else {
+                                    print $email_fh "\"$msg\"\n",
+                                        "     chain=$chain packets=$pkts dp=$dp No local ",
+                                        "server on $proto/$dp\n";
+                                    print LS "\"$msg\"\n",
+                                        "     chain=$chain packets=$pkts dp=$dp No local ",
+                                        "server on $proto/$dp\n";
+                                }
+                            }
+                        } else {
+                            if ($flags) {
+                                print $email_fh "\"$msg\"\n",
+                                    "    chain=$chain packets=$pkts dp=$dp flags=[$flags]\n";
+                                print LS "\"$msg\"\n",
+                                    "    chain=$chain packets=$pkts dp=$dp flags=[$flags]\n";
+                            } else {
+                                print $email_fh "\"$msg\"\n",
+                                    "    chain=$chain packets=$pkts dp=$dp\n";
+                                print LS "\"$msg\"\n",
+                                    "    chain=$chain packets=$pkts dp=$dp\n";
+                            }
+                        }
+                    }
+                } else {
+                    my $pkts = $scan{$src}{$dst}{'icmp'}
+                        {'curr_sig'}{$sig_id}{$chain}{'pkts'};
+                    print $email_fh qq("$msg" chain=$chain packets=$pkts\n);
+                    print LS qq("$msg" chain=$chain packets=$pkts\n);
+                }
+                ### signature logging with syslog is not yet supported
+                ### (requires a message for each matched signature).
 #            if ($sigmatch =~ /^(\".*\")/) {
 #                $syslog_sig_title = "signature=$1";
 #            }
+            }
         }
         ### need to delete the current signature so it
         ### won't show up in the next alert
         delete $scan{$src}{$dst}{$proto}{'curr_sig'}
             unless $config{'SHOW_ALL_SIGNATURES'} eq 'Y';
-        delete $scan{$src}{$dst}{$proto}{'SNORT_SID'}
+        delete $scan{$src}{$dst}{$proto}{'snort_sid'}
             unless $config{'SHOW_ALL_SIGNATURES'} eq 'Y';
     }
     close LS;

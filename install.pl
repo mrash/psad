@@ -9,6 +9,7 @@ use File::Copy; # used for copying/moving files
 use Getopt::Long;
 use Text::Wrap;
 use Sys::Hostname "hostname";
+use strict;
 
 ### Note that Psad.pm is not included within the above list (installation
 ### over existing psad install should not make use of an old Psad.pm).
@@ -25,14 +26,13 @@ $INSTALL_LOG = "/var/log/psad/install.log";
 $HOSTNAME = hostname;
 my $SYSLOG_INIT = "${INIT_DIR}/syslog";
 
-my $psCmd = "/bin/ps";
+### system binaries ###
+my $chkconfigCmd = "/sbin/chkconfig";
 my $mknodCmd = "/bin/mknod";
 my $grepCmd = "/bin/grep";
 my $makeCmd = "/usr/bin/make";
-my $unameCmd = "/bin/uname";
 my $findCmd = "/usr/bin/find";
 my $perlCmd = "/usr/bin/perl";
-my $ifconfigCmd = "/sbin/ifconfig";
 my $ipchainsCmd = "/sbin/ipchains";
 my $iptablesCmd = "/usr/local/bin/iptables";
 my $psadCmd = "${INSTALL_DIR}/psad";
@@ -56,6 +56,8 @@ $SUB_TAB = "       ";
 my $execute_psad = 0;
 my $nopreserve = 0;
 my $uninstall = 0;
+my $verbose = 0;
+my $help = 0;
 
 &usage_and_exit(1) unless (GetOptions (
 	'no_preserve'		=> \$nopreserve,	# don't preserve existing configs
@@ -67,14 +69,12 @@ my $uninstall = 0;
 &usage_and_exit(0) if ($help);
 
 my %Cmds = (
-	"ps"		=> $psCmd,
+	"chkconfig"	=> $chkconfigCmd,
 	"mknod"		=> $mknodCmd,
 	"grep"		=> $grepCmd,
-	"uname"		=> $unameCmd,
 	"find"		=> $findCmd,
 	"make"		=> $makeCmd,
 	"perl"		=> $perlCmd,
-	"ifconfig"	=> $ifconfigCmd,
 	"ipchains"      => $ipchainsCmd,
 	"iptables"	=> $iptablesCmd,
 );
@@ -387,6 +387,7 @@ if ($distro eq "redhat61" || "redhat62" || "redhat70" || "redhat71" || "redhat72
 		&logr(" ----  Copying psad-init -> ${INIT_DIR}/psad  ----\n", \@LOGR_FILES);
 		copy("psad-init", "${INIT_DIR}/psad");
 		&perms_ownership("${INIT_DIR}/psad", 0744);
+		&enable_psad_at_boot(\%Cmds);
 		# remove signature checking from psad process if we are not running an iptables-enabled kernel
 #		system "$Cmds{'perl'} -p -i -e 's|\\-s\\s/etc/psad/psad_signatures||' ${INIT_DIR}/psad" if ($kernel !~ /^2.3/ && $kernel !~ /^2.4/);
 	} else {
@@ -474,7 +475,8 @@ sub get_distro() {
 sub preserve_config() {
 	my ($srcfile, $productionfile, $Cmds_href) = @_;
 	my $start = 0;
-	my @config = (), @defconfig = ();
+	my @config = ();
+	my @defconfig = ();
 	open PROD, "< $productionfile" or die "Could not open production file: $!\n";
 	GETCONFIG: while(<PROD>) {
 		my $l = $_;
@@ -705,6 +707,21 @@ sub put_email() {
 	close F;
 	return;
 }
+sub enable_psad_at_boot() {
+	my $Cmds_href = shift;
+	my $ans = "";
+	while ($ans ne "y" && $ans ne "n") {
+		print " ----  Enable psad at boot time (y/n)?  ";
+		$ans = <STDIN>;
+		chomp $ans;
+	}
+	if ($ans eq "y") {
+		system "$Cmds_href->{'chkconfig'} --add psad";
+	} else {
+		return;
+	}
+	return;
+}	
 ### check paths to commands and attempt to correct if any are wrong.
 sub check_commands() {
         my $Cmds_href = shift;

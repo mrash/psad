@@ -11,7 +11,7 @@
 #
 # Credits:  (see the CREDITS file)
 #
-# Version: 1.2.4
+# Version: 1.3
 #
 # Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.org)
 #
@@ -258,7 +258,8 @@ sub install() {
     }
     unless (-e "${PSAD_DIR}/fwdata") {
         &logr(" .. Creating ${PSAD_DIR}/fwdata file\n");
-        open F, "> ${PSAD_DIR}/fwdata";
+        open F, "> ${PSAD_DIR}/fwdata" or die " ** Could not open ",
+            "${PSAD_DIR}/fwdata: $!";
         close F;
         chmod 0600, "${PSAD_DIR}/fwdata";
         &perms_ownership("${PSAD_DIR}/fwdata", 0600);
@@ -593,7 +594,8 @@ sub install() {
     my $running;
     my $pid;
     if (-e "${RUNDIR}/psad.pid") {
-        open PID, "< ${RUNDIR}/psad.pid";
+        open PID, "< ${RUNDIR}/psad.pid" or die " ** Could not open ",
+            "${RUNDIR}/psad.pid: $!";
         $pid = <PID>;
         close PID;
         chomp $pid;
@@ -639,17 +641,17 @@ sub uninstall() {
     ### after this point, psad will really be uninstalled so stop writing stuff
     ### to the install.log file.  Just print everything to STDOUT
     if (-e "${RUNDIR}/psad.pid") {
-        if (open PID, "${RUNDIR}/psad.pid") {
-            my $pid = <PID>;
-            close PID;
-            chomp $pid;
-            if (kill 0, $pid) {
-                print " .. Stopping psad daemons!\n";
-                if (-e "${init_dir}/psad") {  ### prefer this for old versions
-                    system "${init_dir}/psad stop";
-                } else {
-                    system "${USRSBIN_DIR}/psad --Kill";
-                }
+        open PID, "${RUNDIR}/psad.pid" or die " ** Could not open ",
+            "${RUNDIR}/psad.pid: $!";
+        my $pid = <PID>;
+        close PID;
+        chomp $pid;
+        if (kill 0, $pid) {
+            print " .. Stopping psad daemons!\n";
+            if (-e "${init_dir}/psad") {  ### prefer this for old versions
+                system "${init_dir}/psad stop";
+            } else {
+                system "${USRSBIN_DIR}/psad --Kill";
             }
         }
     }
@@ -714,8 +716,9 @@ sub uninstall() {
             die " **  Unable to open /etc/syslog.conf: $!\n";
         my @sys = <ESYS>;
         close ESYS;
-        open CSYS, '> /etc/syslog.conf';
-            for my $line (@sys) {
+        open CSYS, '> /etc/syslog.conf' or die " ** Could not open ",
+            "/etc/syslog.conf: $!";
+        for my $line (@sys) {
             chomp $line;
             ### don't print the psadfifo line
             print CSYS "$line\n" if ($line !~ /psadfifo/);
@@ -810,7 +813,7 @@ sub set_hostname() {
         my @lines = <P>;
         close P;
         ### replace the "HOSTNAME           CHANGE_ME" line
-        open PH, "> $file";
+        open PH, "> $file" or die " ** Could not open $file: $!";
         for my $line (@lines) {
             chomp $line;
             if ($line =~ /^\s*HOSTNAME(\s+)_?CHANGE.?ME_?/) {
@@ -1031,13 +1034,13 @@ sub test_syslog_config() {
 
     my $start_kmsgsd = 1;
     if (-e "${RUNDIR}/kmsgsd.pid") {
-        if (open PID, "< ${RUNDIR}/kmsgsd.pid") {
-            my $pid = <PID>;
-            close PID;
-            chomp $pid;
-            if (kill 0, $pid) {  ### kmsgsd is already running
-                $start_kmsgsd = 0;
-            }
+        open PID, "< ${RUNDIR}/kmsgsd.pid" or die " ** Could not open ",
+            "${RUNDIR}/kmsgsd.pid: $!";
+        my $pid = <PID>;
+        close PID;
+        chomp $pid;
+        if (kill 0, $pid) {  ### kmsgsd is already running
+            $start_kmsgsd = 0;
         }
     }
     if ($start_kmsgsd) {
@@ -1210,7 +1213,8 @@ sub get_fw_search_string() {
 
 sub query_email() {
     my $filename = 'psad.conf';
-    open F, "< ${PSAD_CONFDIR}/psad.conf";
+    open F, "< ${PSAD_CONFDIR}/psad.conf" or die " ** Could not open ",
+        "${PSAD_CONFDIR}/psad.conf: $!";
     my @clines = <F>;
     close F;
     my $email_addresses;
@@ -1267,7 +1271,7 @@ sub query_email() {
 
 sub put_string() {
     my ($var, $value, $file) = @_;
-    open RF, "< $file";
+    open RF, "< $file" or die " ** Could not open $file: $!";
     my @lines = <RF>;
     close RF;
     open F, "> $file" or die " ** Could not open $file: $!";
@@ -1326,7 +1330,8 @@ sub enable_psad_at_boot() {
                         "/etc/rc.d/rc${RUNLEVEL}.d/S99psad";
                 }
             } elsif (-e '/etc/inittab') {
-                open I, '< /etc/inittab';
+                open I, '< /etc/inittab' or die " ** Could not open ",
+                    "/etc/inittab: $!";
                 my @ilines = <I>;
                 close I;
                 for my $line (@ilines) {
@@ -1470,7 +1475,8 @@ sub logr() {
                 print STDERR $msg;
             }
         } else {
-            open F, ">> $file";
+            open F, ">> $file" or die " ** Could not open ",
+                "$file: $!";
             if (length($msg) > 72) {
                 print F wrap('', $SUB_TAB, $msg);
             } else {

@@ -10,6 +10,7 @@ psad-1.3 ():
       udp signature matching that don't autovivify hash keys.
     - Removed support for ipchains.
     - Added support for metalog.
+    - Removed all "Undefined Code" signatures from psad_signatures.
     - Re-worked %auto_blocked_ips hash and corresponding blocking
       routines.  This (hopefully) fixes a restart bug seen on older
       systems such as those that are still running versions of perl

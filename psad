@@ -556,7 +556,7 @@ my $config_mtime   = stat($config_file)->mtime;
 
 ### zero out the packet counter file (the counters
 ### are all zero at this point).
-&write_packet_counters();
+&write_global_packet_counters();
 
 if ($benchmark) {
     print localtime() . " .. Entering benchmark mode.\n";
@@ -638,8 +638,8 @@ for (;;) {
         }
 
         ### write the number of tcp/udp/icmp packets out
-        ### to the packet counters file
-        &write_packet_counters();
+        ### to the global packet counters file
+        &write_global_packet_counters();
     }
     ### Print how many new packets we got in $FW_DATA if we are
     ### running in $debug mode
@@ -1591,12 +1591,23 @@ sub assign_danger_level() {
     return;
 }
 
-sub write_packet_counters() {
+sub write_global_packet_counters() {
     open P, "> $config{'PACKET_COUNTER_FILE'}" or
         die " ** Could not open $config{'PACKET_COUNTER_FILE'}: $!";
     print P "tcp:  $tcp_ctr\n";
     print P "udp:  $udp_ctr\n";
     print P "icmp: $icmp_ctr\n";
+    close P;
+    return;
+}
+
+sub write_src_packet_counters() {
+    my ($tcp, $udp, $icmp, $file) = @_;
+    open P, "> $file" or
+        die " ** Could not open $file: $!";
+    print P "tcp:  $tcp\n";
+    print P "udp:  $udp\n";
+    print P "icmp: $icmp\n";
     close P;
     return;
 }
@@ -1658,12 +1669,13 @@ sub scan_logr() {
             ### unless it already exists
             mkdir "$config{'PSAD_DIR'}/${src}", 0500 unless
                 -d "$config{'PSAD_DIR'}/${src}";
-            my $scanlog     = "$config{'PSAD_DIR'}/${src}/scanlog";
-            my $email_alert = "$config{'PSAD_DIR'}/${src}/email_alert";
-            my $ecount_file = "$config{'PSAD_DIR'}/${src}/email_count";
-            my $whois_file  = "$config{'PSAD_DIR'}/${src}/whois";
-            my $dl_file     = "$config{'PSAD_DIR'}/${src}/danger_level";
-            my $log_sigs    = "$config{'PSAD_DIR'}/${src}/signatures";
+            my $scanlog       = "$config{'PSAD_DIR'}/${src}/scanlog";
+            my $email_alert   = "$config{'PSAD_DIR'}/${src}/email_alert";
+            my $ecount_file   = "$config{'PSAD_DIR'}/${src}/email_count";
+            my $whois_file    = "$config{'PSAD_DIR'}/${src}/whois";
+            my $dl_file       = "$config{'PSAD_DIR'}/${src}/danger_level";
+            my $log_sigs      = "$config{'PSAD_DIR'}/${src}/signatures";
+            my $pkt_ctr_file  = "$config{'PSAD_DIR'}/${src}/packet_ctr";
 
             ### unlink $email_alert here since we print to this
             ### file multiple times
@@ -1675,16 +1687,20 @@ sub scan_logr() {
             ### log everything to stdout if $output of $debug is set
             $scanlog = *STDOUT if ($output || $debug);
 
-            ### file => append?  e.g.  filename => 0  means don't append
+            ### filename => 0 (overwrite),  filename => 1 (append)
             my %print_hsh = ($scanlog => 1, $email_alert => 1);
 
-            ### set the overall packet counters
+            ### set the overall packet counters for $src
             $tot_tcp  = $scan{$src}{$dst}{'TCP'}{'PKTS'}
                 if defined $scan{$src}{$dst}{'TCP'}{'PKTS'};
             $tot_udp  = $scan{$src}{$dst}{'UDP'}{'PKTS'}
                 if defined $scan{$src}{$dst}{'UDP'}{'PKTS'};
             $tot_icmp = $scan{$src}{$dst}{'ICMP'}{'PKTS'}
                 if defined $scan{$src}{$dst}{'ICMP'}{'PKTS'};
+
+            ### write out the packet counters for $src
+            &write_src_packet_counters($tot_tcp,
+                $tot_udp, $tot_icmp, $pkt_ctr_file);
 
             if (defined $scan{$src}{$dst}{'TCP'}{'ABS_SP'}) {
                 my $tcp_s_port
@@ -1851,9 +1867,9 @@ sub scan_logr() {
                 &Psad::logr(sprintf("%${log_len}s%s", 'Complete UDP range: ',
                     "[$udp_absrange]\n"), \%print_hsh);
             }
-            &Psad::logr(sprintf("%${log_len}s%s", 'Total  TCP packets: ',
+            &Psad::logr(sprintf("%${log_len}s%s", 'Total TCP  packets: ',
                 "$tot_tcp\n"), \%print_hsh);
-            &Psad::logr(sprintf("%${log_len}s%s", 'Total  UDP packets: ',
+            &Psad::logr(sprintf("%${log_len}s%s", 'Total UDP  packets: ',
                 "$tot_udp\n"), \%print_hsh);
             &Psad::logr(sprintf("%${log_len}s%s", 'Total ICMP packets: ',
                 "$tot_icmp\n"), \%print_hsh);
@@ -2440,57 +2456,82 @@ sub status() {
                         print "  %CPU: $1  %MEM: $2\n";
                         print "     Running since: " .
                             localtime(stat($pidfile)->mtime) . "\n";
-                        if ($pidname eq 'psad') {
-                            if ($cmdline) {
-                                print "     Command line arguments: $cmdline\n";
-                            } else {
-                                print "     Command line arguments: [none specified]\n";
-                            }
-                            ### print the packet counters
-                            if (-e $config{'PACKET_COUNTER_FILE'}) {
-                                print "     Packet Counters:\n";
-                                open F, "< $config{'PACKET_COUNTER_FILE'}" or
-                                    die " ** $config{'PACKET_COUNTER_FILE'}: $!";
-                                print STDOUT "        $_" while (<F>);
-                                close F;
-                            }
-                            ### sort and print the scan source ips
-                            my %scan_source_ips;
-                            chdir $config{'PSAD_DIR'} or
-                                die " ** Could not chdir $config{'PSAD_DIR'}: $!";
-                            opendir D, $config{'PSAD_DIR'} or
-                                die " ** Could not open dir: $config{'PSAD_DIR'}: $!";
-                            my @files = readdir D;
-                            closedir D;
-                            shift @files; shift @files;
-                            for my $file (@files) {
-                                if ($file =~ /$ip_re/ && -d $file) {
-                                    ### $file is a current scan source ip
-                                    my $src_ipdir = $file;
-                                    if (-e "${src_ipdir}/danger_level") {
-                                        open F, "< ${src_ipdir}/danger_level" or
-                                            die " ** Could not open ",
-                                                "${src_ipdir}/danger_level\n";
-                                        my $dl = <F>;
-                                        close F;
-                                        chomp $dl;
-                                        $scan_source_ips{$dl}{$src_ipdir} = '';
-                                    } else {
-                                        $scan_source_ips{0}{$src_ipdir} = '';
+                        next unless $pidname eq 'psad';
+                        if ($cmdline) {
+                            print "     Command line arguments: $cmdline\n";
+                        } else {
+                            print "     Command line arguments: [none specified]\n";
+                        }
+                        print "     Alert email address(es): ",
+                            "$config{'EMAIL_ADDRESSES'}\n";
+                        ### print the packet counters
+                        if (-e $config{'PACKET_COUNTER_FILE'}) {
+                            print "\n     Global packet counters:\n";
+                            open F, "< $config{'PACKET_COUNTER_FILE'}" or
+                                die " ** $config{'PACKET_COUNTER_FILE'}: $!";
+                            print STDOUT "        $_" while (<F>);
+                            close F;
+                        }
+                        ### sort and print the scan source ips
+                        my %scan_source_ips;
+                        chdir $config{'PSAD_DIR'} or
+                            die " ** Could not chdir $config{'PSAD_DIR'}: $!";
+                        opendir D, $config{'PSAD_DIR'} or
+                            die " ** Could not open dir: $config{'PSAD_DIR'}: $!";
+                        my @files = readdir D;
+                        closedir D;
+                        shift @files; shift @files;
+                        for my $file (@files) {
+                            if ($file =~ /$ip_re/ && -d $file) {
+                                ### $file is a current scan source ip
+                                my $src_ipdir = $file;
+                                my $dl = 0;
+                                my $tcp_ctr = 0;
+                                my $udp_ctr = 0;
+                                my $icmp_ctr = 0;
+                                if (-e "${src_ipdir}/danger_level") {
+                                    open F, "< ${src_ipdir}/danger_level" or
+                                        die " ** Could not open ",
+                                            "${src_ipdir}/danger_level: $!";
+                                    my $dl = <F>;
+                                    close F;
+                                    chomp $dl;
+                                }
+                                if (-e "${src_ipdir}/packet_ctr") {
+                                    open F, "< ${src_ipdir}/packet_ctr" or
+                                        die " ** Could not open ",
+                                            "${src_ipdir}/packet_ctr: $!";
+                                    my @lines = <F>;
+                                    close F;
+                                    for my $line (@lines) {
+                                        $tcp_ctr = $1 if $line =~ /tcp:\s+(\d+)/;
+                                        $udp_ctr = $1 if $line =~ /udp:\s+(\d+)/;
+                                        $icmp_ctr = $1 if $line =~ /icmp:\s+(\d+)/;
                                     }
                                 }
+                                $scan_source_ips{$dl}{$src_ipdir}{'tcp'}
+                                    = $tcp_ctr;
+                                $scan_source_ips{$dl}{$src_ipdir}{'udp'}
+                                    = $udp_ctr;
+                                $scan_source_ips{$dl}{$src_ipdir}{'icmp'}
+                                    = $icmp_ctr;
                             }
-                            print STDOUT "     Danger_Level:   IP:\n";
-                            if (%scan_source_ips) {
-                                for my $dl (sort {$b <=> $a} keys %scan_source_ips) {
-                                    for my $src (keys %{$scan_source_ips{$dl}}) {
-                                        print STDOUT "                  $dl   ",
-                                            sprintf("%16s\n", $src);
-                                    }
+                        }
+                        print STDOUT "\n";
+                        printf("     %-18s%-9s%-9s%-9s%-9s\n", 'IP', 'TCP',
+                            'UDP', 'ICMP', 'Danger Level');
+                        if (%scan_source_ips) {
+                            for my $dl (sort {$b <=> $a} keys %scan_source_ips) {
+                                for my $src (keys %{$scan_source_ips{$dl}}) {
+                                    my $tcp = $scan_source_ips{$dl}{$src}{'tcp'};
+                                    my $udp = $scan_source_ips{$dl}{$src}{'udp'};
+                                    my $icmp = $scan_source_ips{$dl}{$src}{'icmp'};
+                                    printf("     %-18s%-9s%-9s%-9s%-9s\n",
+                                        $src, $tcp, $udp, $icmp, $dl);
                                 }
-                            } else {
-                                print STDOUT "     [No scans detected.]\n";
                             }
+                        } else {
+                            print STDOUT "     [No scans detected.]\n";
                         }
                         last PS;
                     }
@@ -2714,6 +2755,10 @@ sub setup() {
             system "$cmds{'killall'} -HUP syslog-ng";
         }
     }
+    die " ** PORT_RANGE_SCAN_THRESHOLD must be less than 65535.",
+        "  Exiting." unless $config{'PORT_RANGE_SCAN_THRESHOLD'} < 65535;
+    die " ** PORT_RANGE_SCAN_THRESHOLD must be greater than 0.",
+        "  Exiting." unless $config{'PORT_RANGE_SCAN_THRESHOLD'} > 0;
     return;
 }
 

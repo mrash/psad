@@ -83,14 +83,7 @@ use Sys::Hostname "hostname";
 use POSIX;
 use strict;
 
-### could implement autouse for these modules, but is the performance hit worth it?
-# use autouse 'Data::Dumper' => "Dumper";  ### this one is not used very much so don't load immediately
-# use autouse 'Socket';       ### not used until a scan is detected so don't load until it is needed
-
 # use Sys::Syslog qw(openlog syslog closelog);   ### this does not seem to play nice with perl-5.005_03
-
-### globals
-use vars qw($VERSION %Scan $PRINT_SCAN_HASH $USE_IPCHAINS $USE_IPTABLES $DEBUG $HOSTNAME $PSADCMD);
 
 #==================== config ======================= ## do not remove this line (used by install.pl to preserve configs) ##
 ### Initialize config variables.  Some can be overriden with command line args
@@ -99,7 +92,7 @@ my $PSAD_LOGFILE              = "${PSAD_DIR}/scanlog";
 my $FW_DATA                   = "${PSAD_DIR}/fwdata";
 my $ERROR_LOG                 = "${PSAD_DIR}/fwerrorlog";
 my $EMAIL_ALERTFILE           = "${PSAD_DIR}/email_alert";
-$PRINT_SCAN_HASH              = "${PSAD_DIR}/scan_hash";  ### Global for sub print_scan.
+my $PRINT_SCAN_HASH           = "${PSAD_DIR}/scan_hash";  ### Global for sub print_scan.
 my $CHECK_INTERVAL            = 15;                       ### (seconds).
 my $PORT_RANGE_SCAN_THRESHOLD = 1;
 my $ENABLE_PERSISTENCE        = "Y";    ### If "Y", means that scans will never timeout.
@@ -148,7 +141,7 @@ my $psadCmd       = "/usr/sbin/psad";
 #===================== main =======================
 
 ### A few more configuration variables that should not really be in the config section.
-$VERSION = "0.9.6";
+my $VERSION = "0.9.6";
 
 ### pid files
 my @PIDFILES = qw(/var/run/psadwatchd.pid
@@ -159,11 +152,13 @@ my @PIDFILES = qw(/var/run/psadwatchd.pid
 ### File used to store the psad command line.
 my $cmdline_file = "/var/run/psad.cmd";
 
-### Initialize some of the globals.
-$USE_IPCHAINS = 0;
-$USE_IPTABLES = 0;
-$DEBUG        = 0;
-$HOSTNAME     = hostname;  ### Calculate hostname of the machine on which psad is running.
+my %Scan;
+
+### Initialize some more vars
+my $USE_IPCHAINS = 0;
+my $USE_IPTABLES = 0;
+my $DEBUG        = 0;
+my $HOSTNAME     = hostname;  ### Calculate hostname of the machine on which psad is running.
 
 ### initialize and scope some default variables (command line args can override some default values)
 my $Scan_href;  ### main psad data structure; contains ips, port ranges, tcp flags, and danger levels
@@ -244,7 +239,7 @@ my %Cmds = (
 
 ### Now that we are sure the psad command is where it should be,
 ### assign $PSADCMD (used by the SEGV handler)
-$PSADCMD = $Cmds{'psad'};
+my $PSADCMD = $Cmds{'psad'};
 
 ### the --Status command line switch was given
 if ($status) {
@@ -341,6 +336,8 @@ if ($auto_ips) {  ### support automatic ip danger level increases/decreases.
 $SIG{'USR1'} = \&print_scan;
 $SIG{'SEGV'} = \&print_scan_and_exit;
 $SIG{'CHLD'} = \&REAPER;
+$SIG{'__WARN__'} = \&Psad::warn_handler;
+$SIG{'__DIE__'} = \&Psad::die_handler;
 
 ### initialize fwdata_start_lines
 my $fwdata_start_lines = (split /\s+/, `$Cmds{'wc'} -l $FW_DATA`)[1];
@@ -1156,21 +1153,18 @@ sub scan_logr() {
                 }
                 unless ($whoislookups) {
                     &Psad::logr("\n\n", \@print_array);
-                    &Psad::logr("   =-=-=-=-=-=-= Whois Information: =-=-=-=-=-=-=\n", [$logfile, $email_alertfile]);
+                    &Psad::logr("=-=-=-=-=-=-= Whois Information: =-=-=-=-=-=-=\n", [$logfile, $email_alertfile]);
                     for my $w (@$whois_info_aref) {
                         &Psad::logr($w, \@print_array);
                     }
                     &Psad::logr("\n", \@print_array);
                 }
-                if ($USE_IPCHAINS) {
-                    &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=-=-=-=-=-=-=\n", \@print_array);
-                }
+                &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=-=-=-=-=-=-=\n", \@print_array);
                 if ($Scan_href->{$src}->{$dst}->{'ALERTED'} eq "N"
                                         && $current_danger_level >= $EMAIL_ALERT_DANGER_LEVEL) {
                     $Scan_href = &send_email_alert($Scan_href, $src, $dst, $flags_msg,
                                                     $email_alertfile, $email_addresses_aref, $Cmds_href);
                 }
-                &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=-=-=-=-=-=-=\n", \@print_array);
                 $Scan_href->{$src}->{$dst}->{'LOGR'} = "N";
                 $Scan_href->{$src}->{$dst}->{'EMAIL_LIMIT'}++;
             }
@@ -1305,7 +1299,8 @@ sub get_whois_data() {
         alarm 0;
     };
     if ($@) {
-        die unless $@ eq "alarm\n";
+#         die unless $@ eq "alarm\n";
+        warn "$@: $?";  ### let the warning handler save the error.
         $#whois_data = 0;
         @whois_data = ("Whois data not available!\n");
         return \@whois_data;

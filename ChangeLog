@@ -1,4 +1,11 @@
-psad-1.3.3 (07//2003):
+psad-1.3.3 (08/21/2003):
+    - Fixed __WARN__ and __DIE__ exception handlers so that they
+      reference global message variables.
+    - Bugfix for Text::Wrap calls in install.pl uninstall() routine.
+    - Bugfix for using --no-fw-search-all even when FW_SEARCH_ALL is
+      set to "Y".
+    - Removed extraneous ".." and "**" chars from syslog messages, and
+      updated to use [+] prefix strings.
     - Moved init scripts into init-scripts directory within source tree.
 
 psad-1.3.2 (06/25/2003):

@@ -1,8 +1,35 @@
 #!/usr/bin/perl -w
 #
-################################################################################
+###############################################################################
 #
-################################################################################
+# File: fwcheck_psad.pl
+#
+# Purpose: To parse the iptables ruleset on the underlying system to see if
+#          iptables has been configured to log and block unwanted packets by
+#          default.  This program is called by psad, but can also be executed
+#          manually from the command line.
+#
+# Author: Michael Rash (mbr@cipherdyne.org)
+#
+# Credits: (see the CREDITS file bundled with the psad sources.)
+#
+# Version: 1.3.1
+#
+# Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.org)
+#
+# License (GNU Public License):
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
+#    USA
+#
+###############################################################################
 #
 # $Id$
 #

@@ -64,6 +64,7 @@
 #   reading.
 #
 # Scan hash key explanation:
+#   absnum    - Total number of packets from $src to $dst
 #   chain     - Iptables chain under which the scan packets appear in the
 #               logs.
 #   s_time    - Start time for the first packet seen from src to dst.
@@ -71,10 +72,6 @@
 #   pkts      - Number of packets (used for signatures and a packet counter
 #               for the current interval.
 #   flags     - Keeps track of tcp flags.
-#   no_listen - No server running locally on the destination port used in
-#               the scan packet.
-#   listen    - There is a server running locally on the destination port
-#               used in the scan packet.
 #   curr_sig  - Current signature.
 #   abs_sp    - Absolute starting port.
 #   abs_ep    - Absolute ending port.
@@ -242,7 +239,7 @@ my $year;
 ### %auto_dl holds all ip addresses that should automatically
 ### be assigned a danger level (or ignored).
 my %auto_dl = ();
-my %assigned_auto_dl = ();
+my %auto_assigned_dl = ();
 
 ### cache the source ips that we have automatically blocked
 ### (if ENABLE_AUTO_IDS == 'Y')
@@ -593,20 +590,20 @@ if ($config{'IMPORT_OLD_SCANS'} eq 'Y') {
     &import_old_scans();
 }
 
-### zero out the packet counter file (the counters
-### are all zero at this point anyway unless we
-### imported old scans).
 unless ($fw_analyze or $benchmark) {
+    ### zero out the packet counter file (the counters
+    ### are all zero at this point anyway unless we
+    ### imported old scans).
     &write_global_packet_counters();
 
     ### zero out prefix counters
     &write_prefix_counters();
-}
 
-### zero out dshield alert stats (note we do this here regardles of
-### whether DShield alerting is enabled since if it isn't we will
-### just zero out the counters).
-&write_dshield_stats() unless $fw_analyze or $benchmark;
+    ### zero out dshield alert stats (note we do this here regardless of
+    ### whether DShield alerting is enabled since if it isn't we will
+    ### just zero out the counters).
+    &write_dshield_stats();
+}
 
 ### Get an open filehandle for the main firewall data file FW_DATA_FILE.
 ### All firewall drop/reject log messages are written to FW_DATA_FILE
@@ -700,12 +697,14 @@ for (;;) {
         ### send email/syslog alerts.
         &check_scan(\@fw_packets);
 
-        ### Write the number of tcp/udp/icmp packets out
-        ### to the global packet counters file
-        &write_global_packet_counters() unless $benchmark or $analyze_msgs;
+        unless ($benchmark or $analyze_msgs) {
+            ### Write the number of tcp/udp/icmp packets out
+            ### to the global packet counters file
+            &write_global_packet_counters();
 
-        ### Write out log prefix counters
-        &write_prefix_counters() unless $benchmark or $analyze_msgs;
+            ### Write out log prefix counters
+            &write_prefix_counters();
+        }
     }
 
     ### Timeout any auto-blocked IPs that are past due (need to
@@ -944,14 +943,7 @@ sub check_scan() {
                 push @err_pkts, $pkt;
                 next PKT;
             }
-            if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
-                    and not $benchmark
-                    and not $analyze_msgs
-                    and not &exclude_auto_ignore_ip($src)) {
-                my $dflags = $flags;
-                $dflags =~ s/\s/,/g;
-                $dshield_str = "$src\t$sp\t$dst\t$dp\t$proto\t$dflags";
-            }
+
             ### make sure we have a "reasonable" packet (note that nmap
             ### can scan port 0 and iptables can report this fact)
             unless ($src and $dst and $len >= 0 and $tos and $ttl >= 0
@@ -961,6 +953,14 @@ sub check_scan() {
                 next PKT;
             }
             $tcp_ctr++;
+
+            if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
+                    and not $benchmark
+                    and not $analyze_msgs) {
+                my $dflags = $flags;
+                $dflags =~ s/\s/,/g;
+                $dshield_str = "$src\t$sp\t$dst\t$dp\t$proto\t$dflags";
+            }
         ### May 18 22:21:26 orthanc kernel: DROP IN=eth2 OUT=
         ### MAC=00:60:1d:23:d0:01:00:60:1d:23:d3:0e:08:00
         ### SRC=192.168.20.25 DST=192.168.20.1 LEN=28 TOS=0x00 PREC=0x00
@@ -971,12 +971,7 @@ sub check_scan() {
             ($src, $dst, $len, $tos, $ttl, $id, $sp, $dp) =
                 ($1,$2,$3,$4,$5,$6,$7,$8);
             $proto = 'udp';
-            if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
-                    and not $benchmark
-                    and not $analyze_msgs
-                    and not &exclude_auto_ignore_ip($src)) {
-                $dshield_str = "$src\t$sp\t$dst\t$dp\t$proto";
-            }
+
             ### make sure we have a "reasonable" packet (note that nmap
             ### can scan port 0 and iptables can report this fact)
             unless ($src and $dst and $len >= 0 and $tos and $ttl >= 0
@@ -985,6 +980,12 @@ sub check_scan() {
                 next PKT;
             }
             $udp_ctr++;
+
+            if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
+                    and not $benchmark
+                    and not $analyze_msgs) {
+                $dshield_str = "$src\t$sp\t$dst\t$dp\t$proto";
+            }
         } elsif ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+).*
                           TTL=(\d+).*PROTO=ICMP\s+TYPE=(\d+)\s+
                           CODE=(\d+)\s+ID=(\d+)\s+SEQ=(\d+)/x) {
@@ -998,10 +999,10 @@ sub check_scan() {
                 next PKT;
             }
             $icmp_ctr++;
+
             if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
                     and not $benchmark
-                    and not $analyze_msgs
-                    and not &exclude_auto_ignore_ip($src)) {
+                    and not $analyze_msgs) {
                 $dshield_str = "$src\t$type\t$dst\t$code\t$proto";
             }
         } else {
@@ -1018,12 +1019,21 @@ sub check_scan() {
 
         ### initialize the danger level to 0 if it is not already defined
         ### (note the same source address might have already scanned a
-        ### different destination ip, so the danger level represents the
+        ### different destination IP, so the danger level represents the
         ### aggregate danger level).
         unless (defined $scan_dl{$src}) {
             $scan_dl{$src} = 0;
             $scan{$src}{$dst}{'alerted'} = 0
                 if $config{'ALERT_ALL'} eq 'N';
+        }
+
+        ### see if we need to assign a danger level according to the auto_dl
+        ### file.  A return value of 2 means we ignore this $src
+        unless ($no_auto_dl) {
+            if (not defined $auto_assigned_dl{$src} and
+                    &assign_auto_danger_level($src, $proto) == 2) {
+                next PKT;
+            }
         }
 
         if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
@@ -1754,6 +1764,10 @@ sub validate_config() {
 
     die qq([*] Invalid EMAIL_ADDRESSES value: "$config{'EMAIL_ADDRESSES'}")
         unless $config{'EMAIL_ADDRESSES'} =~ /\S+\@\S+/;
+
+    ### translate commas into spaces
+    $config{'EMAIL_ADDRESSES'} =~ s/\s*\,\s/ /g;
+
     die '[*] DSHIELD_ALERT_INTERVAL must be between 1 and 24 '
         unless (($config{'DSHIELD_ALERT_INTERVAL'} =~ m|^\d+$|)
             and 0 < $config{'DSHIELD_ALERT_INTERVAL'}
@@ -2387,29 +2401,6 @@ sub assign_danger_level() {
         print STDERR "[+] assign_danger_level(): source ip: $src\n"
             if $debug;
 
-        ### get auto danger level
-        my $auto_dl = &get_auto_danger_level($src);
-
-        if ($auto_dl > -1) {  ### the source was auto-assigned some dl
-            if ($auto_dl == 0) {  ### ignore source
-                ### Note that we set the danger level to zero even if the
-                ### source previously had a higher danger level.  This
-                ### allows the admin to ignore IP's that have already
-                ### been assigned a danger level by editing auto_dl and
-                ### then executing "psad -HUP".
-                $scan_dl{$src} = 0;
-                next SRC;
-            } else {
-                if ($scan_dl{$src} < $auto_dl) {
-                    $scan_dl{$src} = $auto_dl;
-                    $assigned_auto_dl{$src} = '';
-                    &Psad::psyslog('psad',
-                        " auto-assigned danger level: $auto_dl for IP: $src");
-                    $changed_dl = 1;
-                }
-            }
-        }
-
         if (defined $curr_sigs_dl_hr->{$src}) {
             if ($scan_dl{$src} < $curr_sigs_dl_hr->{$src}) {
                 $scan_dl{$src} = $curr_sigs_dl_hr->{$src};
@@ -2496,42 +2487,73 @@ sub assign_danger_level() {
     return;
 }
 
-sub get_auto_danger_level() {
-    my $src = shift;
+sub assign_auto_danger_level() {
+    my ($src, $scan_proto) = @_;
 
-    my $dl = -1;
+    ### this function has three possible return values:
+    ###    0 if there is no auto_dl definition for $src and $scan_proto
+    ###    1 if there is a matching auto_dl definition, but the dl is not 0
+    ###    2 if $src and $scan_proto should be ignored according to auto_dl
 
     ### see if the source should automatically be assigned a
     ### danger level
-    if (defined $auto_dl{'ip'}{$src}) {
+    if (defined $auto_dl{'ip'} and defined $auto_dl{'ip'}{$src}) {
         if (defined $auto_dl{'ip'}{$src}{'allproto'}) {
-            if ($dl < $auto_dl{'ip'}{$src}{'allproto'}) {
-                $dl = $auto_dl{'ip'}{$src}{'allproto'};
+            if ($scan_dl{$src} < $auto_dl{'ip'}{$src}{'allproto'}) {
+                $scan_dl{$src} = $auto_dl{'ip'}{$src}{'allproto'};
+                $auto_assigned_dl{$src} = '';
+                &Psad::psyslog('psad',
+                    " auto-assigned danger level: $scan_dl{$src} for IP: $src");
+                return 1;
             }
-        } else {
-            for my $proto (keys %{$auto_dl{'ip'}{$src}}) {
-                if ($dl < $auto_dl{'ip'}{$src}{$proto}) {
-                    $dl = $auto_dl{'ip'}{$src}{$proto};
-                }
+            if ($auto_dl{'ip'}{$src}{'allproto'} == 0) {
+                $auto_assigned_dl{$src} = '';
+                return 2;
+            }
+        } elsif (defined $auto_dl{'ip'}{$src}{$scan_proto}) {
+            if ($scan_dl{$src} < $auto_dl{'ip'}{$src}{$scan_proto}) {
+                $scan_dl{$src} = $auto_dl{'ip'}{$src}{$scan_proto};
+                $auto_assigned_dl{$src} = '';
+                &Psad::psyslog('psad',
+                    " auto-assigned danger level: $scan_dl{$src} for IP: $src");
+                return 1;
+            }
+            if ($auto_dl{'ip'}{$src}{$scan_proto} == 0) {
+                return 2;
+                $auto_assigned_dl{$src} = '';
             }
         }
-    } else {
+    } elsif (defined $auto_dl{'net'}) {
         NET: for my $net (keys %{$auto_dl{'net'}}) {
             next NET unless ipv4_in_network($net, $src);
-            if (defined $auto_dl{'net'}{$src}{'allproto'}) {
-                if ($dl < $auto_dl{'net'}{$src}{'allproto'}) {
-                    $dl = $auto_dl{'net'}{$src}{'allproto'};
+            if (defined $auto_dl{'net'}{$net}{'allproto'}) {
+                if ($scan_dl{$src} < $auto_dl{'net'}{$net}{'allproto'}) {
+                    $scan_dl{$src} = $auto_dl{'net'}{$net}{'allproto'};
+                    $auto_assigned_dl{$src} = '';
+                    &Psad::psyslog('psad', " auto-assigned danger level: " .
+                        "$scan_dl{$src} for IP: $src");
+                    return 1;
                 }
-            } else {
-                for my $proto (keys %{$auto_dl{'net'}{$src}}) {
-                    if ($dl < $auto_dl{'net'}{$src}{'allproto'}) {
-                        $dl = $auto_dl{'net'}{$src}{'allproto'};
-                    }
+                if ($auto_dl{'net'}{$src}{'allproto'} == 0) {
+                    $auto_assigned_dl{$src} = '';
+                    return 2;
+                }
+            } elsif (defined $auto_dl{'net'}{$net}{$scan_proto}) {
+                if ($scan_dl{$src} < $auto_dl{'net'}{$net}{$scan_proto}) {
+                    $scan_dl{$src} = $auto_dl{'net'}{$net}{$scan_proto};
+                    $auto_assigned_dl{$src} = '';
+                    &Psad::psyslog('psad', " auto-assigned danger level: " .
+                        "$scan_dl{$src} for IP: $src");
+                    return 1;
+                }
+                if ($auto_dl{'net'}{$src}{$scan_proto} == 0) {
+                    $auto_assigned_dl{$src} = '';
+                    return 2;
                 }
             }
         }
     }
-    return $dl;
+    return 0;
 }
 
 sub check_scan_proto() {
@@ -2553,6 +2575,7 @@ sub write_global_packet_counters() {
 }
 
 sub write_prefix_counters() {
+return;
     open P, "> $config{'IPT_PREFIX_COUNTER_FILE'}" or
         die "[*] Could not open $config{'IPT_PREFIX_COUNTER_FILE'}: $!";
     for my $prefix (keys %ipt_prefixes) {
@@ -2612,8 +2635,12 @@ sub scan_logr() {
     my $curr_scan_hr = shift;
 
     return if $benchmark;
-    for my $src (keys %$curr_scan_hr) {
+    SRC: for my $src (keys %$curr_scan_hr) {
         print STDERR "[+] scan_logr(): source ip: $src\n" if $debug;
+        ### only send alerts for scans that are at least at
+        ### danger level 1 or above.
+        next SRC unless $scan_dl{$src} >= 1;
+
         DST: for my $dst (keys %{$curr_scan_hr->{$src}}) {
 
             ### see if we have already sent an alert for $src
@@ -2621,10 +2648,6 @@ sub scan_logr() {
             if ($config{'ALERT_ALL'} eq 'N') {
                 next DST if $scan{$src}{$dst}{'alerted'};
             }
-
-            ### only send alerts for scans that are at least at
-            ### danger level 1 or above.
-            next DST unless $scan_dl{$src} >= 1;
             my $syslog_flags = '';
             my $src_dns_str  = '';
             my $dst_dns_str  = '';
@@ -2826,9 +2849,9 @@ sub scan_logr() {
             }
             print $fh "\n\n";
 
-            if (defined $assigned_auto_dl{$src}) {
+            if (defined $auto_assigned_dl{$src}) {
                 printf $fh "%${log_len}s%s\n", ' ', 'Auto-assigned';
-                delete $assigned_auto_dl{$src};
+                delete $auto_assigned_dl{$src};
             }
 
             if ($tcp_f) {
@@ -3607,35 +3630,6 @@ sub timeout_auto_blocked_ips() {
         }
     }
     return;
-}
-
-sub exclude_auto_ignore_ip() {
-    my $ip = shift;
-    if (defined $auto_dl{'ip'}{$ip}) {
-        if (defined $auto_dl{'ip'}{$ip}{'allproto'}) {
-            return 1 if $auto_dl{'ip'}{$ip}{'allproto'} == 0;
-        } else {
-            PR: for my $proto qw(tcp udp icmp) {
-                next PR unless defined $auto_dl{'ip'}{$ip}{$proto};
-                ### ignore $ip if the auto danger level is zero
-                return 1 if $auto_dl{'ip'}{$ip}{$proto} == 0;
-            }
-        }
-    } else {
-        NET: for my $net (keys %{$auto_dl{'net'}}) {
-            next NET unless ipv4_in_network($net, $ip);
-            if (defined $auto_dl{'net'}{$ip}{'allproto'}) {
-                return 1 if $auto_dl{'net'}{$ip}{'allproto'} == 0;
-            } else {
-                PR: for my $proto qw(allproto tcp udp icmp) {
-                    next PR unless defined $auto_dl{'net'}{$ip}{$proto};
-                    ### ignore $ip if the auto danger level is zero
-                    return 1 if $auto_dl{'net'}{$ip}{$proto} == 0;
-                }
-            }
-        }
-    }
-    return 0;
 }
 
 sub get_iptables_chains() {
@@ -4532,7 +4526,7 @@ sub import_old_scans() {
         my @lines = <F>;
         close F;
         for my $line (@lines) {
-            if ($line =~ /^\*(.*?):\s+(\d+)/) {
+            if ($line =~ /^\s*(.*?):\s+(\d+)/) {
                 my $prefix = $1;
                 my $count = $2;
                 $ipt_prefixes{$prefix} = $count;
@@ -4824,129 +4818,145 @@ sub setup() {
                 or -e $config{'ETC_SYSLOGNG_CONF'}
                 or -e $config{'ETC_METALOG_CONF'});
 
-    ### look for psadfifo in some system logger config file
-    ### (syslog, syslog-ng, etc.) and attempt to correct if not
-    ### found.
-    if (-e $config{'ETC_SYSLOG_CONF'}) {
-        unless (-e "$config{'ETC_SYSLOG_CONF'}.orig") {
-            copy $config{'ETC_SYSLOG_CONF'},
-                "$config{'ETC_SYSLOG_CONF'}.orig";
-        }
-        open RS, "< $config{'ETC_SYSLOG_CONF'}" or
-            die "[*] Unable to open $config{'ETC_SYSLOG_CONF'}: $!";
-        my @lines = <RS>;
-        close RS;
-        my $found = 0;
-        for my $line (@lines) {
-            if ($line =~ m/\|\s*$config{'PSAD_FIFO'}/) {
-                $found = 1;
-                last;
+    ### attempt to correct syslog config file if it is not configured
+    ### correctly.
+    if ($config{'SYSLOG_DAEMON'} eq 'syslogd') {
+        if (-e $config{'ETC_SYSLOG_CONF'}) {
+            unless (-e "$config{'ETC_SYSLOG_CONF'}.orig") {
+                copy $config{'ETC_SYSLOG_CONF'},
+                    "$config{'ETC_SYSLOG_CONF'}.orig";
             }
-        }
-        unless ($found) {
-            open SYSLOG, "> $config{'ETC_SYSLOG_CONF'}" or
+            open RS, "< $config{'ETC_SYSLOG_CONF'}" or
                 die "[*] Unable to open $config{'ETC_SYSLOG_CONF'}: $!";
-            ### this loop removes any old location for psadfifo
+            my @lines = <RS>;
+            close RS;
+            my $found = 0;
             for my $line (@lines) {
-                unless ($line =~ /psadfifo/i) {
-                    print SYSLOG $line;
+                if ($line =~ m/\|\s*$config{'PSAD_FIFO'}/) {
+                    $found = 1;
+                    last;
                 }
             }
-            ### reinstate kernel logging to our named pipe
-            print SYSLOG '### Send kern.info messages to psadfifo for ',
-                "analysis by kmsgsd\n";
-            print SYSLOG "kern.info\t\t|$config{'PSAD_FIFO'}\n";
-            close SYSLOG;
-            &Psad::psyslog('psad', 'reconfiguring syslogd to write ' .
-                "kern.info messages to $config{'PSAD_FIFO'}");
-            system "$cmds{'killall'} -HUP $cmds{'syslogd'}";
+            unless ($found) {
+                open SYSLOG, "> $config{'ETC_SYSLOG_CONF'}" or
+                    die "[*] Unable to open $config{'ETC_SYSLOG_CONF'}: $!";
+                ### this loop removes any old location for psadfifo
+                for my $line (@lines) {
+                    unless ($line =~ /psadfifo/i) {
+                        print SYSLOG $line;
+                    }
+                }
+                ### reinstate kernel logging to our named pipe
+                print SYSLOG '### Send kern.info messages to psadfifo for ',
+                    "analysis by kmsgsd\n";
+                print SYSLOG "kern.info\t\t|$config{'PSAD_FIFO'}\n";
+                close SYSLOG;
+                &Psad::psyslog('psad', 'reconfiguring syslogd to write ' .
+                    "kern.info messages to $config{'PSAD_FIFO'}");
+                system "$cmds{'killall'} -HUP syslogd";
+            }
+        } else {
+            &Psad::sendmail("[-] psad: $config{'ETC_SYSLOG_CONF'} does not " .
+                "exist, check SYSLOG_DAEMON setting on $config{'HOSTNAME'}",
+                '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         }
     }
-    if (-e $config{'ETC_SYSLOGNG_CONF'}) {
-        unless (-e "$config{'ETC_SYSLOGNG_CONF'}.orig") {
-            copy $config{'ETC_SYSLOGNG_CONF'},
-                "$config{'ETC_SYSLOGNG_CONF'}.orig";
-        }
-        open RS, "< $config{'ETC_SYSLOGNG_CONF'}" or
-            die "[*] Unable to open $config{'ETC_SYSLOGNG_CONF'}: $!\n";
-        my @lines = <RS>;
-        close RS;
-
-        my $found = 0;
-        for my $line (@lines) {
-            if ($line =~ m/$config{'PSAD_FIFO'}/) {
-                $found = 1;
-                last;
+    if ($config{'SYSLOG_DAEMON'} eq 'syslog-ng') {
+        if (-e $config{'ETC_SYSLOGNG_CONF'}) {
+            unless (-e "$config{'ETC_SYSLOGNG_CONF'}.orig") {
+                copy $config{'ETC_SYSLOGNG_CONF'},
+                    "$config{'ETC_SYSLOGNG_CONF'}.orig";
             }
-        }
-        unless ($found) {
-            open SYSLOGNG, "> $config{'ETC_SYSLOGNG_CONF'}" or
-                die "[*] Unable to open $config{'ETC_SYSLOGNG_CONF'}: $!";
-            ### this loop removes any old location for psadfifo
+            open RS, "< $config{'ETC_SYSLOGNG_CONF'}" or
+                die "[*] Unable to open $config{'ETC_SYSLOGNG_CONF'}: $!\n";
+            my @lines = <RS>;
+            close RS;
+
+            my $found = 0;
             for my $line (@lines) {
-                unless ($line =~ /psadfifo/i) {
-                    print SYSLOGNG $line;
+                if ($line =~ m/$config{'PSAD_FIFO'}/) {
+                    $found = 1;
+                    last;
                 }
             }
-            print SYSLOGNG "\n",
-                'destination psadpipe { pipe(',
-                "\"$config{'PSAD_FIFO'}\"); };\n",
-                "filter f_kerninfo { facility(kern) ",
-                "and level(info); };\n",
-                'log { source(src); ',
-                "filter(f_kerninfo); destination(psadpipe); };\n";
-            close SYSLOGNG;
-            &Psad::psyslog('psad', 'reconfiguring syslog-ng to write ' .
-                "kern.info messages to $config{'PSAD_FIFO'}");
-            system "$cmds{'killall'} -HUP syslog-ng";
+            unless ($found) {
+                open SYSLOGNG, "> $config{'ETC_SYSLOGNG_CONF'}" or
+                    die "[*] Unable to open $config{'ETC_SYSLOGNG_CONF'}: $!";
+                ### this loop removes any old location for psadfifo
+                for my $line (@lines) {
+                    unless ($line =~ /psadfifo/i) {
+                        print SYSLOGNG $line;
+                    }
+                }
+                print SYSLOGNG "\n",
+                    'destination psadpipe { pipe(',
+                    "\"$config{'PSAD_FIFO'}\"); };\n",
+                    "filter f_kerninfo { facility(kern) ",
+                    "and level(info); };\n",
+                    'log { source(src); ',
+                    "filter(f_kerninfo); destination(psadpipe); };\n";
+                close SYSLOGNG;
+                &Psad::psyslog('psad', 'reconfiguring syslog-ng to write ' .
+                    "kern.info messages to $config{'PSAD_FIFO'}");
+                system "$cmds{'killall'} -HUP syslog-ng";
+            }
+        } else {
+            &Psad::sendmail("[-] psad: $config{'ETC_SYSLOGNG_CONF'} does not " .
+                "exist, check SYSLOG_DAEMON setting on $config{'HOSTNAME'}",
+                '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         }
     }
     ### Metalog support added by Dennis Freise <cat@final-frontier.ath.cx>
-    if (-e $config{'ETC_METALOG_CONF'}) {
-        unless (-e "$config{'ETC_METALOG_CONF'}.orig") {
-            copy $config{'ETC_METALOG_CONF'},
-                "$config{'ETC_METALOG_CONF'}.orig";
-        }
-        open RS, "< $config{'ETC_METALOG_CONF'}" or
-            die "[*] Unable to open $config{'ETC_METALOG_CONF'}: $!\n";
-        my @lines = <RS>;
-        close RS;
-
-        my $found = 0;
-        for my $line (@lines) {
-            if ($line =~ m/psadpipe\.sh/) {
-                $found = 1;
-                last;
+    if ($config{'SYSLOG_DAEMON'} eq 'metalog') {
+        if (-e $config{'ETC_METALOG_CONF'}) {
+            unless (-e "$config{'ETC_METALOG_CONF'}.orig") {
+                copy $config{'ETC_METALOG_CONF'},
+                    "$config{'ETC_METALOG_CONF'}.orig";
             }
-        }
-        unless ($found) {
-            open METALOG, "> $config{'ETC_METALOG_CONF'}" or
-                die "[*] Unable to open $config{'ETC_METALOG_CONF'}: $!";
+            open RS, "< $config{'ETC_METALOG_CONF'}" or
+                die "[*] Unable to open $config{'ETC_METALOG_CONF'}: $!\n";
+            my @lines = <RS>;
+            close RS;
 
-            print METALOG "\n",
-                "\nPSAD :\n",
-                "  facility = \"kern\"\n",
-                '  command  = ',
-                "\"/usr/sbin/psadpipe.sh\"\n";
-            close METALOG;
-            &Psad::psyslog('psad', 'reconfiguring metalog to write ' .
-                    "kern-facility messages to /usr/sbin/psadpipe.sh");
+            my $found = 0;
+            for my $line (@lines) {
+                if ($line =~ m/psadpipe\.sh/) {
+                    $found = 1;
+                    last;
+                }
+            }
+            unless ($found) {
+                open METALOG, "> $config{'ETC_METALOG_CONF'}" or
+                    die "[*] Unable to open $config{'ETC_METALOG_CONF'}: $!";
+                print METALOG "\n",
+                    "\nPSAD :\n",
+                    "  facility = \"kern\"\n",
+                    '  command  = ',
+                    "\"/usr/sbin/psadpipe.sh\"\n";
+                close METALOG;
+                &Psad::psyslog('psad', 'reconfiguring metalog to write ' .
+                        "kern-facility messages to /usr/sbin/psadpipe.sh");
 
-            open PIPESCRIPT, '> /usr/sbin/psadpipe.sh' or
-                die "[*] Unable to open /usr/sbin/psadpipe.sh: $!";
-            print PIPESCRIPT "#!/bin/sh\n\n",
-                "echo \"\$3\" >> $config{'PSAD_FIFO'}\n";
-            close PIPESCRIPT;
-            chmod 0700, '/usr/sbin/psadpipe.sh';
-            &Psad::psyslog('psad', 'generated /usr/sbin/psadpipe.sh ' .
-                    "which writes to $config{'PSAD_FIFO'}");
+                open PIPESCRIPT, '> /usr/sbin/psadpipe.sh' or
+                    die "[*] Unable to open /usr/sbin/psadpipe.sh: $!";
+                print PIPESCRIPT "#!/bin/sh\n\n",
+                    "echo \"\$3\" >> $config{'PSAD_FIFO'}\n";
+                close PIPESCRIPT;
+                chmod 0700, '/usr/sbin/psadpipe.sh';
+                &Psad::psyslog('psad', 'generated /usr/sbin/psadpipe.sh ' .
+                        "which writes to $config{'PSAD_FIFO'}");
 
-            ### Metalog seems to simply die on SIGHUP and SIGALRM, and I
-            ### found no signal or option to reload it's config... :-(
-            die '[*] All files written. You have to manually restart metalog! ',
-                'When done, start psad again.';
+                ### Metalog seems to simply die on SIGHUP and SIGALRM, and I
+                ### found no signal or option to reload it's config... :-(
+                die '[*] All files written. You have to manually restart metalog! ',
+                    'When done, start psad again.';
 #          system "$cmds{'killall'} -HUP metalog";
-       }
+           }
+        } else {
+            &Psad::sendmail("[-] psad: $config{'ETC_METALOG_CONF'} does not " .
+                "exist, check SYSLOG_DAEMON setting on $config{'HOSTNAME'}",
+                '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+        }
     }
 
     ### make sure the permissions on these files is 0600
@@ -5101,7 +5111,7 @@ sub required_vars() {
         PROC_FORWARD_FILE ENABLE_PERSISTENCE AUTO_BLOCK_IPT_FILE
         AUTO_BLOCK_TCPWR_FILE PSAD_SIGS_FILE PSAD_AUTO_DL_FILE
         AUTO_BLOCK_TIMEOUT EXTERNAL_SCRIPT ENABLE_EXT_SCRIPT_EXEC
-        EXEC_EXT_SCRIPT_PER_ALERT ENABLE_DSHIELD_ALERTS
+        EXEC_EXT_SCRIPT_PER_ALERT ENABLE_DSHIELD_ALERTS SYSLOG_DAEMON
         DSHIELD_ALERT_INTERVAL DSHIELD_ALERT_EMAIL DSHIELD_USER_ID
         DSHIELD_USER_EMAIL DSHIELD_DL_THRESHOLD DISK_CHECK_INTERVAL
         DISK_MAX_PERCENTAGE DISK_MAX_RM_RETRIES ETC_HOSTS_DENY

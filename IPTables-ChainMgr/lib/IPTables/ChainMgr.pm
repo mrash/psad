@@ -87,7 +87,7 @@ sub delete_chain() {
     }
 }
 
-sub add_rule() {
+sub add_ip_rule() {
     my $self = shift;
     my $src = shift || croak '[-] Must specify a src address/network.';
     my $table  = shift || croak '[-] Must specify a table, e.g. "filter".';
@@ -114,7 +114,8 @@ sub add_rule() {
     }
 
     ### first check to see if this rule already exists
-    if (&find_rule($normalized_src, $table, $chain, $target, $iptables)) {
+    if (&find_ip_rule($normalized_src, $table,
+            $chain, $target, $iptables)) {
         return 1, '[-] Rule already exists.';
     } else {
         ### we need to add the rule
@@ -127,7 +128,7 @@ sub add_rule() {
     }
 }
 
-sub delete_rule() {
+sub delete_ip_rule() {
     my $self = shift;
     my $src = shift || croak '[-] Must specify a src address/network.';
     my $table  = shift || croak '[-] Must specify a table, e.g. "filter".';
@@ -154,7 +155,7 @@ sub delete_rule() {
     }
 
     ### first check to see if this rule already exists
-    my $rulenum = &find_rule($normalized_src, $table,
+    my $rulenum = &find_ip_rule($normalized_src, $table,
             $chain, $target, $iptables);
     if ($rulenum) {
         ### we need to delete the rule
@@ -170,37 +171,48 @@ sub delete_rule() {
     }
 }
 
-sub find_rule() {
+sub find_ip_rule() {
     my ($src, $table, $chain, $target, $iptables) = @_;
 
-    my $ipt_parse = new IPTables::Parse 'iptables' => $iptables;
+    my $ipt_parse = new IPTables::Parse('iptables' => $iptables)
+        or croak "[*] Could not acquire IPTables::Parse object";
 
-    my $chain_href = $ipt_parse->chain_action_rules($table, $chain);
+    my $chain_aref = $ipt_parse->chain_action_rules($table, $chain);
 
-    if (defined $chain_href->{$target}) {
-        if (defined $chain_href->{$target}->{'all'}) {
-            ### all protocols
-            if (defined $chain_href->{$target}->{'all'}->{$src}) {
-                ### $src to any destination
-                if (defined $chain_href->{$target}->{'all'}
-                        ->{$src}->{'0.0.0.0/0'}) {
-                    ### return Netfilter rule number
-                    return $chain_href->{$target}->{'all'}
-                        ->{$src}->{'0.0.0.0/0'};
-                }
-            }
+    for my $rule_href (@$chain_aref) {
+        if ($rule_href->{'target'} eq $target
+                and $rule_href->{'protocol'} eq 'all'
+                and $rule_href->{'src'} eq $src
+                and $rule_href->{'dst'} eq '0.0.0.0/0'
+                and not $rule_href->{'extended'}) {
+            return 1;
         }
     }
     return 0;
 }
 
+sub find_jump_rule() {
+    my ($jump_chain, $table, $chain, $iptables) = @_;
+
+    my $ipt_parse = new IPTables::Parse('iptables' => $iptables)
+        or croak "[*] Could not acquire IPTables::Parse object";
+
+    my $chain_aref = $ipt_parse->chain_action_rules($table, $chain);
+
+    return 0;
+}
+
 sub run_ipt_cmd() {
     my $cmd = shift || croak '[*] Must specify an iptables command to run.';
+    croak "[*] $cmd does not look like an iptables command."
+        unless $cmd =~ /iptables/;
     return (system "$cmd > /dev/null 2>&1") >> 8;
 }
 
 sub run_ipt_cmd_output() {
     my $cmd = shift || croak '[*] Must specify an iptables command to run.';
+    croak "[*] $cmd does not look like an iptables command."
+        unless $cmd =~ /iptables/;
     my @output = ();
     my $rv = 0;
     eval {

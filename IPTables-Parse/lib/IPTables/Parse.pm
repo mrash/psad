@@ -54,62 +54,131 @@ sub chain_action_rules() {
         close F;
     } else {
         eval {
-            open IPT, "$iptables -t $table -nL $chain |"
-                or croak "[*] Could not execute $iptables -t $table -nL $chain";
+            open IPT, "$iptables -t $table -nL $chain -v |"
+                or croak "[*] Could not execute $iptables -t $table -nL $chain -v";
             @ipt_lines = <IPT>;
             close IPT;
         };
     }
 
     my $found_chain = 0;
-    my $rule_ctr = 1;
-    my %chain = ();
+
+    ### array of hash refs
+    my @chain = ();
+
+    ### determine the output style (e.g. "-nL -v" or just plain "-nL")
+    my $ipt_verbose = 0;
+    for my $line (@ipt_lines) {
+        if ($line =~ /^\s*pkts\s+bytes\s+target/) {
+            $ipt_verbose = 1;
+            last;
+        }
+    }
 
     LINE: for my $line (@ipt_lines) {
         chomp $line;
 
         last LINE if ($found_chain and $line =~ /^\s*Chain\s+/);
-        ### ACCEPT tcp  -- 164.109.8.0/24  0.0.0.0/0  tcp dpt:22 flags:0x16/0x02
-        ### ACCEPT tcp  -- 216.109.125.67  0.0.0.0/0  tcp dpts:7000:7500
-        ### ACCEPT udp  -- 0.0.0.0/0       0.0.0.0/0  udp dpts:7000:7500
-        ### ACCEPT udp  -- 0.0.0.0/0       0.0.0.0/0  udp dpt:!7000
-        ### ACCEPT icmp --  0.0.0.0/0      0.0.0.0/0
-        ### ACCEPT tcp  --  0.0.0.0/0      0.0.0.0/0  tcp spt:35000 dpt:5000
-        ### ACCEPT tcp  --  10.1.1.1       0.0.0.0/0
-
-        ### LOG  all  --  0.0.0.0/0  0.0.0.0/0  LOG flags 0 level 4 prefix `DROP '
-        ### LOG  all  --  127.0.0.2  0.0.0.0/0  LOG flags 0 level 4
 
         if ($line =~ /^\s*Chain\s+$chain\s+\(/i) {
             $found_chain = 1;
             next LINE;
         }
-        next LINE if $line =~ /^\s*target\s/i;
+        if ($ipt_verbose) {
+            next LINE if $line =~ /^\s*pkts\s+bytes\s+target\s/i;
+        } else {
+            next LINE if $line =~ /^\s*target\s+prot/i;
+        }
         next LINE unless $found_chain;
-        if ($line =~ m|^\s*(\S+)\s+(\S+)\s+\-\-\s+(\S+)\s+(\S+)\s*(.*)|) {
-            my $target = $1;
-            my $proto  = $2;
-            my $src    = $3;
-            my $dst    = $4;
-            my $p_str  = $5;
-            if ($p_str and ($proto eq 'tcp' or $proto eq 'udp')) {
-                my $s_port  = '0:0';  ### any to any
-                my $d_port  = '0:0';
-                if ($p_str =~ /dpts?:(\S+)/) {
-                    $d_port = $1;
+
+        ### initialize hash
+        my %rule = (
+            'packets'  => '',
+            'bytes'    => '',
+            'target'   => '',
+            'protocol' => '',
+            'intf_in'  => '',
+            'intf_out' => '',
+            'src'      => '',
+            's_port'   => '',
+            'dst'      => '',
+            'd_port'   => '',
+            'extended' => '',
+            'raw'      => ''  ### only used if regex doesn't match
+        );
+
+        if ($ipt_verbose) {
+            ### 0     0 ACCEPT  tcp  --  eth1 * 192.168.10.3  0.0.0.0/0  tcp dpt:80
+            ### 0     0 ACCEPT  tcp  --  eth1 * 192.168.10.15 0.0.0.0/0  tcp dpt:22
+            ### 33 2348 ACCEPT  tcp  --  eth1 * 192.168.10.2  0.0.0.0/0  tcp dpt:22
+            ### 0     0 ACCEPT  tcp  --  eth1 * 192.168.10.2  0.0.0.0/0  tcp dpt:80
+            if ($line =~ m|^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+\-\-\s+
+                                (\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*(.*)|x) {
+                $rule{'packets'}  = $1;
+                $rule{'bytes'}    = $2;
+                $rule{'target'}   = $3;
+                $rule{'protocol'} = $4;
+                $rule{'intf_in'}  = $5;
+                $rule{'intf_out'} = $6;
+                $rule{'src'}      = $7;
+                $rule{'dst'}      = $8;
+                $rule{'extended'} = $9;
+                if ($rule{'extended'}
+                        and ($rule{'protocol'} eq 'tcp'
+                        or $rule{'protocol'} eq 'udp')) {
+                    my $s_port  = '0:0';  ### any to any
+                    my $d_port  = '0:0';
+                    if ($rule{'extended'} =~ /dpts?:(\S+)/) {
+                        $d_port = $1;
+                    }
+                    if ($rule{'extended'} =~ /spts?:(\S+)/) {
+                        $s_port = $1;
+                    }
+                    $rule{'s_port'} = $s_port;
+                    $rule{'d_port'} = $d_port;
                 }
-                if ($p_str =~ /spts?:(\S+)/) {
-                    $s_port = $1;
-                }
-                $chain{$target}{$proto}{$s_port}{$d_port}{$src}{$dst}
-                    = $rule_ctr;
             } else {
-                $chain{$target}{$proto}{$src}{$dst} = $rule_ctr;
+                $rule{'raw'} = $line;
+            }
+        } else {
+            ### ACCEPT tcp  -- 164.109.8.0/24  0.0.0.0/0  tcp dpt:22 flags:0x16/0x02
+            ### ACCEPT tcp  -- 216.109.125.67  0.0.0.0/0  tcp dpts:7000:7500
+            ### ACCEPT udp  -- 0.0.0.0/0       0.0.0.0/0  udp dpts:7000:7500
+            ### ACCEPT udp  -- 0.0.0.0/0       0.0.0.0/0  udp dpt:!7000
+            ### ACCEPT icmp --  0.0.0.0/0      0.0.0.0/0
+            ### ACCEPT tcp  --  0.0.0.0/0      0.0.0.0/0  tcp spt:35000 dpt:5000
+            ### ACCEPT tcp  --  10.1.1.1       0.0.0.0/0
+
+            ### LOG  all  --  0.0.0.0/0  0.0.0.0/0  LOG flags 0 level 4 prefix `DROP '
+            ### LOG  all  --  127.0.0.2  0.0.0.0/0  LOG flags 0 level 4
+
+            if ($line =~ m|^\s*(\S+)\s+(\S+)\s+\-\-\s+(\S+)\s+(\S+)\s*(.*)|) {
+                $rule{'target'}   = $1;
+                $rule{'protocol'} = $2;
+                $rule{'src'}      = $3;
+                $rule{'dst'}      = $4;
+                $rule{'extended'} = $5;
+                if ($rule{'extended'}
+                        and ($rule{'protocol'} eq 'tcp'
+                        or $rule{'protocol'} eq 'udp')) {
+                    my $s_port  = '0:0';  ### any to any
+                    my $d_port  = '0:0';
+                    if ($rule{'extended'} =~ /dpts?:(\S+)/) {
+                        $d_port = $1;
+                    }
+                    if ($rule{'extended'} =~ /spts?:(\S+)/) {
+                        $s_port = $1;
+                    }
+                    $rule{'s_port'} = $s_port;
+                    $rule{'d_port'} = $d_port;
+                }
+            } else {
+                $rule{'raw'} = $line;
             }
         }
-        $rule_ctr++;
+        push @chain, \%rule;
     }
-    return \%chain;
+    return \@chain;
 }
 
 sub default_drop() {

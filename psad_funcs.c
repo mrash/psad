@@ -49,7 +49,7 @@ void check_unique_pid(const char *pid_file, const char *prog_name)
 
 #ifdef DEBUG
     fprintf(stderr,
-        " .. check_unique_pid(): opening pid file %s\n", pid_file);
+        "[+] check_unique_pid(): opening pid file %s\n", pid_file);
 #endif
 
     if ((pidfile_ptr = fopen(pid_file, "r")) == NULL) {
@@ -72,7 +72,7 @@ void check_unique_pid(const char *pid_file, const char *prog_name)
 
 #ifdef DEBUG
     fprintf(stderr,
-        " .. check_unique_pid(): checking pid: %d with kill 0\n", pid);
+        "[+] check_unique_pid(): checking pid: %d with kill 0\n", pid);
 #endif
 
     if (kill(pid, 0) == 0) {  /* another prog_name is already running */
@@ -124,7 +124,7 @@ int find_char_var(char *search_str, char *charvar, char *line)
             return 0;
 
 #ifdef DEBUG
-    fprintf(stderr, " .. find_char_var(): found %s in line: %s",
+    fprintf(stderr, "[+] find_char_var(): found %s in line: %s",
             search_str, line);
 #endif
 
@@ -178,7 +178,7 @@ void daemonize_process(const char *pid_file)
 
     if (child_pid > 0) {
 #ifdef DEBUG
-        fprintf(stderr, " .. writing pid: %d to pid file: %s\n",
+        fprintf(stderr, "[+] writing pid: %d to pid file: %s\n",
                 child_pid, pid_file);
 #endif
         write_pid(pid_file, child_pid);

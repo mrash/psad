@@ -39,7 +39,7 @@ require Exporter;
     print_sys_msg
 );
 
-$VERSION = '1.3.4';
+$VERSION = '1.4.1';
 
 ### subroutines ###
 sub buildconf() {

@@ -11,7 +11,7 @@
 #          which include firewall messages).  For more information
 #          read the psad man page.
 #
-# Author: Michael B. Rash (mbr@cipherdyne.com)
+# Author: Michael B. Rash <mbr@cipherdyne.com>
 #
 # Credits:  (see the CREDITS file)
 #
@@ -2164,20 +2164,25 @@ sub setup_psad() {
         die " ... @@@  Unable to open /etc/syslog.conf: $!";
     my @slines = <RS>;
     close RS;
-    open SYSLOG, '> /etc/syslog.conf' or
-        die " ... @@@  Unable to open /etc/syslog.conf: $!";
+    my $found = 0;
     for my $line (@slines) {
-        chomp $line;
-        unless ($line =~ /psadfifo/) {
-            print SYSLOG "$line\n";
-        }
+        $found = 1 if $line =~ m/|\s*$config{'PSAD_FIFO'}/;
     }
-    ### reinstate kernel logging to our named pipe
-    print SYSLOG "# Send kern.info messages to psadfifo for " .
-        "analysis by kmsgsd\n";
-    print SYSLOG "kern.info		|$config{'PSAD_FIFO'}\n\n";
-    close SYSLOG;
-    system "$cmds{'killall'} -HUP $cmds{'syslogd'}";
+    unless ($found) {
+        open SYSLOG, '> /etc/syslog.conf' or
+            die " ... @@@  Unable to open /etc/syslog.conf: $!";
+        for my $line (@slines) {
+            unless ($line =~ /psadfifo/) {
+                print SYSLOG $line;
+            }
+        }
+        ### reinstate kernel logging to our named pipe
+        print SYSLOG "### Send kern.info messages to psadfifo for " .
+            "analysis by kmsgsd\n";
+        print SYSLOG "kern.info		|$config{'PSAD_FIFO'}\n";
+        close SYSLOG;
+        system "$cmds{'killall'} -HUP $cmds{'syslogd'}";
+    }
     return;
 }
 
@@ -2198,8 +2203,8 @@ sub check_config() {
 }
 
 sub usage_and_exit() {
-        my $exitcode = shift;
-        print <<_HELP_;
+    my $exitcode = shift;
+    print <<_HELP_;
 
 psad; the Port Scan Attack Detector
 Version: $version
@@ -2247,5 +2252,5 @@ OPTIONS:
       -h   --help                     - prints this help message.
 
 _HELP_
-        exit $exitcode;
+    exit $exitcode;
 }

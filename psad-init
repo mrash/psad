@@ -1,9 +1,12 @@
 #!/bin/sh
 #
-# chkconfig: 345 99 05 
+# Startup script for psad
+#
+# chkconfig: 345 99 05
 # description: The Port Scan Attack Detector (psad)
 # processname: psad
-# config: /etc/psad/psad.conf
+# pidfile: /var/run/psad.pid
+# config: /etc/psad/psad.conf 
 
 # Source function library.
 . /etc/rc.d/init.d/functions

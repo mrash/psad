@@ -226,8 +226,8 @@ unless (-e "psad" && -e "Psad.pm/Psad.pm") {
 }
 
 my $t = localtime();
-my $time = " ... Installing psad on $HOSTNAME: $t\n";
-&logr("\n$time\n");
+&logr("\n ... Installing psad on $HOSTNAME\n");
+&logr(" ... $t\n");
 
 unless (-d $PSAD_CONFDIR) {
     &logr(" ... Creating $PSAD_CONFDIR\n");

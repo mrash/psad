@@ -2173,11 +2173,11 @@ sub scan_logr() {
                     "[$udp_absrange]\n";
             }
             print E "\n";
-            printf E "    %-14s%-13s%-7s%-7s%-7s\n", 'Chain_Type:', 'Interface:',
+            printf E "    %-9s%-13s%-7s%-7s%-7s\n", 'chain:', 'interface:',
                 'tcp:', 'udp:', 'icmp:';
             for my $chain qw(input forward) {
 #                if (!defined $scan{$src}{$dst}{$chain}) {
-#                    printf E "    %-14%s\n", $chain, '[No packets]';
+#                    printf E "    %-11%s\n", $chain, '[No packets]';
 #                    next;
 #                }
                 for my $intf (keys %{$scan{$src}{$dst}{$chain}}) {
@@ -2190,7 +2190,7 @@ sub scan_logr() {
                         if defined $scan{$src}{$dst}{$chain}{$intf}{'udp'};
                     $tot_icmp = $scan{$src}{$dst}{$chain}{$intf}{'icmp'}
                         if defined $scan{$src}{$dst}{$chain}{$intf}{'icmp'};
-                    printf E "    %-14s%-13s%-7s%-7s%-7s\n", $chain,
+                    printf E "    %-9s%-13s%-7s%-7s%-7s\n", $chain,
                         $intf, $tot_tcp, $tot_udp, $tot_icmp;
                 }
             }
@@ -3100,7 +3100,7 @@ sub status_psad_daemon() {
         close F;
     }
     ### sort and print the scan source ips
-    my %scan_source_ips;
+    my %scan_srcs;
     chdir $config{'PSAD_DIR'} or
         die " ** Could not chdir $config{'PSAD_DIR'}: $!";
     opendir D, $config{'PSAD_DIR'} or
@@ -3113,12 +3113,6 @@ sub status_psad_daemon() {
             ### $file is a current scan source ip
             my $src_ipdir = $file;
             my $dl = 0;
-            my $tcp_input_ctr = 0;
-            my $udp_input_ctr = 0;
-            my $icmp_input_ctr = 0;
-            my $tcp_forward_ctr = 0;
-            my $udp_forward_ctr = 0;
-            my $icmp_forward_ctr = 0;
             if (-e "${src_ipdir}/danger_level") {
                 open F, "< ${src_ipdir}/danger_level" or
                     die " ** Could not open ",
@@ -3146,96 +3140,91 @@ sub status_psad_daemon() {
                     my @lines = <F>;
                     close F;
                     for my $line (@lines) {
-                        $tcp_input_ctr = $1 if $line =~ /input_tcp:\s+(\d+)/;
-                        $udp_input_ctr = $1 if $line =~ /input_udp:\s+(\d+)/;
-                        $icmp_input_ctr = $1 if $line =~ /input_icmp:\s+(\d+)/;
-                        $tcp_forward_ctr = $1 if $line =~ /forward_tcp:\s+(\d+)/;
-                        $udp_forward_ctr = $1 if $line =~ /forward_udp:\s+(\d+)/;
-                        $icmp_forward_ctr = $1 if $line =~ /forward_icmp:\s+(\d+)/;
+                        if ($line =~ /^(\w+)_(\w+)_(\w+):\s+(\d+)/) {
+                            my $chain = $1;
+                            my $intf  = $2;
+                            my $proto = $3;
+                            my $ctr   = $4;
+                            if ($status_sort_dl) {
+                                $scan_srcs{$dl}{$src_ipdir}{$dst}
+                                    {$chain}{$intf}{$proto} = $ctr;
+                            } else {
+                                $scan_srcs{$src_ipdir}{$dst}{'dl'}
+                                    = $dl;
+                                $scan_srcs{$src_ipdir}{$dst}
+                                    {$chain}{$intf}{$proto} = $ctr;
+                            }
+                        }
                     }
-                }
-                if ($status_sort_dl) {
-                    $scan_source_ips{$dl}{$src_ipdir}{$dst}{'tcp'}{'input'}
-                        = $tcp_input_ctr;
-                    $scan_source_ips{$dl}{$src_ipdir}{$dst}{'udp'}{'input'}
-                        = $udp_input_ctr;
-                    $scan_source_ips{$dl}{$src_ipdir}{$dst}{'icmp'}{'input'}
-                        = $icmp_input_ctr;
-                    $scan_source_ips{$dl}{$src_ipdir}{$dst}{'tcp'}{'forward'}
-                        = $tcp_forward_ctr;
-                    $scan_source_ips{$dl}{$src_ipdir}{$dst}{'udp'}{'forward'}
-                        = $udp_forward_ctr;
-                    $scan_source_ips{$dl}{$src_ipdir}{$dst}{'icmp'}{'forward'}
-                        = $icmp_forward_ctr;
-                } else {
-                    $scan_source_ips{$src_ipdir}{$dst}{'dl'} = $dl;
-                    $scan_source_ips{$src_ipdir}{$dst}{'tcp'}{'input'}
-                        = $tcp_input_ctr;
-                    $scan_source_ips{$src_ipdir}{$dst}{'udp'}{'input'}
-                        = $udp_input_ctr;
-                    $scan_source_ips{$src_ipdir}{$dst}{'icmp'}{'input'}
-                        = $icmp_input_ctr;
-                    $scan_source_ips{$src_ipdir}{$dst}{'tcp'}{'forward'}
-                        = $tcp_forward_ctr;
-                    $scan_source_ips{$src_ipdir}{$dst}{'udp'}{'forward'}
-                        = $udp_forward_ctr;
-                    $scan_source_ips{$src_ipdir}{$dst}{'icmp'}{'forward'}
-                        = $icmp_forward_ctr;
                 }
             }
         }
     }
     print STDOUT "\n";
-    if (%scan_source_ips) {
-        printf "    %-18s%-18s%-11s%-7s%-7s%-7s%-7s\n", 'src:', 'dst:',
-            'chain:', 'tcp:', 'udp:', 'icmp:', 'dl:';
+    if (%scan_srcs) {
+        printf "    %-17s%-17s%-8s%-12s%-6s%-6s%-7s%-7s\n", 'src:', 'dst:',
+            'chain:', 'interface:', 'tcp:', 'udp:', 'icmp:', 'dl:';
         if ($status_sort_dl) {
-            for my $dl (sort {$b <=> $a} keys %scan_source_ips) {
-                for my $src (keys %{$scan_source_ips{$dl}}) {
-                    for my $dst (keys %{$scan_source_ips{$dl}{$src}}) {
-                        my $input_tcp
-                            = $scan_source_ips{$dl}{$src}{$dst}{'tcp'}{'input'};
-                        my $input_udp
-                            = $scan_source_ips{$dl}{$src}{$dst}{'udp'}{'input'};
-                        my $input_icmp
-                            = $scan_source_ips{$dl}{$src}{$dst}{'icmp'}{'input'};
-                        my $forward_tcp
-                            = $scan_source_ips{$dl}{$src}{$dst}{'tcp'}{'forward'};
-                        my $forward_udp
-                            = $scan_source_ips{$dl}{$src}{$dst}{'udp'}{'forward'};
-                        my $forward_icmp
-                            = $scan_source_ips{$dl}{$src}{$dst}{'icmp'}{'forward'};
-                        printf "    %-18s%-18s%-11s%-7s%-7s%-7s%-7s\n",
-                            $src, $dst, 'input', $input_tcp, $input_udp,
-                            $input_icmp, $dl;
-                        printf "    %-18s%-18s%-11s%-7s%-7s%-7s%-7s\n",
-                            $src, $dst, 'forward', $forward_tcp,
-                            $forward_udp, $forward_icmp, $dl;
+            for my $dl (sort {$b <=> $a} keys %scan_srcs) {
+                for my $src (keys %{$scan_srcs{$dl}}) {
+                    for my $dst (keys %{$scan_srcs{$dl}{$src}}) {
+                        for my $chain qw(input forward) {
+                            next unless defined
+                                $scan_srcs{$dl}{$src}{$dst}{$chain};
+                            for my $intf (keys
+                                    %{$scan_srcs{$dl}{$src}{$dst}{$chain}}) {
+                                my $tcp_ctr = 0;
+                                my $udp_ctr = 0;
+                                my $icmp_ctr = 0;
+                                $tcp_ctr = $scan_srcs{$dl}{$src}
+                                {$dst}{$chain}{$intf}{'tcp'}
+                                    if defined $scan_srcs{$dl}{$src}
+                                            {$dst}{$chain}{$intf}{'tcp'};
+                                $udp_ctr = $scan_srcs{$dl}{$src}{$dst}
+                                {$chain}{$intf}{'udp'}
+                                    if defined $scan_srcs{$dl}{$src}
+                                            {$dst}{$chain}{$intf}{'udp'};
+                                $icmp_ctr = $scan_srcs{$dl}{$src}
+                                {$dst}{$chain}{$intf}{'icmp'}
+                                    if defined $scan_srcs{$dl}{$src}
+                                            {$dst}{$chain}{$intf}{'icmp'};
+                                printf "    %-17s%-17s%-8s%-12s%-6s%-6s%-7s%-7s\n",
+                                    $src, $dst, $chain, $intf, $tcp_ctr,
+                                    $udp_ctr, $icmp_ctr, $dl;
+                            }
+                        }
                     }
                 }
             }
         } else {
-            for my $src (sort keys %scan_source_ips) {
-                for my $dst (keys %{$scan_source_ips{$src}}) {
-                    my $dl   = $scan_source_ips{$src}{$dst}{'dl'};
-                    my $input_tcp
-                        = $scan_source_ips{$src}{$dst}{'tcp'}{'input'};
-                    my $input_udp
-                        = $scan_source_ips{$src}{$dst}{'udp'}{'input'};
-                    my $input_icmp
-                        = $scan_source_ips{$src}{$dst}{'icmp'}{'input'};
-                    my $forward_tcp
-                        = $scan_source_ips{$src}{$dst}{'tcp'}{'forward'};
-                    my $forward_udp
-                        = $scan_source_ips{$src}{$dst}{'udp'}{'forward'};
-                    my $forward_icmp
-                        = $scan_source_ips{$src}{$dst}{'icmp'}{'forward'};
-                    printf "    %-18s%-18s%-11s%-7s%-7s%-7s%-7s\n",
-                        $src, $dst, 'input', $input_tcp, $input_udp,
-                        $input_icmp, $dl;
-                    printf "    %-18s%-18s%-11s%-7s%-7s%-7s%-7s\n",
-                        $src, $dst, 'forward', $forward_tcp,
-                        $forward_udp, $forward_icmp, $dl;
+            for my $src (sort keys %scan_srcs) {
+                for my $dst (keys %{$scan_srcs{$src}}) {
+                    my $dl = $scan_srcs{$src}{$dst}{'dl'};
+                    for my $chain qw(input forward) {
+                        next unless defined
+                            $scan_srcs{$src}{$dst}{$chain};
+                        for my $intf (keys
+                                %{$scan_srcs{$src}{$dst}{$chain}}) {
+                            my $tcp_ctr = 0;
+                            my $udp_ctr = 0;
+                            my $icmp_ctr = 0;
+                            $tcp_ctr = $scan_srcs{$src}
+                            {$dst}{$chain}{$intf}{'tcp'}
+                                if defined $scan_srcs{$src}
+                                        {$dst}{$chain}{$intf}{'tcp'};
+                            $udp_ctr = $scan_srcs{$src}{$dst}
+                            {$chain}{$intf}{'udp'}
+                                if defined $scan_srcs{$src}
+                                        {$dst}{$chain}{$intf}{'udp'};
+                            $icmp_ctr = $scan_srcs{$src}
+                            {$dst}{$chain}{$intf}{'icmp'}
+                                if defined $scan_srcs{$src}
+                                        {$dst}{$chain}{$intf}{'icmp'};
+                            printf "    %-17s%-17s%-8s%-12s%-6s%-6s%-7s%-7s\n",
+                                $src, $dst, $chain, $intf, $tcp_ctr,
+                                $udp_ctr, $icmp_ctr, $dl;
+                        }
+                    }
                 }
             }
         }

@@ -312,7 +312,7 @@ unless (-e "Makefile.PL" && -e "Syslog.pm") {
 }
 system "$Cmds{'perl'} Makefile.PL";
 system "$Cmds{'make'}";
-#system "$Cmds{'make'} test";
+system "$Cmds{'make'} test";
 system "$Cmds{'make'} install";
 chdir "..";
 

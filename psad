@@ -452,7 +452,6 @@ sub email_alert(){
 			if (defined $Scan_href->{$ip}->{'SIGMATCH'}) {
 				foreach my $sigmatch (keys %{$Scan_href->{$ip}->{'SIGMATCH'}}) {
                                                 print $EMAILALERT "$sigmatch\n";
-                                        }
                                 }
 			}
                 	close EMAILALERT;

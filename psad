@@ -96,7 +96,7 @@
 #   the only place in the code where capital letters will be used in
 #   variables names.  There are several variables with file-scope, and
 #   these variables are clearly commented near the top of each of the
-#   psad daemons.  Generally lines are limited to 80 characters for easy
+#   psad daemons.  Lines are generally limited to 80 characters for easy
 #   reading.
 #
 # Sample packets:
@@ -465,10 +465,9 @@ if ($benchmark) {
 }
 
 ### print the startup message
-print STDOUT " .. psad started; email alerts will be sent to:\n",
+&Psad::psyslog('psad', '.. psad started ..');
+print STDOUT " .. Email alerts will be sent to:\n",
     " ----> $config{'EMAIL_ADDRESSES'}\n";
-&Psad::logr_nowrap(localtime() . " .. psad started ..\n",
-   $psad_logfile);
 
 ### daemonize psad unless running with --no_daemon or --debug
 unless ($no_daemon || $debug || $benchmark) {
@@ -1569,48 +1568,46 @@ sub import_posf_sigs() {
     ### make sure each of the os signatures has all fields defined
     OS: for my $os (keys %posf_sigs) {
         unless (defined $posf_sigs{$os}{'numpkts'}) {
-            &Psad::logr_nowrap(localtime() . " ** $posf_file: missing " .
-                "NUMPKTS for os: $os\n", $psad_logfile);
+            &Psad::psyslog('psad', "** $posf_file: missing " .
+                "NUMPKTS for os: $os");
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'tos'}) {
-            &Psad::logr_nowrap(localtime() . " ** $posf_file: missing " .
-                "TOS for os: $os\n", $psad_logfile);
+            &Psad::psyslog('psad', "** $posf_file: missing " .
+                "TOS for os: $os");
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'len'}) {
-            &Psad::logr_nowrap(localtime() . " ** $posf_file: missing " .
-                "LEN for os: $os\n", $psad_logfile);
+            &Psad::psyslog('psad', "** $posf_file: missing " .
+                "LEN for os: $os");
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'ttl'}) {
-            &Psad::logr_nowrap(localtime() . " ** $posf_file: missing " .
-                "TTL for os: $os\n", $psad_logfile);
+            &Psad::psyslog('psad', "** $posf_file: missing " .
+                "TTL for os: $os");
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'id'}) {
-            &Psad::logr_nowrap(localtime() . " ** $posf_file: missing " .
-                "ID for os: $os\n", $psad_logfile);
+            &Psad::psyslog('psad', "** $posf_file: missing " .
+                "ID for os: $os");
             delete $posf_sigs{$os};
             next OS;
         } else {
             unless ($posf_sigs{$os}{'id'} eq 'SMALLINCR'
                     || $posf_sigs{$os}{'id'} eq 'RANDOM') {
-                &Psad::logr_nowrap(localtime() . " ** $posf_file: ID must " .
-                    "be either SMALLINCR or RANDOM for os: $os\n",
-                    $psad_logfile);
+                &Psad::psyslog('psad', "** $posf_file: ID must " .
+                    "be either SMALLINCR or RANDOM for os: $os");
                 delete $posf_sigs{$os};
                 next OS;
             }
         }
         unless (defined $posf_sigs{$os}{'win'}) {
-            &Psad::logr_nowrap(localtime() . " ** $posf_file: missing " .
-                "WINDOW for os: $os\n",
-                $psad_logfile);
+            &Psad::psyslog('psad', "** $posf_file: missing " .
+                "WINDOW for os: $os");
             delete $posf_sigs{$os};
             next OS;
         }
@@ -1933,7 +1930,7 @@ sub scan_logr() {
 
             &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=" .
                 "-=-=-=-=\n", \%print_hsh);
-            &Psad::logr("-**- psad: Suspicious traffic detected against " .
+            &Psad::logr(" ** psad: Suspicious traffic detected against " .
                 "$hostname ($dst).\n\n", \%print_hsh);
             &Psad::logr("\n", \%print_hsh);
             &Psad::logr(sprintf("%${log_len}s%s", 'Source: ', "$src\n"),

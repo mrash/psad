@@ -1,5 +1,5 @@
 %define name psad
-%define version 1.3.3
+%define version 1.3.4
 %define release 1
 %define psadlibdir /usr/lib/psad
 %define psadlogdir /var/log/psad
@@ -53,6 +53,8 @@ cd Psad && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
 cd ..
 cd IPTables/Parse && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
 cd ../..
+cd Bit-Vector && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
+cd ..
 cd Net-IPv4Addr && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
 cd ..
 cd Unix-Syslog && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
@@ -70,6 +72,7 @@ make OPTS="$RPM_OPT_FLAGS" -C whois
 ### build perl modules used by psad
 make OPTS="$RPM_OPT_FLAGS" -C Psad
 make OPTS="$RPM_OPT_FLAGS" -C IPTables/Parse
+make OPTS="$RPM_OPT_FLAGS" -C Bit-Vector
 make OPTS="$RPM_OPT_FLAGS" -C Net-IPv4Addr
 make OPTS="$RPM_OPT_FLAGS" -C Unix-Syslog
 make OPTS="$RPM_OPT_FLAGS" -C Date-Calc
@@ -85,6 +88,8 @@ mkdir -p $RPM_BUILD_ROOT%psadvarlibdir
 mkdir -p $RPM_BUILD_ROOT%psadrundir
 
 ### psad module dirs
+mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Bit/Vector
+mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Bit
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Psad
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Unix/Syslog
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Date/Calc
@@ -116,6 +121,9 @@ install -m 644 {signatures,icmp_types,auto_dl,posf} $RPM_BUILD_ROOT%_sysconfdir/
 install -m 644 *.8 $RPM_BUILD_ROOT%{_mandir}/man8/
 
 ### install perl modules used by psad
+install -m 555 Bit-Vector/blib/arch/auto/Bit/Vector/Vector.so $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Bit/Vector/Vector.so
+install -m 444 Bit-Vector/blib/arch/auto/Bit/Vector/Vector.bs $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Bit/Vector/Vector.bs
+install -m 444 Bit-Vector/blib/lib/Bit/Vector.pm $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Bit/Vector.pm
 install -m 555 Unix-Syslog/blib/arch/auto/Unix/Syslog/Syslog.so $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Unix/Syslog/Syslog.so
 install -m 444 Unix-Syslog/blib/arch/auto/Unix/Syslog/Syslog.bs $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Unix/Syslog/Syslog.bs
 install -m 444 Unix-Syslog/blib/lib/auto/Unix/Syslog/autosplit.ix $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Unix/Syslog/autosplit.ix
@@ -222,6 +230,11 @@ fi
 %_libdir/%name
 
 %changelog
+* Sat Sep 25 2004 Michael Rash <mbr@cipherydne.org>
+- Added Bit::Vector back since not having it causes dependency
+  problems with Date::Calc even though psad does not require any
+  Date::Calc functions that require Bit::Vector functions.
+
 * Mon Sep 06 2004 Michael Rash <mbr@cipherydne.org>
 - Updated to psad-1.3.3.
 - Fixed path to psad-init.redhat (Mate Wierdl)

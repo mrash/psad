@@ -133,6 +133,7 @@
 ### modules used by psad
 use lib '/usr/lib/psad';
 use Psad;
+use IPTables::ChainMgr;
 use Net::IPv4Addr qw(ipv4_network ipv4_in_network);
 use File::Copy;
 use File::Path;
@@ -163,6 +164,10 @@ my $fw_search_file = '/etc/psad/fw_search.conf';
 my $debug = 0;
 
 my $flush_fw = 0;
+
+### build the iptables blocking configuration out of the
+### IPT_AUTO_CHAIN variable
+my @ipt_block_config = ();
 
 ### Cache the default table->chain relationships used
 ### by the auto blocking code for iptables firewalls.
@@ -1964,8 +1969,10 @@ sub psad_init() {
     ### turn off buffering
     $| = 1;
 
-    ### import psad.conf
-    &Psad::buildconf(\%config, \%cmds, $config_file);
+    ### import psad.conf, for now the IPT_AUTO_CHAIN variable is the
+    ### only multi-line variable in psad.conf
+    &Psad::buildconf(\%config, \%cmds, {'IPT_AUTO_CHAIN' => ''},
+        $config_file);
 
     ### make sure all necessary configuration variables
     ### are defined
@@ -1993,6 +2000,11 @@ sub psad_init() {
 
     ### set some config variables based on command line input
     &handle_cmdline();
+
+    ### build iptable block config hash out of IPT_AUTO_CHAIN keywords
+    ### (we don't check ENABLE_AUTO_IDS here since someone may have turned
+    ### it off but still want to run --Status checks or use --Flush).
+    &build_ipt_block_config();
 
     ### note that we don't have a check for ENABLE_AUTO_IDS here
     ### since someone may turn this off but still want to be able
@@ -4160,6 +4172,41 @@ sub timeout_auto_blocked_ips() {
     return;
 }
 
+sub build_ipt_block_config() {
+
+    my $ipt = new IPTables::ChainMgr(
+        'iptables' => $cmds{'iptables'}
+    ) or die "[*] Could not acquire IPTables::ChainMgr object.";
+
+    for my $value (@{$config{'IPT_AUTO_CHAIN'}}) {
+        ### DROP, src, filter, INPUT, PSAD_BLOCK_INPUT;
+        my @block = split /\s*,\s*/, $value;
+        if ($#block == 4) {
+            my %hsh = (
+                'target'     => $block[0],
+                'direction'  => $block[1],
+                'table'      => $block[2],
+                'from_chain' => $block[3],
+                'to_chain'   => $block[4]
+            );
+            if ($ipt->chain_exists($hsh{'table'}, $hsh{'from_chain'})) {
+                push @ipt_block_config, \%hsh;
+            } else {
+                my $msg = "invalid IPT_AUTO_CHAIN keyword, " .
+                    "$hsh{'from_chain'} chain does not exist.";
+                &Psad::psyslog('psad', $msg);
+                print STDERR "[-] build_ipt_block_config(): $msg\n"
+                    if $debug;
+            }
+        } else {
+            my $msg = "invalid IPT_AUTO_CHAIN variable: $value";
+            &Psad::psyslog('psad', $msg);
+            print STDERR "[-] build_ipt_block_config(): $msg\n" if $debug;
+        }
+    }
+    return;
+}
+
 sub get_iptables_chains() {
 
     print STDERR "[+] get_iptables_chains()\n" if $debug;
@@ -4797,26 +4844,12 @@ sub status_psad_daemon() {
             close F;
         }
     }
+
+    ### print block status of IP addresses blocked by iptables
     unless ($analyze_msgs) {
-        if ($config{'ENABLE_AUTO_IDS'} eq 'Y' and
-                -e $config{'AUTO_BLOCK_IPT_FILE'}) {
-            open F, "< $config{'AUTO_BLOCK_IPT_FILE'}" or
-                die "[*] $config{'AUTO_BLOCK_IPT_FILE'}: $!";
-            my @lines = <F>;
-            close F;
-            print STDOUT "\n    Iptables auto-blocked IPs:\n";
-            my $found_blocked = 0;
-            for my $ip (@lines) {
-                chomp $ip;
-                if (&ipt_test_block($ip)) {
-                    $found_blocked = 1;
-                    print STDOUT "        $ip\n";
-                }
-            }
-            print STDOUT "        [NONE]\n"
-                unless $found_blocked;
-        }
+        &print_blocked_ip_status();
     }
+
     if ($analyze_msgs) {
         if (%ipt_prefixes) {
             print "\n    Iptables prefix counters:\n";
@@ -4861,6 +4894,46 @@ sub status_psad_daemon() {
             print STDOUT "        $_" while (<F>);
             close F;
         }
+    }
+    return;
+}
+
+sub print_blocked_ip_status() {
+    if (-e $config{'AUTO_BLOCK_IPT_FILE'}) {
+        open F, "< $config{'AUTO_BLOCK_IPT_FILE'}" or
+            die "[*] $config{'AUTO_BLOCK_IPT_FILE'}: $!";
+        my @lines = <F>;
+        close F;
+        print "\n    Iptables auto-blocked IPs:\n";
+        my $ipt = new IPTables::ChainMgr(
+            'iptables' => $cmds{'iptables'}
+        ) or die "[*] Could not acquire IPTables::ChainMgr object.";
+
+        my $found_line = 0;
+        for my $line (@lines) {
+            chomp $line;
+            if ($line =~ /^\s*($ip_re)/) {
+                my $ip    = $1;
+                print "        $ip";
+                my $blocked = 0;
+                for my $block_hr (@ipt_block_config) {
+                    if ($ipt->find_ip_rule($ip, '0.0.0.0/0',
+                            $block_hr->{'table'},
+                            $block_hr->{'to_chain'},
+                            $block_hr->{'target'})) {
+                        $blocked = 1;
+                        print " $block_hr->{'to_chain'}($block_hr->{'target'})";
+                    }
+                }
+                $found_line = 1;
+                unless ($blocked) {
+                    print ' [NONE]';
+                }
+                print "\n";
+            }
+        }
+        print "        [NONE]\n"
+            unless $found_line;
     }
     return;
 }
@@ -5682,7 +5755,7 @@ sub required_vars() {
         ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL ANALYSIS_MODE_DIR
         IMPORT_OLD_SCANS ICMP_TYPES_FILE SHOW_ALL_SIGNATURES
         IPT_PREFIX_COUNTER_FILE IGNORE_PORTS ENABLE_SCAN_ARCHIVE
-        EMAIL_LIMIT_STATUS_MSG P0F_FILE IGNORE_PROTOCOLS
+        EMAIL_LIMIT_STATUS_MSG P0F_FILE IGNORE_PROTOCOLS IPT_AUTO_CHAIN
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

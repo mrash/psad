@@ -18,7 +18,7 @@ Linux kernel on which the software is deployed.  For kernel versions
 any capability to log or distinguish any tcp flags other than syn, or ack.  
 Hence, most of the tcp signatures included in psad_signatures cannot be 
 detected by psad running on these kernel versions.  By contrast, the 
-iptables firewalling code (see http://netfilter.kernelnotes.org) 
+iptables firewalling code (see http://netfilter.gnumonks.org) 
 integrated within the 2.4.x kernels can distinguish all tcp flags and 
 hence make the signature logic possible within psad.
 

@@ -99,7 +99,7 @@ for (;;) {
     my $service = <FIFO>;  ### don't chomp for better performance
     if (defined $service
         && ($service =~ /Packet\slog/ || $service =~ /IN.+?OUT/)
-        && ($service =~ /$FW_MSG_SEARCH/ || $service =~ /$SNORT_SID_STR/) {
+        && ($service =~ /$FW_MSG_SEARCH/ || $service =~ /$SNORT_SID_STR/)) {
         ### log to the fwdata file
         my $old_fh = select LOG;
         $| = 1;

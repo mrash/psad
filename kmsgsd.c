@@ -36,22 +36,30 @@
 
 /* includes */
 #include "psad.h"
+#include <getopt.h>
 
 /* defines */
 #define KMSGSD_CONF "/etc/psad/kmsgsd.conf"
+#define FW_SEARCH_FILE "/etc/psad/fw_search.conf"
 
 /* globals */
 static volatile sig_atomic_t received_sighup = 0;
+extern char *optarg; /* for getopt */
+extern int   optind; /* for getopt */
+char *fw_msg_search[MAX_GEN_LEN];
+int num_fw_search_strings = 0;
 
 /* prototypes */
 static void parse_config(
     char *config_file,
     char *psadfifo_file,
     char *fwdata_file,
-    char *fw_msg_search,
     char *snort_sid_str,
     char *kmsgsd_pid_file
 );
+
+static void parse_fw_search_file(char *fw_search_file);
+static int match_fw_msg(char *fw_mgs);
 
 static void sighup_handler(int sig);
 
@@ -60,12 +68,12 @@ int main(int argc, char *argv[]) {
     char psadfifo_file[MAX_PATH_LEN];
     char fwdata_file[MAX_PATH_LEN];
     char config_file[MAX_PATH_LEN];
-    char fw_msg_search[MAX_PATH_LEN];
+    char fw_search_file[MAX_PATH_LEN];
     char snort_sid_str[MAX_PATH_LEN];
     char kmsgsd_pid_file[MAX_PATH_LEN];
-    int fifo_fd, fwdata_fd;  /* file descriptors */
     char buf[MAX_LINE_BUF];
-    int numbytes;
+    int fifo_fd, fwdata_fd;  /* file descriptors */
+    int cmdlopt, numbytes;
 #ifdef DEBUG
     int fwlinectr = 0;
 #endif
@@ -76,27 +84,35 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "STDOUT _and_ to fwdata.\n\n");
 #endif
 
-    /* handle command line arguments */
-    if (argc == 1) {
-        /* nothing but the program name was
-         * specified on the command line */
-        strlcpy(config_file, KMSGSD_CONF, MAX_PATH_LEN);
-    } else if (argc == 2) {
-        /* the path to the config file was
-         * supplied on the command line */
-        strlcpy(config_file, argv[1], MAX_PATH_LEN);
-    } else {
-        printf(" .. You can only specify the path to a single config file:  ");
-        printf("Usage:  kmsgsd <configfile>\n");
-        exit(EXIT_FAILURE);
+    /* establish default paths to config and fw_search file (may be
+     * overriden with command line args below */
+    strlcpy(config_file, KMSGSD_CONF, MAX_PATH_LEN);
+    strlcpy(fw_search_file, FW_SEARCH_FILE, MAX_PATH_LEN);
+
+    while((cmdlopt = getopt(argc, argv, "c:k:")) != -1) {
+        switch(cmdlopt) {
+            case 'c':
+                strlcpy(config_file, optarg, MAX_PATH_LEN);
+                break;
+            case 'k':
+                strlcpy(fw_search_file, optarg, MAX_PATH_LEN);
+                break;
+            default:
+                printf(" .. Usage:  kmsgsd [-c <config file>] ");
+                printf("[-k <fw_search file>]\n");
+                exit(EXIT_FAILURE);
+        }
     }
 
 #ifdef DEBUG
     fprintf(stderr, " .. parsing config_file: %s\n", config_file);
 #endif
-    /* parse the config file */
+    /* parse config file (kmsgsd.conf) */
     parse_config(config_file, psadfifo_file,
-        fwdata_file, fw_msg_search, snort_sid_str, kmsgsd_pid_file);
+        fwdata_file, snort_sid_str, kmsgsd_pid_file);
+
+    /* parse fw_search.conf file */
+    parse_fw_search_file(fw_search_file);
 
     /* make sure there isn't another kmsgsd already running */
     check_unique_pid(kmsgsd_pid_file, "kmsgsd");
@@ -153,7 +169,10 @@ int main(int argc, char *argv[]) {
 
             /* re-parse the config file after receiving HUP signal */
             parse_config(config_file, psadfifo_file,
-                fwdata_file, fw_msg_search, snort_sid_str, kmsgsd_pid_file);
+                fwdata_file, snort_sid_str, kmsgsd_pid_file);
+
+            /* re-parse the fw_search.conf file */
+            parse_fw_search_file(fw_search_file);
 
             /* close file descriptors and re-open them after
              * re-reading config file */
@@ -181,7 +200,7 @@ int main(int argc, char *argv[]) {
          * fwdata file */
         if ((strstr(buf, "OUT") != NULL
                 && strstr(buf, "IN") != NULL)
-                && (strstr(buf, fw_msg_search) != NULL
+                && (match_fw_msg(buf)
                 || strstr(buf, snort_sid_str) != NULL)) {
 
             if (write(fwdata_fd, buf, numbytes) < 0)
@@ -208,11 +227,20 @@ int main(int argc, char *argv[]) {
 }
 /******************** end main ********************/
 
+static int match_fw_msg(char *fw_msg)
+{
+    int i;
+    for (i=0; i < num_fw_search_strings; i++)
+        if (strstr(fw_msg, fw_msg_search[i]) != NULL)
+            return 1;
+    return 0;
+}
+
 static void parse_config(char *config_file, char *psadfifo_file,
-    char *fwdata_file, char *fw_msg_search, char *snort_sid_str,
+    char *fwdata_file, char *snort_sid_str,
     char *kmsgsd_pid_file)
 {
-    FILE *config_ptr;         /* FILE pointer to the config file */
+    FILE *config_ptr;   /* FILE pointer to the config file */
     int linectr = 0;
     char config_buf[MAX_LINE_BUF];
     char *index;
@@ -239,7 +267,6 @@ static void parse_config(char *config_file, char *psadfifo_file,
 
             find_char_var("PSAD_FIFO ", psadfifo_file, index);
             find_char_var("FW_DATA_FILE ", fwdata_file, index);
-            find_char_var("FW_MSG_SEARCH ", fw_msg_search, index);
             find_char_var("SNORT_SID_STR ", snort_sid_str, index);
             find_char_var("KMSGSD_PID_FILE ", kmsgsd_pid_file, index);
         }
@@ -248,10 +275,54 @@ static void parse_config(char *config_file, char *psadfifo_file,
 #ifdef DEBUG
     fprintf(stderr, " .. PSAD_FIFO: %s\n", psadfifo_file);
     fprintf(stderr, " .. FW_DATA_FILE: %s\n", fwdata_file);
-    fprintf(stderr, " .. FW_MSG_SEARCH: %s\n", fw_msg_search);
     fprintf(stderr, " .. SNORT_SID_STR: %s\n", snort_sid_str);
     fprintf(stderr, " .. KMSGSD_PID_FILE: %s\n", kmsgsd_pid_file);
 #endif
+    return;
+}
+
+static void parse_fw_search_file(char *fw_search_file)
+{
+    FILE *fw_search_ptr;
+    char fw_search_buf[MAX_LINE_BUF], tmp_fw_search_buf[MAX_GEN_LEN], *index;
+    int linectr = 0, i;
+
+    for (i=0; i < num_fw_search_strings; i++)
+        free(fw_msg_search[i]);
+
+    num_fw_search_strings = 0;
+    fw_msg_search[num_fw_search_strings] = NULL;
+
+    if ((fw_search_ptr = fopen(fw_search_file, "r")) == NULL) {
+        fprintf(stderr, " ** Could not open %s for reading.\n",
+            fw_search_file);
+        exit(EXIT_FAILURE);
+    }
+
+    /* increment through each line of the config file */
+    while ((fgets(fw_search_buf, MAX_LINE_BUF, fw_search_ptr)) != NULL) {
+        linectr++;
+        /* set the index pointer to the beginning of the line */
+        index = fw_search_buf;
+
+        /* advance the index pointer through any whitespace
+         * at the beginning of the line */
+        while (*index == ' ' || *index == '\t') index++;
+
+        /* skip comments and blank lines, etc. */
+        if ((*index != '#') && (*index != '\n') &&
+                (*index != ';') && (index != NULL)) {
+
+            if (find_char_var("FW_MSG_SEARCH", tmp_fw_search_buf, index)) {
+                fw_msg_search[num_fw_search_strings]
+                    = (char *) malloc(strlen(tmp_fw_search_buf));
+                strlcpy(fw_msg_search[num_fw_search_strings],
+                    tmp_fw_search_buf, MAX_GEN_LEN);
+                num_fw_search_strings++;
+            }
+        }
+    }
+    fclose(fw_search_ptr);
     return;
 }
 

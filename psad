@@ -268,10 +268,8 @@ if ($restart) {
 
 ### make sure the permissions on these files is 0600
 &check_permissions(
-    $Config{'PSAD_LOGFILE'},
     $Config{'FW_DATA'},
     $Config{'ERROR_LOG'},
-    $Config{'EMAIL_ALERTFILE'}
 );
 
 ### get the ip addresses that are local to this machine
@@ -444,23 +442,23 @@ sub check_scan() {
     unless ($netstat_lookup) {
         $local_listening_ports_href = &get_listening_ports();
     }
-    READPKT: for my $l (@$process_lines_aref) {
-        chomp $l;
+    READPKT: for my $line (@$process_lines_aref) {
+        chomp $line;
         if ($USE_IPTABLES) {
             ### Sometimes the log entry is messed up by iptables so
             ### we write it to the error log.
-            if ($l =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+).*TTL=(\d+).*PROTO=(\S+)\s+SPT=(\d+)\s+DPT=(\d+)/) {
+            if ($line =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+).*TTL=(\d+).*PROTO=(\S+)\s+SPT=(\d+)\s+DPT=(\d+)/) {
                 ($src, $dst, $len, $ttl, $proto, $srcport, $dstport)
                                             = ($1,$2,$3,$4,$5,$6,$7,$8);
                 if ($proto ne 'TCP' && $proto ne 'UDP') {
                     ### it was some weird non-tcp/udp packet
                     ### with source and destination ports
-                    push @bad_packets, $l;
+                    push @bad_packets, $line;
                     next READPKT;
                 }
                 if ($proto eq 'TCP') {
                     $tcp_ctr++;
-                    if ($l =~ /RES=\S+\s+(.*)\s+URGP=/) {
+                    if ($line =~ /RES=\S+\s+(.*)\s+URGP=/) {
                         $flags = $1;
                     } else {
                         $flags = 'NULL';
@@ -475,26 +473,26 @@ sub check_scan() {
                              $flags =~ /RST/ ||
                              $flags =~ /NULL/) &&
                             ($flags !~ /WINDOW/)) {
-                        push @bad_packets, $l;
+                        push @bad_packets, $line;
                         next READPKT;
                     }
-                } else {  
+                } else {
                     ### it is UDP, but there are no more fields we need to
                     ### define since we already have the ports, etc.
                     $udp_ctr++;
                 }
-            } elsif ($l =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+).*TTL=(\d+).*PROTO=ICMP\s+TYPE=(\d+)\s+CODE=(\d+)\s+ID=(\d+)\s+SEQ=(\d+)/) {
+            } elsif ($line =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+).*TTL=(\d+).*PROTO=ICMP\s+TYPE=(\d+)\s+CODE=(\d+)\s+ID=(\d+)\s+SEQ=(\d+)/) {
                 ($src, $dst, $len, $ttl, $type, $code, $id, $seq)
                                         = ($1,$2,$3,$4,$5,$6,$7,$8);
                 $proto = 'ICMP';
                 $icmp_ctr++;
             } else {
-                push @bad_packets, $l;
+                push @bad_packets, $line;
                 next READPKT;
             }
         } elsif ($USE_IPCHAINS) {
             ### could implement source port checking here
-            if ($l =~ /PROTO\=(\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\:(\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\:(\d+)/) {
+            if ($line =~ /PROTO\=(\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\:(\d+)\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\:(\d+)/) {
                 ($proto, $src, $srcport, $dst, $dstport)
                                             = ($1,$2,$3,$4,$5);
                 ### should implement protocol mapping
@@ -508,7 +506,7 @@ sub check_scan() {
                 }
                 $flags = 'NONE';
             } else {
-                push @bad_packets, $l;
+                push @bad_packets, $line;
                 next READPKT;
             }
         }
@@ -1121,8 +1119,6 @@ sub scan_logr() {
     my ($tcp_newrange, $udp_newrange);
     my $dnsstring = '';
     my $whois_info_aref;
-    $Config{'PSAD_LOGFILE'} = *STDOUT if ($output || $DEBUG);
-    my @print_array = ($Config{'PSAD_LOGFILE'}, $Config{'EMAIL_ALERTFILE'});
     for my $src (keys %Scan) {
         print STDOUT "scan_logr(): source ip: $src\n" if $DEBUG;
         DST: for my $dst (keys %{$Scan{$src}}) {
@@ -1143,6 +1139,19 @@ sub scan_logr() {
             my $current_danger_level
                     = $Scan{$src}{$dst}{'CURR_DL'};
             if ($current_danger_level >= 1 && $Scan{$src}{$dst}{'LOGR'} == 1) {
+                ### make $src directory here in /var/log/psad if it
+                ### already exist
+                mkdir "$Config{'PSAD_DIR'}/${src}" unless
+                            -d "$Config{'PSAD_DIR'}/${src}";
+                my $scanlog     = "$Config{'PSAD_DIR'}/${src}/scanlog";
+                my $email_alert = "$Config{'PSAD_DIR'}/${src}/email_alert";
+                my $whois_file  = "$Config{'PSAD_DIR'}/${src}/whois";
+
+                ### log everything to stdout if $output of $DEBUG is set
+                $scanlog = *STDOUT if ($output || $DEBUG);
+                my @print_array = ($scanlog, $email_alert);
+
+                ### scope these vars
                 my $abs_start_range;
                 my $abs_end_range;
                 my $tcp_new_start_range;
@@ -1196,7 +1205,7 @@ sub scan_logr() {
                     }
                 }
                 unless ($whoislookups) {
-                    $whois_info_aref = &get_whois_data($src);
+                    $whois_info_aref = &get_whois_data($src, $whois_file);
                 }
                 if ($tcp || $udp) {
                     $abs_start_range = $Scan{$src}{$dst}{'S_PORT'};
@@ -1255,10 +1264,10 @@ sub scan_logr() {
                     delete $Scan{$src}{$dst}{'ICMP'}{'CURR_INT'};
                 }
                 print STDOUT "scan_logr():  generating email......\n" if $DEBUG;
-                unlink $Config{'EMAIL_ALERTFILE'};  ### remove $EMAIL_ALERTFILE so we don't send old alert info
+                unlink $email_alert;  ### remove old $email_alert so we don't send old alert info
                 &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=-=-=-=-=-=-=\n", \@print_array);
                 &Psad::logr("psad: portscan detected against $HOSTNAME ($dst).\n", \@print_array);
-                &Psad::logr("\n", [$Config{'PSAD_LOGFILE'}, $Config{'EMAIL_ALERTFILE'}]);
+                &Psad::logr("\n", \@print_array);
                 &Psad::logr("Source:                      $src\n", \@print_array);
                 &Psad::logr("Destination:                 $dst\n", \@print_array);
                 &Psad::logr("Newly scanned TCP ports:     [$tcp_newrange]   (since: $tcp_new_start_time)\n", \@print_array) if $tcp;
@@ -1325,8 +1334,7 @@ sub scan_logr() {
                 closelog();
                 unless ($whoislookups) {
                     &Psad::logr("\n\n", \@print_array);
-                    &Psad::logr("---- Whois Information: ----\n",
-                            [$Config{'PSAD_LOGFILE'}, $Config{'EMAIL_ALERTFILE'}]);
+                    &Psad::logr("---- Whois Information: ----\n", \@print_array);
                     for my $w (@$whois_info_aref) {
                         &Psad::logr($w, \@print_array);
                     }
@@ -1335,7 +1343,9 @@ sub scan_logr() {
                 &Psad::logr("=-=-=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=-=-=-=-=-=-=\n", \@print_array);
                 if ($Scan{$src}{$dst}{'ALERTED'} == 0
                                         && $current_danger_level >= $Config{'EMAIL_ALERT_DANGER_LEVEL'}) {
-                    &send_email_alert($src, $dst);
+                    my $subject = "psad WARNING: $HOSTNAME ($dst) has been scanned!";
+                    &Psad::sendmail($subject, $email_alert, $Emails_aref, $Cmds{'mail'});
+                    $Scan{$src}{$dst}{'ALERTED'} = 1;
                 }
                 $Scan{$src}{$dst}{'LOGR'} = 0;
                 $Scan{$src}{$dst}{'EMAIL_LIMIT'}++;
@@ -1522,15 +1532,6 @@ sub get_input_chains() {
     return \@chains;
 }
 
-sub send_email_alert() {
-    my ($src, $dst) = @_;
-    my $subject = "psad WARNING: $HOSTNAME ($dst) has been scanned!";
-    &Psad::sendmail($subject, $Config{'EMAIL_ALERTFILE'},
-                                $Emails_aref, $Cmds{'mail'});
-    $Scan{$src}{$dst}{'ALERTED'} = 1;
-    return;
-}
-
 sub print_scan() {  ### this should primarily be used for debugging
     my $scanfile = $Config{'PRINT_SCAN_HASH'} . ".$$";
     open PSCAN, "> $scanfile";
@@ -1573,9 +1574,8 @@ sub get_listening_ports() {
 }
 
 sub get_whois_data() {
-    my $ip = shift;
+    my ($ip, $whois_datafile) = @_;
     my @whois_data;
-    my $whois_datafile = $Config{'WHOIS_DATAFILE'} . "_${ip}";
     if (defined $whois_cache{$ip}
         && $whois_cache{$ip} < $Config{'WHOIS_THRESHOLD'}
         && -e $whois_datafile) {
@@ -1809,10 +1809,6 @@ sub psad_setup() {
         open F, "> $Config{'FW_DATA'}";
         close F;
     }
-    unless (-e $Config{'PSAD_LOGFILE'}) {
-        open L, "> $Config{'PSAD_LOGFILE'}";
-        close L;
-    }
     unless (-e $Config{'ERROR_LOG'}) {
         open E, "> $Config{'ERROR_LOG'}";
         close E;
@@ -1840,13 +1836,12 @@ sub psad_setup() {
 
 sub check_config() {
     my @required_vars = qw(
-        EMAIL_ADDRESSES  PSAD_CHECK_INTERVAL  PSAD_LOGFILE
-        FW_DATA ERROR_LOG  EMAIL_ALERTFILE   FW_MSG_SEARCH
-        ENABLE_AUTO_IDS  ENABLE_PERSISTENCE   SCAN_TIMEOUT
-        DANGER_LEVEL1     DANGER_LEVEL2      DANGER_LEVEL3
-        DANGER_LEVEL4 DANGER_LEVEL5 PORT_RANGE_SCAN_THRESHOLD
-        ALERT_ALL    PSAD_EMAIL_LIMIT   IPTABLES_BLOCK_METHOD
-        IPCHAINS_BLOCK_METHOD TCPWRAPPERS_BLOCK_METHOD
+        EMAIL_ADDRESSES  PSAD_CHECK_INTERVAL
+        FW_DATA ERROR_LOG  FW_MSG_SEARCH ENABLE_AUTO_IDS
+        ENABLE_PERSISTENCE   SCAN_TIMEOUT DANGER_LEVEL1
+        DANGER_LEVEL2 DANGER_LEVEL3 DANGER_LEVEL4 DANGER_LEVEL5
+        PORT_RANGE_SCAN_THRESHOLD   ALERT_ALL  PSAD_EMAIL_LIMIT
+        IPTABLES_BLOCK_METHOD IPCHAINS_BLOCK_METHOD TCPWRAPPERS_BLOCK_METHOD
         EMAIL_ALERT_DANGER_LEVEL PSAD_FIFO WHOIS_THRESHOLD
         WHOIS_TIMEOUT   PACKET_COUNTER_FILE
     );

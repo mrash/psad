@@ -2329,8 +2329,8 @@ sub scan_logr_signatures() {
                     print $email_fh qq(       content:   "$content"\n);
                     print LS qq(       content:   "$content"\n);
                 }
-                print $email_fh "       chain:   $chain\n";
-                print LS "       chain:   $chain\n";
+                print $email_fh "       chain:     $chain\n";
+                print LS "       chain:     $chain\n";
                 print $email_fh "       packets:   $pkts\n\n";
                 print LS "       packets:   $pkts\n\n";
             }
@@ -3637,33 +3637,28 @@ sub setup() {
 sub fw_check() {
     unlink $config{'FW_CHECK_FILE'} if -e $config{'FW_CHECK_FILE'};
 
-    ### we don't always have more than one interface or forwarding
-    ### turned on, so we only check the FORWARD iptables chain if we
-    ### do.
+    ### only send a firewall config alert if we really need to.
+    my $send_alert = 0;
+
     my $forward_chain_rv = 1;
     my $input_chain_rv = &ipt_chk_chain('INPUT');
 
-    if (&check_forwarding()) {
-        $forward_chain_rv = &ipt_chk_chain('FORWARD');
-    }
-
-    my $send_alert = 0;
-    if ($input_chain_rv && $forward_chain_rv) {
-        &Psad::logr(" .. The iptables ruleset on $config{'HOSTNAME'} " .
-            "will log and block unwanted packets in both the INPUT and " .
-            "FORWARD chains.  Firewall config success!\n",
-            {$config{'FW_CHECK_FILE'} => 1});
-        if ($fw_analyze) {
-            print scalar localtime(), " .. Firewall config looks good.\n";
-            print scalar localtime(), " .. Completed check of firewall ruleset.\n";
-        }
-    } elsif ($input_chain_rv and not $forward_chain_rv) {
-        &print_fw_help('FORWARD');
-        $send_alert = 1;
-    } elsif ($forward_chain_rv and not $input_chain_rv) {
+    unless ($input_chain_rv) {
         &print_fw_help('INPUT');
         $send_alert = 1;
     }
+
+    ### we don't always have more than one interface or forwarding
+    ### turned on, so we only check the FORWARD iptables chain if we
+    ### do and we have multiple interfaces on the box.
+    if (&check_forwarding()) {
+        $forward_chain_rv = &ipt_chk_chain('FORWARD');
+        unless ($forward_chain_rv) {
+            &print_fw_help('FORWARD');
+            $send_alert = 1;
+        }
+    }
+
     if ($send_alert) {
         &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
         &Psad::logr(' .. NOTE: IPTables::Parse does not yet parse user ' .
@@ -3681,6 +3676,15 @@ sub fw_check() {
                 "$config{'FW_CHECK_FILE'}\n";
             print scalar localtime(), "    emailed to ",
                 "$config{'EMAIL_ADDRESSES'}\n";
+        }
+    } else {
+        &Psad::logr(" .. The iptables ruleset on $config{'HOSTNAME'} " .
+            "will log and block unwanted packets in both the INPUT and " .
+            "FORWARD chains.  Firewall config success!\n",
+            {$config{'FW_CHECK_FILE'} => 1});
+        if ($fw_analyze) {
+            print scalar localtime(), " .. Firewall config looks good.\n";
+            print scalar localtime(), " .. Completed check of firewall ruleset.\n";
         }
     }
     if ($fw_analyze) {
@@ -3737,7 +3741,12 @@ sub ipt_chk_chain() {
     ### for now we are only looking at the filter table, so if
     ### the iptables ruleset includes the log and drop rules in
     ### a user defined chain then psad will not see this.
-    my $ld_hr = $ipt->default_drop('filter', $chain);
+    my $ld_hr;
+    if ($fw_file) {
+        $ld_hr = $ipt->default_drop('filter', $chain, $fw_file);
+    } else {
+        $ld_hr = $ipt->default_drop('filter', $chain);
+    }
 
     print Dumper $ld_hr if $debug;
 
@@ -3758,7 +3767,7 @@ sub ipt_chk_chain() {
             my $str2;
             if (! defined $ld_hr->{$proto}->{'LOG'}) {
                 if ($proto eq 'all') {
-                    $str1 = "for all protocols";
+                    $str1 = 'for all protocols';
                     $str2 = 'scans';
                 } else {
                     $str1 = "for the $proto protocol";
@@ -3834,7 +3843,7 @@ sub print_fw_help() {
         {$config{'FW_CHECK_FILE'} => 1});
     &Psad::logr("\n", {$config{'FW_CHECK_FILE'} => 1});
     &Psad::logr("              iptables -A $chain -j LOG --log-prefix " .
-        qq(" $config{'FW_MSG_SEARCH'}"\n), {$config{'FW_CHECK_FILE'} => 1});
+        qq("$config{'FW_MSG_SEARCH'} "\n), {$config{'FW_CHECK_FILE'} => 1});
     &Psad::logr("              iptables -A $chain -j DROP\n\n",
         {$config{'FW_CHECK_FILE'} => 1});
     &Psad::logr(" ** Psad will not detect in the iptables $chain chain " .

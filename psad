@@ -1133,17 +1133,18 @@ sub scan_logr() {
             my $tcp  = 0;
             my $udp  = 0;
             my $icmp = 0;
-            my $current_danger_level
-                    = $Scan{$src}{$dst}{'CURR_DL'};
+            my $current_danger_level =
+                $Scan{$src}{$dst}{'CURR_DL'};
             if ($current_danger_level >= 1 && $Scan{$src}{$dst}{'LOGR'} == 1) {
                 ### make $src directory here in /var/log/psad if it
-                ### already exist
+                ### already exists
                 mkdir "$Config{'PSAD_DIR'}/${src}" unless
                     -d "$Config{'PSAD_DIR'}/${src}";
                 my $scanlog     = "$Config{'PSAD_DIR'}/${src}/scanlog";
                 my $email_alert = "$Config{'PSAD_DIR'}/${src}/email_alert";
                 my $whois_file  = "$Config{'PSAD_DIR'}/${src}/whois";
                 my $dl_file     = "$Config{'PSAD_DIR'}/${src}/danger_level";
+                my $sigs_file   = "$Config{'PSAD_DIR'}/${src}/signatures";
 
                 ### unlink $email_alert here since we print to this
                 ### file multiple times
@@ -1333,16 +1334,25 @@ sub scan_logr() {
                             ### won't show up in the next alert
                             delete $Scan{$src}{$dst}{$proto}{'CURR_SIG'};
                         }
-                        if (defined $Scan{$src}{$dst}{$proto}{'SIGMATCH'} &&
-                                $Config{'SHOW_ALL_SIGNATURES'} eq 'Y') {
-                            &Psad::logr("\n", \%print_hsh);
-                            &Psad::logr("---- ALL $proto alert signatures " .
-                                "found since [$start_time]\n", \%print_hsh);
+                        if (defined $Scan{$src}{$dst}{$proto}{'SIGMATCH'}) {
+                            if ($Config{'SHOW_ALL_SIGNATURES'} eq 'Y') {
+                                &Psad::logr("\n", \%print_hsh);
+                                &Psad::logr("---- ALL $proto alert signatures " .
+                                    "found since [$start_time]\n", \%print_hsh);
+                            }
+                            ### truncate the sigs file
+                            &Psad::logr('', {$sigs_file => 0});
                             for my $sigmatch (keys %{$Scan{$src}{$dst}{$proto}{'SIGMATCH'}}) {
+                                next if $sigmatch eq 'SIGDL';
                                 my $sig_num_packets =
                                     $Scan{$src}{$dst}{$proto}{'SIGMATCH'}->{$sigmatch};
+                                if ($Config{'SHOW_ALL_SIGNATURES'} eq 'Y') {
+                                    &Psad::logr("$sigmatch  Packets=$sig_num_packets\n",
+                                        \%print_hsh);
+                                }
+                                ### print all of the signatures to $sigs_file
                                 &Psad::logr("$sigmatch  Packets=$sig_num_packets\n",
-                                    \%print_hsh);
+                                    {$sigs_file => 1});
                             }
                         }
                     }

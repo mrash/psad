@@ -234,7 +234,9 @@ static void check_process(
         /* restart the process */
         exec_binary(binary_path, cmdline_file);
 
-        /* increment the number of times we have tried to restart the binary */
+        /* increment the number of times we have tried to
+         * restart the binary (this will also call give_up()
+         * if necessary).*/
         incr_syscall_ctr(pid_name, max_retries);
         return;
     }
@@ -245,6 +247,8 @@ static void check_process(
 #ifdef DEBUG
     printf(" .. Could not read the pid_file: %s\n", pid_file);
 #endif
+        /* see if we need to give up */
+        incr_syscall_ctr(pid_name, max_retries);
         fclose(pidfile_ptr);
         return;
     }
@@ -283,7 +287,9 @@ static void check_process(
 #ifdef DEBUG
         printf(" .. %s is running.\n", pid_name);
 #endif
-        reset_syscall_ctr(pid_name); /* reset the syscall counter */
+        /* reset the syscall counter since the process is successfully
+         * running. */
+        reset_syscall_ctr(pid_name);
     }
     return;
 }

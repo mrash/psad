@@ -16,7 +16,7 @@
 #
 # Author: Michael Rash (mbr@cipherdyne.org)
 #
-# Credits: (see the CREDITS file)
+# Credits: (see the CREDITS file bundled with the psad sources.)
 #
 # Version: 1.3.1
 #
@@ -34,59 +34,7 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
 #    USA
 #
-# TODO:
-#   - Replace full ascii signature listings in <ip>_signatures with sid
-#     numbers and packet counts.
-#   - Rework IGNORE_CONNTRACK_BUG_PKTS strategy to maximze signature
-#     detection.
-#   - More syslog messages from psad, psadwatchd, and kmsgsd.
-#   - Put a "psad signature strategy" link in all alert emails.
-#   - Module tests for Psad.pm
-#   - Extract default behavior into psad.conf.
-#   - Remove dependency on DROP tag in iptables messages.
-#   - Custom logging line upon auto-blocking an ip.
-#   - Add difference notification (via syslog) for changed variables
-#     after receiving a HUP signal.
-#   - Signature based auto block rules.
-#   - Include the ability to specify a network in CIDR notation with
-#     --Status output.
-#   - Drop root privileges if not running in auto-blocking mode.
-#   - Extend install.pl to provide an option to dowload the latest perl
-#     modules (Date:Calc, Unix::Syslog, etc.) from CPAN.
-#   - Extend passive OS fingerprinting to make use of more types of
-#     packets than just tcp/syn packets.
-#   - Extend passive OS fingerprinting to include signatures from
-#     Xprobe from http://www.sys-security.com.
-#   - Add a density calculation for a range of scanned ports, and also
-#     add a "verbose" mode that will display which of the scanned ports
-#     actually resolve to something in the IANA spec.
-#   - Packet grapher mode with annotated scan alerts.
-#   - Mysql database support?
-#   - Make use of other logging options available in iptables to detect
-#     more tcp signatures.  (E.g. --log-tcp-options, --log-ip-options,
-#     --log-tcp-sequence, etc.) for better signature recognition.
-#   - Include a verbose message in the body of certain emails that as
-#     of psad-1.0.0-pre2 only contain a subject line.
-#   - Deal with the possibility that psad could eat lots of memory over
-#     time if $ENABLE_PERSISTENCE="Y". This should involve periodically
-#     deleting entries in %scan (or maybe the entire hash), but this
-#     should be done in a way that allows some scan data to persist.
-#   - Ipfilter support on *BSD platforms.
-#   - Take into account syslog message summarization; i.e. "last message
-#     repeated n times".
-#   - Possibly add a daemon to take into account ACK PSH, ACK FIN, RST etc.
-#     packets that the client may generate after the ip_conntrack module
-#     is reloaded.  Without anticipating such packets psad will interpret
-#     them as a belonging to a port scan.  NOTE: This problem is mostly
-#     corrected by the conntrack patch to the kernel.  Also, the
-#     IGNORE_CONNTRACK_BUG_PKTS variable was added to mitigate this
-#     problem.
-#   - Improve check_firewall_rules() to check for a state rule (iptables)
-#     since having such a rule greatly improves the quality of the data
-#     stream provided to psad by kmsgsd since more packet types will be
-#     denied without requiring overly complicated firewall rules to detect
-#     odd tcp flag combinations.
-#   - perldoc
+# TODO: (see the TODO file bundled with the psad sources.)
 #
 # Default Command Line Arguments:  As of the 1.0.0-pre3 release, psad by
 #   by default will have the --signatures and --auto-ips options set even
@@ -870,7 +818,7 @@ sub check_scan() {
         if (not $sid) {
             ### note that this is not _too_ strict since people
             ### have different ways of writing --log-prefix strings
-            next PKT unless (index($pkt, $config{'FW_MSG_SEARCH'}) > -1);
+            next PKT unless $pkt =~ /$config{'FW_MSG_SEARCH'}/;
         }
 
         ### May 18 22:21:26 orthanc kernel: DROP IN=eth2 OUT=
@@ -1686,14 +1634,14 @@ sub import_configs() {
 
 sub validate_config() {
     die ' ** PORT_RANGE_SCAN_THRESHOLD must be between 1 and 65535 '
-        unless (&is_digit($config{'PORT_RANGE_SCAN_THRESHOLD'})
+        unless (($config{'PORT_RANGE_SCAN_THRESHOLD'} =~ m|^\d+$|)
             and 0 < $config{'PORT_RANGE_SCAN_THRESHOLD'}
             and $config{'PORT_RANGE_SCAN_THRESHOLD'} < 65535);
 
     die qq( ** Invalid EMAIL_ADDRESSES value: "$config{'EMAIL_ADDRESSES'}")
         unless $config{'EMAIL_ADDRESSES'} =~ /\S+\@\S+/;
     die ' ** DSHIELD_ALERT_INTERVAL must be between 1 and 24 '
-        unless (&is_digit($config{'DSHIELD_ALERT_INTERVAL'})
+        unless (($config{'DSHIELD_ALERT_INTERVAL'} =~ m|^\d+$|)
             and 0 < $config{'DSHIELD_ALERT_INTERVAL'}
             and $config{'DSHIELD_ALERT_INTERVAL'} < 25);
     if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
@@ -1775,12 +1723,6 @@ sub validate_home_net() {
     return;
 }
 
-sub is_digit() {
-    my $str = shift;
-    return 1 if $str =~ m|^\d+$|;
-    return 0;
-}
-
 sub import_snort_rules() {
     opendir D, $config{'SNORT_RULES_DIR'}
         or die " ** Could not open $config{'SNORT_RULES_DIR'}";
@@ -1801,10 +1743,11 @@ sub import_snort_rules() {
         my @lines = <R>;
         close R;
         RULE: for my $line (@lines) {
-            next RULE unless $line =~ /^alert/;
+            next RULE unless $line =~ /^\s*alert/;
             chomp $line;
             my $msg;
-            my $sid;
+            my $sid;     ### snort rule id
+#            my $psad_id; ### psad signature id   XXX not implemented yet.
             my $classtype;
             my $content;
 
@@ -1813,7 +1756,14 @@ sub import_snort_rules() {
             next RULE if ($line =~ /content-list:/);
 
             $msg = $1 if $line =~ /msg:\s*\"(.*?)\"\s*;/;
-            $sid = $1 if $line =~ /[\s;]sid:\s*(\d+)\s*;/;
+            if ($line =~ /[\s;]sid:\s*(\d+)\s*;/) {
+                $sid = $1;
+            }
+            ### Future?  Add psad-specific signatures?  Then what happens when
+            ### the "real" snort sig comes out for the same thing?
+#            } elsif ($line =~ /[\s;]sid:\s*psad_(\d+)\s*;/) {
+#                $psad_id = $1;
+#            }
             $classtype = $1 if $line =~ /[\s;]classtype:\s*(.*?)\s*;/;
             $content = $1 if $line =~ /[\s;]uricontent:\s*\"(.*?)\"\s*;/;
             $content = $1 if $line =~ /[\s;]content:\s*\"(.*?)\"\s*;/;
@@ -4780,6 +4730,13 @@ sub dump_conf() {
             printf STDOUT "%-30s %s\n", " .. $var", $config{$var};
         }
     }
+    for my $var (sort keys %cmds) {
+        if ($debug) {
+            printf STDERR "%-30s %s\n", " .. $var", $cmds{$var};
+        } else {
+            printf STDOUT "%-30s %s\n", " .. $var", $cmds{$var};
+        }
+    }
     return 0;
 }
 
@@ -4802,7 +4759,7 @@ sub required_vars() {
         DSHIELD_USER_EMAIL DISK_CHECK_INTERVAL DISK_MAX_PERCENTAGE
         DISK_MAX_RM_RETRIES ETC_HOSTS_DENY ETC_SYSLOG_CONF
         ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL ANALYSIS_DIR
-        IMPORT_OLD_SCANS PSAD_ICMP_TYPES_FILE
+        IMPORT_OLD_SCANS PSAD_ICMP_TYPES_FILE SHOW_ALL_SIGNATURES
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

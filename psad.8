@@ -260,12 +260,17 @@ seconds (1 hour).
 .TP
 
 .BR DANGER_LEVEL{1,2,3,4,5}
-The DANGER_LEVEL{n} variables define the number of packets that must be
-dropped by the firewall before psad will assign the respective danger level
-to the scan.  There are five possible danger levels with one being the
-lowest and five the highest.  Note there are several factors that can
-influence how danger levels are calculated: whether or not a scan matches a
-signature listed in
+psad uses a scoring system to keep track of the severity a scans reaches
+(represented as a "danger level") over time.  The DANGER_LEVEL{n} variables
+define the number of packets that must be dropped by the firewall before psad
+will assign the respective danger level to the scan.  A scan may also be
+assigned a danger level if the scan matches a particular signature contained
+in the
+.B psad_signatures
+file.  There are five
+possible danger levels with one being the lowest and five the highest.
+Note there are several factors that can influence how danger levels are
+calculated: whether or not a scan matches a signature listed in
 .B psad_signatures,
 the value of PORT_RANGE_SCAN_THRESHOLD (see below), whether or not a scan comes
 from an ip that is listed in the

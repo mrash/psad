@@ -2795,20 +2795,20 @@ sub scan_logr() {
                 $tcp_absrange, $udp_absrange, $pkt_ctr_file);
 
             ### get reverse dns info
+            $src_subj = $src;
+            $dst_subj = $dst;
             unless ($no_rdns) {
                 $src_dns_str = &get_dns_info($src);
                 if ($src_dns_str) {
                     $src_subj = $src_dns_str;
                 } else {
                     $src_dns_str = '[No reverse dns info available]';
-                    $src_subj    = $src;
                 }
                 $dst_dns_str = &get_dns_info($dst);
-                if ($src_dns_str) {
+                if ($dst_dns_str) {
                     $dst_subj = $dst_dns_str;
                 } else {
                     $dst_dns_str = '[No reverse dns info available]';
-                    $dst_subj    = $dst;
                 }
             }
 
@@ -2933,7 +2933,9 @@ sub scan_logr() {
                     $posf{$src}{'guess'};
             }
             printf $fh "\n%${log_len}s%s\n", 'Destination: ', $dst;
-            printf $fh "%${log_len}s%s\n\n", 'DNS: ', $dst_dns_str;
+            printf $fh "%${log_len}s%s\n", 'DNS: ', $dst_dns_str
+                unless $no_rdns;
+            print $fh "\n";
 
             if (defined $curr_scan_hr->{$src}->{$dst}->{'syslog_host'}) {
                 my $syslog_hosts = '';
@@ -2998,9 +3000,8 @@ sub scan_logr() {
                 for my $line (@$whois_info_aref) {
                     print $fh $line;
                 }
-                print $fh "\n";
             }
-            print $fh "=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=",
+            print $fh "\n=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=",
                 "-=-=-=-=\n";
             close $fh unless $no_daemon;
             if ($curr_dl >= $config{'EMAIL_ALERT_DANGER_LEVEL'}
@@ -3908,7 +3909,7 @@ sub stop_psad() {
                 }
             } else {
                 print "[*] psad: $pidname is not running on ",
-                    "$config{'HOSTNAME'}.\n";
+                    "$config{'HOSTNAME'}\n";
                 $rv = 1;
             }
         } else {

@@ -244,10 +244,11 @@ sub install() {
             $restarted_syslog = 1;
         }
     }
-#    &append_metalog();   ### metalog support some day
-
-    ### restart any running syslog daemon (killall should really work here)
-#    &hup_syslog();
+    if (-e '/etc/metalog/metalog.conf') {
+        &config_metalog();
+        &logr(" ** Metalog support is shaky in psad.  " .
+            "Use at your own risk.\n");
+    }
 
     unless ($restarted_syslog) {
         &logr(" ** Could not restart any syslog daemons.\n");
@@ -857,6 +858,54 @@ sub append_fifo_syslog_ng() {
         print SYSLOGNG "filter f_kerninfo { facility(kern) and level(info); };\n";
         print SYSLOGNG "log { source(src); filter(f_kerninfo); destination(psadpipe); };\n";
         close SYSLOGNG;
+    }
+    return;
+}
+
+sub config_metalog() {
+    unless (-e '/etc/metalog/metalog.conf.orig') {
+        copy '/etc/metalog/metalog.conf',
+            '/etc/metalog/metalog.conf.orig'
+    }
+    open RS, "< /etc/metalog/metalog.conf" or
+        die " ** Unable to open /etc/metalog/metalog.conf: $!\n";
+    my @lines = <RS>;
+    close RS;
+
+    my $found = 0;
+    for my $line (@lines) {
+        if ($line =~ m/psadpipe\.sh/) {
+            $found = 1;
+            last;
+        }
+    }
+    unless ($found) {
+        open METALOG, "> /etc/metalog/metalog.conf" or
+            die " ** Unable to open /etc/metalog/metalog.conf: $!";
+
+        print METALOG "\n";
+        print METALOG "\nPSAD :\n",
+            "  facility = \"kern\"\n";
+        print METALOG '  command  = ',
+            "\"/usr/sbin/psadpipe.sh\"\n";
+        close METALOG;
+        &Psad::psyslog('psad', '.. reconfiguring metalog to write ' .
+                "kern-facility messages to /usr/sbin/psadpipe.sh");
+
+        open PIPESCRIPT, '> /usr/sbin/psadpipe.sh' or
+            die " ** Unable to open /usr/sbin/psadpipe.sh: $!";
+        print PIPESCRIPT "#!/bin/sh\n\n";
+        print PIPESCRIPT "echo \"\$3\" >> $PSAD_FIFO\n";
+        close PIPESCRIPT;
+        chmod 0700, '/usr/sbin/psadpipe.sh';
+        &logr(' .. Generated /usr/sbin/psadpipe.sh ' .
+            "which writes to $PSAD_FIFO");
+
+        ### (Dennis Freise <cat@final-frontier.ath.cx>
+        ### Metalog seems to simply die on SIGHUP and SIGALRM, and I
+        ### found no signal or option to reload it's config... :-(
+        &logr(' ** All files written. You have to manually restart metalog! ',
+            'When done, start psad again.');
     }
     return;
 }

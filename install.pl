@@ -736,6 +736,9 @@ sub test_syslog_config() {
     my $test_port = 5000;
     $test_port++ while defined $used_ports{$test_port};
 
+    ### make sure the interface is actually up
+    `$Cmds{'ifconfig'} lo up`;
+
     ### make sure we can see the loopback interface with
     ### ifconfig
     my @if_out = `$Cmds{'ifconfig'} lo`;
@@ -751,6 +754,8 @@ sub test_syslog_config() {
     for my $line (@if_out) {
         if ($line =~ /inet\s+addr:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s/) {
             $lo_ip = $1;  ### this should always be 127.0.0.1
+            &logr(" ** loopback interface ip is not 127.0.0.1.  Continuing ".
+                "anyway.\n");
         }
     }
 
@@ -774,8 +779,7 @@ sub test_syslog_config() {
         ### with a packet to port 5000 (or higher).
         unless (((system "${USRSBIN_DIR}/kmsgsd")>>8) == 0) {
             &logr(" ** Could not start kmsgsd to test syslog.\n" .
-                "         Send email to Michael Rash " .
-                "(mbr\@cipherdyne.com)\n");
+                "    Send email to Michael Rash (mbr\@cipherdyne.com)\n");
             return;
         }
     }

@@ -43,6 +43,7 @@ short int email_ctr = 0;
 const char mail_redr[] = " < /dev/null > /dev/null 2>&1";
 const char hostname[] = HOSTNAME;
 char mail_addrs[MAX_GEN_LEN];
+char shCmd[MAX_GEN_LEN];
 char mailCmd[MAX_GEN_LEN];
 
 /* PROTOTYPES ***************************************************************/
@@ -51,6 +52,7 @@ static void parse_config(
     char *psad_dir,
     char *fwdata_file,
     char *archive_dir,
+    char *shCmd,
     char *mailCmd,
     char *mail_addrs,
     char *diskmond_pid_file,
@@ -115,6 +117,7 @@ int main(int argc, char *argv[]) {
         psad_dir,
         fwdata_file,
         archive_dir,
+        shCmd,
         mailCmd,
         mail_addrs,
         diskmond_pid_file,
@@ -161,6 +164,7 @@ int main(int argc, char *argv[]) {
                 psad_dir,
                 fwdata_file,
                 archive_dir,
+                shCmd,
                 mailCmd,
                 mail_addrs,
                 diskmond_pid_file,
@@ -183,6 +187,7 @@ static void parse_config(
     char *psad_dir,
     char *fwdata_file,
     char *archive_dir,
+    char *shCmd,
     char *mailCmd,
     char *mail_addrs,
     char *diskmond_pid_file,
@@ -220,6 +225,7 @@ static void parse_config(
             find_char_var("PSAD_DIR", psad_dir, index);
             find_char_var("FW_DATA", fwdata_file, index);
             find_char_var("SCAN_DATA_ARCHIVE_DIR", archive_dir, index);
+            find_char_var("shCmd ", shCmd, index);
             find_char_var("mailCmd ", mailCmd, index);
             find_char_var("EMAIL_ADDRESSES ", mail_addrs, index);
             find_char_var("DISKMOND_PID_FILE ", diskmond_pid_file, index);
@@ -240,6 +246,7 @@ static void parse_config(
 }
 
 void rm_data(char *fwdata_file, char *psad_dir, char *archive_dir) {
+    char mail_str[MAX_MSG_LEN] = "";
     char path_tmp[MAX_PATH_LEN];
     int fd;
 
@@ -267,7 +274,21 @@ void rm_data(char *fwdata_file, char *psad_dir, char *archive_dir) {
     if ((fd = open(path_tmp, O_TRUNC)) >= 0)
         close(fd);
 
+#ifdef DEBUG
+    printf(" .. sending mail:  %s\n", mail_str);
+#endif
+
+    strlcat(mail_str,
+            " -s \" ** psad diskmond: Removing data in ", MAX_MSG_LEN);
+    strlcat(mail_str, psad_dir, MAX_MSG_LEN);
+    strlcat(mail_str, " on ", MAX_MSG_LEN);
+    strlcat(mail_str, hostname, MAX_MSG_LEN);
+    strlcat(mail_str, "\" ", MAX_MSG_LEN);
+    strlcat(mail_str, mail_addrs, MAX_MSG_LEN);
+    strlcat(mail_str, mail_redr, MAX_MSG_LEN);
+
     /* send alert email */
+    send_alert_email(shCmd, mailCmd, mail_str);
     return;
 }
 

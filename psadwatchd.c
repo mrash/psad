@@ -230,7 +230,7 @@ static void check_process(
         strlcat(mail_str, mail_redr, MAX_MSG_LEN);
 
 #ifdef DEBUG
-    printf("sending mail:  %s\n", mail_str);
+    printf(" .. sending mail:  %s\n", mail_str);
 #endif
         /* send the email */
         send_alert_email(shCmd, mailCmd, mail_str);

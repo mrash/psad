@@ -1969,10 +1969,8 @@ sub psad_init() {
     ### turn off buffering
     $| = 1;
 
-    ### import psad.conf, for now the IPT_AUTO_CHAIN variable is the
-    ### only multi-line variable in psad.conf
-    &Psad::buildconf(\%config, \%cmds, {'IPT_AUTO_CHAIN' => ''},
-        $config_file);
+    ### import psad.conf
+    &Psad::buildconf(\%config, \%cmds, $config_file);
 
     ### make sure all necessary configuration variables
     ### are defined
@@ -2116,6 +2114,7 @@ sub validate_config() {
         die '[*] The --no-kmsgsd option can only be used with ',
             '--debug.  Exiting.';
     }
+
     return;
 }
 
@@ -3692,23 +3691,21 @@ sub renew_auto_blocked_ips() {
             die "[*] Could not open $config{'AUTO_BLOCK_IPT_FILE'}: $!";
         my @lines = <B>;
         close B;
+
         for my $line (@lines) {
             if ($line =~ /($ip_re)/) {
                 my $ip = $1;
-                ### add block rule for $ip unless it is already blocked
-                unless (&ipt_test_block($ip)) {
-                    &Psad::psyslog('psad', "renewing iptables auto-block " .
-                        "against $ip $timeout_str");
-                    &ipt_block($ip);
-                    &Psad::sendmail("[psad-status] RENEWED iptables " .
-                        "BLOCK against $ip $timeout_str", '',
-                        $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+
+                ### block the IP address (note that checks are built into
+                ### this function)
+                if (&ipt_block($ip, 'renew')) {
+
+                    ### set the auto-block start time here since
+                    ### renew_auto_blocked_ips() is only called
+                    ### at startup.
+                    $auto_blocked_ips{$ip}{'time'}    = time();
+                    $auto_blocked_ips{$ip}{'blocked'} = 1;
                 }
-                ### set the auto-block start time here since
-                ### renew_auto_blocked_ips() is only called
-                ### at startup.
-                $auto_blocked_ips{$ip}{'time'}    = time();
-                $auto_blocked_ips{$ip}{'blocked'} = 1;
             }
         }
     }
@@ -3749,7 +3746,8 @@ sub flush_auto_blocked_ips() {
             if ($line =~ /($ip_re)/) {
                 my $ip = $1;
                 ### remove block rules for $ip if it has been blocked
-                &ipt_remove_block($ip) if &ipt_test_block($ip);
+                ### (checks are built into ipt_remove_block())
+                &ipt_remove_block($ip);
                 $found_blocked = 1;
             }
         }
@@ -3786,242 +3784,184 @@ sub flush_auto_blocked_ips() {
     exit $found_blocked;
 }
 
-sub ipt_test_block() {
-    my $ip = shift;
-
-    print STDERR "[+] ipt_test_block($ip)\n" if $debug;
-
-    for my $table (keys %ipt_chains) {
-        for my $chain (keys %{$ipt_chains{$table}}) {
-            print STDERR "[+] ipt_test_block(): table: $table, chain: $chain\n"
-                if $debug;
-            open IPT, "$cmds{'iptables'} -t $table -nL $chain |" or next;
-            my @rules = <IPT>;
-            close IPT;
-            RULE: for my $rule (@rules) {
-                chomp $rule;
-                next RULE if $rule =~ /^\s*Chain\s/;
-                next RULE if $rule =~ /^\s*target\s/;
-                if ($chain eq 'INPUT') {
-                    ### DROP       all  --  1.2.3.4        0.0.0.0/0
-                    if ($rule =~ m|^DROP\s+all.*?$ip\s+0\.0\.0\.0/0|) {
-                        if ($debug) {
-                            print STDERR "[+] ipt_test_block($ip): found ip: ",
-                                "$ip\n";
-                            print STDERR "[+] ipt_test_block($ip): matched ",
-                                "rule: $rule\n";
-                        }
-                        return 1;
-                    }
-                } elsif ($chain eq 'OUTPUT') {
-                    ### DROP       all  --  0.0.0.0/0      1.2.3.4
-                    if ($rule =~ m|^DROP\s+all.*?0\.0\.0\.0/0\s+$ip\s*|) {
-                        if ($debug) {
-                            print STDERR "[+] ipt_test_block($ip): found ip: ",
-                                "$ip\n";
-                            print STDERR "[+] ipt_test_block($ip): matched ",
-                                "rule: $rule\n";
-                        }
-                        return 1;
-                    }
-                } else {
-                    ### DROP       all  --  1.2.3.4        0.0.0.0/0
-                    if ($rule =~ m|^DROP\s+all.*?$ip\s+0\.0\.0\.0/0|) {
-                        if ($debug) {
-                            print STDERR "[+] ipt_test_block($ip): found ip: ",
-                                "$ip\n";
-                            print STDERR "[+] ipt_test_block($ip): matched ",
-                                "rule: $rule\n";
-                        }
-                        return 1;
-                    }
-                    ### Note that we may have already returned
-                    ### DROP       all  --  0.0.0.0/0      1.2.3.4
-                    if ($rule =~ m|^DROP\s+all.*?0\.0\.0\.0/0\s+$ip\s*|) {
-                        if ($debug) {
-                            print STDERR "[+] ipt_test_block($ip): found ip: ",
-                                "$ip\n";
-                            print STDERR "[+] ipt_test_block($ip): matched ",
-                                "rule: $rule\n";
-                        }
-                        return 1;
-                    }
-                }
-            }
-        }
-    }
-    print STDERR "[-] ipt_test_block($ip): did not find ip: $ip\n"
-        if $debug;
-    ### did not find the ip
-    return 0;
-}
-
 sub ipt_block() {
-    my $src = shift;
+    my ($ip, $renewed_status) = @_;
 
-    print STDERR "[+] ipt_block($src)\n" if $debug;
+    print STDERR "[+] ipt_block($ip)\n" if $debug;
+
+    my $ipt = new IPTables::ChainMgr(
+        'iptables' => $cmds{'iptables'}
+    ) or die "[*] Could not acquire IPTables::ChainMgr object.";
 
     my $block_success = 0;
-    for my $table (keys %ipt_chains) {
-        for my $chain (keys %{$ipt_chains{$table}}) {
-            print STDERR "[+] ipt_block($src): table: $table, chain: $chain\n"
-                if $debug;
-            if ($chain eq 'INPUT') {
-                my $rv = 1;
-                eval {
-                    $rv = (system "$cmds{'iptables'} -t $table -I $chain " .
-                        "$config{'IPTABLES_AUTO_RULENUM'} -s $src -j " .
-                        "DROP 2> /dev/null 1>&2") >> 8;
-                };
-                $block_success = 1 if $rv == 0;
-            } elsif ($chain eq 'OUTPUT') {
-                my $rv = 1;
-                eval {
-                    $rv = (system "$cmds{'iptables'} -t $table -I $chain " .
-                        "$config{'IPTABLES_AUTO_RULENUM'} -d $src -j " .
-                        "DROP 2> /dev/null 1>&2") >> 8;
-                };
-                $block_success = 1 if $rv == 0;
-            } else {  ### we need to block by both src and dst
-                my $rv1 = 1;
-                my $rv2 = 1;
-                eval {
-                    $rv2 = (system "$cmds{'iptables'} -t $table -I $chain " .
-                        "$config{'IPTABLES_AUTO_RULENUM'} -d $src -j " .
-                        "DROP 2> /dev/null 1>&2") >> 8;
-                };
-                eval {
-                    $rv1 = (system "$cmds{'iptables'} -t $table -I $chain " .
-                        "$config{'IPTABLES_AUTO_RULENUM'} -s $src -j " .
-                        "DROP 2> /dev/null 1>&2") >> 8;
-                };
-                ### the above iptables commands will result in the block
-                ### rule for -s src being rule number 1 and the destination
-                ### block rule will be rule number 2.
-                $block_success = 1 if $rv1 == 0 and $rv2 == 0;
+
+    my $timeout_str = '';
+    if ($config{'AUTO_BLOCK_TIMEOUT'} > 0) {
+        $timeout_str = "for $config{'AUTO_BLOCK_TIMEOUT'} seconds";
+    } else {
+        $timeout_str = '(unlimited timeout)';
+    }
+
+    ### add block rule for $ip unless it is already blocked
+    for my $block_hr (@ipt_block_config) {
+        my $target     = $block_hr->{'target'};
+        my $direction  = $block_hr->{'direction'};
+        my $table      = $block_hr->{'table'};
+        my $from_chain = $block_hr->{'from_chain'};
+        my $to_chain   = $block_hr->{'to_chain'};
+
+        ### make sure "to_chain" exists
+        my ($rv, $status_msg) = $ipt->create_chain($table, $to_chain);
+
+        unless ($rv) {
+            my $msg = "could not create $table $to_chain chain for $ip";
+            &Psad::psyslog('psad', $msg);
+            print STDERR "[-] ipt_block(): $msg\n" if $debug;
+            next;
+        }
+
+        ### add jump rule to the "to_chain" from the "from_chain"
+        ($rv, $status_msg) = $ipt->add_jump_rule($table,
+            $from_chain, $to_chain);
+
+        unless ($rv) {
+            my $msg = "could not create jump rule to " .
+                "$to_chain from $from_chain";
+            &Psad::psyslog('psad', $msg);
+            print STDERR "[-] ipt_block(): $msg\n" if $debug;
+            next;
+        }
+
+        my $src = '';
+        my $dst = '';
+        if ($direction eq 'src') {
+            $src = $ip;
+            $dst = '0.0.0.0/0';
+        } elsif ($direction eq 'dst') {
+            $src = '0.0.0.0/0';
+            $dst = $ip;
+        }
+
+        if ($src and $dst) {
+            if ($ipt->find_ip_rule($src, $dst,
+                    $table, $to_chain, $target)) {
+                ($rv, $status_msg) = $ipt->add_ip_rule($src, $dst,
+                    $config{'IPTABLES_AUTO_RULENUM'}, $table,
+                    $to_chain, $target);
+                if ($rv) {
+                    my $msg = "iptables auto-block against $ip $timeout_str";
+                    if ($renewed_status) {
+                        $msg = "renewed $msg";
+                    } else {
+                        $msg = "added $msg";
+                    }
+                    &Psad::psyslog('psad', $msg);
+                    &Psad::sendmail("[psad-status] $msg", '',
+                        $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+                    $block_success = 1;
+                } else {
+                    my $msg = "could not add iptables block to " .
+                        "$to_chain for $ip";
+                    &Psad::psyslog('psad', $msg);
+                    print STDERR "[-] ipt_block(): $msg\n" if $debug;
+                }
+            }
+        } else {
+            next;
+        }
+
+        if ($direction eq 'both') {
+            ### need to add reverse rule for FORWARD chain
+            my $src2 = $dst;
+            my $dst2 = $src;
+            unless ($ipt->find_ip_rule($src2, $dst2, $table,
+                $to_chain, $target)) {
+
+                ($rv, $status_msg) = $ipt->add_ip_rule($src2, $dst2,
+                    $config{'IPTABLES_AUTO_RULENUM'}, $table,
+                    $to_chain, $target);
             }
         }
     }
     if ($block_success) {
         ### write the ip out to the auto blocked file
-        print STDERR "[+] ipt_block(): added block for $src\n"
+        print STDERR "[+] ipt_block(): added block for $ip\n"
             if $debug;
-        &write_blocked_ip($src, $config{'AUTO_BLOCK_IPT_FILE'});
+        &write_blocked_ip($ip, $config{'AUTO_BLOCK_IPT_FILE'});
     } else {
         &Psad::psyslog('psad', "could not add iptables " .
-            "block rule for: $src");
-        print STDERR "[-] Could not add iptables block rule for: $src\n"
+            "block rule for: $ip");
+        print STDERR "[-] Could not add iptables block rule for: $ip\n"
             if $debug;
     }
     return;
 }
 
 sub ipt_remove_block() {
-    my $src = shift;
+    my $ip = shift;
 
-    print STDERR "[+] ipt_remove_block($src)\n" if $debug;
+    my $ipt = new IPTables::ChainMgr(
+        'iptables' => $cmds{'iptables'}
+    ) or die "[*] Could not acquire IPTables::ChainMgr object.";
 
+    print STDERR "[+] ipt_remove_block($ip)\n" if $debug;
+
+    ### delete block rule for $ip
     my $rm_block = 0;
-    for my $table (keys %ipt_chains) {
-        CHAIN: for my $chain (keys %{$ipt_chains{$table}}) {
-            print STDERR "[+] ipt_remove_block($src): executing ",
-                "$cmds{'iptables'} -t $table -nL $chain\n" if $debug;
-            my @rules = ();
-            eval {
-                open IPT, "$cmds{'iptables'} -t $table -nL $chain |"
-                    or next CHAIN;
-                @rules = <IPT>;
-                close IPT;
-            };
-            my $rulenum = 1;
-            RULE: for my $rule (@rules) {
-                chomp $rule;
-                next RULE if $rule =~ /^\s*Chain\s/;
-                next RULE if $rule =~ /^\s*target\s/;
-                if ($chain eq 'INPUT') {
-                    ### DROP       all  --  1.2.3.4        0.0.0.0/0
-                    if ($rule =~ m|^DROP\s+all.*?$src\s+0\.0\.0\.0/0|) {
-                        $rm_block = 1 if &ipt_delete_rule($src,
-                            $table, $chain, $rulenum, $rule);
-                        last RULE;  ### there should only be one auto-blocked rule
-                                    ### per INPUT chain.
-                    }
-                } elsif ($chain eq 'OUTPUT') {
-                    ### DROP       all  --  0.0.0.0/0      1.2.3.4
-                    if ($rule =~ m|^DROP\s+all.*?0\.0\.0\.0/0\s+$src\s*|) {
-                        $rm_block = 1 if &ipt_delete_rule($src,
-                            $table, $chain, $rulenum, $rule);
-                        last RULE;  ### there should only be one auto-blocked rule
-                                    ### per OUTPUT chain.
-                    }
-                } else {  ### it is a bi-directional chain
-                    my $rv1;
-                    my $rv2;
-                    ### DROP       all  --  1.2.3.4        0.0.0.0/0
-                    if ($rule =~ m|^DROP\s+all.*?\s$src\s+0\.0\.0\.0/0|) {
-                        ### delete the rule
-                        $rv1 = &ipt_delete_rule($src, $table, $chain,
-                            $rulenum, $rule);
-                        $rm_block = 1 if $rv1;
-                        $rulenum--;  ### we have just removed a rule
-                                     ### from the policy
-                    }
-                    ### DROP       all  --  0.0.0.0/0      1.2.3.4
-                    if ($rule =~ m|^DROP\s+all.*?\s0\.0\.0\.0/0\s+$src\s*|) {
-                        ### delete the rule
-                        $rv2 = &ipt_delete_rule($src, $table, $chain,
-                            $rulenum, $rule);
-                        $rm_block = 1 if $rv2;
-                        last RULE;  ### we always add src rules first, so if we
-                                    ### get here then we are done
-                    }
-                }
-                $rulenum++;
-            }
+    for my $block_hr (@ipt_block_config) {
+        my $target     = $block_hr->{'target'};
+        my $direction  = $block_hr->{'direction'};
+        my $table      = $block_hr->{'table'};
+        my $from_chain = $block_hr->{'from_chain'};
+        my $to_chain   = $block_hr->{'to_chain'};
+
+        my $src = '';
+        my $dst = '';
+        if ($direction eq 'src') {
+            $src = $ip;
+            $dst = '0.0.0.0/0';
+        } elsif ($direction eq 'dst') {
+            $src = '0.0.0.0/0';
+            $dst = $ip;
+        }
+
+        if ($src and $dst) {
+            my ($rv, $status_msg) = $ipt->delete_ip_rule($src, $dst,
+                $table, $to_chain, $target);
+            $rm_block = 1 if $rv;
+        } else {
+            next;
+        }
+
+        if ($direction eq 'both') {
+            ### need to delete reverse rule for FORWARD chain
+            my $src2 = $dst;
+            my $dst2 = $src;
+            my ($rv, $status_msg) = $ipt->delete_ip_rule($src, $dst,
+                $table, $to_chain, $target);
         }
     }
+
     if ($rm_block) {
         if (not $flush_fw) {
             ### don't send timeout email if we are manually flushing
             ### the auto-block rules from the command line with --Flush.
             &Psad::psyslog('psad', "removed iptables auto-block against " .
-                "$src (timeout expired).");
+                "$ip (timeout expired).");
             &Psad::sendmail('[psad-status] removed iptables block ' .
-                "against $src (timeout expired).", '',
+                "against $ip (timeout expired).", '',
                 $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         }
         print STDERR "[+] ipt_remove_block(): removed iptables block ",
-            "against $src (timeout expired).\n" if $debug;
-        &rm_blocked_ip($src, $config{'AUTO_BLOCK_IPT_FILE'});
+            "against $ip (timeout expired).\n" if $debug;
+        &cache_file_rm_blocked_ip($ip, $config{'AUTO_BLOCK_IPT_FILE'});
     } else {
         &Psad::psyslog('psad', 'could not locate iptables ' .
-            "block rule for $src") if $flush_fw;
-        print STDERR "[-] Could not locate iptables block rule for $src.\n"
+            "block rule for $ip") if $flush_fw;
+        print STDERR "[-] Could not locate iptables block rule for $ip.\n"
             if $debug;
     }
     return;
-}
-
-sub ipt_delete_rule() {
-    my ($src, $table, $chain, $rulenum, $rule) = @_;
-    if ($flush_fw) {
-        print "[+] Deleting rule $rulenum for $src, $table ",
-            "table $chain chain:\n",
-            "        $rule\n";
-    }
-    if ($debug) {
-        print STDERR "[+] ipt_remove_block($src) removing ",
-            "block in $table $chain\n";
-        print STDERR "[+] ipt_remove_block($src): matched ",
-            "rule: $rule\n";
-    }
-    my $rv = 1;
-    eval {
-        $rv = (system "$cmds{'iptables'} -t $table -D " .
-                "$chain $rulenum") >> 8;
-    };
-    return 1 if $rv == 0;
-    return 0;
 }
 
 sub tcpwr_test_block() {
@@ -4057,7 +3997,7 @@ sub tcpwr_remove_block() {
     for my $line (@lines) {
         chomp $line;
         if ($line =~ /ALL:\s+$ip$/) {
-            &rm_blocked_ip($ip, $config{'AUTO_BLOCK_TCPWR_FILE'});
+            &cache_file_rm_blocked_ip($ip, $config{'AUTO_BLOCK_TCPWR_FILE'});
             &Psad::sendmail("[psad-status] removed tcpwrappers block " .
                 "against $ip (timeout expired).", '',
                 $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
@@ -4098,12 +4038,7 @@ sub auto_psad_response() {
             ### we have seen at least one packet logged by the firewall
             ### at this point
             if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
-                &Psad::psyslog('psad', 'initiating iptables auto-block ' .
-                    "against $src $timeout_str");
-                &ipt_block($src);
-                &Psad::sendmail("[psad-status] iptables AUTO-BLOCK " .
-                    "against $src $timeout_str", '',
-                    $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+                &ipt_block($src, '');
             }
             if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
                 &Psad::psyslog('psad', 'initiating tcpwrappers auto-block ' .
@@ -4178,7 +4113,11 @@ sub build_ipt_block_config() {
         'iptables' => $cmds{'iptables'}
     ) or die "[*] Could not acquire IPTables::ChainMgr object.";
 
-    for my $value (@{$config{'IPT_AUTO_CHAIN'}}) {
+    my $ctr = 1;
+
+    VAR: while (defined $config{"IPT_AUTO_CHAIN$ctr"}) {
+        my $value = $config{"IPT_AUTO_CHAIN$ctr"};
+
         ### DROP, src, filter, INPUT, PSAD_BLOCK_INPUT;
         my @block = split /\s*,\s*/, $value;
         if ($#block == 4) {
@@ -4189,20 +4128,31 @@ sub build_ipt_block_config() {
                 'from_chain' => $block[3],
                 'to_chain'   => $block[4]
             );
+            unless ($hsh{'direction'} eq 'src' or
+                        $hsh{'direction'} eq 'dst' or
+                        $hsh{'direction'} eq 'both') {
+                my $msg = "invalid direction $hsh{'direction'} " .
+                    "in IPT_AUTO_CHAIN$ctr keyword";
+                &Psad::psyslog('psad', $msg);
+                print STDERR "[-] build_ipt_block_config(): $msg\n"
+                    if $debug;
+                next VAR;
+            }
             if ($ipt->chain_exists($hsh{'table'}, $hsh{'from_chain'})) {
                 push @ipt_block_config, \%hsh;
             } else {
-                my $msg = "invalid IPT_AUTO_CHAIN keyword, " .
+                my $msg = "invalid IPT_AUTO_CHAIN$ctr keyword, " .
                     "$hsh{'from_chain'} chain does not exist.";
                 &Psad::psyslog('psad', $msg);
                 print STDERR "[-] build_ipt_block_config(): $msg\n"
                     if $debug;
             }
         } else {
-            my $msg = "invalid IPT_AUTO_CHAIN variable: $value";
+            my $msg = "invalid IPT_AUTO_CHAIN$ctr variable: $value";
             &Psad::psyslog('psad', $msg);
             print STDERR "[-] build_ipt_block_config(): $msg\n" if $debug;
         }
+        $ctr++;
     }
     return;
 }
@@ -4286,7 +4236,7 @@ sub write_blocked_ip() {
     return;
 }
 
-sub rm_blocked_ip() {
+sub cache_file_rm_blocked_ip() {
     my ($src, $file) = @_;
     print STDERR "[+] rm_blocked_ip($src, $file)\n" if $debug;
     if (-e $file) {
@@ -5755,7 +5705,7 @@ sub required_vars() {
         ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL ANALYSIS_MODE_DIR
         IMPORT_OLD_SCANS ICMP_TYPES_FILE SHOW_ALL_SIGNATURES
         IPT_PREFIX_COUNTER_FILE IGNORE_PORTS ENABLE_SCAN_ARCHIVE
-        EMAIL_LIMIT_STATUS_MSG P0F_FILE IGNORE_PROTOCOLS IPT_AUTO_CHAIN
+        EMAIL_LIMIT_STATUS_MSG P0F_FILE IGNORE_PROTOCOLS IPT_AUTO_CHAIN1
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

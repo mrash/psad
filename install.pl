@@ -141,7 +141,7 @@ if ($distro eq 'redhat') {
     $Cmds{'chkconfig'} = $chkconfigCmd;
 } elsif ($distro eq 'gentoo') {
     ### add rc-update if we are running on a gentoo distro
-    $Cmds{'rcupdate'} = $rcupdateCmd;
+    $Cmds{'rc-update'} = $rcupdateCmd;
 }
 
 my $init_dir = '';
@@ -1240,7 +1240,7 @@ sub enable_psad_at_boot() {
         if ($distro eq 'redhat') {
             system "$Cmds{'chkconfig'} --add psad";
         } elsif ($distro eq 'gentoo') {
-            system "$Cmds{'rcupdate'} add psad default";
+            system "$Cmds{'rc-update'} add psad default";
         } else {  ### it is a non-redhat distro, try to
                   ### get the runlevel from /etc/inittab
             if ($RUNLEVEL) {

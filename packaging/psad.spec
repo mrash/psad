@@ -1,6 +1,6 @@
 %define name psad
 %define version 1.2.4
-%define release 1
+%define release 2
 %define psadlibdir /usr/lib/psad
 %define psadlogdir /var/log/psad
 %define psadrundir /var/run/psad
@@ -20,7 +20,7 @@ Group: System/Servers
 Url: http://www.cipherdyne.org/psad/
 Source: %name-%version.tar.gz
 BuildRoot: %_tmppath/%{name}-buildroot
-Requires: sendmail
+Requires: smtpdaemon
 Requires: iptables
 #Prereq: rpm-helper
 

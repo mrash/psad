@@ -26,9 +26,9 @@
 #	- signal handler for configuration updating. 
 #	- "ignore ips" file so that psad will ignore scans originating
 #	  from any ip contained within this file.
-#	- include check for running pid of kmsgsd an alert if not.
+#	- include check for running pid of kmsgsd an alert/restart if not.
 #	- use umask for newly created files.
-#	- make CHECK_INTERVAL configuable from the command line.
+#	- make CHECK_INTERVAL configurable from the command line.
 #
 # Sample packet (rejected by ipchains)
 # Dec 19 11:54:07 orthanc kernel: Packet log: input REJECT lo PROTO=1
@@ -150,6 +150,7 @@ my $Sigs_href = import_signatures($signatures) if $signatures;
 # my @LOCAL_IPS = get_local_ips($ifconfigCmd, $grepCmd);
 # main loop
 for (;;) {
+	check_kmsgsd($EMAIL_ADDRESS, \%Cmds);
 	$fwdata_start_lines = (split /\s+/, `$Cmds{'wc'} -l $FW_DATA`)[1];
 #	print "Current number of lines: $fwdata_start_lines\n";   # this will be useful for the TODO
 	sleep $CHECK_INTERVAL;
@@ -281,6 +282,14 @@ sub check_port() {
         	return 1 if ($port_to_check < $start || $port_to_check > $end);
        }
 	return 0;
+}
+sub check_kmsgsd() {
+	my $email_address = shift;
+	my $Cmds_href = shift;
+	unless (`$Cmds_href->{'ps'} -auxw |$Cmds_href->{'grep'} kmsgsd |$Cmds_href->{'grep'} -v grep`) {
+		$Cmds_href->{'kmsgsd'};   # restart kmsgsd
+		`$Cmds_href->{'mail'} $email_address -s \"psad: restarted kmsgsd\"`;
+	}
 }
 sub import_signatures() {
 	my $sigfile = shift;

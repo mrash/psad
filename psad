@@ -115,6 +115,7 @@ my $WHOIS_TIMEOUT = 60;
 ### system binaries ###
 my $ipchainsCmd = "/sbin/ipchains";
 my $iptablesCmd = "/usr/local/bin/iptables";
+my $psCmd = "/bin/ps";
 my $wcCmd = "/usr/bin/wc";
 my $tailCmd = "/usr/bin/tail";
 my $mailCmd = "/bin/mail";
@@ -208,12 +209,6 @@ if ($kill) {
         exit 0;
 }
 
-### the --Status command line switch was given
-if ($status) {
-        my $rv = &psad_status(\@PIDFILES);
-        exit $rv;
-}
-
 ### the --USR1 command line switch was given
 if ($usr1) {
 	my $rv = &psad_usr1(\@PIDFILES);
@@ -224,6 +219,7 @@ my %Cmds = (
         "ipchains"      => $ipchainsCmd,
         "iptables"      => $iptablesCmd,
 	"wc"		=> $wcCmd,
+	"ps"		=> $psCmd,
 	"tail"		=> $tailCmd,
 	"mail"		=> $mailCmd,
 	"ifconfig"	=> $ifconfigCmd,
@@ -239,6 +235,12 @@ my %Cmds = (
 
 ### check to make sure the commands specified in the config section are in the right place, and attempt to correct automatically if not.
 %Cmds = &Psad::check_commands(\%Cmds);
+
+### the --Status command line switch was given
+if ($status) {
+        my $rv = &psad_status(\@PIDFILES, $cmdline_file, \%Cmds);
+        exit $rv;
+}
 
 ### the --Restart command line switch was given
 if ($restart) {
@@ -1207,10 +1209,20 @@ sub restart_psad() {
 	return;
 }
 sub psad_status() {
-	my $pidfiles_aref = shift;
+	my ($pidfiles_aref, $cmdline_file, $Cmds_href) = @_;
+	my $cmdline;
+	### only the psad daemon runs with command line arguments
+	if (-e $cmdline_file) {
+		open CMD, "< $cmdline_file";
+		$cmdline = <CMD>;
+		chomp $cmdline;
+	}
 	my $rv = 0;   ### assume psad is not running and test...
 	for my $pidfile (@$pidfiles_aref) {
-		my $pidname = (split /\./, (split /\//, $pidfile)[$#_])[0];
+#		my $pidname = (split /\./, (split /\//, $pidfile)[$#_])[0];
+		my @p_tmp = split /\//, $pidfile;
+		my $pname_tmp = $p_tmp[$#p_tmp];
+		my $pidname = (split /\./, $pname_tmp)[0];
 		if (-e $pidfile) {
 			open PIDFILE, "< $pidfile";
 			my $pid = <PIDFILE>;
@@ -1218,6 +1230,16 @@ sub psad_status() {
 			chomp $pid;
 			if (kill 0, $pid) {
 				print " ----  $pidname is running on $HOSTNAME as pid: $pid\n";
+				my @grep_output = `$Cmds_href->{'ps'} -auxww |$Cmds_href->{'grep'} $pid`;
+				GP: for my $g (@grep_output) {
+					if ($g =~ /^\S+\s+$pid\s+(\S+)\s+(\S+)/) {
+						print "       %CPU: $1  %MEM: $2\n";
+						if ($pidname eq "psad" && $cmdline) {
+							print "       CMDL ARGS: $cmdline\n";
+						}
+						last GP;
+					}
+				}
 				$rv = 1;
 			} else {
 				print " ----  $pidname is not currently running on $HOSTNAME  ----\n";

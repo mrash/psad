@@ -114,13 +114,16 @@ my $SUB_TAB = '    ';
 my $noarchive    = 0;
 my $uninstall    = 0;
 my $help         = 0;
+my $default_yes  = 0;
 
 &usage(1) unless (GetOptions(
-    'no-preserve' => \$noarchive,    # don't preserve existing configs
-    'uninstall'   => \$uninstall,
-    'help'        => \$help           # display help
+    'no-preserve' => \$noarchive,   ### Don't preserve existing configs.
+    'uninstall'   => \$uninstall,   ### Uninstall psad.
+    'default-yes' => \$default_yes, ### Automatically answer yes to all
+                                    ###   installation questions.
+    'help'        => \$help         ### Display help.
 ));
-&usage(0) if ($help);
+&usage(0) if $help;
 
 my %Cmds = (
     'gzip'     => $gzipCmd,

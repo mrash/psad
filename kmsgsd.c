@@ -132,6 +132,10 @@ int main(int argc, char *argv[]) {
      * O_NONBLOCK) and write it to the fwdata file if it is a firewall message
      */
     while ((numbytes = read(fifo_fd, buf, MAX_LINE_BUF)) >= 0) {
+
+        /* make sure the buf contents qualifies as a string */
+        buf[numbytes] = '\0';
+
         if (received_sighup) {
             /* clear the signal flag */
             received_sighup = 0;
@@ -162,18 +166,21 @@ int main(int argc, char *argv[]) {
 
         /* see if we matched a firewall message and write it to the
          * fwdata file */
-        if (((strstr(buf, "OUT") != NULL && strstr(buf, "IN") != NULL)
-            && (strstr(buf, fw_msg_search) != NULL || strstr(buf, snort_sid_str)))
-            || (strstr(buf, "Packet log") != NULL)) {
+        if ((strstr(buf, "OUT") != NULL
+                && strstr(buf, "IN") != NULL)
+                && (strstr(buf, fw_msg_search) != NULL
+                || strstr(buf, snort_sid_str) != NULL)) {
 
             if (write(fwdata_fd, buf, numbytes) < 0)
                 exit(EXIT_FAILURE);  /* could not write to the fwdata file */
 #ifdef DEBUG
-            buf[numbytes] = '\0';
             puts(buf);
             fwlinectr++;
             if (fwlinectr % 50 == 0)
                 printf(" .. Processed %d firewall lines.\n", fwlinectr);
+        } else {
+            puts(buf);
+            printf(" ** Line did not match search strings.\n");
 #endif
         }
     }

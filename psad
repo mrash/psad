@@ -50,8 +50,6 @@
 #	- Include an installation log.
 #	- Better formatting of print statements throughout (maybe use 'here'
 #	  docs.)
-#	- Set an alarm for whois lookups since they may hang depending on
-#	  network accessibility of the whois databases.
 #	- (psad-init) make sure the init script will work on different Linux
 #	  distros.
 #
@@ -95,6 +93,7 @@ my @EMAIL_ADDRESSES = ('root@localhost');  # supports multiple email addresses
 my $ALERT_ALL = "Y";	# if "Y", send email for all new bad packets instead of just when a danger level increases
 my $ENABLE_AUTO_IDS = "N"; 	# if "Y", enable automated IDS response (auto manages firewall rulesets). 
 my $AUTO_IDS_DANGER_LEVEL = 5;  # Block all traffic from offending IP if danger level >= to this value 
+my $WHOIS_TIMEOUT = 60;
 
 # system binaries
 my $ipchainsCmd = "/sbin/ipchains";
@@ -249,7 +248,7 @@ for (;;) {
 		print "MAIN: calling assign_danger_level()\n" if $DEBUG;
 		$Scan_href = assign_danger_level($Scan_href, $Auto_ips_href, $PORT_RANGE_SCAN_THRESHOLD, $ALERT_ALL, \%DANGER_LEVELS);
 		print "MAIN: calling logr()\n" if $DEBUG;
-		$Scan_href = logr($Scan_href, $PSAD_LOGFILE, $output, $dnslookups, $whoislookups, $ENABLE_EMAIL_ALERTS,
+		$Scan_href = logr($Scan_href, $PSAD_LOGFILE, $output, $dnslookups, $whoislookups, $WHOIS_TIMEOUT, $ENABLE_EMAIL_ALERTS,
 					$EMAIL_ALERT_DANGER_LEVEL, $EMAIL_ALERTFILE, \@EMAIL_ADDRESSES, $SHOW_ALL_SIGNATURES, \%Cmds);
 		if ($ENABLE_AUTO_IDS eq "Y") {
 			$Scan_href = auto_psad_response($Scan_href, $AUTO_IDS_DANGER_LEVEL, \%Cmds, \@EMAIL_ADDRESSES);
@@ -705,7 +704,7 @@ sub collect_errors() {
 	close ERRORS;
 }
 sub logr() {
-	my ($Scan_href, $logfile, $output, $dnslookups, $whoislookups, $enable_email_alerts, $email_alert_danger_level,
+	my ($Scan_href, $logfile, $output, $dnslookups, $whoislookups, $whois_timeout, $enable_email_alerts, $email_alert_danger_level,
 					$email_alertfile, $email_addresses_aref, $show_all_signatures, $Cmds_href) = @_;
 	my $flags_mesg;
 	my $hndl;
@@ -713,7 +712,7 @@ sub logr() {
 	my ($tcp_newrange, $udp_newrange, $tcp_new_start_range, $tcp_new_end_range, $udp_new_start_range, $udp_new_end_range);
 	my ($tcp_new_start_time, $udp_new_start_time);
 	my $dnsstring = "";
-	my @whois_info;
+	my $whois_info_aref;
 	my $hostname = `$Cmds_href->{'hostname'}`;
        	if ($output || $DEBUG) {
                 $hndl = "STDOUT";
@@ -756,7 +755,7 @@ sub logr() {
                                 	$dnsstring = "$srcip -> $rdns";
                         	} 
 				unless ($whoislookups) {
-					@whois_info = `$Cmds_href->{'whois'} $srcip`;
+					$whois_info_aref = get_whois_data($whois_timeout, $srcip, $Cmds_href);
 				}
 				if ($abs_start_range == $abs_end_range) {
 					$range = $abs_start_range;
@@ -882,8 +881,8 @@ sub logr() {
                                         print $hndl "   =-=-=-=-=-=-= Whois Information: =-=-=-=-=-=-=\n";
                                         print EMAILALERT "\n\n";
                                         print EMAILALERT "   =-=-=-=-=-=-= Whois Information =-=-=-=-=-=-=\n";
-                                        print $hndl $_ foreach (@whois_info);
-                                        print EMAILALERT $_ foreach (@whois_info);
+                                        print $hndl $_ foreach (@$whois_info_aref);
+                                        print EMAILALERT $_ foreach (@$whois_info_aref);
                                         print $hndl "\n";
                                         print EMAILALERT "\n";
                                 }
@@ -1006,6 +1005,24 @@ sub get_listening_ports() {
 		$listening_ports{$key} = "";
 	}
 	return \%listening_ports;
+}
+sub get_whois_data() {
+	my ($whois_timeout, $ip, $Cmds_href) = @_;
+	my @whois_data;
+	eval {
+		local $SIG{'ALRM'} = sub {die "alarm\n"};
+		alarm $whois_timeout;
+		@whois_data = `$Cmds_href->{'whois'} $ip`;
+		alarm 0;
+	};
+	if ($@) {
+		die unless $@ eq "alarm\n";
+		$#whois_data = 0;
+		@whois_data = ("Whois data not available!\n");
+		return \@whois_data;
+	} else {
+		return \@whois_data;
+	}
 }
 sub check_firewall_rules() {
 	my $Cmds_href = shift;

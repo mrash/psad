@@ -1303,7 +1303,7 @@ sub check_fw() {
 sub get_local_ips() {
 	my $Cmds_href = shift;
 	my %localips;
-	my @ips = `$Cmds_href->{'ifconfig'} -a |$Cmds_href->{'grep'} inet`;
+	my @ips = `$Cmds_href->{'ifconfig'} -a |$Cmds_href->{'grep'} -w inet`;
 	for my $iptmp (@ips) {
 		my $ip = (split /:/, (split /\s+/, $iptmp)[2])[1];
 		$localips{$ip} = "";

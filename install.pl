@@ -213,7 +213,22 @@ sub install() {
     ### deal with old psad_auto_ips path
     if (-e "${PSAD_CONFDIR}/psad_auto_ips") {
         move "${PSAD_CONFDIR}/psad_auto_ips",
-            "${PSAD_CONFDIR}/psad_auto_dl";
+            "${PSAD_CONFDIR}/auto_dl";
+    }
+    ### deal with old psad_signatures path
+    if (-e "${PSAD_CONFDIR}/psad_signatures") {
+        move "${PSAD_CONFDIR}/psad_signatures",
+            "${PSAD_CONFDIR}/signatures";
+    }
+    ### deal with old psad_posf path
+    if (-e "${PSAD_CONFDIR}/psad_posf") {
+        move "${PSAD_CONFDIR}/psad_posf",
+            "${PSAD_CONFDIR}/posf";
+    }
+    ### deal with old psad_icmp_types path
+    if (-e "${PSAD_CONFDIR}/psad_icmp_types") {
+        move "${PSAD_CONFDIR}/psad_icmp_types",
+            "${PSAD_CONFDIR}/icmp_types";
     }
 
     ### change any existing psad module directory to allow anyone to execute
@@ -522,10 +537,8 @@ sub install() {
         unlink "${PSAD_CONFDIR}/diskmond.conf";
     }
 
-    ### deal with psad_auto_dl, psad_signatures,
-    ### psad_icmp_types, and psad_posf
-    for my $file qw(psad_signatures psad_icmp_types
-            psad_posf psad_auto_dl) {
+    ### deal with auto_dl, signatures,icmp_types, and posf files
+    for my $file qw(signatures icmp_types posf auto_dl) {
         if (-e "${PSAD_CONFDIR}/$file") {
             &archive("${PSAD_CONFDIR}/$file") unless $noarchive;
             unless (&query_preserve_sigs_autodl("${PSAD_CONFDIR}/$file")) {
@@ -1064,12 +1077,16 @@ sub preserve_config() {
         "${PSAD_CONFDIR}/${file}.new: $!";
     for my $new_line (@new_lines) {
         if ($new_line =~ /^\s*#/) {
-            print CONF $new_line;
+            print CONF $new_line;  ### take comments from new file.
         } elsif ($new_line =~ /^\s*(\S+)/) {
             my $var = $1;
             my $found = 0;
             for my $orig_line (@orig_lines) {
-                if ($orig_line =~ /^\s*$var\s/) {
+                if ($orig_line =~ /^\s*$var\s/
+                        and $var ne 'PSAD_AUTO_DL_FILE'  ### special case paths
+                        and $var ne 'PSAD_ICMP_TYPES_FILE'
+                        and $var ne 'PSAD_SIGS_FILE'
+                        and $var ne 'PSAD_POSF_FILE') {
                     print CONF $orig_line;
                     $found = 1;
                     last;

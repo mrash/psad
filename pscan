@@ -7,6 +7,7 @@
 #
 # TODO:  
 #	- use alarms to avoid hanging on closed ports
+# 	- multithread?
 
 use Socket;
 use Getopt::Long;
@@ -57,7 +58,7 @@ sub usage_and_exit() {
         my $exitcode = shift;
         print <<_HELP_;
 
-Usage: bscan [-i <ip address>] [-s <start port>] [-e <end port>] [-h]
+Usage: pscan [-i <ip address>] [-s <start port>] [-e <end port>] [-h]
 
 	-i		- ip address
 	-s		- starting port

@@ -89,7 +89,7 @@ if ($fw_file) {
 }
 
 ### import psad.conf
-&Psad::buildconf(\%config, \%cmds, {}, $config_file);
+&Psad::buildconf(\%config, \%cmds, $config_file);
 
 ### check to make sure the commands specified in the config section
 ### are in the right place, and attempt to correct automatically if not.

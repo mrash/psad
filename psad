@@ -14,13 +14,13 @@
 #          the psad man page or view the documentation provided at:
 #          http://www.cipherdyne.com.
 #
-# Author: Michael B. Rash (mbr@cipherdyne.com)
+# Author: Michael Rash (mbr@cipherdyne.com)
 #
 # Credits:  (see the CREDITS file)
 #
 # Version: 1.0
 #
-# Copyright (C) 1999-2002 Michael B. Rash (mbr@cipherdyne.com)
+# Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.com)
 #
 # License (GNU Public License):
 #
@@ -138,6 +138,7 @@
 ### modules used by psad
 use lib '/usr/lib/psad';
 use Psad;
+use IPTables::Parse;
 use Net::IPv4Addr 'ipv4_in_network';
 use File::stat 'stat';
 use File::Copy;
@@ -426,10 +427,6 @@ if ($chk_interval) {
 ### are in the right place, and attempt to correct automatically if not.
 &Psad::check_commands(\%cmds);
 
-### Now that we are sure the psad command is where it should be,
-### assign $PSADCMD (used by the SEGV handler)
-my $PSADCMD = $cmds{'psad'};
-
 ### the --Status command line switch was given
 &status() if $status;
 
@@ -459,8 +456,8 @@ my $local_ips_href = &get_local_ips();
 ### bundled with psad can't be found
 unless ($no_whois) {
     unless (defined $cmds{'whois'}
-            && -x $cmds{'whois'}) {  ### we couldn't find whois.psad
-        warn " ** Could not locate whois.psad binary.  " .
+            && -x $cmds{'whois'}) {  ### we couldn't find whois_psad
+        warn " ** Could not locate whois_psad binary.  ",
             "Disabling whois lookups.\n";
         $no_whois = 1;
     }
@@ -468,32 +465,7 @@ unless ($no_whois) {
 
 ### if psad is running on a syslog server, don't check the firewall
 ### rules since they may not be local.
-unless ($no_fwcheck || $syslog_server) {
-    my $rv = &Psad::check_firewall_rules(
-        $config{'FW_MSG_SEARCH'},  ### SNORT_SID_STR is normally used for
-                                   ### snort "sid" values so don't include
-                                   ### it within the firewall check
-        $config{'EMAIL_ADDRESSES'},
-        "$config{'PSAD_DIR'}/fw_check.txt",
-        \%cmds
-    );
-    if ($rv) {
-        if ($fw_analyze) {
-            print localtime() . " .. Firewall config looks good.\n";
-            print localtime() . " .. Completed check of firewall ruleset.\n";
-        }
-    } else {
-        if ($fw_analyze) {
-            print localtime() . " ** Errors found in firewall config.\n";
-            print localtime() . " ** Results emailed to ",
-                "$config{'EMAIL_ADDRESSES'}\n";
-        }
-    }
-    if ($fw_analyze) {
-        print localtime() . " .. Exiting.\n";
-        exit 0;
-    }
-}
+&fw_check() unless $no_fwcheck || $syslog_server;
 
 ### parse snort rules if we enable psad to match on iptables log
 ### messages that include snort SID's
@@ -1178,7 +1150,7 @@ sub check_import() {
         } else {
             &import_auto_ips($file);
         }
-        my $subject = "psad: re-read $file on $hostname";
+        my $subject = " ** psad: re-read $file on $hostname";
         &Psad::sendmail($subject, '',
             $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         $$mtime_ref = $mtime_tmp;
@@ -1198,7 +1170,7 @@ sub check_import_config() {
 
         %config = %$config_href;
         %cmds   = %$cmds_href;
-        my $subject = "psad: re-read $file on $hostname";
+        my $subject = " ** psad: re-read $file on $hostname";
         &Psad::sendmail($subject, '',
             $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         $$mtime_ref = $mtime_tmp;
@@ -1814,15 +1786,15 @@ sub scan_logr() {
                 my $subject;
                 if ($rdns) {
                     if ($benchmark) {
-                        $subject = "psad: BENCHMARK SCAN from: $rdns";
+                        $subject = " ** psad: BENCHMARK SCAN from: $rdns";
                     } else {
-                        $subject = "psad: SCAN DETECTED from: $rdns";
+                        $subject = " ** psad: SCAN DETECTED from: $rdns";
                     }
                 } else {
                     if ($benchmark) {
-                        $subject = "psad: BENCHMARK SCAN from: $src";
+                        $subject = " ** psad: BENCHMARK SCAN from: $src";
                     } else {
-                        $subject = "psad: SCAN DETECTED from: $src";
+                        $subject = " ** psad: SCAN DETECTED from: $src";
                     }
                 }
                 &Psad::sendmail($subject, $email_alert, $config{'EMAIL_ADDRESSES'},
@@ -2071,7 +2043,7 @@ sub auto_psad_response() {
                         $scan{$src}{$dst}{'BLOCKED'} = 1;
                     }
                     if ($config{'ALERT_AUTO_BLOCKED'} eq 'Y' && $blocked_str) {
-                        my $subject = "psad: All traffic from $src has been " .
+                        my $subject = " ** psad: All traffic from $src has been " .
                             "BLOCKED $blocked_str on $hostname ($dst)";
                         &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
                             $cmds{'mail'});
@@ -2102,7 +2074,7 @@ sub auto_psad_response() {
                         $scan{$src}{$dst}{'BLOCKED'} = 1;
                     }
                     if ($config{'ALERT_AUTO_BLOCKED'} eq 'Y' && $blocked_str) {
-                        my $subject = "psad: All traffic from $src has been ".
+                        my $subject = " ** psad: All traffic from $src has been ".
                             "BLOCKED $blocked_str on $hostname ($dst)";
                         &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
                             $cmds{'mail'});
@@ -2168,8 +2140,8 @@ sub write_blocked_ip() {
 
 sub email_limit_reached() {
     my ($src, $dst) = @_;
-    my $subject = "psad: Email message limit for $src has been reached on " .
-        "$hostname ($dst)!!!";
+    my $subject = " ** psad: Email message limit for $src has " .
+        "been reached on $hostname ($dst)!!!";
     &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
     return;
 }
@@ -2617,9 +2589,219 @@ sub check_config() {
         TCPWRAPPERS_BLOCK_METHOD EMAIL_ALERT_DANGER_LEVEL
         PSAD_FIFO WHOIS_THRESHOLD WHOIS_TIMEOUT
         PACKET_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR
-        ENABLE_PERSISTENCE
+        PROC_FORWARD_FILE ENABLE_PERSISTENCE
     );
     &Psad::validate_config($config_file, \@required_vars, $config_href);
+    return;
+}
+
+sub fw_check() {
+    my $rv = 0;
+    if (defined $cmds{'iptables'} && -x $cmds{'iptables'}) {
+        unlink "$config{'PSAD_DIR'}/fw_check.txt";
+        my $input_rv = &ipt_chk_chain('INPUT');
+        my $forward_rv = &ipt_chk_chain('FORWARD');
+        if ($input_rv && $forward_rv) {
+            &Psad::logr(" .. The iptables ruleset on $hostname will log and " .
+                "block unwanted packets in both the INPUT and FORWARD " .
+                "chains.  Firewall config success!\n",
+                {"$config{'PSAD_DIR'}/fw_check.txt" => 1});
+            $rv = 1;
+        } else {
+            &Psad::logr("\n", {"$config{'PSAD_DIR'}/fw_check.txt" => 1});
+            &Psad::logr(" .. NOTE: IPTables::Parse does not yet parse user " .
+                "defined chains and so it is possible your firewall config " .
+                "is compatible with psad anyway.\n",
+                {"$config{'PSAD_DIR'}/fw_check.txt" => 1});
+            &Psad::sendmail(" ** psad: firewall setup warning!",
+                "$config{'PSAD_DIR'}/fw_check.txt",
+                $config{'EMAIL_ADDRESSES'},
+                $cmds{'mail'}
+            );
+        }
+    } else {
+        $rv = &Psad::check_firewall_rules(
+            $config{'FW_MSG_SEARCH'},  ### SNORT_SID_STR is normally used for
+                                       ### snort "sid" values so don't include
+                                       ### it within the firewall check
+            $config{'EMAIL_ADDRESSES'},
+            "$config{'PSAD_DIR'}/fw_check.txt",
+            \%cmds
+        );
+    }
+    if ($fw_analyze) {
+        if ($rv) {
+            print localtime() . " .. Firewall config looks good.\n";
+            print localtime() . " .. Completed check of firewall ruleset.\n";
+        } else {
+            print localtime() . " ** Errors found in firewall config.\n";
+            print localtime() . " ** Results in " .
+                "$config{'PSAD_DIR'}/fw_check.txt\n";
+            print localtime() . "    emailed to ",
+                "$config{'EMAIL_ADDRESSES'}\n";
+        }
+        print localtime() . " .. Exiting.\n";
+        exit 0;
+    }
+}
+
+### should probably make this into its own script
+sub ipt_chk_chain() {
+    my $chain = shift;
+
+    my $rv = 1;
+
+    ### check to see if there are multiple interfaces on the
+    ### machine and return true by default for the FORWARD
+    ### chain if no since the machine will not be able to
+    ### forward packets anyway (e.g. desktop machines).  Also
+    ### return true by default if forwarding is turned off
+    ### we have to trust the machine config is as the admin
+    ### wants it).
+    if ($chain eq 'FORWARD') {
+        my $forwarding;
+        if (-e $config{'PROC_FORWARD_FILE'}) {
+            open F, "< $config{'PROC_FORWARD_FILE'}"
+                or die " ** Could not open $config{'PROC_FORWARD_FILE'}: $!";
+            $forwarding = <F>;
+            close F;
+            chomp $forwarding;
+            print " .. forwarding value: $forwarding\n" if $debug;
+            return $rv if $forwarding == 0;
+        } else {
+            die " ** Make sure the path to the ip forwarding file correct.\n",
+                "    The PROC_FORWARD_FILE in $config_file points to\n",
+                "    $config{'PROC_FORWARD_FILE'}";
+        }
+        my @if_out = `$cmds{'ifconfig'} -a`;
+        my $num_intf = 0;
+        for my $line (@if_out) {
+            if ($line =~ /inet\s+addr/i && $line !~ /127\.0\.0\.1/) {
+                $num_intf++;
+            }
+        }
+        print " .. number of interfaces: $num_intf\n" if $debug;
+        if ($num_intf < 2) {
+            return $rv;
+        }
+    }
+
+    my $ipt = new IPTables::Parse;
+
+    if ($fw_analyze) {
+        print localtime() . " .. Parsing iptables $chain chain rules.\n";
+    }
+    ### for now we are only looking at the filter table, so if
+    ### the iptables ruleset includes the log and drop rules in
+    ### a user defined chain then psad will not see this.
+    my $ld_hr = $ipt->default_drop('filter', $chain);
+
+    print Dumper $ld_hr if $debug;
+
+    my $fw_check_file = "$config{'PSAD_DIR'}/fw_check.txt";
+    if (defined $ld_hr && keys %$ld_hr) {
+        my @protos;
+        my $found_all = 0;
+        if (defined $ld_hr->{'all'}) {
+            @protos = qw(all);
+            $found_all = 1;
+        } else {
+            @protos = qw(tcp udp icmp);
+        }
+        for my $proto (@protos) {
+            my $str1;
+            my $str2;
+            if (! defined $ld_hr->{$proto}->{'LOG'}) {
+                if ($proto eq 'all') {
+                    $str1 = "for all protocols";
+                    $str2 = 'scans';
+                } else {
+                    $str1 = "for the $proto protocol";
+                    $str2 = "$proto scans";
+                }
+                &Psad::logr(" ** The $chain chain in the iptables ruleset on " .
+                    "$hostname does not include a default LOG rule $str1.  " .
+                    "psad will not be able to detect $str2 without such a " .
+                    "rule.\n",
+                    {$fw_check_file => 1});
+                &Psad::logr("\n", {$fw_check_file => 1});
+                $rv = 0;
+            }
+            if (defined $ld_hr->{$proto}->{'LOG'}->{'prefix'}
+                && $ld_hr->{$proto}->{'LOG'}->{'prefix'}
+                ne $config{'FW_MSG_SEARCH'}) {
+                if ($proto eq 'all') {
+                    $str1 = " ** The $chain chain in the iptables ruleset " .
+                    "on $hostname includes a default LOG rule for all " .
+                    "protocols,";
+                    $str2 = 'scans';
+                } else {
+                    $str1 = " ** The $chain chain in the iptables ruleset " .
+                    "on $hostname inclues a default LOG rule for the $proto " .
+                    "protocol,";
+                    $str2 = "$proto scans";
+                }
+                &Psad::logr("$str1 but the rule does not have a log prefix " .
+                    "of \"$config{'FW_MSG_SEARCH'}\"  psad will not be able " .
+                    "to detect $str2 without adding --log-prefix " .
+                    "\"$config{'FW_MSG_SEARCH'}\" to the rule.\n",
+                    {$fw_check_file => 1});
+                &Psad::logr("\n", {$fw_check_file => 1});
+                $rv = 0;
+            }
+            if (! defined $ld_hr->{$proto}->{'DROP'}) {
+                if ($proto eq 'all') {
+                    $str1 = "for all protocols";
+                } else {
+                    $str1 = "for the $proto protocol";
+                }
+                &Psad::logr(" ** The $chain chain in the iptables ruleset on " .
+                    "$hostname does not include a default DROP rule $str1.\n",
+                    {$fw_check_file => 1});
+                &Psad::logr("\n", {$fw_check_file => 1});
+                $rv = 0;
+            }
+            if ($found_all) {  ### avoid $ld_hr->{'all'} auto vivification
+                return $rv;
+            }
+        }
+        unless ($found_all) {
+            &Psad::logr(" ** The best way to fix the above errors is to " .
+                "first setup iptables to accept traffic that you need " .
+                "to/through the iptables $chain chain, and then execute the " .
+                "following commands:\n", {$fw_check_file => 1});
+            &Psad::logr("        iptables -A $chain -j LOG --log-prefix " .
+                "\"$config{'FW_MSG_SEARCH'}\"\n", {$fw_check_file => 1});
+            &Psad::logr("        iptables -A $chain -j DROP\n",
+                {$fw_check_file => 1});
+        }
+    } else {
+        &Psad::logr(" ** The $chain chain in the iptables ruleset on " .
+            "$hostname does not include default rules that will log and " .
+            "drop unwanted packets. You need to include two default rules; ".
+            "one that logs packets that have not been accepted by previous " .
+            "rules (this rule should have a logging prefix of " .
+            "\"$config{'FW_MSG_SEARCH'}\"), and a final rule that drops any " .
+            "unwanted packets.\n",
+            {$fw_check_file => 1});
+        &Psad::logr("\n", {$fw_check_file => 1});
+        &Psad::logr("    FOR EXAMPLE:  Assuming you have already setup " .
+            "iptables rules to accept traffic you want to accept, you can " .
+            "probably execute the following two commands to have iptables " .
+            "log and drop unwanted packets in the $chain chain by " .
+            "default.\n",
+            {$fw_check_file => 1});
+        &Psad::logr("\n", {$fw_check_file => 1});
+        &Psad::logr("              iptables -A $chain -j LOG --log-prefix " .
+            "\" $config{'FW_MSG_SEARCH'}\"\n", {$fw_check_file => 1});
+        &Psad::logr("              iptables -A $chain -j DROP\n\n",
+            {$fw_check_file => 1});
+        &Psad::logr(" ** Psad will not detect in the iptables $chain chain " .
+            "scans without an iptables ruleset that includes rules similar " .
+            "to the two rules above.\n",
+            {$fw_check_file => 1});
+        &Psad::logr("\n", {$fw_check_file => 1});
+    }
     return;
 }
 

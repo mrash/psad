@@ -1,0 +1,33 @@
+# (C) Copyright 2001,2002, Martin Roesch, Brian Caswell, et al.
+#    All rights reserved.
+# $Id$
+# ---------------
+# SHELLCODE RULES
+# ---------------
+# These signatures are based on shellcode that is common ammong multiple
+# publicly available exploits.
+#
+# Because these signatures check ALL traffic for shellcode, these signatures
+# are disabled by default.  There is a LARGE performance hit by enabling
+# these signatures.
+#
+
+alert ip $EXTERNAL_NET any -> $HOME_NET $SHELLCODE_PORTS (msg:"SHELLCODE sparc setuid 0"; content: "|82102017 91d02008|"; reference:arachnids,282; classtype:system-call-detect; sid:647; rev:3;)
+alert ip $EXTERNAL_NET any -> $HOME_NET $SHELLCODE_PORTS (msg:"SHELLCODE x86 setgid 0"; content: "|b0b5 cd80|"; reference:arachnids,284; classtype:system-call-detect; sid:649; rev:5;)
+alert ip $EXTERNAL_NET any -> $HOME_NET $SHELLCODE_PORTS (msg:"SHELLCODE x86 setuid 0"; content: "|b017 cd80|"; reference:arachnids,436; classtype:system-call-detect; sid:650; rev:5;)
+alert ip $EXTERNAL_NET any -> $HOME_NET $SHELLCODE_PORTS (msg:"SHELLCODE SGI NOOP"; content:"|03e0 f825 03e0 f825 03e0 f825 03e0 f825|"; reference:arachnids,356; classtype:shellcode-detect; sid:638; rev:3;)
+alert ip $EXTERNAL_NET any -> $HOME_NET $SHELLCODE_PORTS (msg:"SHELLCODE SGI NOOP"; content:"|240f 1234 240f 1234 240f 1234 240f 1234|"; reference:arachnids,357; classtype:shellcode-detect; sid:639; rev:3;)
+alert ip $EXTERNAL_NET any -> $HOME_NET $SHELLCODE_PORTS (msg:"SHELLCODE aix NOOP"; content:"|4fff fb82 4fff fb82 4fff fb82 4fff fb82|"; classtype:shellcode-detect; sid:640; rev:3;)
+alert ip $EXTERNAL_NET any -> $HOME_NET $SHELLCODE_PORTS (msg:"SHELLCODE digital unix NOOP"; content:"|47 ff 04 1f 47 ff 04 1f 47 ff 04 1f 47 ff 04 1f|"; reference:arachnids,352; classtype:shellcode-detect; sid:641; rev:3;)
+alert ip $EXTERNAL_NET any -> $HOME_NET $SHELLCODE_PORTS (msg:"SHELLCODE hpux NOOP"; content:"|0821 0280 0821 0280 0821 0280 0821 0280|"; reference:arachnids,358; classtype:shellcode-detect; sid:642; rev:3;)
+alert ip $EXTERNAL_NET any -> $HOME_NET $SHELLCODE_PORTS (msg:"SHELLCODE hpux NOOP"; content:"|0b39 0280 0b39 0280 0b39 0280 0b39 0280|";reference:arachnids,359; classtype:shellcode-detect; sid:643; rev:3;)
+alert ip $EXTERNAL_NET any -> $HOME_NET $SHELLCODE_PORTS (msg:"SHELLCODE sparc NOOP"; content:"|13c0 1ca6 13c0 1ca6 13c0 1ca6 13c0 1ca6|"; reference:arachnids,345; classtype:shellcode-detect; sid:644; rev:3;)
+alert ip $EXTERNAL_NET any -> $HOME_NET $SHELLCODE_PORTS (msg:"SHELLCODE sparc NOOP"; content:"|801c 4011 801c 4011 801c 4011 801c 4011|"; reference:arachnids,353; classtype:shellcode-detect; sid:645; rev:3;)
+alert ip $EXTERNAL_NET any -> $HOME_NET $SHELLCODE_PORTS (msg:"SHELLCODE sparc NOOP"; content:"|a61c c013 a61c c013 a61c c013 a61c c013|"; reference:arachnids,355; classtype:shellcode-detect; sid:646; rev:3;)
+alert ip $EXTERNAL_NET any -> $HOME_NET $SHELLCODE_PORTS (msg:"SHELLCODE x86 NOOP"; content: "|90 90 90 90 90 90 90 90 90 90 90 90 90 90|"; depth: 128; reference:arachnids,181; classtype:shellcode-detect; sid:648; rev:5;)
+alert ip $EXTERNAL_NET any -> $HOME_NET $SHELLCODE_PORTS (msg:"SHELLCODE x86 stealth NOOP";   content: "|eb 02 eb 02 eb 02|"; reference:arachnids,291; classtype:shellcode-detect; sid:651; rev:5;)
+alert ip $EXTERNAL_NET any -> $HOME_NET $SHELLCODE_PORTS (msg:"SHELLCODE x86 unicode NOOP"; content: "|90009000900090009000|"; classtype:shellcode-detect; sid:653; rev:5;)
+alert ip $EXTERNAL_NET any -> $HOME_NET $SHELLCODE_PORTS (msg:"SHELLCODE linux shellcode"; content:"|90 90 90 e8 c0 ff ff ff|/bin/sh";  reference:arachnids,343; classtype:shellcode-detect; sid:652; rev:5;)
+alert ip $EXTERNAL_NET any -> $HOME_NET $SHELLCODE_PORTS (msg:"SHELLCODE x86 inc ebx NOOP"; content:"|43 43 43 43 43 43 43 43 43 43 43 43 43 43 43 43 43 43 43 43 43 43 43 43|"; classtype:shellcode-detect; sid:1390; rev:3;)
+alert ip $EXTERNAL_NET any -> $HOME_NET $SHELLCODE_PORTS (msg:"SHELLCODE x86 NOOP"; content:"|61 61 61 61 61 61 61 61 61 61 61 61 61 61 61 61 61 61 61 61 61|"; classtype:shellcode-detect; sid:1394; rev:3;)
+alert ip $EXTERNAL_NET any -> $HOME_NET $SHELLCODE_PORTS (msg:"SHELLCODE x86 EB OC NOOP"; content:"|EB 0C EB 0C EB 0C EB 0C EB 0C EB 0C EB 0C EB 0C|"; classtype:shellcode-detect; sid:1424; rev:4;)

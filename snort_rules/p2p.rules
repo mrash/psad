@@ -1,0 +1,23 @@
+# (C) Copyright 2001,2002, Martin Roesch, Brian Caswell, et al.
+#    All rights reserved.
+# $Id$
+#-------------
+# P2P RULES
+#-------------
+# These signatures look for usage of P2P protocols, which are usually
+# against corporate policy
+
+alert tcp $HOME_NET any -> $EXTERNAL_NET 8888 (msg:"P2P napster login"; flow:to_server,established; content:"|00 0200|"; offset:1; depth:3; classtype:misc-activity; sid:549;  rev:5;)
+alert tcp $HOME_NET any -> $EXTERNAL_NET 8888 (msg:"P2P napster new user login"; flow:to_server,established; content:"|00 0600|"; offset:1; depth:3; classtype:misc-activity; sid:550;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 8888 (msg:"P2P napster download attempt"; flow:to_server,established; content:"|00 cb00|"; offset:1; depth:3; classtype:misc-activity; sid:551;  rev:4;)
+alert tcp $EXTERNAL_NET 8888 -> $HOME_NET any (msg:"P2P napster upload request"; flow:from_server,established; content:"|00 5f02|"; offset:1; depth:3; classtype:misc-activity; sid:552;  rev:4;)
+alert tcp $HOME_NET any -> $EXTERNAL_NET !80 (msg:"P2P GNUTella GET"; flow:to_server,established; content:"GET "; offset:0; depth:4; classtype:misc-activity; sid:1432;  rev:3;)
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (msg:"P2P Outbound GNUTella client request"; flow:to_server,established; content:"GNUTELLA CONNECT"; depth:40; classtype:misc-activity; sid:556;  rev:4;)
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (msg:"P2P GNUTella client request"; flow:to_server,established; content:"GNUTELLA OK"; depth:40; classtype:misc-activity; sid:557;  rev:5;)
+alert tcp $HOME_NET any <> $EXTERNAL_NET 6699 (msg:"P2P Napster Client Data"; flow:established; content:".mp3"; nocase; classtype:misc-activity; sid:561;  rev:5;)
+alert tcp $HOME_NET any <> $EXTERNAL_NET 7777 (msg:"P2P Napster Client Data"; flow:to_server,established; content:".mp3"; nocase; classtype:misc-activity; sid:562;  rev:4;)
+alert tcp $HOME_NET any <> $EXTERNAL_NET 6666 (msg:"P2P Napster Client Data"; flow:established; content:".mp3"; nocase; classtype:misc-activity; sid:563;  rev:5;)
+alert tcp $HOME_NET any <> $EXTERNAL_NET 5555 (msg:"P2P Napster Client Data"; flow:established; content:".mp3"; nocase; classtype:misc-activity; sid:564;  rev:5;)
+alert tcp $HOME_NET any <> $EXTERNAL_NET 8875 (msg:"P2P Napster Server Login"; flow:established; content:"anon@napster.com"; classtype:misc-activity; sid:565; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 1214 (msg:"P2P Fastrack  (kazaa/morpheus) GET request"; flow:to_server,established; content:"GET "; depth:4; reference:url,www.musiccity.com/technology.htm; reference:url,www.kazaa.com; classtype:protocol-command-decode; sid:1383;  rev:3;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 1214 (msg:"P2P Fastrack (kazaa/morpheus) traffic"; flow:to_server,established; content:"X-Kazaa-Username"; reference:url,www.kazaa.com; classtype:protocol-command-decode; sid:1699;  rev:2;)

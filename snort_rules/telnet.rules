@@ -1,0 +1,26 @@
+# (C) Copyright 2001,2002, Martin Roesch, Brian Caswell, et al.
+#    All rights reserved.
+# $Id$
+#-------------
+# TELNET RULES
+#-------------
+#
+# These signatures are based on various telnet exploits and unpassword
+# protected accounts.
+#
+
+
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"TELNET solaris memory mismanagement exploit attempt"; flow:to_server,established; content:"|A0 23 A0 10 AE 23 80 10 EE 23 BF EC 82 05 E0 D6 90 25 E0|"; classtype:shellcode-detect; sid:1430; rev:5;)
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"TELNET SGI telnetd format bug"; flow:to_server,established; content:"_RLD"; content:"bin/sh"; reference:arachnids,304; classtype:attempted-admin; sid:711; rev:5;)
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"TELNET ld_library_path"; flow:to_server,established; content:"ld_library_path"; reference:cve,CVE-1999-0073; reference:arachnids,367; classtype:attempted-admin; sid:712; rev:5;)
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"TELNET livingston DOS"; flow:to_server,established; content:"|fff3 fff3 fff3 fff3 fff3|"; reference:arachnids,370; classtype:attempted-dos; sid:713; rev:5;)
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"TELNET resolv_host_conf"; flow:to_server,established; content:"resolv_host_conf"; reference:arachnids,369; classtype:attempted-admin; sid:714; rev:4;)
+alert tcp $TELNET_SERVERS 23 -> $EXTERNAL_NET any (msg:"TELNET Attempted SU from wrong group"; flow:from_server,established; content:"to su root"; nocase; classtype:attempted-admin; sid:715; rev:6;)
+alert tcp $TELNET_SERVERS 23 -> $EXTERNAL_NET any (msg:"TELNET not on console"; flow:from_server,established; content:"not on system console"; nocase; reference:arachnids,365; classtype:bad-unknown; sid:717; rev:6;)
+alert tcp $TELNET_SERVERS 23 -> $EXTERNAL_NET any (msg:"TELNET login incorrect"; content:"Login incorrect"; flow:from_server,established; reference:arachnids,127; classtype:bad-unknown; sid:718; rev:6;)
+alert tcp $TELNET_SERVERS 23 -> $EXTERNAL_NET any (msg:"TELNET root login"; content:"login\: root"; flow:from_server,established; classtype:suspicious-login; sid:719; rev:5;)
+alert tcp $TELNET_SERVERS 23 -> $EXTERNAL_NET any (msg:"TELNET bsd telnet exploit response"; flow:from_server,established; content: "|0D0A|[Yes]|0D0A FFFE 08FF FD26|"; classtype: attempted-admin; sid:1252; rev:8; reference:bugtraq,3064; reference:cve,CAN-2001-0554;)
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"TELNET bsd exploit client finishing"; flow:to_client,established; dsize:>200; content:"|FF F6 FF F6 FF FB 08 FF F6|"; offset:200; depth:50; classtype:successful-admin; sid:1253; reference:bugtraq,3064; reference:cve,CAN-2001-0554; rev:7;)
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"TELNET 4Dgifts SGI account attempt"; flow:to_server,established; content:"4Dgifts"; reference:cve,CAN-1999-0501; classtype:suspicious-login; sid:709; rev:6;)
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"TELNET EZsetup account attempt"; flow:to_server,established; content:"OutOfBox"; reference:cve,CAN-1999-0501; classtype:suspicious-login; sid:710; rev:6;)
+alert tcp $TELNET_SERVERS 23 -> $EXTERNAL_NET any (msg:"TELNET access"; flow:from_server,established; content:"|FF FD 18 FF FD 1F FF FD 23 FF FD 27 FF FD 24|"; reference:arachnids,08; reference:cve,CAN-1999-0619; classtype:not-suspicious; sid:716; rev:5;)

@@ -1,0 +1,24 @@
+# (C) Copyright 2001,2002, Martin Roesch, Brian Caswell, et al.
+#    All rights reserved.
+# $Id$
+# ---------------
+# SNMP RULES
+# ---------------
+#
+alert udp $EXTERNAL_NET any -> $HOME_NET 161 (msg:"SNMP missing community string attempt"; content:"|04 00|"; offset:5; depth:15; reference:cve,CAN-1999-0517; classtype:misc-attack; sid:1893; rev:1;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 161 (msg:"SNMP null community string attempt"; content:"|04 01 00|"; offset:5; depth:15; reference:cve,CAN-1999-0517; classtype:misc-attack; sid:1892; rev:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 161:162 (msg:"SNMP community string buffer overflow attempt"; content:"|02 01 00 04 82 01 00|"; offset:4; reference:url,www.cert.org/advisories/CA-2002-03.html; reference:cve,CAN-2002-0012; reference:cve,CAN-2002-0013; classtype:misc-attack; sid:1409; rev:3;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 161:162 (msg:"SNMP community string buffer overflow attempt (with evasion)"; content:" | 04 82 01 00 |"; offset: 7; depth: 5; reference:url,www.cert.org/advisories/CA-2002-03.html; reference:cve,CAN-2002-0012; reference:cve,CAN-2002-0013; classtype:misc-attack; sid:1422; rev:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 161 (msg:"SNMP public access udp"; content:"public"; reference:cve,CAN-1999-0517; reference:cve,CAN-2002-0012; reference:cve,CAN-2002-0013; sid:1411; rev:3; classtype:attempted-recon;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 161 (msg:"SNMP public access tcp"; flow:to_server,established; content:"public"; reference:cve,CAN-1999-0517; reference:cve,CAN-2002-0012; reference:cve,CAN-2002-0013; sid:1412; classtype:attempted-recon; rev:5;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 161 (msg:"SNMP private access udp"; content:"private"; reference:cve,CAN-2002-0012; reference:cve,CAN-2002-0013; sid:1413; rev:2; classtype:attempted-recon;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 161 (msg:"SNMP private access tcp"; flow:to_server,established; content:"private"; reference:cve,CAN-2002-0012; reference:cve,CAN-2002-0013; sid:1414; classtype:attempted-recon; rev:4;)
+alert udp any any -> 255.255.255.255 161 (msg:"SNMP Broadcast request"; reference:cve,CAN-2002-0012; reference:cve,CAN-2002-0013; sid:1415; rev:2; classtype:attempted-recon;)
+alert udp any any -> 255.255.255.255 162 (msg:"SNMP broadcast trap"; reference:cve,CAN-2002-0012; reference:cve,CAN-2002-0013; sid:1416; rev:2; classtype:attempted-recon;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 161 (msg:"SNMP request udp"; reference:cve,CAN-2002-0012; reference:cve,CAN-2002-0013; sid:1417; rev:2; classtype:attempted-recon;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 161 (msg:"SNMP request tcp"; reference:cve,CAN-2002-0012; reference:cve,CAN-2002-0013; sid:1418; rev:2; classtype:attempted-recon;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 162 (msg:"SNMP trap udp"; reference:cve,CAN-2002-0012; reference:cve,CAN-2002-0013;  sid:1419; rev:2; classtype:attempted-recon;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 162 (msg:"SNMP trap tcp"; reference:cve,CAN-2002-0012; reference:cve,CAN-2002-0013; sid:1420; rev:2; classtype:attempted-recon;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 705 (msg:"SNMP AgentX/tcp request"; reference:cve,CAN-2002-0012; reference:cve,CAN-2002-0013; sid:1421; rev:2; classtype:attempted-recon;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 161 (msg:"SNMP PROTOS test-suite-req-app attempt"; content: "|30 26 02 01 00 04 06 70 75 62 6C 69 63 A0 19 02 01 00 02 01 00 02 01 00 30 0E 30 0C 06 08 2B 06 01 02 01 01 05 00 05 00|"; reference:url,www.ee.oulu.fi/research/ouspg/protos/testing/c06/snmpv1/index.html; classtype:misc-attack; sid:1426; rev:3;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 162 (msg:"SNMP PROTOS test-suite-trap-app attempt"; content:"|30 38 02 01 00 04 06 70 75 62 6C 69 63 A4 2B 06|"; reference:url,www.ee.oulu.fi/research/ouspg/protos/testing/c06/snmpv1/index.html; classtype:misc-attack; sid:1427; rev:3;)

@@ -1,0 +1,28 @@
+# (C) Copyright 2001,2002, Martin Roesch, Brian Caswell, et al.
+#    All rights reserved.
+# $Id$
+# ----------------
+# ATTACK RESPONSES
+# ----------------
+# These signatures are those when they happen, its usually because a machine
+# has been compromised.  These should not false that often and almost always
+# mean a compromise.
+
+alert tcp $HTTP_SERVERS $HTTP_PORTS -> $EXTERNAL_NET any (msg:"ATTACK RESPONSES http dir listing"; content: "Volume Serial Number"; flow:from_server,established; classtype:bad-unknown; sid:1292; rev:4;)
+alert tcp $HTTP_SERVERS $HTTP_PORTS -> $EXTERNAL_NET any (msg:"ATTACK RESPONSES command completed"; content:"Command completed"; nocase; flow:from_server,established; classtype:bad-unknown; sid:494; rev:5;)
+alert tcp $HTTP_SERVERS $HTTP_PORTS -> $EXTERNAL_NET any (msg:"ATTACK RESPONSES command error"; content:"Bad command or filename"; nocase; flow:from_server,established; classtype:bad-unknown; sid:495; rev:5;)
+alert tcp $HTTP_SERVERS $HTTP_PORTS -> $EXTERNAL_NET any (msg:"ATTACK RESPONSES file copied ok"; content:"1 file(s) copied"; nocase; flow:from_server,established; classtype:bad-unknown; sid:497; rev:5;)
+alert tcp $HTTP_SERVERS $HTTP_PORTS -> $EXTERNAL_NET any (msg:"ATTACK RESPONSES Invalid URL"; content:"Invalid URL"; nocase; flow:from_server,established; reference:url,www.microsoft.com/technet/security/bulletin/MS00-063.asp; classtype:attempted-recon; sid:1200; rev:7;)
+alert tcp $HTTP_SERVERS $HTTP_PORTS -> $EXTERNAL_NET any (msg:"ATTACK RESPONSES index of /cgi-bin/ response"; flow:from_server,established; content:"Index of /cgi-bin/"; nocase; classtype:bad-unknown; sid:1666; rev:3;)
+alert tcp $HTTP_SERVERS $HTTP_PORTS -> $EXTERNAL_NET any (msg:"ATTACK RESPONSES 403 Forbidden"; flow:from_server,established; content:"HTTP/1.1 403"; depth:12; classtype:attempted-recon; sid:1201; rev:6;)
+alert ip any any -> any any (msg:"ATTACK RESPONSES id check returned root"; content: "uid=0(root)"; classtype:bad-unknown; sid:498; rev:3;)
+alert tcp $HOME_NET 8002 -> $EXTERNAL_NET any (msg:"ATTACK RESPONSES oracle one hour install"; flow:from_server,established; content:"Oracle Applications One-Hour Install"; classtype:bad-unknown; sid:1464; rev:2;)
+alert tcp $HTTP_SERVERS $HTTP_PORTS -> $EXTERNAL_NET any (msg:"ATTACK RESPONSES id check returned www"; flow:from_server,established; content:"uid="; content:"(www)"; classtype:bad-unknown; sid:1882; rev:2;)
+alert tcp $HTTP_SERVERS $HTTP_PORTS -> $EXTERNAL_NET any (msg:"ATTACK RESPONSES id check returned nobody"; flow:from_server,established; content:"uid="; content:"(nobody)"; classtype:bad-unknown; sid:1883; rev:2;)
+alert tcp $HTTP_SERVERS $HTTP_PORTS -> $EXTERNAL_NET any (msg:"ATTACK RESPONSES id check returned web"; flow:from_server,established; content:"uid="; content:"(web)"; classtype:bad-unknown; sid:1884; rev:2;)
+alert tcp $HTTP_SERVERS $HTTP_PORTS -> $EXTERNAL_NET any (msg:"ATTACK RESPONSES id check returned http"; flow:from_server,established; content:"uid="; content:"(http)"; classtype:bad-unknown; sid:1885; rev:2;)
+alert tcp $HTTP_SERVERS $HTTP_PORTS -> $EXTERNAL_NET any (msg:"ATTACK RESPONSES id check returned apache"; flow:from_server,established; content:"uid="; content:"(apache)"; classtype:bad-unknown; sid:1886; rev:2;)
+alert tcp $HOME_NET 749 -> $EXTERNAL_NET any (msg:"ATTACK-RESPONSE successful kadmind bufferflow attempt"; flow:established,from_server; content:"*GOBBLE*"; depth:8; reference:cve,CAN-2002-1235; reference:url,www.kb.cert.org/vuls/id/875073; classtype:successful-admin; sid:1900; rev:1;)
+alert tcp $HOME_NET 751 -> $EXTERNAL_NET any (msg:"ATTACK-RESPONSE successful kadmind bufferflow attempt"; flow:established,from_server; content:"*GOBBLE*"; depth:8; reference:cve,CAN-2002-1235; reference:url,www.kb.cert.org/vuls/id/875073; classtype:successful-admin; sid:1901; rev:1;)
+alert tcp $HOME_NET 22 -> $EXTERNAL_NET any (msg:"ATTACK-RESPONSE successful gobbles ssh exploit (GOBBLE)"; flow:from_server,established; content:"|2a|GOBBLE|2a|"; reference:bugtraq,5093; classtype:successful-admin; sid:1810; rev:2;)
+alert tcp $HOME_NET 22 -> $EXTERNAL_NET any (msg:"ATTACK-RESPONSE successful gobbles ssh exploit (uname)"; flow:from_server,established; content:"uname"; reference:bugtraq,5093; classtype:misc-attack; sid:1811; rev:2;)

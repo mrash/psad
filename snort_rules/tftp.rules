@@ -1,0 +1,22 @@
+# (C) Copyright 2001,2002, Martin Roesch, Brian Caswell, et al.
+#    All rights reserved.
+# $Id$
+#-----------
+# TFTP RULES
+#-----------
+#
+# These signatures are based on TFTP traffic.  These include malicious files
+# that are distrubted via TFTP.
+#
+# The last two signatures refer to generic GET and PUT via TFTP, which is
+# generally frowned upon on most networks, but may be used in some enviornments
+
+alert udp any any -> any 69 (msg:"TFTP filename overflow attempt"; content: "|0001|"; offset:0; depth:2; content:!"|00|"; within:100; reference:cve,CAN-2002-0813; reference:bugtraq,5328; classtype:bad-unknown; sid:1941; rev:2;)
+alert udp any any -> any 69 (msg:"TFTP GET Admin.dll"; content: "|0001|"; offset:0; depth:2; content:"admin.dll"; offset:2; nocase; classtype:successful-admin; reference:url,www.cert.org/advisories/CA-2001-26.html; sid:1289; rev:2;)
+alert udp any any -> any 69 (msg:"TFTP GET nc.exe"; content: "|0001|"; offset:0; depth:2; content:"nc.exe"; offset:2; nocase; classtype:successful-admin; sid:1441; rev:2;)
+alert udp any any -> any 69 (msg:"TFTP GET shadow"; content: "|0001|"; offset:0; depth:2; content:"shadow"; offset:2; nocase; classtype:successful-admin; sid:1442; rev:2;)
+alert udp any any -> any 69 (msg:"TFTP GET passwd"; content: "|0001|"; offset:0; depth:2; content:"passwd"; offset:2; nocase; classtype:successful-admin; sid:1443; rev:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 69 (msg:"TFTP parent directory"; content:".."; offset:2; reference:cve,CAN-2002-1209; reference:arachnids,137; reference:cve,CVE-1999-0183; classtype:bad-unknown; sid:519; rev:3;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 69 (msg:"TFTP root directory"; content:"|0001|/"; offset:0; depth:3; reference:arachnids,138; reference:cve,CVE-1999-0183; classtype:bad-unknown; sid:520; rev:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 69 (msg:"TFTP Put"; content:"|00 02|"; offset:0; depth:2; reference:cve,CVE-1999-0183; reference:arachnids,148; classtype:bad-unknown; sid:518; rev:3;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 69 (msg:"TFTP Get"; content:"|00 01|"; offset:0; depth:2; classtype:bad-unknown; sid:1444; rev:2;)

@@ -1,0 +1,83 @@
+# (C) Copyright 2001,2002, Martin Roesch, Brian Caswell, et al.
+#    All rights reserved.
+# $Id$
+#---------------
+# BACKDOOR RULES
+#---------------
+#
+
+alert tcp $EXTERNAL_NET 27374 -> $HOME_NET any (msg:"BACKDOOR subseven 22"; flow:to_server,established; content:"|0d0a5b52504c5d3030320d0a|"; reference:arachnids,485; reference:url,www.hackfix.org/subseven/; classtype:misc-activity; sid:103; rev:5;)
+ alert tcp $HOME_NET 16959 -> $EXTERNAL_NET any (msg:"BACKDOOR subseven DEFCON8 2.1 access"; flow:from_server,established; content:"PWD"; classtype:trojan-activity; sid:107; rev:6;)
+
+
+alert tcp $HOME_NET 12345:12346 -> $EXTERNAL_NET any (msg:"BACKDOOR netbus active"; flow:from_server,established; content:"NetBus"; reference:arachnids,401; classtype:misc-activity;  sid:109; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 12345:12346 (msg:"BACKDOOR netbus getinfo"; flow:to_server,established; content:"GetInfo|0d|"; reference:arachnids,403; classtype:misc-activity; sid:110; rev:3;)
+alert tcp $HOME_NET 20034 -> $EXTERNAL_NET any (msg:"BACKDOOR netbus active"; flow:to_server,established; content:"NetBus";  reference:arachnids,401; classtype:misc-activity; sid:115; rev:4;)
+
+# 3150, 4120
+alert udp $EXTERNAL_NET any -> $HOME_NET 2140 (msg:"BACKDOOR DeepThroat 3.1 Connection attempt"; content:"00"; depth:2; classtype:misc-activity; sid:1980; rev:1;)
+alert udp $HOME_NET 2140 -> $EXTERNAL_NET any (msg:"BACKDOOR DeepThroat 3.1 Server Response"; content:"Ahhhh My Mouth Is Open"; reference:arachnids,106; sid:195;  classtype:misc-activity; rev:4;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 3150 (msg:"BACKDOOR DeepThroat 3.1 Connection attempt [3150]"; content:"00"; depth:2; classtype:misc-activity; sid:1981; rev:1;)
+alert udp $HOME_NET 3150 -> $EXTERNAL_NET any (msg:"BACKDOOR DeepThroat 3.1 Server Response [3150]"; content:"Ahhhh My Mouth Is Open"; reference:arachnids,106; classtype:misc-activity; sid:1982; rev:1;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 4120 (msg:"BACKDOOR DeepThroat 3.1 Connection attempt [4120]"; content:"00"; depth:2; classtype:misc-activity; sid:1983; rev:1;)
+alert udp $HOME_NET 4120 -> $EXTERNAL_NET any (msg:"BACKDOOR DeepThroat 3.1 Server Response [4120]"; content:"Ahhhh My Mouth Is Open"; reference:arachnids,106; classtype:misc-activity; sid:1984; rev:1;)
+
+
+alert tcp $HOME_NET 6789 -> $EXTERNAL_NET any (msg:"BACKDOOR Doly 2.0 access"; content: "|57 74 7a 75 70 20 55 73 65|"; flags: A+; depth: 32;  reference:arachnids,312; sid:119;  classtype:misc-activity; rev:3;)
+alert tcp $HOME_NET any -> $EXTERNAL_NET 1094 (msg:"BACKDOOR Doly 1.5 server response"; flow:from_server,established; content:"Connected."; classtype:trojan-activity; sid:1985; rev:1;)
+
+
+alert tcp $EXTERNAL_NET 1024: -> $HOME_NET 2589 (msg:"BACKDOOR - Dagger_1.4.0_client_connect"; flags: A+; content: "|0b 00 00 00 07 00 00 00|Connect"; depth: 16; reference:url,www.tlsecurity.net/backdoor/Dagger.1.4.html; reference:arachnids,483; sid:104;  classtype:misc-activity; rev:4;)
+alert tcp $HOME_NET 2589 -> $EXTERNAL_NET 1024: (msg:"BACKDOOR - Dagger_1.4.0"; flags: A+; content: "|3200000006000000|Drives|2400|"; depth: 16; reference:arachnids,484; reference:url,www.tlsecurity.net/backdoor/Dagger.1.4.html; sid:105;  classtype:misc-activity; rev:4;)
+alert tcp $EXTERNAL_NET 80 -> $HOME_NET 1054 (msg:"BACKDOOR ACKcmdC trojan scan"; seq: 101058054; ack: 101058054; flags: A;reference:arachnids,445; sid:106;  classtype:misc-activity; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 7597 (msg:"BACKDOOR QAZ Worm Client Login access"; flags: A+; content:"|71 61 7a 77 73 78 2e 68 73 71|"; reference:MCAFEE,98775; sid:108;  classtype:misc-activity; rev:3;)
+
+
+alert tcp $HOME_NET 146 -> $EXTERNAL_NET 1024: (msg:"BACKDOOR Infector.1.x"; content: "WHATISIT"; flags: A+; reference:arachnids,315; sid:117;  classtype:misc-activity; rev:3;)
+alert tcp $HOME_NET 666 -> $EXTERNAL_NET 1024: (msg:"BACKDOOR SatansBackdoor.2.0.Beta"; content: "Remote|3A| You are connected to me."; flags:A+;  reference:arachnids,316; sid:118;  classtype:misc-activity; rev:3;)
+alert tcp $HOME_NET 146 -> $EXTERNAL_NET 1000:1300 (msg:"BACKDOOR Infector 1.6 Server to Client"; content:"|57 48 41 54 49 53 49 54|"; flags:A+; sid:120;  classtype:misc-activity; rev:3;)
+alert tcp $EXTERNAL_NET 1000:1300 -> $HOME_NET 146 (msg:"BACKDOOR Infector 1.6 Client to Server Connection Request"; content:"|46 43 20|"; flags:A+; sid:121;  classtype:misc-activity; rev:3;)
+
+alert tcp $HOME_NET 31785 -> $EXTERNAL_NET any (msg:"BACKDOOR HackAttack 1.20 Connect"; flags: A+; content:"host"; sid:141;  classtype:misc-activity; rev:3;)
+
+alert tcp $EXTERNAL_NET !80 -> $HOME_NET 21554 (msg:"BACKDOOR GirlFriendaccess"; flags: A+; content:"Girl"; reference:arachnids,98; sid:145;  classtype:misc-activity; rev:3;)
+alert tcp $HOME_NET 30100 -> $EXTERNAL_NET any (msg:"BACKDOOR NetSphere access"; flags: A+; content:"NetSphere"; reference:arachnids,76; sid:146;  classtype:misc-activity; rev:3;)
+alert tcp $HOME_NET 6969 -> $EXTERNAL_NET any (msg:"BACKDOOR GateCrasher"; flags: A+; content:"GateCrasher";reference:arachnids,99; sid:147;  classtype:misc-activity; rev:3;)
+alert tcp $HOME_NET 5401:5402 -> $EXTERNAL_NET any (msg:"BACKDOOR BackConstruction 2.1 Connection"; flags: A+; content:"c|3A|\\"; sid:152;  classtype:misc-activity; rev:3;)
+alert tcp $HOME_NET 23476 -> $EXTERNAL_NET any (msg:"BACKDOOR DonaldDick 1.53 Traffic"; flags: A+; content:"pINg"; sid:153;  classtype:misc-activity; rev:3;)
+alert tcp $HOME_NET 30100:30102 -> $EXTERNAL_NET any (msg:"BACKDOOR NetSphere 1.31.337 access"; flags: A+; content:"NetSphere";  reference:arachnids,76; sid:155;  classtype:misc-activity; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 666 (msg:"BACKDOOR BackConstruction 2.1 Client FTP Open Request"; flags: A+; content:"FTPON"; sid:157;  classtype:misc-activity; rev:3;)
+alert tcp $HOME_NET 666 -> $EXTERNAL_NET any (msg:"BACKDOOR BackConstruction 2.1 Server FTP Open Reply"; flags: A+; content:"FTP Port open"; sid:158;  classtype:misc-activity; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 5032 (msg:"BACKDOOR NetMetro File List"; flow:to_server,established; content:"|2D 2D|";  reference:arachnids,79; sid:159;  classtype:misc-activity; rev:4;)
+#alert tcp $EXTERNAL_NET 5031 -> $HOME_NET !53:80 (msg:"BACKDOOR NetMetro Incoming Traffic"; flags: A+;  reference:arachnids,79; classtype:misc-activity; sid:160; rev:2;)
+alert udp $EXTERNAL_NET 3344 -> $HOME_NET 3345 (msg:"BACKDOOR Matrix 2.0 Client connect"; content:"activate"; reference:arachnids,83; sid:161;  classtype:misc-activity; rev:3;)
+alert udp $EXTERNAL_NET 3345 -> $HOME_NET 3344 (msg:"BACKDOOR Matrix 2.0 Server access"; content:"logged in";  reference:arachnids,83; sid:162;  classtype:misc-activity; rev:3;)
+alert tcp $HOME_NET 5714 -> $EXTERNAL_NET any (msg:"BACKDOOR WinCrash 1.0 Server Active" ; flags:SA; content:"|B4 B4|";  reference:arachnids,36; sid:163;  classtype:misc-activity; rev:3;)
+alert icmp 255.255.255.0/24 any -> $HOME_NET any (msg:"BACKDOOR SIGNATURE - Q ICMP"; itype: 0; dsize: >1; reference:arachnids,202; sid:183;  classtype:misc-activity; rev:3;)
+alert tcp 255.255.255.0/24 any -> $HOME_NET any (msg:"BACKDOOR Q access"; flags:A+; dsize: >1;  reference:arachnids,203; sid:184;  classtype:misc-activity; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 79 (msg:"BACKDOOR CDK"; content: "ypi0ca"; nocase; flags: A+; depth: 15;  reference:arachnids,263; sid:185;  classtype:misc-activity; rev:3;)
+
+
+
+alert tcp $HOME_NET 555 -> $EXTERNAL_NET any (msg:"BACKDOOR PhaseZero Server Active on Network"; flags: A+; content:"phAse"; sid:208;  classtype:misc-activity; rev:3;)
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"BACKDOOR w00w00 attempt";flags: A+; content:"w00w00"; reference:arachnids,510; classtype:attempted-admin; sid:209; rev:3;)
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"BACKDOOR attempt"; flags: A+; content:"backdoor"; nocase; classtype:attempted-admin; sid:210; rev:2;)
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"BACKDOOR MISC r00t attempt";flags: A+; content:"r00t"; classtype:attempted-admin; sid:211; rev:2;)
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"BACKDOOR MISC rewt attempt";flags: A+; content:"rewt"; classtype:attempted-admin; sid:212; rev:2;)
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"BACKDOOR MISC linux rootkit attempt";flags: A+; content:"wh00t!"; classtype:attempted-admin; sid:213; rev:2;)
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"BACKDOOR MISC linux rootkit attempt lrkr0x";flags: A+; content:"lrkr0x"; classtype:attempted-admin; sid:214; rev:2;)
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"BACKDOOR MISC linux rootkit attempt";flags: A+; content:"d13hh["; nocase; classtype:attempted-admin; sid:215; rev:2;)
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"BACKDOOR MISC linux rootkit satori attempt";flags: A+; content:"satori"; reference:arachnids,516; classtype:attempted-admin; sid:216; rev:4;)
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"BACKDOOR MISC sm4ck attempt";flags: A+; content:"hax0r"; classtype:attempted-admin; sid:217; rev:2;)
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"BACKDOOR MISC solaris 2.5 attempt";flags: A+; content:"friday"; classtype:attempted-user; sid:218; rev:2;)
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"BACKDOOR HidePak backdoor attempt";flags: A+; content:"StoogR"; sid:219;  classtype:misc-activity; rev:4;)
+alert tcp $EXTERNAL_NET any -> $TELNET_SERVERS 23 (msg:"BACKDOOR HideSource backdoor attempt";flags: A+; content:"wank"; sid:220;  classtype:misc-activity; rev:4;)
+alert tcp $EXTERNAL_NET 31790 -> $HOME_NET 31789 (msg:"BACKDOOR hack-a-tack attempt"; content: "A"; depth: 1; reference:arachnids,314; flags:A+; classtype:attempted-recon; sid:614; rev:2;)
+alert ip any any -> 216.80.99.202 any (msg:"BACKDOOR fragroute trojan connection attempt"; reference:bugtraq,4898; classtype:trojan-activity; sid:1791; rev:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 35555 (msg:"BACKDOOR win-trin00 connection attempt"; content:"png []..Ks l44"; offset:0; depth:14; reference:cve,CAN-2000-0138; reference:nessus,10307; classtype:attempted-admin; sid:1853; rev:3;)
+
+
+# NOTES: this string should be within the first 3 bytes of the connection
+alert tcp $EXTERNAL_NET any -> $HOME_NET 33270 (msg:"BACKDOOR trinity connection attempt"; flow:to_server,established; content:"|21 40 23|"; offset:0; depth:3; reference:nessus,10501; reference:cve,CAN-2000-0138; classtype:attempted-admin; sid:1843; rev:3;)
+alert tcp any any -> 212.146.0.34 1963 (msg:"BACKDOOR TCPDUMP/PCAP trojan traffic"; reference:url,hlug.fscker.com; classtype:trojan-activity; sid:1929; rev:3;)
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (msg:"BACKDOOR SubSeven 2.1 Gold server connection response"; flow:from_server,established; content:"connected. time/date\: "; depth:22; content:"version\: GOLD 2.1"; distance:1; classtype:misc-activity; sid:2100; rev:1;)

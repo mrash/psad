@@ -1,0 +1,355 @@
+# (C) Copyright 2001,2002, Martin Roesch, Brian Caswell, et al.
+#    All rights reserved.
+# $Id$
+#---------------
+# WEB-MISC RULES
+#---------------
+
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC cross site scripting attempt"; flow:to_server,established; content:"<SCRIPT>"; nocase; classtype:web-application-attack; sid:1497; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC cross site scripting \(img src=javascript\) attempt"; flow:to_server,established; content:"img src=javascript"; nocase; classtype:web-application-attack; sid:1667; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Cisco IOS HTTP configuration attempt"; uricontent:"/level/"; uricontent:"/exec/"; flow:to_server,established; classtype:web-application-attack; reference:bugtraq,2936; sid:1250; rev:7;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Netscape Enterprise DOS"; content:"REVLOG / "; offset:0; depth:9; flow:to_server,established; reference:cve,CAN-2001-0251; reference:bugtraq,2294; classtype:web-application-attack; sid:1047; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Netscape Enterprise directory listing attempt"; content:"INDEX "; offset:0; depth:6; flow:to_server,established; reference:cve,CAN-2001-0250; reference:bugtraq,2285; classtype:web-application-attack; sid:1048;  rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC iPlanet GETPROPERTIES attempt"; flow:to_server,established; content:"GETPROPERTIES"; offset:0; depth:13; classtype:web-application-attack; sid:1050;  rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC weblogic view source attempt"; flow:to_server,established; uricontent:".js%70"; reference:bugtraq,2527; classtype:web-application-attack; sid:1054;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC tomcat directory traversal attempt"; flow:to_server,established; uricontent:"%00.jsp"; reference:bugtraq,2518;  classtype:web-application-attack; sid:1055;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC tomcat view source attempt"; flow:to_server,established; uricontent:"%252ejsp"; reference:bugtraq,2527; classtype:web-application-attack; sid:1056;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC ftp attempt"; flow:to_server,established; content:"ftp.exe"; nocase; classtype:web-application-activity; sid:1057;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC enumdsn attempt"; flow:to_server,established; content:"xp_enumdsn"; nocase; classtype:web-application-attack; sid:1058;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC filelist attempt"; flow:to_server,established; content:"xp_filelist"; nocase; classtype:web-application-attack; sid:1059;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC availablemedia attempt"; flow:to_server,established; content:"xp_availablemedia"; nocase; classtype:web-application-attack; sid:1060;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC cmdshell attempt"; flow:to_server,established; content:"xp_cmdshell"; nocase; classtype:web-application-attack; sid:1061;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC nc.exe attempt"; flow:to_server,established; content:"nc.exe"; nocase; classtype:web-application-activity; sid:1062;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC wsh attempt"; flow:to_server,established; content:"wsh.exe"; nocase; classtype:web-application-activity; sid:1064;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC rcmd attempt"; flow:to_server,established; content:"rcmd.exe"; nocase; classtype:web-application-activity; sid:1065;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC telnet attempt"; flow:to_server,established; content:"telnet.exe"; nocase; classtype:web-application-activity; sid:1066;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC net attempt"; flow:to_server,established; content:"net.exe"; nocase; classtype:web-application-activity; sid:1067;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC tftp attempt"; flow:to_server,established; content:"tftp.exe"; nocase; classtype:web-application-activity; sid:1068;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC xp_regread attempt"; flow:to_server,established; content:"xp_regread"; nocase; classtype:web-application-activity; sid:1069; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC xp_regwrite attempt"; flow:to_server,established; content:"xp_regwrite"; nocase; classtype:web-application-activity; sid:1977; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC xp_regdeletekey attempt"; flow:to_server,established; content:"xp_regdeletekey"; nocase; classtype:web-application-activity; sid:1978; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC webdav search access"; flow:to_server,established; content: "SEARCH "; depth: 8; nocase;reference:arachnids,474; classtype:web-application-activity; sid:1070;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC .htpasswd access"; flow:to_server,established; content:".htpasswd"; nocase; classtype:web-application-attack; sid:1071;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Lotus Domino directory traversal"; uricontent:".nsf/"; uricontent:"../"; nocase; flow:to_server,established; reference:cve,CVE-2001-0009; reference:bugtraq,2173; classtype:web-application-attack; sid:1072;  rev:6;)
+# alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC webhits.exe access"; flow:to_server,established; uricontent:"/scripts/samples/search/webhits.exe"; nocase; classtype:web-application-activity; sid:1073;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC postinfo.asp access"; flow:to_server,established; uricontent:"/scripts/postinfo.asp"; nocase; classtype:web-application-activity; sid:1075;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC queryhit.htm access"; flow:to_server,established; uricontent:"/samples/search/queryhit.htm"; nocase; classtype:web-application-activity; sid:1077;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC counter.exe access"; flow:to_server,established; uricontent:"/scripts/counter.exe"; nocase; reference:bugtraq,267; classtype:web-application-activity; sid:1078;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC webdav propfind access"; content:"<a\:propfind"; nocase; content:"xmlns\:a=\"DAV\">"; nocase; flow:to_server,established; reference:bugtraq,1656; reference:cve,CVE-2000-0869; classtype:web-application-activity; sid:1079;  rev:7;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC unify eWave ServletExec upload"; uricontent:"/servlet/com.unify.servletexec.UploadServlet"; nocase; flow:to_server,established; classtype:web-application-attack; sid:1080; reference:bugtraq,1868; reference:cve,CVE-2000-1024; rev:7;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC netscape servers suite DOS"; flow:to_server,established; uricontent:"/dsgw/bin/search?context="; nocase; classtype:web-application-attack; sid:1081; reference:bugtraq,1868; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC amazon 1-click cookie theft"; flow:to_server,established; content:"ref%3Cscript%20language%3D%22Javascript"; nocase; classtype:web-application-attack; sid:1082; reference:bugtraq,1194; reference:cve,CVE-2000-0439; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC unify eWave ServletExec DOS"; flow:to_server,established; uricontent:"/servlet/ServletExec"; classtype:web-application-activity; sid:1083;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Allaire JRUN DOS attempt"; flow:to_server,established; content:"servlet/......."; nocase; classtype:web-application-attack; sid:1084; reference:bugtraq,2337; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC PHP strings overflow"; flow:to_server,established; content: "|ba49feffff f7d2 b9bfffffff f7d1|"; reference:bugtraq,802; reference:arachnids,431; classtype:web-application-attack; sid:1085;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC PHP strings overflow"; flow:to_server,established; content: "?STRENGUR ";reference:arachnids,430; classtype:web-application-attack; sid:1086;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC ICQ Webfront HTTP DOS"; flow:to_server,established; uricontent:"??????????"; classtype:web-application-attack; sid:1091;  rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Talentsoft Web+ Source Code view access"; flow:to_server,established; uricontent:"/webplus.exe?script=test.wml";reference:bugtraq,1722; classtype:web-application-attack; sid:1095;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Talentsoft Web+ internal IP Address access"; flow:to_server,established; uricontent:"/webplus.exe?about";reference:bugtraq,1720; classtype:web-application-activity; sid:1096;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC SmartWin CyberOffice Shopping Cart access"; flow:to_server,established; uricontent:"_private/shopping_cart.mdb"; reference:bugtraq,1734; classtype:web-application-attack; sid:1098;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC cybercop scan"; flow:to_server,established; uricontent:"/cybercop"; nocase; reference:arachnids,374; classtype:web-application-activity; sid:1099;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC L3retriever HTTP Probe"; content: "User-Agent|3a| Java1.2.1|0d0a|"; flow:to_server,established; reference:arachnids,310; classtype:web-application-activity; sid:1100;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Webtrends HTTP probe"; content: "User-Agent|3a| Webtrends Security Analyzer|0d0a|"; flow:to_server,established; reference:arachnids,309; classtype:web-application-activity; sid:1101;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Nessus 404 probe"; flow:to_server,established; uricontent: "/nessus_is_probing_you_"; depth: 32;reference:arachnids,301; classtype:web-application-activity; sid:1102;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC netscape admin passwd"; flow:to_server,established; uricontent:"/admin-serv/config/admpw"; nocase;reference:bugtraq,1579; classtype:web-application-attack; sid:1103;  rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC BigBrother access"; flow:to_server,established; uricontent:"/bb-hostsvc.sh?HOSTSVC"; nocase; classtype:attempted-recon; sid:1105;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC ftp.pl attempt"; flow:to_server,established; uricontent:"/ftp.pl?dir=../.."; nocase; reference:cve,CAN-2000-0674; reference:bugtraq,1471; reference:nessus,10467; classtype:web-application-attack; sid:1612; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC ftp.pl access"; flow:to_server,established; uricontent:"/ftp.pl"; nocase; reference:cve,CAN-2000-0674; reference:bugtraq,1471; reference:nessus,10467; classtype:web-application-activity; sid:1107; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Tomcat server snoop access"; flow:to_server,established; uricontent:"/jsp/snp/"; uricontent:".snp"; reference:cve,CAN-2000-0760; reference:bugtraq,1532; classtype:attempted-recon; sid:1108;  rev:8;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC ROXEN directory list attempt"; flow:to_server,established; uricontent:"|2F 25 30 30|"; reference:bugtraq,1510; reference:cve,CVE-2000-0671; classtype:attempted-recon; sid:1109;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC apache source.asp file access"; flow:to_server,established; uricontent:"/site/eg/source.asp"; nocase;reference:bugtraq,1457; reference:cve,CVE-2000-0628; classtype:attempted-recon; sid:1110;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC tomcat server exploit access"; flow:to_server,established; uricontent:"/contextAdmin/contextAdmin.html"; nocase; classtype:attempted-recon; sid:1111;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC http directory traversal"; flow:to_server,established; content: "..\\";reference:arachnids,298; classtype:attempted-recon; sid:1112;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC ICQ webserver DOS"; flow:to_server,established; uricontent:".html/......"; nocase; reference:cve,CVE-1999-0474; classtype:attempted-dos; sid:1115;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Lotus DelDoc attempt"; flow:to_server,established; uricontent:"?DeleteDocument"; nocase; classtype:attempted-recon; sid:1116;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Lotus EditDoc attempt"; flow:to_server,established; uricontent:"?EditDocument"; nocase; classtype:attempted-recon; reference:url,www.securiteam.com/exploits/5NP080A1RE.html; sid:1117;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC ls%20-l"; flow:to_server,established; content:"ls%20-l"; nocase; classtype:attempted-recon; sid:1118;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC mlog.phtml access"; flow:to_server,established; uricontent:"/mlog.phtml"; nocase; reference:bugtraq,713; reference:cve,CVE-1999-0346; classtype:attempted-recon; sid:1119;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC mylog.phtml access"; flow:to_server,established; uricontent:"/mylog.phtml"; nocase; reference:bugtraq,713; reference:cve,CVE-1999-0346; classtype:attempted-recon; sid:1120;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC /etc/passwd"; flow:to_server,established; content:"/etc/passwd"; nocase; classtype:attempted-recon; sid:1122;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC ?PageServices access"; flow:to_server,established; uricontent:"?PageServices"; nocase; reference:bugtraq,1063; reference:cve,CVE-1999-0269; classtype:attempted-recon; sid:1123;  rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Ecommerce check.txt access"; flow:to_server,established; uricontent:"/config/check.txt"; nocase; classtype:attempted-recon; sid:1124;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC webcart access"; flow:to_server,established; uricontent:"/webcart/"; nocase; reference:nessus,10298; reference:cve,CAN-1999-0610; classtype:attempted-recon; sid:1125; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC AuthChangeUrl access"; flow:to_server,established; uricontent:"_AuthChangeUrl?"; nocase; classtype:attempted-recon; sid:1126; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC convert.bas access"; flow:to_server,established; uricontent:"/scripts/convert.bas"; nocase; reference:bugtraq,2025; reference:cve,CVE-1999-0175; classtype:attempted-recon; sid:1127;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC cpshost.dll access"; flow:to_server,established; uricontent:"/scripts/cpshost.dll"; nocase; classtype:attempted-recon; sid:1128;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC .htaccess access"; flow:to_server,established; content:".htaccess"; nocase; classtype:attempted-recon; sid:1129;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC .wwwacl access"; flow:to_server,established; uricontent:".wwwacl"; nocase; classtype:attempted-recon; sid:1130;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC .wwwacl access"; flow:to_server,established; uricontent:".www_acl"; nocase; classtype:attempted-recon; sid:1131;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"SCAN cybercop os probe"; content: "AAAAAAAAAAAAAAAA"; flags:SFP; ack: 0; depth: 16;reference:arachnids,145; classtype:attempted-recon; sid:1133; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Phorum admin access"; flow:to_server,established; uricontent:"/admin.php3"; nocase; reference:bugtraq,2271; reference:arachnids,205; classtype:attempted-recon; sid:1134;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC cd.."; flow:to_server,established; content:"cd.."; nocase; classtype:attempted-recon; sid:1136;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Phorum auth access"; flow:to_server,established; content:"PHP_AUTH_USER=boogieman"; nocase;  reference:bugtraq,2274; reference:arachnids,206; classtype:attempted-recon; sid:1137;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Cisco Web DOS attempt"; flow:to_server,established; content: "|20 2F 25 25|"; depth: 16; reference:arachnids,275; classtype:attempted-dos; sid:1138;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC guestbook.pl access"; flow:to_server,established; uricontent:"/guestbook.pl"; nocase; reference:nessus,10099; reference:bugtraq,776; reference:cve,CVE-1999-0237; reference:arachnids,228; classtype:attempted-recon; sid:1140; rev:7;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC handler attempt"; flow:to_server,established; uricontent:"/handler"; uricontent:"\|"; nocase; reference:nessus,10100; reference:bugtraq,380; reference:arachnids,235; reference:cve,CVE-1999-0148; classtype:web-application-attack; sid:1613; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC handler access"; flow:to_server,established; uricontent:"/handler"; nocase; reference:nessus,10100; reference:bugtraq,380; reference:arachnids,235; reference:cve,CVE-1999-0148; classtype:web-application-activity; sid:1141; rev:7;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC /...."; flow:to_server,established; content:"|2f2e2e2e2e|"; classtype:attempted-recon; sid:1142;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC ///cgi-bin"; flow:to_server,established; uricontent:"///cgi-bin"; nocase; classtype:attempted-recon; sid:1143;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC /cgi-bin/// access"; flow:to_server,established; uricontent:"/cgi-bin///"; nocase; classtype:attempted-recon; sid:1144;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC /~root access"; flow:to_server,established; uricontent:"/~root"; nocase; classtype:attempted-recon; sid:1145;  rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC /~ftp access"; flow:to_server,established; uricontent:"/~ftp"; nocase; classtype:attempted-recon; sid:1662;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Ecommerce import.txt access"; flow:to_server,established; uricontent:"/config/import.txt"; nocase; classtype:attempted-recon; sid:1146;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC cat%20 access"; flow:to_server,established; content:"cat%20"; nocase; reference:cve,CVE-1999-0039; reference:bugtraq,374; classtype:attempted-recon; sid:1147;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Ecommerce import.txt access"; flow:to_server,established; uricontent:"/orders/import.txt"; nocase; classtype:attempted-recon; sid:1148;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Domino catalog.nsf access"; flow:to_server,established; uricontent:"/catalog.nsf"; nocase; classtype:attempted-recon; sid:1150;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Domino domcfg.nsf access"; flow:to_server,established; uricontent:"/domcfg.nsf"; nocase; classtype:attempted-recon; sid:1151;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Domino domlog.nsf access"; flow:to_server,established; uricontent:"/domlog.nsf"; nocase; classtype:attempted-recon; sid:1152;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Domino log.nsf access"; flow:to_server,established; uricontent:"/log.nsf"; nocase; classtype:attempted-recon; sid:1153;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Domino names.nsf access"; flow:to_server,established; uricontent:"/names.nsf"; nocase; classtype:attempted-recon; sid:1154;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Domino mab.nsf access"; flow:to_server,established; uricontent:"/mab.nsf"; nocase; classtype:attempted-recon; sid:1575;  rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Domino cersvr.nsf access"; flow:to_server,established; uricontent:"/cersvr.nsf"; nocase; classtype:attempted-recon; sid:1576;  rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Domino setup.nsf access"; flow:to_server,established; uricontent:"/setup.nsf"; nocase; classtype:attempted-recon; sid:1577;  rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Domino statrep.nsf access"; flow:to_server,established; uricontent:"/statrep.nsf"; nocase; classtype:attempted-recon; sid:1578;  rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Domino webadmin.nsf access"; flow:to_server,established; uricontent:"/webadmin.nsf"; nocase; classtype:attempted-recon; sid:1579;  rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Domino events4.nsf access"; flow:to_server,established; uricontent:"/events4.nsf"; nocase; classtype:attempted-recon; sid:1580;  rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Domino ntsync4.nsf access"; flow:to_server,established; uricontent:"/ntsync4.nsf"; nocase; classtype:attempted-recon; sid:1581;  rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Domino collect4.nsf access"; flow:to_server,established; uricontent:"/collect4.nsf"; nocase; classtype:attempted-recon; sid:1582;  rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Domino mailw46.nsf access"; flow:to_server,established; uricontent:"/mailw46.nsf"; nocase; classtype:attempted-recon; sid:1583;  rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Domino bookmark.nsf access"; flow:to_server,established; uricontent:"/bookmark.nsf"; nocase; classtype:attempted-recon; sid:1584;  rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Domino agentrunner.nsf access"; flow:to_server,established; uricontent:"/agentrunner.nsf"; nocase; classtype:attempted-recon; sid:1585;  rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Domino mail.box access"; flow:to_server,established; uricontent:"/mail.box"; nocase; classtype:attempted-recon; sid:1586;  rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Ecommerce checks.txt access"; flow:to_server,established; uricontent:"/orders/checks.txt"; nocase; classtype:attempted-recon; sid:1155;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC apache DOS attempt"; flow:to_server,established; content:"|2f2f2f2f2f2f2f2f|"; classtype:attempted-dos; sid:1156;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC netscape PublishingXpert 2 Exploit"; flow:to_server,established; uricontent:"/PSUser/PSCOErrPage.htm?"; nocase; reference:cve,CAN-2000-1196; classtype:attempted-recon; sid:1157;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC windmail.exe access"; flow:to_server,established; uricontent:"/windmail.exe"; nocase; reference:cve,CAN-2000-0242; reference:bugtraq,1073; reference:arachnids,465; reference:nessus,10365; classtype:attempted-recon; sid:1158; rev:7;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC webplus access"; content:"webplus?script"; nocase; flow:to_server,established; reference:cve,CVE-2000-1005; reference:bugtraq,1174; reference:bugtraq,1720; reference:bugtraq,1722; reference:bugtraq,1725; classtype:attempted-recon; sid:1159;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC netscape dir index wp"; flow:to_server,established; content: "?wp-"; nocase; reference:bugtraq,1063; reference:cve,CVE-2000-0236; reference:arachnids,270; classtype:attempted-recon; sid:1160;  rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC piranha passwd.php3 access"; flow:to_server,established; uricontent: "/passwd.php3"; reference:bugtraq,1149; reference:cve,CVE-2000-0322; reference:arachnids,272; classtype:attempted-recon; sid:1161;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC cart 32 AdminPwd access"; flow:to_server,established; uricontent:"/c32web.exe/ChangeAdminPassword"; nocase; reference:cve,CAN-2000-0429; reference:bugtraq,1153; classtype:attempted-recon; sid:1162;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC shopping cart access access"; uricontent:"/quikstore.cfg"; nocase; flow:to_server,established; classtype:attempted-recon; sid:1164;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC novell groupwise gwweb.exe attempt"; flow:to_server,established; content:"/GWWEB.EXE?HELP="; nocase; reference:bugtraq,879; reference:cve,CAN-1999-1006; classtype:attempted-recon; sid:1614;  rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC novell groupwise gwweb.exe access"; flow:to_server,established; content:"/GWWEB.EXE"; nocase; reference:bugtraq,879; reference:cve,CAN-1999-1006; classtype:attempted-recon; sid:1165;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC ws_ftp.ini access"; uricontent:"/ws_ftp.ini"; nocase; flow:to_server,established; reference:cve,CAN-1999-1078; reference:bugtraq,547; classtype:attempted-recon; sid:1166;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC rpm_query access"; flow:to_server,established; uricontent:"/rpm_query"; nocase; reference:cve,CVE-2000-0192; reference:bugtraq,1036; classtype:attempted-recon; sid:1167;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC mall log order access"; uricontent:"/mall_log_files/order.log"; nocase; flow:to_server,established; classtype:attempted-recon; sid:1168;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC architext_query.pl access"; uricontent:"/ews/architext_query.pl"; nocase; flow:to_server,established; classtype:attempted-recon; sid:1173;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC wwwboard.pl access"; uricontent:"/wwwboard.pl"; nocase; flow:to_server,established; reference:bugtraq,649; reference:bugtraq,1795; reference:cve,CAN-1999-0930; classtype:attempted-recon; sid:1175;  rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC order.log access"; uricontent:"/admin_files/order.log"; nocase; flow:to_server,established; classtype:attempted-recon; sid:1176;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Netscape Enterprise Server directory view"; flow:to_server,established; uricontent:"?wp-verify-link";nocase;reference:bugtraq,1063; classtype:attempted-recon; sid:1177;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Phorum read access"; flow:to_server,established; uricontent:"/read.php3"; nocase;  reference:arachnids,208; classtype:attempted-recon; sid:1178;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Phorum violation access"; flow:to_server,established; uricontent:"/violation.php3"; nocase; reference:bugtraq,2272; reference:arachnids,209; classtype:attempted-recon; sid:1179;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC get32.exe access"; flow:to_server,established; uricontent:"/get32.exe"; nocase; reference:bugtraq,1485; reference:arachnids,258; classtype:attempted-recon; sid:1180;  rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Annex Terminal DOS attempt"; flow:to_server,established; uricontent:"/ping?query="; reference:cve,CAN-1999-1070; reference:arachnids,260; classtype:attempted-dos; sid:1181; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC cgitest.exe attempt"; flow:to_server,established; uricontent:"/cgitest.exe|0d0a|user"; nocase; reference:nessus,10623; reference:nessus,10040; reference:cve,CVE-2000-0521; reference:bugtraq,3885; reference:arachnids,265; classtype:web-application-attack; sid:1182; rev:11;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC cgitest.exe access"; flow:to_server,established; uricontent:"/cgitest.exe"; nocase; reference:nessus,10623; reference:cve,CVE-2000-0521; reference:nessus,10040; reference:bugtraq,3885; reference:arachnids,265; classtype:web-application-activity; sid:1587; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Netscape Enterprise Server directory view"; flow:to_server,established; uricontent:"?wp-cs-dump"; nocase; reference:cve,CVE-2000-0236; reference:bugtraq,1063; classtype:attempted-recon; sid:1183;  rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Netscape Enterprise Server directory view"; flow:to_server,established; uricontent:"?wp-ver-info"; nocase; reference:bugtraq,1063; classtype:attempted-recon; sid:1184;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Netscape Enterprise Server directory view"; flow:to_server,established; uricontent:"?wp-ver-diff"; nocase; reference:bugtraq,1063; classtype:attempted-recon; sid:1186;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC SalesLogix Eviewer web command attempt"; flow:to_server,established; uricontent:"/slxweb.dll/admin?command="; nocase; reference:bugtraq,1089; reference:cve,CAN-2000-0289; classtype:web-application-attack; sid:1187;  rev:7;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC SalesLogix Eviewer access"; flow:to_server,established; uricontent:"/slxweb.dll"; nocase; reference:bugtraq,1089; reference:cve,CAN-2000-0289; classtype:web-application-activity; sid:1588;  rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Netscape Enterprise Server directory view"; flow:to_server,established; uricontent:"?wp-start-ver";nocase;reference:bugtraq,1063; classtype:attempted-recon; sid:1188;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Netscape Enterprise Server directory view"; flow:to_server,established; uricontent:"?wp-stop-ver"; nocase; reference:bugtraq,1063; classtype:attempted-recon; sid:1189;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Netscape Enterprise Server directory view"; flow:to_server,established; uricontent:"?wp-uncheckout"; nocase; reference:bugtraq,1063; classtype:attempted-recon; sid:1190;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Netscape Enterprise Server directory view"; flow:to_server,established; uricontent:"?wp-html-rend"; nocase; reference:bugtraq,1063; classtype:attempted-recon; sid:1191;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Trend Micro OfficeScan attempt"; flow:to_server,established; uricontent:"/officescan/cgi/jdkRqNotify.exe?"; nocase; uricontent:"domain="; nocase; uricontent:"event="; nocase; reference:bugtraq,1057; classtype:attempted-recon; sid:1381;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Trend Micro OfficeScan access"; flow:to_server,established; uricontent:"/officescan/cgi/jdkRqNotify.exe"; nocase; reference:bugtraq,1057; classtype:attempted-recon; sid:1192;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC oracle web arbitrary command execution attempt"; flow:to_server,established; uricontent:"/ows-bin/"; nocase; uricontent:"?&"; reference:cve,CVE-2000-0169; reference:bugtraq,1053; reference:nessus,10348; classtype:web-application-attack; sid:1193; rev:7;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC oracle web application server access"; flow:to_server,established; uricontent:"/ows-bin/"; nocase; reference:cve,CVE-2000-0169; reference:bugtraq,1053; reference:nessus,10348; classtype:web-application-activity; sid:1880; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Phorum code access"; flow:to_server,established; uricontent:"/code.php3"; nocase;  reference:arachnids,207; classtype:attempted-recon; sid:1197;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Netscape Enterprise Server directory view"; flow:to_server,established; uricontent:"?wp-usr-prop"; nocase;reference:bugtraq,1063; classtype:web-application-attack; sid:1198;  rev:6;)
+
+
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC search.vts access"; flow:to_server,established; uricontent:"/search.vts"; classtype:attempted-recon; sid:1202;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC htgrep attempt"; flow:to_server,established; uricontent:"/htgrep"; content:"hdr=/"; classtype:web-application-attack; reference:cve,CAN-2000-0832; sid:1615;  rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC htgrep access"; flow:to_server,established; uricontent:"/htgrep"; classtype:web-application-activity; reference:cve,CAN-2000-0832; sid:1207;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC .nsconfig access"; flow:to_server,established; uricontent:"/.nsconfig"; classtype:attempted-recon; sid:1209;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Admin_files access"; flow:to_server,established; uricontent:"/admin_files"; nocase; classtype:attempted-recon; sid:1212;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC backup access"; flow:to_server,established; uricontent:"/backup"; nocase; classtype:attempted-recon; sid:1213;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC intranet access"; flow:to_server,established; uricontent:"/intranet/"; nocase; classtype:attempted-recon; sid:1214;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC filemail access"; flow:to_server,established; uricontent:"/filemail"; nocase; classtype:attempted-recon; sid:1216;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC plusmail access"; flow:to_server,established; uricontent:"/plusmail"; nocase; classtype:attempted-recon; sid:1217;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC adminlogin access"; flow:to_server,established; uricontent:"/adminlogin"; nocase; classtype:attempted-recon; sid:1218;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC ultraboard access"; flow:to_server,established; uricontent:"/ultraboard"; nocase; classtype:attempted-recon; sid:1220;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC musicat empower attempt"; flow:to_server,established; uricontent:"/empower?DB="; nocase; classtype:web-application-attack; sid:1589;  rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC musicat empower access"; flow:to_server,established; uricontent:"/empower"; nocase; classtype:web-application-activity; sid:1221;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC ROADS search.pl attempt"; flow:to_server,established; uricontent:"/ROADS/cgi-bin/search.pl"; content:"form="; nocase; reference:cve,CAN-2001-0215; reference:bugtraq,2371; reference:nessus,10627; classtype:attempted-recon; sid:1224; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC VirusWall FtpSave access"; flow:to_server,established; uricontent:"/FtpSave.dll"; nocase; reference:bugtraq,2808; reference:cve,CAN-2001-0432; reference:nessus,10733; classtype:attempted-recon; sid:1230; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC VirusWall FtpSaveCSP access"; flow:to_server,established; uricontent:"/FtpSaveCSP.dll"; nocase; reference:bugtraq,2808; reference:cve,CAN-2001-0432; reference:nessus,10733; classtype:attempted-recon; sid:1234; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC VirusWall FtpSaveCVP access"; flow:to_server,established; uricontent:"/FtpSaveCVP.dll"; nocase; reference:bugtraq,2808; reference:cve,CAN-2001-0432; reference:nessus,10733; classtype:attempted-recon; sid:1235; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Tomcat sourcode view"; flow:to_server,established; uricontent:".js%2570"; nocase; classtype:attempted-recon; sid:1236;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Tomcat sourcode view"; flow:to_server,established; uricontent:".j%2573p"; nocase; classtype:attempted-recon; sid:1237;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Tomcat sourcode view"; flow:to_server,established; uricontent:".%256Asp"; nocase; classtype:attempted-recon; sid:1238;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC SWEditServlet directory traversal attempt"; uricontent:"/SWEditServlet"; content:"template=../../../"; flow:to_server,established; classtype:attempted-user; sid:1241;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC SWEditServlet access"; uricontent:"/SWEditServlet"; flow:to_server,established; classtype:attempted-recon; sid:1259;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC whisker HEAD/./"; flow:to_server,established; content:"HEAD/./"; classtype:attempted-recon; reference:url,www.wiretrip.net/rfp/pages/whitepapers/whiskerids.html; sid:1139;  rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC PHPLIB remote command attempt"; flow:to_server,established; content:"_PHPLIB[libdir]"; reference:bugtraq,3079; classtype:attempted-user; sid:1254;  rev:5;)
+alert tcp $HTTP_SERVERS any -> $EXTERNAL_NET $HTTP_PORTS (msg:"WEB-MISC PHPLIB remote command attempt"; flow:to_server,established; uricontent:"/db_mysql.inc"; reference:bugtraq,3079; classtype:attempted-user; sid:1255;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC HP Openview Manager DOS"; flow:to_server,established; uricontent:"/OvCgi/OpenView5.exe?Context=Snmp&Action=Snmp&Host=&Oid="; nocase; reference:bugtraq,2845; sid:1258;  classtype:misc-activity; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC long basic authorization string"; flow:to_server,established; content:"Authorization\: Basic "; nocase; content:!"|0A|"; within:512; classtype:attempted-dos; reference:bugtraq,3230; sid:1260; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC sml3com access"; flow:to_server,established; uricontent:"/graphics/sml3com"; classtype:web-application-activity; reference:bugtraq,2721; sid:1291;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC carbo.dll access"; flow:to_server,established; uricontent:"/carbo.dll"; content:"icatcommand="; nocase; reference:cve,CAN-1999-1069; reference:bugtraq,2126; classtype:attempted-recon; sid:1001;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC admin.php file upload attempt"; flow:to_server,established; uricontent:"/admin.php"; nocase; content:"file_name="; reference:bugtraq,3361; classtype:attempted-admin; sid:1300;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC admin.php access"; flow:to_server,established; uricontent:"/admin.php"; nocase; reference:bugtraq,3361; classtype:attempted-recon; sid:1301;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC console.exe access"; flow:to_server,established; uricontent:"/cgi-bin/console.exe"; nocase; reference:bugtraq,3375; classtype:attempted-recon; sid:1302;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC cs.exe access"; flow:to_server,established; uricontent:"/cgi-bin/cs.exe"; nocase; reference:bugtraq,3375; classtype:attempted-recon; sid:1303;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC http directory traversal"; flow:to_server,established; content: "../"; reference:arachnids,297; classtype:attempted-recon; sid:1113;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC sadmind worm access"; flow:to_server,established; content:"GET x HTTP/1.0"; offset:0; depth:15; classtype:attempted-recon; reference:url,www.cert.org/advisories/CA-2001-11.html; sid:1375;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC jrun directory browse attempt"; flow:to_server,established; uricontent:"/%3f.jsp"; classtype:web-application-attack; sid:1376;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC mod-plsql administration access"; flow:to_server,established; uricontent:"/admin_/"; reference:nessus,10849; reference:bugtraq,3726; reference:bugtraq,3727; classtype:web-application-activity; sid:1385; rev:7;)
+# alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC viewcode.jse access"; flow:to_server,established; uricontent:"/viewcode.jse"; reference:bugtraq,3715; classtype:web-application-activity; sid:1389;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Phorecast remote code execution attempt"; flow:to_server,established; content:"includedir="; reference:bugtraq,3388; classtype:web-application-attack; sid:1391;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC viewcode access"; flow:to_server,established; uricontent:"/viewcode"; classtype:web-application-attack; sid:1403;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC showcode access"; flow:to_server,established; uricontent:"/showcode"; classtype:web-application-attack; sid:1404;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC smssend.php access"; flow:to_server,established; uricontent:"/smssend.php"; classtype:web-application-activity; reference:bugtraq,3982; sid:1407;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC PHP-Nuke remote file include attempt"; flow:to_server,established; uricontent:"index.php"; nocase; content:"file=http\://"; nocase; reference:bugtraq,3889; classtype:web-application-attack; sid:1399;  rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC .history access"; flow:to_server,established; uricontent:"/.history"; classtype:web-application-attack; sid:1433;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC .bash_history access"; flow:to_server,established; uricontent:"/.bash_history"; classtype:web-application-attack; sid:1434;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC /~nobody access"; flow:to_server,established; uricontent:"/~nobody"; classtype:web-application-attack; sid:1489;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC phorum /support/common.php attempt"; flow:to_server,established; uricontent:"/support/common.php"; content:"ForumLang=../"; classtype:web-application-attack; sid:1490;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC phorum /support/common.php access"; flow:to_server,established; uricontent:"/support/common.php"; classtype:web-application-attack; sid:1491;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC RBS ISP /newuser  directory traversal attempt"; flow:to_server,established; uricontent:"/newuser?Image=../.."; classtype:web-application-attack; sid:1492;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC RBS ISP /newuser access"; flow:to_server,established; uricontent:"/newuser"; classtype:web-application-activity; sid:1493;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC *%0a.pl access"; flow:to_server,established; uricontent:"/*%0a.pl"; nocase; classtype:web-application-attack; sid:1663;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC mkplog.exe access"; flow:to_server,established; uricontent:"/mkplog.exe"; nocase; classtype:web-application-activity; sid:1664;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC mkilog.exe access"; flow:to_server,established; uricontent:"/mkilog.exe"; nocase; classtype:web-application-activity; sid:1665;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC PCCS mysql database admin tool access"; flow:to_server,established; content:"pccsmysqladm/incs/dbconnect.inc"; nocase; depth:36; reference:arachnids,300; classtype:web-application-attack; sid:509;  rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC .DS_Store access"; flow:to_server,established; uricontent:"/.DS_Store"; classtype:web-application-activity; reference:url,www.macintouch.com/mosxreaderreports46.html; sid:1769; rev:2;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC .FBCIndex access"; flow:to_server,established; uricontent:"/.FBCIndex"; classtype:web-application-activity; reference:url,www.securiteam.com/securitynews/5LP0O005FS.html; sid:1770; rev:2;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC ExAir access"; flow:to_server,established; uricontent:"/exair/search/"; reference:cve,CVE-1999-0449; classtype:web-application-activity; sid:1500; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC apache ?M=D directory list attempt"; flow:to_server,established; uricontent:"/?M=D"; classtype:web-application-activity; reference:cve,CVE-2001-0731; reference:bugtraq,3009; sid:1519; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC server-info access"; flow:to_server,established; uricontent:"/server-info"; classtype:web-application-activity; sid:1520; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC server-status access"; flow:to_server,established; uricontent:"/server-status"; classtype:web-application-activity; sid:1521; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC ans.pl attempt"; flow:to_server,established; uricontent:"/ans.pl?p=../../"; classtype:web-application-attack; reference:cve,CAN-2002-0307; reference:nessus,10875; reference:bugtraq,4147; reference:bugtraq,4149; sid:1522; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC ans.pl access"; flow:to_server,established; uricontent:"/ans.pl"; classtype:web-application-activity; reference:cve,CAN-2002-0307; reference:nessus,10875; reference:bugtraq,4147; reference:bugtraq,4149; sid:1523; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC AxisStorpoint CD attempt"; flow:to_server,established; uricontent:"/cd/../config/html/cnf_gi.htm"; classtype:web-application-attack; reference:cve,CAN-2000-0191; sid:1524; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Axis Storpoint CD access"; flow:to_server,established; uricontent:"/config/html/cnf_gi.htm"; classtype:web-application-activity; reference:cve,CAN-2000-0191; sid:1525; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC basilix sendmail.inc access"; flow:to_server,established; uricontent:"/inc/sendmail.inc"; reference:nessus,10601; reference:cve,CAN-2001-1044; classtype:web-application-activity; sid:1526; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC basilix mysql.class access"; flow:to_server,established; uricontent:"/class/mysql.class"; reference:nessus,10601; reference:cve,CAN-2001-1044; classtype:web-application-activity; sid:1527; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC BBoard access"; flow:to_server,established; uricontent:"/servlet/sunexamples.BBoardServlet"; classtype:web-application-activity; reference:nessus,10507; reference:cve,CAN-2000-0629; sid:1528; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Cisco Catalyst command execution attempt"; flow:to_server,established; uricontent:"/exec/show/config/cr"; nocase; reference:cve,CAN-2000-0945; classtype:web-application-activity; sid:1544; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC cisco /%% DOS attempt"; flow:to_server,established; uricontent:"/%%"; classtype:web-application-attack; sid:1546; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC /CVS/Entries access"; flow:to_server,established; uricontent:"/CVS/Entries"; classtype:web-application-activity; sid:1551; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC cvsweb version access"; flow:to_server,established; uricontent:"/cvsweb/version"; reference:cve,CAN-2000-0670; classtype:web-application-activity; sid:1552; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC /doc/packages access"; flow:to_server,established; uricontent:"/doc/packages"; nocase; classtype:web-application-activity; sid:1559; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC /doc/ access"; flow:to_server,established; uricontent:"/doc/"; nocase; reference:cve,CVE-1999-0678; reference:bugtraq,318; classtype:web-application-activity; sid:1560; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC ?open access"; flow:to_server,established; uricontent:"?open"; nocase; classtype:web-application-activity; sid:1561; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC login.htm attempt"; flow:to_server,established; uricontent:"/login.htm?password="; nocase; reference:cve,CAN-1999-1533; classtype:web-application-activity; sid:1563; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC login.htm access"; flow:to_server,established; uricontent:"/login.htm"; nocase; reference:cve,CAN-1999-1533; classtype:web-application-activity; sid:1564; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC /exchange/root.asp attempt"; flow:to_server,established; uricontent:"/exchange/root.asp?acs=anon"; nocase; classtype:web-application-attack; sid:1567; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC /exchange/root.asp access"; flow:to_server,established; uricontent:"/exchange/root.asp"; nocase; classtype:web-application-activity; sid:1568; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC DELETE attempt"; flow:to_server,established; content:"DELETE "; offset:0; depth:7; nocase; classtype:web-application-activity; sid:1603; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC /home/ftp access"; flow:to_server,established; uricontent:"/home/ftp"; nocase; classtype:web-application-activity; sid:1670; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC /home/www access"; flow:to_server,established; uricontent:"/home/www"; nocase; classtype:web-application-activity; sid:1671; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC global.inc access"; flow:to_server,established; uricontent:"/global.inc"; nocase; reference:bugtraq,4612; classtype:web-application-attack; sid:1738; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC SecureSite authentication bypass attempt"; flow:to_server,established; content:"secure_site, ok"; nocase; reference:bugtraq,4621; classtype:web-application-attack; sid:1744; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC b2 arbitrary command execution attempt"; flow:to_server,established; uricontent:"/b2/b2-include/"; content:"b2inc"; content:"http\://"; classtype:web-application-attack; sid:1757; rev:2;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC b2 access"; flow:to_server,established; uricontent:"/b2/b2-include/"; content:"b2inc"; content:"http\://"; classtype:web-application-attack; sid:1758; rev:2;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC search.dll directory listing attempt"; flow:to_server,established; uricontent:"/search.dll"; content:"query=%00"; reference:cve,CAN-2000-0835; reference:nessus,10514; classtype:web-application-attack; sid:1766; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC search.dll access"; flow:to_server,established; uricontent:"/search.dll"; reference:nessus,10514; reference:cve,CAN-2000-0835; classtype:web-application-activity; sid:1767; rev:3;)
+
+
+# The following signatures are for non-standard ports.  When ports lists work, then these will be converted to use HTTP_PORTS & HTTP_SERVERS
+alert tcp $EXTERNAL_NET any -> $HOME_NET 8181 (msg:"WEB-MISC PIX firewall manager directory traversal attempt"; flow:to_server,established; uricontent:"/../../"; classtype:web-application-attack; sid:1498; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 4080 (msg:"WEB-MISC iChat directory traversal attempt"; flow:to_server,established; uricontent:"/../../"; classtype:web-application-activity; reference:cve,CAN-1999-0897; sid:1604;  rev:3;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 8080 (msg:"WEB-MISC Delegate whois overflow attempt"; flow:to_server,established; content:"whois\://"; nocase; reference:cve,CVE-2000-0165; classtype:web-application-activity; sid:1558; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 8000 (msg:"WEB-MISC nstelemetry.adp access"; flow:to_server,established; uricontent:"/nstelemetry.adp"; classtype:web-application-activity; sid:1518; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 457 (msg:"WEB-MISC netscape unixware overflow"; content: "|eb 5f 9a ff ff ff ff 07 ff c3 5e 31 c0 89 46 9d|"; flow:to_server,established; reference:arachnids,180; classtype:attempted-recon; sid:1132;  rev:3;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 2301 (msg:"WEB-MISC Compaq Insight directory traversal"; flow:to_server,established; uricontent: "../"; reference:bugtraq,282; reference:arachnids,244; reference:cve,CVE-1999-0771; classtype:web-application-attack; sid:1199;  rev:7;)
+
+
+# when we get real ports list, we will merge these sigs.  so for now, keep the
+# message the same.
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC VirusWall catinfo access"; flow:to_server,established; uricontent:"/catinfo"; nocase; reference:bugtraq,2808; reference:bugtraq,2579; reference:nessus,10650; reference:cve,CAN-2001-0432; classtype:attempted-recon; sid:1231; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 1812 (msg:"WEB-MISC VirusWall catinfo access"; flow:to_server,established; uricontent:"/catinfo"; nocase; reference:bugtraq,2808; reference:bugtraq,2579; reference:nessus,10650; reference:cve,CAN-2001-0432; classtype:attempted-recon; sid:1232; rev:4;)
+
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Apache Chunked-Encoding worm attempt"; flow:to_server,established; content:"CCCCCCC\: AAAAAAAAAAAAAAAAAAA"; nocase; classtype:web-application-attack; reference:bugtraq,4474; reference:cve,CAN-2002-0079;reference:bugtraq,5033; reference:cve,CAN-2002-0392; sid:1809; rev:2;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Transfer-Encoding\: chunked"; flow:to_server,established; content:"Transfer-Encoding\:"; nocase; content:"chunked"; nocase; classtype:web-application-attack; reference:bugtraq,4474; reference:cve,CAN-2002-0079; reference:bugtraq,5033; reference:cve,CAN-2002-0392; sid:1807; rev:1;)
+
+
+
+
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC CISCO VoIP DOS ATTEMPT"; flow:to_server,established; uricontent:"/StreamingStatistics"; reference:bugtraq,4794; classtype:misc-attack; sid:1814; rev:2;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC IBM Net.Commerce orderdspc.d2w access"; flow:established,to_server; uricontent:"/ncommerce3/ExecMacro/orderdspc.d2w"; reference:cve,CVE-2001-0319; reference:nessus,11020; classtype:web-application-activity; sid:1820; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC WEB-INF access"; flow:established,to_server; uricontent:"/WEB-INF"; nocase; reference:nessus,11037; classtype:web-application-activity; sid:1826; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC tomcat servlet mapping cross site scripting attempt"; flow:established,to_server; uricontent:"/servlet/"; uricontent:"/org.apache."; reference:nessus,11041; reference:bugtraq,5193; classtype:web-application-attack; sid:1827; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC iPlanet Search directory traversal attempt"; flow:established,to_server; uricontent:"/search"; content:"NS-query-pat="; content:"../../"; reference:nessus,11043; reference:bugtraq,5191; classtype:web-application-attack; sid:1828; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC tomcat TroubleShooter servlet access"; flow:established,to_server; uricontent:"/examples/servlet/TroubleShooter"; reference:nessus,11046; reference:bugtraq,4575; classtype:web-application-activity; sid:1829; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC tomcat SnoopServlet servlet access"; flow:established,to_server; uricontent:"/examples/servlet/SnoopServlet"; reference:nessus,11046; reference:bugtraq,4575; classtype:web-application-activity; sid:1830; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC jigsaw dos attempt"; flow:established,to_server; uricontent:"/servlet/con"; reference:nessus,11047; classtype:web-application-attack; sid:1831; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Macromedia SiteSpring cross site scripting attempt"; flow:established,to_server; uricontent:"/error/500error.jsp"; nocase; uricontent:"et="; uricontent:"<script"; nocase; reference:bugtraq,5249; classtype:web-application-attack; sid:1835; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC mailman cross site scripting attempt"; flow:established,to_server; uricontent:"/mailman/"; nocase; uricontent:"?"; uricontent:"info="; uricontent:"<script"; nocase; reference:bugtraq,5298; classtype:web-application-attack; sid:1839; rev:2;)
+
+
+
+# NOTES: this signature looks for access to common webalizer output directories.
+# Webalizer is a http server log reporting program.  By allowing anyone on the
+# internet to view the web access logs, attackers can gain information about
+# your customers that probably should not be made public.  webalizer had cross
+# site scripting bugs prior to version 2.01-09.
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC webalizer access"; flow:established,to_server; uricontent:"/webalizer/"; nocase; reference:nessus,10816; reference:cve,CAN-1999-0643; classtype:web-application-activity; sid:1847; rev:3;)
+
+
+# NOTES: this signature looks for someone accessing the directory webcart-lite.
+# webcart-lite allows users to access world readable plain text customer
+# information databases.  To correct this issue, users should make the
+# data directories and databases not world readable, move the files outside of
+# WEBROOT if possile, and verify that a compromise of customer information has
+# not occured.
+# SIMILAR RULES: sid:1125
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC webcart-lite access"; flow:to_server,established; uricontent:"/webcart-lite/"; nocase; reference:cve,CAN-1999-0610; reference:nessus,10298; classtype:web-application-activity; sid:1848; rev:2;)
+
+
+# NOTES: this signature looks for someone accessing the web application
+# "webfind.exe".  This application has a buffer overflow in the keywords
+# arguement.  An attacker can use this vulnerability to execute arbitrary
+# code on the web server.
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC webfind.exe access"; flow:to_server,established; uricontent:"/webfind.exe"; nocase; reference:cve,CAN-2000-0622; reference:nessus,10475; classtype:web-application-activity; sid:1849; rev:2;)
+
+
+# NOTES: this signature looks for someone accessing the web application
+# "way-board.cgi".  This application allows attackers to view arbitrary
+# files that are readable with the privilages of the web server.
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC way-board.cgi access"; flow:to_server,established; uricontent:"/way-board.cgi"; nocase; reference:nessus,10610; classtype:web-application-activity; sid:1850; rev:2;)
+
+# NOTES: this signature looks for someone accessing the file "active.log" via
+# a web server.  By allowing anyone on the internet to view the web access
+# logs, attackers can gain information about your customers that probably
+# should not be made public.
+#
+# This logfile is made available from the WebActive webserver.  This webserver
+# is no longer maintained and should be replaced with an activily maintained
+# webserver.  If converting to another webserver is not possible, remove read
+# access to this file.
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC active.log access"; flow:to_server,established; uricontent:"/active.log"; nocase; reference:nessus,10470; reference:cve,CAN-2000-0642; classtype:web-application-activity; sid:1851; rev:2;)
+
+
+
+# NOTES: this signature looks for someone accessing the file "robots.txt" via
+# web server.  This file is used to make web spider agents (including search
+# engines) more efficent.  robots.txt is often used to inform a web spider
+# which directories that the spider should ignore because the content may be
+# dynamic or restricted.  An attacker can use this information to gain insite
+# into directories that may have been deemed sensitive.
+#
+# Verify that the robots.txt does not include any sensitive information.
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC robots.txt access"; flow:to_server,established; uricontent:"/robots.txt"; nocase; reference:nessus,10302; classtype:web-application-activity; sid:1852; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC robot.txt access"; flow:to_server,established; uricontent:"/robot.txt"; nocase; reference:nessus,10302; classtype:web-application-activity; sid:1857; rev:3;)
+
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 8181 (msg:"WEB-MISC CISCO PIX Firewall Manager directory traversal attempt"; flow:to_server,established; uricontent:"/pixfir~1/how_to_login.html"; reference:bugtraq,691; reference:nessus,10819; classtype:misc-attack; sid:1858; rev:2;)
+
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 9090 (msg:"WEB-MISC Sun JavaServer default password login attempt"; flow:to_server,established; uricontent:"/servlet/admin"; content:"ae9f86d6beaa3f9ecb9a5b7e072a4138"; reference:nessus,10995; classtype:default-login-attempt; sid:1859; rev:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 8080 (msg:"WEB-MISC Linksys router default password login attempt \(\:admin\)"; flow:to_server,established; content:"Authorization\: Basic OmFkbWlu"; reference:nessus,10999; classtype:default-login-attempt; sid:1860; rev:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 8080 (msg:"EXPERIMENTAL WEB-MISC Linksys router default password login attempt \(admin\:admin\)";  flow:to_server,established; content:"Authorization\: "; nocase; content:" Basic "; nocase; content:"YWRtaW46YWRtaW4"; reference:nessus,10999; classtype:default-login-attempt; sid:1861; rev:3;)
+
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-CGI mrtg.cgi directory traversal attempt"; flow:to_server,established; uricontent:"/mrtg.cgi"; content:"cfg=/../"; reference:nessus,11001; classtype:web-application-attack; sid:1862; rev:2;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-CGI mrtg.cgi access"; flow:to_server,established; uricontent:"/mrtg.cgi"; reference:nessus,11001; classtype:web-application-activity; sid:1863; rev:2;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Oracle XSQLConfig.xml access"; flow:to_server,established; uricontent:"/XSQLConfig.xml"; reference:nessus,10855; reference:cve,CAN-2002-0568; classtype:web-application-activity; sid:1871; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Oracle Dynamic Monitoring Services (dms) access"; flow:to_server,established; uricontent:"/dms0"; reference:nessus,10848; classtype:web-application-activity; sid:1872; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC globals.jsa access"; flow:to_server,established; uricontent:"/globals.jsa"; reference:nessus,10850; reference:cve,CAN-2002-0562; classtype:web-application-activity; sid:1873; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC Oracle Java Process Manager access"; flow:to_server,established; uricontent:"/oprocmgr-status"; reference:nessus,10851; classtype:web-application-activity; sid:1874; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC bad HTTP/1.1 request, Potentially worm attack"; flow:to_server,established; content:"GET / HTTP/1.1|0d 0a 0d 0a|";  offset:0; depth:18; reference:url,securityresponse.symantec.com/avcenter/security/Content/2002.09.13.html; classtype:web-application-activity; sid:1881; rev:4;)
+# alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC whisker HEAD with large datagram"; content:"HEAD"; offset: 0; depth: 4; nocase; dsize:>512; flow:to_server,established,no_stream; classtype:attempted-recon; reference:url,www.wiretrip.net/rfp/pages/whitepapers/whiskerids.html; sid:1171; rev:7;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC whisker space splice attack"; content:"|20|"; flow:to_server,established; dsize:1; reference:arachnids,296; classtype:attempted-recon; reference:url,www.wiretrip.net/rfp/pages/whitepapers/whiskerids.html; sid:1104;  rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC whisker tab splice attack"; dsize: <5; flow:to_server,established; content: "|09|"; reference:arachnids,415; classtype:attempted-recon; reference:url,www.wiretrip.net/rfp/pages/whitepapers/whiskerids.html; sid:1087; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC apache chunked encoding memory corruption exploit attempt"; flow:established,to_server; content:"|C0 50 52 89 E1 50 51 52 50 B8 3B 00 00 00 CD 80|"; reference:bugtraq,5033; reference:cve,CAN-2002-0392; classtype:web-application-activity; sid:1808; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC /Carello/add.exe access"; flow:to_server,established; uricontent:"/Carello/add.exe"; nocase; reference:cve,CVE-2000-0396; reference:bugtraq,1245; classtype:web-application-activity; sid:1943; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC /ecscripts/ecware.exe access"; flow:to_server,established; uricontent:"/ecscripts/ecware.exe"; nocase; classtype:web-application-activity; sid:1944; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"WEB-MISC ion-p access"; flow:to_server,established; uricontent:"/ion-p"; nocase; reference:bugtraq,6091; classtype:web-application-activity; sid:1969; rev:1;)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 8888 (msg:"WEB-MISC SiteScope Service access"; flow:to_server,established; uricontent:"/SiteScope/cgi/go.exe/SiteScope"; reference:nessus,10778; classtype:web-application-activity; sid:1499; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 8888 (msg:"WEB-MISC answerbook2 admin attempt"; flow:to_server,established; content:"/cgi-bin/admin/admin"; classtype:web-application-activity; sid:1946; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 8888 (msg:"WEB-MISC answerbook2 arbitrary command execution attempt"; flow:to_server,established; content:"/ab2/"; content:"\;"; distance:1; classtype:web-application-attack; sid:1947; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET $HTTP_PORTS (msg:"WEB-MISC perl post attempt"; flow:to_server,established; content:"POST"; offset:0; depth:4; uricontent:"/perl/"; reference:bugtraq,5520; reference:nessus,11158; classtype:web-application-attack; sid:1979; rev:1;)

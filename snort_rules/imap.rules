@@ -1,0 +1,22 @@
+# (C) Copyright 2001,2002, Martin Roesch, Brian Caswell, et al.
+#    All rights reserved.
+# $Id$
+#--------------
+# IMAP RULES
+#--------------
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP login buffer overflow attempt"; flow:established,to_server; content:"LOGIN"; content:"{"; distance:0; nocase; byte_test:5,>,256,0,string,dec,relative; reference:bugtraq,6298; classtype:misc-attack; sid:1993; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP login buffer overflow attempt"; flow:established,to_server; content:" LOGIN "; content:!"|0a|"; within:100; reference:nessus,10125; reference:cve,CVE-1999-0005; classtype:attempted-user; sid:1842; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP authenticate overflow attempt"; flow:established,to_server; content:" AUTHENTICATE {"; nocase; byte_test:5,>,256,0,string,dec,relative; reference:nessus,10292; reference:cve,CVE-1999-0042; classtype:misc-attack; sid:1844; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP auth overflow attempt"; flow:established,to_server; content:" AUTH"; nocase; content:"{"; byte_test:5,>,256,0,string,dec,relative; reference:cve,CVE-1999-0005; classtype:misc-attack; sid:1930; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP lsub overflow attempt"; content:" LSUB |22 22| {"; byte_test:5,>,256,0,string,dec,relative; reference:nessus,10374; reference:cve,CAN-2000-0284; classtype:misc-attack; sid:1902; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP list overflow attempt"; flow:established,to_server; content:" LIST |22 22| {"; nocase; byte_test:5,>,256,0,string,dec,relative; reference:nessus,10374; reference:cve,CAN-2000-0284; classtype:misc-attack; sid:1845; rev:7;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP rename overflow attempt"; flow:established,to_server; content:" RENAME "; nocase; content:!"|0a|"; within:1024; reference:nessus,10374; reference:cve,CAN-2000-0284; classtype:misc-attack; sid:1903; rev:3;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP find overflow attempt"; flow:established,to_server; content:" FIND "; nocase; content:!"|0a|"; within:1024; reference:nessus,10374; reference:cve,CAN-2000-0284; classtype:misc-attack; sid:1904; rev:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP partial body buffer overflow attempt"; flow:to_server,established; content:" PARTIAL "; content:" BODY["; content:!"]"; within:1024; reference:bugtraq,4713; reference:cve,CAN-2002-0379; classtype:misc-attack; sid:1755; rev:9;)
+#alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP EXPLOIT overflow"; flow:to_server,established; content:"|E8 C0FF FFFF|/bin/sh"; classtype:attempted-admin; sid:293; rev:4;)
+#alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP EXPLOIT x86 linux overflow"; flow:to_server,established; content:"|89d8 40cd 80e8 c8ff ffff|/";reference:bugtraq,130; reference:cve,CVE-1999-0005; classtype:attempted-admin; sid:295; rev:4;)
+#alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP EXPLOIT x86 linux overflow"; flow:to_server,established; content:"|eb34 5e8d 1E89 5e0b 31d2 8956 07|";reference:bugtraq,130; reference:cve,CVE-1999-0005; classtype:attempted-admin; sid:296; rev:4;)
+#alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP EXPLOIT x86 linux overflow"; flow:to_server,established; content:"|eb35 5E80 4601 3080 4602 3080 4603 30|";reference:bugtraq,130; reference:cve,CVE-1999-0005; classtype:attempted-admin; sid:297; rev:4;)
+#alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP EXPLOIT x86 linux overflow"; flow:to_server,established; content:"|eb38 5e89f389d880460120804602|"; reference:bugtraq,130; reference:cve,CVE-1999-0005; classtype:attempted-admin; sid:298; rev:4;)
+#alert tcp $EXTERNAL_NET any -> $HOME_NET 143 (msg:"IMAP EXPLOIT x86 linux overflow"; flow:to_server,established; content:"|eb58 5E31 db83 c308 83c3 0288 5e26|"; reference:bugtraq,130; reference:cve, CVE-1999-0005; classtype:attempted-admin; sid:299; rev:4;)

@@ -1,0 +1,15 @@
+# (C) Copyright 2001,2002, Martin Roesch, Brian Caswell, et al.
+#    All rights reserved.
+# $Id$
+#----------
+# MYSQL RULES
+#----------
+#
+# These signatures detect unusual and potentually malicous mysql traffic.
+#
+# These signatures are not enabled by default as they may generate false
+# positive alarms on networks that do mysql development.
+#
+
+alert tcp $EXTERNAL_NET any -> $SQL_SERVERS 3306 (msg:"MYSQL root login attempt"; flow:to_server,established; content:"|0A 00 00 01 85 04 00 00 80 72 6F 6F 74 00|"; classtype:protocol-command-decode; sid:1775; rev:1;)
+alert tcp $EXTERNAL_NET any -> $SQL_SERVERS 3306 (msg:"MYSQL show databases attempt"; flow:to_server,established; content:"|0f 00 00 00 03|show databases"; classtype:protocol-command-decode; sid:1776; rev:1;)

@@ -1,0 +1,42 @@
+# (C) Copyright 2001,2002, Martin Roesch, Brian Caswell, et al.
+#    All rights reserved.
+# $Id$
+#-----------
+# DDOS RULES
+#-----------
+
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"DDOS TFN Probe"; id: 678; itype: 8; content: "1234";reference:arachnids,443; classtype:attempted-recon; sid:221; rev:1;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"DDOS tfn2k icmp possible communication"; itype: 0; icmp_id: 0; content: "AAAAAAAAAA"; reference:arachnids,425; classtype:attempted-dos; sid:222; rev:1;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 31335 (msg:"DDOS Trin00\:DaemontoMaster(PONGdetected)"; content:"PONG";reference:arachnids,187; classtype:attempted-recon; sid:223; rev:1;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"DDOS TFN client command BE"; itype: 0; icmp_id: 456; icmp_seq: 0; reference:arachnids,184; classtype:attempted-dos; sid:228; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 20432 (msg:"DDOS shaft client to handler"; flags: A+; reference:arachnids,254; classtype:attempted-dos; sid:230; rev:1;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 31335 (msg:"DDOS Trin00\:DaemontoMaster(messagedetected)"; content:"l44";reference:arachnids,186; classtype:attempted-dos; sid:231; rev:1;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 31335 (msg:"DDOS Trin00\:DaemontoMaster(*HELLO*detected)"; content:"*HELLO*"; reference:arachnids,185; reference:url,www.sans.org/newlook/resources/IDFAQ/trinoo.htm; classtype:attempted-dos; sid:232; rev:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 27665 (msg:"DDOS Trin00\:Attacker to Master default startup password";flags: A+; content:"betaalmostdone"; reference:arachnids,197; classtype:attempted-dos; sid:233; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 27665 (msg:"DDOS Trin00 Attacker to Master default password";flags: A+; content:"gOrave"; classtype:attempted-dos; sid:234; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 27665 (msg:"DDOS Trin00 Attacker to Master default mdie password";flags: A+; content:"killme"; classtype:bad-unknown; sid:235; rev:1;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 27444 (msg:"DDOS Trin00\:MastertoDaemon(defaultpassdetected!)"; content:"l44adsl"; reference:arachnids,197; classtype:attempted-dos; sid:237; rev:1;)
+alert icmp $HOME_NET any -> $EXTERNAL_NET any (msg:"DDOS TFN server response"; itype:0; icmp_id:123; icmp_seq:0; content: "|73 68 65 6C 6C 20 62 6F 75 6E 64 20 74 6F 20 70 6F 72 74|"; reference:arachnids,182; classtype:attempted-dos; sid:238; rev:3;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 18753 (msg:"DDOS shaft handler to agent"; content: "alive tijgu";  reference:arachnids,255; classtype:attempted-dos; sid:239; rev:1;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 20433 (msg:"DDOS shaft agent to handler"; content: "alive"; reference:arachnids,256; classtype:attempted-dos; sid:240; rev:1;)
+alert tcp $HOME_NET any <> $EXTERNAL_NET any (msg:"DDOS shaft synflood"; flags: S; seq: 674711609; reference:arachnids,253; classtype:attempted-dos; sid:241; rev:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 6838 (msg:"DDOS mstream agent to handler"; content: "newserver";  classtype:attempted-dos; sid:243; rev:1;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 10498 (msg:"DDOS mstream handler to agent"; content: "stream/"; reference:cve,CAN-2000-0138; classtype:attempted-dos; sid:244; rev:1;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 10498 (msg:"DDOS mstream handler ping to agent" ; content: "ping"; reference:cve,CAN-2000-0138; classtype:attempted-dos; sid:245; rev:1;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 10498 (msg:"DDOS mstream agent pong to handler" ; content: "pong"; classtype:attempted-dos; sid:246; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 12754 (msg:"DDOS mstream client to handler"; content: ">"; flags: A+; reference:cve,CAN-2000-0138; classtype:attempted-dos; sid:247; rev:1;)
+alert tcp $HOME_NET 12754 -> $EXTERNAL_NET any (msg:"DDOS mstream handler to client"; content: ">"; flags: A+;reference:cve,CAN-2000-0138; classtype:attempted-dos; sid:248; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 15104 (msg:"DDOS mstream client to handler"; flags: S; reference:arachnids,111; reference:cve,CAN-2000-0138; classtype:attempted-dos; sid:249; rev:1;)
+alert tcp $HOME_NET 15104 -> $EXTERNAL_NET any (msg:"DDOS mstream handler to client"; content: ">"; flags: A+; reference:cve,CAN-2000-0138; classtype:attempted-dos; sid:250; rev:1;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"DDOS - TFN client command LE"; itype: 0; icmp_id: 51201; icmp_seq: 0; reference:arachnids,183; classtype:attempted-dos; sid:251; rev:1;)
+
+
+alert icmp 3.3.3.3/32 any -> $EXTERNAL_NET any (msg:"DDOS Stacheldraht server-spoof"; itype: 0; icmp_id: 666; reference:arachnids,193; classtype:attempted-dos; sid:224; rev:1;)
+alert icmp $HOME_NET any -> $EXTERNAL_NET any (msg:"DDOS Stacheldraht server-response-gag"; content: "|73 69 63 6B 65 6E|"; itype: 0; icmp_id: 669; reference:arachnids,195; classtype:attempted-dos; sid:225; rev:1;)
+alert icmp $HOME_NET any -> $EXTERNAL_NET any (msg:"DDOS Stacheldraht server-response"; content: "|66 69 63 6B 65 6E|"; itype: 0; icmp_id: 667; reference:arachnids,191; classtype:attempted-dos; sid:226; rev:1;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"DDOS Stacheldraht client-spoofworks"; content: "|73 70 6F 6F 66 77 6F 72 6B 73|"; itype: 0; icmp_id: 1000; reference:arachnids,192; classtype:attempted-dos; sid:227; rev:1;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"DDOS Stacheldraht client-check-gag"; content: "|67 65 73 75 6E 64 68 65 69 74 21|"; itype: 0; icmp_id: 668; reference:arachnids,194; classtype:attempted-dos; sid:236; rev:1;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"DDOS Stacheldraht client-check"; content: "|73 6B 69 6C 6C 7A|"; itype: 0; icmp_id: 666; reference:arachnids,190; classtype:attempted-dos; sid:229; rev:1;)
+alert icmp $EXTERNAL_NET any <> $HOME_NET any (msg:"DDOS Stacheldraht handler->agent (niggahbitch)"; content:"niggahbitch"; itype:0; icmp_id:9015; reference:url,staff.washington.edu/dittrich/misc/stacheldraht.analysis; classtype:attempted-dos; sid:1854; rev:2;)
+alert icmp $EXTERNAL_NET any <> $HOME_NET any (msg:"DDOS Stacheldraht agent->handler (skillz)"; content:"skillz"; itype:0; icmp_id:6666; reference:url,staff.washington.edu/dittrich/misc/stacheldraht.analysis; classtype:attempted-dos; sid:1855; rev:2;)
+alert icmp $EXTERNAL_NET any <> $HOME_NET any (msg:"DDOS Stacheldraht handler->agent (ficken)"; content:"ficken"; itype:0; icmp_id:6667; reference:url,staff.washington.edu/dittrich/misc/stacheldraht.analysis; classtype:attempted-dos; sid:1856; rev:2;)

@@ -1,0 +1,35 @@
+# (C) Copyright 2001,2002, Martin Roesch, Brian Caswell, et al.
+#    All rights reserved.
+# $Id$
+#-------------
+# POLICY RULES
+#-------------
+#
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"POLICY FTP anonymous login attempt"; content:"USER"; nocase; content:" anonymous|0D0A|"; nocase; flow:to_server,established; classtype:misc-activity; sid:553; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"POLICY FTP anonymous (ftp) login attempt"; content:"USER"; nocase; content:" ftp|0D0A|"; nocase; flow:to_server,established; classtype:misc-activity; sid:1449; rev:3;)
+alert tcp $HOME_NET 23 -> $EXTERNAL_NET any (msg:"POLICY WinGate telnet server response"; content:"WinGate>"; flow:from_server,established; reference:arachnids,366; reference:cve,CAN-1999-0657; classtype:misc-activity; sid:555; rev:4;)
+
+
+# we have started to see multiple versions of this beyond 003.003, so we have
+# expanded this signature to take that into account.
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"POLICY VNC server response"; flow:established; content:"RFB 0"; offset:0; depth:5; content:".0"; offset:7; depth:2; classtype:misc-activity; sid:560; rev:5;)
+
+alert udp $EXTERNAL_NET any -> $HOME_NET 5632 (msg:"POLICY PCAnywhere server response"; content:"ST"; depth: 2; reference:arachnids,239; classtype:misc-activity; sid:566; rev:3;)
+alert tcp $SMTP_SERVERS 25 -> $EXTERNAL_NET any (msg:"POLICY SMTP relaying denied"; flow:established,from_server; content: "550 5.7.1"; depth:70; reference:url,mail-abuse.org/tsi/ar-fix.html; reference:arachnids,249; classtype:misc-activity; sid:567; rev:9;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 9100 (msg:"POLICY HP JetDirect LCD modification attempt"; flow:to_server,established; content:"@PJL RDYMSG DISPLAY ="; classtype:misc-activity; reference:bugtraq,2245; reference:arachnids,302; sid:568; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 9000:9002 (msg:"POLICY HP JetDirect LCD modification attempt"; flow:to_server,established; content:"@PJL RDYMSG DISPLAY ="; classtype:misc-activity; reference:bugtraq,2245; reference:arachnids,302; sid:510; rev:6;)
+alert ip 63.251.224.177 any -> $HOME_NET any (msg:"POLICY poll.gotomypc.com access"; reference:url,www.gotomypc.com/help2.tmpl; classtype:misc-activity; sid:1429; rev:2;)
+
+# NOTES: This signature would be better off using uricontent, and having the
+# http decoder looking at 5800 and 5802, but that is on by default
+alert tcp $EXTERNAL_NET any -> $HOME_NET 5800:5802 (msg:"POLICY vncviewer java applet download attempt"; content:"/vncviewer.jar"; reference:nessus,10758; classtype:misc-activity; sid:1846; rev:2;)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"POLICY FTP file_id.diz access possible warez site";  flow:to_server,established; content:"RETR"; nocase; content:"file_id.diz"; nocase; distance:1; classtype:suspicious-filename-detect; sid:1445; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"POLICY FTP 'STOR 1MB' possible warez site"; flow:to_server,established; content:"STOR"; nocase; content:"1MB"; nocase; distance:1; classtype:misc-activity; sid:543; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"POLICY FTP 'RETR 1MB' possible warez site"; flow:to_server,established; content:"RETR"; nocase; content:"1MB"; nocase; distance:1; classtype:misc-activity; sid:544; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"POLICY FTP 'CWD  ' possible warez site"; flow:to_server,established; content:"CWD  "; nocase; depth: 5; classtype:misc-activity; sid:546; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"POLICY FTP 'MKD  ' possible warez site"; flow:to_Server,established; content:"MKD  "; nocase; depth: 5; classtype:misc-activity; sid:547; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"POLICY FTP 'MKD .' possible warez site"; flow:to_server,established; content:"MKD ."; nocase; depth: 5; classtype:misc-activity; sid:548; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"POLICY FTP 'CWD / ' possible warez site"; flow:to_server,established; content:"CWD"; nocase; content:"/ "; distance:1; classtype: misc-activity; sid:545; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"POLICY FTP 'MKD / ' possible warez site"; flow:to_server,established; content:"MKD"; nocase; content:"/ "; distance:1; classtype:misc-activity; sid:554; rev:6;)

@@ -1,0 +1,24 @@
+# (C) Copyright 2001,2002, Martin Roesch, Brian Caswell, et al.
+#    All rights reserved.
+# $Id$
+#--------------
+# NETBIOS RULES
+#--------------
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 139 (msg:"NETBIOS nimda .eml"; content:"|00|.|00|E|00|M|00|L"; flow:to_server,established; classtype:bad-unknown; reference:url,www.datafellows.com/v-descs/nimda.shtml; sid:1293; rev:7;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 139 (msg:"NETBIOS nimda .nws"; content:"|00|.|00|N|00|W|00|S"; flow:to_server,established; classtype:bad-unknown; reference:url,www.datafellows.com/v-descs/nimda.shtml; sid:1294; rev:7;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 139 (msg:"NETBIOS nimda RICHED20.DLL"; content:"R|00|I|00|C|00|H|00|E|00|D|00|2|00|0"; flow:to_server,established; classtype:bad-unknown; reference:url,www.datafellows.com/v-descs/nimda.shtml; sid:1295; rev:6;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 139 (msg:"NETBIOS DOS RFPoison"; flow:to_server,established; content: "|5C 00 5C 00 2A 00 53 00 4D 00 42 00 53 00 45 00 52 00 56 00 45 00 52 00 00 00 00 00 01 00 00 00 01 00 00 00 00 00 00 00 FF FF FF FF 00 00 00 00|";reference:arachnids,454; classtype:attempted-dos; sid:529; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 139 (msg:"NETBIOS NT NULL session"; flow:to_server,established; content: "|00 00 00 00 57 00 69 00 6E 00 64 00 6F 00 77 00 73 00 20 00 4E 00 54 00 20 00 31 00 33 00 38 00 31|"; reference:bugtraq,1163; reference:cve,CVE-2000-0347; reference:arachnids,204; classtype:attempted-recon; sid:530; rev:7;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 139 (msg:"NETBIOS RFParalyze Attempt"; flow:to_server,established; content:"BEAVIS"; content:"yep yep"; classtype:attempted-recon; sid:1239; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 139 (msg:"NETBIOS SMB ADMIN$access"; flow:to_server,established; content:"\\ADMIN$|00 41 3a 00|"; reference:arachnids,340; classtype:attempted-admin; sid:532;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 139 (msg:"NETBIOS SMB C$ access"; flow:to_server,established; content: "|5c|C$|00 41 3a 00|";reference:arachnids,339; classtype:attempted-recon; sid:533; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 139 (msg:"NETBIOS SMB CD.."; flow:to_server,established; content:"\\..|2f 00 00 00|"; reference:arachnids,338; classtype:attempted-recon; sid:534;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 139 (msg:"NETBIOS SMB CD..."; flow:to_server,established; content:"\\...|00 00 00|"; reference:arachnids,337; classtype:attempted-recon; sid:535;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 139 (msg:"NETBIOS SMB D$access"; flow:to_server,established; content:"\\D$|00 41 3a 00|"; reference:arachnids,336; classtype:attempted-recon; sid:536;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 139 (msg:"NETBIOS SMB IPC$access"; flow:to_server,established; content:"\\IPC$|00 41 3a 00|"; reference:arachnids,335; classtype:attempted-recon; sid:537;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 139 (msg:"NETBIOS SMB IPC$access"; flow:to_server,established; content:"|5c00|I|00|P|00|C|00|$|000000|IPC|00|"; reference:arachnids,334; classtype:attempted-recon; sid:538;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 139 (msg:"NETBIOS Samba clientaccess"; flow:to_server,established; content:"|00|Unix|00|Samba"; reference:arachnids,341; classtype:not-suspicious; sid:539;  rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 139 (msg:"NETBIOS SMB SMB_COM_TRANSACTION Max Parameter of 0 DOS Attempt"; flow:to_server,established; content:"|00|"; offset:0; depth:1; content:"|FF 53 4D 42 25|"; offset:4; depth:5; content:"|00 00|"; offset:43; depth:2; reference:cve,CAN-2002-0724; reference:url,www.microsoft.com/technet/security/bulletin/MS02-045.asp; reference:url,www.corest.com/common/showdoc.php?idx=262; classtype:denial-of-service; sid:2101; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 139 (msg:"NETBIOS SMB SMB_COM_TRANSACTION Max Data Count of 0 DOS Attempt"; flow:to_server,established; content:"|00|"; offset:0; depth:1; content:"|FF 53 4D 42 25|"; offset:4; depth:5; content:"|00 00|"; offset:45; depth:2; reference:cve,CAN-2002-0724; reference:url,www.microsoft.com/technet/security/bulletin/MS02-045.asp; reference:url,www.corest.com/common/showdoc.php?idx=262; classtype:denial-of-service; sid:2102; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 139 (msg:"NETBIOS SMB trans2open buffer overflow attempt"; flow:to_server,established; content:"|00|"; offset:0; depth:1; content:"|ff 53 4d 42 32|"; offset:4; depth:5; content:"|00|"; distance:1; within:1; content:"|00 00 00 00 00 00 00 00 00 00 00 00|"; distance:5; within:12; content:"|00 14|"; distance:32; within:2; byte_test:2,>,1024,0,relative,little; reference:cve,CAN-2003-0201; reference:url,www.digitaldefense.net/labs/advisories/DDI-1013.txt; classtype:attempted-admin; sid:2103; rev:1;)

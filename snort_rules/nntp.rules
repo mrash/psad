@@ -1,0 +1,9 @@
+# (C) Copyright 2001,2002, Martin Roesch, Brian Caswell, et al.
+#    All rights reserved.
+# $Id$
+#----------
+# NNTP RULES
+#----------
+
+alert tcp $EXTERNAL_NET 119 -> $HOME_NET any (msg:"NNTP return code buffer overflow attempt"; flow:to_server,established,no_stream; content:"200 "; offset:0; depth:4; content:!"|0a|"; within:64; reference:bugtraq,4900; reference:cve,CAN-2002-0909; classtype:protocol-command-decode; sid:1792; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 119 (msg:"NNTP AUTHINFO USER overflow attempt"; flow:to_server,established; content:"AUTHINFO USER "; nocase; depth:14; content:!"|0a|"; within:500; reference:cve,CAN-2000-0341; reference:arachnids,274; classtype:attempted-admin; sid:1538; rev:5;)

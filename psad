@@ -2187,17 +2187,17 @@ sub scan_logr() {
             print E "\n";
             printf E "    %-12s%-14s%-10s\n", 'Protocol:', 'Chain Type:',
                 'Packets:';
-            printf E "    %-12s%-14s%-10d\n", 'TCP', 'input',
+            printf E "      %-12s%-14s%-10d\n", 'TCP', 'input',
                 $tot_input_tcp;
-            printf E "    %-12s%-14s%-10d\n", 'UDP', 'input',
+            printf E "      %-12s%-14s%-10d\n", 'UDP', 'input',
                 $tot_input_udp;
-            printf E "    %-12s%-14s%-10d\n", 'ICMP', 'input',
+            printf E "      %-12s%-14s%-10d\n", 'ICMP', 'input',
                 $tot_input_icmp;
-            printf E "    %-12s%-14s%-10d\n", 'TCP', 'forward',
+            printf E "      %-12s%-14s%-10d\n", 'TCP', 'forward',
                 $tot_forward_tcp;
-            printf E "    %-12s%-14s%-10d\n", 'UDP', 'forward',
+            printf E "      %-12s%-14s%-10d\n", 'UDP', 'forward',
                 $tot_forward_udp;
-            printf E "    %-12s%-14s%-10d\n", 'ICMP', 'forward',
+            printf E "      %-12s%-14s%-10d\n", 'ICMP', 'forward',
                 $tot_forward_icmp;
 
             if ($use_iptables) {

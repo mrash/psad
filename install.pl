@@ -90,7 +90,7 @@ my $distro = get_distro();
 my $kernel = get_kernel(\%Cmds);
 
 # remove signature checking from psad process if we are not running an iptables-enabled kernel
-system "perl -p -i -e 's|\-s\s/etc/psad/psad_signatures||' psad-init" unless ($kernel =~ /^2.3/ || $kernel =~ /^2.4/);
+system "perl -p -i -e 's|\-s\s/etc/psad/psad_signatures||' psad-init" if ($kernel !~ /^2.3/ && $kernel !~ /^2.4/);
 
 if ($distro eq "redhat61" || $distro eq "redhat62") {
 	print "*** Copying psad-init -> /etc/rc.d/init.d/psad-init\n";

@@ -72,7 +72,6 @@ my $help         = 0;
 &usage_and_exit(0) if ($help);
 
 my %Cmds = (
-    "chkconfig" => $chkconfigCmd,
     "mknod"     => $mknodCmd,
     "grep"      => $grepCmd,
     "find"      => $findCmd,
@@ -81,6 +80,12 @@ my %Cmds = (
     "ipchains"  => $ipchainsCmd,
     "iptables"  => $iptablesCmd,
 );
+
+my $distro = &get_distro();
+
+if ($distro =~ /redhat/) {
+    $Cmds{'chkconfig'}  = $chkconfigCmd;
+}
 
 ### need to make sure this exists before attempting to write anything to the install log.
 &create_varlogpsad();
@@ -405,9 +410,6 @@ if (-e "/etc/man.config") {
     &perms_ownership("/usr/man/man8/psad.8", 0644);
 }
 
-my $distro = &get_distro();
-
-# if ($distro eq "redhat61" || "redhat62" || "redhat70" || "redhat71" || "redhat72") {
 if ($distro =~ /redhat/) {
     if (-e $INIT_DIR) {
         &logr(" ----  Copying psad-init -> ${INIT_DIR}/psad  ----\n", \@LOGR_FILES);

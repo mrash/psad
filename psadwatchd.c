@@ -229,30 +229,30 @@ static void check_process(
         restart = 1;
     }
 
-
     /* read the first line of the pid_file, which will contain the
      * process id of any running pid_name process. */
-    if (fgets(pid_line, MAX_PID_SIZE, pidfile_ptr) == NULL) {
+    if (! restart) {
+        if (fgets(pid_line, MAX_PID_SIZE, pidfile_ptr) == NULL) {
 #ifdef DEBUG
-    fprintf(stderr, "[-] Could not read the pid_file: %s\n", pid_file);
+            fprintf(stderr, "[-] Could not read the pid_file: %s\n", pid_file);
 #endif
-        /* see if we need to give up */
-        incr_syscall_ctr(pid_name, max_retries);
+            /* see if we need to give up */
+            incr_syscall_ctr(pid_name, max_retries);
+            fclose(pidfile_ptr);
+            return;
+        }
+
+        /* convert the pid_line into an integer */
+        pid = atoi(pid_line);
+
+        /* close the pid_file now that we have read it */
         fclose(pidfile_ptr);
-        return;
+
+        if (kill(pid, 0) != 0) {
+            /* the process is not running so start it */
+            restart = 1;
+        }
     }
-
-    /* convert the pid_line into an integer */
-    pid = atoi(pid_line);
-
-    /* close the pid_file now that we have read it */
-    fclose(pidfile_ptr);
-
-    if (kill(pid, 0) != 0) {
-        /* the process is not running so start it */
-        restart = 1;
-    }
-
 
     if (restart) {
 #ifdef DEBUG

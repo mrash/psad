@@ -314,6 +314,7 @@ my $status_dl        = 0;
 my $fw_list_auto     = 0;
 my $fw_block_ip      = '';
 my $fw_del_chains    = 0;
+my $dump_ipt_policy  = 0;
 my $benchmark        = 0;
 my $b_packets        = 0;
 my $usr1             = 0;
@@ -445,6 +446,8 @@ Getopt::Long::Configure('no_ignore_case');
     'fw-del-chains'     => \$fw_del_chains,   # Delete psad chains in addition to
                                               #   flushing them (requires --F as
                                               #   well).
+    'fw-dump-policy'    => \$dump_ipt_policy, # Dump the iptables policy
+                                              #   (requires -D as well).
     'log-server'        => \$syslog_server,   # We are running psad on a syslog
                                               #   logging server.
     'Kill'              => \$kill,            # Kill all running psad processes.
@@ -5942,10 +5945,16 @@ sub dump_conf() {
         print STDOUT "[+] Dumping psad config from: $config_file\n";
     }
     for my $var (sort keys %config) {
+        my $str = $config{$var};
+        $str = '(removed)' if $var eq 'DSHIELD_USER_EMAIL';
+        $str = '(removed)' if $var eq 'DSHIELD_USER_ID';
+        $str = '(removed)' if $var eq 'EMAIL_ADDRESSES';
+        $str = '(removed)' if $var eq 'HOME_NET';
+        $str = '(removed)' if $var eq 'HOSTNAME';
         if ($debug) {
-            printf STDERR "%-30s %s\n", "[+] $var", $config{$var};
+            printf STDERR "%-30s %s\n", "[+] $var", $str;
         } else {
-            printf STDOUT "%-30s %s\n", "[+] $var", $config{$var};
+            printf STDOUT "%-30s %s\n", "[+] $var", $str;
         }
     }
     if ($debug) {
@@ -5960,7 +5969,39 @@ sub dump_conf() {
             printf STDOUT "%-30s %s\n", "[+] $var", $cmds{$var};
         }
     }
+
+    &dump_ipt_policy() if $dump_ipt_policy;
+
     return 0;
+}
+
+sub dump_ipt_policy() {
+    if ($debug) {
+        print STDERR "\n[+] Netfilter policy dump:\n";
+    } else {
+        print STDOUT "\n[+] Netfilter policy dump:\n";
+    }
+    if (defined $cmds{'iptables'} and -x $cmds{'iptables'}) {
+        open IPT, "$cmds{'iptables'} -v -n -L |" or die "[*] Could not ",
+            "execute $cmds{'iptables'} -v -n -L: $!";
+        my @lines = <IPT>;
+        close IPT;
+        for my $line (@lines) {
+            $line =~ s/($ip_re)/x.x.x.x/g;
+            if ($debug) {
+                print STDERR $line;
+            } else {
+                print STDOUT $line;
+            }
+        }
+    } else {
+        if ($debug) {
+            print STDERR "[*] Could not find iptables command.\n";
+        } else {
+            print STDOUT "[*] Could not find iptables command.\n";
+        }
+    }
+    return;
 }
 
 sub required_vars() {

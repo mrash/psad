@@ -5987,7 +5987,8 @@ sub dump_ipt_policy() {
         my @lines = <IPT>;
         close IPT;
         for my $line (@lines) {
-            $line =~ s/($ip_re)/x.x.x.x/g;
+            $line =~ s|($ip_re/\d+)|x.x.x.x/x|g;
+            $line =~ s|($ip_re)|x.x.x.x|g;
             if ($debug) {
                 print STDERR $line;
             } else {
@@ -6044,10 +6045,10 @@ Usage: psad [-a <auto ips file>] [-c <config file>] [-l] [-i <interval>]
        [-d] [--signatures <sig file>] [--passive-os-sigs <posf file>]
        [--snort-type <type>] [--snort-rdir <rules dir>] [--fw-analyze]
        [--fw-file <file>] [--fw-search <file>] [--fw-list-auto]
-       [--fw-block-ip <ip] [-m <messages file>] [--interval <seconds>]
-       [--status-brief] [--status-ip <ip>] [--status-sort-dl]
-       [--no-fwcheck] [--no-daemon] [--no-rdns] [--no-whois]
-       [--no-netstat] [--no-ipt-errors] [--no-passiveos]
+       [--fw-block-ip <ip] [--fw-dump] [-m <messages file>]
+       [--interval <seconds>] [--status-brief] [--status-ip <ip>]
+       [--status-sort-dl] [--no-fwcheck] [--no-daemon] [--no-rdns]
+       [--no-whois] [--no-netstat] [--no-ipt-errors] [--no-passiveos]
        [--no-snort-sids] [--no-signatures] [--no-kmsgsd]
 
 Options:
@@ -6090,6 +6091,8 @@ Options:
                                     instead of a running policy.
     --fw-del-chains               - Delete Netfilter chains used by
                                     psad for auto-blocking rules.
+    --fw-dump                     - Dump a sanitzed version of the local
+                                    Netfilter policy.
     -snort-rdir <rule dir>        - Path to snort rules directory.
     -d,  --debug                  - Run psad in debugging mode.
     -D,  --Dump-conf              - Dump psad configuration on STDOUT

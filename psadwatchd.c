@@ -37,12 +37,14 @@
 
 /* defines */
 #define PSADWATCHD_CONF "/etc/psad/psadwatchd.conf"
+#define PSAD_CONF "/etc/psad/psad.conf" /* only used for DATA_INPUT_METHOD */
 #define ALERT_CONF "/etc/psad/alert.conf"
 
 /* globals */
-short int psad_syscalls_ctr   = 0;
-short int kmsgsd_syscalls_ctr = 0;
-unsigned short int no_email   = 0;
+short int psad_syscalls_ctr     = 0;
+short int kmsgsd_syscalls_ctr   = 0;
+unsigned short int no_email     = 0;
+unsigned short int check_kmsgsd = 1;
 const char mail_redr[] = " < /dev/null > /dev/null 2>&1";
 char hostname[MAX_GEN_LEN];
 char mail_addrs[MAX_GEN_LEN];
@@ -77,6 +79,7 @@ static void check_process(
     const char *binary_path,
     unsigned int max_retries
 );
+static void check_data_input_mode(void);
 static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries);
 static void reset_syscall_ctr(const char *pid_name);
 static void give_up(const char *pid_name);
@@ -168,8 +171,10 @@ int main(int argc, char *argv[]) {
         /* restart processes as necessary */
         check_process("psad", psad_pid_file, psad_cmdline_file,
             psadCmd, psadwatchd_max_retries);
-        check_process("kmsgsd", kmsgsd_pid_file, NULL,
-            kmsgsdCmd, psadwatchd_max_retries);
+
+        if (check_kmsgsd)
+            check_process("kmsgsd", kmsgsd_pid_file, NULL,
+                kmsgsdCmd, psadwatchd_max_retries);
 
         /* sleep and then check to see if we received any signals */
         sleep(psadwatchd_check_interval);
@@ -446,6 +451,9 @@ static void parse_config(
     char char_psadwatchd_max_retries[MAX_NUM_LEN];
     char *index;
 
+    /* check to see if kmsgsd needs to be running */
+    check_data_input_mode();
+
     if ((config_ptr = fopen(config_file, "r")) == NULL) {
         perror("[*] Could not open config file");
         exit(EXIT_FAILURE);
@@ -484,6 +492,46 @@ static void parse_config(
     *psadwatchd_check_interval = atoi(char_psadwatchd_check_interval);
     *psadwatchd_max_retries    = atoi(char_psadwatchd_max_retries);
     fclose(config_ptr);
+    return;
+}
+
+static void check_data_input_mode(void)
+{
+    FILE *config_ptr;   /* FILE pointer to the config file */
+    char config_buf[MAX_LINE_BUF];
+    char data_input_mode[MAX_GEN_LEN];
+    char *index;
+
+    if ((config_ptr = fopen(PSAD_CONF, "r")) == NULL) {
+        fprintf(stderr, "[-] Could not open %s for reading.\n",
+            PSAD_CONF);
+        exit(EXIT_FAILURE);
+    }
+
+    data_input_mode[0] = '\0';
+
+    /* increment through each line of the config file */
+    while ((fgets(config_buf, MAX_LINE_BUF, config_ptr)) != NULL) {
+        /* set the index pointer to the beginning of the line */
+        index = config_buf;
+
+        /* advance the index pointer through any whitespace
+         * at the beginning of the line */
+        while (*index == ' ' || *index == '\t') index++;
+
+        /* skip comments and blank lines, etc. */
+        if ((*index != '#') && (*index != '\n') &&
+                (*index != ';') && (index != NULL)) {
+
+            find_char_var("SYSLOG_DAEMON", data_input_mode, index);
+        }
+    }
+    fclose(config_ptr);
+
+    /* see if we are using the ulogd mode */
+    if (strncmp(data_input_mode, "ulogd", MAX_GEN_LEN) == 0)
+        check_kmsgsd = 0;
+
     return;
 }
 

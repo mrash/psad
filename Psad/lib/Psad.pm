@@ -127,7 +127,7 @@ sub check_commands() {
 }
 
 sub pidrunning() {
-    my $pidfile = shift || croak '[*] Must supply a pid file.';
+    my $pidfile = shift or croak '[*] Must supply a pid file.';
     return 0 unless -e $pidfile;
     open PIDFILE, "< $pidfile" or croak "[*] Could not open $pidfile: $!";
     my $pid = <PIDFILE>;

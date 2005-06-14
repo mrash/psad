@@ -564,42 +564,44 @@ sub install() {
     &put_string('SYSLOG_DAEMON', $syslog_str,
         "${PSAD_CONFDIR}/psad.conf");
 
-    my $restarted_syslog = 0;
-    if ($syslog_str eq 'syslogd') {
-        if (-e $syslog_conf) {
-            &append_fifo_syslog($syslog_conf);
-            if (((system "$Cmds{'killall'} -HUP syslogd 2> /dev/null")>>8) == 0) {
-                &logr("[+] HUP signal sent to syslogd.\n");
+    if ($syslog_str ne 'ulogd') {
+        my $restarted_syslog = 0;
+        if ($syslog_str eq 'syslogd') {
+            if (-e $syslog_conf) {
+                &append_fifo_syslog($syslog_conf);
+                if (((system "$Cmds{'killall'} -HUP syslogd 2> /dev/null")>>8) == 0) {
+                    &logr("[+] HUP signal sent to syslogd.\n");
+                    $restarted_syslog = 1;
+                }
+            }
+        } elsif ($syslog_str eq 'syslog-ng') {
+            if (-e $syslog_conf) {
+                &append_fifo_syslog_ng($syslog_conf);
+                if (((system "$Cmds{'killall'} -HUP syslog-ng 2> /dev/null")>>8) == 0) {
+                    &logr("[+] HUP signal sent to syslog-ng.\n");
+                    $restarted_syslog = 1;
+                }
+            }
+        } elsif ($syslog_str eq 'metalog') {
+            if (-e $syslog_conf) {
+                &config_metalog($syslog_conf);
+                &logr("[-] Metalog support is shaky in psad.  " .
+                    "Use at your own risk.\n");
+                ### don't send warning about not restarting metalog daemon
                 $restarted_syslog = 1;
             }
         }
-    } elsif ($syslog_str eq 'syslog-ng') {
-        if (-e $syslog_conf) {
-            &append_fifo_syslog_ng($syslog_conf);
-            if (((system "$Cmds{'killall'} -HUP syslog-ng 2> /dev/null")>>8) == 0) {
-                &logr("[+] HUP signal sent to syslog-ng.\n");
-                $restarted_syslog = 1;
-            }
-        }
-    } elsif ($syslog_str eq 'metalog') {
-        if (-e $syslog_conf) {
-            &config_metalog($syslog_conf);
-            &logr("[-] Metalog support is shaky in psad.  " .
-                "Use at your own risk.\n");
-            ### don't send warning about not restarting metalog daemon
-            $restarted_syslog = 1;
-        }
-    }
 
-    unless ($restarted_syslog) {
-        &logr("[-] Could not restart any syslog daemons.\n");
+        unless ($restarted_syslog) {
+            &logr("[-] Could not restart any syslog daemons.\n");
+        }
     }
 
     if (-x $Cmds{'iptables'}) {
         &logr("[+] Found iptables. Testing syslog configuration:\n");
         ### make sure we actually see packets being logged by
         ### the firewall.
-        &test_syslog_config($syslog_str);
+        &test_syslog_config($syslog_str) if $syslog_str ne 'ulogd';
     }
 
     ### see if there are any "_CHANGEME_" strings left and give the
@@ -882,7 +884,8 @@ sub install_perl_module() {
             &logr("[+] Creating $LIBDIR\n");
             mkdir $LIBDIR, 0755 or die "[*] Could not mkdir $LIBDIR: $!";
         }
-        &logr("[+] Installing the $mod_name $version perl module\n");
+        &logr("[+] Installing the $mod_name $version perl " .
+            "module in $LIBDIR/\n");
         my $mod_dir = $mod_name;
         $mod_dir =~ s/::/-/g;
         chdir $mod_dir or die "[*] Could not chdir to ",
@@ -1646,12 +1649,13 @@ sub query_email() {
 }
 
 sub query_syslog() {
-    &logr("\n[+] psad supports the syslogd, syslog-ng, and metalog logging " .
-        "daemons.\n\n");
+    &logr("\n[+] psad supports the syslogd, syslog-ng, ulogd, and metalog " .
+        "logging daemons.\n\n");
     my $ans = '';
-    while ($ans ne 'syslogd' and $ans ne 'syslog-ng' and $ans ne 'metalog') {
+    while ($ans ne 'syslogd' and $ans ne 'syslog-ng' and $ans ne 'ulogd'
+            and $ans ne 'metalog') {
         &logr("    Which system logger is running (syslogd, " .
-            "syslog-ng, metalog)?  ");
+            "syslog-ng, ulogd, metalog)?  ");
         $ans = <STDIN>;
         $ans =~ s/\s*//g;
 
@@ -1665,7 +1669,7 @@ sub query_syslog() {
             ### allow command line --syslog-conf arg to take over
             $syslog_conf = '/etc/metalog/metalog.conf' unless $syslog_conf;
         }
-        if ($syslog_conf and not -e $syslog_conf) {
+        if ($ans ne 'ulogd' and $syslog_conf and not -e $syslog_conf) {
             die
 "[-] The config file $syslog_conf does not exist. Re-run install.pl\n",
 "    with the --syslog-conf argument to specify the path to the syslog\n",
@@ -1676,6 +1680,7 @@ sub query_syslog() {
         unless ($ans and
             ($ans eq 'syslogd'
             or $ans eq 'syslog-ng'
+            or $ans eq 'ulogd'
             or $ans eq 'metalog'));
     print "\n";
     return $ans;

@@ -30,17 +30,19 @@ stop() {
         start-stop-daemon --stop --quiet --pidfile /var/run/psad/psadwatchd.pid
         eend $? "Failed to stop psadwatchd"
 
-        ebegin "Stopping kmsgsd"
-        start-stop-daemon --stop --quiet --pidfile /var/run/psad/kmsgsd.pid
-        eend $? "Failed to stop kmsgsd"
+        if [ -f /var/run/psad/kmsgsd.pid ] ; then
+            ebegin "Stopping kmsgsd"
+            start-stop-daemon --stop --quiet --pidfile /var/run/psad/kmsgsd.pid
+            eend $? "Failed to stop kmsgsd"
+        fi
 
         ebegin "Stopping psad"
         start-stop-daemon --stop --quiet --pidfile /var/run/psad/psad.pid
         eend $? "Failed to stop psad"
 
         # clean stale pidfiles
-        [ -f /var/run/psad/psad.pid ] && rm -f /var/run/psad/psad.pid
-        [ -f /var/run/psad/psadwatchd.pid ] && rm -f /var/run/psad/psadwatchd.pid
         [ -f /var/run/psad/kmsgsd.pid ] && rm -f /var/run/psad/kmsgsd.pid
+        [ -f /var/run/psad/psadwatchd.pid ] && rm -f /var/run/psad/psadwatchd.pid
+        [ -f /var/run/psad/psad.pid ] && rm -f /var/run/psad/psad.pid
 }
 

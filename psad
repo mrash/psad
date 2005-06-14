@@ -160,6 +160,9 @@ my $config_file  = '/etc/psad/psad.conf';
 ### psad.conf and kmsgsd.conf.
 my $fw_search_file = '/etc/psad/fw_search.conf';
 
+### this will be set to either FW_DATA_FILE or ULOG_DATA_FILE
+my $fw_data_file = '';
+
 ### default config file for ALERTING_METHODS keyword, which
 ### is referenced by both psad and psadwatchd.  This keyword
 ### allows email alerting or syslog alerting (or both) to be
@@ -593,14 +596,16 @@ unless ($no_daemon or $debug or $benchmark) {
 &Psad::writecmdline(\@args_cp, $cmdline_file)
     unless $benchmark or $debug;
 
-### psad _requires_ that kmsgsd is running to receive any data, so let's
-### start it here for good measure (as of 0.9.2 it makes use of the pid
-### files and unique_pid(), so we don't have to worry about starting a
-### duplicate copy).  While we're at it, start psadwatchd as well.
-### Note that this is the best place to start the other daemons since we
-### just wrote the psad pid to PID_FILE above.
+### psad _requires_ that kmsgsd is running to receive any data (unless
+### SYSLOG_DAEMON is set to ulogd), so let's start it here for good
+### measure (as of 0.9.2 it makes use of the pid files and unique_pid(),
+### so we don't have to worry about starting a duplicate copy).  While
+### we're at it, start psadwatchd as well.  Note that this is the best
+### place to start the other daemons since we just wrote the psad pid
+### to PID_FILE above.
 unless ($benchmark or $fw_analyze) {
-    system $cmds{'kmsgsd'} unless $no_kmsgsd;
+    system $cmds{'kmsgsd'}
+        unless $no_kmsgsd or $config{'SYSLOG_DAEMON'} eq 'ulogd';
     system $cmds{'psadwatchd'}
         unless $debug or $no_daemon;
 }
@@ -675,9 +680,11 @@ unless ($fw_analyze or $benchmark) {
 
 ### Get an open filehandle for the main firewall data file FW_DATA_FILE.
 ### All firewall drop/reject log messages are written to FW_DATA_FILE
-### by kmsgsd.
-open FWDATA, $config{'FW_DATA_FILE'} or die '[*] Could not open ',
-    "$config{'FW_DATA_FILE'}: $!" unless $benchmark;
+### by kmsgsd (or by ulogd directly).
+unless ($benchmark) {
+    open FWDATA, $fw_data_file or die '[*] Could not open ',
+        "$fw_data_file: $!";
+}
 
 ###=========================================================###
 ######                    MAIN LOOP                      ######
@@ -693,18 +700,18 @@ MAIN: for (;;) {
         &Psad::psyslog('psad', 'received HUP signal, ' .
             're-importing psad.conf') unless $no_syslog_alerts;
 
-        my $orig_fwdata = $config{'FW_DATA_FILE'};
+        my $orig_fwdata = $fw_data_file;
 
         ### Re-import all used config files (psad.conf, auto_dl,
         ### posf, signatures) if we received a HUP signal.
         &psad_init();
 
-        if ($orig_fwdata ne $config{'FW_DATA_FILE'}) {
+        if ($orig_fwdata ne $fw_data_file) {
             close FWDATA;
 
             ### re-open the fwdata file
-            open FWDATA, $config{'FW_DATA_FILE'} or die
-                "[*] Could not open $config{'FW_DATA_FILE'}: $!";
+            open FWDATA, $fw_data_file or die
+                "[*] Could not open $fw_data_file: $!";
 
             $skipped_first_loop = 0;
         }
@@ -813,13 +820,13 @@ MAIN: for (;;) {
             close FWDATA;
 
             ### truncate fwdata file
-            open FWDATA, "> $config{'FW_DATA_FILE'}" or die
-                "[*] Could not open $config{'FW_DATA_FILE'}: $!";
+            open FWDATA, "> $fw_data_file" or die
+                "[*] Could not open $fw_data_file: $!";
             close FWDATA;
 
             ### re-open the fwdata file
-            open FWDATA, $config{'FW_DATA_FILE'} or die
-                "[*] Could not open $config{'FW_DATA_FILE'}: $!";
+            open FWDATA, $fw_data_file or die
+                "[*] Could not open $fw_data_file: $!";
         }
         $last_disk_check = time();
     }
@@ -2051,6 +2058,14 @@ sub psad_init() {
     ### make sure the values in the config file make sense
     &validate_config();
 
+    ### setup the appropriate Netfilter data file depending on whether
+    ### SYSLOG_DAEMON is set to ulogd
+    if ($config{'SYSLOG_DAEMON'} eq 'ulogd') {
+        $fw_data_file = $config{'ULOG_DATA_FILE'};
+    } else {
+        $fw_data_file = $config{'FW_DATA_FILE'};
+    }
+
     ### check to make sure the commands specified in the config section
     ### are in the right place, and attempt to correct automatically if not.
     &Psad::check_commands(\%cmds);
@@ -2182,7 +2197,6 @@ sub validate_config() {
     if ($status_dl and $status_dl > 5) {
         die '[*] The --status-dl must be between 1 and 5.';
     }
-
     if ($no_kmsgsd and not $debug) {
         die '[*] The --no-kmsgsd option can only be used with --debug.';
     }
@@ -2199,7 +2213,6 @@ sub validate_config() {
                 'an IP address or network.';
         }
     }
-
     return;
 }
 
@@ -4714,15 +4727,27 @@ sub stop_psad() {
                     kill 9, $pid or print "[*] psad: Could not kill ",
                         "$pidname, pid: $pid $!\n";
                     $rv = 1;
+                } else {
+                    unlink $pidfile;
                 }
             } else {
+                my $print = 1;
+                if ($pidname eq 'kmsgsd'
+                        and $config{'SYSLOG_DAEMON'} eq 'ulogd') {
+                    $print = 0;
+                }
                 print "[-] psad: $pidname is not running on ",
-                    "$config{'HOSTNAME'}\n";
+                    "$config{'HOSTNAME'}\n" if $print;
                 $rv = 1;
             }
         } else {
+            my $print = 1;
+            if ($pidname eq 'kmsgsd'
+                    and $config{'SYSLOG_DAEMON'} eq 'ulogd') {
+                $print = 0;
+            }
             print "[-] psad: pid file $pidfile does not exist for ",
-                "$pidname on $config{'HOSTNAME'}\n";
+                "$pidname on $config{'HOSTNAME'}\n" if $print;
             $rv = 1;
         }
     }
@@ -4836,12 +4861,22 @@ sub status() {
                 print "\n";
                 $rv = 1;
             } else {
+                my $print = 1;
+                if ($pidname eq 'kmsgsd'
+                        and $config{'SYSLOG_DAEMON'} eq 'ulogd') {
+                    $print = 0;
+                }
                 print "[-] psad: $pidname is not running on ",
-                    "$config{'HOSTNAME'}\n";
+                    "$config{'HOSTNAME'}\n" if $print;
             }
         } else {
+            my $print = 1;
+            if ($pidname eq 'kmsgsd'
+                    and $config{'SYSLOG_DAEMON'} eq 'ulogd') {
+                $print = 0;
+            }
             print "[-] psad: pid file $pidfile does not exist for ",
-                "$pidname on $config{'HOSTNAME'}\n";
+                "$pidname on $config{'HOSTNAME'}\n" if $print;
         }
     }
     return $rv;
@@ -5195,22 +5230,22 @@ sub print_blocked_ip_status() {
 sub status_ip() {
     my $rv = 0;
     my @match_ip;
-    die "[*] $config{'FW_DATA_FILE'} does not exist yet.  Exiting."
-        unless -e $config{'FW_DATA_FILE'};
-    die "[*] No data yet in $config{'FW_DATA_FILE'}.  Exiting."
-        unless -s $config{'FW_DATA_FILE'} > 0;
+    die "[*] $fw_data_file does not exist yet.  Exiting."
+        unless -e $fw_data_file;
+    die "[*] No data yet in $fw_data_file.  Exiting."
+        unless -s $fw_data_file > 0;
     die "[*] No scans from $status_ip have been detected.\n",
         "    See 'psad --Status' for a complete list."
         unless -d "$config{'PSAD_DIR'}/$status_ip";
-    open FW, "< $config{'FW_DATA_FILE'}" or die "[*] Could not open ",
-        "$config{'FW_DATA_FILE'}: $!";
+    open FW, "< $fw_data_file" or die "[*] Could not open ",
+        "$fw_data_file: $!";
     while (<FW>) {
         push @match_ip, $_ if $_ =~ /SRC=$status_ip\s/
             || $_ =~ /DST=$status_ip\s/;
     }
     close FW;
     die "[*] Could not match $status_ip to packets in ",
-        "$config{'FW_DATA_FILE'}.  Exiting." unless @match_ip;
+        "$fw_data_file.  Exiting." unless @match_ip;
     open D, "> $config{'PSAD_DIR'}/$status_ip/fwdata" or
         die "[*] Could not open $config{'PSAD_DIR'}/$status_ip/fwdata";
     for my $line (@match_ip) {
@@ -5503,7 +5538,12 @@ sub hup() {
                 $rv = 1;
             }
         } else {
-            print "[-] $pidname daemon not running.\n";
+            my $print = 1;
+            if ($pidname eq 'kmsgsd'
+                    and $config{'SYSLOG_DAEMON'} eq 'ulogd') {
+                $print = 0;
+            }
+            print "[-] $pidname daemon not running.\n" if $print;
             $rv = 1;
         }
     }
@@ -5569,7 +5609,7 @@ sub archive_data() {
     }
 
     ### archive the fwdata file
-    my $fwdata    = $config{'FW_DATA_FILE'};
+    my $fwdata    = $fw_data_file;
     my $fwarchive = "$config{'SCAN_DATA_ARCHIVE_DIR'}/fwdata_archive";
     ### first see how big the archive file is and zero out if
     ### it is larger than about 10,000 lines
@@ -5692,6 +5732,25 @@ sub setup() {
 
     $no_email_alerts = 1 if $config{'ALERTING_METHODS'} =~ /no.?e?mail/i;
     $no_syslog_alerts = 1 if $config{'ALERTING_METHODS'} =~ /no.?syslog/i;
+
+    unless (-e $fw_data_file) {
+        ### create the Netfilter data file if it doesn't exist
+        ### (this is better than dying because it isn't there).
+        open F, "> $fw_data_file" or die "[*] Could not create ",
+            "$fw_data_file: $!";
+        close F;
+        &Psad::psyslog('psad', "data file $fw_data_file " .
+            "does not exist, creating it")
+            unless $no_syslog_alerts;
+    }
+
+    ### make sure the permissions on these files is 0600
+    for my $file ($fw_data_file, $config{'FW_ERROR_LOG'}) {
+        chmod 0600, $file;
+    }
+
+    ### we assume that ulogd is properly configured
+    return if $config{'SYSLOG_DAEMON'} eq 'ulogd';
 
     die '[*] No system logger config file could be found.'
         unless (-e $config{'ETC_SYSLOG_CONF'}
@@ -5853,10 +5912,6 @@ sub setup() {
         }
     }
 
-    ### make sure the permissions on these files is 0600
-    for my $file ($config{'FW_DATA_FILE'}, $config{'FW_ERROR_LOG'}) {
-        chmod 0600, $file;
-    }
     return;
 }
 
@@ -6027,6 +6082,7 @@ sub required_vars() {
         IPT_PREFIX_COUNTER_FILE IGNORE_PORTS ENABLE_SCAN_ARCHIVE
         EMAIL_LIMIT_STATUS_MSG P0F_FILE IGNORE_PROTOCOLS IPT_AUTO_CHAIN1
         AUTO_IPT_ADD_IP_FILE IGNORE_INTERFACES ALERTING_METHODS
+        ULOG_DATA_FILE
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

@@ -36,7 +36,9 @@ start() {
 stop() {
 	echo -n $"Stopping $prog: "
 	killproc /usr/sbin/psadwatchd
-	killproc /usr/sbin/kmsgsd
+	if [ -f /var/run/psad/kmsgsd.pid ]; then
+		killproc /usr/sbin/kmsgsd
+	fi
 	killproc /usr/sbin/psad
 	RETVAL=$?
 	[ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/psad
@@ -55,7 +57,9 @@ reload() {
 }	
 
 status_psad() {
- 	status /usr/sbin/kmsgsd
+	if [ -f /var/run/psad/kmsgsd.pid ]; then
+	 	status /usr/sbin/kmsgsd
+	fi
  	status /usr/sbin/psadwatchd
  	status /usr/sbin/psad
 }

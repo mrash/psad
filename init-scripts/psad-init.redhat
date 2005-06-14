@@ -41,12 +41,16 @@ stop)
     RETVAL=$?
     [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/psad
     echo
-    echo -n "Shutting down the psad kmsgsd daemon: "
-    killproc kmsgsd
-    echo
+    if [ -f /var/run/psad/kmsgsd.pid ]; then
+        echo -n "Shutting down the psad kmsgsd daemon: "
+        killproc kmsgsd
+        echo
+    fi
     ;;
 status)
-    status kmsgsd
+    if [ -f /var/run/psad/kmsgsd.pid ]; then
+        status kmsgsd
+    fi
     status psad
     status psadwatchd
     ;;

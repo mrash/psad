@@ -339,6 +339,14 @@ static void parse_fw_search_file(char *fw_search_file)
             }
         }
     }
+    if (! fw_search_all_flag && num_fw_search_strings == 0) {
+        /* there are no FW_MSG_SEARCH vars in fw_search.conf; default
+         * to "DROP".  Psad will generate a syslog warning.  */
+        fw_msg_search[num_fw_search_strings]
+            = (char *) malloc(strlen("DROP"));
+        strlcpy(fw_msg_search[0], "DROP", MAX_GEN_LEN);
+        num_fw_search_strings++;
+    }
     fclose(fw_search_ptr);
     return;
 }

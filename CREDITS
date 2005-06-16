@@ -136,6 +136,8 @@ Albert E. Whale
     - Bugfix for auto-ignored addresses appearing in DShield alerts.
     - Bugfix for not timing-out blocked IP addresses from a previous psad
       execution.
+    - Suggested putting -pre release versions in psad to make
+      troubleshooting easier.
 
 David Krider
     - Discovered iptables path bug on SuSE 8.2.
@@ -279,3 +281,7 @@ Najib Bakari
     - Pointed out that sendmail is not usually required to run psad.  The
       result is the alert.conf file with the ALERTING_METHODS keyword,
       which also gets referenced by psadwatchd.
+
+Sam Weiss
+    - Suggested that psad default FW_MSG_SEARCH to "DROP" if no strings are
+      defined in fw_search.conf.

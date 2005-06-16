@@ -148,7 +148,7 @@ use strict;
 ### ========================== main =================================
 
 ### set the current psad version number
-my $version = '1.4.1';
+my $version = '1.4.2-pre4';
 
 ### default config file for psad (can be changed with
 ### --config switch)
@@ -2110,10 +2110,10 @@ sub psad_init() {
     exit &ipt_list_auto_chains() if $fw_list_auto;
 
     ### add an IP/network to the cache file used by a running psad
-    ### process (note that &cache_file_add_ipt_block_ip() calls
+    ### process (note that &diskwrite_add_ipt_block_ip() calls
     ### &import_auto_dl() to make sure we don't add an IP that should
     ### be ignored).
-    exit &cache_file_add_ipt_block_ip() if $fw_block_ip;
+    exit &diskwrite_add_ipt_block_ip() if $fw_block_ip;
 
     ### import psad signatures (note that these signatures have been
     ### adapted from the Snort IDS and contain several keywords that
@@ -2329,11 +2329,13 @@ sub import_fw_search() {
         "string file $fw_search_file: $!";
     my @lines = <F>;
     close F;
+    my $found_fw_search = 0;
     for my $line (@lines) {
         next unless $line =~ /\S/;
         next if $line =~ /^\s*#/;
         if ($line =~ /^\s*FW_MSG_SEARCH\s+(.*?);/) {
             push @fw_search, $1;
+            $found_fw_search = 1;
         } elsif ($line =~ /^\s*FW_SEARCH_ALL\s+(\w+);/) {
             my $strategy = $1;
             if ($strategy eq 'Y' or $strategy eq 'N') {
@@ -2353,6 +2355,13 @@ sub import_fw_search() {
         &Psad::psyslog('psad', 'setting FW_SEARCH_ALL to Y.')
             unless $no_syslog_alerts;
         $config{'FW_SEARCH_ALL'} = 'Y';
+    }
+
+    if ($config{'FW_SEARCH_ALL'} eq 'N' and not $found_fw_search) {
+        &Psad::psyslog('psad', 'defaulting missing ' .
+            "FW_MSG_SEARCH variable in $fw_search_file to DROP.")
+            unless $no_syslog_alerts;
+        push @fw_search, 'DROP';
     }
     return;
 }
@@ -3949,7 +3958,7 @@ sub flush_auto_blocked_ips() {
                     }
                 } else {
                     if ($ipt->flush_chain($table, $to_chain)) {
-                        print "[+] Flushed: $to_chain.\n";
+                        print "[+] Flushed: $to_chain\n";
                     } else {
                         print "[-] Could not flush: $to_chain\n";
                     }
@@ -4116,7 +4125,8 @@ sub ipt_block() {
         ### write the ip out to the auto blocked file
         print STDERR "[+] ipt_block(): added block for $ip\n"
             if $debug;
-        &cache_file_write_blocked_ip($ip, $config{'AUTO_BLOCK_IPT_FILE'});
+        &diskwrite_blocked_ip($ip,
+            $config{'AUTO_BLOCK_IPT_FILE'}, $renewed_status);
     } else {
         &Psad::psyslog('psad', "could not add iptables " .
             "block rule for: $ip") unless $no_syslog_alerts;
@@ -4200,13 +4210,13 @@ sub ipt_rm_block() {
         }
         print STDERR "[+] ipt_rm_block(): removed iptables block ",
             "against $ip (timeout expired).\n" if $debug;
-        &cache_file_rm_blocked_ip($ip, $config{'AUTO_BLOCK_IPT_FILE'});
+        &diskwrite_rm_blocked_ip($ip, $config{'AUTO_BLOCK_IPT_FILE'});
     } else {
         if ($flush_fw) {
             &Psad::psyslog('psad', 'could not remove iptables ' .
                 "block rule for $ip") unless $no_syslog_alerts;
         }
-        print STDERR "[-] Could not remove iptables block rule for $ip.\n"
+        print STDERR "[-] Could not remove iptables block rule for $ip\n"
             if $debug;
     }
     return;
@@ -4245,36 +4255,37 @@ sub ipt_list_auto_chains() {
 }
 
 sub check_ipt_add_ip() {
-    if (-e $config{'AUTO_IPT_ADD_IP_FILE'}) {
-        open F, "< $config{'AUTO_IPT_ADD_IP_FILE'}" or die "[*] Could ",
-            "not open $config{'AUTO_IPT_ADD_IP_FILE'}: $!";
-        my @lines = <F>;
-        close F;
+    return unless -e $config{'AUTO_IPT_ADD_IP_FILE'};
+    open F, "< $config{'AUTO_IPT_ADD_IP_FILE'}" or die "[*] Could ",
+        "not open $config{'AUTO_IPT_ADD_IP_FILE'}: $!";
+    my @lines = <F>;
+    close F;
 
-        my $ipt = new IPTables::ChainMgr(
-            'iptables' => $cmds{'iptables'}
-        ) or die "[*] Could not acquire IPTables::ChainMgr object.";
+    my $ipt = new IPTables::ChainMgr(
+        'iptables' => $cmds{'iptables'}
+    ) or die "[*] Could not acquire IPTables::ChainMgr object.";
 
-        for my $ip (@lines) {
-            chomp $ip;
-            if ($ip =~ m|^\s*$ip_re\s*$|
+    for my $ip (@lines) {
+        chomp $ip;
+        if ($ip =~ m|^\s*$ip_re\s*$|
                 or $ip =~ m|^\s*$ip_re/\d+\s*$|
                 or $ip =~ m|^\s*$ip_re/$ip_re\s*$|) {
 
-                &Psad::psyslog('psad',
-                    "adding $ip from cache file to psad chains")
-                    unless $no_syslog_alerts;
+            &Psad::psyslog('psad',
+                "adding $ip from cache file to psad chains")
+                unless $no_syslog_alerts;
 
-                ### instantiate the blocking rule
-                &ipt_block($ip, '');
-            }
+            ### instantiate the blocking rule
+            &ipt_block($ip, '');
         }
-        unlink $config{'AUTO_IPT_ADD_IP_FILE'} or die $!;
     }
+    unlink $config{'AUTO_IPT_ADD_IP_FILE'} or die $!;
     return;
 }
 
-sub cache_file_add_ipt_block_ip() {
+### this only gets used when issuing --fw-block
+### from the command line.
+sub diskwrite_add_ipt_block_ip() {
     unless ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
         print "[-] ENABLE_AUTO_IDS is not enabled. Exiting.\n";
         return 0;
@@ -4290,6 +4301,17 @@ sub cache_file_add_ipt_block_ip() {
         $block_mask = $2;  ### CIDR or regular
     }
 
+    if ($block_mask ne '32') {
+        ### a subnet was given on the command line, so make
+        ### sure we were also given a network address (Netfilter
+        ### converts to the network address in -nL output)
+        my ($tmpnetaddr, $tmpnetmask) =
+            ipv4_network($block_ip, $block_mask);
+        $block_ip = $tmpnetaddr if $block_ip ne $tmpnetaddr;
+        $block_mask = $tmpnetmask if $block_mask ne $tmpnetmask;
+        $fw_block_ip = "$block_ip/$block_mask";
+    }
+
     ### import auto_dl file
     &import_auto_dl();
 
@@ -4298,7 +4320,7 @@ sub cache_file_add_ipt_block_ip() {
         my $dl   = $auto_dl{$net}{'dl'};
         my $mask = $auto_dl{$net}{'mask'};  ### may be a /32 (single IP)
 
-        next unless $dl == 0;  ### only care about the ignored IPs/nets
+        next NET unless $dl == 0;  ### only care about the ignored IPs/nets
 
         if (&net_overlap($net, $mask, $block_ip, $block_mask)) {
             die "[*] $fw_block_ip overlaps with whitelisted ",
@@ -4306,20 +4328,14 @@ sub cache_file_add_ipt_block_ip() {
         }
     }
 
-
     if (-e $config{'PID_FILE'}) {
         if (&Psad::pidrunning($config{'PID_FILE'})) {
             print "[+] Writing $fw_block_ip to cache file. Psad will add the IP\n",
                 "    within $config{'CHECK_INTERVAL'} seconds.\n";
-            open F, "> $config{'AUTO_IPT_ADD_IP_FILE'}.tmp" or die "[*] Could ",
-                "not open $config{'AUTO_IPT_ADD_IP_FILE'}.tmp: $!";
+            open F, ">> $config{'AUTO_IPT_ADD_IP_FILE'}" or die "[*] Could ",
+                "not open $config{'AUTO_IPT_ADD_IP_FILE'}: $!";
             print F $fw_block_ip, "\n";
             close F;
-            if (-e $config{'AUTO_IPT_ADD_IP_FILE'}) {
-                unlink $config{'AUTO_IPT_ADD_IP_FILE'} or die $!;
-            }
-            move "$config{'AUTO_IPT_ADD_IP_FILE'}.tmp",
-                $config{'AUTO_IPT_ADD_IP_FILE'} or die $!;
         } else {
             print "[-] There is no running psad process. Exiting.\n"
         }
@@ -4362,7 +4378,7 @@ sub tcpwr_remove_block() {
     for my $line (@lines) {
         chomp $line;
         if ($line =~ /ALL:\s+$ip$/) {
-            &cache_file_rm_blocked_ip($ip, $config{'AUTO_BLOCK_TCPWR_FILE'});
+            &diskwrite_rm_blocked_ip($ip, $config{'AUTO_BLOCK_TCPWR_FILE'});
             &Psad::sendmail("$mail_status_prefix removed tcpwrappers block " .
                 "against $ip (timeout expired).", '',
                 $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
@@ -4428,8 +4444,8 @@ sub auto_psad_response() {
                     print H "ALL: $src\n";
                     close H;
                     ### write the ip out to the auto blocked file
-                    &cache_file_write_blocked_ip($src,
-                        $config{'AUTO_BLOCK_TCPWR_FILE'});
+                    &diskwrite_blocked_ip($src,
+                        $config{'AUTO_BLOCK_TCPWR_FILE'}, '');
                 }
             }
             print STDERR "[+] setting blocked = 1 for $src\n" if $debug;
@@ -4532,34 +4548,60 @@ sub build_ipt_config() {
     return;
 }
 
-sub cache_file_write_blocked_ip() {
-    my ($src, $file) = @_;
-    print STDERR "[+] cache_file_write_blocked_ip($src, $file)\n" if $debug;
+### this is the main caching function that adds an IP upon a
+### successful block.
+sub diskwrite_blocked_ip() {
+    my ($src, $file, $renewed_status) = @_;
+    print STDERR "[+] diskwrite_blocked_ip($src, $file, $renewed_status)\n"
+        if $debug;
+    my @lines = ();
+    my $skip_src = 0;
     if (-e $file) {
-        open F, "< $file" or die "[*] Could not open open ",
+        open F, "< $file" or die "[*] Could not open ",
             "$file: $!";
-        my @lines = <F>;
+        my @tmplines = <F>;
         close F;
         ### see if we have already written the ip to the block
-        ### file.
-        for my $line (@lines) {
+        ### file (or update the time if $renewed_status)
+        for my $line (@tmplines) {
             chomp $line;
-            return if $line eq $src;  ### already blocked $src
+            if ($line =~ /^\s*(\S+)\s*$/) {  ### old format; update to include time
+                my $tmpsrc = $1;
+                push @lines, "$tmpsrc " . $auto_blocked_ips{$tmpsrc}{'time'};
+                $skip_src = 1 if $tmpsrc eq $src;
+            } else {
+                if ($renewed_status) {  ### must update the time to now
+                    if ($line =~ m|$src\s|) {
+                        push @lines, "$src " . $auto_blocked_ips{$src}{'time'};
+                    } else {
+                        push @lines, $line;
+                    }
+                } else {
+                    if ($line =~ m|$src\s+\d+|) {
+                        return;  ### already blocked $src, do nothing
+                    } else {
+                        push @lines, $line;
+                    }
+                }
+            }
         }
-        open B, ">> $file" or
-            die "[*] Could not append to $file";
-        print B "$src\n";
-        close B;
-    } else {
-        open B, "> $file" or
-            die "[*] Could not create $file";
-        print B "$src\n";
-        close B;
     }
+    unless ($skip_src) {
+        push @lines, "$src " . $auto_blocked_ips{$src}{'time'};
+    }
+
+    open B, "> ${file}.tmp" or
+        die "[*] Could not write to $file: $!";
+    print B $_, "\n" for @lines;
+    close B;
+    move "${file}.tmp", $file or die "[*] Could not move ",
+        "${file}.tmp -> $file: $!";
     return;
 }
 
-sub cache_file_rm_blocked_ip() {
+### this gets called when we want to remove an IP from the disk
+### cache
+sub diskwrite_rm_blocked_ip() {
     my ($src, $file) = @_;
     print STDERR "[+] rm_blocked_ip($src, $file)\n" if $debug;
     if (-e $file) {
@@ -4571,11 +4613,14 @@ sub cache_file_rm_blocked_ip() {
             die "[*] Could not open ${file}.tmp: $!";
         for my $line (@lines) {
             chomp $line;
-            print W $line, "\n" unless $line eq $src;
+            unless ($line =~ m|$src\s| or $line =~ m|$src$|) {
+                ### handle old format (no timestamp)
+                print W $line, "\n";
+            }
         }
         close W;
         move "${file}.tmp", $file or die "[*] Could not move ",
-            "${file}.tmp -> $file";
+            "${file}.tmp -> $file: $!";
     }
     return;
 }
@@ -5188,42 +5233,58 @@ sub status_psad_daemon() {
 }
 
 sub print_blocked_ip_status() {
-    if (-e $config{'AUTO_BLOCK_IPT_FILE'}) {
-        open F, "< $config{'AUTO_BLOCK_IPT_FILE'}" or
-            die "[*] $config{'AUTO_BLOCK_IPT_FILE'}: $!";
-        my @lines = <F>;
-        close F;
-        print "\n    Iptables auto-blocked IPs:\n";
-        my $ipt = new IPTables::ChainMgr(
-            'iptables' => $cmds{'iptables'}
-        ) or die "[*] Could not acquire IPTables::ChainMgr object.";
+    return unless -e $config{'AUTO_BLOCK_IPT_FILE'};
+    open F, "< $config{'AUTO_BLOCK_IPT_FILE'}" or
+        die "[*] $config{'AUTO_BLOCK_IPT_FILE'}: $!";
+    my @lines = <F>;
+    close F;
+    print "\n    Iptables auto-blocked IPs:\n";
+    my $ipt = new IPTables::ChainMgr(
+        'iptables' => $cmds{'iptables'}
+    ) or die "[*] Could not acquire IPTables::ChainMgr object.";
 
-        my $found_line = 0;
-        for my $line (@lines) {
-            chomp $line;
-            if ($line =~ /^\s*($ip_re)/) {
-                my $ip    = $1;
-                print "        $ip";
-                my $blocked = 0;
-                for my $hr (@ipt_config) {
-                    if ($ipt->find_ip_rule($ip, '0.0.0.0/0',
-                            $hr->{'table'},
-                            $hr->{'to_chain'},
-                            $hr->{'target'})) {
-                        $blocked = 1;
-                        print " $hr->{'to_chain'}($hr->{'target'})";
-                    }
+    my $found_line = 0;
+    for my $line (@lines) {
+        chomp $line;
+        if ($line =~ /^\s*(\S+)/) {
+            my $ip = $1;  ### this may be a subnet
+            next unless $ip =~ /$ip_re/;
+            my $timestamp = '';
+            ### older versions do not have the timestamp
+            if ($line =~ /^\s*\S+\s+(\d+)/) {
+                $timestamp = $1;
+                if ($config{'AUTO_BLOCK_TIMEOUT'} > 0) {
+                    my $time_remain = $config{'AUTO_BLOCK_TIMEOUT'}
+                        - (time() - $timestamp);
+                    $time_remain = 0 if $time_remain < 0;
+
+                    print "        $ip ($time_remain ",
+                        "seconds remaining):\n";
+                } else {
+                    print "        $ip (unlimited timeout):\n";
                 }
-                $found_line = 1;
-                unless ($blocked) {
-                    print ' [NONE]';
+            } else {
+                print "        $ip:\n";
+            }
+            my $blocked = 0;
+            for my $hr (@ipt_config) {
+                if ($ipt->find_ip_rule($ip, '0.0.0.0/0',
+                        $hr->{'table'},
+                        $hr->{'to_chain'},
+                        $hr->{'target'})) {
+                    $blocked = 1;
+                    print "            $hr->{'to_chain'}",
+                        "($hr->{'target'})\n";
                 }
-                print "\n";
+            }
+            $found_line = 1;
+            unless ($blocked) {
+                print '            [not currently blocked]';
             }
         }
-        print "        [NONE]\n"
-            unless $found_line;
     }
+    print "        [NONE]\n"
+        unless $found_line;
     return;
 }
 

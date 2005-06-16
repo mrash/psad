@@ -1,0 +1,38 @@
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+TESTING YOUR INSTALLATION:
+
+In order to test whether your installation is working or not, you can do the
+following as root:
+
+  $ iptables -I INPUT -i lo -p tcp --dport 3003 -j LOG --log-prefix "Inbound "
+  $ telnet localhost 3003
+
+Assuming that psad is running, this should generate in /var/log/psad/fwdata
+something similar to:
+
+  Jun 15 23:37:33 <your_hostname> kernel: Inbound IN=lo OUT=
+  MAC=<mac_addresses> SRC=127.0.0.1 DST=127.0.0.1 LEN=60 TOS=0x10 PREC=0x00
+  TTL=64 ID=47312 DF PROTO=TCP SPT=40945 DPT=3003 WINDOW=32767 RES=0x00 SYN
+  URGP=0
+
+Also, executing "psad --Status" should display (among other things) something
+like:
+
+    Iptables prefix counters:
+        "Inbound": 1
+
+
+If the /var/log/psad/fwdata file is empty but you are getting messages in the
+system log (for example when you type "dmesg" or in /var/log/messages), then
+you should make sure that psad has the fifo open:
+
+  $ lsof | grep psadfifo
+
+You should get something along the lines of:
+
+  syslogd     942   root   20u   FIFO  3,5   544097 /var/lib/psad/psadfifo
+  kmsgsd    25457   root    0u   FIFO  3,5   544097 /var/lib/psad/psadfifo
+
+The main requirement is that Netfilter logs are getting logged via kern.info
+by syslog.  This is the default for Netfilter, but this can be changed with
+the --log-level option.

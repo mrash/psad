@@ -397,11 +397,6 @@ my %tcp_p0f_opt_types = (
     'T' => $tcp_timestamp_type
 );
 
-my $mail_status_prefix = '[psad-status]';
-my $mail_error_prefix  = '[psad-error]';
-my $mail_fatal_prefix  = '[psad-fatal]';
-my $mail_alert_prefix  = '[psad-alert]';
-
 ### save a copy of the command line arguments
 my @args_cp = @ARGV;
 
@@ -2829,7 +2824,7 @@ sub import_auto_dl() {
         }
         unless ($ip and $mask) {
             unless ($fw_block_ip) {
-                my $subject = "$mail_error_prefix import warning: " .
+                my $subject = "$config{'MAIL_ERROR_PREFIX'} import warning: " .
                     "$config{'AUTO_DL_FILE'} error on line: $i";
                 &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'},
                     $cmds{'mail'}) unless $no_email_alerts;
@@ -3621,10 +3616,12 @@ sub scan_logr() {
                 unless ($analyze_msgs and not $analysis_emails) {
                     my $subject;
                     if ($analyze_msgs) {
-                        $subject = "$mail_alert_prefix DL$curr_dl (analysis " .
+                        $subject = "$config{'MAIL_ALERT_PREFIX'} " .
+                            "DL$curr_dl (analysis " .
                             "mode) src: $src_subj dst: $dst_subj";
                     } else {
-                        $subject = "$mail_alert_prefix DL$curr_dl src: " .
+                        $subject = "$config{'MAIL_ALERT_PREFIX'} " .
+                            "DL$curr_dl src: " .
                             "$src_subj dst: $dst_subj";
                     }
                     &Psad::psyslog('psad', "sending email alert to: " .
@@ -3913,8 +3910,8 @@ sub renew_auto_blocked_ips() {
                         "against $ip $timeout_str")
                         unless $no_syslog_alerts;
                     &tcpwr_block($ip);
-                    &Psad::sendmail("$mail_status_prefix RENEWED tcpwrappers " .
-                        "BLOCK against $ip $timeout_str", '',
+                    &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} RENEWED " .
+                        "tcpwrappers BLOCK against $ip $timeout_str", '',
                         $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
                         unless $no_email_alerts;
                 }
@@ -4117,7 +4114,7 @@ sub ipt_block() {
             $mail_msg = "added $mail_msg";
         }
 
-        &Psad::sendmail("$mail_status_prefix $mail_msg", '',
+        &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} $mail_msg", '',
             $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
             unless $no_email_alerts;
         &Psad::psyslog('psad', $mail_msg) unless $no_syslog_alerts;
@@ -4203,8 +4200,8 @@ sub ipt_rm_block() {
             ### the auto-block rules from the command line with --Flush.
             &Psad::psyslog('psad', "removed iptables auto-block against " .
                 "$ip (timeout expired).") unless $no_syslog_alerts;
-            &Psad::sendmail("$mail_status_prefix removed iptables block " .
-                "against $ip (timeout expired).", '',
+            &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} removed iptables " .
+                "block against $ip (timeout expired).", '',
                 $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
                 unless $no_email_alerts;
         }
@@ -4379,8 +4376,8 @@ sub tcpwr_remove_block() {
         chomp $line;
         if ($line =~ /ALL:\s+$ip$/) {
             &diskwrite_rm_blocked_ip($ip, $config{'AUTO_BLOCK_TCPWR_FILE'});
-            &Psad::sendmail("$mail_status_prefix removed tcpwrappers block " .
-                "against $ip (timeout expired).", '',
+            &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} removed " .
+                "tcpwrappers block against $ip (timeout expired).", '',
                 $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
                 unless $no_email_alerts;
         } else {
@@ -4425,8 +4422,8 @@ sub auto_psad_response() {
             if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
                 &Psad::psyslog('psad', 'initiating tcpwrappers auto-block ' .
                     "against $src $timeout_str") unless $no_syslog_alerts;
-                &Psad::sendmail("$mail_status_prefix tcpwrappers AUTO-BLOCK " .
-                    "against $src $timeout_str", '',
+                &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} tcpwrappers " .
+                    "AUTO-BLOCK against $src $timeout_str", '',
                     $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
                     unless $no_email_alerts;
                 my $found = 0;
@@ -4627,8 +4624,8 @@ sub diskwrite_rm_blocked_ip() {
 
 sub email_limit_reached() {
     my ($src, $dst) = @_;
-    my $subject = "$mail_status_prefix email message limit for $src has " .
-        "been reached on $config{'HOSTNAME'} ($dst)";
+    my $subject = "$config{'MAIL_STATUS_PREFIX'} reached email message " .
+        "limit for $src on $config{'HOSTNAME'} ($dst)";
     &Psad::sendmail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
         unless $no_email_alerts;
     $scan{$src}{$dst}{'stop_email'} = 1;
@@ -5859,7 +5856,8 @@ sub setup() {
                 system "$cmds{'killall'} -HUP syslogd";
             }
         } else {
-            &Psad::sendmail("$mail_error_prefix $config{'ETC_SYSLOG_CONF'} does not " .
+            &Psad::sendmail("$config{'MAIL_ERROR_PREFIX'} " .
+                "$config{'ETC_SYSLOG_CONF'} does not " .
                 "exist, check SYSLOG_DAEMON setting on $config{'HOSTNAME'}",
                 '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
                 unless $no_email_alerts;
@@ -5909,7 +5907,8 @@ sub setup() {
                 system "$cmds{'killall'} -HUP syslog-ng";
             }
         } else {
-            &Psad::sendmail("$mail_error_prefix $config{'ETC_SYSLOGNG_CONF'} does not " .
+            &Psad::sendmail("$config{'MAIL_ERROR_PREFIX'} " .
+                "$config{'ETC_SYSLOGNG_CONF'} does not " .
                 "exist, check SYSLOG_DAEMON setting on $config{'HOSTNAME'}",
                 '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
                 unless $no_email_alerts;
@@ -5966,7 +5965,8 @@ sub setup() {
 #          system "$cmds{'killall'} -HUP metalog";
             }
         } else {
-            &Psad::sendmail("$mail_error_prefix $config{'ETC_METALOG_CONF'} does not " .
+            &Psad::sendmail("$config{'MAIL_ERROR_PREFIX'} " .
+                "$config{'ETC_METALOG_CONF'} does not " .
                 "exist, check SYSLOG_DAEMON setting on $config{'HOSTNAME'}",
                 '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
                 unless $no_email_alerts;
@@ -5992,7 +5992,7 @@ sub disk_space_exceeded() {
             "$config{'PSAD_DIR'} exceeded " .
             "$config{'DISK_MAX_PERCENTAGE'} prct utilization.")
             unless $no_syslog_alerts;
-        &Psad::sendmail("$mail_error_prefix Exceeded max disk utilization for " .
+        &Psad::sendmail("$config{'MAIL_ERROR_PREFIX'} Exceeded max disk utilization for " .
             "$config{'PSAD_DIR'} on $config{'HOSTNAME'}", '',
             $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
             unless $no_email_alerts;
@@ -6031,11 +6031,14 @@ sub disk_space_exceeded() {
             &Psad::psyslog('psad', "could not sufficiently reduce disk " .
                 "utilization in $config{'PSAD_DIR'} partition.  " .
                 "Stopping psad!") unless $no_syslog_alerts;
-            &Psad::sendmail("$mail_error_prefix Could not reduce disk utilization on " .
+            &Psad::sendmail("$config{'MAIL_ERROR_PREFIX'} Could not " .
+                "reduce disk utilization on " .
                 $config{'HOSTNAME'}, '', $config{'EMAIL_ADDRESSES'},
                 $cmds{'mail'}) unless $no_email_alerts;
-            &Psad::sendmail("$mail_fatal_prefix Stopping psad on $config{'HOSTNAME'}!",
-                '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'}) unless $no_email_alerts;
+            &Psad::sendmail("$config{'MAIL_FATAL_PREFIX'} Stopping psad " .
+                "on $config{'HOSTNAME'}!",
+                '', $config{'EMAIL_ADDRESSES'},
+                $cmds{'mail'}) unless $no_email_alerts;
             for my $pidname qw(psadwatchd kmsgsd) {
                 my $pidfile = $pidfiles{$pidname};
                 my $pid = &Psad::pidrunning($pidfile);
@@ -6143,7 +6146,8 @@ sub required_vars() {
         IPT_PREFIX_COUNTER_FILE IGNORE_PORTS ENABLE_SCAN_ARCHIVE
         EMAIL_LIMIT_STATUS_MSG P0F_FILE IGNORE_PROTOCOLS IPT_AUTO_CHAIN1
         AUTO_IPT_ADD_IP_FILE IGNORE_INTERFACES ALERTING_METHODS
-        ULOG_DATA_FILE
+        ULOG_DATA_FILE MAIL_ALERT_PREFIX MAIL_STATUS_PREFIX
+        MAIL_ERROR_PREFIX MAIL_FATAL_PREFIX
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

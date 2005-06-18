@@ -1649,14 +1649,16 @@ sub query_email() {
 }
 
 sub query_syslog() {
-    &logr("\n[+] psad supports the syslogd, syslog-ng, ulogd, and metalog " .
-        "logging daemons.\n\n");
+    &logr("\n[+] psad supports the syslogd, syslog-ng, ulogd, and\n" .
+        "    metalog logging daemons.  Which system logger is running?\n\n");
     my $ans = '';
     while ($ans ne 'syslogd' and $ans ne 'syslog-ng' and $ans ne 'ulogd'
             and $ans ne 'metalog') {
-        &logr("    Which system logger is running (syslogd, " .
-            "syslog-ng, ulogd, metalog)?  ");
+        &logr("    syslogd / syslog-ng / ulogd / metalog? [syslogd] ");
         $ans = <STDIN>;
+        if ($ans eq "\n") {  ### allow default to take over
+            $ans = 'syslogd';
+        }
         $ans =~ s/\s*//g;
 
         if ($ans eq 'syslogd') {

@@ -318,6 +318,7 @@ my $fw_list_auto     = 0;
 my $fw_block_ip      = '';
 my $fw_del_chains    = 0;
 my $dump_ipt_policy  = 0;
+my $fw_include_ips   = 0;
 my $benchmark        = 0;
 my $b_packets        = 0;
 my $usr1             = 0;
@@ -446,6 +447,8 @@ Getopt::Long::Configure('no_ignore_case');
                                               #   well).
     'fw-dump-policy'    => \$dump_ipt_policy, # Dump the iptables policy
                                               #   (requires -D as well).
+    'fw-include-ips'    => \$fw_include_ips,  # Include all IPs/nets in iptables
+                                              # dump (--fw-dump) output.
     'log-server'        => \$syslog_server,   # We are running psad on a syslog
                                               #   logging server.
     'Kill'              => \$kill,            # Kill all running psad processes.
@@ -6106,8 +6109,15 @@ sub dump_ipt_policy() {
         my @lines = <IPT>;
         close IPT;
         for my $line (@lines) {
-            $line =~ s|($ip_re/\d+)|x.x.x.x/x|g;
-            $line =~ s|($ip_re)|x.x.x.x|g;
+            unless ($fw_include_ips) {
+                ### always include 0.0.0.0/0
+                $line =~ s|0\.0\.0\.0/0|___PsAd0Net___|g;
+                $line =~ s|0\.0\.0\.0|___PsAd0IP___|g;
+                $line =~ s|($ip_re/\d+)|x.x.x.x/x|g;
+                $line =~ s|($ip_re)|x.x.x.x|g;
+                $line =~ s|___PsAd0Net___|0.0.0.0/0|g;
+                $line =~ s|___PsAd0IP___|0.0.0.0|g;
+            }
             if ($debug) {
                 print STDERR $line;
             } else {

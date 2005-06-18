@@ -5,7 +5,10 @@ psad-1.4.2 (03//2005):
     - Updated to version 0.2 of the IPTables::ChainMgr module.
     - Updated to not truncate the fwdata file upon psad startup.
     - Added --fw-dump which produces a sanitized (i.e. no IP addresses)
-      version of the local Netfilter policy.
+      version of the local Netfilter policy.  Also added --fw-include-ips
+      to (optionally) not sanitize IPs/nets.  Note that the 0.0.0.0 and
+      0.0.0.0/0 IPs/nets are not sanitized since they give no useful
+      information about specific IPs/nets.
     - Added ulogd data collection mode.
     - Bugfix for FW_MSG_SEARCH default (at least "DROP" is included now
       even if FW_SEARCH_ALL is set to "N").

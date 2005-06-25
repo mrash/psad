@@ -31,6 +31,11 @@ all : kmsgsd.c psadwatchd.c psad_funcs.c strlcpy.c strlcat.c psad.h
 	/usr/bin/gcc -Wall kmsgsd.c psad_funcs.c strlcpy.c strlcat.c -o kmsgsd
 	/usr/bin/gcc -Wall psadwatchd.c psad_funcs.c strlcpy.c strlcat.c -o psadwatchd
 
+### debug mode
+debug : kmsgsd.c psadwatchd.c psad_funcs.c strlcpy.c strlcat.c psad.h
+	/usr/bin/gcc -Wall -g -DDEBUG kmsgsd.c psad_funcs.c strlcpy.c strlcat.c -o kmsgsd
+	/usr/bin/gcc -Wall -g -DDEBUG psadwatchd.c psad_funcs.c strlcpy.c strlcat.c -o psadwatchd
+
 #install : kmsgsd
 #	if [ -x kmsgsd ]; then \
 #		/bin/cp kmsgsd /usr/sbin/kmsgsd

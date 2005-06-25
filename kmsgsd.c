@@ -217,17 +217,18 @@ int main(int argc, char *argv[]) {
 #endif
             }
 #ifdef DEBUG
-        if (matched_ipt_log_msg) {
-            puts(buf);
-            fprintf(stderr, "[+] Line matched search strings.\n");
-            fwlinectr++;
-            if (fwlinectr % 50 == 0)
-                fprintf(stderr,
-                    "[+] Processed %d firewall lines.\n", fwlinectr);
-            matched_ipt_log_msg = 0;
-        } else {
-            puts(buf);
-            printf("[-] Line did not match search strings.\n");
+            if (matched_ipt_log_msg) {
+                puts(buf);
+                fprintf(stderr, "[+] Line matched search strings.\n");
+                fwlinectr++;
+                if (fwlinectr % 50 == 0)
+                    fprintf(stderr,
+                        "[+] Processed %d firewall lines.\n", fwlinectr);
+                matched_ipt_log_msg = 0;
+            } else {
+                puts(buf);
+                printf("[-] Line did not match search strings.\n");
+            }
 #endif
         }
     }

@@ -1,0 +1,15 @@
+
+This README applies to the patch files contained within the "patches"
+directory in the psad (http://www.cipherdyne.org/psad) sources.
+
+The patches in this directory are organized by kernel version, so
+"linux-2.4.27_conntrack.patch" applies to the linux-2.4.27 kernel.
+The "_conntrack" portion of the filename describes the Netfilter module
+to which the patch applies.  As of psad-1.4.2, all of the patches in
+this directory apply to the conntrack module.  Specifically, each patch
+extends the close wait timeout for TCP connections from 60 seconds to
+2 minutes.  If you are seeing Netfilter logging messages for TCP ACK
+packets associated with legitimate TCP connections (i.e. packets are
+not being correctly identified as such by the conntrack module), you
+may want to apply the appropriate conntrack patch. See the BUGS section
+of the psad man page for more information.

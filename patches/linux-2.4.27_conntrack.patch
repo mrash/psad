@@ -1,0 +1,11 @@
+--- net/ipv4/netfilter/ip_conntrack_proto_tcp.c.orig	2005-07-01 09:57:22.000000000 -0400
++++ net/ipv4/netfilter/ip_conntrack_proto_tcp.c	2005-07-01 09:57:49.000000000 -0400
+@@ -53,7 +53,7 @@
+ unsigned long ip_ct_tcp_timeout_syn_recv =     60 SECS;
+ unsigned long ip_ct_tcp_timeout_established =   5 DAYS;
+ unsigned long ip_ct_tcp_timeout_fin_wait =      2 MINS;
+-unsigned long ip_ct_tcp_timeout_close_wait =   60 SECS;
++unsigned long ip_ct_tcp_timeout_close_wait =    2 MINS;
+ unsigned long ip_ct_tcp_timeout_last_ack =     30 SECS;
+ unsigned long ip_ct_tcp_timeout_time_wait =     2 MINS;
+ unsigned long ip_ct_tcp_timeout_close =        10 SECS;

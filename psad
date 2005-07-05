@@ -4867,6 +4867,8 @@ sub analysis_mode() {
     }
     print "[+] Found $#ipt_msgs iptables messages out of ",
         "$#lines total lines.\n";
+    print "    This may take a while...\n"
+        if $#lines > 10000;
     &check_scan(\@ipt_msgs);
     print "[+] Displaying status output.\n";
     &status_psad_daemon();

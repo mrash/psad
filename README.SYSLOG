@@ -34,5 +34,14 @@ You should get something along the lines of:
   kmsgsd    25457   root    0u   FIFO  3,5   544097 /var/lib/psad/psadfifo
 
 The main requirement is that Netfilter logs are getting logged via kern.info
-by syslog.  This is the default for Netfilter, but this can be changed with
-the --log-level option.
+(or at a higher priority such as "warn") by syslog.  The default for the
+Netfilter LOG target is log Netfilter messages at the "warn" priority, but
+this can be changed with the --log-level option.  For example, to have
+Netfilter generate logs at the "info" priority in the INPUT chain, the
+following command could be used:
+
+# iptables -A INPUT -j LOG --log-level info
+
+This may help cut down on Netfilter logs being sent to the console if your
+syslog.conf instructs syslog to log kernel messages at a "warn" level or
+higher to the console device.

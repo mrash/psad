@@ -1,8 +1,10 @@
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 TESTING YOUR INSTALLATION:
 
-In order to test whether your installation is working or not, you can do the
-following as root:
+The psad installer does its best to reconfigure your syslog daemon to write
+all kern.info messages (or higher) to the /var/lib/psad/psadfifo named pipe
+for analysis.  However, in order to test whether your installation is working
+or not, you can do the following as root:
 
   $ iptables -I INPUT -i lo -p tcp --dport 3003 -j LOG --log-prefix "Inbound "
   $ telnet localhost 3003

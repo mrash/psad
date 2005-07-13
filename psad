@@ -4016,7 +4016,8 @@ sub ipt_block() {
         'iptables' => $cmds{'iptables'}
     ) or die '[*] Could not acquire IPTables::ChainMgr object.';
 
-    my $block_success = 0;
+    my $block_success   = 0;
+    my $already_blocked = 0;
 
     my $timeout_str = '';
     if ($config{'AUTO_BLOCK_TIMEOUT'} > 0) {
@@ -4063,8 +4064,10 @@ sub ipt_block() {
         }
 
         if ($src and $dst) {
-            unless ($ipt->find_ip_rule($src, $dst,
+            if ($ipt->find_ip_rule($src, $dst,
                     $table, $to_chain, $target)) {
+                $already_blocked = 1;
+            } else {
                 ($rv, $status_msg) = $ipt->add_ip_rule($src, $dst,
                     $config{'IPTABLES_AUTO_RULENUM'}, $table,
                     $to_chain, $target);
@@ -4084,9 +4087,10 @@ sub ipt_block() {
             ### need to add reverse rule for FORWARD chain
             my $src2 = $dst;
             my $dst2 = $src;
-            unless ($ipt->find_ip_rule($src2, $dst2, $table,
-                $to_chain, $target)) {
-
+            if ($ipt->find_ip_rule($src2, $dst2, $table,
+                    $to_chain, $target)) {
+                $already_blocked = 1;
+            } else {
                 ($rv, $status_msg) = $ipt->add_ip_rule($src2, $dst2,
                     $config{'IPTABLES_AUTO_RULENUM'}, $table,
                     $to_chain, $target);
@@ -4100,7 +4104,12 @@ sub ipt_block() {
             }
         }
     }
-    if ($block_success) {
+    if ($already_blocked) {
+        &Psad::psyslog('psad', "block rule for ip: $ip already exists")
+            unless $no_syslog_alerts;
+        print STDERR "[-] Block rule for ip: $ip already exists\n"
+            if $debug;
+    } elsif ($block_success) {
 
         ### make sure the ip is in the auto_blocked_ips cache (the ip
         ### may have come from the command line with --fw-block-ip

@@ -1,5 +1,5 @@
 %define name psad
-%define version 1.4.1
+%define version 1.4.2
 %define release 1
 %define psadlibdir /usr/lib/psad
 %define psadlogdir /var/log/psad
@@ -183,18 +183,18 @@ chown root.root %psadvarlibdir/psadfifo
 chmod 0600 %psadvarlibdir/psadfifo
 ### make psad start at boot
 /sbin/chkconfig --add psad
-[ -f /etc/syslog.conf ] || exit 0
-### make a backup of /etc/syslog.conf
-[ -f /etc/syslog.conf.orig ] || cp -p /etc/syslog.conf /etc/syslog.conf.orig
-### add the psadfifo line to /etc/syslog.conf if necessary
-if ! grep -v "#" /etc/syslog.conf | grep -q psadfifo;
-then echo "[+] Adding psadfifo line to /etc/syslog.conf"
-echo "kern.info |/var/lib/psad/psadfifo" >> /etc/syslog.conf
-fi
-if [ -e /var/run/syslogd.pid ];
-then
-echo "[+] Restarting syslogd "
-kill -HUP `cat /var/run/syslogd.pid`
+if [ -f /etc/syslog.conf ];
+then [ -f /etc/syslog.conf.orig ] || cp -p /etc/syslog.conf /etc/syslog.conf.orig
+    ### add the psadfifo line to /etc/syslog.conf if necessary
+    if ! grep -v "#" /etc/syslog.conf | grep -q psadfifo;
+    then echo "[+] Adding psadfifo line to /etc/syslog.conf"
+    echo "kern.info |/var/lib/psad/psadfifo" >> /etc/syslog.conf
+    fi
+    if [ -e /var/run/syslogd.pid ];
+    then
+    echo "[+] Restarting syslogd "
+    kill -HUP `cat /var/run/syslogd.pid`
+    fi
 fi
 if grep -q "EMAIL.*root.*localhost" /etc/psad/psad.conf;
 then
@@ -236,6 +236,10 @@ fi
 %_libdir/%name
 
 %changelog
+* Tue Jul 12 2005 Michael Rash <mbr@cipherydne.org>
+- Updated to only update syslog.conf if it actually exists. Psad
+  is now comptable with other syslog daemons, and also with ulogd.
+
 * Thu Mar 10 2005 Michael Rash <mbr@cipherydne.org>
 - Updated to new IPTables-Parse and IPTables-ChainMgr modules.
 - psad-1.4.1 release.

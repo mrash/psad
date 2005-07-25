@@ -271,8 +271,11 @@ Michael Hadjimichael
 
 Blair Zajac
     - Submitted patch to not install perl modules in that are already
-      installed in the system perl lib tree (he originally submitted this
-      patch for fwknop).
+      installed in the system perl lib tree (this was originally submitted
+      as a patch for fwknop).
+    - Found bug with perl module file paths and naming convention (this bug
+      resulted in some modules being needlessly installed).  This find was
+      originally for fwknop.
 
 Troy Swaine
     - Suggested a command line interface to block IP addresses.  The result

@@ -86,37 +86,37 @@ my %required_perl_modules = (
     'Unix::Syslog' => {
         'version' => '0.100',
         'force-lib-install' => 0,
-        'module-path' => 'Unix-Syslog/Syslog.pm'
+        'mod-dir' => 'Unix-Syslog'
     },
     'Bit::Vector' => {
         'version' => '6.3',
         'force-lib-install' => 0,
-        'module-path' => 'Bit-Vector/Vector.pm'
+        'mod-dir' => 'Bit-Vector'
     },
     'Date::Calc', => {
         'version' => '5.3',
         'force-lib-install' => 0,
-        'module-path' => 'Date-Calc/Calc.pm'
+        'mod-dir' => 'Date-Calc'
     },
     'Net::IPv4Addr' => {
         'version' => '0.10',
         'force-lib-install' => 0,
-        'module-path' => 'Net-IPv4Addr/IPv4Addr.pm'
+        'mod-dir' => 'Net-IPv4Addr'
     },
     'IPTables::Parse' => {
         'version' => '0.2',
         'force-lib-install' => 1,
-        'module-path' => 'IPTables-Parse/lib/IPTables/Parse.pm'
+        'mod-dir' => 'IPTables-Parse'
     },
     'IPTables::ChainMgr' => {
         'version' => '0.2',
         'force-lib-install' => 1,
-        'module-path' => 'IPTables-ChainMgr/lib/IPTables/ChainMgr.pm'
+        'mod-dir' => 'IPTables-ChainMgr'
     },
     'Psad' => {
         'version' => '1.4.1',
         'force-lib-install' => 1,
-        'module-path' => 'Psad/lib/Psad.pm'
+        'mod-dir' => 'Psad'
     }
 );
 
@@ -871,8 +871,8 @@ sub install_perl_module() {
         unless defined $required_perl_modules{$mod_name}{'version'};
     die '[*] Missing force-lib-install key in required_perl_modules hash.'
         unless defined $required_perl_modules{$mod_name}{'force-lib-install'};
-    die '[*] Missing module-path key in required_perl_modules hash.'
-        unless defined $required_perl_modules{$mod_name}{'module-path'};
+    die '[*] Missing mod-dir key in required_perl_modules hash.'
+        unless defined $required_perl_modules{$mod_name}{'mod-dir'};
 
     my $version = $required_perl_modules{$mod_name}{'version'};
 
@@ -882,10 +882,15 @@ sub install_perl_module() {
         ### install regardless of whether the module may already be
         ### installed
         $install_module = 1;
-    } elsif (not has_perl_module($required_perl_modules{$mod_name}{'module-path'})) {
-        ### install the module in the /usr/lib/psad directory because
-        ### it is not already installed.
-        $install_module = 1;
+    } else {
+        if (has_perl_module($mod_name)) {
+            print "[+] Module $mod_name is already installed in the ",
+                "system perl tree, skipping.\n";
+        } else {
+            ### install the module in the /usr/lib/fwknop directory because
+            ### it is not already installed.
+            $install_module = 1;
+        }
     }
 
     if ($install_module) {
@@ -895,8 +900,7 @@ sub install_perl_module() {
         }
         &logr("[+] Installing the $mod_name $version perl " .
             "module in $LIBDIR/\n");
-        my $mod_dir = $mod_name;
-        $mod_dir =~ s/::/-/g;
+        my $mod_dir = $required_perl_modules{$mod_name}{'mod-dir'};
         chdir $mod_dir or die "[*] Could not chdir to ",
             "$mod_dir: $!";
         unless (-e 'Makefile.PL') {
@@ -1892,15 +1896,15 @@ sub install_manpage() {
 }
 
 sub has_perl_module() {
-    my $module_path = shift;
+    my $module = shift;
 
     # 5.8.0 has a bug with require Foo::Bar alone in an eval, so an
     # extra statement is a workaround.
-    if (-e $module_path) {
-        eval { require $module_path };
-        return $@ ? 0 : 1;
-    }
-    return 0;
+    my $file = "$module.pm";
+    $file =~ s{::}{/}g;
+    eval { require $file };
+
+    return $@ ? 0 : 1;
 }
 
 ### logging subroutine that handles multiple filehandles

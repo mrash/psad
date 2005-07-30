@@ -5270,7 +5270,7 @@ sub print_blocked_ip_status() {
                     $time_remain = 0 if $time_remain < 0;
 
                     print "        $ip ($time_remain ",
-                        "seconds remaining):\n";
+                        "seconds remaining)\n";
                 } else {
                     print "        $ip (unlimited timeout):\n";
                 }
@@ -5278,21 +5278,19 @@ sub print_blocked_ip_status() {
                 print "        $ip:\n";
             }
             my $blocked = 0;
-            if ($verbose) {
-                for my $hr (@ipt_config) {
-                    if ($ipt->find_ip_rule($ip, '0.0.0.0/0',
-                            $hr->{'table'},
-                            $hr->{'to_chain'},
-                            $hr->{'target'})) {
-                        $blocked = 1;
-                        print "            $hr->{'to_chain'}",
-                            "($hr->{'target'})\n";
-                    }
+            for my $hr (@ipt_config) {
+                if ($ipt->find_ip_rule($ip, '0.0.0.0/0',
+                        $hr->{'table'},
+                        $hr->{'to_chain'},
+                        $hr->{'target'})) {
+                    $blocked = 1;
+                    print "            $hr->{'to_chain'}",
+                        "($hr->{'target'})\n" if $verbose;
                 }
-                $found_line = 1;
-                unless ($blocked) {
-                    print '            [not currently blocked]';
-                }
+            }
+            $found_line = 1;
+            unless ($blocked) {
+                print '            [not currently blocked]';
             }
         }
     }

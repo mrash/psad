@@ -1186,12 +1186,6 @@ sub check_scan() {
             }
         }
 
-        if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
-                and not defined $auto_blocked_ips{$src}) {
-            $auto_blocked_ips{$src}{'time'}    = time();
-            $auto_blocked_ips{$src}{'blocked'} = 0;
-        }
-
         ### record the absolute starting time of the scan
         unless (defined $scan{$src}{$dst}{'s_time'}) {
             if ($analyze_msgs) {
@@ -3884,18 +3878,21 @@ sub renew_auto_blocked_ips() {
         close B;
 
         for my $line (@lines) {
-            if ($line =~ /($ip_re)/) {
+            if ($line =~ /^\s*($ip_re)\s+(\d+)/) {
                 my $ip = $1;
+                my $orig_block_time = $2;
 
-                ### block the IP address (note that checks are built into
-                ### this function)
-                &ipt_block($ip, 'renew');
+                if ((time() - $orig_block_time)
+                        > $config{'AUTO_BLOCK_TIMEOUT'}) {
+                    ### timeout has expired, so we should remove any
+                    ### existing blocking rule
+                    &ipt_rm_block($ip);
 
-                ### set the auto-block start time here since
-                ### renew_auto_blocked_ips() is only called
-                ### at startup.
-                $auto_blocked_ips{$ip}{'time'}    = time();
-                $auto_blocked_ips{$ip}{'blocked'} = 1;
+                } else {
+                    ### block the IP address (note that checks are built
+                    ### into this function to not add a duplicate rule)
+                    &ipt_block($ip, 'renew');
+                }
             }
         }
     }
@@ -3918,8 +3915,10 @@ sub renew_auto_blocked_ips() {
                         $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
                         unless $no_email_alerts;
                 }
-                $auto_blocked_ips{$ip}{'time'}    = time();
-                $auto_blocked_ips{$ip}{'blocked'} = 1;
+                ### defer to the iptables block time if it is already
+                ### defined
+                $auto_blocked_ips{$ip} = time()
+                    unless defined $auto_blocked_ips{$ip};
             }
         }
     }
@@ -4010,6 +4009,9 @@ sub flush_auto_blocked_ips() {
 sub ipt_block() {
     my ($ip, $renewed_status) = @_;
 
+    ### see if the IP is already blocked
+    return if defined $auto_blocked_ips{$ip};
+
     print STDERR "[+] ipt_block($ip)\n" if $debug;
 
     my $ipt = new IPTables::ChainMgr(
@@ -4063,24 +4065,22 @@ sub ipt_block() {
             $dst = $ip;
         }
 
-        if ($src and $dst) {
-            if ($ipt->find_ip_rule($src, $dst,
-                    $table, $to_chain, $target)) {
-                $already_blocked = 1;
-            } else {
-                ($rv, $status_msg) = $ipt->add_ip_rule($src, $dst,
-                    $config{'IPTABLES_AUTO_RULENUM'}, $table,
-                    $to_chain, $target);
-                if ($rv) {
-                    $block_success = 1;
-                } else {
-                    &Psad::psyslog('psad', $status_msg)
-                        unless $no_syslog_alerts;
-                    print STDERR "[-] ipt_block(): $status_msg\n" if $debug;
-                }
-            }
+        next unless $src and $dst;
+
+        if ($ipt->find_ip_rule($src, $dst,
+                $table, $to_chain, $target)) {
+            $already_blocked = 1;
         } else {
-            next;
+            ($rv, $status_msg) = $ipt->add_ip_rule($src, $dst,
+                $config{'IPTABLES_AUTO_RULENUM'}, $table,
+                $to_chain, $target);
+            if ($rv) {
+                $block_success = 1;
+            } else {
+                &Psad::psyslog('psad', $status_msg)
+                    unless $no_syslog_alerts;
+                print STDERR "[-] ipt_block(): $status_msg\n" if $debug;
+            }
         }
 
         if ($direction eq 'both') {
@@ -4113,11 +4113,12 @@ sub ipt_block() {
 
         ### make sure the ip is in the auto_blocked_ips cache (the ip
         ### may have come from the command line with --fw-block-ip
-        ### instead of through the Netfilter log).
-        unless (defined $auto_blocked_ips{$ip}) {
-            $auto_blocked_ips{$ip}{'time'}    = time();
-            $auto_blocked_ips{$ip}{'blocked'} = 1;
-        }
+        ### instead of through the Netfilter log).  Also, don't re-define
+        ### the block time if it has already been defined (note that we
+        ### may instantiate multiple block actions in the for loop
+        ### above).
+        $auto_blocked_ips{$ip} = time()
+            unless defined $auto_blocked_ips{$ip};
 
         my $mail_msg = "iptables auto-block against $ip $timeout_str";
         if ($renewed_status) {
@@ -4172,20 +4173,18 @@ sub ipt_rm_block() {
             $dst = $ip;
         }
 
-        if ($src and $dst) {
-            if ($ipt->find_ip_rule($src, $dst, $table, $to_chain, $target)) {
-                my ($rv, $status_msg) = $ipt->delete_ip_rule($src, $dst,
-                    $table, $to_chain, $target);
-                if ($rv) {
-                    $rm_block = 1;
-                } else {
-                    &Psad::psyslog('psad', $status_msg)
-                        unless $no_syslog_alerts;
-                    print STDERR "[-] ipt_rm_block(): $status_msg\n" if $debug;
-                }
+        next unless $src and $dst;
+
+        if ($ipt->find_ip_rule($src, $dst, $table, $to_chain, $target)) {
+            my ($rv, $status_msg) = $ipt->delete_ip_rule($src, $dst,
+                $table, $to_chain, $target);
+            if ($rv) {
+                $rm_block = 1;
+            } else {
+                &Psad::psyslog('psad', $status_msg)
+                    unless $no_syslog_alerts;
+                print STDERR "[-] ipt_rm_block(): $status_msg\n" if $debug;
             }
-        } else {
-            next;
         }
 
         if ($direction eq 'both') {
@@ -4220,6 +4219,8 @@ sub ipt_rm_block() {
         print STDERR "[+] ipt_rm_block(): removed iptables block ",
             "against $ip (timeout expired).\n" if $debug;
         &diskwrite_rm_blocked_ip($ip, $config{'AUTO_BLOCK_IPT_FILE'});
+
+        delete $auto_blocked_ips{$ip} if defined $auto_blocked_ips{$ip};
     } else {
         if ($flush_fw) {
             &Psad::psyslog('psad', 'could not remove iptables ' .
@@ -4265,6 +4266,7 @@ sub ipt_list_auto_chains() {
 
 sub check_ipt_add_ip() {
     return unless -e $config{'AUTO_IPT_ADD_IP_FILE'};
+
     open F, "< $config{'AUTO_IPT_ADD_IP_FILE'}" or die "[*] Could ",
         "not open $config{'AUTO_IPT_ADD_IP_FILE'}: $!";
     my @lines = <F>;
@@ -4295,19 +4297,24 @@ sub check_ipt_add_ip() {
 ### this only gets used when issuing --fw-block
 ### from the command line.
 sub diskwrite_add_ipt_block_ip() {
-    unless ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
-        print "[-] ENABLE_AUTO_IDS is not enabled. Exiting.\n";
-        return 0;
-    }
+
+    die "[*] ENABLE_AUTO_IDS is not enabled. Exiting."
+        unless $config{'ENABLE_AUTO_IDS'} eq 'Y';
+
+    die "[*] --fw-block-ip takes an IP/subnet as an argument."
+        unless $fw_block_ip =~ /$ip_re/;
 
     my $block_ip   = '';
     my $block_mask = '';
     if ($fw_block_ip =~ m|^\s*($ip_re)\s*$|) {
         $block_ip   = $1;
         $block_mask = '32';
-    } elsif ($fw_block_ip =~ m|^\s*($ip_re)/(.*)\s*$|) {
+    } elsif ($fw_block_ip =~ m|^\s*($ip_re)/($ip_re)\s*$|) {
         $block_ip   = $1;
-        $block_mask = $2;  ### CIDR or regular
+        $block_mask = $2;
+    } elsif ($fw_block_ip =~ m|^\s*($ip_re)/(\d+)\s*$|) {
+        $block_ip   = $1;
+        $block_mask = $2;
     }
 
     if ($block_mask ne '32') {
@@ -4341,10 +4348,12 @@ sub diskwrite_add_ipt_block_ip() {
         if (&Psad::pidrunning($config{'PID_FILE'})) {
             print "[+] Writing $fw_block_ip to cache file. Psad will add the IP\n",
                 "    within $config{'CHECK_INTERVAL'} seconds.\n";
-            open F, ">> $config{'AUTO_IPT_ADD_IP_FILE'}" or die "[*] Could ",
-                "not open $config{'AUTO_IPT_ADD_IP_FILE'}: $!";
+            open F, "> $config{'AUTO_IPT_ADD_IP_FILE'}.tmp" or die "[*] Could ",
+                "not open $config{'AUTO_IPT_ADD_IP_FILE'}.tmp: $!";
             print F $fw_block_ip, "\n";
             close F;
+            move "$config{'AUTO_IPT_ADD_IP_FILE'}.tmp",
+                $config{'AUTO_IPT_ADD_IP_FILE'} or die $!;
         } else {
             print "[-] There is no running psad process. Exiting.\n"
         }
@@ -4408,18 +4417,20 @@ sub auto_psad_response() {
 
     print STDERR "[+] auto_psad_response()\n" if $debug;
 
-    for my $src (keys %$curr_scan_hr) {
+    SRC: for my $src (keys %$curr_scan_hr) {
         ### make sure we are not attempting to block 0.0.0.0
         ### or 127.0.0.1 or any of the interface ips.
-        next if &auto_block_ignore_ip($src);
+        next SRC if &auto_block_ignore_ip($src);
 
         my $dl = $scan_dl{$src};
         ### We only want to block the IP once.  Currently this will block
         ### all traffic from the host to _all_ destinations that are
         ### protected by the firewall if the ip trips the $auto_psad_level
         ### threshold for _any_ destination.
-        if ($dl >= $config{'AUTO_IDS_DANGER_LEVEL'}
-                and $auto_blocked_ips{$src}{'blocked'} == 0) {
+        if ($dl >= $config{'AUTO_IDS_DANGER_LEVEL'}) {
+
+            next SRC if defined $auto_blocked_ips{$src};
+
             my $timeout_str = '';
             if ($config{'AUTO_BLOCK_TIMEOUT'} > 0) {
                 $timeout_str = "for $config{'AUTO_BLOCK_TIMEOUT'} seconds.";
@@ -4457,12 +4468,6 @@ sub auto_psad_response() {
                         $config{'AUTO_BLOCK_TCPWR_FILE'}, '');
                 }
             }
-            print STDERR "[+] setting blocked = 1 for $src\n" if $debug;
-            ### don't try to block again
-            $auto_blocked_ips{$src}{'blocked'} = 1;
-        } elsif ($debug) {
-            print STDERR "[+] blocked value for $src: ",
-                "$auto_blocked_ips{$src}{'blocked'}\n";
         }
     }
     return;
@@ -4485,7 +4490,7 @@ sub timeout_auto_blocked_ips() {
     print STDERR "[+] timeout_auto_block_ips()\n" if $debug;
     return if $config{'AUTO_BLOCK_TIMEOUT'} == 0;
     for my $ip (keys %auto_blocked_ips) {
-        if ((time() - $auto_blocked_ips{$ip}{'time'})
+        if ((time() - $auto_blocked_ips{$ip})
                 > $config{'AUTO_BLOCK_TIMEOUT'}) {
 
             ### remove all Netfiler blocking rules for $ip
@@ -4501,7 +4506,8 @@ sub timeout_auto_blocked_ips() {
             ### delete the ip from the hash (if new packets are seen
             ### from the same ip, then the hash will be updated again
             ### in check_scan()).
-            delete $auto_blocked_ips{$ip};
+            delete $auto_blocked_ips{$ip}
+                if defined $auto_blocked_ips{$ip};
         }
     }
     return;
@@ -4576,17 +4582,18 @@ sub diskwrite_blocked_ip() {
             chomp $line;
             if ($line =~ /^\s*(\S+)\s*$/) {  ### old format; update to include time
                 my $tmpsrc = $1;
-                push @lines, "$tmpsrc " . $auto_blocked_ips{$tmpsrc}{'time'};
+                push @lines, "$tmpsrc " . $auto_blocked_ips{$tmpsrc};
                 $skip_src = 1 if $tmpsrc eq $src;
             } else {
                 if ($renewed_status) {  ### must update the time to now
-                    if ($line =~ m|$src\s|) {
-                        push @lines, "$src " . $auto_blocked_ips{$src}{'time'};
+                    if ($line =~ m|^\s*$src\s|) {
+                        push @lines, "$src " . $auto_blocked_ips{$src};
+                        $skip_src = 1;
                     } else {
                         push @lines, $line;
                     }
                 } else {
-                    if ($line =~ m|$src\s+\d+|) {
+                    if ($line =~ m|^\s*$src\s+\d+|) {
                         return;  ### already blocked $src, do nothing
                     } else {
                         push @lines, $line;
@@ -4596,7 +4603,7 @@ sub diskwrite_blocked_ip() {
         }
     }
     unless ($skip_src) {
-        push @lines, "$src " . $auto_blocked_ips{$src}{'time'};
+        push @lines, "$src " . $auto_blocked_ips{$src};
     }
 
     open B, "> ${file}.tmp" or
@@ -4622,7 +4629,7 @@ sub diskwrite_rm_blocked_ip() {
             die "[*] Could not open ${file}.tmp: $!";
         for my $line (@lines) {
             chomp $line;
-            unless ($line =~ m|$src\s| or $line =~ m|$src$|) {
+            unless ($line =~ m|^\s*$src\s| or $line =~ m|^\s*$src$|) {
                 ### handle old format (no timestamp)
                 print W $line, "\n";
             }
@@ -5275,7 +5282,7 @@ sub print_blocked_ip_status() {
                     print "        $ip (unlimited timeout)\n";
                 }
             } else {
-                print "        $ip:\n";
+                print "        $ip\n";
             }
             my $blocked = 0;
             for my $hr (@ipt_config) {

@@ -3882,16 +3882,22 @@ sub renew_auto_blocked_ips() {
                 my $ip = $1;
                 my $orig_block_time = $2;
 
-                if ((time() - $orig_block_time)
-                        > $config{'AUTO_BLOCK_TIMEOUT'}) {
-                    ### timeout has expired, so we should remove any
-                    ### existing blocking rule
-                    &ipt_rm_block($ip);
-
-                } else {
+                if ($config{'AUTO_BLOCK_TIMEOUT'} == 0) {
                     ### block the IP address (note that checks are built
                     ### into this function to not add a duplicate rule)
                     &ipt_block($ip, 'renew');
+                } else {
+                    if ((time() - $orig_block_time)
+                            > $config{'AUTO_BLOCK_TIMEOUT'}) {
+                        ### timeout has expired, so we should remove any
+                        ### existing blocking rule
+                        &ipt_rm_block($ip);
+
+                    } else {
+                        ### block the IP address (note that checks are built
+                        ### into this function to not add a duplicate rule)
+                        &ipt_block($ip, 'renew');
+                    }
                 }
             }
         }

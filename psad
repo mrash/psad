@@ -342,7 +342,7 @@ my $warn_msg         = '';
 my $die_msg          = '';
 my $messages_file    = '/var/log/messages';
 my $local_ips_lkup_ctr = 0;
-my $skipped_first_loop = 0;
+my $skip_first_loop = 1;
 
 ### these flags are used to disable several features
 ### in psad if specified from the command line
@@ -711,7 +711,7 @@ MAIN: for (;;) {
             open FWDATA, $fw_data_file or die
                 "[*] Could not open $fw_data_file: $!";
 
-            $skipped_first_loop = 0;
+            $skip_first_loop = 1;
         }
     }
 
@@ -737,15 +737,18 @@ MAIN: for (;;) {
             push @fw_packets, "$test_pkt DPT=$dp $test_pktend";
             $dp++ if $dp < 50000;
         }
-    } else {
-        @fw_packets = <FWDATA>;
     }
 
     ### allow the contents of the fwdata file to be processed only after
     ### the first loop has been executed.
-    if ($skipped_first_loop == 0) {
-        $skipped_first_loop = 1;
-        next MAIN;
+    if ($skip_first_loop) {
+        unless ($benchmark) {
+            $skip_first_loop = 0;
+            seek FWDATA,0,2;  ### seek to the end of the file
+            next MAIN;
+        }
+    } else {
+        @fw_packets = <FWDATA>;
     }
 
     if (@fw_packets) {

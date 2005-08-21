@@ -682,6 +682,11 @@ unless ($fw_analyze or $benchmark) {
 unless ($benchmark) {
     open FWDATA, $fw_data_file or die '[*] Could not open ',
         "$fw_data_file: $!";
+
+    if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
+        open ADDIPTCACHE, $config{'AUTO_IPT_ADD_IP_FILE'} or
+            die "[*] Could not open $config{'AUTO_IPT_ADD_IP_FILE'}: $!";
+    }
 }
 
 ###=========================================================###
@@ -692,6 +697,9 @@ MAIN: for (;;) {
     ### scope and clear the firewall data array
     my @fw_packets = ();
 
+    ### for --fw-block <ip>
+    my @add_ipt_addrs = ();
+
     if ($hup_flag) {
         $hup_flag = 0;  ### clear the HUP flag
 
@@ -699,6 +707,10 @@ MAIN: for (;;) {
             're-importing psad.conf') unless $no_syslog_alerts;
 
         my $orig_fwdata = $fw_data_file;
+        my $orig_ipt_cache = '';
+
+        $orig_ipt_cache = $config{'AUTO_IPT_ADD_IP_FILE'}
+            if $config{'ENABLE_AUTO_IDS'} eq 'Y';
 
         ### Re-import all used config files (psad.conf, auto_dl,
         ### posf, signatures) if we received a HUP signal.
@@ -713,6 +725,18 @@ MAIN: for (;;) {
 
             $skip_first_loop = 1;
         }
+
+        if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
+            if ($orig_ipt_cache ne $config{'AUTO_IPT_ADD_IP_FILE'}) {
+                close ADDIPTCACHE;
+
+                ### re-open the iptables add cache file
+                open ADDIPTCACHE, "< $config{'AUTO_IPT_ADD_IP_FILE'}" or die
+                    "[*] Could not open $config{'AUTO_IPT_ADD_IP_FILE'}: $!";
+
+                $skip_first_loop = 1;
+            }
+        }
     }
 
     ### See if we need to print out the %scan datastructure
@@ -724,6 +748,7 @@ MAIN: for (;;) {
             "hashes to $config{'PSAD_DIR'}/scan_hash.$$")
             unless $no_syslog_alerts;
 
+        ### dump scan hash to filesystem
         &print_scan();
     }
 
@@ -745,10 +770,14 @@ MAIN: for (;;) {
         unless ($benchmark) {
             $skip_first_loop = 0;
             seek FWDATA,0,2;  ### seek to the end of the file
+            seek ADDIPTCACHE,0,2
+                if $config{'ENABLE_AUTO_IDS'} eq 'Y' and not $benchmark;
             next MAIN;
         }
     } else {
         @fw_packets = <FWDATA>;
+        @add_ipt_addrs = <ADDIPTCACHE>
+            if $config{'ENABLE_AUTO_IDS'} eq 'Y' and not $benchmark;
     }
 
     if (@fw_packets) {
@@ -801,7 +830,7 @@ MAIN: for (;;) {
 
         ### see if we need to add any IP address from the Netfilter cache
         ### file.
-        &check_ipt_add_ip();
+        &check_ipt_add_ip(\@add_ipt_addrs) if @add_ipt_addrs;
     }
 
     ### Send logs to dshield in dshield format
@@ -858,9 +887,18 @@ MAIN: for (;;) {
     ### clearerr() on the FWDATA filehandle to be ready for new packets
     FWDATA->clearerr();
 
+    ### be ready for new --fw-block addresses
+    ADDIPTCACHE->clearerr()
+        if $config{'ENABLE_AUTO_IDS'} eq 'Y' and not $benchmark;
+
     ### sleep for the check interval seconds
     sleep $config{'CHECK_INTERVAL'};
 }
+
+### for completeness
+close FWDATA;
+close ADDIPTCACHE
+    if $config{'ENABLE_AUTO_IDS'} eq 'Y' and not $benchmark;
 exit 0;
 ###=========================================================###
 ######                    END MAIN                       ######
@@ -3889,6 +3927,8 @@ sub renew_auto_blocked_ips() {
                     ### block the IP address (note that checks are built
                     ### into this function to not add a duplicate rule)
                     &ipt_block($ip, 'renew');
+
+                    $auto_blocked_ips{$ip} = $orig_block_time;
                 } else {
                     if ((time() - $orig_block_time)
                             > $config{'AUTO_BLOCK_TIMEOUT'}) {
@@ -3900,6 +3940,8 @@ sub renew_auto_blocked_ips() {
                         ### block the IP address (note that checks are built
                         ### into this function to not add a duplicate rule)
                         &ipt_block($ip, 'renew');
+
+                        $auto_blocked_ips{$ip} = $orig_block_time;
                     }
                 }
             }
@@ -4274,32 +4316,22 @@ sub ipt_list_auto_chains() {
 }
 
 sub check_ipt_add_ip() {
-    return unless -e $config{'AUTO_IPT_ADD_IP_FILE'};
-
-    open F, "< $config{'AUTO_IPT_ADD_IP_FILE'}" or die "[*] Could ",
-        "not open $config{'AUTO_IPT_ADD_IP_FILE'}: $!";
-    my @lines = <F>;
-    close F;
+    my $lines_aref = shift;
 
     my $ipt = new IPTables::ChainMgr(
         'iptables' => $cmds{'iptables'}
     ) or die "[*] Could not acquire IPTables::ChainMgr object.";
 
-    for my $ip (@lines) {
+    for my $ip (@$lines_aref) {
         chomp $ip;
         if ($ip =~ m|^\s*$ip_re\s*$|
                 or $ip =~ m|^\s*$ip_re/\d+\s*$|
                 or $ip =~ m|^\s*$ip_re/$ip_re\s*$|) {
 
-            &Psad::psyslog('psad',
-                "adding $ip from cache file to psad chains")
-                unless $no_syslog_alerts;
-
             ### instantiate the blocking rule
             &ipt_block($ip, '');
         }
     }
-    unlink $config{'AUTO_IPT_ADD_IP_FILE'} or die $!;
     return;
 }
 
@@ -4357,12 +4389,10 @@ sub diskwrite_add_ipt_block_ip() {
         if (&Psad::pidrunning($config{'PID_FILE'})) {
             print "[+] Writing $fw_block_ip to cache file. Psad will add the IP\n",
                 "    within $config{'CHECK_INTERVAL'} seconds.\n";
-            open F, "> $config{'AUTO_IPT_ADD_IP_FILE'}.tmp" or die "[*] Could ",
-                "not open $config{'AUTO_IPT_ADD_IP_FILE'}.tmp: $!";
+            open F, ">> $config{'AUTO_IPT_ADD_IP_FILE'}" or die "[*] Could ",
+                "not open $config{'AUTO_IPT_ADD_IP_FILE'}: $!";
             print F $fw_block_ip, "\n";
             close F;
-            move "$config{'AUTO_IPT_ADD_IP_FILE'}.tmp",
-                $config{'AUTO_IPT_ADD_IP_FILE'} or die $!;
         } else {
             print "[-] There is no running psad process. Exiting.\n"
         }
@@ -5832,12 +5862,19 @@ sub setup() {
             unless $no_syslog_alerts;
     }
 
+    ### create and truncate
+    open F, "> $config{'AUTO_IPT_ADD_IP_FILE'}" or die
+        "[*] Could not create $config{'AUTO_IPT_ADD_IP_FILE'}: $!";
+    close F;
+
     ### make sure the permissions on these files is 0600
-    for my $file ($fw_data_file, $config{'FW_ERROR_LOG'}) {
+    for my $file ($fw_data_file,
+            $config{'FW_ERROR_LOG'},
+            $config{'AUTO_IPT_ADD_IP_FILE'}) {
         chmod 0600, $file;
     }
 
-    ### we assume that ulogd is properly configured
+    ### we assume that ulogd is properly configured (FIXME?)
     return if $config{'SYSLOG_DAEMON'} eq 'ulogd';
 
     die '[*] No system logger config file could be found.'

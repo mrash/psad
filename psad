@@ -4120,12 +4120,15 @@ sub ipt_block() {
 
         if ($ipt->find_ip_rule($src, $dst,
                 $table, $to_chain, $target)) {
+            print STDERR "[-] Test1, IP rule ($src->$dst $to_chain) ",
+                "already exists.\n" if $debug;
             $already_blocked = 1;
         } else {
             ($rv, $status_msg) = $ipt->add_ip_rule($src, $dst,
                 $config{'IPTABLES_AUTO_RULENUM'}, $table,
                 $to_chain, $target);
             if ($rv) {
+                print STDERR "[+] Test1 block success.\n" if $debug;
                 $block_success = 1;
             } else {
                 &Psad::psyslog('psad', $status_msg)
@@ -4140,12 +4143,15 @@ sub ipt_block() {
             my $dst2 = $src;
             if ($ipt->find_ip_rule($src2, $dst2, $table,
                     $to_chain, $target)) {
+                print STDERR "[-] Test2, IP rule ($src2->$dst2 $to_chain) ",
+                    "already exists.\n" if $debug;
                 $already_blocked = 1;
             } else {
                 ($rv, $status_msg) = $ipt->add_ip_rule($src2, $dst2,
                     $config{'IPTABLES_AUTO_RULENUM'}, $table,
                     $to_chain, $target);
                 if ($rv) {
+                    print STDERR "[+] Test2 block success.\n" if $debug;
                     $block_success = 1;
                 } else {
                     &Psad::psyslog('psad', $status_msg)
@@ -4226,8 +4232,21 @@ sub ipt_rm_block() {
 
         next unless $src and $dst;
 
-        if ($ipt->find_ip_rule($src, $dst, $table, $to_chain, $target)) {
-            my ($rv, $status_msg) = $ipt->delete_ip_rule($src, $dst,
+        my ($rv, $status_msg) = $ipt->delete_ip_rule($src, $dst,
+            $table, $to_chain, $target);
+        if ($rv) {
+            $rm_block = 1;
+        } else {
+            &Psad::psyslog('psad', $status_msg)
+                unless $no_syslog_alerts;
+            print STDERR "[-] ipt_rm_block(): $status_msg\n" if $debug;
+        }
+
+        if ($direction eq 'both') {
+            ### need to delete reverse rule for FORWARD chain
+            my $src2 = $dst;
+            my $dst2 = $src;
+            my ($rv, $status_msg) = $ipt->delete_ip_rule($src2, $dst2,
                 $table, $to_chain, $target);
             if ($rv) {
                 $rm_block = 1;
@@ -4235,23 +4254,6 @@ sub ipt_rm_block() {
                 &Psad::psyslog('psad', $status_msg)
                     unless $no_syslog_alerts;
                 print STDERR "[-] ipt_rm_block(): $status_msg\n" if $debug;
-            }
-        }
-
-        if ($direction eq 'both') {
-            ### need to delete reverse rule for FORWARD chain
-            my $src2 = $dst;
-            my $dst2 = $src;
-            if ($ipt->find_ip_rule($src2, $dst2, $table, $to_chain, $target)) {
-                my ($rv, $status_msg) = $ipt->delete_ip_rule($src2, $dst2,
-                    $table, $to_chain, $target);
-                if ($rv) {
-                    $rm_block = 1;
-                } else {
-                    &Psad::psyslog('psad', $status_msg)
-                        unless $no_syslog_alerts;
-                    print STDERR "[-] ipt_rm_block(): $status_msg\n" if $debug;
-                }
             }
         }
     }
@@ -4464,7 +4466,7 @@ sub auto_psad_response() {
         my $dl = $scan_dl{$src};
         ### We only want to block the IP once.  Currently this will block
         ### all traffic from the host to _all_ destinations that are
-        ### protected by the firewall if the ip trips the $auto_psad_level
+        ### protected by the firewall if the IP trips the $auto_psad_level
         ### threshold for _any_ destination.
         if ($dl >= $config{'AUTO_IDS_DANGER_LEVEL'}) {
 
@@ -4502,6 +4504,7 @@ sub auto_psad_response() {
                         "[*] Could not open $config{'ETC_HOSTS_DENY'}: $!";
                     print H "ALL: $src\n";
                     close H;
+                    $auto_blocked_ips{$src} = time();
                     ### write the ip out to the auto blocked file
                     &diskwrite_blocked_ip($src,
                         $config{'AUTO_BLOCK_TCPWR_FILE'}, '');
@@ -4619,7 +4622,7 @@ sub diskwrite_blocked_ip() {
         ### file (or update the time if $renewed_status)
         for my $line (@tmplines) {
             chomp $line;
-            if ($line =~ /^\s*(\S+)\s*$/) {  ### old format; update to include time
+            if ($line =~ /^\s*($ip_re)\s*$/) {  ### old format; update to include time
                 my $tmpsrc = $1;
                 push @lines, "$tmpsrc " . $auto_blocked_ips{$tmpsrc};
                 $skip_src = 1 if $tmpsrc eq $src;
@@ -4668,9 +4671,8 @@ sub diskwrite_rm_blocked_ip() {
             die "[*] Could not open ${file}.tmp: $!";
         for my $line (@lines) {
             chomp $line;
-            unless ($line =~ m|^\s*$src\s| or $line =~ m|^\s*$src$|) {
-                ### handle old format (no timestamp)
-                print W $line, "\n";
+            if ($line =~ /^\s*($ip_re)/) {
+                print W $line, "\n" unless $src eq $1;
             }
         }
         close W;

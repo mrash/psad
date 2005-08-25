@@ -4324,8 +4324,10 @@ sub check_ipt_add_ip() {
         'iptables' => $cmds{'iptables'}
     ) or die "[*] Could not acquire IPTables::ChainMgr object.";
 
+    my %uniq_ips = ();
     for my $ip (@$lines_aref) {
         chomp $ip;
+        next if defined $uniq_ips{$ip};
         if ($ip =~ m|^\s*$ip_re\s*$|
                 or $ip =~ m|^\s*$ip_re/\d+\s*$|
                 or $ip =~ m|^\s*$ip_re/$ip_re\s*$|) {
@@ -4333,6 +4335,7 @@ sub check_ipt_add_ip() {
             ### instantiate the blocking rule
             &ipt_block($ip, '');
         }
+        $uniq_ips{$ip} = '';
     }
     return;
 }
@@ -4648,6 +4651,7 @@ sub diskwrite_blocked_ip() {
         push @lines, "$src " . $auto_blocked_ips{$src};
     }
 
+    return unless @lines;
     open B, "> ${file}.tmp" or
         die "[*] Could not write to $file: $!";
     print B $_, "\n" for @lines;
@@ -4662,23 +4666,27 @@ sub diskwrite_blocked_ip() {
 sub diskwrite_rm_blocked_ip() {
     my ($src, $file) = @_;
     print STDERR "[+] rm_blocked_ip($src, $file)\n" if $debug;
-    if (-e $file) {
-        open B, "< $file" or
-            die "[*] Could not open $file: $!";
-        my @lines = <B>;
-        close B;
-        open W, "> ${file}.tmp" or
-            die "[*] Could not open ${file}.tmp: $!";
-        for my $line (@lines) {
-            chomp $line;
-            if ($line =~ /^\s*($ip_re)/) {
-                print W $line, "\n" unless $src eq $1;
-            }
+    return unless -e $file;
+
+    open B, "< $file" or
+        die "[*] Could not open $file: $!";
+    my @lines = <B>;
+    close B;
+
+    return unless @lines;
+
+    open W, "> ${file}.tmp" or
+        die "[*] Could not open ${file}.tmp: $!";
+    for my $line (@lines) {
+        chomp $line;
+        if ($line =~ /^\s*($ip_re)/) {
+            print W $line, "\n" unless $src eq $1;
         }
-        close W;
-        move "${file}.tmp", $file or die "[*] Could not move ",
-            "${file}.tmp -> $file: $!";
     }
+    close W;
+
+    move "${file}.tmp", $file or die "[*] Could not move ",
+        "${file}.tmp -> $file: $!";
     return;
 }
 
@@ -5293,10 +5301,20 @@ sub status_psad_daemon() {
 
 sub print_blocked_ip_status() {
     return unless -e $config{'AUTO_BLOCK_IPT_FILE'};
-    open F, "< $config{'AUTO_BLOCK_IPT_FILE'}" or
-        die "[*] $config{'AUTO_BLOCK_IPT_FILE'}: $!";
+
+    unlink "$config{'AUTO_BLOCK_IPT_FILE'}.status"
+        if -e "$config{'AUTO_BLOCK_IPT_FILE'}.status";
+
+    copy $config{'AUTO_BLOCK_IPT_FILE'},
+        "$config{'AUTO_BLOCK_IPT_FILE'}.status";
+
+    open F, "< $config{'AUTO_BLOCK_IPT_FILE'}.status" or
+        die "[*] $config{'AUTO_BLOCK_IPT_FILE'}.status: $!";
     my @lines = <F>;
     close F;
+
+    unlink "$config{'AUTO_BLOCK_IPT_FILE'}.status";
+
     print "\n    Iptables auto-blocked IPs:\n";
     my $ipt = new IPTables::ChainMgr(
         'iptables' => $cmds{'iptables'}

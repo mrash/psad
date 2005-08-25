@@ -3954,22 +3954,53 @@ sub renew_auto_blocked_ips() {
         my @lines = <B>;
         close B;
         for my $line (@lines) {
-            if ($line =~ /($ip_re)/) {
+            if ($line =~ /^\s*($ip_re)\s+(\d+)/) {
                 my $ip = $1;
-                unless (&tcpwr_test_block($ip)) {
-                    &Psad::psyslog('psad', "renewing tcpwrappers auto-block " .
-                        "against $ip $timeout_str")
-                        unless $no_syslog_alerts;
-                    &tcpwr_block($ip);
-                    &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} RENEWED " .
-                        "tcpwrappers BLOCK against $ip $timeout_str", '',
-                        $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
-                        unless $no_email_alerts;
+                my $orig_block_time = $2;
+
+                if ($config{'AUTO_BLOCK_TIMEOUT'} == 0) {
+                    ### block the IP address (note that checks are built
+                    ### into this function to not add a duplicate rule)
+                    if (&tcpwr_test_block($ip)) {
+                        $auto_blocked_ips{$ip} = $orig_block_time
+                            unless defined $auto_blocked_ips{$ip};
+                    } else {
+                        &Psad::psyslog('psad', "renewing tcpwrappers auto-block " .
+                            "against $ip $timeout_str")
+                            unless $no_syslog_alerts;
+                        &tcpwr_block($ip);
+                        &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} RENEWED " .
+                            "tcpwrappers BLOCK against $ip $timeout_str", '',
+                            $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+                            unless $no_email_alerts;
+                        $auto_blocked_ips{$ip} = $orig_block_time;
+                    }
+                } else {
+                    if ((time() - $orig_block_time)
+                            > $config{'AUTO_BLOCK_TIMEOUT'}) {
+                        ### timeout has expired, so we should remove any
+                        ### existing blocking rule
+                        &tcpwr_remove_block($ip);
+
+                    } else {
+                        ### block the IP address (note that checks are built
+                        ### into this function to not add a duplicate rule)
+                        if (&tcpwr_test_block($ip)) {
+                            $auto_blocked_ips{$ip} = $orig_block_time
+                                unless defined $auto_blocked_ips{$ip};
+                        } else {
+                            &Psad::psyslog('psad', "renewing tcpwrappers auto-block " .
+                                "against $ip $timeout_str")
+                                unless $no_syslog_alerts;
+                            &tcpwr_block($ip);
+                            &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} RENEWED " .
+                                "tcpwrappers BLOCK against $ip $timeout_str", '',
+                                $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+                                unless $no_email_alerts;
+                            $auto_blocked_ips{$ip} = $orig_block_time;
+                        }
+                    }
                 }
-                ### defer to the iptables block time if it is already
-                ### defined
-                $auto_blocked_ips{$ip} = time()
-                    unless defined $auto_blocked_ips{$ip};
             }
         }
     }

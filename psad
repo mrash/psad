@@ -3980,7 +3980,7 @@ sub renew_auto_blocked_ips() {
                             > $config{'AUTO_BLOCK_TIMEOUT'}) {
                         ### timeout has expired, so we should remove any
                         ### existing blocking rule
-                        &tcpwr_remove_block($ip);
+                        &tcpwr_rm_block($ip);
 
                     } else {
                         ### block the IP address (note that checks are built
@@ -4071,7 +4071,7 @@ sub flush_auto_blocked_ips() {
             if ($line =~ /($ip_re)/) {
                 my $ip = $1;
                 ### remove block rules for $ip if it has been blocked
-                &tcpwr_remove_block($ip) if &tcpwr_test_block($ip);
+                &tcpwr_rm_block($ip) if &tcpwr_test_block($ip);
                 $found_blocked = 1;
             }
         }
@@ -4261,8 +4261,6 @@ sub ipt_rm_block() {
             $dst = $ip;
         }
 
-        next unless $src and $dst;
-
         my ($rv, $status_msg) = $ipt->delete_ip_rule($src, $dst,
             $table, $to_chain, $target);
         if ($rv) {
@@ -4302,18 +4300,17 @@ sub ipt_rm_block() {
         }
         print STDERR "[+] ipt_rm_block(): removed iptables block ",
             "against $ip (timeout expired).\n" if $debug;
+
         &diskwrite_rm_blocked_ip($ip, $config{'AUTO_BLOCK_IPT_FILE'});
 
-        delete $auto_blocked_ips{$ip} if defined $auto_blocked_ips{$ip};
-    } else {
-        if ($flush_fw) {
-            &Psad::psyslog('psad', 'could not remove iptables ' .
-                "block rule for $ip") unless $no_syslog_alerts;
-        }
-        print STDERR "[-] Could not remove iptables block rule for $ip\n"
-            if $debug;
+        return 1;
     }
-    return;
+
+    &Psad::psyslog('psad', 'could not remove iptables ' .
+        "block rule for $ip") unless $no_syslog_alerts;
+    print STDERR "[-] Could not remove iptables block rule for $ip\n"
+        if $debug;
+    return 0;
 }
 
 sub ipt_list_auto_chains() {
@@ -4460,8 +4457,9 @@ sub tcpwr_block() {
     return;
 }
 
-sub tcpwr_remove_block() {
+sub tcpwr_rm_block() {
     my $ip = shift;
+    my $rv = 0;
     open T, "< $config{'ETC_HOSTS_DENY'}" or die '[*] Could not open ',
         "$config{'ETC_HOSTS_DENY'}: $!";
     my @lines = <T>;
@@ -4476,6 +4474,7 @@ sub tcpwr_remove_block() {
                 "tcpwrappers block against $ip (timeout expired).", '',
                 $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
                 unless $no_email_alerts;
+            $rv = 1;
         } else {
             print T "$line\n";
         }
@@ -4484,7 +4483,7 @@ sub tcpwr_remove_block() {
     move "$config{'ETC_HOSTS_DENY'}.tmp", $config{'ETC_HOSTS_DENY'} or die
         "[*] Could not move $config{'ETC_HOSTS_DENY'}.tmp -> ",
         "$config{'ETC_HOSTS_DENY'}";
-    return;
+    return $rv;
 }
 
 sub auto_psad_response() {
@@ -4566,20 +4565,33 @@ sub auto_block_ignore_ip() {
 sub timeout_auto_blocked_ips() {
     print STDERR "[+] timeout_auto_block_ips()\n" if $debug;
     return if $config{'AUTO_BLOCK_TIMEOUT'} == 0;
+    my @del_keys = ();
     for my $ip (keys %auto_blocked_ips) {
         if ((time() - $auto_blocked_ips{$ip})
                 > $config{'AUTO_BLOCK_TIMEOUT'}) {
 
+            my $del_ip_ipt   = 0;
+            my $del_ip_tcpwr = 0;
+
             ### remove all Netfiler blocking rules for $ip
             if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
-                &ipt_rm_block($ip);
+                $del_ip_ipt = &ipt_rm_block($ip);
             }
 
             ### remove all tcpwrapper blocking rules for $ip
             if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
-                &tcpwr_remove_block($ip);
+                $del_ip_tcpwr = &tcpwr_rm_block($ip);
             }
 
+            ### if the rm function did not work for one of them
+            ### there are larger problems, and the admin should
+            ### investigate why it didn't work... psad should
+            ### not keep trying to remove these rules.
+            push @del_keys, $ip if $del_ip_ipt or $del_ip_tcpwr;
+        }
+    }
+    if (@del_keys) {
+        for my $ip (@del_keys) {
             ### delete the ip from the hash (if new packets are seen
             ### from the same ip, then the hash will be updated again
             ### in check_scan()).

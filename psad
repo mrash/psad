@@ -4538,7 +4538,8 @@ sub auto_psad_response() {
                         "[*] Could not open $config{'ETC_HOSTS_DENY'}: $!";
                     print H "ALL: $src\n";
                     close H;
-                    $auto_blocked_ips{$src} = time();
+                    $auto_blocked_ips{$src} = time()
+                        unless defined $auto_blocked_ips{$src};
                     ### write the ip out to the auto blocked file
                     &diskwrite_blocked_ip($src,
                         $config{'AUTO_BLOCK_TCPWR_FILE'}, '');

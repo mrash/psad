@@ -18,7 +18,7 @@
 #
 # Credits: (see the CREDITS file bundled with the psad sources.)
 #
-# Version: 1.4.3-pre3
+# Version: 1.4.3-pre5
 #
 # Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.org)
 #
@@ -148,7 +148,7 @@ use strict;
 ### ========================== main =================================
 
 ### set the current psad version number
-my $version = '1.4.3-pre3';
+my $version = '1.4.3-pre5';
 
 ### default config file for psad (can be changed with
 ### --config switch)
@@ -6286,7 +6286,7 @@ sub required_vars() {
         EMAIL_LIMIT_STATUS_MSG P0F_FILE IGNORE_PROTOCOLS IPT_AUTO_CHAIN1
         AUTO_IPT_ADD_IP_FILE IGNORE_INTERFACES ALERTING_METHODS
         ULOG_DATA_FILE MAIL_ALERT_PREFIX MAIL_STATUS_PREFIX
-        MAIL_ERROR_PREFIX MAIL_FATAL_PREFIX
+        MAIL_ERROR_PREFIX MAIL_FATAL_PREFIX PROC_FORWARD_FILE
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

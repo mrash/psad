@@ -138,6 +138,7 @@ use Net::IPv4Addr qw(ipv4_network ipv4_in_network ipv4_broadcast);
 use File::Copy;
 use File::Path;
 use Date::Calc qw(Timezone This_Year Decode_Month);
+use IO::Socket;
 use Socket;
 use POSIX;
 use IO::Handle;
@@ -183,6 +184,9 @@ my %config = ();
 
 ### fw search string array
 my @fw_search = ();
+
+### socket for --fw-block
+my $ipt_sock = '';
 
 ### commands hash
 my %cmds = ();
@@ -684,8 +688,12 @@ unless ($benchmark) {
         "$fw_data_file: $!";
 
     if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
-        open ADDIPTCACHE, $config{'AUTO_IPT_ADD_IP_FILE'} or
-            die "[*] Could not open $config{'AUTO_IPT_ADD_IP_FILE'}: $!";
+        $ipt_sock = IO::Socket::UNIX->new(
+            Type   => SOCK_STREAM,
+            Local  => $config{'AUTO_IPT_SOCK'},
+            Listen => SOMAXCONN,
+            Timeout => .1
+        ) or die "[*] Could not acquire auto-response domain socket: $!";
     }
 }
 
@@ -707,9 +715,9 @@ MAIN: for (;;) {
             're-importing psad.conf') unless $no_syslog_alerts;
 
         my $orig_fwdata = $fw_data_file;
-        my $orig_ipt_cache = '';
+        my $orig_ipt_sockfile = '';
 
-        $orig_ipt_cache = $config{'AUTO_IPT_ADD_IP_FILE'}
+        $orig_ipt_sockfile = $config{'AUTO_IPT_SOCK'}
             if $config{'ENABLE_AUTO_IDS'} eq 'Y';
 
         ### Re-import all used config files (psad.conf, auto_dl,
@@ -727,12 +735,15 @@ MAIN: for (;;) {
         }
 
         if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
-            if ($orig_ipt_cache ne $config{'AUTO_IPT_ADD_IP_FILE'}) {
-                close ADDIPTCACHE;
+            if ($orig_ipt_sockfile ne $config{'AUTO_IPT_SOCK'}) {
+                close $ipt_sock;
 
-                ### re-open the iptables add cache file
-                open ADDIPTCACHE, "< $config{'AUTO_IPT_ADD_IP_FILE'}" or die
-                    "[*] Could not open $config{'AUTO_IPT_ADD_IP_FILE'}: $!";
+                $ipt_sock = IO::Socket::UNIX->new(
+                    Type   => SOCK_STREAM,
+                    Local  => $config{'AUTO_IPT_SOCK'},
+                    Listen => SOMAXCONN,
+                    Timeout => .1
+                ) or die "[*] Could not acquire auto-response domain socket: $!";
 
                 $skip_first_loop = 1;
             }
@@ -770,14 +781,19 @@ MAIN: for (;;) {
         unless ($benchmark) {
             $skip_first_loop = 0;
             seek FWDATA,0,2;  ### seek to the end of the file
-            seek ADDIPTCACHE,0,2
-                if $config{'ENABLE_AUTO_IDS'} eq 'Y' and not $benchmark;
             next MAIN;
         }
     } else {
         @fw_packets = <FWDATA>;
-        @add_ipt_addrs = <ADDIPTCACHE>
-            if $config{'ENABLE_AUTO_IDS'} eq 'Y' and not $benchmark;
+
+        if ($config{'ENABLE_AUTO_IDS'} eq 'Y' and not $benchmark) {
+
+            ### get IP from the domain socket
+            my $ipt_add_connection = $ipt_sock->accept();
+            if ($ipt_add_connection) {
+                @add_ipt_addrs = <$ipt_add_connection>;
+            }
+        }
     }
 
     if (@fw_packets) {
@@ -887,18 +903,12 @@ MAIN: for (;;) {
     ### clearerr() on the FWDATA filehandle to be ready for new packets
     FWDATA->clearerr();
 
-    ### be ready for new --fw-block addresses
-    ADDIPTCACHE->clearerr()
-        if $config{'ENABLE_AUTO_IDS'} eq 'Y' and not $benchmark;
-
     ### sleep for the check interval seconds
     sleep $config{'CHECK_INTERVAL'};
 }
 
 ### for completeness
 close FWDATA;
-close ADDIPTCACHE
-    if $config{'ENABLE_AUTO_IDS'} eq 'Y' and not $benchmark;
 exit 0;
 ###=========================================================###
 ######                    END MAIN                       ######
@@ -4420,17 +4430,20 @@ sub diskwrite_add_ipt_block_ip() {
 
     if (-e $config{'PID_FILE'}) {
         if (&Psad::pidrunning($config{'PID_FILE'})) {
-            print "[+] Writing $fw_block_ip to cache file. Psad will add the IP\n",
+            print "[+] Writing $fw_block_ip to socket. Psad will add the IP\n",
                 "    within $config{'CHECK_INTERVAL'} seconds.\n";
-            open F, ">> $config{'AUTO_IPT_ADD_IP_FILE'}" or die "[*] Could ",
-                "not open $config{'AUTO_IPT_ADD_IP_FILE'}: $!";
-            print F $fw_block_ip, "\n";
-            close F;
+
+            ### open domain socket with running psad domain
+            my $sock = IO::Socket::UNIX->new($config{'AUTO_IPT_SOCK'})
+                or die "[*] Could not acquire $config{'AUTO_IPT_SOCK'} ",
+                "socket: $!";
+            print $sock $fw_block_ip, "\n";
+            close $sock;
         } else {
-            print "[-] There is no running psad process. Exiting.\n"
+            print "[-] There is no running psad process. Exiting.\n";
         }
     } else {
-        print "[-] There is no running psad process. Exiting.\n"
+        print "[-] There is no running psad process. Exiting.\n";
     }
     return 0;
 }
@@ -5926,15 +5939,12 @@ sub setup() {
             unless $no_syslog_alerts;
     }
 
-    ### create and truncate
-    open F, "> $config{'AUTO_IPT_ADD_IP_FILE'}" or die
-        "[*] Could not create $config{'AUTO_IPT_ADD_IP_FILE'}: $!";
-    close F;
+    ### unlink socket file if it exists from a previous run
+    unlink $config{'AUTO_IPT_SOCK'} if -e $config{'AUTO_IPT_SOCK'};
 
     ### make sure the permissions on these files is 0600
     for my $file ($fw_data_file,
-            $config{'FW_ERROR_LOG'},
-            $config{'AUTO_IPT_ADD_IP_FILE'}) {
+            $config{'FW_ERROR_LOG'}) {
         chmod 0600, $file;
     }
 
@@ -6284,7 +6294,7 @@ sub required_vars() {
         IMPORT_OLD_SCANS ICMP_TYPES_FILE SHOW_ALL_SIGNATURES
         IPT_PREFIX_COUNTER_FILE IGNORE_PORTS ENABLE_SCAN_ARCHIVE
         EMAIL_LIMIT_STATUS_MSG P0F_FILE IGNORE_PROTOCOLS IPT_AUTO_CHAIN1
-        AUTO_IPT_ADD_IP_FILE IGNORE_INTERFACES ALERTING_METHODS
+        AUTO_IPT_SOCK IGNORE_INTERFACES ALERTING_METHODS
         ULOG_DATA_FILE MAIL_ALERT_PREFIX MAIL_STATUS_PREFIX
         MAIL_ERROR_PREFIX MAIL_FATAL_PREFIX PROC_FORWARD_FILE
     );

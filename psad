@@ -612,13 +612,19 @@ unless ($benchmark or $fw_analyze) {
         unless $debug or $no_daemon;
 }
 
-### Check to see if psad automatically blocked some IPs from
-### a previous run.  This feature is most useful for preserving
-### auto-block rules for IPs after a reboot or after restarting
-### psad.  (Note that ENABLE_AUTO_IDS is disabled by psad_init()
-### if we are running on a syslog server or if we are running
-### in -A mode).
-&renew_auto_blocked_ips() if $config{'ENABLE_AUTO_IDS'} eq 'Y';
+if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
+    ### always flush old rules (the subsequent renew_auto_blocked_ips()
+    ### will re-instantiate any that should not have been expired).
+    &flush_auto_blocked_ips() if $config{'FLUSH_IPT_AT_INIT'} eq 'Y';
+
+    ### Check to see if psad automatically blocked some IPs from
+    ### a previous run.  This feature is most useful for preserving
+    ### auto-block rules for IPs after a reboot or after restarting
+    ### psad.  (Note that ENABLE_AUTO_IDS is disabled by psad_init()
+    ### if we are running on a syslog server or if we are running
+    ### in -A mode).
+    &renew_auto_blocked_ips();
+}
 
 ### Install signal handlers for debugging %scan with Data::Dumper,
 ### and for reaping zombie whois processes.  Only install signal
@@ -4023,14 +4029,21 @@ sub flush_auto_blocked_ips() {
         'iptables' => $cmds{'iptables'}
     ) or die '[*] Could not acquire IPTables::ChainMgr object.';
 
-    if ($fw_del_chains) {
-        print "[+] Flushing and deleting Netfilter IPT_AUTO_CHAIN chains...\n";
+    if ($flush_fw) {
+        if ($fw_del_chains) {
+            print "[+] Flushing and deleting Netfilter ",
+                "IPT_AUTO_CHAIN chains...\n";
+        } else {
+            print "[+] Flushing Netfilter IPT_AUTO_CHAIN chains...\n";
+        }
     } else {
-        print "[+] Flushing Netfilter IPT_AUTO_CHAIN chains...\n";
+        &Psad::psyslog('psad', 'flushing existing psad Netfilter ' .
+            'auto-response chains');
     }
     if (&Psad::pidrunning($config{'PID_FILE'})) {
         print "    WARNING: psad is currently running, so flushing the ",
-            "chains may\n    cause some warning syslog messages to appear.\n";
+            "chains may\n    cause some warning syslog messages to appear.\n"
+            if $flush_fw;
     }
     if (@ipt_config) {
         for my $hr (@ipt_config) {
@@ -4043,26 +4056,26 @@ sub flush_auto_blocked_ips() {
                     my ($rv, $status_msg) = $ipt->delete_chain($table,
                         $from_chain, $to_chain);
                     if ($rv) {
-                        print "[+] $status_msg\n";
+                        print "[+] $status_msg\n" if $flush_fw;
                     } else {
-                        print "[-] $status_msg\n";
+                        print "[-] $status_msg\n" if $flush_fw;
                     }
                 } else {
                     if ($ipt->flush_chain($table, $to_chain)) {
-                        print "[+] Flushed: $to_chain\n";
+                        print "[+] Flushed: $to_chain\n" if $flush_fw;
                     } else {
-                        print "[-] Could not flush: $to_chain\n";
+                        print "[-] Could not flush: $to_chain\n" if $flush_fw;
                     }
                 }
             } else {
-                print "[-] Chain: $to_chain does not exist.\n";
+                print "[-] Chain: $to_chain does not exist.\n" if $flush_fw;
             }
         }
     } else {
-        print "[-] No valid IPT_AUTO_CHAIN keywords.\n";
+        print "[-] No valid IPT_AUTO_CHAIN keywords.\n" if $flush_fw;
     }
 
-    if (-e $config{'AUTO_BLOCK_IPT_FILE'}) {
+    if ($flush_fw and -e $config{'AUTO_BLOCK_IPT_FILE'}) {
         ### we have removed the iptables block rules, so truncate
         ### the cache file.
         open T, "> $config{'AUTO_BLOCK_IPT_FILE'}" or
@@ -4072,7 +4085,8 @@ sub flush_auto_blocked_ips() {
 
     if (-e $config{'AUTO_BLOCK_TCPWR_FILE'}) {
         my $found_blocked = 0;
-        print "[+] Removing tcpwrapper auto-generated block rules.\n";
+        print "[+] Removing tcpwrapper auto-generated block rules.\n"
+            if $flush_fw;
         open B, "< $config{'AUTO_BLOCK_TCPWR_FILE'}" or
             die "[*] Could not open $config{'AUTO_BLOCK_TCPWR_FILE'}: $!";
         my @lines = <B>;
@@ -4092,10 +4106,10 @@ sub flush_auto_blocked_ips() {
         close T;
         unless ($found_blocked) {
             print "[-] Currently there are no auto-generated ".
-                "tcpwrapper blocking rules in effect.\n";
+                "tcpwrapper blocking rules in effect.\n" if $flush_fw;
         }
     }
-    exit 0;
+    return 0;
 }
 
 sub ipt_block() {
@@ -4433,7 +4447,7 @@ sub diskwrite_add_ipt_block_ip() {
             print "[+] Writing $fw_block_ip to socket. Psad will add the IP\n",
                 "    within $config{'CHECK_INTERVAL'} seconds.\n";
 
-            ### open domain socket with running psad domain
+            ### open domain socket with running psad process
             my $sock = IO::Socket::UNIX->new($config{'AUTO_IPT_SOCK'})
                 or die "[*] Could not acquire $config{'AUTO_IPT_SOCK'} ",
                 "socket: $!";
@@ -6297,6 +6311,7 @@ sub required_vars() {
         AUTO_IPT_SOCK IGNORE_INTERFACES ALERTING_METHODS
         ULOG_DATA_FILE MAIL_ALERT_PREFIX MAIL_STATUS_PREFIX
         MAIL_ERROR_PREFIX MAIL_FATAL_PREFIX PROC_FORWARD_FILE
+        FLUSH_IPT_AT_INIT
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

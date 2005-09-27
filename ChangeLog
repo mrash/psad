@@ -11,6 +11,8 @@ psad-1.4.3 (08//2005):
     - Updated to only display psad chains if --verbose is set
     - Updated to use a filehandle strategy similar to the fwdata file
       strategy for --fw-block IP additions.
+    - Updated to automatically flush the psad auto-reponse Netfilter chains
+      at start time (subject to a new config keyword "FLUSH_IPT_AT_INIT").
 
 psad-1.4.2 (07/15/2005):
     - Dependency bugfixes for mail binary.

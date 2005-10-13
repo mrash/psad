@@ -981,6 +981,8 @@ sub check_scan() {
         my $sid   = 0;
         my $chain    = '';
         my $intf     = '';
+        my $src_mac  = '';
+        my $dst_mac  = '';
         my $tcp_options = '';
         my $dshield_str = '';
         my $syslog_host = '';
@@ -1004,16 +1006,28 @@ sub check_scan() {
         }
 
         ### get the in/out interface and iptables chain
-        if ($pkt =~ /IN=(\S+)\s+OUT=\s/) {
+        if ($pkt =~ /IN=(\S+)\s+OUT=\s*MAC=(\S+)/) {
             $intf = $1;
+            my $mac_str = $2;
             $chain = 'INPUT';
+            if ($mac_str =~ /^((?:\w{2}\:){6})((?:\w{2}\:){6})/) {
+                $dst_mac = $1;
+                $src_mac = $2;
+            }
         } elsif ($pkt =~ /IN=(\S+)\s+OUT=\S/) {
             $intf = $1;
             $chain = 'FORWARD';
-        } elsif ($pkt =~ /IN=\s+OUT=(\S+)/) {
+        } elsif ($pkt =~ /IN=\s+OUT=(\S+)\s*MAC=(\S+)/) {
             $intf = $1;
+            my $mac_str = $2;
             $chain = 'OUTPUT';
+            if ($mac_str =~ /^((?:\w{2}\:){6})((?:\w{2}\:){6})/) {
+                $dst_mac = $1;
+                $src_mac = $2;
+            }
         }
+        $src_mac =~ s/:$// if $src_mac;
+        $dst_mac =~ s/:$// if $dst_mac;
 
         unless ($intf and $chain) {
             print STDERR "[-] err packet: could not determine ",
@@ -1266,6 +1280,10 @@ sub check_scan() {
         $curr_scan{$src}{$dst}{$proto}{'pkts'}++;
         $curr_scan{$src}{$dst}{$proto}{'flags'}{$flags}++
             if $flags;
+
+        ### keep track of MAC addresses
+        $curr_scan{$src}{$dst}{'s_mac'} = $src_mac;
+        $curr_scan{$src}{$dst}{'d_mac'} = $dst_mac;
 
         ### keep track of which syslog daemon reported the message.
         $curr_scan{$src}{$dst}{'syslog_host'}{$syslog_host} = ''
@@ -3285,6 +3303,8 @@ sub scan_logr() {
             my $rdns         = '';
             my $src_subj     = '';
             my $dst_subj     = '';
+            my $src_mac      = '';
+            my $dst_mac      = '';
             my $syslog_range = '';
             my $tcp_newrange = '';
             my $tcp_absrange = '';
@@ -3359,6 +3379,11 @@ sub scan_logr() {
                 die "[*] Could not open $s_time_file: $!";
             print T $scan{$src}{$dst}{'s_time'}, "\n";
             close T;
+
+            $src_mac = $curr_scan_hr->{$src}->{$dst}->{'s_mac'}
+                if defined $curr_scan_hr->{$src}->{$dst}->{'s_mac'};
+            $dst_mac = $curr_scan_hr->{$src}->{$dst}->{'d_mac'}
+                if defined $curr_scan_hr->{$src}->{$dst}->{'d_mac'};
 
             if (defined $scan{$src}{$dst}{'tcp'}
                     and defined $scan{$src}{$dst}{'tcp'}{'abs_sp'}) {
@@ -3562,7 +3587,10 @@ sub scan_logr() {
             printf $fh "\n%${log_len}s%s\n", 'Source: ', $src;
             printf $fh "%${log_len}s%s\n", 'DNS: ', $src_dns_str
                 unless $no_rdns;
-
+            if ($config{'ENABLE_MAC_ADDR_REPORTING'} eq 'Y') {
+                printf $fh "%${log_len}s%s\n", 'MAC: ', $src_mac
+                    if $src_mac;
+            }
             unless ($no_posf) {
                 if (defined $p0f{$src}) {  ### prefer p0f-based fingerprinting
                     ### any p0f fingerprint that contains a "@" is an
@@ -3595,6 +3623,10 @@ sub scan_logr() {
             printf $fh "\n%${log_len}s%s\n", 'Destination: ', $dst;
             printf $fh "%${log_len}s%s\n", 'DNS: ', $dst_dns_str
                 unless $no_rdns;
+            if ($config{'ENABLE_MAC_ADDR_REPORTING'} eq 'Y') {
+                printf $fh "%${log_len}s%s\n", 'MAC: ', $dst_mac
+                    if $dst_mac;
+            }
             print $fh "\n";
 
             if (defined $curr_scan_hr->{$src}->{$dst}->{'syslog_host'}) {

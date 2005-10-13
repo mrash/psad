@@ -160,9 +160,11 @@ unless ($found) {
 my $noarchive   = 0;
 my $uninstall   = 0;
 my $help        = 0;
+my $cmdline_force_install = 0;
 my $syslog_conf = '';
 
 &usage(1) unless (GetOptions(
+    'force-mod-install' => \$cmdline_force_install,  ### force install perl module
     'no-preserve'   => \$noarchive,   ### Don't preserve existing configs.
     'syslog-conf=s' => \$syslog_conf, ### specify path to syslog config file.
     'uninstall'     => \$uninstall,   ### Uninstall psad.
@@ -878,7 +880,8 @@ sub install_perl_module() {
 
     my $install_module = 0;
 
-    if ($required_perl_modules{$mod_name}{'force-lib-install'}) {
+    if ($required_perl_modules{$mod_name}{'force-lib-install'}
+            or $cmdline_force_install) {
         ### install regardless of whether the module may already be
         ### installed
         $install_module = 1;

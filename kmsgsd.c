@@ -131,7 +131,7 @@ int main(int argc, char *argv[]) {
     /* open the psadfifo named pipe.  Note that we are opening the pipe
      * _without_ the O_NONBLOCK flag since we want the read on the file
      * descriptor to block until there is something new in the pipe.
-     * Also, not that we are opening with O_RDWR, since this seems to
+     * Also, note that we are opening with O_RDWR, since this seems to
      * fix the problem with kmsgsd not blocking on the read() if the
      * system logger dies (and hence closes its file descriptor for the
      * psadfifo). */

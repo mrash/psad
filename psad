@@ -715,7 +715,6 @@ MAIN: for (;;) {
     my @add_ipt_addrs = ();
 
     if ($hup_flag) {
-        $hup_flag = 0;  ### clear the HUP flag
 
         &Psad::psyslog('psad', 'received HUP signal, ' .
             're-importing psad.conf') unless $no_syslog_alerts;
@@ -754,6 +753,7 @@ MAIN: for (;;) {
                 $skip_first_loop = 1;
             }
         }
+        $hup_flag = 0;  ### clear the HUP flag
     }
 
     ### See if we need to print out the %scan datastructure
@@ -5974,19 +5974,32 @@ sub setup() {
     $no_email_alerts = 1 if $config{'ALERTING_METHODS'} =~ /no.?e?mail/i;
     $no_syslog_alerts = 1 if $config{'ALERTING_METHODS'} =~ /no.?syslog/i;
 
-    unless (-e $fw_data_file) {
-        ### create the Netfilter data file if it doesn't exist
-        ### (this is better than dying because it isn't there).
-        open F, "> $fw_data_file" or die "[*] Could not create ",
-            "$fw_data_file: $!";
-        close F;
-        &Psad::psyslog('psad', "data file $fw_data_file " .
-            "does not exist, creating it")
-            unless $no_syslog_alerts;
+    unless ($hup_flag) {
+        my $truncate_or_create = 0;
+        if ($config{'TRUNCATE_FWDATA'} eq 'Y') {
+            $truncate_or_create = 1;
+        } else {
+            unless (-e $fw_data_file) {
+                $truncate_or_create = 1;
+            }
+        }
+        if ($truncate_or_create) {
+            ### create the Netfilter data file if it doesn't exist
+            ### (this is better than dying because it isn't there).
+            open F, "> $fw_data_file" or die "[*] Could not create ",
+                "$fw_data_file: $!";
+            close F;
+            &Psad::psyslog('psad', "data file $fw_data_file " .
+                "does not exist, creating it")
+                unless $no_syslog_alerts;
+        }
     }
 
-    ### unlink socket file if it exists from a previous run
-    unlink $config{'AUTO_IPT_SOCK'} if -e $config{'AUTO_IPT_SOCK'};
+    ### unlink socket file if it exists from a previous run (only
+    ### if we have not received a HUP signal)
+    unless ($hup_flag) {
+        unlink $config{'AUTO_IPT_SOCK'} if -e $config{'AUTO_IPT_SOCK'};
+    }
 
     ### make sure the permissions on these files is 0600
     for my $file ($fw_data_file,
@@ -6343,7 +6356,8 @@ sub required_vars() {
         AUTO_IPT_SOCK IGNORE_INTERFACES ALERTING_METHODS
         ULOG_DATA_FILE MAIL_ALERT_PREFIX MAIL_STATUS_PREFIX
         MAIL_ERROR_PREFIX MAIL_FATAL_PREFIX PROC_FORWARD_FILE
-        FLUSH_IPT_AT_INIT
+        FLUSH_IPT_AT_INIT ENABLE_MAC_ADDR_REPORTING TRUNC_FWDATA_FILE
+        TRUNCATE_FWDATA
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

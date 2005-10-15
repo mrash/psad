@@ -2859,10 +2859,10 @@ sub import_auto_dl() {
     my @lines = <A>;
     close A;
     my $i = 1;
-    for my $line (@lines) {
+    LINE: for my $line (@lines) {
         $i++;
-        next unless $line =~ /\S/;
-        next if $line =~ /^\s*#/;
+        next LINE unless $line =~ /\S/;
+        next LINE if $line =~ /^\s*#/;
         my $ip   = '';
         my $mask = '';
         my $dl   = '';
@@ -2878,6 +2878,20 @@ sub import_auto_dl() {
             $ip   = $1;
             $mask = '32';  ### single IP
             $dl   = $2;
+        } elsif ($line =~ m|^\s*(\S+)\s+([0-5])|) {
+            ### check to see if it is a hostname
+            my $hostname = $1;
+            $dl          = $2;
+            my $iaddr = inet_aton($hostname);
+                &Psad::psyslog('psad', "could not resolve auto_dl $hostname " .
+                    "to an IP at line $i");
+            $ip = inet_ntoa($iaddr);
+                &Psad::psyslog('psad', "could not resolve auto_dl $hostname " .
+                    "to an IP at line $i");
+            $mask = '32';  ### single IP
+        } else {
+            &Psad::psyslog('psad', "improperly formatted auto_dl line $i");
+            next LINE;
         }
 
         $auto_dl{$ip}{'mask'} = $mask;
@@ -6356,8 +6370,7 @@ sub required_vars() {
         AUTO_IPT_SOCK IGNORE_INTERFACES ALERTING_METHODS
         ULOG_DATA_FILE MAIL_ALERT_PREFIX MAIL_STATUS_PREFIX
         MAIL_ERROR_PREFIX MAIL_FATAL_PREFIX PROC_FORWARD_FILE
-        FLUSH_IPT_AT_INIT ENABLE_MAC_ADDR_REPORTING TRUNC_FWDATA_FILE
-        TRUNCATE_FWDATA
+        FLUSH_IPT_AT_INIT ENABLE_MAC_ADDR_REPORTING TRUNCATE_FWDATA
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

@@ -2882,10 +2882,10 @@ sub import_auto_dl() {
             ### check to see if it is a hostname
             my $hostname = $1;
             $dl          = $2;
-            my $iaddr = inet_aton($hostname);
+            my $iaddr = inet_aton($hostname) or
                 &Psad::psyslog('psad', "could not resolve auto_dl $hostname " .
                     "to an IP at line $i");
-            $ip = inet_ntoa($iaddr);
+            $ip = inet_ntoa($iaddr) or
                 &Psad::psyslog('psad', "could not resolve auto_dl $hostname " .
                     "to an IP at line $i");
             $mask = '32';  ### single IP

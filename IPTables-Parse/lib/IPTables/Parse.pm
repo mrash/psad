@@ -227,7 +227,9 @@ sub default_drop() {
         }
         next LINE if $line =~ /^\s*target\s/i;
         next LINE unless $found_chain;
-        if ($line =~ m|^\s*LOG\s+(\w+)\s+\-\-\s+
+
+        ### include ULOG target as well
+        if ($line =~ m|^\s*U?LOG\s+(\w+)\s+\-\-\s+
             $any_ip_re\s+$any_ip_re\s+(.*)|x) {
             my $proto  = $1;
             my $p_tmp  = $2;
@@ -303,8 +305,8 @@ sub default_log() {
         $log_chain = '' unless $line =~ /\S/;
         next unless $log_chain;
 
-        if ($line =~ m|^\s*LOG\s+(\w+)\s+\-\-\s+$any_ip_re
-            \s+$any_ip_re\s+LOG|x) {
+        if ($line =~ m|^\s*U?LOG\s+(\w+)\s+\-\-\s+$any_ip_re
+            \s+$any_ip_re\s+U?LOG|x) {
             $log_chains{$log_chain}{$1} = '';  ### protocol
 
             if ($log_chain eq $chain) {

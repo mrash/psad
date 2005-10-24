@@ -484,6 +484,7 @@ Getopt::Long::Configure('no_ignore_case');
                                               #   in iptables messages.
     'no-whois'          => \$no_whois,        # Do not issue whois lookups against
     'no-passiveos'      => \$no_posf,         # Do not attempt to passively
+    'no-passive-os'     => \$no_posf,         # Do not attempt to passively
                                               #   fingerprint the remote OS.
     'no-signatures'     => \$no_signatures,   # Disable signature processing.
     'no-icmp-types'     => \$no_icmp_types,   # Disable icmp type/code validation.
@@ -607,7 +608,7 @@ unless ($no_daemon or $debug or $benchmark) {
 ### to PID_FILE above.
 unless ($benchmark or $fw_analyze) {
     system $cmds{'kmsgsd'}
-        unless $no_kmsgsd or $config{'SYSLOG_DAEMON'} eq 'ulogd';
+        unless $no_kmsgsd or $config{'SYSLOG_DAEMON'} =~ /ulog/i;
     system $cmds{'psadwatchd'}
         unless $debug or $no_daemon;
 }
@@ -872,9 +873,7 @@ MAIN: for (;;) {
             close FWDATA;
 
             ### truncate fwdata file
-            open FWDATA, "> $fw_data_file" or die
-                "[*] Could not open $fw_data_file: $!";
-            close FWDATA;
+            &truncate_file($fw_data_file);
 
             ### re-open the fwdata file
             open FWDATA, $fw_data_file or die
@@ -1085,12 +1084,14 @@ sub check_scan() {
         if ($pkt =~ /SRC=(\S+)\s+DST=(\S+)\s+LEN=(\d+)\s+TOS=(\S+)
                     \s*.*\s+TTL=(\d+)\s+ID=(\d+)\s*.*\s+PROTO=TCP\s+
                     SPT=(\d+)\s+DPT=(\d+)\s.*\s*WINDOW=(\d+)\s+
-                    RES=\S+\s*(.*)\s+URGP=/x) {
+                    (.*)\s+URGP=/x) {
             ($src, $dst, $len, $tos, $ttl, $id, $sp, $dp, $win, $flags) =
                 ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
-            if ($pkt =~ /\sRES=\S+\s*(.*)\s+URGP=/) {
-                    $flags = $1;
-            }
+
+            ### the reserve bits are not reported by ulogd, but normal
+            ### Netfilter syslog messages contain them.
+            $flags =~ s/\s*RES=\S+\s*//;
+
             $proto = 'tcp';
 
             $flags = 'NULL' unless $flags;  ### default to NULL
@@ -2127,7 +2128,7 @@ sub psad_init() {
 
     ### setup the appropriate Netfilter data file depending on whether
     ### SYSLOG_DAEMON is set to ulogd
-    if ($config{'SYSLOG_DAEMON'} eq 'ulogd') {
+    if ($config{'SYSLOG_DAEMON'} =~ /ulog/i) {
         $fw_data_file = $config{'ULOG_DATA_FILE'};
     } else {
         $fw_data_file = $config{'FW_DATA_FILE'};
@@ -4124,9 +4125,7 @@ sub flush_auto_blocked_ips() {
     if ($flush_fw and -e $config{'AUTO_BLOCK_IPT_FILE'}) {
         ### we have removed the iptables block rules, so truncate
         ### the cache file.
-        open T, "> $config{'AUTO_BLOCK_IPT_FILE'}" or
-            die "[*] Could not truncate $config{'AUTO_BLOCK_IPT_FILE'}: $!";
-        close T;
+        &truncate_file($config{'AUTO_BLOCK_IPT_FILE'});
     }
 
     if (-e $config{'AUTO_BLOCK_TCPWR_FILE'}) {
@@ -4147,9 +4146,7 @@ sub flush_auto_blocked_ips() {
         }
         ### we have removed the tcpwrapper block rules, so truncate
         ### the cache file.
-        open T, "> $config{'AUTO_BLOCK_TCPWR_FILE'}" or
-            die "[*] Could not truncate $config{'AUTO_BLOCK_TCPWR_FILE'}: $!";
-        close T;
+        &truncate_file($config{'AUTO_BLOCK_TCPWR_FILE'});
         unless ($found_blocked) {
             print "[-] Currently there are no auto-generated ".
                 "tcpwrapper blocking rules in effect.\n" if $flush_fw;
@@ -4960,7 +4957,7 @@ sub stop_psad() {
             } else {
                 my $print = 1;
                 if ($pidname eq 'kmsgsd'
-                        and $config{'SYSLOG_DAEMON'} eq 'ulogd') {
+                        and $config{'SYSLOG_DAEMON'} =~ /ulog/i) {
                     $print = 0;
                 }
                 print "[-] psad: $pidname is not running on ",
@@ -4970,7 +4967,7 @@ sub stop_psad() {
         } else {
             my $print = 1;
             if ($pidname eq 'kmsgsd'
-                    and $config{'SYSLOG_DAEMON'} eq 'ulogd') {
+                    and $config{'SYSLOG_DAEMON'} =~ /ulog/i) {
                 $print = 0;
             }
             print "[-] psad: pid file $pidfile does not exist for ",
@@ -5092,7 +5089,7 @@ sub status() {
             } else {
                 my $print = 1;
                 if ($pidname eq 'kmsgsd'
-                        and $config{'SYSLOG_DAEMON'} eq 'ulogd') {
+                        and $config{'SYSLOG_DAEMON'} =~ /ulog/i) {
                     $print = 0;
                 }
                 print "[-] psad: $pidname is not running on ",
@@ -5101,7 +5098,7 @@ sub status() {
         } else {
             my $print = 1;
             if ($pidname eq 'kmsgsd'
-                    and $config{'SYSLOG_DAEMON'} eq 'ulogd') {
+                    and $config{'SYSLOG_DAEMON'} =~ /ulog/i) {
                 $print = 0;
             }
             print "[-] psad: pid file $pidfile does not exist for ",
@@ -5506,6 +5503,7 @@ sub status_ip() {
     for my $line (@match_ip) {
         print D $line;
     }
+    close D;
     for (my $i=$#match_ip; $i>=$#match_ip-10; $i--) {
         print STDOUT $match_ip[$i] if defined $match_ip[$i];
     }
@@ -5795,7 +5793,7 @@ sub hup() {
         } else {
             my $print = 1;
             if ($pidname eq 'kmsgsd'
-                    and $config{'SYSLOG_DAEMON'} eq 'ulogd') {
+                    and $config{'SYSLOG_DAEMON'} =~ /ulog/i) {
                 $print = 0;
             }
             print "[-] $pidname daemon not running.\n" if $print;
@@ -5869,9 +5867,7 @@ sub archive_data() {
     ### first see how big the archive file is and zero out if
     ### it is larger than about 10,000 lines
     if (-e $fwarchive && (-s $fwarchive) > 2367766) {  ### about 10,000 lines
-        open F, "> $fwarchive" or die '[*] Could not open ',
-            "$fwarchive: $!";
-        close F;
+        &truncate_file($fwarchive);
     }
     unless (-e $fwdata) {
         return;
@@ -6000,29 +5996,33 @@ sub setup() {
         if ($truncate_or_create) {
             ### create the Netfilter data file if it doesn't exist
             ### (this is better than dying because it isn't there).
-            open F, "> $fw_data_file" or die "[*] Could not create ",
-                "$fw_data_file: $!";
-            close F;
+            &truncate_file($fw_data_file);
             &Psad::psyslog('psad', "data file $fw_data_file " .
                 "does not exist, creating it")
                 unless $no_syslog_alerts;
         }
-    }
 
-    ### unlink socket file if it exists from a previous run (only
-    ### if we have not received a HUP signal)
-    unless ($hup_flag) {
+        ### unlink socket file if it exists from a previous run (only
+        ### if we have not received a HUP signal)
         unlink $config{'AUTO_IPT_SOCK'} if -e $config{'AUTO_IPT_SOCK'};
-    }
 
-    ### make sure the permissions on these files is 0600
-    for my $file ($fw_data_file,
-            $config{'FW_ERROR_LOG'}) {
-        chmod 0600, $file;
+        ### if we are not importing old scans, then remove old counter
+        ### values
+        if ($config{'IMPORT_OLD_SCANS'} eq 'N') {
+            &truncate_file($config{'PACKET_COUNTER_FILE'});
+            &truncate_file($config{'IPT_PREFIX_COUNTER_FILE'});
+            &truncate_file($config{'DSHIELD_COUNTER_FILE'});
+        }
+
+        ### make sure the permissions on these files is 0600
+        for my $file ($fw_data_file,
+                $config{'FW_ERROR_LOG'}) {
+            chmod 0600, $file;
+        }
     }
 
     ### we assume that ulogd is properly configured (FIXME?)
-    return if $config{'SYSLOG_DAEMON'} eq 'ulogd';
+    return if $config{'SYSLOG_DAEMON'} =~ /ulog/i;
 
     die '[*] No system logger config file could be found.'
         unless (-e $config{'ETC_SYSLOG_CONF'}
@@ -6187,6 +6187,13 @@ sub setup() {
         }
     }
 
+    return;
+}
+
+sub truncate_file() {
+    my $file = shift;
+    open F, "> $file" or die "[*] Could not open $file: $!";
+    close F;
     return;
 }
 

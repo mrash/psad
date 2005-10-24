@@ -1378,8 +1378,6 @@ sub test_syslog_config() {
 
     open FWDATA, "${PSAD_DIR}/fwdata" or
         die "[*] Could not open ${PSAD_DIR}/fwdata: $!";
-    seek FWDATA,0,2;  ### seek to the end of the file
-    sleep 1;
 
     ### try to connect to $test_port to generate an iptables
     ### drop message.  Note that since nothing is listening on
@@ -1397,6 +1395,7 @@ sub test_syslog_config() {
     sleep 2;
     my $found = 0;
 
+    seek FWDATA,-2000,2;  ### seek to the end of the file
     my @pkts = <FWDATA>;
     close FWDATA;
     for my $pkt (@pkts) {

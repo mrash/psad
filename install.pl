@@ -160,15 +160,17 @@ unless ($found) {
 my $noarchive   = 0;
 my $uninstall   = 0;
 my $help        = 0;
+my $skip_syslog_test = 0;
 my $cmdline_force_install = 0;
 my $syslog_conf = '';
 
 &usage(1) unless (GetOptions(
     'force-mod-install' => \$cmdline_force_install,  ### force install perl module
-    'no-preserve'   => \$noarchive,   ### Don't preserve existing configs.
-    'syslog-conf=s' => \$syslog_conf, ### specify path to syslog config file.
-    'uninstall'     => \$uninstall,   ### Uninstall psad.
-    'help'          => \$help         ### Display help.
+    'no-preserve'       => \$noarchive,   ### Don't preserve existing configs.
+    'syslog-conf=s'     => \$syslog_conf, ### specify path to syslog config file.
+    'no-syslog-test'    => \$skip_syslog_test,
+    'uninstall'         => \$uninstall,   ### Uninstall psad.
+    'help'              => \$help         ### Display help.
 ));
 &usage(0) if $help;
 
@@ -606,7 +608,7 @@ sub install() {
         }
     }
 
-    if (-x $Cmds{'iptables'}) {
+    if (-x $Cmds{'iptables'} and not $skip_syslog_test) {
         &logr("[+] Found iptables. Testing syslog configuration:\n");
         ### make sure we actually see packets being logged by
         ### the firewall.

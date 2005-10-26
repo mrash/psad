@@ -165,7 +165,7 @@ my $cmdline_force_install = 0;
 my $syslog_conf = '';
 
 &usage(1) unless (GetOptions(
-    'force-mod-install' => \$cmdline_force_install,  ### force install perl module
+    'force-mod-install' => \$cmdline_force_install,  ### force install of all modules
     'no-preserve'       => \$noarchive,   ### Don't preserve existing configs.
     'syslog-conf=s'     => \$syslog_conf, ### specify path to syslog config file.
     'no-syslog-test'    => \$skip_syslog_test,
@@ -1347,7 +1347,6 @@ sub test_syslog_config() {
 
     ### remove any "test_DROP" lines from fwdata file and ipt_prefix_ctr
     ### before seeing if new ones can be written
-    &scrub_fwdata();
     &scrub_prefix_ctr();
 
     my $start_kmsgsd = 1;
@@ -1379,6 +1378,10 @@ sub test_syslog_config() {
     open FWDATA, "${PSAD_DIR}/fwdata" or
         die "[*] Could not open ${PSAD_DIR}/fwdata: $!";
 
+    ### sleep to give kmsgsd a chance to pick up the packet
+    ### log message from syslog
+    seek FWDATA,0,2;  ### seek to the end of the file
+
     ### try to connect to $test_port to generate an iptables
     ### drop message.  Note that since nothing is listening on
     ### the port we will immediately receive a tcp reset.
@@ -1389,13 +1392,10 @@ sub test_syslog_config() {
         'Timeout'  => 1
     );
     undef $sock if defined $sock;
-
-    ### sleep to give kmsgsd a chance to pick up the packet
-    ### log message from syslog
     sleep 2;
+
     my $found = 0;
 
-    seek FWDATA,-2000,2;  ### seek to the end of the file
     my @pkts = <FWDATA>;
     close FWDATA;
     for my $pkt (@pkts) {
@@ -1406,7 +1406,9 @@ sub test_syslog_config() {
     system "$Cmds{'iptables'} -D INPUT 1";
 
     ### remove the any new test_DROP lines we just created
-    &scrub_fwdata();
+    ### (this probably is not necessary because psad is not
+    ### running).
+    &scrub_prefix_ctr();
 
     if ($found) {
         &logr("[+] Successful $syslog_str reconfiguration.\n\n");
@@ -1424,23 +1426,6 @@ sub test_syslog_config() {
         if (kill 0, $pid) {
             kill 9, $pid;
         }
-    }
-    return;
-}
-
-sub scrub_fwdata() {
-    if (-e "${PSAD_DIR}/fwdata") {
-        open SCRUB, "< ${PSAD_DIR}/fwdata" or
-            die "[*] Could not open ${PSAD_DIR}/fwdata: $!";
-        my @lines = <SCRUB>;
-        close SCRUB;
-
-        open SCRUB, "> ${PSAD_DIR}/fwdata" or
-            die "[*] Could not open ${PSAD_DIR}/fwdata: $!";
-        for my $line (@lines) {
-            print SCRUB $line unless $line =~ /test_DROP/;
-        }
-        close SCRUB;
     }
     return;
 }
@@ -1936,11 +1921,17 @@ sub usage() {
         my $exitcode = shift;
         print <<_HELP_;
 
-Usage: install.pl [-n] [-u] [-h]
+Usage: install.pl [-f] [-s <file> ] [-u] [--no-syslog-test]
+                  [--no-preserve] [-h]
 
-    -n  --no-preserve   - disable preservation of old configs.
-    -u  --uninstall     - uninstall psad.
-    -h  --help          - prints this help message.
+    -u  --uninstall     - Uninstall psad.
+    -f  --force-mod     - Force all perl modules to be installed
+                          even if some already exist in the system
+                          /usr/lib/perl5 tree.
+    -s  <file>          - Specify path to syslog.conf file.
+    --no-syslog-test    - Skip syslog reconfiguration test.
+    --no-preserve       - Disable preservation of old configs.
+    -h  --help          - Prints this help message.
 
 _HELP_
         exit $exitcode;

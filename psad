@@ -4086,7 +4086,8 @@ sub renew_auto_blocked_ips() {
 
 sub sockwrite_flush_auto_rules() {
     if (-e $config{'PID_FILE'}) {
-        if (&Psad::pidrunning($config{'PID_FILE'})) {
+        if (&Psad::pidrunning($config{'PID_FILE'})
+                and $config{'ENABLE_AUTO_IDS'} eq 'Y') {
             print "[+] Flushing psad chains via running psad daemon within\n",
                 "    $config{'CHECK_INTERVAL'} seconds.\n";
 

@@ -320,6 +320,7 @@ my $status_sort_dl   = 0;
 my $status_dl        = 0;
 my $fw_list_auto     = 0;
 my $fw_block_ip      = '';
+my $fw_rm_block_ip   = '';
 my $fw_del_chains    = 0;
 my $dump_ipt_policy  = 0;
 my $fw_include_ips   = 0;
@@ -446,6 +447,7 @@ Getopt::Long::Configure('no_ignore_case');
     'fw-block-ip=s'     => \$fw_block_ip,     # Add an IP/net to the psad auto-
                                               #   blocking chains.  Then psad can
                                               #   manage timeouts, etc.
+    'fw-rm-block-ip=s'  => \$fw_rm_block_ip,  # Delete any block rule against an IP
     'fw-del-chains'     => \$fw_del_chains,   # Delete psad chains in addition to
                                               #   flushing them (requires --F as
                                               #   well).
@@ -851,9 +853,9 @@ MAIN: for (;;) {
             &timeout_auto_blocked_ips();
         }
 
-        ### see if we need to add any IP address from the Netfilter cache
-        ### file.
-        &check_ipt_add_ip(\@add_ipt_addrs) if @add_ipt_addrs;
+        ### see if we need to add any IP address from the domain
+        ### socket
+        &check_ipt_cmd(\@add_ipt_addrs) if @add_ipt_addrs;
     }
 
     ### Send logs to dshield in dshield format
@@ -2166,7 +2168,7 @@ sub psad_init() {
     exit &dump_conf() if $dump_conf;
 
     ### The --Flush command line switch was given.
-    exit &flush_auto_blocked_ips() if $flush_fw;
+    exit &sockwrite_flush_auto_rules() if $flush_fw;
 
     ### the --Status command line switch was given
     exit &status() if $status;
@@ -2177,11 +2179,14 @@ sub psad_init() {
     ### list any existing Netfilter IPT_AUTO_CHAIN chains
     exit &ipt_list_auto_chains() if $fw_list_auto;
 
-    ### add an IP/network to the cache file used by a running psad
-    ### process (note that &diskwrite_add_ipt_block_ip() calls
+    ### add an IP/network to the psad auto blocking chains via the
+    ### domain socket (note that &sockwrite_add_ipt_block_ip() calls
     ### &import_auto_dl() to make sure we don't add an IP that should
     ### be ignored).
-    exit &diskwrite_add_ipt_block_ip() if $fw_block_ip;
+    exit &sockwrite_add_ipt_block_ip() if $fw_block_ip;
+
+    ### delete IP/network from psad auto blocking chains
+    exit &sockwrite_rm_ipt_block_ip() if $fw_rm_block_ip;
 
     ### import psad signatures (note that these signatures have been
     ### adapted from the Snort IDS and contain several keywords that
@@ -2278,6 +2283,15 @@ sub validate_config() {
                 or $fw_block_ip =~ m|^\s*$ip_re/\d+\s*$|
                 or $fw_block_ip =~ m|^\s*$ip_re/$ip_re\s*$|) {
             die '[-] The --fw-block-ip argument accepts ' .
+                'an IP address or network.';
+        }
+    }
+
+    if ($fw_rm_block_ip) {
+        unless ($fw_rm_block_ip =~ m|^\s*$ip_re\s*$|
+                or $fw_rm_block_ip =~ m|^\s*$ip_re/\d+\s*$|
+                or $fw_rm_block_ip =~ m|^\s*$ip_re/$ip_re\s*$|) {
+            die '[-] The --fw-rm-block-ip argument accepts ' .
                 'an IP address or network.';
         }
     }
@@ -4070,28 +4084,43 @@ sub renew_auto_blocked_ips() {
     return;
 }
 
+sub sockwrite_flush_auto_rules() {
+    if (-e $config{'PID_FILE'}) {
+        if (&Psad::pidrunning($config{'PID_FILE'})) {
+            print "[+] Flushing psad chains via running psad daemon within\n",
+                "    $config{'CHECK_INTERVAL'} seconds.\n";
+
+            ### open domain socket with running psad process
+            my $sock = IO::Socket::UNIX->new($config{'AUTO_IPT_SOCK'})
+                or die "[*] Could not acquire $config{'AUTO_IPT_SOCK'} ",
+                "socket: $!";
+            if ($fw_del_chains) {
+                print $sock "flush delchains\n";
+            } else {
+                print $sock "flush\n";
+            }
+            close $sock;
+            return 0;
+        }
+    }
+
+    ### if we make it here then we have to flush manually because
+    ### it looks like psad is not running.
+    print "[+] Flushing psad chains.\n";
+    &flush_auto_blocked_ips($fw_del_chains);
+    return 0;
+}
+
 sub flush_auto_blocked_ips() {
+    my $fw_del_chains = shift;
 
     my $ipt = new IPTables::ChainMgr(
         'iptables' => $cmds{'iptables'}
     ) or die '[*] Could not acquire IPTables::ChainMgr object.';
 
-    if ($flush_fw) {
-        if ($fw_del_chains) {
-            print "[+] Flushing and deleting Netfilter ",
-                "IPT_AUTO_CHAIN chains...\n";
-        } else {
-            print "[+] Flushing Netfilter IPT_AUTO_CHAIN chains...\n";
-        }
-    } else {
-        &Psad::psyslog('psad', 'flushing existing psad Netfilter ' .
-            'auto-response chains');
-    }
-    if (&Psad::pidrunning($config{'PID_FILE'})) {
-        print "    WARNING: psad is currently running, so flushing the ",
-            "chains may\n    cause some warning syslog messages to appear.\n"
-            if $flush_fw;
-    }
+    &Psad::psyslog('psad', 'flushing existing psad Netfilter ' .
+        'auto-response chains');
+
     if (@ipt_config) {
         for my $hr (@ipt_config) {
             my $table      = $hr->{'table'};
@@ -4102,27 +4131,22 @@ sub flush_auto_blocked_ips() {
                 if ($fw_del_chains) {
                     my ($rv, $status_msg) = $ipt->delete_chain($table,
                         $from_chain, $to_chain);
-                    if ($rv) {
-                        print "[+] $status_msg\n" if $flush_fw;
-                    } else {
-                        print "[-] $status_msg\n" if $flush_fw;
-                    }
+                    &Psad::psyslog('psad', $status_msg);
                 } else {
                     if ($ipt->flush_chain($table, $to_chain)) {
-                        print "[+] Flushed: $to_chain\n" if $flush_fw;
+                        &Psad::psyslog('psad', "flushed: $to_chain");
                     } else {
-                        print "[-] Could not flush: $to_chain\n" if $flush_fw;
+                        &Psad::psyslog('psad', "could not flush: $to_chain");
                     }
                 }
-            } else {
-                print "[-] Chain: $to_chain does not exist.\n" if $flush_fw;
             }
         }
-    } else {
-        print "[-] No valid IPT_AUTO_CHAIN keywords.\n" if $flush_fw;
     }
 
-    if ($flush_fw and -e $config{'AUTO_BLOCK_IPT_FILE'}) {
+    ### zero out the in-memory cache of blocked addresses
+    %auto_blocked_ips = ();
+
+    if (-e $config{'AUTO_BLOCK_IPT_FILE'}) {
         ### we have removed the iptables block rules, so truncate
         ### the cache file.
         &truncate_file($config{'AUTO_BLOCK_IPT_FILE'});
@@ -4130,8 +4154,8 @@ sub flush_auto_blocked_ips() {
 
     if (-e $config{'AUTO_BLOCK_TCPWR_FILE'}) {
         my $found_blocked = 0;
-        print "[+] Removing tcpwrapper auto-generated block rules.\n"
-            if $flush_fw;
+        &Psad::syslog('psad',
+            "removing tcpwrapper auto-generated block rules.");
         open B, "< $config{'AUTO_BLOCK_TCPWR_FILE'}" or
             die "[*] Could not open $config{'AUTO_BLOCK_TCPWR_FILE'}: $!";
         my @lines = <B>;
@@ -4148,8 +4172,8 @@ sub flush_auto_blocked_ips() {
         ### the cache file.
         &truncate_file($config{'AUTO_BLOCK_TCPWR_FILE'});
         unless ($found_blocked) {
-            print "[-] Currently there are no auto-generated ".
-                "tcpwrapper blocking rules in effect.\n" if $flush_fw;
+            &Psad::psyslog('psad', "currently there are no auto-generated " .
+                "tcpwrapper blocking rules in effect.");
         }
     }
     return 0;
@@ -4359,14 +4383,14 @@ sub ipt_rm_block() {
             ### don't send timeout email if we are manually flushing
             ### the auto-block rules from the command line with --Flush.
             &Psad::psyslog('psad', "removed iptables auto-block against " .
-                "$ip (timeout expired).") unless $no_syslog_alerts;
+                "$ip.") unless $no_syslog_alerts;
             &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} removed iptables " .
-                "block against $ip (timeout expired).", '',
+                "block against $ip.", '',
                 $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
                 unless $no_email_alerts;
         }
         print STDERR "[+] ipt_rm_block(): removed iptables block ",
-            "against $ip (timeout expired).\n" if $debug;
+            "against $ip.\n" if $debug;
 
         &diskwrite_rm_blocked_ip($ip, $config{'AUTO_BLOCK_IPT_FILE'});
 
@@ -4412,35 +4436,38 @@ sub ipt_list_auto_chains() {
     return 0;
 }
 
-sub check_ipt_add_ip() {
+sub check_ipt_cmd() {
     my $lines_aref = shift;
 
-    my $ipt = new IPTables::ChainMgr(
-        'iptables' => $cmds{'iptables'}
-    ) or die "[*] Could not acquire IPTables::ChainMgr object.";
-
-    my %uniq_ips = ();
-    for my $ip (@$lines_aref) {
-        chomp $ip;
-        next if defined $uniq_ips{$ip};
-        if ($ip =~ m|^\s*$ip_re\s*$|
-                or $ip =~ m|^\s*$ip_re/\d+\s*$|
-                or $ip =~ m|^\s*$ip_re/$ip_re\s*$|) {
-
-            ### instantiate the blocking rule
-            &ipt_block($ip, '');
+    my %uniq_cmds = ();
+    for my $line (@$lines_aref) {
+        chomp $line;
+        next if defined $uniq_cmds{$line};
+        if ($line =~ /flush/i) {
+            my $del_chains = 0;
+            $del_chains = 1 if $line =~ /delchains/i;
+            &flush_auto_blocked_ips($del_chains);
+        } else {
+            if ($line =~ m|add.*($ip_re)\s*$|i
+                    or $line =~ m|add.*($ip_re/\d+)\s*$|i
+                    or $line =~ m|add.*($ip_re/$ip_re)\s*$|i) {
+                ### instantiate the blocking rule
+                &ipt_block($1, '');
+            } elsif ($line =~ m|del.*($ip_re)\s*$|i
+                    or $line =~ m|del.*($ip_re/\d+)\s*$|i
+                    or $line =~ m|del.*($ip_re/$ip_re)\s*$|i) {
+                ### instantiate the blocking rule
+                &ipt_rm_block($1, '');
+            }
         }
-        $uniq_ips{$ip} = '';
+        $uniq_cmds{$line} = '';
     }
     return;
 }
 
 ### this only gets used when issuing --fw-block
 ### from the command line.
-sub diskwrite_add_ipt_block_ip() {
-
-    die "[*] ENABLE_AUTO_IDS is not enabled. Exiting."
-        unless $config{'ENABLE_AUTO_IDS'} eq 'Y';
+sub sockwrite_add_ipt_block_ip() {
 
     die "[*] --fw-block-ip takes an IP/subnet as an argument."
         unless $fw_block_ip =~ /$ip_re/;
@@ -4456,6 +4483,8 @@ sub diskwrite_add_ipt_block_ip() {
     } elsif ($fw_block_ip =~ m|^\s*($ip_re)/(\d+)\s*$|) {
         $block_ip   = $1;
         $block_mask = $2;
+    } else {
+        die "[*] Badly formatted block IP: $fw_block_ip";
     }
 
     if ($block_mask ne '32') {
@@ -4494,13 +4523,61 @@ sub diskwrite_add_ipt_block_ip() {
             my $sock = IO::Socket::UNIX->new($config{'AUTO_IPT_SOCK'})
                 or die "[*] Could not acquire $config{'AUTO_IPT_SOCK'} ",
                 "socket: $!";
-            print $sock $fw_block_ip, "\n";
+            print $sock "add $fw_block_ip\n";
             close $sock;
         } else {
             print "[-] There is no running psad process. Exiting.\n";
         }
     } else {
         print "[-] There is no running psad process. Exiting.\n";
+    }
+    return 0;
+}
+
+sub sockwrite_rm_ipt_block_ip() {
+
+    die "[*] --fw-rm-block-ip takes an IP/subnet as an argument."
+        unless $fw_rm_block_ip =~ /$ip_re/;
+
+    my $rm_block_ip   = '';
+    my $rm_block_mask = '';
+    if ($fw_rm_block_ip =~ m|^\s*($ip_re)\s*$|) {
+        $rm_block_ip   = $1;
+        $rm_block_mask = '32';
+    } elsif ($fw_rm_block_ip =~ m|^\s*($ip_re)/($ip_re)\s*$|) {
+        $rm_block_ip   = $1;
+        $rm_block_mask = $2;
+    } elsif ($fw_rm_block_ip =~ m|^\s*($ip_re)/(\d+)\s*$|) {
+        $rm_block_ip   = $1;
+        $rm_block_mask = $2;
+    } else {
+        die "[*] Badly formatted rm block IP: $fw_rm_block_ip";
+    }
+
+    if ($rm_block_mask ne '32') {
+        ### a subnet was given on the command line, so make
+        ### sure we were also given a network address (Netfilter
+        ### converts to the network address in -nL output)
+        my ($tmpnetaddr, $tmpnetmask) =
+            ipv4_network($rm_block_ip, $rm_block_mask);
+        $rm_block_ip = $tmpnetaddr if $rm_block_ip ne $tmpnetaddr;
+        $rm_block_mask = $tmpnetmask if $rm_block_mask ne $tmpnetmask;
+        $fw_rm_block_ip = "$rm_block_ip/$rm_block_mask";
+    }
+
+    if (-e $config{'PID_FILE'}) {
+        if (&Psad::pidrunning($config{'PID_FILE'})) {
+            print "[+] Writing $fw_rm_block_ip to socket. Psad will remove the IP\n",
+                "    within $config{'CHECK_INTERVAL'} seconds.\n";
+
+            ### open domain socket with running psad process
+            my $sock = IO::Socket::UNIX->new($config{'AUTO_IPT_SOCK'})
+                or die "[*] Could not acquire $config{'AUTO_IPT_SOCK'} ",
+                "socket: $!";
+            print $sock "del $fw_rm_block_ip\n";
+            close $sock;
+            return 0;
+        }
     }
     return 0;
 }
@@ -4640,24 +4717,21 @@ sub timeout_auto_blocked_ips() {
         if ((time() - $auto_blocked_ips{$ip})
                 > $config{'AUTO_BLOCK_TIMEOUT'}) {
 
-            my $del_ip_ipt   = 0;
-            my $del_ip_tcpwr = 0;
-
             ### remove all Netfiler blocking rules for $ip
             if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
-                $del_ip_ipt = &ipt_rm_block($ip);
+                &ipt_rm_block($ip);
             }
 
             ### remove all tcpwrapper blocking rules for $ip
             if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
-                $del_ip_tcpwr = &tcpwr_rm_block($ip);
+                &tcpwr_rm_block($ip);
             }
 
             ### if the rm function did not work for one of them
             ### there are larger problems, and the admin should
             ### investigate why it didn't work... psad should
             ### not keep trying to remove these rules.
-            push @del_keys, $ip if $del_ip_ipt or $del_ip_tcpwr;
+            push @del_keys, $ip;
         }
     }
     if (@del_keys) {

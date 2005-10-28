@@ -1,10 +1,16 @@
 psad-1.4.4 (11//2005):
     - Added MAC address reporting in psad email alerts.  This feature is
       enabled via a new config keyword "ENABLE_MAC_ADDR_REPORTING".
+    - Added --fw-rm-block-ip <ip> option to allow IP addresses to be removed
+      from the auto-blocking chains from the command line.
+    - Updated command line firewall arguments to write commands to the
+      AUTO_IPT_SOCK domain socket.
     - Added --force-mod-install command line argument to installer to force
       perl modules used by psad to be installed within /usr/lib/psad
       regardless of whether they already exist in the system perl tree.
     - Bugfix in the installer to seek() to the end of the fwdata file
+    - Bugfix for psad repeatedly trying to remove the same IP address(es)
+      from the auto-blocking chains.
       instead of reading the entire thing into memory.
     - Added the ability to truncate the fwdata file via a new configuration
       keyword "TRUNCATE_FWDATA" (this is enabled by default).

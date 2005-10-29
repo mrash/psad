@@ -1007,28 +1007,32 @@ sub check_scan() {
         }
 
         ### get the in/out interface and iptables chain
-        if ($pkt =~ /IN=(\S+)\s+OUT=\s*MAC=(\S+)/) {
+        if ($pkt =~ /IN=(\S+)\s+OUT=\s/) {
             $intf = $1;
-            my $mac_str = $2;
             $chain = 'INPUT';
-            if ($mac_str =~ /^((?:\w{2}\:){6})((?:\w{2}\:){6})/) {
-                $dst_mac = $1;
-                $src_mac = $2;
-            }
         } elsif ($pkt =~ /IN=(\S+)\s+OUT=\S/) {
             $intf = $1;
             $chain = 'FORWARD';
-        } elsif ($pkt =~ /IN=\s+OUT=(\S+)\s*MAC=(\S+)/) {
+        } elsif ($pkt =~ /IN=\s+OUT=(\S+)/) {
             $intf = $1;
-            my $mac_str = $2;
             $chain = 'OUTPUT';
+        }
+
+        if ($pkt =~ /\sMAC=(\S+)/) {
+            my $mac_str = $1;
             if ($mac_str =~ /^((?:\w{2}\:){6})((?:\w{2}\:){6})/) {
                 $dst_mac = $1;
                 $src_mac = $2;
             }
         }
-        $src_mac =~ s/:$// if $src_mac;
-        $dst_mac =~ s/:$// if $dst_mac;
+        if ($src_mac) {
+            $src_mac =~ s/:$//;
+            print STDERR "[+] src mac addr: $src_mac\n" if $debug;
+        }
+        if ($dst_mac) {
+            $dst_mac =~ s/:$//;
+            print STDERR "[+] dst mac addr: $dst_mac\n" if $debug;
+        }
 
         unless ($intf and $chain) {
             print STDERR "[-] err packet: could not determine ",

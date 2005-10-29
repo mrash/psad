@@ -16,6 +16,8 @@ psad-1.4.4 (11//2005):
       keyword "TRUNCATE_FWDATA" (this is enabled by default).
     - Bugfix in auto-blocking mode for deleting AUTO_IPT_SOCK when a HUP
       signal is received.
+    - Bugfix for parsing Netfilter policies that contain ULOG logging rules
+      instead of the standard LOG target.
 
 psad-1.4.3 (09/27/2005):
     - Bugfixes for auto-blocking code.  Timeouts should be handled

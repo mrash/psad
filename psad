@@ -4155,7 +4155,7 @@ sub flush_auto_blocked_ips() {
 
     if (-e $config{'AUTO_BLOCK_TCPWR_FILE'}) {
         my $found_blocked = 0;
-        &Psad::syslog('psad',
+        &Psad::psyslog('psad',
             "removing tcpwrapper auto-generated block rules.");
         open B, "< $config{'AUTO_BLOCK_TCPWR_FILE'}" or
             die "[*] Could not open $config{'AUTO_BLOCK_TCPWR_FILE'}: $!";
@@ -6072,9 +6072,6 @@ sub setup() {
             ### create the Netfilter data file if it doesn't exist
             ### (this is better than dying because it isn't there).
             &truncate_file($fw_data_file);
-            &Psad::psyslog('psad', "data file $fw_data_file " .
-                "does not exist, creating it")
-                unless $no_syslog_alerts;
         }
 
         ### unlink socket file if it exists from a previous run (only

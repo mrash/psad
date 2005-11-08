@@ -118,7 +118,6 @@ int find_char_var(char *search_str, char *charvar, char *line)
 
     /* look for specific variables in the config
      * file that match the search_str */
-
     for (i=0; i < strlen(search_str); i++)
         if (index_tmp[i] != search_str[i])
             return 0;

@@ -190,7 +190,6 @@ sub sendmail() {
 ### write a message to syslog
 sub psyslog() {
     my ($ident, $msg) = @_;
-    ### write a message to syslog and return
     openlog $ident, LOG_DAEMON, LOG_LOCAL7;
     syslog LOG_INFO, $msg;
     closelog();

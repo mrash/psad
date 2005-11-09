@@ -23,7 +23,7 @@ psad-1.4.3 (09/27/2005):
     - Bugfixes for auto-blocking code.  Timeouts should be handled
       properly, including cached IP addresses in the auto_blocked_iptables
       file that are referenced upon psad startup.  Communication with the
-      running psad is performed over a unix domain socket in --fw-block
+      running psad is performed over a Unix domain socket in --fw-block
       mode.
     - Bugfix to seek to the end of the fwdata file instead of reading the
       entire thing into memory and then looking for newly written logging

@@ -18,7 +18,7 @@
 #
 # Credits: (see the CREDITS file bundled with the psad sources.)
 #
-# Version: 1.4.4-pre9
+# Version: 1.4.4-pre10
 #
 # Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.org)
 #
@@ -149,7 +149,7 @@ use strict;
 ### ========================== main =================================
 
 ### set the current psad version number
-my $version = '1.4.4-pre9';
+my $version = '1.4.4-pre10';
 
 ### default config file for psad (can be changed with
 ### --config switch)
@@ -4453,14 +4453,14 @@ sub check_ipt_cmd() {
             $del_chains = 1 if $line =~ /delchains/i;
             &flush_auto_blocked_ips($del_chains);
         } else {
-            if ($line =~ m|add.*($ip_re)\s*$|i
-                    or $line =~ m|add.*($ip_re/\d+)\s*$|i
-                    or $line =~ m|add.*($ip_re/$ip_re)\s*$|i) {
+            if ($line =~ m|add\s+($ip_re)\s*$|i
+                    or $line =~ m|add\s+($ip_re/\d+)\s*$|i
+                    or $line =~ m|add\s+($ip_re/$ip_re)\s*$|i) {
                 ### instantiate the blocking rule
                 &ipt_block($1, '');
-            } elsif ($line =~ m|del.*($ip_re)\s*$|i
-                    or $line =~ m|del.*($ip_re/\d+)\s*$|i
-                    or $line =~ m|del.*($ip_re/$ip_re)\s*$|i) {
+            } elsif ($line =~ m|del\s+($ip_re)\s*$|i
+                    or $line =~ m|del\s+($ip_re/\d+)\s*$|i
+                    or $line =~ m|del\s+($ip_re/$ip_re)\s*$|i) {
                 ### instantiate the blocking rule
                 &ipt_rm_block($1, '');
             }

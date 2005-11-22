@@ -1,5 +1,5 @@
 %define name psad
-%define version 1.4.3
+%define version 1.4.4
 %define release 1
 %define psadlibdir /usr/lib/psad
 %define psadlogdir /var/log/psad
@@ -235,6 +235,10 @@ fi
 %_libdir/%name
 
 %changelog
+* Tue Nov 22 2005 Michael Rash <mbr@cipherydne.org>
+- Removed smtpdaemon dependency since psad can be run without sending
+  email alerts by configuring /etc/psad/alert.conf appropriately.
+
 * Tue Jul 12 2005 Michael Rash <mbr@cipherydne.org>
 - Updated to only update syslog.conf if it actually exists. Psad
   is now comptable with other syslog daemons, and also with ulogd.

@@ -20,7 +20,6 @@ Group: System/Servers
 Url: http://www.cipherdyne.org/psad/
 Source: %name-%version.tar.gz
 BuildRoot: %_tmppath/%{name}-buildroot
-Requires: smtpdaemon
 Requires: iptables
 #Prereq: rpm-helper
 

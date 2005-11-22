@@ -4383,6 +4383,12 @@ sub ipt_rm_block() {
         }
     }
 
+    ### delete the ip from the hash (if new packets are seen
+    ### from the same ip, then the hash will be updated again
+    ### in check_scan()).
+    delete $auto_blocked_ips{$ip}
+        if defined $auto_blocked_ips{$ip};
+
     if ($rm_block) {
         if (not $flush_fw) {
             ### don't send timeout email if we are manually flushing
@@ -4461,8 +4467,8 @@ sub check_ipt_cmd() {
             } elsif ($line =~ m|del\s+($ip_re)\s*$|i
                     or $line =~ m|del\s+($ip_re/\d+)\s*$|i
                     or $line =~ m|del\s+($ip_re/$ip_re)\s*$|i) {
-                ### instantiate the blocking rule
-                &ipt_rm_block($1, '');
+                ### remove the blocking rule
+                &ipt_rm_block($1);
             }
         }
         $uniq_cmds{$line} = '';
@@ -4635,6 +4641,12 @@ sub tcpwr_rm_block() {
     move "$config{'ETC_HOSTS_DENY'}.tmp", $config{'ETC_HOSTS_DENY'} or die
         "[*] Could not move $config{'ETC_HOSTS_DENY'}.tmp -> ",
         "$config{'ETC_HOSTS_DENY'}";
+
+    ### delete the ip from the hash (if new packets are seen
+    ### from the same ip, then the hash will be updated again
+    ### in check_scan()).
+    delete $auto_blocked_ips{$ip}
+        if defined $auto_blocked_ips{$ip};
     return $rv;
 }
 
@@ -4717,7 +4729,6 @@ sub auto_block_ignore_ip() {
 sub timeout_auto_blocked_ips() {
     print STDERR "[+] timeout_auto_block_ips()\n" if $debug;
     return if $config{'AUTO_BLOCK_TIMEOUT'} == 0;
-    my @del_keys = ();
     for my $ip (keys %auto_blocked_ips) {
         if ((time() - $auto_blocked_ips{$ip})
                 > $config{'AUTO_BLOCK_TIMEOUT'}) {
@@ -4731,21 +4742,6 @@ sub timeout_auto_blocked_ips() {
             if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
                 &tcpwr_rm_block($ip);
             }
-
-            ### if the rm function did not work for one of them
-            ### there are larger problems, and the admin should
-            ### investigate why it didn't work... psad should
-            ### not keep trying to remove these rules.
-            push @del_keys, $ip;
-        }
-    }
-    if (@del_keys) {
-        for my $ip (@del_keys) {
-            ### delete the ip from the hash (if new packets are seen
-            ### from the same ip, then the hash will be updated again
-            ### in check_scan()).
-            delete $auto_blocked_ips{$ip}
-                if defined $auto_blocked_ips{$ip};
         }
     }
     return;

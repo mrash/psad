@@ -4432,14 +4432,14 @@ sub ipt_rm_block() {
             ### don't send timeout email if we are manually flushing
             ### the auto-block rules from the command line with --Flush.
             &Psad::psyslog('psad', "removed iptables auto-block against " .
-                "$ip.") unless $no_syslog_alerts;
+                $ip) unless $no_syslog_alerts;
             &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} removed iptables " .
-                "block against $ip.", '',
+                "block against $ip", '',
                 $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
                 unless $no_email_alerts;
         }
         print STDERR "[+] ipt_rm_block(): removed iptables block ",
-            "against $ip.\n" if $debug;
+            "against $ip\n" if $debug;
 
         &diskwrite_rm_blocked_ip($ip, $config{'AUTO_BLOCK_IPT_FILE'});
 

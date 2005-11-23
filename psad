@@ -1235,7 +1235,12 @@ sub check_scan() {
         ### file.  The return value is the auto-assigned danger level (or
         ### -1 if there is no auto-assigned danger level.
         unless ($no_auto_dl) {
-            if (&assign_auto_danger_level($src, $proto) == 0) {
+            my $rv = &assign_auto_danger_level($src, $proto, $dp);
+            if ($debug) {
+                print STDERR "[+] assign_auto_danger_level() returned: $rv\n";
+            }
+            if ($rv == 0) {
+                print STDERR "[+] ignoring $src $proto $dp scan.\n" if $debug;
                 next PKT;
             }
         }
@@ -1488,12 +1493,17 @@ sub match_sigs() {
 sub ignore_port() {
     my ($port, $proto) = @_;
     return 0 unless defined $ignore_ports{$proto};
-    if (defined $ignore_ports{$proto}{'port'}) {
-        return 1 if defined $ignore_ports{$proto}{'port'}{$port};
+    return &match_port(\%{$ignore_ports{$proto}}, $port);
+}
+
+sub match_port() {
+    my ($href, $port) = @_;
+    if (defined $href->{'port'}) {
+        return 1 if defined $href->{'port'}->{$port};
     }
-    if (defined $ignore_ports{$proto}{'range'}) {
-        for my $low_port (keys %{$ignore_ports{$proto}{'range'}}) {
-            my $high_port = $ignore_ports{$proto}{'range'}{$low_port};
+    if (defined $href->{'range'}) {
+        for my $low_port (keys %{$href->{'range'}}) {
+            my $high_port = $href->{'range'}->{$low_port};
             return 1 if ($port >= $low_port and $port <= $high_port);
         }
     }
@@ -2459,7 +2469,15 @@ sub parse_ignore_ports() {
 
     return if $config{'IGNORE_PORTS'} eq 'NONE';
 
-    my @fields = split /\s*,\s*/, $config{'IGNORE_PORTS'};
+    &parse_port_range(\%ignore_ports, $config{'IGNORE_PORTS'});
+
+    return;
+}
+
+sub parse_port_range() {
+    my ($href, $line) = @_;
+
+    my @fields = split /\s*,\s*/, $line;
     for my $field (@fields) {
         if ($field =~ m/(tcp|udp)\/(\d+)\s*-\s*(\d+)/) {
             my $proto = $1;
@@ -2467,23 +2485,23 @@ sub parse_ignore_ports() {
             my $high  = $3;
             if ($low < $high) {
                 my $existing_high = 0;
-                if (defined $ignore_ports{$proto}
-                        and defined $ignore_ports{$proto}{'range'}
-                        and defined $ignore_ports{$proto}{'range'}{$low}) {
-                    $existing_high = $ignore_ports{$proto}{'range'}{$low};
+                if (defined $href->{$proto}
+                        and defined $href->{$proto}->{'range'}
+                        and defined $href->{$proto}->{'range'}->{$low}) {
+                    $existing_high = $href->{$proto}->{'range'}->{$low};
                 }
                 if ($existing_high) {
                     if ($high > $existing_high) {
-                        $ignore_ports{$proto}{'range'}{$low} = $high;
+                        $href->{$proto}->{'range'}->{$low} = $high;
                     }
                 } else {
-                    $ignore_ports{$proto}{'range'}{$low} = $high;
+                    $href->{$proto}->{'range'}->{$low} = $high;
                 }
             }
         } elsif ($field =~ m/(tcp|udp)\/(\d+)/) {
             my $proto = $1;
             my $port  = $2;
-            $ignore_ports{$proto}{'port'}{$port} = '';
+            $href->{$proto}->{'port'}->{$port} = '';
         }
     }
     return;
@@ -2885,22 +2903,27 @@ sub import_auto_dl() {
         my $ip   = '';
         my $mask = '';
         my $dl   = '';
-        if ($line =~ m|^\s*($ip_re)\s*/\s*($ip_re)\s+([0-5])|) {
+        my $opt_criteria = '';
+        if ($line =~ m|^\s*($ip_re)\s*/\s*($ip_re)\s+([0-5])\s*(.*);|) {
             $ip   = $1;
             $mask = $2;
             $dl   = $3;
-        } elsif ($line =~ m|^\s*($ip_re)\s*/\s*(\d+)\s+([0-5])|) {
+            $opt_criteria = $4;
+        } elsif ($line =~ m|^\s*($ip_re)\s*/\s*(\d+)\s+([0-5])\s*(.*);|) {
             $ip   = $1;
             $mask = $2;
             $dl   = $3;
-        } elsif ($line =~ m|^\s*($ip_re)\s+([0-5])|) {
+            $opt_criteria = $4;
+        } elsif ($line =~ m|^\s*($ip_re)\s+([0-5])\s*(.*);|) {
             $ip   = $1;
             $mask = '32';  ### single IP
             $dl   = $2;
-        } elsif ($line =~ m|^\s*(\S+)\s+([0-5])|) {
+            $opt_criteria = $3;
+        } elsif ($line =~ m|^\s*(\S+)\s+([0-5])\s*(.*);|) {
             ### check to see if it is a hostname
             my $hostname = $1;
             $dl          = $2;
+            $opt_criteria = $3;
             my $iaddr = inet_aton($hostname) or
                 &Psad::psyslog('psad', "could not resolve auto_dl $hostname " .
                     "to an IP at line $i");
@@ -2916,17 +2939,20 @@ sub import_auto_dl() {
         $auto_dl{$ip}{'mask'} = $mask;
         $auto_dl{$ip}{'dl'}   = $dl;
 
-        ### check for optional protocol (any combination of tcp, udp
-        ### or icmp is allowed)
-        if ($line =~ m|tcp|i) {
-            push @{$auto_dl{$ip}{'proto'}}, 'tcp';
-        }
-        if ($line =~ m|udp|i) {
-            push @{$auto_dl{$ip}{'proto'}}, 'udp';
-        }
         if ($line =~ m|icmp|i) {
-            push @{$auto_dl{$ip}{'proto'}}, 'icmp';
+            $auto_dl{$ip}{'proto'}{'icmp'}{'all'} = '';
         }
+
+        ### check for optional port/protocol criteria
+        &parse_port_range(\%{$auto_dl{$ip}{'proto'}}, $opt_criteria);
+
+        if ($line =~ m|tcp|i and not defined $auto_dl{$ip}{'proto'}{'tcp'}) {
+            $auto_dl{$ip}{'proto'}{'tcp'}{'all'} = '';
+        }
+        if ($line =~ m|udp|i and not defined $auto_dl{$ip}{'proto'}{'udp'}) {
+            $auto_dl{$ip}{'proto'}{'udp'}{'all'} = '';
+        }
+
         unless ($ip and $mask) {
             unless ($fw_block_ip) {
                 my $subject = "$config{'MAIL_ERROR_PREFIX'} import warning: " .
@@ -3186,7 +3212,7 @@ sub assign_danger_level() {
 }
 
 sub assign_auto_danger_level() {
-    my ($src, $scan_proto) = @_;
+    my ($src, $scan_proto, $scan_port) = @_;
 
     ### see if the source should automatically be assigned a
     ### danger level
@@ -3208,13 +3234,25 @@ sub assign_auto_danger_level() {
                     "$dl for IP: $src") unless $no_syslog_alerts;
                 return $dl;
             } else {
-                for my $proto (@{$auto_dl{$net}{'proto'}}) {
-                    if ($scan_proto eq $proto) {
-                        $scan_dl{$src} = $dl;
-                        &Psad::psyslog('psad', 'auto-assigned danger ' .
-                            "level: $dl for IP: $src")
-                            unless $no_syslog_alerts;
-                        return $dl;
+                for my $proto (keys %{$auto_dl{$net}{'proto'}}) {
+                    next unless $scan_proto eq $proto;
+                    if (defined $auto_dl{$net}{'proto'}{$proto}{'port'}
+                            or defined $auto_dl{$net}{'proto'}{$proto}{'range'}) {
+                        if (&match_port(\%{$auto_dl{$net}{'proto'}{$proto}},
+                                $scan_port)) {
+                            $scan_dl{$src} = $dl;
+                            &Psad::psyslog('psad', 'auto-assigned danger ' .
+                                "level: $dl for IP: $src")
+                                unless $no_syslog_alerts;
+                            return $dl;
+                        }
+                    } elsif (defined $auto_dl{$net}{'proto'}{$proto}{'all'}) {
+                        ### we only require to match the protocol
+                         $scan_dl{$src} = $dl;
+                         &Psad::psyslog('psad', 'auto-assigned danger ' .
+                             "level: $dl for IP: $src")
+                             unless $no_syslog_alerts;
+                         return $dl;
                     }
                 }
             }

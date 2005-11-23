@@ -2944,7 +2944,9 @@ sub import_auto_dl() {
         }
 
         ### check for optional port/protocol criteria
-        &parse_port_range(\%{$auto_dl{$ip}{'proto'}}, $opt_criteria);
+        if ($line =~ /tcp/i or $line =~ /udp/i) {
+            &parse_port_range(\%{$auto_dl{$ip}{'proto'}}, $opt_criteria);
+        }
 
         if ($line =~ m|tcp|i and not defined $auto_dl{$ip}{'proto'}{'tcp'}) {
             $auto_dl{$ip}{'proto'}{'tcp'}{'all'} = '';

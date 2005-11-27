@@ -235,6 +235,9 @@ fi
 %_libdir/%name
 
 %changelog
+* Sun Nov 27 2005 Michael Rash <mbr@cipherydne.org>
+- psad-1.4.4 release.
+
 * Tue Nov 22 2005 Michael Rash <mbr@cipherydne.org>
 - Removed smtpdaemon dependency since psad can be run without sending
   email alerts by configuring /etc/psad/alert.conf appropriately.

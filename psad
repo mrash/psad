@@ -702,7 +702,8 @@ unless ($benchmark) {
             Local  => $config{'AUTO_IPT_SOCK'},
             Listen => SOMAXCONN,
             Timeout => .1
-        ) or die "[*] Could not acquire auto-response domain socket: $!";
+        ) or die "[*] Could not acquire auto-response domain ",
+            "socket $config{'AUTO_IPT_SOCK'}: $!";
     }
 }
 

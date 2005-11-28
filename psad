@@ -6069,21 +6069,23 @@ sub handle_cmdline() {
 
 sub setup() {
 
-    ### initialize dshield alerting interval
-    $dshield_alert_interval = 3600 * $config{'DSHIELD_ALERT_INTERVAL'};
-
-    ### scale back the alerting interval from 24 hours by just enough
-    ### to make sure that an alert will be sent each day.
-    $dshield_alert_interval -= 1 + $config{'CHECK_INTERVAL'}
-        if $config{'DSHIELD_ALERT_INTERVAL'} == 24;
-
-    unless (-d $config{'PSAD_DIR'}) {
-        mkdir $config{'PSAD_DIR'}, 0500 or
-            die "[*] Could not mkdir $config{'PSAD_DIR'}: $!";
+    for my $dir qw(
+        /var/lib
+        /var/run
+    ) {
+        next if -d $dir;
+        mkdir $dir, 0755 or die "[*] Could not mkdir $dir: $!";
     }
-    unless (-d $config{'ERROR_DIR'}) {
-        mkdir $config{'ERROR_DIR'}, 0500 or
-            die "[*] Could not mkdir $config{'ERROR_DIR'}: $!";
+
+    for my $dir qw(
+        PSAD_DIR
+        PSAD_RUN_DIR
+        PSAD_LIB_DIR
+        ERROR_DIR
+    ) {
+        next if -d $config{$dir};
+        mkdir $config{$dir}, 0500 or
+            die "[*] Could not mkdir $config{$dir}: $!";
     }
 
     unless (-e $config{'PSAD_FIFO'}) {
@@ -6098,6 +6100,14 @@ sub setup() {
 
     $no_email_alerts = 1 if $config{'ALERTING_METHODS'} =~ /no.?e?mail/i;
     $no_syslog_alerts = 1 if $config{'ALERTING_METHODS'} =~ /no.?syslog/i;
+
+    ### initialize dshield alerting interval
+    $dshield_alert_interval = 3600 * $config{'DSHIELD_ALERT_INTERVAL'};
+
+    ### scale back the alerting interval from 24 hours by just enough
+    ### to make sure that an alert will be sent each day.
+    $dshield_alert_interval -= 1 + $config{'CHECK_INTERVAL'}
+        if $config{'DSHIELD_ALERT_INTERVAL'} == 24;
 
     unless ($hup_flag) {
         my $truncate_or_create = 0;
@@ -6490,6 +6500,7 @@ sub required_vars() {
         ULOG_DATA_FILE MAIL_ALERT_PREFIX MAIL_STATUS_PREFIX
         MAIL_ERROR_PREFIX MAIL_FATAL_PREFIX PROC_FORWARD_FILE
         FLUSH_IPT_AT_INIT ENABLE_MAC_ADDR_REPORTING TRUNCATE_FWDATA
+        PSAD_DIR PSAD_RUN_DIR PSAD_LIB_DIR
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

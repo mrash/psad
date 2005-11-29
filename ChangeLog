@@ -1,3 +1,7 @@
+psad-1.4.5 (12//2005):
+    - Bugfix to make sure /var/run/psad directory exists at startup since
+      this directory is removed by some Linux distributions at boot time.
+
 psad-1.4.4 (11/27/2005):
     - Added MAC address reporting in psad email alerts.  This feature is
       enabled via a new config keyword "ENABLE_MAC_ADDR_REPORTING".

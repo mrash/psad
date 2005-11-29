@@ -451,7 +451,7 @@ Getopt::Long::Configure('no_ignore_case');
     'fw-del-chains'     => \$fw_del_chains,   # Delete psad chains in addition to
                                               #   flushing them (requires --F as
                                               #   well).
-    'fw-dump-policy'    => \$dump_ipt_policy, # Dump the iptables policy
+    'fw-dump'           => \$dump_ipt_policy, # Dump the iptables policy
                                               #   (requires -D as well).
     'fw-include-ips'    => \$fw_include_ips,  # Include all IPs/nets in iptables
                                               # dump (--fw-dump) output.
@@ -6561,6 +6561,8 @@ Options:
                                     chains use for auto-blocking rules.
     --fw-block-ip  <ip>           - Add an IP/network to the auto-
                                     blocking chains.
+    --fw-rm-block-ip  <ip>        - Remove an IP/network from the auto-
+                                    blocking chains.
     --fw-file <rules file>        - Analyze the iptables ruleset
                                     contained within <rules file>
                                     instead of a running policy.
@@ -6568,6 +6570,8 @@ Options:
                                     psad for auto-blocking rules.
     --fw-dump                     - Dump a sanitzed version of the local
                                     Netfilter policy.
+    --fw-includ-ips               - Include all IPs/nets in iptables dump
+                                    (--fw-dump) output.
     -snort-rdir <rule dir>        - Path to snort rules directory.
     -d,  --debug                  - Run psad in debugging mode.
     -D,  --Dump-conf              - Dump psad configuration on STDOUT

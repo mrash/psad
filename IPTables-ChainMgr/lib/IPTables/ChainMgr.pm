@@ -325,11 +325,6 @@ sub find_ip_rule() {
     my $extended_href = shift || {};
     my $iptables = $self->{'_iptables'};
 
-    ### first make sure the chain actually exists
-    unless ($self->chain_exists($table, $chain, $iptables)) {
-        return 0;
-    }
-
     my $ipt_parse = new IPTables::Parse('iptables' => $iptables)
         or croak "[*] Could not acquire IPTables::Parse object";
 

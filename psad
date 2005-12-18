@@ -271,6 +271,9 @@ my %auto_assigned_msg = ();
 ### (if ENABLE_AUTO_IDS == 'Y')
 my %auto_blocked_ips = ();
 
+### counter to check psad Netfilter chains and jump rules
+my $netfilter_prereq_check = 0;
+
 ### cache the addresses we have issued dns lookups against.
 my %dns_cache = ();
 
@@ -4229,7 +4232,10 @@ sub ipt_block() {
     my ($ip, $renewed_status) = @_;
 
     ### see if the IP is already blocked
-    return if defined $auto_blocked_ips{$ip};
+    if (defined $auto_blocked_ips{$ip}) {
+        print STDERR "[-] ipt_block($ip) already blocked.\n" if $debug;
+        return;
+    }
 
     print STDERR "[+] ipt_block($ip)\n" if $debug;
 
@@ -4255,23 +4261,33 @@ sub ipt_block() {
         my $from_chain = $hr->{'from_chain'};
         my $to_chain   = $hr->{'to_chain'};
 
-        ### make sure "to_chain" exists
-        my ($rv, $status_msg) = $ipt->create_chain($table, $to_chain);
+        my $rv = 0;
+        my $status_msg = '';
+        $netfilter_prereq_check++;
+        $netfilter_prereq_check = 1 if $netfilter_prereq_check == 100;
 
-        unless ($rv) {
-            &Psad::psyslog('psad', $status_msg) unless $no_syslog_alerts;
-            print STDERR "[-] ipt_block(): $status_msg\n" if $debug;
-            next;
-        }
+        if ($netfilter_prereq_check == 1) {
+            print STDERR "[+] Netfilter chains and jump rule check.\n"
+                if $debug;
 
-        ### add jump rule to the "to_chain" from the "from_chain"
-        ($rv, $status_msg) = $ipt->add_jump_rule($table,
-            $from_chain, $to_chain);
+            ### make sure "to_chain" exists
+            ($rv, $status_msg) = $ipt->create_chain($table, $to_chain);
 
-        unless ($rv) {
-            &Psad::psyslog('psad', $status_msg) unless $no_syslog_alerts;
-            print STDERR "[-] ipt_block(): $status_msg\n" if $debug;
-            next;
+            unless ($rv) {
+                &Psad::psyslog('psad', $status_msg) unless $no_syslog_alerts;
+                print STDERR "[-] ipt_block(): $status_msg\n" if $debug;
+                next;
+            }
+
+            ### add jump rule to the "to_chain" from the "from_chain"
+            ($rv, $status_msg) = $ipt->add_jump_rule($table,
+                $from_chain, $to_chain);
+
+            unless ($rv) {
+                &Psad::psyslog('psad', $status_msg) unless $no_syslog_alerts;
+                print STDERR "[-] ipt_block(): $status_msg\n" if $debug;
+                next;
+            }
         }
 
         my $src = '';
@@ -4495,6 +4511,7 @@ sub check_ipt_cmd() {
     for my $line (@$lines_aref) {
         chomp $line;
         next if defined $uniq_cmds{$line};
+        $uniq_cmds{$line} = '';
         if ($line =~ /flush/i) {
             my $del_chains = 0;
             $del_chains = 1 if $line =~ /delchains/i;
@@ -4512,7 +4529,6 @@ sub check_ipt_cmd() {
                 &ipt_rm_block($1);
             }
         }
-        $uniq_cmds{$line} = '';
     }
     return;
 }

@@ -229,7 +229,7 @@ sub default_drop() {
         next LINE unless $found_chain;
 
         ### include ULOG target as well
-        if ($line =~ m|^\s*U?LOG\s+(\w+)\s+\-\-\s+
+        if ($line =~ m|^\s*U?LOG\s+(\w+)\s+\-\-\s+.*
             $any_ip_re\s+$any_ip_re\s+(.*)|x) {
             my $proto  = $1;
             my $p_tmp  = $2;
@@ -242,7 +242,7 @@ sub default_drop() {
             ### $proto may equal "all" here
             $protocols{$proto}{'LOG'}{'prefix'} = $prefix;
             $protocols{$proto}{'LOG'}{'rulenum'} = $rule_ctr;
-        } elsif ($policy eq 'ACCEPT' and $line =~ m|^DROP\s+(\w+)\s+\-\-\s+
+        } elsif ($policy eq 'ACCEPT' and $line =~ m|^DROP\s+(\w+)\s+\-\-\s+.*
             $any_ip_re\s+$any_ip_re\s*$|x) {
             ### DROP    all  --  0.0.0.0/0     0.0.0.0/0
             $protocols{$1}{'DROP'} = $rule_ctr;
@@ -305,8 +305,9 @@ sub default_log() {
         $log_chain = '' unless $line =~ /\S/;
         next unless $log_chain;
 
-        if ($line =~ m|^\s*U?LOG\s+(\w+)\s+\-\-\s+$any_ip_re
-            \s+$any_ip_re\s+U?LOG|x) {
+        if ($line =~ m|^\s*U?LOG\s+(\w+)\s+\-\-\s+.*$any_ip_re
+                \s+$any_ip_re\s+.*U?LOG|x) {
+            ### the above regex allows the limit target to be used
             $log_chains{$log_chain}{$1} = '';  ### protocol
 
             if ($log_chain eq $chain) {

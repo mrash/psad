@@ -104,7 +104,7 @@ my %required_perl_modules = (
         'mod-dir' => 'Net-IPv4Addr'
     },
     'IPTables::Parse' => {
-        'version' => '0.2',
+        'version' => '0.3',
         'force-lib-install' => 1,
         'mod-dir' => 'IPTables-Parse'
     },

@@ -4253,6 +4253,9 @@ sub ipt_block() {
         $timeout_str = '(unlimited timeout)';
     }
 
+    $netfilter_prereq_check++;
+    $netfilter_prereq_check = 1 if $netfilter_prereq_check == 100;
+
     ### add block rule for $ip unless it is already blocked
     for my $hr (@ipt_config) {
         my $target     = $hr->{'target'};
@@ -4263,8 +4266,6 @@ sub ipt_block() {
 
         my $rv = 0;
         my $status_msg = '';
-        $netfilter_prereq_check++;
-        $netfilter_prereq_check = 1 if $netfilter_prereq_check == 100;
 
         if ($netfilter_prereq_check == 1) {
             print STDERR "[+] Netfilter chains and jump rule check.\n"

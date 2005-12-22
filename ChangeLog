@@ -1,6 +1,8 @@
 psad-1.4.5 (12//2005):
     - Bugfix in IPTables::Parse to allow the limit target to apply to
       logging rules.
+    - Made calls to chain creation and jump rule functions for only every
+      100 block calls in auto-IDS mode.
     - Bugfix to make sure /var/run/psad directory exists at startup since
       this directory is removed by some Linux distributions at boot time.
 

@@ -2959,7 +2959,7 @@ sub import_auto_dl() {
             $auto_dl{$ip}{'proto'}{'udp'}{'all'} = '';
         }
 
-        unless ($ip and $mask) {
+        unless ($ip and ($mask =~ /^0$/ or $mask)) {  ### allow a mask of "0"
             unless ($fw_block_ip) {
                 my $subject = "$config{'MAIL_ERROR_PREFIX'} import warning: " .
                     "$config{'AUTO_DL_FILE'} error on line: $i";

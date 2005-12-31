@@ -5,6 +5,8 @@ psad-1.4.5 (12//2005):
       100 block calls in auto-IDS mode.
     - Bugfix to make sure /var/run/psad directory exists at startup since
       this directory is removed by some Linux distributions at boot time.
+    - Bugfix for zero masks in auto_dl; this allows a network of "0.0.0.0/0"
+      to be specified.
 
 psad-1.4.4 (11/27/2005):
     - Added MAC address reporting in psad email alerts.  This feature is

@@ -4053,6 +4053,9 @@ sub renew_auto_blocked_ips() {
                     ### into this function to not add a duplicate rule)
                     &ipt_block($ip, 'renew');
 
+                    ### reset the block time to the original time that
+                    ### the rule was added so the rule does not stay
+                    ### around longer than it should.
                     $auto_blocked_ips{$ip} = $orig_block_time;
                 } else {
                     if ((time() - $orig_block_time)
@@ -4225,7 +4228,7 @@ sub flush_auto_blocked_ips() {
                 "tcpwrapper blocking rules in effect.");
         }
     }
-    return 0;
+    return;
 }
 
 sub ipt_block() {
@@ -4357,7 +4360,7 @@ sub ipt_block() {
         ### may have come from the command line with --fw-block-ip
         ### instead of through the Netfilter log).  Also, don't re-define
         ### the block time if it has already been defined (note that we
-        ### may instantiate multiple block actions in the for loop
+        ### may instantiated multiple block actions in the for loop
         ### above).
         $auto_blocked_ips{$ip} = time()
             unless defined $auto_blocked_ips{$ip};

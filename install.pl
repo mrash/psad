@@ -377,7 +377,7 @@ sub install() {
         unless (((system "$Cmds{'perl'} -c kmsgsd.pl")>>8) == 0) {
             die "[*] kmsgsd.pl does not compile with \"perl -c\".  ",
                 "Download the latest sources " .
-                "from:\n\nhttp://www.cipherdyne.org\n";
+                "from:\n\nhttp://www.cipherdyne.org/\n";
         }
         copy 'kmsgsd.pl', 'kmsgsd' or die "[*] Could not copy ",
             "kmsgsd.pl -> kmsgsd: $!";
@@ -388,7 +388,7 @@ sub install() {
         unless (((system "$Cmds{'perl'} -c psadwatchd.pl")>>8) == 0) {
             die "[*] psadwatchd.pl does not compile with \"perl -c\".  ",
                 "Download the latest sources " .
-                "from:\n\nhttp://www.cipherdyne.org\n";
+                "from:\n\nhttp://www.cipherdyne.org/\n";
         }
         copy 'psadwatchd.pl', 'psadwatchd' or die "[*] Could not copy ",
             "psadwatchd.pl -> psadwatchd: $!";
@@ -399,7 +399,7 @@ sub install() {
     &logr("[+] Verifying compilation of fwcheck_psad.pl script:\n");
     unless (((system "$Cmds{'perl'} -c fwcheck_psad.pl")>>8) == 0) {
         die "[*] fwcheck_psad.pl does not compile with \"perl -c\".  Download ",
-            "the latest sources from:\n\nhttp://www.cipherdyne.org\n";
+            "the latest sources from:\n\nhttp://www.cipherdyne.org/\n";
     }
 
     ### make sure the psad (perl) daemon compiles.  The other three
@@ -407,7 +407,7 @@ sub install() {
     &logr("[+] Verifying compilation of psad perl daemon:\n");
     unless (((system "$Cmds{'perl'} -c psad")>>8) == 0) {
         die "[*] psad does not compile with \"perl -c\".  Download the",
-            " latest sources from:\n\nhttp://www.cipherdyne.org\n";
+            " latest sources from:\n\nhttp://www.cipherdyne.org/\n";
     }
     print "\n\n";
 
@@ -911,7 +911,7 @@ sub install_perl_module() {
         unless (-e 'Makefile.PL') {
             die "[*] Your $mod_name source directory appears to be incomplete!\n",
                 "    Download the latest sources from ",
-                "http://www.cipherdyne.org\n";
+                "http://www.cipherdyne.org/\n";
         }
         system "$Cmds{'make'} clean" if -e 'Makefile';
         system "$Cmds{'perl'} Makefile.PL PREFIX=$LIBDIR LIB=$LIBDIR";
@@ -1043,7 +1043,7 @@ sub set_hostname() {
     } else {
         die "[*] Your source directory appears to be incomplete!  $file ",
             "is missing.\n    Download the latest sources from ",
-            "http://www.cipherdyne.org\n";
+            "http://www.cipherdyne.org/\n";
     }
     return;
 }
@@ -1918,10 +1918,10 @@ sub logr() {
 }
 
 sub usage() {
-        my $exitcode = shift;
-        print <<_HELP_;
+    my $exitcode = shift;
+    print <<_HELP_;
 
-Usage: install.pl [-f] [-s <file> ] [-u] [--no-syslog-test]
+Usage: install.pl [-f] [-s <file>] [-u] [--no-syslog-test]
                   [--no-preserve] [-h]
 
     -u  --uninstall     - Uninstall psad.
@@ -1934,5 +1934,5 @@ Usage: install.pl [-f] [-s <file> ] [-u] [--no-syslog-test]
     -h  --help          - Prints this help message.
 
 _HELP_
-        exit $exitcode;
+    exit $exitcode;
 }

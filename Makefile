@@ -28,8 +28,8 @@
 
 ### default
 all : kmsgsd.c psadwatchd.c psad_funcs.c strlcpy.c strlcat.c psad.h
-	/usr/bin/gcc -Wall kmsgsd.c psad_funcs.c strlcpy.c strlcat.c -o kmsgsd
-	/usr/bin/gcc -Wall psadwatchd.c psad_funcs.c strlcpy.c strlcat.c -o psadwatchd
+	/usr/bin/gcc -Wall -O kmsgsd.c psad_funcs.c strlcpy.c strlcat.c -o kmsgsd
+	/usr/bin/gcc -Wall -O psadwatchd.c psad_funcs.c strlcpy.c strlcat.c -o psadwatchd
 
 ### debug mode
 debug : kmsgsd.c psadwatchd.c psad_funcs.c strlcpy.c strlcat.c psad.h

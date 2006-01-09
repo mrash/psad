@@ -3639,7 +3639,7 @@ sub scan_logr() {
                     );
                 }
                 $syslog_flags =~ s/\s*$//;
-                $syslog_range .= "tcp=[$tcp_newrange] $syslog_flags";
+                $syslog_range .= " tcp=[$tcp_newrange] $syslog_flags";
             }
             if ($udp_f) {
                 printf $fh "%${log_len}s%s\n", 'Scanned udp ports: ',
@@ -3761,10 +3761,10 @@ sub scan_logr() {
             &scan_logr_signatures($src, $dst, $fh, $log_sigs);
 
             ### write a scan message to syslog
-            &Psad::psyslog('psad', "scan detected: $src -> $dst " .
+            &Psad::psyslog('psad', "scan detected: $src -> $dst" .
                 "$syslog_range tcp=$tcp_newpkts udp=$udp_newpkts " .
                 "icmp=$icmp_newpkts dangerlevel: $curr_dl")
-                unless $no_syslog_alerts;
+                unless $no_syslog_alerts or $analyze_msgs;
 
             unless ($no_whois) {
                 print $fh  "\n[+] Whois Information:\n";
@@ -3788,9 +3788,10 @@ sub scan_logr() {
                             "DL$curr_dl src: " .
                             "$src_subj dst: $dst_subj";
                     }
-                    &Psad::psyslog('psad', "sending email alert to: " .
-                        "$config{'EMAIL_ADDRESSES'}\n")
-                        unless $no_syslog_alerts;
+                    ### commented out for now
+#                    &Psad::psyslog('psad', "sending email alert to: " .
+#                        "$config{'EMAIL_ADDRESSES'}\n")
+#                        unless $no_syslog_alerts;
                     &Psad::sendmail($subject, $email_file,
                         $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
                         unless $no_email_alerts;

@@ -2362,10 +2362,7 @@ sub check_mail_commands() {
 }
 
 sub validate_home_net() {
-    open IFC, "$cmds{'ifconfig'} -a |" or die "[*] Could not execute ",
-        "$cmds{'ifconfig'} -a: $!";
-    my @ifconfig_out = <IFC>;
-    close IFC;
+    my @ifconfig_out = @{&run_command($cmds{'ifconfig'}, '-a')};
     my @connected_subnets = ();
     my @connected_subnets_cidr = ();
     my $intf_name    = '';
@@ -4971,10 +4968,7 @@ sub print_scan() {  ### this should primarily be used for debugging
 
 sub get_local_ips() {
     print STDERR "[+] get_local_ips()\n" if $debug;
-    open IFC, "$cmds{'ifconfig'} -a |" or die "[*] Could not execute ",
-        "$cmds{'ifconfig'} -a: $!";
-    my @ips = <IFC>;
-    close IFC;
+    my @ips = @{&run_command($cmds{'ifconfig'}, '-a')};
     return unless @ips;
     for my $line (@ips) {
         if ($line =~ /inet\s+.*?:($ip_re)\s/) {
@@ -4986,10 +4980,7 @@ sub get_local_ips() {
 
 sub get_listening_ports() {
     %local_ports = ();
-    open NETS, "$cmds{'netstat'} -an 2> /dev/null |" or
-        die "[*] Could not execute $cmds{'netstat'} -an: $!";
-    my @lines = <NETS>;
-    close NETS;
+    my @lines = @{&run_command($cmds{'netstat'}, '-an 2> /dev/null')};
     return unless @lines;
     for my $line (@lines) {
         next unless $line;
@@ -5210,10 +5201,7 @@ sub status() {
                 print "[+] $pidname (pid: $pid)";
                 ### FIXME: should probably just parse /proc instead of
                 ### using ps
-                open PS, "$cmds{'ps'} auxww |" or die "[*] Could not ",
-                    "execute: $cmds{'ps'} auxww: $!";
-                my @ps_out = <PS>;
-                close PS;
+                my @ps_out = @{&run_command($cmds{'ps'}, 'auxww')};
                 PS: for my $line (@ps_out) {
                     chomp $line;
                     if ($line =~ /^\S+\s+$pid\s+(\S+)\s+(\S+)/) {
@@ -6345,10 +6333,7 @@ sub truncate_file() {
 }
 
 sub disk_space_exceeded() {
-    open DF, "$cmds{'df'} $config{'PSAD_DIR'} |" or die "[*] Could not ",
-        "execute: $cmds{'df'} $config{'PSAD_DIR'}: $!";
-    my @df_data = <DF>;
-    close DF;
+    my @df_data = @{&run_command($cmds{'df'}, $config{'PSAD_DIR'})};
     my ($prcnt) = ($df_data[$#df_data] =~ /(\d+)%/);
     my $rv = 0;
     if ($config{'DISK_MAX_PERCENTAGE'} > 0
@@ -6426,11 +6411,23 @@ sub disk_space_exceeded() {
 }
 
 sub dump_conf() {
-    if ($debug) {
-        print STDERR "[+] Dumping psad config from: $config_file\n";
-    } else {
-        print STDOUT "[+] Dumping psad config from: $config_file\n";
+    my $fh = *STDOUT;
+    $fh = *STDERR if $debug;
+
+    ### uname output
+    my @uname_out = @{&run_command($cmds{'uname'}, '-a')};
+    if (@uname_out) {
+        print $fh $_ for @uname_out;
+        print $fh "\n";
     }
+
+    ### perl version (we assume perl is in the path)
+    my @perl_info = @{&run_command('perl', '-V')};
+    if (@perl_info) {
+        print $fh $_ for @perl_info;
+        print "\n";
+    }
+    print $fh "[+] Dumping psad config from: $config_file\n";
     for my $var (sort keys %config) {
         my $str = $config{$var};
         ### sanitize sensitive information
@@ -6439,23 +6436,11 @@ sub dump_conf() {
         $str = '(removed)' if $var eq 'EMAIL_ADDRESSES';
         $str = '(removed)' if $var eq 'HOME_NET';
         $str = '(removed)' if $var eq 'HOSTNAME';
-        if ($debug) {
-            printf STDERR "%-30s %s\n", "[+] $var", $str;
-        } else {
-            printf STDOUT "%-30s %s\n", "[+] $var", $str;
-        }
+        printf $fh "%-30s %s\n", "[+] $var", $str;
     }
-    if ($debug) {
-        print STDERR "\n[+] Command paths:\n\n";
-    } else {
-        print STDOUT "\n[+] Command paths:\n\n";
-    }
+    print $fh "\n[+] Command paths:\n\n";
     for my $var (sort keys %cmds) {
-        if ($debug) {
-            printf STDERR "%-30s %s\n", "[+] $var", $cmds{$var};
-        } else {
-            printf STDOUT "%-30s %s\n", "[+] $var", $cmds{$var};
-        }
+        printf $fh "%-30s %s\n", "[+] $var", $cmds{$var};
     }
 
     &dump_ipt_policy() if $dump_ipt_policy;
@@ -6464,16 +6449,16 @@ sub dump_conf() {
 }
 
 sub dump_ipt_policy() {
-    if ($debug) {
-        print STDERR "\n[+] Netfilter policy dump:\n";
-    } else {
-        print STDOUT "\n[+] Netfilter policy dump:\n";
-    }
+    my $fh = *STDOUT;
+    $fh = *STDERR if $debug;
+    print $fh "\n[+] Netfilter policy dump:\n";
     if (defined $cmds{'iptables'} and -x $cmds{'iptables'}) {
-        open IPT, "$cmds{'iptables'} -v -n -L |" or die "[*] Could not ",
-            "execute $cmds{'iptables'} -v -n -L: $!";
-        my @lines = <IPT>;
-        close IPT;
+        my @ipt_ver = @{&run_command($cmds{'iptables'}, '-V')};
+        if (@ipt_ver) {
+            print $fh $_ for @ipt_ver;
+            print "\n";
+        }
+        my @lines = @{&run_command($cmds{'iptables'}, '-v -n -L')};
         for my $line (@lines) {
             unless ($fw_include_ips) {
                 ### always include 0.0.0.0/0
@@ -6484,20 +6469,23 @@ sub dump_ipt_policy() {
                 $line =~ s|___PsAd0Net___|0.0.0.0/0|g;
                 $line =~ s|___PsAd0IP___|0.0.0.0|g;
             }
-            if ($debug) {
-                print STDERR $line;
-            } else {
-                print STDOUT $line;
-            }
+            print $fh $line;
         }
     } else {
-        if ($debug) {
-            print STDERR "[*] Could not find iptables command.\n";
-        } else {
-            print STDOUT "[*] Could not find iptables command.\n";
-        }
+        print $fh "[*] Could not find iptables command.\n";
     }
     return;
+}
+
+sub run_command() {
+    my ($cmd_path, $args) = @_;
+    my $cmd = $cmd_path;
+    $cmd .= " $args" if $args;
+    open CMD, "$cmd |" or die "[*] Could not ",
+        "execute $cmd: $!";
+    my @lines = <CMD>;
+    close CMD;
+    return \@lines;
 }
 
 sub required_vars() {

@@ -4143,7 +4143,9 @@ sub sockwrite_flush_auto_rules() {
                 and $config{'ENABLE_AUTO_IDS'} eq 'Y') {
             print "[+] Flushing psad chains via running psad daemon within\n",
                 "    $config{'CHECK_INTERVAL'} seconds.\n";
-
+            die "[*] $config{'AUTO_IPT_SOCK'} file is missing. Did something ",
+                "remove it?\n    You should stop psad, run the -F command ",
+                "again, then restart psad." unless -e $config{'AUTO_IPT_SOCK'};
             ### open domain socket with running psad process
             my $sock = IO::Socket::UNIX->new($config{'AUTO_IPT_SOCK'})
                 or die "[*] Could not acquire $config{'AUTO_IPT_SOCK'} ",

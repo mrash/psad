@@ -1,6 +1,6 @@
 %define name psad
-%define version 1.4.4
-%define release 2
+%define version 1.4.5
+%define release 1
 %define psadlibdir /usr/lib/psad
 %define psadlogdir /var/log/psad
 %define psadrundir /var/run/psad
@@ -235,6 +235,9 @@ fi
 %_libdir/%name
 
 %changelog
+* Fri Jan 13 2006 Michael Rash <mbr@cipherydne.org>
+- psad-1.4.5 release.
+
 * Sun Nov 27 2005 Michael Rash <mbr@cipherydne.org>
 - psad-1.4.4 release.
 

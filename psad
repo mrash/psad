@@ -4096,10 +4096,12 @@ sub renew_auto_blocked_ips() {
                             "against $ip $timeout_str")
                             unless $no_syslog_alerts;
                         &tcpwr_block($ip);
-                        &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} RENEWED " .
-                            "tcpwrappers BLOCK against $ip $timeout_str", '',
-                            $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
-                            unless $no_email_alerts;
+                        if ($config{'ENABLE_RENEW_BLOCK_EMAILS'} eq 'Y') {
+                            &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} RENEWED " .
+                                "tcpwrappers BLOCK against $ip $timeout_str", '',
+                                $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+                                unless $no_email_alerts;
+                        }
                         $auto_blocked_ips{$ip} = $orig_block_time;
                     }
                 } else {
@@ -4120,10 +4122,12 @@ sub renew_auto_blocked_ips() {
                                 "against $ip $timeout_str")
                                 unless $no_syslog_alerts;
                             &tcpwr_block($ip);
-                            &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} RENEWED " .
-                                "tcpwrappers BLOCK against $ip $timeout_str", '',
-                                $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
-                                unless $no_email_alerts;
+                            if ($config{'ENABLE_RENEW_BLOCK_EMAILS'} eq 'Y') {
+                                &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} RENEWED " .
+                                    "tcpwrappers BLOCK against $ip $timeout_str", '',
+                                    $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+                                    unless $no_email_alerts;
+                            }
                             $auto_blocked_ips{$ip} = $orig_block_time;
                         }
                     }
@@ -4373,9 +4377,17 @@ sub ipt_block() {
             $mail_msg = "added $mail_msg";
         }
 
-        &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} $mail_msg", '',
-            $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
-            unless $no_email_alerts;
+        if ($renewed_status) {
+            if ($config{'ENABLE_RENEW_BLOCK_EMAILS'} eq 'Y') {
+                &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} $mail_msg", '',
+                    $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+                    unless $no_email_alerts;
+            }
+        } else {
+            &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} $mail_msg", '',
+                $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+                unless $no_email_alerts;
+        }
         &Psad::psyslog('psad', $mail_msg) unless $no_syslog_alerts;
 
         ### write the ip out to the auto blocked file
@@ -6514,6 +6526,7 @@ sub required_vars() {
         MAIL_ERROR_PREFIX MAIL_FATAL_PREFIX PROC_FORWARD_FILE
         FLUSH_IPT_AT_INIT ENABLE_MAC_ADDR_REPORTING TRUNCATE_FWDATA
         PSAD_DIR PSAD_RUN_DIR PSAD_LIB_DIR ENABLE_FW_LOGGING_CHECK
+        ENABLE_RENEW_BLOCK_EMAILS
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

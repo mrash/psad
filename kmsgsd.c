@@ -14,7 +14,7 @@
 *
 *  Credits:  (see the CREDITS file)
 *
-*  Copyright (C) 1999-2001 Michael Rash (mbr@cipherdyne.org)
+*  Copyright (C) 1999-2006 Michael Rash (mbr@cipherdyne.org)
 *
 *  License (GNU Public License):
 *
@@ -198,8 +198,8 @@ int main(int argc, char *argv[]) {
 
         /* see if we matched a firewall message and write it to the
          * fwdata file */
-        if ((strstr(buf, "OUT") != NULL
-                && strstr(buf, "IN") != NULL)) {
+        if ((strstr(buf, "OUT=") != NULL
+                && strstr(buf, "IN=") != NULL)) {
             if (! fw_search_all_flag) {  /* we are looking for specific log prefixes */
                 if (match_fw_msg(buf) || strstr(buf, snort_sid_str) != NULL) {
                     if (write(fwdata_fd, buf, numbytes) < 0) {

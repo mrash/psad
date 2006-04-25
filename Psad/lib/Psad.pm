@@ -190,8 +190,8 @@ sub sendmail() {
 ### write a message to syslog
 sub psyslog() {
     my ($ident, $msg) = @_;
-    openlog $ident, LOG_DAEMON, LOG_LOCAL7;
-    syslog LOG_INFO, $msg;
+    openlog($ident, &LOG_DAEMON(), &LOG_LOCAL7());
+    syslog(&LOG_INFO(), $msg);
     closelog();
     return;
 }

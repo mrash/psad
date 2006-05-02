@@ -20,7 +20,7 @@
 #
 # Version: 1.4.5
 #
-# Copyright (C) 1999-2002 Michael Rash (mbr@cipherdyne.org)
+# Copyright (C) 1999-2006 Michael Rash (mbr@cipherdyne.org)
 #
 # License (GNU Public License):
 #
@@ -214,21 +214,28 @@ my %posf = ();
 ### cache TOS-based passive os fingerprinting signature information
 my %posf_sigs = ();
 
-### cache all scan signatures (initialized by default)
-my %sigs = ();
-
 ### cache valid icmp types and corresponding codes
 my %valid_icmp_types = ();
 
-### Cache snort rule messages if --snort-sids switch was
+### Cache snort rule messages unless --no-snort-sids switch was
 ### given.  This is only useful if iptables includes rule
 ### that log things like "SID123".  "fwsnort"
 ### (http://www.cipherdyne.org/fwsnort/) will automatically
 ### build such a ruleset from snort signatures.
 my %snort_msgs = ();
 
-### cache signature messages, danger levels, etc.
+### cache all scan signatures (initialized by default)
+my %sigs = ();
+
+### cache signature messages, danger levels, etc.  All of these
+### signatures come from the /etc/psad/signatures file.
 my %sigs_attr = ();
+
+### cache all signatures that have been derived from Snort rules
+### (these signatures also come from /etc/psad/signatures, but conform
+### to the new signature format in psad-1.5.0
+my %derived_sigs = ();
+my %derived_sigs_attr = ();
 
 ### cache iptables prefixes
 my %ipt_prefixes = ();
@@ -938,6 +945,7 @@ sub check_scan() {
     my %curr_sigs_dl = ();
     my %curr_sids_dl = ();
     my @err_pkts     = ();
+    my %auto_block_regex_match = ();
 
     my $pkt_ctr = 0;
     my $print_scale_factor = 0;
@@ -1250,6 +1258,9 @@ sub check_scan() {
             }
         }
 
+        ### note that we send this packet data off to DShield regardless
+        ### of whether psad decides that it is associated with a scan so
+        ### that DShield can make its own determination
         if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
                 and not $benchmark
                 and not $analyze_msgs
@@ -1306,9 +1317,23 @@ sub check_scan() {
         $curr_scan{$src}{$dst}{'syslog_host'}{$syslog_host} = ''
             if $syslog_host;
 
-        ### keep track of iptables chain and logging prefix (if there
-        ### was one)
-        $log_prefix = '*noprfx*' unless $log_prefix;
+        if ($log_prefix) {
+            ### see if the logging prefix matches the blocking
+            ### regex, and if not the IP will not be blocked
+            if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
+                    and $config{'ENABLE_AUTO_IDS_REGEX'} eq 'Y'
+                    and $config{'AUTO_BLOCK_REGEX'} ne 'NONE') {
+                ### we require a match
+                if (not defined $auto_block_regex_match{$src}
+                    and $log_prefix =~ /$config{'AUTO_BLOCK_REGEX'}/) {
+                    $auto_block_regex_match{$src} = '';
+                }
+            }
+        } else {
+            $log_prefix = '*noprfx*';
+        }
+
+        ### keep track of iptables chain and logging prefix
         $curr_scan{$src}{$dst}{$proto}{'chain'}
                 {$chain}{$log_prefix}++;
 
@@ -1361,9 +1386,7 @@ sub check_scan() {
                     &p0f($src, $len, $frag_bit, $ttl, $win, $tcp_options);
 
                 } elsif (not defined $posf{$src}{'guess'}
-                        and $scan{$src}{$dst}{'absnum'} < 100
-                        and $proto eq 'tcp'
-                        and $flags =~ /SYN/) {
+                        and $scan{$src}{$dst}{'absnum'} < 100) {
                     &posf($src, $len, $tos, $ttl, $id, $win)
                 }
             }
@@ -1411,7 +1434,7 @@ sub check_scan() {
 
     ### remember that ENABLE_AUTO_IDS may have been set to 'N' if we
     ### are running on a syslog server, of if we are running in -A mode.
-    &auto_psad_response(\%curr_scan)
+    &auto_psad_response(\%curr_scan, \%auto_block_regex_match)
         if $config{'ENABLE_AUTO_IDS'} eq 'Y';
 
     return;
@@ -1802,22 +1825,34 @@ sub dshield_email_log() {
             open MAIL, qq(| $cmds{'mail'} -s "$subject" ) .
                 $config{'DSHIELD_ALERT_EMAIL'} or die '[*] Could not send ',
                 'dshield alert email.';
+            ### save this email to disk also
+            open DSSAVE, "> $config{'DSHIELD_LATEST_EMAIL'}" or die '[*] ',
+                "Could not open $config{'DSHIELD_LATEST_EMAIL'}: $!";
             if ($config{'DSHIELD_DL_THRESHOLD'} > 0) {
                 for my $line (@dshield_data) {
                     if ($line =~ /^.*?($ip_re)/) {
                         if ($scan_dl{$1} >= $config{'DSHIELD_DL_THRESHOLD'}) {
                             print MAIL $line;
+                            print DSSAVE $line;
                         }
                     }
                 }
             } else {
                 print MAIL for @dshield_data;
+                print DSSAVE for @dshield_data;
             }
             close MAIL;
+            close DSSAVE;
         } else {
             open MAIL, "| $cmds{'sendmail'} -oi -t" or die '[*] Could not ',
                 'send dshield alert email.';
+            ### save this email to disk also
+            open DSSAVE, "> $config{'DSHIELD_LATEST_EMAIL'}" or die '[*] ',
+                "Could not open $config{'DSHIELD_LATEST_EMAIL'}: $!";
             print MAIL "From: $config{'DSHIELD_USER_EMAIL'}\n",
+                "To: $config{'DSHIELD_ALERT_EMAIL'}\n",
+                "Subject: $subject\n";
+            print DSSAVE "From: $config{'DSHIELD_USER_EMAIL'}\n",
                 "To: $config{'DSHIELD_ALERT_EMAIL'}\n",
                 "Subject: $subject\n";
             if ($config{'DSHIELD_DL_THRESHOLD'} > 0) {
@@ -1825,13 +1860,16 @@ sub dshield_email_log() {
                     if ($line =~ /^.*?($ip_re)/) {
                         if ($scan_dl{$1} >= $config{'DSHIELD_DL_THRESHOLD'}) {
                             print MAIL $line;
+                            print DSSAVE $line;
                         }
                     }
                 }
             } else {
                 print MAIL for @dshield_data;
+                print DSSAVE for @dshield_data;
             }
             close MAIL;
+            close DSSAVE;
         }
 
         &Psad::psyslog('psad', "sent $#dshield_data lines of log data to " .
@@ -2124,7 +2162,7 @@ sub psad_init() {
     ### import psad.conf
     &Psad::buildconf(\%config, \%cmds, $config_file);
 
-    ### import alerting config (psadwatchd also references this file
+    ### import alerting config (psadwatchd also references this file)
     &Psad::buildconf(\%config, \%cmds, $alert_conf_file);
 
     ### make sure all necessary configuration variables
@@ -2601,7 +2639,10 @@ sub import_snort_rules() {
 sub import_signatures() {
     ### undef %sigs so we don't leave old signatures around if
     ### we execute this code after receiving a HUP signal.
-    %sigs = ();
+    %sigs      = ();
+    %sigs_attr = ();
+    %derived_sigs      = ();
+    %derived_sigs_attr = ();
     open SIGS, "< $config{'SIGS_FILE'}" or die
         "[*] Could not open the signatures file $config{'SIGS_FILE'}: $!";
     my @lines = <SIGS>;
@@ -2616,6 +2657,8 @@ sub import_signatures() {
         ### content:"NetBus"; reference:arachnids,401; classtype:misc-activity;
         ### sid:109; rev:4; psad_dlevel:2)
 
+        my $sigs_href;  ### reference %sigs or %derived_sigs
+        my $sigs_attr_href;  ### reference %sigs_attr or %derived_sigs_attr
         my $rule_hdr;
         my $rule_options;
         my $src;
@@ -2626,7 +2669,8 @@ sub import_signatures() {
         my $bidir  = 0;
         my $msg    = '';
         my $dlevel = 2;  ### default all signatures to danger level 2
-        my $sid    = 0;
+        my $id     = 0;  ### signature ID
+        my $derived_sids_str = '';
 
         if ($line =~ m|^(.*?)\s+\((.*)\)|) {
             $rule_hdr     = $1;
@@ -2646,13 +2690,13 @@ sub import_signatures() {
                 $bidir = 1;
             }
             if ($direction eq '<-') {
-                $proto = $1;
+                $proto = lc($1);
                 $src   = $5;  ### switch src and dst
                 $sp    = $3;
                 $dst   = $2;
                 $dp    = $6;
             } else {
-                $proto = $1;
+                $proto = lc($1);
                 $src   = $2;  ### normal src -> dst
                 $sp    = $3;
                 $dst   = $5;
@@ -2665,11 +2709,19 @@ sub import_signatures() {
         }
 
         ### parse rule options
-        if ($rule_options =~ /[\s;]sid:\s*(\d+)\s*;/) {
-            $sid = $1;
+
+        ### first see if this is a derived sig or not
+        if ($rule_options =~ /[\s;]psad_id:\s*(\d+)\s*;/) {
+            $id = $1;
+            $sigs_href = \%derived_sigs;
+            $sigs_attr_href = \%derived_sigs_attr;
+        } elsif ($rule_options =~ /[\s;]sid:\s*(\d+)\s*;/) {
+            $id = $1;
+            $sigs_href = \%sigs;
+            $sigs_attr_href = \%sigs_attr;
         } else {
             print STDERR "[-] import_signatures(): could not find ",
-                "sid: $line\n" if $debug;
+                "sid or psad_id: $line\n" if $debug;
             next SIG;
         }
         if ($rule_options =~ /msg:\s*\"(.*?)\"\s*;/) {
@@ -2686,19 +2738,29 @@ sub import_signatures() {
                 "dlevel: $line\n" if $debug;
             next SIG;
         }
+        if ($rule_options =~ /[\s;]psad_derived_sids:\s*(.*?)\s*;/) {
+            $derived_sids_str = $1;
+        }
 
-        ### add the signature message string to the %sig_attr cache
-        $sigs_attr{$sid}{'dl'}  = $dlevel;
-        $sigs_attr{$sid}{'msg'} = $msg;
+        ### add the signature message string to the approprite signature
+        ### cache
+        $sigs_attr_href->{$id}->{'dl'}  = $dlevel;
+        $sigs_attr_href->{$id}->{'msg'} = $msg;
 
         ### assign source and destination
-        $sigs{$proto}{$sid}{'src'} = $src;
-        $sigs{$proto}{$sid}{'dst'} = $dst;
+        $sigs_href->{$proto}->{$id}->{'src'} = $src;
+        $sigs_href->{$proto}->{$id}->{'dst'} = $dst;
+
+        ### add any derived sids
+        if ($derived_sids_str and $derived_sids_str =~ /\d/) {
+            $sigs_href->{$proto}->{$id}->{'derivedsids'} =
+                    [split /\s*,\s*/, $derived_sids_str];
+        }
 
             ### future
 #            my $ttl   = '';
 #            if ($options =~ /ttl:\s*(\d+)/i) {
-#                $sigs{$proto}{$sid}{'TTL'} = $1;
+#                $sigs{$proto}{$id}{'TTL'} = $1;
 #            }
 
         if ($proto eq 'tcp') {
@@ -2740,61 +2802,70 @@ sub import_signatures() {
             }
             $flags =~ s/\s*$// if $flags;
 
-            $sigs{'tcp'}{$sid}{'flags'} = $flags
+            $sigs_href->{'tcp'}->{$id}->{'flags'} = $flags
                 if $flags;
 
             ### assign the source and destination port ranges
-            &build_sig_ports($sid, 'tcp', $sp, $dp);
+            &build_sig_ports($id, 'tcp', $sp, $dp);
 
-            unless (defined $sigs{'tcp'}{$sid}{'flags'}
-                    and defined $sigs{'tcp'}{$sid}{'src'}
-                    and defined $sigs{'tcp'}{$sid}{'dst'}) {
-                delete $sigs_attr{$sid} if defined $sigs_attr{$sid};
-                delete $sigs{'tcp'}{$sid} if defined $sigs{'tcp'}{$sid};
+            unless (defined $sigs_href->{'tcp'}->{$id}->{'flags'}
+                    and defined $sigs_href->{'tcp'}->{$id}->{'src'}
+                    and defined $sigs_href->{'tcp'}->{$id}->{'dst'}) {
+                delete $sigs_attr_href->{$id}
+                    if defined $sigs_attr_href->{$id};
+                delete $sigs_href->{'tcp'}->{$id}
+                    if defined $sigs_href->{'tcp'}->{$id};
                 next SIG;
             }
         } elsif ($proto eq 'udp') {
 
             ### assign the source and destination port ranges
-            &build_sig_ports($sid, 'udp', $sp, $dp);
+            &build_sig_ports($id, 'udp', $sp, $dp);
 
-            unless (defined $sigs{'udp'}{$sid}{'src'}
-                    and defined $sigs{'udp'}{$sid}{'dst'}) {
-                delete $sigs_attr{$sid} if defined $sigs_attr{$sid};
-                delete $sigs{'udp'}{$sid} if defined $sigs{'udp'}{$sid};
+            unless (defined $sigs_href->{'udp'}->{$id}->{'src'}
+                    and defined $sigs_href->{'udp'}->{$id}->{'dst'}) {
+                delete $sigs_attr_href->{$id}
+                    if defined $sigs_attr_href->{$id};
+                delete $sigs_href->{'udp'}->{$id}
+                    if defined $sigs_href->{'udp'}->{$id};
                 next SIG;
             }
         } elsif ($proto eq 'icmp') {
             if ($rule_options =~ /ttl:\s*(\d+)/i) {
-                $sigs{'icmp'}{$sid}{'ttl'} = $1;
+                $sigs_href->{'icmp'}->{$id}->{'ttl'} = $1;
             }
             if ($rule_options =~ /itype:\s*(\d+)/i) {
-                $sigs{'icmp'}{$sid}{'type'} = $1;
+                $sigs_href->{'icmp'}->{$id}->{'type'} = $1;
             }
             if ($rule_options =~ /icode:\s*(\d+)/i) {
-                $sigs{'icmp'}{$sid}{'code'} = $1;
+                $sigs_href->{'icmp'}->{$id}->{'code'} = $1;
             }
             if ($rule_options =~ /icmp_seq:\s*(\d+)/i) {
-                $sigs{'icmp'}{$sid}{'icmp_seq'} = $1;
+                $sigs_href->{'icmp'}->{$id}->{'icmp_seq'} = $1;
             }
             if ($rule_options =~ /icmp_id:\s*(\d+)/i) {
-                $sigs{'icmp'}{$sid}{'icmp_id'} = $1;
+                $sigs_href->{'icmp'}->{$id}->{'icmp_id'} = $1;
             }
         } else {
             print STDERR "[-] import_signatures(): bad protocol: $line\n"
                 if $debug;
-            delete $sigs_attr{$sid} if defined $sigs_attr{$sid};
-            delete $sigs{$proto}{$sid} if defined $sigs{$proto}{$sid};
+            delete $sigs_attr_href->{$id} if defined $sigs_attr_href->{$id};
+            delete $sigs_href->{$proto}->{$id}
+                if defined $sigs_href->{$proto}->{$id};
             next SIG;
         }
     }
-    if ($debug) {
-        print STDERR "[-] main signatures hash:\n";
-        print STDERR Dumper %sigs if $verbose;
-        print STDERR Dumper "[-] signature attributes hash:\n";
-        print STDERR Dumper %sigs_attr if $verbose;
+    if ($debug and $verbose) {
+        print STDERR "[+] Main signatures hash:\n";
+        print STDERR Dumper %sigs;
+        print STDERR "[+] Signature attributes hash:\n";
+        print STDERR Dumper %sigs_attr;
+        print STDERR "[+] Derived signatures hash:\n";
+        print STDERR Dumper %derived_sigs;
+        print STDERR "[+] Derived signatures attributes hash:\n";
+        print STDERR Dumper %derived_sigs_attr;
     }
-    &Psad::psyslog('psad', 'imported psad-1.4.1 signatures')
+    &Psad::psyslog('psad', 'imported psad signatures')
         unless $no_syslog_alerts;
     return;
 }
@@ -4261,8 +4332,11 @@ sub ipt_block() {
         $timeout_str = '(unlimited timeout)';
     }
 
-    $netfilter_prereq_check++;
-    $netfilter_prereq_check = 1 if $netfilter_prereq_check == 100;
+    if ($config{'IPABLES_PREREQ_CHECK'} > 1) {
+        $netfilter_prereq_check++;
+        $netfilter_prereq_check = 1
+            if $netfilter_prereq_check == $config{'IPTABLES_PREREQ_CHECK'};
+    }
 
     ### add block rule for $ip unless it is already blocked
     for my $hr (@ipt_config) {
@@ -4275,7 +4349,8 @@ sub ipt_block() {
         my $rv = 0;
         my $status_msg = '';
 
-        if ($netfilter_prereq_check == 1) {
+        if ($config{'IPTABLES_PREREQ_CHECK'} == 1
+                or $netfilter_prereq_check == 1) {
             print STDERR "[+] Netfilter chains and jump rule check.\n"
                 if $debug;
 
@@ -4725,14 +4800,26 @@ sub tcpwr_rm_block() {
 }
 
 sub auto_psad_response() {
-    my $curr_scan_hr = shift;
+    my ($curr_scan_hr, $auto_block_regex_match_hr) = @_;
 
     print STDERR "[+] auto_psad_response()\n" if $debug;
 
     SRC: for my $src (keys %$curr_scan_hr) {
+
         ### make sure we are not attempting to block 0.0.0.0
         ### or 127.0.0.1 or any of the interface ips.
         next SRC if &auto_block_ignore_ip($src);
+
+        if ($config{'ENABLE_AUTO_IDS_REGEX'} eq 'Y'
+                and $config{'AUTO_BLOCK_REGEX'} ne 'NONE') {
+            ### skip if AUTO_BLOCK_REGEX did not match --log-prefix
+            unless (defined $auto_block_regex_match_hr->{$src}) {
+                print STDERR "[+] Skipping IP from auto-block, ",
+                    "AUTO_BLOCK_REGEX $config{'AUTO_BLOCK_REGEX'} ",
+                    "did not match.\n" if $debug;
+                next SRC;
+            }
+        }
 
         my $dl = $scan_dl{$src};
         ### We only want to block the IP once.  Currently this will block
@@ -4790,13 +4877,20 @@ sub auto_psad_response() {
 sub auto_block_ignore_ip() {
     my $ip = shift;
     for my $local_ip (keys %local_ips) {
-        return 1 if $ip eq $local_ip;
+        if ($ip eq $local_ip) {
+            print STDERR "[+] Skipping local IP $ip from auto-block.\n"
+                if $debug;
+            return 1;
+        }
     }
     ### matching the following two addresses is less likely (assuming
     ### iptables is not logging traffic from localhost) than matching
     ### a legitimate interface address
-    return 1 if $ip eq '127.0.0.1';
-    return 1 if $ip eq '0.0.0.0';
+    if ($ip eq '127.0.0.1' or $ip eq '0.0.0.0') {
+        print STDERR "[+] Skipping IP $ip from auto-block.\n"
+            if $debug;
+        return 1;
+    }
     return 0;
 }
 
@@ -6526,7 +6620,8 @@ sub required_vars() {
         MAIL_ERROR_PREFIX MAIL_FATAL_PREFIX PROC_FORWARD_FILE
         FLUSH_IPT_AT_INIT ENABLE_MAC_ADDR_REPORTING TRUNCATE_FWDATA
         PSAD_DIR PSAD_RUN_DIR PSAD_LIB_DIR ENABLE_FW_LOGGING_CHECK
-        ENABLE_RENEW_BLOCK_EMAILS
+        ENABLE_RENEW_BLOCK_EMAILS DSHIELD_LATEST_EMAIL AUTO_BLOCK_REGEX
+        ENABLE_AUTO_IDS_REGEX IPTABLES_PREREQ_CHECK
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;
@@ -6593,9 +6688,9 @@ Options:
                                     instead of a running policy.
     --fw-del-chains               - Delete Netfilter chains used by
                                     psad for auto-blocking rules.
-    --fw-dump                     - Dump a sanitzed version of the local
+    --fw-dump                     - Dump a sanitized version of the local
                                     Netfilter policy.
-    --fw-includ-ips               - Include all IPs/nets in iptables dump
+    --fw-include-ips              - Include all IPs/nets in iptables dump
                                     (--fw-dump) output.
     -snort-rdir <rule dir>        - Path to snort rules directory.
     -d,  --debug                  - Run psad in debugging mode.

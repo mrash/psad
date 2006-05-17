@@ -1,3 +1,10 @@
+psad-1.4.6 (//2006):
+    - Added ENABLE_AUTO_IDS_REGEX and AUTO_BLOCK_REGEX to allow filtering on
+      logging prefixes.
+    - Added code to save DShield email to a file.
+    - Added IPTABLES_PREREQ_CHECK to allow the administrator to control the
+      frequency of Netfilter checks (for auto-block compatibility).
+
 psad-1.4.5 (01/13/2006):
     - Bugfix in IPTables::Parse to allow the limit target to apply to
       logging rules.

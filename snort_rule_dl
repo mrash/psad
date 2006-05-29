@@ -1,0 +1,18 @@
+#
+#############################################################################
+#
+# File: snort_rule_dl
+#
+# Purpose: To allow a psad danger level to be manually specified for each
+#          Snort rule ID.
+#
+# Syntax: Each non-comment line of this file contains a snort ID number, and
+#         the corresponding psad danger level like so: <sid> <danger level>.
+#
+#############################################################################
+#
+# $Id$
+#
+
+### The following example illustrates the syntax for Snort SID 2284
+#2284   3;

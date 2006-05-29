@@ -17,7 +17,7 @@ alert tcp $HOME_NET any <> $EXTERNAL_NET 1863 (msg:"CHAT MSN file transfer rejec
 alert tcp $HOME_NET any -> $EXTERNAL_NET 1863 (msg:"CHAT MSN user search"; flow:to_server,established; content:"CAL "; depth:4; nocase; classtype:policy-violation; sid:1990; rev:1;)
 alert tcp $HOME_NET any -> $EXTERNAL_NET 1863 (msg:"CHAT MSN login attempt"; flow:to_server,established; content:"USR "; depth:4; nocase; content:" TWN "; distance:1; nocase; classtype:policy-violation; sid:1991; rev:1;)
 
-alert tcp $HOME_NET any -> $EXTERNAL_NET 6666:7000 (msg:"CHAT IRC nick change"; flow:to_server,established; content:"NICK "; offset:0; classtype:policy-violation; sid:542; rev:10;)
+alert tcp $HOME_NET any -> $EXTERNAL_NET 6666:7000 (msg:"CHAT IRC nick change"; flow:to_server,established; content:"NICK "; offset:0; nocase; classtype:policy-violation; sid:542; rev:11;)
 alert tcp $HOME_NET any -> $EXTERNAL_NET 6666:7000 (msg:"CHAT IRC DCC file transfer request"; flow:to_server,established; content:"PRIVMSG "; offset:0; nocase; content:" |3A|.DCC SEND"; nocase; classtype:policy-violation; sid:1639; rev:6;)
 alert tcp $HOME_NET any -> $EXTERNAL_NET 6666:7000 (msg:"CHAT IRC DCC chat request"; flow:to_server,established; content:"PRIVMSG "; offset:0; nocase; content:" |3A|.DCC CHAT chat"; nocase; classtype:policy-violation; sid:1640; rev:6;)
 alert tcp $HOME_NET any -> $EXTERNAL_NET 6666:7000 (msg:"CHAT IRC channel join"; flow:to_server,established; content:"JOIN |3A| |23|"; offset:0; nocase; classtype:policy-violation; sid:1729; rev:5;)
@@ -25,7 +25,7 @@ alert tcp $HOME_NET any <> $EXTERNAL_NET 6666:7000 (msg:"CHAT IRC message"; flow
 alert tcp $HOME_NET any -> $EXTERNAL_NET 6666:7000 (msg:"CHAT IRC dns request"; flow:to_server,established; content:"USERHOST "; offset:0; nocase; classtype:policy-violation; sid:1789; rev:3;)
 alert tcp $EXTERNAL_NET 6666:7000 -> $HOME_NET any (msg:"CHAT IRC dns response"; flow:to_client,established; content:"|3A|"; offset:0; content:" 302 "; content:"=+"; classtype:policy-violation; sid:1790; rev:4;)
 
-alert tcp $HOME_NET any -> $AIM_SERVERS any (msg:"CHAT AIM login"; flow:to_server,established; content:"*|01|"; depth:2; classtype:policy-violation; sid:1631; rev:6;)
+alert tcp $HOME_NET any -> $AIM_SERVERS any (msg:"CHAT AIM login"; flow:to_server,established; content:"*|02|"; depth:2; content:"|00 17 00 06|"; distance:4; within:8; classtype:policy-violation; sid:1631; rev:7;)
 alert tcp $HOME_NET any -> $AIM_SERVERS any (msg:"CHAT AIM send message"; flow:to_server,established; content:"*|02|"; depth:2; content:"|00 04 00 06|"; depth:4; offset:6; classtype:policy-violation; sid:1632; rev:6;)
 alert tcp $AIM_SERVERS any -> $HOME_NET any (msg:"CHAT AIM receive message"; flow:to_client; content:"*|02|"; depth:2; content:"|00 04 00 07|"; depth:4; offset:6; classtype:policy-violation; sid:1633; rev:6;)
 

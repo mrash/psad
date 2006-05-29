@@ -14,7 +14,7 @@ alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"DDOS TFN client command BE";
 alert tcp $HOME_NET 20432 -> $EXTERNAL_NET any (msg:"DDOS shaft client login to handler"; flow:from_server,established; content:"login|3A|"; reference:arachnids,254; reference:url,security.royans.net/info/posts/bugtraq_ddos3.shtml; classtype:attempted-dos; sid:230; rev:5;)
 alert udp $EXTERNAL_NET any -> $HOME_NET 18753 (msg:"DDOS shaft handler to agent"; content:"alive tijgu"; reference:arachnids,255; classtype:attempted-dos; sid:239; rev:2;)
 alert udp $EXTERNAL_NET any -> $HOME_NET 20433 (msg:"DDOS shaft agent to handler"; content:"alive"; reference:arachnids,256; classtype:attempted-dos; sid:240; rev:2;)
-alert tcp $HOME_NET any <> $EXTERNAL_NET any (msg:"DDOS shaft synflood"; flow:stateless; flags:S,12; seq:674711609; reference:arachnids,253; reference:cve,2000-0138; classtype:attempted-dos; sid:241; rev:9;)
+# alert tcp $HOME_NET any <> $EXTERNAL_NET any (msg:"DDOS shaft synflood"; flow:stateless; flags:S,12; seq:674711609; reference:arachnids,253; reference:cve,2000-0138; classtype:attempted-dos; sid:241; rev:10;)
 
 
 

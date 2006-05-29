@@ -21,7 +21,7 @@ alert udp $EXTERNAL_NET any -> $HOME_NET 177 (msg:"MISC xdmcp query"; content:"|
 # once we get response, check for content:"|00 01 00|"; offset:0; depth:3;
 alert udp $EXTERNAL_NET any -> $HOME_NET 177 (msg:"MISC xdmcp info query"; content:"|00 01 00 02 00 01 00|"; reference:nessus,10891; classtype:attempted-recon; sid:1867; rev:1;)
 # alert udp $EXTERNAL_NET any -> $HOME_NET any (msg:"MISC Large UDP Packet"; dsize:>4000; reference:arachnids,247; classtype:bad-unknown; sid:521; rev:2;)
-alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"MISC Tiny Fragments"; dsize:< 25; fragbits:M; classtype:bad-unknown; sid:522; rev:2;)
+# alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"MISC Tiny Fragments"; dsize:< 25; fragbits:M; classtype:bad-unknown; sid:522; rev:3;)
 alert udp $EXTERNAL_NET any -> $HOME_NET 1900 (msg:"MISC UPnP malformed advertisement"; content:"NOTIFY * "; nocase; reference:bugtraq,3723; reference:cve,2001-0876; reference:cve,2001-0877; reference:url,www.microsoft.com/technet/security/bulletin/MS01-059.mspx; classtype:misc-attack; sid:1384; rev:8;)
 alert udp $EXTERNAL_NET any -> $HOME_NET 1900 (msg:"MISC UPnP Location overflow"; content:"Location|3A|"; nocase; pcre:"/^Location\:[^\n]{128}/smi"; reference:bugtraq,3723; reference:cve,2001-0876; classtype:misc-attack; sid:1388; rev:12;)
 alert tcp $AIM_SERVERS any -> $HOME_NET any (msg:"MISC AIM AddGame attempt"; flow:to_client,established; content:"aim|3A|AddGame?"; nocase; reference:bugtraq,3769; reference:cve,2002-0005; reference:url,www.w00w00.org/files/w00aimexp/; classtype:misc-attack; sid:1393; rev:12;)
@@ -98,3 +98,7 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 8000 (msg:"MISC HP Web JetAdmin Execute
 
 
 alert tcp $EXTERNAL_NET any -> $HOME_NET 873 (msg:"MISC rsync backup-dir directory traversal attempt"; flow:to_server,established; content:"--backup-dir"; pcre:"/--backup-dir\s+\x2e\x2e\x2f/"; reference:bugtraq,10247; reference:cve,2004-0426; reference:nessus,12230; classtype:string-detect; sid:2561; rev:4;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 3632 (msg:"MISC distccd command execution attempt"; flow:to_server,established; content:"DIST00000001"; nocase; depth:12; reference:url,distcc.samba.org/security.html; classtype:misc-activity; sid:3061; rev:1;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 7787 (msg:"MISC Unreal Tournament secure overflow attempt"; content:"|5c|secure|5c|"; nocase; pcre:"/\x5csecure\x5c[^\x00]{50}/smi"; reference:cve,CAN-2004-0608; reference:bugtraq,10570; classtype:misc-attack; sid:3080; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 617 (msg:"MISC Arkeia client backup system info probe"; flow:established,to_server; content:"ARKADMIN_GET_"; nocase; pcre:"/^(CLIENT|MACHINE)_INFO/Ri"; reference:bugtraq,12594; classtype:attempted-recon; sid:3453; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 617 (msg:"MISC Arkeia client backup generic info probe"; flow:established,to_server; content:"ARKFS|00|root|00|root"; nocase; reference:bugtraq,12594; classtype:attempted-recon; sid:3454; rev:1;)

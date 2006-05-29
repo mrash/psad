@@ -231,6 +231,9 @@ my %snort_class_dl = ();
 ### the snort_rule_dl file
 my %snort_rule_dl = ();
 
+### Cache Snort rule reference configuration
+my %snort_ref_baseurl = ();
+
 ### cache all scan signatures (initialized by default)
 my %sigs = ();
 
@@ -2649,11 +2652,11 @@ sub import_snort_rules() {
                 push @{$snort_msgs{$sid}{'content'}}, $1;
             }
 
-            while ($line =~ /[\s;]reference:\s*\"(.*?)\"\s*;/g) {
+            while ($line =~ /[\s;]reference:\s*(.*?)\s*;/g) {
                 my $ref = $1;
                 if ($ref =~ /^(\w+),(\S+)/) {
                     ### reference:bugtraq,9732;
-                    push @{$snort_msgs{$sid}{'reference'}{$1}}, $2;
+                    push @{$snort_msgs{$sid}{'reference'}{lc($1)}}, $2;
                 }
             }
 
@@ -2715,6 +2718,19 @@ sub import_snort_class_priorities() {
 }
 
 sub import_snort_reference_config() {
+
+    my $ref_file = "$config{'SNORT_RULES_DIR'}/reference.config";
+    return unless -e $ref_file;
+
+    open F, "< $ref_file" or die $!;
+    while (<F>) {
+        if (/^\s*config\s+reference:\s+(\w+)\s+(\S+)/) {
+            ### config reference: bugtraq   http://www.securityfocus.com/bid/
+            $snort_ref_baseurl{lc($1)} = $2;
+        }
+    }
+    close F;
+    return;
 }
 
 sub import_snort_rule_dl() {
@@ -4019,14 +4035,29 @@ sub scan_logr_signatures() {
                     my $sm_hr = $snort_msgs{$sid};
 
                     my $pkts = $href->{'sid'}->{$sid}->{$chain};
-                    print $fh qq(   "$sm_hr->{'msg'}"\n),
-                        "       classtype: $sm_hr->{'classtype'}\n",
-                        "       sid:       $sid\n";
+                    print $fh qq(   "$sm_hr->{'msg'}"\n);
                     for my $content (@{$sm_hr->{'content'}}) {
                         print $fh qq(       content:   "$content"\n);
                     }
-                    print $fh "       chain:     $chain\n",
-                        "       packets:   $pkts\n\n";
+                    print $fh "       sid:       $sid\n",
+                        "       chain:     $chain\n",
+                        "       packets:   $pkts\n",
+                        "       classtype: $sm_hr->{'classtype'}\n";
+                    if (defined $sm_hr->{'reference'}) {
+                        for my $reftype (keys %{$sm_hr->{'reference'}}) {
+                            my $baseurl = '';
+                            if (defined $snort_ref_baseurl{$reftype}) {
+                                $baseurl = $snort_ref_baseurl{$reftype};
+                            } else {
+                                next;
+                            }
+                            for my $ref (@{$sm_hr->{'reference'}->{$reftype}}) {
+                                print $fh "       reference: ($reftype) ",
+                                    "${baseurl}$ref\n";
+                            }
+                        }
+                    }
+                    print $fh "\n";
                 }
             }
             if (defined $href->{'invalid_type'}) {

@@ -224,6 +224,13 @@ my %valid_icmp_types = ();
 ### build such a ruleset from snort signatures.
 my %snort_msgs = ();
 
+### Cache snort classification.config file for class priorities
+my %snort_class_dl = ();
+
+### Cache any individual Snort rule priority definitions from
+### the snort_rule_dl file
+my %snort_rule_dl = ();
+
 ### cache all scan signatures (initialized by default)
 my %sigs = ();
 
@@ -1801,9 +1808,21 @@ sub add_snort_sid() {
     my ($src, $dst, $chain, $proto, $sid) = @_;
     if (defined $snort_msgs{$sid}) {
         $scan{$src}{$dst}{$proto}{'sid'}{$sid}{$chain}++;
-        ### FIXME: for now hardcode snort sid matches at
-        ### a danger level of two
-        return 2;
+
+        my $classtype = $snort_msgs{$sid}{'classtype'};
+        if (defined $snort_rule_dl{$sid}) {
+            print STDERR "[+] snort_rule_dl assigning SID $sid a danger ",
+                "level of $snort_rule_dl{$sid}\n" if $debug;
+            return $snort_rule_dl{$sid};
+        } elsif (defined $snort_class_dl{$classtype}) {
+            print STDERR "[+] classification.config assigning SID $sid ",
+                "a danger level of $snort_class_dl{$classtype}\n" if $debug;
+            return $snort_class_dl{$classtype};
+        } else {
+            print STDERR "[-] No classification or rule dl defined for ",
+                "SID $sid\n" if $debug;
+            return 2;
+        }
     }
     return 0;
 }
@@ -2609,30 +2628,112 @@ sub import_snort_rules() {
         RULE: for my $line (@lines) {
             next RULE unless $line =~ /^\s*alert/;
             chomp $line;
-            my $msg;
-            my $sid;  ### snort rule id
-            my $classtype;
-            my $content;
 
-            $msg = $1 if $line =~ /msg:\s*\"(.*?)\"\s*;/;
+            my $sid;  ### snort rule id
             if ($line =~ /[\s;]sid:\s*(\d+)\s*;/) {
                 $sid = $1;
+            } else {
+                next RULE;
             }
-            $classtype = $1 if $line =~ /[\s;]classtype:\s*(.*?)\s*;/;
-            $content = $1 if $line =~ /[\s;]uricontent:\s*\"(.*?)\"\s*;/;
-            $content = $1 if $line =~ /[\s;]content:\s*\"(.*?)\"\s*;/;
-            if ($msg && $sid && $classtype) {
-                $snort_msgs{$sid}{'classtype'} = $classtype;
-                $snort_msgs{$sid}{'msg'}       = $msg;
-                if ($content) {
-                    $snort_msgs{$sid}{'content'} = $content;
+
+            $snort_msgs{$sid}{'msg'} = $1
+                if $line =~ /msg:\s*\"(.*?)\"\s*;/;
+
+            $snort_msgs{$sid}{'classtype'} = $1
+                if $line =~ /[\s;]classtype:\s*(.*?)\s*;/;
+
+            ### import multiple content fields; someone could have built
+            ### a series of custom Netfilter chains in order to detect
+            ### multiple content strings.
+            while ($line =~ /[\s;](?:uri)?content:\s*\"(.*?)\"\s*;/g) {
+                push @{$snort_msgs{$sid}{'content'}}, $1;
+            }
+
+            while ($line =~ /[\s;]reference:\s*\"(.*?)\"\s*;/g) {
+                my $ref = $1;
+                if ($ref =~ /^(\w+),(\S+)/) {
+                    ### reference:bugtraq,9732;
+                    push @{$snort_msgs{$sid}{'reference'}{$1}}, $2;
                 }
             }
+
+            next RULE unless defined $snort_msgs{$sid}{'msg'}
+                    and defined $snort_msgs{$sid}{'classtype'}
+                    and defined $snort_msgs{$sid}{'content'};
         }
     }
+
+    ### import the Snort classification.config file
+    &import_snort_class_priorities();
+
+    ### import the reference.config file
+    &import_snort_reference_config();
+
+    ### import any specific SID -> DL mappings from the
+    ### snort_rule_dl file
+    &import_snort_rule_dl();
+
     print STDERR Dumper %snort_msgs if $debug and $verbose;
     &Psad::psyslog('psad', 'imported Snort rules')
         unless $no_syslog_alerts;
+    return;
+}
+
+sub import_snort_class_priorities() {
+
+    my $snort_class_file = "$config{'SNORT_RULES_DIR'}/classification.config";
+
+    return unless -e $snort_class_file;
+    open F, "< $snort_class_file" or die $!;
+    while (<F>) {
+        ### config classification: rpc-portmap-decode,Decode of an RPC Query,2
+        if (/config\s+classification:\s+(\S+),.*(\d+)/) {
+            ### the snort priority value can go from 1 to 10, with 1 being the
+            ### worst offense and 10 being the least.  Most priorities are
+            ### from 1 to 4.  We need to map these into the psad danger levels
+            ### (reversed).
+            my $classtype = $1;
+            my $snort_dl  = $2;
+            my $psad_dl   = 1;  ### default
+
+            if ($snort_dl == 1) {
+                $psad_dl = 5;
+            } elsif ($snort_dl == 2) {
+                $psad_dl = 4;
+            } elsif ($snort_dl == 3) {
+                $psad_dl = 3;
+            } elsif ($snort_dl == 4) {
+                $psad_dl = 2;
+            }
+            $snort_class_dl{$classtype} = $psad_dl;
+        }
+    }
+    close F;
+    &Psad::psyslog('psad', 'imported Snort classification.config')
+        unless $no_syslog_alerts;
+    return;
+}
+
+sub import_snort_reference_config() {
+}
+
+sub import_snort_rule_dl() {
+    ### parse the snort_rule_dl file
+    return unless -e $config{'SNORT_RULE_DL_FILE'};
+    open F, "< $config{'SNORT_RULE_DL_FILE'}" or die $!;
+    while (<F>) {
+        next unless /^\s*\d/;
+        if (/^\s*(\d+)\s+(\d+)/) {
+            ### <sid>  <dl>
+            my $sid = $1;
+            my $dl  = $2;
+            unless ($dl > 0 and $dl < 6) {
+                next;
+            }
+            $snort_rule_dl{$sid} = $dl;
+        }
+    }
+    close F;
     return;
 }
 
@@ -3896,163 +3997,136 @@ sub scan_logr_signatures() {
     my $dst_ip_is_local = 0;
     $dst_ip_is_local = 1 if defined $local_ips{$dst};
     open LS, ">> $log_sigs" or die "[*] Could not open $log_sigs: $!";
-    for my $proto qw(tcp udp icmp) {
-        next unless defined $scan{$src}{$dst}{$proto};
-        next unless (defined $scan{$src}{$dst}{$proto}{'curr_sig'}
-            or defined $scan{$src}{$dst}{$proto}{'sid'}
-            or defined $scan{$src}{$dst}{$proto}{'invalid_type'}
-            or defined $scan{$src}{$dst}{$proto}{'invalid_code'});
-        print $email_fh "\n\n[+] $proto scan signatures:\n\n";
-        print LS "\n\n[+] $proto scan signatures\n\n";
-        print STDERR "[+] scan_logr_signatures(): src: $src dst: $dst ",
-            "proto: $proto\n" if $debug;
-        for my $sid (keys %{$scan{$src}{$dst}{$proto}{'sid'}}) {
-            for my $chain (keys %{$scan{$src}{$dst}{$proto}{'sid'}{$sid}}) {
-                my $msg = $snort_msgs{$sid}{'msg'};
-                my $classtype = $snort_msgs{$sid}{'classtype'};
-                my $pkts = $scan{$src}{$dst}{$proto}{'sid'}{$sid}{$chain};
-                my $content = '';
-                if (defined $snort_msgs{$sid}{'content'}) {
-                    $content = $snort_msgs{$sid}{'content'};
-                }
-                print $email_fh qq(   "$msg"\n);
-                print LS qq(   "$msg"\n);
-                print $email_fh "       classtype: $classtype\n";
-                print LS "       classtype: $classtype\n";
-                print $email_fh "       sid:       $sid\n";
-                print LS "       sid:       $sid\n";
-                if ($content) {
-                    print $email_fh qq(       content:   "$content"\n);
-                    print LS qq(       content:   "$content"\n);
-                }
-                print $email_fh "       chain:     $chain\n";
-                print LS "       chain:     $chain\n";
-                print $email_fh "       packets:   $pkts\n\n";
-                print LS "       packets:   $pkts\n\n";
-            }
-        }
-        if (defined $scan{$src}{$dst}{$proto}{'invalid_type'}) {
-            for my $type (keys %{$scan{$src}{$dst}{$proto}{'invalid_type'}}) {
-                for my $chain (keys %{$scan{$src}{$dst}{$proto}
-                        {'invalid_type'}{$type}}) {
-                    my $pkts = $scan{$src}{$dst}{$proto}
-                        {'invalid_type'}{$type}{$chain}{'pkts'};
-                    print $email_fh
-                        qq(   Invalid ICMP type "$type" chain=$chain packets=$pkts\n);
-                    print LS
-                        qq(   Invalid ICMP type "$type" chain=$chain packets=$pkts\n);
+    my @print_fh = ($email_fh, *LS);
+
+    for my $fh (@print_fh) {
+        for my $proto qw(tcp udp icmp) {
+            next unless defined $scan{$src}{$dst}{$proto};
+            my $href = $scan{$src}{$dst}{$proto};
+
+            next unless (defined $href->{'curr_sig'}
+                or defined $href->{'sid'}
+                or defined $href->{'invalid_type'}
+                or defined $href->{'invalid_code'});
+
+            print $fh "\n\n[+] $proto scan signatures:\n\n";
+            print STDERR "[+] scan_logr_signatures(): src: $src dst: $dst ",
+                "proto: $proto\n" if $debug;
+
+            for my $sid (keys %{$href->{'sid'}}) {
+                for my $chain (keys %{$href->{'sid'}->{$sid}}) {
+                    next unless defined $snort_msgs{$sid};
+                    my $sm_hr = $snort_msgs{$sid};
+
+                    my $pkts = $href->{'sid'}->{$sid}->{$chain};
+                    print $fh qq(   "$sm_hr->{'msg'}"\n),
+                        "       classtype: $sm_hr->{'classtype'}\n",
+                        "       sid:       $sid\n";
+                    for my $content (@{$sm_hr->{'content'}}) {
+                        print $fh qq(       content:   "$content"\n);
+                    }
+                    print $fh "       chain:     $chain\n",
+                        "       packets:   $pkts\n\n";
                 }
             }
-        }
-        if (defined $scan{$src}{$dst}{$proto}{'invalid_code'}) {
-            for my $type (keys %{$scan{$src}{$dst}{$proto}{'invalid_code'}}) {
-                for my $code (keys %{$scan{$src}{$dst}
-                        {$proto}{'invalid_code'}{$type}}) {
-                    for my $chain (keys %{$scan{$src}{$dst}{$proto}
-                            {'invalid_code'}{$type}{$code}}) {
-                        my $pkts = $scan{$src}{$dst}{$proto}{'invalid_code'}
-                            {$type}{$code}{$chain}{'pkts'};
-                        print $email_fh "   Invalid ICMP code \"$code\" for ICMP ",
-                            "\"$valid_icmp_types{$type}{'text'}\" packet\n",
-                            "       chain=$chain packets=$pkts\n";
-                        print LS "   Invalid ICMP code \"$code\" for ICMP ",
-                            "\"$valid_icmp_types{$type}{'text'}\" packet\n",
-                            "       chain=$chain packets=$pkts\n";
+            if (defined $href->{'invalid_type'}) {
+                for my $type (keys %{$href->{'invalid_type'}}) {
+                    for my $chain (keys %{$href->{'invalid_type'}->{$type}}) {
+                        my $pkts = $href->{'invalid_type'}->
+                            {$type}->{$chain}->{'pkts'};
+                        print $fh
+                            qq(   Invalid ICMP type "$type" chain=$chain packets=$pkts\n);
                     }
                 }
             }
-        }
-        for my $sid (keys %{$scan{$src}{$dst}{$proto}{'curr_sig'}}) {
-            my $msg = $sigs_attr{$sid}{'msg'};
-
-            for my $chain (keys %{$scan{$src}{$dst}{$proto}{'curr_sig'}{$sid}}) {
-                if ($proto eq 'tcp' or $proto eq 'udp') {
-                    for my $dp (keys %{$scan{$src}{$dst}{$proto}{'curr_sig'}
-                            {$sid}{$chain}{'dp'}}) {
-                        my $flags = '';
-                        my $pkts = $scan{$src}{$dst}{$proto}{'curr_sig'}
-                            {$sid}{$chain}{'dp'}{$dp};
-                        if (defined $scan{$src}{$dst}{$proto}{'curr_sig'}
-                                {$sid}{$chain}{'flags'} and defined $scan{$src}{$dst}
-                                    {$proto}{'curr_sig'}{$sid}{$chain}{'flags'}{$dp}) {
-                            $flags = $scan{$src}{$dst}{$proto}{'curr_sig'}
-                                        {$sid}{$chain}{'flags'}{$dp};
-                        }
-
-                        if ($dst_ip_is_local) {
-                            ### check local ports here since we know the
-                            ### destination is a local ip address
-                            if (defined $local_ports{$proto}{$dp}) {
-                                if ($flags) {
-                                    print $email_fh "   \"$msg\"\n",
-                                        "        sid=$sid chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
-                                        "** Your machine is listening on $proto port: $dp!\n";
-                                    print LS "   \"$msg\"\n",
-                                        "        sid=$sid chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
-                                        "** Your machine is listening on $proto port: $dp!\n";
-                                } else {
-                                    print $email_fh "   \"$msg\"\n",
-                                        "        sid=$sid chain=$chain packets=$pkts dp=$dp ",
-                                        "** Your machine is listening on $proto port: $dp!\n";
-                                    print LS "   \"$msg\"\n",
-                                        "        sid=$sid chain=$chain packets=$pkts dp=$dp ",
-                                        "** Your machine is listening on $proto port: $dp!\n";
-                                }
-                            } else {
-                                if ($flags) {
-                                    print $email_fh "   \"$msg\"\n",
-                                        "        sid=$sid chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
-                                        "No local server on $proto/$dp\n";
-                                    print LS "   \"$msg\"\n",
-                                        "        sid=$sid chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
-                                        "No local server on $proto/$dp\n";
-                                } else {
-                                    print $email_fh "   \"$msg\"\n",
-                                        "        sid=$sid chain=$chain packets=$pkts dp=$dp No local ",
-                                        "server on $proto/$dp\n";
-                                    print LS "   \"$msg\"\n",
-                                        "        sid=$sid chain=$chain packets=$pkts dp=$dp No local ",
-                                        "server on $proto/$dp\n";
-                                }
-                            }
-                        } else {
-                            if ($flags) {
-                                print $email_fh "   \"$msg\"\n",
-                                    "       sid=$sid chain=$chain packets=$pkts dp=$dp flags=[$flags]\n";
-                                print LS "   \"$msg\"\n",
-                                    "       sid=$sid chain=$chain packets=$pkts dp=$dp flags=[$flags]\n";
-                            } else {
-                                print $email_fh "   \"$msg\"\n",
-                                    "       sid=$sid chain=$chain packets=$pkts dp=$dp\n";
-                                print LS "   \"$msg\"\n",
-                                    "       sid=$sid chain=$chain packets=$pkts dp=$dp\n";
-                            }
+            if (defined $href->{'invalid_code'}) {
+                for my $type (keys %{$href->{'invalid_code'}}) {
+                    for my $code (keys %{$href->{'invalid_code'}->{$type}}) {
+                        for my $chain (keys %{$href->{'invalid_code'}->{$type}->{$code}}) {
+                            my $pkts = $href->{'invalid_code'}->
+                                {$type}->{$code}->{$chain}->{'pkts'};
+                            print $fh "   Invalid ICMP code \"$code\" for ICMP ",
+                                "\"$valid_icmp_types{$type}{'text'}\" packet\n",
+                                "       chain=$chain packets=$pkts\n";
                         }
                     }
-                } else {
-                    my $pkts = $scan{$src}{$dst}{'icmp'}
-                        {'curr_sig'}{$sid}{$chain}{'pkts'};
-                    print $email_fh qq(   "$msg" sid=$sid chain=$chain packets=$pkts\n);
-                    print LS qq(   "$msg" sid=$sid chain=$chain packets=$pkts\n);
                 }
-                ### signature logging with syslog is not yet supported
-                ### (requires a message for each matched signature).
+            }
+            for my $sid (keys %{$href->{'curr_sig'}}) {
+                my $msg = $sigs_attr{$sid}{'msg'};
+
+                for my $chain (keys %{$href->{'curr_sig'}->{$sid}}) {
+                    if ($proto eq 'tcp' or $proto eq 'udp') {
+                        for my $dp (keys %{$href->{'curr_sig'}
+                                {$sid}->{$chain}->{'dp'}}) {
+                            my $flags = '';
+                            my $pkts = $href->{'curr_sig'}
+                                {$sid}->{$chain}->{'dp'}->{$dp};
+                            if (defined $href->{'curr_sig'}->{$sid}->{$chain}->{'flags'}
+                                    and defined $href->{'curr_sig'}->
+                                        {$sid}->{$chain}->{'flags'}->{$dp}) {
+                                $flags = $href->{'curr_sig'}->
+                                    {$sid}->{$chain}->{'flags'}->{$dp};
+                            }
+
+                            if ($dst_ip_is_local) {
+                                ### check local ports here since we know the
+                                ### destination is a local ip address
+                                if (defined $local_ports{$proto}{$dp}) {
+                                    if ($flags) {
+                                        print $fh "   \"$msg\"\n",
+                                            "        sid=$sid chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
+                                            "** Your machine is listening on $proto port: $dp!\n";
+                                    } else {
+                                        print $fh "   \"$msg\"\n",
+                                            "        sid=$sid chain=$chain packets=$pkts dp=$dp ",
+                                            "** Your machine is listening on $proto port: $dp!\n";
+                                    }
+                                } else {
+                                    if ($flags) {
+                                        print $fh "   \"$msg\"\n",
+                                            "        sid=$sid chain=$chain packets=$pkts dp=$dp flags=[$flags] ",
+                                            "No local server on $proto/$dp\n";
+                                    } else {
+                                        print $fh "   \"$msg\"\n",
+                                            "        sid=$sid chain=$chain packets=$pkts dp=$dp No local ",
+                                            "server on $proto/$dp\n";
+                                    }
+                                }
+                            } else {
+                                if ($flags) {
+                                    print $fh "   \"$msg\"\n",
+                                        "       sid=$sid chain=$chain packets=$pkts dp=$dp flags=[$flags]\n";
+                                } else {
+                                    print $fh "   \"$msg\"\n",
+                                        "       sid=$sid chain=$chain packets=$pkts dp=$dp\n";
+                                }
+                            }
+                        }
+                    } else {
+                        my $pkts = $scan{$src}{$dst}{'icmp'}
+                            {'curr_sig'}{$sid}{$chain}{'pkts'};
+                        print $fh qq(   "$msg" sid=$sid chain=$chain packets=$pkts\n);
+                    }
+                    ### signature logging with syslog is not yet supported
+                    ### (requires a message for each matched signature).
 #            if ($sigmatch =~ /^(\".*\")/) {
 #                $syslog_sig_title = "signature=$1";
 #            }
+                }
             }
-        }
-        ### need to delete the current signature so it
-        ### won't show up in the next alert
-        unless ($config{'SHOW_ALL_SIGNATURES'} eq 'Y') {
-            delete $scan{$src}{$dst}{$proto}{'curr_sig'}
-                if defined $scan{$src}{$dst}{$proto}{'curr_sig'};
-            delete $scan{$src}{$dst}{$proto}{'sid'}
-                if defined $scan{$src}{$dst}{$proto}{'sid'};
-            delete $scan{$src}{$dst}{$proto}{'invalid_type'}
-                if defined $scan{$src}{$dst}{$proto}{'invalid_type'};
-            delete $scan{$src}{$dst}{$proto}{'invalid_code'}
-                if defined $scan{$src}{$dst}{$proto}{'invalid_code'};
+            ### need to delete the current signature so it
+            ### won't show up in the next alert
+            unless ($config{'SHOW_ALL_SIGNATURES'} eq 'Y') {
+                delete $href->{'curr_sig'}
+                    if defined $href->{'curr_sig'};
+                delete $href->{'sid'}
+                    if defined $href->{'sid'};
+                delete $href->{'invalid_type'}
+                    if defined $href->{'invalid_type'};
+                delete $href->{'invalid_code'}
+                    if defined $href->{'invalid_code'};
+            }
         }
     }
     close LS;
@@ -6621,7 +6695,7 @@ sub required_vars() {
         FLUSH_IPT_AT_INIT ENABLE_MAC_ADDR_REPORTING TRUNCATE_FWDATA
         PSAD_DIR PSAD_RUN_DIR PSAD_LIB_DIR ENABLE_FW_LOGGING_CHECK
         ENABLE_RENEW_BLOCK_EMAILS DSHIELD_LATEST_EMAIL AUTO_BLOCK_REGEX
-        ENABLE_AUTO_IDS_REGEX IPTABLES_PREREQ_CHECK
+        ENABLE_AUTO_IDS_REGEX IPTABLES_PREREQ_CHECK SNORT_RULE_DL_FILE
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

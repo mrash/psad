@@ -343,22 +343,22 @@ sub install() {
         &install_perl_module($module);
     }
 
-    &logr("[+] Installing Snort-2.3 signatures in $SNORT_DIR\n");
+    &logr("[+] Installing Snort-2.3.3 signatures in $SNORT_DIR\n");
     unless (-d $SNORT_DIR) {
         mkdir $SNORT_DIR, 0500 or die "[*] Could not create $SNORT_DIR: $!";
     }
     opendir D, 'snort_rules' or die "[*] Could not open ",
         'the snort_rules directory';
-    my @rfiles = readdir D;
+    my @files = readdir D;
     closedir D;
-    shift @rfiles; shift @rfiles;
-    for my $rfile (@rfiles) {
-        next unless $rfile =~ /\.rules$/;
-        &logr("[+] Installing snort_rules/${rfile}\n");
-        copy "snort_rules/${rfile}", "${SNORT_DIR}/${rfile}" or
-            die "[*] Could not copy snort_rules/${rfile} -> ",
-                "${SNORT_DIR}/${rfile}: $!";
-        &perms_ownership("${SNORT_DIR}/${rfile}", 0600);
+    shift @files; shift @files;
+    for my $file (@files) {
+        next unless $file =~ /\.rules$/ or $file =~ /\.config$/;
+        &logr("[+] Installing snort_rules/${file}\n");
+        copy "snort_rules/${file}", "${SNORT_DIR}/${file}" or
+            die "[*] Could not copy snort_rules/${file} -> ",
+                "${SNORT_DIR}/${file}: $!";
+        &perms_ownership("${SNORT_DIR}/${file}", 0600);
     }
     print "\n\n";
 
@@ -490,7 +490,7 @@ sub install() {
     }
 
     ### install auto_dl, signatures, icmp_types, posf, and pf.os files
-    for my $file qw(signatures icmp_types posf auto_dl pf.os) {
+    for my $file qw(signatures icmp_types posf auto_dl snort_rule_dl pf.os) {
         if (-e "${PSAD_CONFDIR}/$file") {
             &archive("${PSAD_CONFDIR}/$file") unless $noarchive;
             unless (&query_preserve_sigs_autodl("${PSAD_CONFDIR}/$file")) {

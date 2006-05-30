@@ -1813,10 +1813,21 @@ sub add_snort_sid() {
         $scan{$src}{$dst}{$proto}{'sid'}{$sid}{$chain}++;
 
         my $classtype = $snort_msgs{$sid}{'classtype'};
+
+        ### first see if the /etc/psad/snort_rule_dl file has defined
+        ### the danger level
         if (defined $snort_rule_dl{$sid}) {
             print STDERR "[+] snort_rule_dl assigning SID $sid a danger ",
                 "level of $snort_rule_dl{$sid}\n" if $debug;
             return $snort_rule_dl{$sid};
+        ### now see if the rule itself has a priority defined (note that
+        ### this value has already been converted into a valid psad
+        ### danger level.
+        } elsif (defined $snort_msgs{$sid}{'priority'}) {
+            print STDERR "[+] Snort rule contains priority field, ",
+                "assigning SID $sid a danger level of ",
+                "$snort_msgs{$sid}{'priority'}\n" if $debug;
+            return $snort_msgs{$sid}{'priority'};
         } elsif (defined $snort_class_dl{$classtype}) {
             print STDERR "[+] classification.config assigning SID $sid ",
                 "a danger level of $snort_class_dl{$classtype}\n" if $debug;
@@ -2645,6 +2656,9 @@ sub import_snort_rules() {
             $snort_msgs{$sid}{'classtype'} = $1
                 if $line =~ /[\s;]classtype:\s*(.*?)\s*;/;
 
+            $snort_msgs{$sid}{'priority'} = &convert_snort_priority($1)
+                if $line =~ /[\s;]priority:\s*(\d+)\s*;/;
+
             ### import multiple content fields; someone could have built
             ### a series of custom Netfilter chains in order to detect
             ### multiple content strings.
@@ -2694,27 +2708,31 @@ sub import_snort_class_priorities() {
             ### the snort priority value can go from 1 to 10, with 1 being the
             ### worst offense and 10 being the least.  Most priorities are
             ### from 1 to 4.  We need to map these into the psad danger levels
-            ### (reversed).
-            my $classtype = $1;
-            my $snort_dl  = $2;
-            my $psad_dl   = 1;  ### default
-
-            if ($snort_dl == 1) {
-                $psad_dl = 5;
-            } elsif ($snort_dl == 2) {
-                $psad_dl = 4;
-            } elsif ($snort_dl == 3) {
-                $psad_dl = 3;
-            } elsif ($snort_dl == 4) {
-                $psad_dl = 2;
-            }
-            $snort_class_dl{$classtype} = $psad_dl;
+            ### (reversed).  NOTE: the Snort engine does not enforce the 1-10
+            ### range.
+            $snort_class_dl{$1} = &convert_snort_priority($2);
         }
     }
     close F;
     &Psad::psyslog('psad', 'imported Snort classification.config')
         unless $no_syslog_alerts;
     return;
+}
+
+sub convert_snort_priority() {
+    my $snort_priority = shift;
+    my $psad_dl = 1;
+
+    if ($snort_priority == 1) {
+        $psad_dl = 5;
+    } elsif ($snort_priority == 2) {
+        $psad_dl = 4;
+    } elsif ($snort_priority == 3) {
+        $psad_dl = 3;
+    } elsif ($snort_priority == 4) {
+        $psad_dl = 2;
+    }
+    return $psad_dl;
 }
 
 sub import_snort_reference_config() {

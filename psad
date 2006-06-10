@@ -1102,6 +1102,10 @@ sub check_scan() {
         if ($pkt =~ /kernel:\s+(.*?)\s*IN=/) {
             $log_prefix = $1;
             if ($log_prefix =~ /\S/) {
+                if ($config{'IGNORE_LOG_PREFIXES'} ne 'NONE') {
+                    next PKT if $log_prefix
+                            =~ m|$config{'IGNORE_LOG_PREFIXES'}|;
+                }
                 $ipt_prefixes{$log_prefix}++;
             }
         }

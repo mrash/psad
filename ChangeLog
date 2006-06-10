@@ -4,6 +4,18 @@ psad-1.4.6 (//2006):
     - Added code to save DShield email to a file.
     - Added IPTABLES_PREREQ_CHECK to allow the administrator to control the
       frequency of Netfilter checks (for auto-block compatibility).
+    - Added IGNORE_LOG_PREFIXES to allow certain log prefixes to be completely
+      ignored by psad.
+    - Added classification.config file from Snort-2.3.3 so that psad can
+      assign danger levels based upon Snort rule class type.  This is useful
+      when also running fwsnort.
+    - Added snort_rule_dl to allow specific psad to assign specific danger
+      level values to particular signatures.  This is useful if you want to
+      do define certain Snort rules as being particularly evil (or not).
+      Running fwsnort is also necessary to take advantage of this feature.
+    - Added reference.config so that psad can include reference information in
+      email alerts that are derived from attacks detected by fwsnort.
+    - Updated to Snort-2.3.3 signatures.
 
 psad-1.4.5 (01/13/2006):
     - Bugfix in IPTables::Parse to allow the limit target to apply to

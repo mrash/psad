@@ -4,7 +4,7 @@
 #
 # File: psad
 #
-# Purpose: psad makes use of iptables logs to detect port scans,
+# Purpose: psad makes use of Netfilter logs to detect port scans,
 #          probes for backdoors and DDoS tools, and other suspect traffic
 #          (many signatures were adapted from the snort intrusion
 #          detection system).  Data is provided by kmsgsd which reads
@@ -65,7 +65,7 @@
 #
 # Scan hash key explanation:
 #   absnum    - Total number of packets from $src to $dst
-#   chain     - Iptables chain under which the scan packets appear in the
+#   chain     - Netfilter chain under which the scan packets appear in the
 #               logs.
 #   s_time    - Start time for the first packet seen from src to dst.
 #   alerted   - An alert has been sent.
@@ -78,14 +78,14 @@
 #   strtp     - Starting port.
 #   endp      - Ending port.
 #
-# Sample iptables log messages:
+# Sample Netfilter log messages:
 #
-#  Sample tcp packet (rejected by iptables... --log-prefix = "DROP ")
+#  Sample tcp packet (rejected by Netfilter... --log-prefix = "DROP ")
 #  Mar 11 13:15:52 orthanc kernel: DROP IN=lo OUT= MAC=00:00:00:00:00:00:00:00:
 #  00:00:00:00:08:00 SRC=127.0.0.1 DST=127.0.0.1 LEN=60 TOS=0x00 PREC=0x00
 #  TTL=64 ID=0 DF PROTO=TCP SPT=44847 DPT=35 WINDOW=32304 RES=0x00 SYN URGP=0
 #
-#  Sample icmp packet rejected by iptables INPUT chain:
+#  Sample icmp packet rejected by Netfilter INPUT chain:
 #  Nov 27 15:45:51 orthanc kernel: DROP IN=eth1 OUT= MAC=00:a0:cc:e2:1f:f2:00:
 #  20:78:10:70:e7:08:00 SRC=192.168.10.20 DST=192.168.10.1 LEN=84 TOS=0x00
 #  PREC=0x00 TTL=64 ID=0 DF PROTO=ICMP TYPE=8 CODE=0 ID=61055 SEQ=256
@@ -103,9 +103,9 @@
 #  00:00:00:00:00:08:00 SRC=127.0.0.1 DST=127.0.0.1 LEN=60 TOS=0x00 PREC=0x00
 #  TTL=64 ID=0 DF PROTO=TCP SPT=39935 DINDOW=32304 RES=0x00 SYN URGP=0
 #
-# Note on iptables tcp log messages:
+# Note on Netfilter tcp log messages:
 #
-#   Iptables reports tcp flags in the following order:
+#   Netfilter reports tcp flags in the following order:
 #
 #       URG ACK PSH RST SYN FIN
 #
@@ -175,7 +175,7 @@ my $debug = 0;
 
 my $flush_fw = 0;
 
-### build the iptables blocking configuration out of the
+### build the Netfilter blocking configuration out of the
 ### IPT_AUTO_CHAIN variable
 my @ipt_config = ();
 
@@ -218,7 +218,7 @@ my %posf_sigs = ();
 my %valid_icmp_types = ();
 
 ### Cache snort rule messages unless --no-snort-sids switch was
-### given.  This is only useful if iptables includes rule
+### given.  This is only useful if Netfilter includes rule
 ### that log things like "SID123".  "fwsnort"
 ### (http://www.cipherdyne.org/fwsnort/) will automatically
 ### build such a ruleset from snort signatures.
@@ -247,7 +247,7 @@ my %sigs_attr = ();
 my %derived_sigs = ();
 my %derived_sigs_attr = ();
 
-### cache iptables prefixes
+### cache Netfilter prefixes
 my %ipt_prefixes = ();
 
 ### ignore ports
@@ -441,7 +441,7 @@ Getopt::Long::Configure('no_ignore_case');
     'auto-dl=s'         => \$auto_dl_file,    # Path to psad auto IPs file for
                                               #   auto-setting IP danger level.
     'alert-conf=s'      => \$alert_conf_file, # Path to psad alert.conf file.
-    'Analyze-msgs'      => \$analyze_msgs,    # Analysis mode for old iptables
+    'Analyze-msgs'      => \$analyze_msgs,    # Analysis mode for old Netfilter
                                               #   messages in the psad fwdata file
                                               #   (or messages file; see
                                               #   --messages).
@@ -449,7 +449,7 @@ Getopt::Long::Configure('no_ignore_case');
                                               #   mode.
     'email-analysis'    => \$analysis_emails, # Send analysis mode emails.
     'messages-file=s'   => \$messages_file,   # Specify the path to file containing
-                                              #   old iptables messages (fwdata by
+                                              #   old Netfilter messages (fwdata by
                                               #   default).
     'debug'             => \$debug,           # Run in debug mode.
     'Dump-conf'         => \$dump_conf,       # Dump config and exit.
@@ -471,9 +471,9 @@ Getopt::Long::Configure('no_ignore_case');
     'fw-del-chains'     => \$fw_del_chains,   # Delete psad chains in addition to
                                               #   flushing them (requires --F as
                                               #   well).
-    'fw-dump'           => \$dump_ipt_policy, # Dump the iptables policy
+    'fw-dump'           => \$dump_ipt_policy, # Dump the Netfilter policy
                                               #   (requires -D as well).
-    'fw-include-ips'    => \$fw_include_ips,  # Include all IPs/nets in iptables
+    'fw-include-ips'    => \$fw_include_ips,  # Include all IPs/nets in Netfilter
                                               # dump (--fw-dump) output.
     'log-server'        => \$syslog_server,   # We are running psad on a syslog
                                               #   logging server.
@@ -503,7 +503,7 @@ Getopt::Long::Configure('no_ignore_case');
     'HUP'               => \$hup,             # Send psad processes a HUP signal
                                               #   to re-import config.
     'no-snort-sids'     => \$no_snort_sids,   # Disable search for snort SID's
-                                              #   in iptables messages.
+                                              #   in Netfilter messages.
     'no-whois'          => \$no_whois,        # Do not issue whois lookups against
     'no-passiveos'      => \$no_posf,         # Do not attempt to passively
     'no-passive-os'     => \$no_posf,         # Do not attempt to passively
@@ -582,7 +582,7 @@ unless ($no_whois) {
 
 ### if psad is running on a syslog server, do not check the firewall
 ### rules since they may not be local.  Also, do not check the
-### firewall if psad is configured to parse all iptables messages.
+### firewall if psad is configured to parse all Netfilter messages.
 unless ($no_fwcheck or $syslog_server or $benchmark
         or $config{'ENABLE_FW_LOGGING_CHECK'} eq 'N') {
     my $opts = "-c $config_file --fw-search $fw_search_file";
@@ -947,7 +947,7 @@ exit 0;
 
 ### Keeps track of scanning ip's, increments packet counters,
 ### keeps track of tcp flags for each scan, test for snort sid
-### values in iptables packets (if fwsnort is being used).
+### values in Netfilter packets (if fwsnort is being used).
 sub check_scan() {
     my $fw_packets_aref = shift;
 
@@ -1029,7 +1029,7 @@ sub check_scan() {
             }
         }
 
-        ### get the in/out interface and iptables chain
+        ### get the in/out interface and Netfilter chain
         if ($pkt =~ /IN=(\S+)\s+OUT=\s/) {
             $intf = $1;
             $chain = 'INPUT';
@@ -1134,7 +1134,7 @@ sub check_scan() {
                 ### FIXME: ignore TCP packets that have the ACK or RST
                 ### bits set (unless we matched a snort sid) since
                 ### _usually_ we see these packets as a result of the
-                ### iptables connection tracking bug.  Also, note that
+                ### Netfilter connection tracking bug.  Also, note that
                 ### no signatures make use of the RST flag.
                 print STDERR "[-] err packet: matched ACK or RST flag.\n"
                     if $debug;
@@ -1162,7 +1162,7 @@ sub check_scan() {
             }
 
             ### make sure we have a "reasonable" packet (note that nmap
-            ### can scan port 0 and iptables can report this fact)
+            ### can scan port 0 and Netfilter can report this fact)
             unless ($src and $dst and $len >= 0 and $tos and $ttl >= 0
                     and $id >= 0 and $proto and $sp >= 0 and $dp >= 0
                     and $win >= 0 and $flags) {
@@ -1197,7 +1197,7 @@ sub check_scan() {
             $proto = 'udp';
 
             ### make sure we have a "reasonable" packet (note that nmap
-            ### can scan port 0 and iptables can report this fact)
+            ### can scan port 0 and Netfilter can report this fact)
             unless ($src and $dst and $len >= 0 and $tos and $ttl >= 0
                     and $id >= 0 and $proto and $sp >= 0 and $dp >= 0) {
                 push @err_pkts, $pkt;
@@ -1237,7 +1237,7 @@ sub check_scan() {
                 $dshield_str = "$src\t$type\t$dst\t$code\t$proto";
             }
         } else {
-            ### Sometimes the iptables log entry gets messed up due to
+            ### Sometimes the Netfilter log entry gets messed up due to
             ### buffering issues so we write it to the error log.
             print STDERR "[-] err packet: no regex match.\n" if $debug;
             push @err_pkts, $pkt;
@@ -1347,7 +1347,7 @@ sub check_scan() {
             $log_prefix = '*noprfx*';
         }
 
-        ### keep track of iptables chain and logging prefix
+        ### keep track of Netfilter chain and logging prefix
         $curr_scan{$src}{$dst}{$proto}{'chain'}
                 {$chain}{$log_prefix}++;
 
@@ -1694,7 +1694,7 @@ sub parse_tcp_options() {
         print 'tcp options length not a multiple of two.' if $debug;
         return '';
     }
-    ### $tcp_options is a hex string like "020405B401010402" from the iptables
+    ### $tcp_options is a hex string like "020405B401010402" from the Netfilter
     ### log message
     my @chars = split //, $tcp_options;
     for (my $i=0; $i <= $#chars; $i += 2) {
@@ -2302,7 +2302,7 @@ sub psad_init() {
     ### level assignment
     &import_auto_dl() unless $no_auto_dl;
 
-    ### parse snort rules if we enable psad to match on iptables log
+    ### parse snort rules if we enable psad to match on Netfilter log
     ### messages that include snort SID's (see "fwsnort":
     ### http://www.cipherdyne.org/fwsnort).
     &import_snort_rules() unless $no_snort_sids;
@@ -2325,7 +2325,7 @@ sub psad_init() {
     ### analysis mode or benchmarking mode
     return if $fw_analyze or $benchmark;
 
-    ### enter iptables analysis mode.
+    ### enter Netfilter analysis mode.
     exit &analysis_mode() if $analyze_msgs;
 
     ### make sure PSAD_DIR, FW_DATA_FILE, and /var/lib/psad/psadfifo, etc.
@@ -2918,8 +2918,8 @@ sub import_signatures() {
 
             if ($rule_options =~ /[\s;]flags:\s*(.*?)\s*;/) {
                 $sig_flags = $1;
-                ### make flags identical to what iptables log messages
-                ### would report (check in iptables flag reporting order).
+                ### make flags identical to what Netfilter log messages
+                ### would report (check in Netfilter flag reporting order).
                 if ($sig_flags =~ /U/) {
                     if ($flags) {
                         $flags = 'URG ' . $flags;
@@ -2935,7 +2935,7 @@ sub import_signatures() {
                 $flags .= 'SYN ' if $sig_flags =~ /S/;
                 $flags .= 'FIN ' if $sig_flags =~ /F/;
 
-                ### if no flags are set iptables simply reports no flags
+                ### if no flags are set Netfilter simply reports no flags
                 ### at all instead of reporting "NULL".
                 $flags .= 'NULL ' if $sig_flags =~ /N/;
             }
@@ -4192,10 +4192,10 @@ sub print_chains_and_prefixes() {
         for my $prefix (keys %{$chain_hr->{$chain}}) {
             my $count = $chain_hr->{$chain}->{$prefix};
             if ($prefix eq '*noprfx*') {
-                printf $fh "%${log_len}s%s\n", 'Iptables chain: ',
+                printf $fh "%${log_len}s%s\n", 'Netfilter chain: ',
                     "$chain, $count packets";
             } else {
-                printf $fh "%${log_len}s%s\n", 'Iptables chain: ',
+                printf $fh "%${log_len}s%s\n", 'Netfilter chain: ',
                     qq/$chain (prefix "$prefix"), $count packets/;
             }
         }
@@ -4572,7 +4572,7 @@ sub ipt_block() {
         $auto_blocked_ips{$ip} = time()
             unless defined $auto_blocked_ips{$ip};
 
-        my $mail_msg = "iptables auto-block against $ip $timeout_str";
+        my $mail_msg = "Netfilter auto-block against $ip $timeout_str";
         if ($renewed_status) {
             $mail_msg = "renewed $mail_msg";
         } else {
@@ -4598,9 +4598,9 @@ sub ipt_block() {
         &diskwrite_blocked_ip($ip,
             $config{'AUTO_BLOCK_IPT_FILE'}, $renewed_status);
     } else {
-        &Psad::psyslog('psad', "could not add iptables " .
+        &Psad::psyslog('psad', "could not add Netfilter " .
             "block rule for: $ip") unless $no_syslog_alerts;
-        print STDERR "[-] Could not add iptables block rule for: $ip\n"
+        print STDERR "[-] Could not add Netfilter block rule for: $ip\n"
             if $debug;
     }
     return;
@@ -4669,14 +4669,14 @@ sub ipt_rm_block() {
         if (not $flush_fw) {
             ### don't send timeout email if we are manually flushing
             ### the auto-block rules from the command line with --Flush.
-            &Psad::psyslog('psad', "removed iptables auto-block against " .
+            &Psad::psyslog('psad', "removed Netfilter auto-block against " .
                 $ip) unless $no_syslog_alerts;
-            &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} removed iptables " .
+            &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} removed Netfilter " .
                 "block against $ip", '',
                 $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
                 unless $no_email_alerts;
         }
-        print STDERR "[+] ipt_rm_block(): removed iptables block ",
+        print STDERR "[+] ipt_rm_block(): removed Netfilter block ",
             "against $ip\n" if $debug;
 
         &diskwrite_rm_blocked_ip($ip, $config{'AUTO_BLOCK_IPT_FILE'});
@@ -4684,9 +4684,9 @@ sub ipt_rm_block() {
         return 1;
     }
 
-    &Psad::psyslog('psad', 'could not remove iptables ' .
+    &Psad::psyslog('psad', 'could not remove Netfilter ' .
         "block rule for $ip") unless $no_syslog_alerts;
-    print STDERR "[-] Could not remove iptables block rule for $ip\n"
+    print STDERR "[-] Could not remove Netfilter block rule for $ip\n"
         if $debug;
     return 0;
 }
@@ -5011,7 +5011,7 @@ sub auto_block_ignore_ip() {
         }
     }
     ### matching the following two addresses is less likely (assuming
-    ### iptables is not logging traffic from localhost) than matching
+    ### Netfilter is not logging traffic from localhost) than matching
     ### a legitimate interface address
     if ($ip eq '127.0.0.1' or $ip eq '0.0.0.0') {
         print STDERR "[+] Skipping IP $ip from auto-block.\n"
@@ -5249,7 +5249,7 @@ sub get_dns_info() {
         }
     } else {
         ### $ipaddr was already reported as
-        ### a host name by iptables (does this actually
+        ### a host name by Netfilter (does this actually
         ### happen?)
         $dns_str  = $ip;
     }
@@ -5408,7 +5408,7 @@ sub analysis_mode() {
             }
         }
     }
-    print "[+] Found $#ipt_msgs iptables messages out of ",
+    print "[+] Found $#ipt_msgs Netfilter messages out of ",
         "$#lines total lines.\n";
     print "    This may take a while...\n"
         if $#lines > 10000;
@@ -5721,14 +5721,14 @@ sub status_psad_daemon() {
         }
     }
 
-    ### print block status of IP addresses blocked by iptables
+    ### print block status of IP addresses blocked by Netfilter
     unless ($analyze_msgs) {
         &print_blocked_ip_status();
     }
 
     if ($analyze_msgs) {
         if (%ipt_prefixes) {
-            print "\n    Iptables prefix counters:\n";
+            print "\n    Netfilter prefix counters:\n";
             for my $prefix (keys %ipt_prefixes) {
                 my $count = $ipt_prefixes{$prefix};
                 print "        \"$prefix\": $count\n";
@@ -5738,7 +5738,7 @@ sub status_psad_daemon() {
         }
     } else {
         if (-e $config{'IPT_PREFIX_COUNTER_FILE'}) {
-            print "\n    Iptables prefix counters:\n";
+            print "\n    Netfilter prefix counters:\n";
             open F, "< $config{'IPT_PREFIX_COUNTER_FILE'}" or
                 die "[*] $config{'IPT_PREFIX_COUNTER_FILE'}: $!";
             my @lines = <F>;
@@ -5870,7 +5870,7 @@ sub status_ip() {
     }
     print STDOUT "\n[+] The above packet output shows up to 10 of the ",
         "most recently\n    logged packets for $status_ip.\n",
-        "[+] All packets logged by iptables specifically ",
+        "[+] All packets logged by Netfilter specifically ",
         "for $status_ip\n    can be viewed here: ",
         "$config{'PSAD_DIR'}/$status_ip/fwdata\n";
 
@@ -6058,7 +6058,7 @@ sub import_old_scans() {
             }
         }
     }
-    ### import iptables prefix stats
+    ### import Netfilter prefix stats
     if (-e $config{'IPT_PREFIX_COUNTER_FILE'}) {
         open F, "< $config{'IPT_PREFIX_COUNTER_FILE'}" or die "[*] Could not ",
             "open $config{'IPT_PREFIX_COUNTER_FILE'}: $!";
@@ -6792,17 +6792,17 @@ Options:
     -c,  --config <config file>   - Use <config file> instead of the
                                     normal config file located at
                                     $config_file.
-    -A,  --Analyze-msgs           - Analyze iptables logfile and exit.
+    -A,  --Analyze-msgs           - Analyze Netfilter logfile and exit.
     -e,  --email-analysis         - Send emails for scans detected in
                                     offline analysis mode.
     -w,  --whois-analysis         - Enable whois lookups when running
                                     in offline analysis mode.
-    -m,  --messages-file <file>   - Specify the path to the iptables
+    -m,  --messages-file <file>   - Specify the path to the Netfilter
                                     logfile (use in conjunction with
                                     --Analyze-msgs).
     --fw-search <file>            - Use <file> instead of the normal
                                     fw-search file: $fw_search_file.
-    --fw-analyze                  - Analyze the local iptables ruleset
+    --fw-analyze                  - Analyze the local Netfilter ruleset
                                     and exit.
     --fw-list-auto                - List the contents of any Netfilter
                                     chains use for auto-blocking rules.
@@ -6810,15 +6810,15 @@ Options:
                                     blocking chains.
     --fw-rm-block-ip  <ip>        - Remove an IP/network from the auto-
                                     blocking chains.
-    --fw-file <rules file>        - Analyze the iptables ruleset
+    --fw-file <rules file>        - Analyze the Netfilter ruleset
                                     contained within <rules file>
                                     instead of a running policy.
     --fw-del-chains               - Delete Netfilter chains used by
                                     psad for auto-blocking rules.
     --fw-dump                     - Dump a sanitized version of the local
                                     Netfilter policy.
-    --fw-include-ips              - Include all IPs/nets in iptables dump
-                                    (--fw-dump) output.
+    --fw-include-ips              - Include all IPs/nets in Netfilter
+                                    dump (--fw-dump) output.
     -snort-rdir <rule dir>        - Path to snort rules directory.
     -d,  --debug                  - Run psad in debugging mode.
     -D,  --Dump-conf              - Dump psad configuration on STDOUT
@@ -6852,7 +6852,7 @@ Options:
 
     --no-snort-sids               - Disable examination for snort sids
                                     (such as those generated by fwsnort)
-                                    in iptables messages.
+                                    in Netfilter messages.
     --no-signatures               - Disable psad signature processing
                                     (independent of snort sid matching).
     --no-icmp-types               - Disable icmp type/code validation.
@@ -6866,7 +6866,7 @@ Options:
                                     scanning IP addresses.
     --no-kmsgsd                   - Disable startup of kmsgsd (useful
                                     for debugging with an existing file
-                                    of iptables messages).
+                                    of Netfilter messages).
     --no-netstat                  - Disable local port lookups for scan
                                     signatures.
     -h   --help                   - Display usage on STDOUT and exit.

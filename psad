@@ -4437,6 +4437,8 @@ sub flush_auto_blocked_ips() {
 sub ipt_block() {
     my ($ip, $renewed_status) = @_;
 
+    return unless $ip and $ip =~ /^$ip_re$/;
+
     ### see if the IP is already blocked
     if (defined $auto_blocked_ips{$ip}) {
         print STDERR "[-] ipt_block($ip) already blocked.\n" if $debug;
@@ -4473,7 +4475,9 @@ sub ipt_block() {
         my $from_chain = $hr->{'from_chain'};
         my $to_chain   = $hr->{'to_chain'};
 
-        my $rv = 0;
+        my $src = '';
+        my $dst = '';
+        my $rv  = 0;
         my $status_msg = '';
 
         if ($config{'IPTABLES_PREREQ_CHECK'} == 1
@@ -4501,8 +4505,6 @@ sub ipt_block() {
             }
         }
 
-        my $src = '';
-        my $dst = '';
         if ($direction eq 'src' or $direction eq 'both') {
             $src = $ip;
             $dst = '0.0.0.0/0';
@@ -4510,8 +4512,6 @@ sub ipt_block() {
             $src = '0.0.0.0/0';
             $dst = $ip;
         }
-
-        next unless $src and $dst;
 
         if ($ipt->find_ip_rule($src, $dst,
                 $table, $to_chain, $target)) {
@@ -4593,10 +4593,11 @@ sub ipt_block() {
         &Psad::psyslog('psad', $mail_msg) unless $no_syslog_alerts;
 
         ### write the ip out to the auto blocked file
-        print STDERR "[+] ipt_block(): added block for $ip\n"
-            if $debug;
         &diskwrite_blocked_ip($ip,
             $config{'AUTO_BLOCK_IPT_FILE'}, $renewed_status);
+
+        print STDERR "[+] ipt_block(): added block for $ip\n"
+            if $debug;
     } else {
         &Psad::psyslog('psad', "could not add Netfilter " .
             "block rule for: $ip") unless $no_syslog_alerts;
@@ -4756,7 +4757,7 @@ sub check_ipt_cmd() {
 ### from the command line.
 sub sockwrite_add_ipt_block_ip() {
 
-    die "[*] --fw-block-ip takes an IP/subnet as an argument."
+    die "[*] --fw-block-ip takes either an IP or subnet as an argument."
         unless $fw_block_ip =~ /$ip_re/;
 
     my $block_ip   = '';
@@ -6074,8 +6075,8 @@ sub import_old_scans() {
     }
 
     if ($import_ctr) {
-        &Psad::psyslog('psad',
-            "imported $import_ctr scanning IP addresses from previous psad run")
+        &Psad::psyslog('psad', "imported $import_ctr scanning IP " .
+                "addresses from previous psad instance")
             unless $no_syslog_alerts;
     }
     return;

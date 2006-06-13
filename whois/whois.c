@@ -71,8 +71,8 @@ int main(int argc, char *argv[])
     textdomain(NLS_CAT_NAME);
 #endif
 
-    while ((ch = GETOPT_LONGISH(argc, argv, "acdFg:h:Hi:KlLmMp:q:rRs:St:T:v:V:x",
-				longopts, 0)) > 0) {
+    while ((ch = GETOPT_LONGISH(argc, argv,
+		"abBcdFg:Gh:Hi:KlLmMp:q:rRs:St:T:v:V:x", longopts, 0)) > 0) {
 	/* RIPE flags */
 	if (strchr(ripeflags, ch)) {
 	    for (p = fstring; *p; p++);
@@ -341,36 +341,28 @@ const char *whichwhois(const char *s)
 {
     unsigned long ip;
     unsigned int i;
+    char *colon;
 
     /* IPv6 address */
-    if (strchr(s, ':')) {
+    if ((colon = strchr(s, ':'))) {
 	unsigned long v6prefix, v6net;
-	const struct ip6_del *ip6_assign;
+
+	/* RPSL hierarchical objects like AS8627:fltr-TRANSIT-OUT */
+	if (strncasecmp(s, "as", 2) == 0 && isasciidigit(s[2]))
+	    return whereas(atoi(s + 2));
 
 	v6prefix = strtol(s, NULL, 16);
 
-	if (v6prefix == 0) {
-	    /* RPSL hierarchical object like AS8627:fltr-TRANSIT-OUT */
-	    if (strncasecmp(s, "as", 2) == 0 && isasciidigit(s[2]))
-		return whereas(atoi(s + 2));
-	    return "\x05";
-	} else if (v6prefix == 0x3FFE) {
-	    return "whois.6bone.net";
-	} else if (v6prefix == 0x2002) {
-	    return "\x0A";
-	} else if (v6prefix == 0x2001) {
-	    v6net = strtol(s + 5, NULL, 16);	/* second u16 */
-	    v6net = (v6net & 0xFE00) >> 8;	/* first 7 bits */
-	    ip6_assign = ip6_assign_misc;
-	} else if (v6prefix >= 0x2400 && v6prefix <= 0x3A00) {
-	    v6net = (v6prefix & 0xFC00) >> 8;	/* first 6 bits */
-	    ip6_assign = ip6_assign_rirs;
-	} else
-	    return "\x06";
+	if (v6prefix == 0)
+	    return "\x05";			/* unknown */
 
-	for (i = 0; ip6_assign[i].serv; i++)
-	    if (v6net == ip6_assign[i].net)
+	v6net = (v6prefix << 16) + strtol(colon + 1, NULL, 16);/* second u16 */
+
+	for (i = 0; ip6_assign[i].serv; i++) {
+	    if ((v6net & (~0UL << (32 - ip6_assign[i].masklen)))
+		    == ip6_assign[i].net)
 		return ip6_assign[i].serv;
+	}
 
 	return "\x06";			/* unknown allocation */
     }
@@ -387,8 +379,6 @@ const char *whichwhois(const char *s)
 	if (strncasecmp(s, "as", 2) == 0 &&	/* it's an AS */
 		(isasciidigit(s[2]) || s[2] == ' '))
 	    return whereas(atoi(s + 2));
-	else if (strncasecmp(p - 2, "jp", 2) == 0) /* JP NIC handle */
-	    return "whois.nic.ad.jp";
 	if (*s == '!')	/* NSI NIC handle */
 	    return "whois.networksolutions.com";
 	else
@@ -449,33 +439,35 @@ char *queryformat(const char *server, const char *flags, const char *query)
 	    isripe = 1;
 	    break;
 	}
-    if (!isripe)
-	for (i = 0; ripe_servers_old[i]; i++)
-	    if (strcmp(server, ripe_servers_old[i]) == 0) {
-		strcat(buf, "-V");
-		strcat(buf, client_tag);
-		strcat(buf, " ");
-		isripe = 1;
-		break;
-	    }
     if (*flags) {
 	if (!isripe && strcmp(server, "whois.corenic.net") != 0)
 	    puts(_("Warning: RIPE flags used with a traditional server."));
 	strcat(buf, flags);
     }
 
+#ifdef HAVE_LIBIDN
     /* why, oh why DENIC had to make whois "user friendly"?
-     * I hope that adding -T dn,ace will not break some queries.
+     * Do this only if the user did not use any flag.
      */
     if (isripe && strcmp(server, "whois.denic.de") == 0 && domcmp(query, ".de")
-	    && !strchr(query, ' '))
+	    && !strchr(query, ' ') && !*flags)
 	sprintf(buf, "-T dn,ace -C US-ASCII %s", query);
-    else if (!isripe && (strcmp(server, "whois.nic.mil") == 0 ||
+    else
+    /* here we have another registrar who could not make things simple
+     * -C sets the language for both input and output
+     */
+    if (!isripe && strcmp(server, "whois.cat") == 0 && domcmp(query, ".cat")
+	    && !strchr(query, ' '))
+	sprintf(buf, "-C US-ASCII ace %s", query);
+    else
+#endif
+    if (!isripe && (strcmp(server, "whois.nic.mil") == 0 ||
 	    strcmp(server, "whois.nic.ad.jp") == 0) &&
 	    strncasecmp(query, "AS", 2) == 0 && isasciidigit(query[2]))
 	/* FIXME: /e is not applied to .JP ASN */
 	sprintf(buf, "AS %s", query + 2);	/* fix query for DDN */
-    else if (!isripe && strcmp(server, "whois.nic.ad.jp") == 0) {
+    else if (!isripe && (strcmp(server, "whois.nic.ad.jp") == 0 ||
+	    strcmp(server, "whois.jprs.jp") == 0)) {
 	char *lang = getenv("LANG");	/* not a perfect check, but... */
 	if (!lang || (strncmp(lang, "ja", 2) != 0))
 	    sprintf(buf, "%s/e", query);	/* ask for english text */
@@ -506,20 +498,20 @@ int hide_line(int *hiding, const char *const line)
 	}
 	return 0;				/* don't hide this line */
     } else if (*hiding > HIDE_UNSTARTED) {	/* hiding something */
-	if (strncmp(line, hide_strings[*hiding + 1],
-		    strlen(hide_strings[*hiding + 1])) == 0) {
-	    *hiding = HIDE_DISABLED;		/* stop hiding */
-	    return 1;				/* but hide the last line */
+	if (*hide_strings[*hiding + 1] == '\0')	{ /*look for a blank line?*/
+	    if (*line == '\n' || *line == '\r' || *line == '\0') {
+		*hiding = HIDE_DISABLED;	/* stop hiding */
+		return 0;		/* but do not hide the blank line */
+	    }
+	} else {				/*look for a matching string*/
+	    if (strncmp(line, hide_strings[*hiding + 1],
+			strlen(hide_strings[*hiding + 1])) == 0) {
+		*hiding = HIDE_DISABLED;	/* stop hiding */
+		return 1;			/* but hide the last line */
+	    }
 	}
 	return 1;				/* we are hiding, so do it */
-    }
-#if 0
-    /* XXX */
-    /* no match, the action depends on the state stored in *hiding */
-    if (*hiding > HIDE_UNSTARTED)
-	return 1;
-    else
-#endif
+    } else
 	return 0;
 }
 
@@ -534,7 +526,7 @@ const char *do_query(const int sock, const char *query)
     fi = fdopen(sock, "r");
     if (write(sock, query, strlen(query)) < 0)
 	err_sys("write");
-/* Using shutdown breaks the buggy RIPE server.
+/* Using shutdown used to break the buggy RIPE server. Would this work now?
     if (shutdown(sock, 1) < 0)
 	err_sys("shutdown");
 */

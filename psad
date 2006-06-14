@@ -4461,7 +4461,7 @@ sub ipt_block() {
         $timeout_str = '(unlimited timeout)';
     }
 
-    if ($config{'IPABLES_PREREQ_CHECK'} > 1) {
+    if ($config{'IPTABLES_PREREQ_CHECK'} > 1) {
         $netfilter_prereq_check++;
         $netfilter_prereq_check = 1
             if $netfilter_prereq_check == $config{'IPTABLES_PREREQ_CHECK'};

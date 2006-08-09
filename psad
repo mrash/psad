@@ -4361,17 +4361,23 @@ sub sockwrite_flush_auto_rules() {
 
     ### if we make it here then we have to flush manually because
     ### it looks like psad is not running.
-    print "[+] Flushing psad chains.\n";
-    &flush_auto_blocked_ips($fw_del_chains);
+    if ($fw_del_chains) {
+        print "[+] Flushing and deleting psad chains.\n";
+    } else {
+        print "[+] Flushing psad chains.\n";
+    }
+    &flush_auto_blocked_ips();
     return 0;
 }
 
 sub flush_auto_blocked_ips() {
-    my $fw_del_chains = shift;
 
-    my $ipt = new IPTables::ChainMgr(
-        'iptables' => $cmds{'iptables'}
-    ) or die '[*] Could not acquire IPTables::ChainMgr object.';
+    my %ipt_opts = ('iptables' => $cmds{'iptables'});
+    $ipt_opts{'debug'}   = 1 if $debug;
+    $ipt_opts{'verbose'} = 1 if $verbose;
+
+    my $ipt = new IPTables::ChainMgr(%ipt_opts)
+        or die '[*] Could not acquire IPTables::ChainMgr object.';
 
     &Psad::psyslog('psad', 'flushing existing psad Netfilter ' .
         'auto-response chains');
@@ -4382,16 +4388,34 @@ sub flush_auto_blocked_ips() {
             my $from_chain = $hr->{'from_chain'};
             my $to_chain   = $hr->{'to_chain'};
 
-            if ($ipt->chain_exists($table, $to_chain)) {
+            my ($rv, $out_aref, $err_aref)
+                = $ipt->chain_exists($table, $to_chain);
+
+            if ($rv) {
                 if ($fw_del_chains) {
-                    my ($rv, $status_msg) = $ipt->delete_chain($table,
+                    ($rv, $out_aref, $err_aref) = $ipt->delete_chain($table,
                         $from_chain, $to_chain);
-                    &Psad::psyslog('psad', $status_msg);
-                } else {
-                    if ($ipt->flush_chain($table, $to_chain)) {
-                        &Psad::psyslog('psad', "flushed: $to_chain");
+                    if ($rv) {
+                        &Psad::psyslog('psad',
+                            "deleted $table table $to_chain chain");
                     } else {
-                        &Psad::psyslog('psad', "could not flush: $to_chain");
+                        unless ($no_syslog_alerts) {
+                            &Psad::psyslog('psad',
+                                "could not delete $table table $to_chain chain");
+                            &psyslog_errs($err_aref);
+                        }
+                    }
+                } else {
+                    ($rv, $out_aref, $err_aref)
+                        = $ipt->flush_chain($table, $to_chain);
+                    if ($rv) {
+                        &Psad::psyslog('psad', "flushed: $to_chain")
+                            unless $no_syslog_alerts;
+                    } else {
+                        unless ($no_syslog_alerts) {
+                            &Psad::psyslog('psad', "could not flush: $to_chain");
+                            &psyslog_errs($err_aref);
+                        }
                     }
                 }
             }
@@ -4447,9 +4471,12 @@ sub ipt_block() {
 
     print STDERR "[+] ipt_block($ip)\n" if $debug;
 
-    my $ipt = new IPTables::ChainMgr(
-        'iptables' => $cmds{'iptables'}
-    ) or die '[*] Could not acquire IPTables::ChainMgr object.';
+    my %ipt_opts = ('iptables' => $cmds{'iptables'});
+    $ipt_opts{'debug'}   = 1 if $debug;
+    $ipt_opts{'verbose'} = 1 if $verbose;
+
+    my $ipt = new IPTables::ChainMgr(%ipt_opts)
+        or die '[*] Could not acquire IPTables::ChainMgr object.';
 
     my $block_success   = 0;
     my $already_blocked = 0;
@@ -4474,11 +4501,11 @@ sub ipt_block() {
         my $table      = $hr->{'table'};
         my $from_chain = $hr->{'from_chain'};
         my $to_chain   = $hr->{'to_chain'};
+        my $jump_rule_position = $hr->{'jump_rule_position'};
+        my $auto_rule_position = $hr->{'auto_rule_position'};
 
         my $src = '';
         my $dst = '';
-        my $rv  = 0;
-        my $status_msg = '';
 
         if ($config{'IPTABLES_PREREQ_CHECK'} == 1
                 or $netfilter_prereq_check == 1) {
@@ -4486,21 +4513,30 @@ sub ipt_block() {
                 if $debug;
 
             ### make sure "to_chain" exists
-            ($rv, $status_msg) = $ipt->create_chain($table, $to_chain);
+            my ($rv, $out_aref, $err_aref)
+                = $ipt->create_chain($table, $to_chain);
 
             unless ($rv) {
-                &Psad::psyslog('psad', $status_msg) unless $no_syslog_alerts;
-                print STDERR "[-] ipt_block(): $status_msg\n" if $debug;
+                my $msg = "could not create $table $to_chain chain";
+                unless ($no_syslog_alerts) {
+                    &Psad::psyslog('psad', $msg);
+                    &psyslog_errs($err_aref);
+                }
+                print STDERR "[-] ipt_block(): $msg\n" if $debug;
                 next;
             }
 
             ### add jump rule to the "to_chain" from the "from_chain"
-            ($rv, $status_msg) = $ipt->add_jump_rule($table,
-                $from_chain, $to_chain);
+            ($rv, $out_aref, $err_aref) = $ipt->add_jump_rule($table,
+                $from_chain, $jump_rule_position, $to_chain);
 
             unless ($rv) {
-                &Psad::psyslog('psad', $status_msg) unless $no_syslog_alerts;
-                print STDERR "[-] ipt_block(): $status_msg\n" if $debug;
+                my $msg = "could not add jump rule to $to_chain chain";
+                unless ($no_syslog_alerts) {
+                    &Psad::psyslog('psad', $msg);
+                    &psyslog_errs($err_aref);
+                }
+                print STDERR "[-] ipt_block(): $msg\n" if $debug;
                 next;
             }
         }
@@ -4513,22 +4549,26 @@ sub ipt_block() {
             $dst = $ip;
         }
 
-        if ($ipt->find_ip_rule($src, $dst,
-                $table, $to_chain, $target)) {
+        my ($rv, $out_aref, $err_aref) = $ipt->find_ip_rule($src, $dst,
+                $table, $to_chain, $target);
+
+        if ($rv) {
             print STDERR "[-] Test1, IP rule ($src->$dst $to_chain) ",
                 "already exists.\n" if $debug;
             $already_blocked = 1;
         } else {
-            ($rv, $status_msg) = $ipt->add_ip_rule($src, $dst,
-                $config{'IPTABLES_AUTO_RULENUM'}, $table,
-                $to_chain, $target);
+            ($rv, $out_aref, $err_aref) = $ipt->add_ip_rule($src, $dst,
+                $auto_rule_position, $table, $to_chain, $target);
             if ($rv) {
                 print STDERR "[+] Test1 block success.\n" if $debug;
                 $block_success = 1;
             } else {
-                &Psad::psyslog('psad', $status_msg)
-                    unless $no_syslog_alerts;
-                print STDERR "[-] ipt_block(): $status_msg\n" if $debug;
+                my $msg = "could not add block rule for $src -> $dst";
+                unless ($no_syslog_alerts) {
+                    &Psad::psyslog('psad', $msg);
+                    &psyslog_errs($err_aref);
+                }
+                print STDERR "[-] ipt_block(): $msg\n" if $debug;
             }
         }
 
@@ -4536,22 +4576,26 @@ sub ipt_block() {
             ### need to add reverse rule for FORWARD chain
             my $src2 = $dst;
             my $dst2 = $src;
-            if ($ipt->find_ip_rule($src2, $dst2, $table,
-                    $to_chain, $target)) {
+            my ($rv, $out_aref, $err_aref) = $ipt->find_ip_rule($src2,
+                    $dst2, $table, $to_chain, $target);
+
+            if ($rv) {
                 print STDERR "[-] Test2, IP rule ($src2->$dst2 $to_chain) ",
                     "already exists.\n" if $debug;
                 $already_blocked = 1;
             } else {
-                ($rv, $status_msg) = $ipt->add_ip_rule($src2, $dst2,
-                    $config{'IPTABLES_AUTO_RULENUM'}, $table,
-                    $to_chain, $target);
+                ($rv, $out_aref, $err_aref) = $ipt->add_ip_rule($src2, $dst2,
+                    $auto_rule_position, $table, $to_chain, $target);
                 if ($rv) {
                     print STDERR "[+] Test2 block success.\n" if $debug;
                     $block_success = 1;
                 } else {
-                    &Psad::psyslog('psad', $status_msg)
-                        unless $no_syslog_alerts;
-                    print STDERR "[-] ipt_block(): $status_msg\n" if $debug;
+                    my $msg = "could not add block rule for $src2 -> $dst2";
+                    unless ($no_syslog_alerts) {
+                        &Psad::psyslog('psad', $msg);
+                        &psyslog_errs($err_aref);
+                    }
+                    print STDERR "[-] ipt_block(): $msg\n" if $debug;
                 }
             }
         }
@@ -4610,9 +4654,12 @@ sub ipt_block() {
 sub ipt_rm_block() {
     my $ip = shift;
 
-    my $ipt = new IPTables::ChainMgr(
-        'iptables' => $cmds{'iptables'}
-    ) or die "[*] Could not acquire IPTables::ChainMgr object.";
+    my %ipt_opts = ('iptables' => $cmds{'iptables'});
+    $ipt_opts{'debug'}   = 1 if $debug;
+    $ipt_opts{'verbose'} = 1 if $verbose;
+
+    my $ipt = new IPTables::ChainMgr(%ipt_opts)
+        or die '[*] Could not acquire IPTables::ChainMgr object.';
 
     print STDERR "[+] ipt_rm_block($ip)\n" if $debug;
 
@@ -4634,28 +4681,34 @@ sub ipt_rm_block() {
             $dst = $ip;
         }
 
-        my ($rv, $status_msg) = $ipt->delete_ip_rule($src, $dst,
+        my ($rv, $out_aref, $err_aref) = $ipt->delete_ip_rule($src, $dst,
             $table, $to_chain, $target);
         if ($rv) {
             $rm_block = 1;
         } else {
-            &Psad::psyslog('psad', $status_msg)
-                unless $no_syslog_alerts;
-            print STDERR "[-] ipt_rm_block(): $status_msg\n" if $debug;
+            my $msg = "could not delete rule for $src -> $dst";
+            unless ($no_syslog_alerts) {
+                &Psad::psyslog('psad', $msg);
+                &psyslog_errs($err_aref);
+            }
+            print STDERR "[-] ipt_rm_block(): $msg\n" if $debug;
         }
 
         if ($direction eq 'both') {
             ### need to delete reverse rule for FORWARD chain
             my $src2 = $dst;
             my $dst2 = $src;
-            my ($rv, $status_msg) = $ipt->delete_ip_rule($src2, $dst2,
+            ($rv, $out_aref, $err_aref) = $ipt->delete_ip_rule($src2, $dst2,
                 $table, $to_chain, $target);
             if ($rv) {
                 $rm_block = 1;
             } else {
-                &Psad::psyslog('psad', $status_msg)
-                    unless $no_syslog_alerts;
-                print STDERR "[-] ipt_rm_block(): $status_msg\n" if $debug;
+                my $msg = "could not delete rule for $src -> $dst";
+                unless ($no_syslog_alerts) {
+                    &Psad::psyslog('psad', $msg);
+                    &psyslog_errs($err_aref);
+                }
+                print STDERR "[-] ipt_rm_block(): $msg\n" if $debug;
             }
         }
     }
@@ -4694,9 +4747,12 @@ sub ipt_rm_block() {
 
 sub ipt_list_auto_chains() {
 
-    my $ipt = new IPTables::ChainMgr(
-        'iptables' => $cmds{'iptables'}
-    ) or die '[*] Could not acquire IPTables::ChainMgr object.';
+    my %ipt_opts = ('iptables' => $cmds{'iptables'});
+    $ipt_opts{'debug'}   = 1 if $debug;
+    $ipt_opts{'verbose'} = 1 if $verbose;
+
+    my $ipt = new IPTables::ChainMgr(%ipt_opts)
+        or die '[*] Could not acquire IPTables::ChainMgr object.';
 
     print "[+] Listing chains from IPT_AUTO_CHAIN keywords...\n";
     if ($config{'ENABLE_AUTO_IDS'} eq 'N') {
@@ -4708,13 +4764,15 @@ sub ipt_list_auto_chains() {
         my $table    = $hr->{'table'};
         my $to_chain = $hr->{'to_chain'};
 
-        if ($ipt->chain_exists($table, $to_chain)) {
-            my ($rv, $output_aref) =
-                $ipt->run_ipt_cmd_output("$cmds{'iptables'} -t " .
-                    "$table -n -L $to_chain -v");
+        my ($rv, $out_aref, $err_aref)
+            = $ipt->chain_exists($table, $to_chain);
 
-            if ($rv and $output_aref) {
-                print for @$output_aref;
+        if ($rv) {
+            ($rv, $out_aref, $err_aref) =
+                $ipt->run_ipt_cmd("$cmds{'iptables'} -t " .
+                    "$table -n -L $to_chain -v");
+            if ($rv and $out_aref) {
+                print for @$out_aref;
             }
             print "\n";
         } else {
@@ -5045,25 +5103,51 @@ sub timeout_auto_blocked_ips() {
 
 sub build_ipt_config() {
 
-    my $ipt = new IPTables::ChainMgr(
-        'iptables' => $cmds{'iptables'}
-    ) or die "[*] Could not acquire IPTables::ChainMgr object.";
+    my %ipt_opts = ('iptables' => $cmds{'iptables'});
+    $ipt_opts{'debug'}   = 1 if $debug;
+    $ipt_opts{'verbose'} = 1 if $verbose;
+
+    my $ipt = new IPTables::ChainMgr(%ipt_opts)
+        or die '[*] Could not acquire IPTables::ChainMgr object.';
 
     my $ctr = 1;
 
     VAR: while (defined $config{"IPT_AUTO_CHAIN$ctr"}) {
         my $value = $config{"IPT_AUTO_CHAIN$ctr"};
 
-        ### DROP, src, filter, INPUT, PSAD_BLOCK_INPUT;
         my @block = split /\s*,\s*/, $value;
-        if ($#block == 4) {
-            my %hsh = (
-                'target'     => $block[0],
-                'direction'  => $block[1],
-                'table'      => $block[2],
-                'from_chain' => $block[3],
-                'to_chain'   => $block[4]
-            );
+        if ($#block == 4 or $#block == 6) {
+            my %hsh = ();
+            if ($#block == 4) {
+                ### DROP, src, filter, INPUT, PSAD_BLOCK_INPUT;
+                %hsh = (
+                    'target'     => $block[0],
+                    'direction'  => $block[1],
+                    'table'      => $block[2],
+                    'from_chain' => $block[3],
+                    'to_chain'   => $block[4],
+                    'jump_rule_position' => 1,
+                    'auto_rule_position' => 1
+                );
+                ### this is the old format; generate a warning
+                my $msg = "the IPT_AUTO_CHAIN$ctr variable in psad.conf " .
+                    "needs to be updated to set the jump rule position and " .
+                    "the auto rule position; defaulting both to 1.";
+                    &Psad::psyslog('psad', $msg) unless $no_syslog_alerts;
+                    print STDERR "[-] build_ipt_config(): $msg\n"
+                        if $debug;
+            } else {
+                ### DROP, src, filter, INPUT, 1, PSAD_BLOCK_INPUT, 1;
+                %hsh = (
+                    'target'     => $block[0],
+                    'direction'  => $block[1],
+                    'table'      => $block[2],
+                    'from_chain' => $block[3],
+                    'jump_rule_position' => $block[4],
+                    'to_chain'   => $block[5],
+                    'auto_rule_position' => $block[6]
+                );
+            }
             unless ($hsh{'direction'} eq 'src' or
                         $hsh{'direction'} eq 'dst' or
                         $hsh{'direction'} eq 'both') {
@@ -5074,7 +5158,10 @@ sub build_ipt_config() {
                     if $debug;
                 next VAR;
             }
-            if ($ipt->chain_exists($hsh{'table'}, $hsh{'from_chain'})) {
+            my ($rv, $out_aref, $err_aref)
+                = $ipt->chain_exists($hsh{'table'}, $hsh{'from_chain'});
+
+            if ($rv) {
                 push @ipt_config, \%hsh;
             } else {
                 my $msg = "invalid IPT_AUTO_CHAIN$ctr keyword, " .
@@ -5792,9 +5879,13 @@ sub print_blocked_ip_status() {
     unlink "$config{'AUTO_BLOCK_IPT_FILE'}.status";
 
     print "\n    Iptables auto-blocked IPs:\n";
-    my $ipt = new IPTables::ChainMgr(
-        'iptables' => $cmds{'iptables'}
-    ) or die "[*] Could not acquire IPTables::ChainMgr object.";
+
+    my %ipt_opts = ('iptables' => $cmds{'iptables'});
+    $ipt_opts{'debug'}   = 1 if $debug;
+    $ipt_opts{'verbose'} = 1 if $verbose;
+
+    my $ipt = new IPTables::ChainMgr(%ipt_opts)
+        or die '[*] Could not acquire IPTables::ChainMgr object.';
 
     my $found_line = 0;
     for my $line (@lines) {
@@ -6711,6 +6802,14 @@ sub dump_ipt_policy() {
     return;
 }
 
+sub psyslog_errs() {
+    my $aref = shift;
+    for (my $i=0; $i<5 && $i<=$#$aref; $i++) {
+        &Psad::psyslog('psad', $aref->[$i]);
+    }
+    return;
+}
+
 sub run_command() {
     my ($cmd_path, $args) = @_;
     my $cmd = $cmd_path;
@@ -6750,6 +6849,7 @@ sub required_vars() {
         PSAD_DIR PSAD_RUN_DIR PSAD_LIB_DIR ENABLE_FW_LOGGING_CHECK
         ENABLE_RENEW_BLOCK_EMAILS DSHIELD_LATEST_EMAIL AUTO_BLOCK_REGEX
         ENABLE_AUTO_IDS_REGEX IPTABLES_PREREQ_CHECK SNORT_RULE_DL_FILE
+        IPT_OUTPUT_FILE IPT_ERROR_FILE
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

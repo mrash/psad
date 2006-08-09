@@ -10,7 +10,7 @@
 #
 # Author: Michael Rash (mbr@cipherdyne.org)
 #
-# Version: 0.1
+# Version: 0.4
 #
 #############################################################################
 #
@@ -27,7 +27,7 @@ use strict;
 use warnings;
 use vars qw($VERSION);
 
-$VERSION = '0.2';
+$VERSION = '0.4';
 
 sub new() {
     my $class = shift;
@@ -35,9 +35,12 @@ sub new() {
 
     my $self = {
         _iptables => $args{'iptables'} || '/sbin/iptables',
-        _debug    => $args{'debug'}    || 0
+        _iptout   => $args{'iptout'}   || '/tmp/ipt.out',
+        _ipterr   => $args{'ipterr'}   || '/tmp/ipt.err',
+        _debug    => $args{'debug'}    || 0,
+        _verbose  => $args{'verbose'}  || 0,
     };
-    croak "[*] $self->{'_iptables'} incorrect path.\n"
+    croak "[*] $self->{'_iptables'} incorrect iptables path.\n"
         unless -e $self->{'_iptables'};
     croak "[*] $self->{'_iptables'} not executable.\n"
         unless -x $self->{'_iptables'};
@@ -50,10 +53,8 @@ sub chain_exists() {
     my $chain = shift || croak '[*] Must specify a chain to create.';
     my $iptables = $self->{'_iptables'};
 
-    if ($self->run_ipt_cmd("$iptables -t $table -n -L $chain") == 0) {
-        return 1;
-    }
-    return 0;
+    ### see if the chain exists
+    return $self->run_ipt_cmd("$iptables -t $table -n -L $chain");
 }
 
 sub create_chain() {
@@ -62,18 +63,14 @@ sub create_chain() {
     my $chain = shift || croak '[*] Must specify a chain to create.';
     my $iptables = $self->{'_iptables'};
 
-    if ($self->chain_exists($table, $chain, $iptables)) {
-        ### the chain already exists
-        return 1, "Table: $table, chain: $chain, already exists.";
-    } else {
-        ### create the chain
-        if ($self->run_ipt_cmd("$iptables -t $table -N $chain") == 0) {
-            return 1, "Table: $table, chain: $chain, created.";
-        } else {
-            ### could not create the chain
-            return 0, "Table: $table, chain: $chain, could not create.";
-        }
-    }
+    ### see if the chain exists first
+    my ($rv, $out_aref, $err_aref) = $self->chain_exists($table, $chain);
+
+    ### the chain already exists
+    return 1, $out_aref, $err_aref if $rv;
+
+    ### create the chain
+    return $self->run_ipt_cmd("$iptables -t $table -N $chain");
 }
 
 sub flush_chain() {
@@ -82,10 +79,8 @@ sub flush_chain() {
     my $chain = shift || croak '[*] Must specify a chain.';
     my $iptables = $self->{'_iptables'};
 
-    if ($self->run_ipt_cmd("$iptables -t $table -F $chain") == 0) {
-        return 1;
-    }
-    return 0;
+    ### flush the chain
+    return $self->run_ipt_cmd("$iptables -t $table -F $chain");
 }
 
 sub delete_chain() {
@@ -98,34 +93,33 @@ sub delete_chain() {
     my $iptables = $self->{'_iptables'};
 
     ### see if the chain exists first
-    if ($self->run_ipt_cmd("$iptables -t $table -n -L $del_chain") == 0) {
-        ### flush the chain
-        if ($self->flush_chain($table, $del_chain, $iptables)) {
-            ### find and delete jump rules to this chain (we can't delete
-            ### the chain until there are no references to it)
-            my $rulenum = $self->find_ip_rule('0.0.0.0/0',
-                '0.0.0.0/0', $table, $jump_from_chain, $del_chain, {});
-            if ($rulenum) {
-                $self->run_ipt_cmd("$iptables -t $table " .
-                    "-D $jump_from_chain $rulenum");
-            }
-            ### note that we try to delete the chain now regardless
-            ### of whether their were jump rules above (should probably
-            ### parse for the "0 references" under the -nL <chain> output).
-            if ($self->run_ipt_cmd("$iptables -t $table " .
-                    "-X $del_chain") == 0) {
-                return 1, "Table: $table, chain: $del_chain, deleted.";
-            } else {
-                return 0, "Table: $table, chain: $del_chain, " .
-                    "could not delete.";
-            }
-        } else {
-            return 0, "Table: $table, chain: $del_chain, " .
-                "could not flush.";
-        }
-    } else {
-        return 0, "Table: $table, chain: $del_chain, does not exist";
+    my ($rv, $out_aref, $err_aref) = $self->chain_exists($table, $del_chain);
+
+    ### return true if the chain doesn't exist (it is not an error condition)
+    return 1, $out_aref, $err_aref unless $rv;
+
+    ### flush the chain
+    ($rv, $out_aref, $err_aref)
+        = $self->flush_chain($table, $del_chain, $iptables);
+
+    ### could not flush the chain
+    return 0, $out_aref, $err_aref unless $rv;
+
+    ### find and delete jump rules to this chain (we can't delete
+    ### the chain until there are no references to it)
+    my ($rulenum, $num_chain_rules)
+        = $self->find_ip_rule('0.0.0.0/0',
+            '0.0.0.0/0', $table, $jump_from_chain, $del_chain, {});
+
+    if ($rulenum) {
+        $self->run_ipt_cmd(
+            "$iptables -t $table -D $jump_from_chain $rulenum");
     }
+
+    ### note that we try to delete the chain now regardless
+    ### of whether their were jump rules above (should probably
+    ### parse for the "0 references" under the -nL <chain> output).
+    return $self->run_ipt_cmd("$iptables -t $table -X $del_chain");
 }
 
 sub add_ip_rule() {
@@ -141,40 +135,17 @@ sub add_ip_rule() {
     my $extended_href = shift || {};
     my $iptables = $self->{'_iptables'};
 
-    ### regex to match an IP address
-    my $ip_re = '(?:\d{1,3}\.){3}\d{1,3}';
-
-    ### normalize src network if necessary; this is because Netfilter
+    ### normalize src/dst if necessary; this is because Netfilter
     ### always reports network address for subnets
-    my $normalized_src = '';
-    if ($src =~ m|($ip_re)/($ip_re)|) {
-        my ($net_addr, $cidr) = ipv4_network($1, $2);
-        $normalized_src = "$net_addr/$cidr";
-    } elsif ($src =~ m|($ip_re)/(\d+)|) {
-        my ($net_addr, $cidr) = ipv4_network($1, $2);
-        $normalized_src = "$net_addr/$cidr";
-    } else {
-        ### it is a hostname or an individual IP
-        $normalized_src = $src;
-    }
-
-    ### normalize dst network if necessary; this is because Netfilter
-    ### always reports network address for subnets
-    my $normalized_dst = '';
-    if ($dst =~ m|($ip_re)/($ip_re)|) {
-        my ($net_addr, $cidr) = ipv4_network($1, $2);
-        $normalized_dst = "$net_addr/$cidr";
-    } elsif ($dst =~ m|($ip_re)/(\d+)|) {
-        my ($net_addr, $cidr) = ipv4_network($1, $2);
-        $normalized_dst = "$net_addr/$cidr";
-    } else {
-        ### it is a hostname or an individual IP
-        $normalized_dst = $dst;
-    }
+    my $normalized_src = $self->normalize_net($src);
+    my $normalized_dst = $self->normalize_net($dst);
 
     ### first check to see if this rule already exists
-    if ($self->find_ip_rule($normalized_src, $normalized_dst, $table,
-            $chain, $target, $extended_href)) {
+    my ($rule_position, $num_chain_rules)
+            = $self->find_ip_rule($normalized_src, $normalized_dst, $table,
+                $chain, $target, $extended_href);
+
+    if ($rule_position) {
         my $msg = '';
         if ($extended_href) {
             $msg = "Table: $table, chain: $chain, $normalized_src -> " .
@@ -188,51 +159,54 @@ sub add_ip_rule() {
             $msg = "Table: $table, chain: $chain, $normalized_src -> " .
                 "$normalized_dst rule already exists.";
         }
-        return 1, $msg;
-    } else {
-        ### we need to add the rule
-        my $ipt_cmd = '';
-        my $msg     = '';
-        my $err_msg = '';
-        if ($extended_href) {
-            $ipt_cmd = "$iptables -t $table -I $chain $rulenum ";
-            $ipt_cmd .= "-p $extended_href->{'protocol'} "
-                if defined $extended_href->{'protocol'};
-            $ipt_cmd .= "-s $normalized_src ";
-            $ipt_cmd .= "--sport $extended_href->{'s_port'} "
-                if defined $extended_href->{'s_port'};
-            $ipt_cmd .= "-d $normalized_dst ";
-            $ipt_cmd .= "--dport $extended_href->{'d_port'} "
-                if defined $extended_href->{'d_port'};
-            $ipt_cmd .= "-j $target";
-            $msg = "Table: $table, chain: $chain, added $normalized_src " .
-                "-> $normalized_dst ";
-            for my $key qw(protocol s_port d_port) {
-                $msg .= "$key $extended_href->{$key} "
-                    if defined $extended_href->{$key};
-            }
-            $msg =~ s/\s*$//;
-            $err_msg = "Table: $table, chain: $chain, could not add $target " .
-                "rule for $normalized_src -> $normalized_dst";
-            for my $key qw(protocol s_port d_port) {
-                $err_msg .= "$key $extended_href->{$key} "
-                    if defined $extended_href->{$key};
-            }
-            $err_msg =~ s/\s*$//;
-        } else {
-            $ipt_cmd = "$iptables -t $table -I $chain $rulenum " .
-                "-s $normalized_src -d $normalized_dst -j $target";
-            $msg = "Table: $table, chain: $chain, added $normalized_src " .
-                "-> $normalized_dst";
-            $err_msg = "Table: $table, chain: $chain, could not add $target " .
-                "rule for $normalized_src -> $normalized_dst";
-        }
-        if ($self->run_ipt_cmd($ipt_cmd) == 0) {
-            return 1, $msg;
-        } else {
-            return 0, $err_msg;
-        }
+        return 1, [$msg], [];
     }
+
+    ### we need to add the rule
+    my $ipt_cmd = '';
+    my $msg     = '';
+    my $idx_err = '';
+
+    ### check to see if the insertion index ($rulenum) is too big
+    $rulenum = 1 if $rulenum <= 0;
+    if ($rulenum > $num_chain_rules+1) {
+        $idx_err = "Rule position $rulenum is past end of $chain " .
+            "chain ($num_chain_rules rules), compensating."
+            if $num_chain_rules > 0;
+        $rulenum = $num_chain_rules + 1;
+    }
+    $rulenum = 1 if $rulenum == 0;
+
+    if ($extended_href) {
+        $ipt_cmd = "$iptables -t $table -I $chain $rulenum ";
+        $ipt_cmd .= "-p $extended_href->{'protocol'} "
+            if defined $extended_href->{'protocol'};
+        $ipt_cmd .= "-s $normalized_src ";
+        $ipt_cmd .= "--sport $extended_href->{'s_port'} "
+            if defined $extended_href->{'s_port'};
+        $ipt_cmd .= "-d $normalized_dst ";
+        $ipt_cmd .= "--dport $extended_href->{'d_port'} "
+            if defined $extended_href->{'d_port'};
+        $ipt_cmd .= "-j $target";
+        $msg = "Table: $table, chain: $chain, added $normalized_src " .
+            "-> $normalized_dst ";
+        for my $key qw(protocol s_port d_port) {
+            $msg .= "$key $extended_href->{$key} "
+                if defined $extended_href->{$key};
+        }
+        $msg =~ s/\s*$//;
+    } else {
+        $ipt_cmd = "$iptables -t $table -I $chain $rulenum " .
+            "-s $normalized_src -d $normalized_dst -j $target";
+        $msg = "Table: $table, chain: $chain, added $normalized_src " .
+            "-> $normalized_dst";
+    }
+    my ($rv, $out_aref, $err_aref) = $self->run_ipt_cmd($ipt_cmd);
+    if ($rv) {
+        push @$out_aref, $msg if $msg;
+    }
+    push @$err_aref, $idx_err if $idx_err;
+    return $rv, $out_aref, $err_aref;
 }
 
 sub delete_ip_rule() {
@@ -247,70 +221,31 @@ sub delete_ip_rule() {
     my $extended_href = shift || {};
     my $iptables = $self->{'_iptables'};
 
-    ### regex to match an IP address
-    my $ip_re = '(?:\d{1,3}\.){3}\d{1,3}';
-
-    ### normalize src network if necessary; this is because Netfilter
+    ### normalize src/dst if necessary; this is because Netfilter
     ### always reports network address for subnets
-    my $normalized_src = '';
-    if ($src =~ m|($ip_re)/($ip_re)|) {
-        my ($net_addr, $cidr) = ipv4_network($1, $2);
-        $normalized_src = "$net_addr/$cidr";
-    } elsif ($src =~ m|($ip_re)/(\d+)|) {
-        my ($net_addr, $cidr) = ipv4_network($1, $2);
-        $normalized_src = "$net_addr/$cidr";
-    } else {
-        ### it is a hostname or an individual IP
-        $normalized_src = $src;
-    }
-
-    ### normalize dst network if necessary; this is because Netfilter
-    ### always reports network address for subnets
-    my $normalized_dst = '';
-    if ($dst =~ m|($ip_re)/($ip_re)|) {
-        my ($net_addr, $cidr) = ipv4_network($1, $2);
-        $normalized_dst = "$net_addr/$cidr";
-    } elsif ($dst =~ m|($ip_re)/(\d+)|) {
-        my ($net_addr, $cidr) = ipv4_network($1, $2);
-        $normalized_dst = "$net_addr/$cidr";
-    } else {
-        ### it is a hostname or an individual IP
-        $normalized_dst = $dst;
-    }
+    my $normalized_src = $self->normalize_net($src);
+    my $normalized_dst = $self->normalize_net($dst);
 
     ### first check to see if this rule already exists
-    my $rulenum = $self->find_ip_rule($normalized_src,
-        $normalized_dst, $table, $chain, $target, $extended_href);
+    my ($rulenum, $num_chain_rules)
+        = $self->find_ip_rule($normalized_src,
+            $normalized_dst, $table, $chain, $target, $extended_href);
+
     if ($rulenum) {
         ### we need to delete the rule
-        if ($self->run_ipt_cmd("$iptables " .
-            "-t $table -D $chain $rulenum") == 0) {
-            return 1, "Table: $table, chain: $chain, deleted rule #$rulenum";
-        } else {
-            my $extended_msg = '.';
-            if ($extended_href) {
-                for my $key qw(protocol s_port d_port) {
-                    $extended_msg .= "$key: $extended_href->{$key} "
-                        if defined $extended_href->{$key};
-                }
-            }
-            $extended_msg =~ s/\s*$//;
-            return 0, "Table: $table, chain: $chain, could not delete " .
-                "$target rule #$rulenum for $normalized_src -> " .
-                "$normalized_dst $extended_msg";
-        }
-    } else {
-        my $extended_msg = '';
-        if ($extended_href) {
-            for my $key qw(protocol s_port d_port) {
-                $extended_msg .= "$key: $extended_href->{$key} "
-                    if defined $extended_href->{$key};
-            }
-        }
-        $extended_msg =~ s/\s*$//;
-        return 0, "Table: $table, chain: $chain, rule $normalized_src -> " .
-            "$normalized_dst $extended_msg does not exist.";
+        return $self->run_ipt_cmd("$iptables -t $table -D $chain $rulenum");
     }
+
+    my $extended_msg = '';
+    if ($extended_href) {
+        for my $key qw(protocol s_port d_port) {
+            $extended_msg .= "$key: $extended_href->{$key} "
+                if defined $extended_href->{$key};
+        }
+    }
+    $extended_msg =~ s/\s*$//;
+    return 0, [], ["Table: $table, chain: $chain, rule $normalized_src " .
+        "-> $normalized_dst $extended_msg does not exist."];
 }
 
 sub find_ip_rule() {
@@ -349,79 +284,142 @@ sub find_ip_rule() {
                         }
                     }
                 }
-                return $rulenum if $found;
+                return $rulenum, $#$chain_aref+1 if $found;
             } else {
                 if ($rule_href->{'protocol'} eq 'all') {
                     if ($target eq 'LOG' or $target eq 'ULOG') {
                         ### built-in LOG and ULOG target rules always
                         ### have extended information
-                        return $rulenum;
+                        return $rulenum, $#$chain_aref+1;
                     } elsif (not $rule_href->{'extended'}) {
                         ### don't want any additional criteria (such as
                         ### port numbers) in the rule. Note that we are
                         ### also not checking interfaces
-                        return $rulenum;
+                        return $rulenum, $#$chain_aref+1;
                     }
                 }
             }
         }
         $rulenum++;
     }
-    return 0;
+    return 0, $#$chain_aref;
+}
+
+sub normalize_net() {
+    my $self = shift;
+    my $net  = shift || croak '[*] Must specify net.';
+
+    ### regex to match an IP address
+    my $ip_re = '(?:\d{1,3}\.){3}\d{1,3}';
+
+    my $normalized_net = '';
+    if ($net =~ m|($ip_re)/($ip_re)|) {
+        my ($net_addr, $cidr) = ipv4_network($1, $2);
+        $normalized_net = "$net_addr/$cidr";
+    } elsif ($net =~ m|($ip_re)/(\d+)|) {
+        my ($net_addr, $cidr) = ipv4_network($1, $2);
+        $normalized_net = "$net_addr/$cidr";
+    } else {
+        ### it is a hostname or an individual IP
+        $normalized_net = $net;
+    }
+    return $normalized_net;
 }
 
 sub add_jump_rule() {
     my $self  = shift;
     my $table = shift || croak '[-] Must specify a table, e.g. "filter".';
     my $from_chain = shift || croak '[-] Must specify chain to jump from.';
+    my $rulenum    = shift || croak '[-] Must specify jump rule chain position';
     my $to_chain   = shift || croak '[-] Must specify chain to jump to.';
     my $iptables = $self->{'_iptables'};
+    my $idx_err = '';
 
     ### first check to see if the jump rule already exists
-    if ($self->find_ip_rule('0.0.0.0/0', '0.0.0.0/0', $table,
-            $from_chain, $to_chain, {})) {
-        return 1, "Table: $table, chain: $to_chain, jump rule already exists.";
-    } else {
-        ### we need to add the rule
-        if ($self->run_ipt_cmd("$iptables " .
-            "-t $table -I $from_chain 1 -j $to_chain") == 0) {
-            return 1, "Table: $table, chain: $to_chain, added jump rule.";
-        } else {
-            return 0, "Table: $table, chain: $to_chain, could not add jump.";
-        }
+    my ($rule_position, $num_chain_rules)
+        = $self->find_ip_rule('0.0.0.0/0', '0.0.0.0/0', $table,
+            $from_chain, $to_chain, {});
+
+    ### check to see if the insertion index ($rulenum) is too big
+    $rulenum = 1 if $rulenum <= 0;
+    if ($rulenum > $num_chain_rules+1) {
+        $idx_err = "Rule position $rulenum is past end of $from_chain " .
+            "chain ($num_chain_rules rules), compensating."
+            if $num_chain_rules > 0;
+        $rulenum = $num_chain_rules + 1;
     }
+    $rulenum = 1 if $rulenum == 0;
+
+    if ($rule_position) {
+        ### the rule already exists
+        return 1,
+            ["Table: $table, chain: $to_chain, jump rule already exists."], [];
+    }
+
+    ### we need to add the rule
+    my ($rv, $out_aref, $err_aref) = $self->run_ipt_cmd(
+        "$iptables -t $table -I $from_chain $rulenum -j $to_chain");
+    push @$err_aref, $idx_err if $idx_err;
+    return $rv, $out_aref, $err_aref;
 }
 
 sub run_ipt_cmd() {
     my $self  = shift;
     my $cmd = shift || croak '[*] Must specify an iptables command to run.';
     my $iptables = $self->{'_iptables'};
+    my $iptout   = $self->{'_iptout'};
+    my $ipterr   = $self->{'_ipterr'};
+    my $debug    = $self->{'_debug'};
+    my $verbose  = $self->{'_verbose'};
     croak "[*] $cmd does not look like an iptables command."
-        unless $cmd =~ /iptables/;
+        unless $cmd =~ m|^\s*iptables| or $cmd =~ m|^\S+/iptables|;
 
-    return (system "$cmd > /dev/null 2>&1") >> 8;
-}
-
-sub run_ipt_cmd_output() {
-    my $self  = shift;
-    my $cmd = shift || croak '[*] Must specify an iptables command to run.';
-    my $iptables = $self->{'_iptables'};
-    croak "[*] $cmd does not look like an iptables command."
-        unless $cmd =~ /iptables/;
-
-    my @output = ();
-    my $rv = 0;
-    eval {
-        open IPT, "$cmd |"
-            or croak "[*] Could not execute $cmd: $!";
-        @output = <IPT>;
-        close IPT or croak "[*] Could not close command $cmd: $!";
-        $rv = $?;
-    };
-    if ($rv == 0) {
-        return 1, \@output;
+    if ($verbose) {
+        print STDOUT $cmd, "\n";
+    } elsif ($debug) {
+        print STDERR $cmd, "\n";
     }
-    return 0, \@output;
+
+    ### run the command and collect both stdout and stderr
+    system "$cmd > $iptout 2> $ipterr";
+
+    my $rv = 1;
+    my @stdout = ();
+    my @stderr = ();
+
+    if (-e $iptout) {
+        open F, "< $iptout" or croak "[*] Could not open $iptout";
+        @stdout = <F>;
+        close F;
+    }
+    if (-e $ipterr) {
+        open F, "< $ipterr" or croak "[*] Could not open $ipterr";
+        @stderr = <F>;
+        close F;
+
+        $rv = 0 if @stderr;
+    }
+
+    if ($debug and $verbose) {
+        print "[+] iptables command stdout:\n";
+        for my $line (@stdout) {
+            if ($line =~ /\n$/) {
+                print $line;
+            } else {
+                print $line, "\n";
+            }
+        }
+        print "[+] iptables command stderr:\n";
+        for my $line (@stderr) {
+            if ($line =~ /\n$/) {
+                print $line;
+            } else {
+                print $line, "\n";
+            }
+        }
+    }
+
+    return $rv, \@stdout, \@stderr;
 }
 
 1;

@@ -612,7 +612,28 @@ sub install() {
         &logr("[+] Found iptables. Testing syslog configuration:\n");
         ### make sure we actually see packets being logged by
         ### the firewall.
-        &test_syslog_config($syslog_str) if $syslog_str ne 'ulogd';
+        if ($syslog_str ne 'ulogd') {
+            unless (&test_syslog_config($syslog_str)) {
+                if (&query_init_script_restart_syslog()) {
+
+                    my $restarted = 0;
+                    if (-e "$INIT_DIR/sysklogd") {
+                        system "$INIT_DIR/sysklogd restart";
+                        $restarted = 1;
+                    } elsif (-e "$INIT_DIR/syslog") {
+                        system "$INIT_DIR/syslogd restart";
+                        $restarted = 1;
+                    }
+                    ### test syslog config again now that we
+                    ### have restarted syslog via the init script
+                    ### instead of relying on a HUP signal to
+                    ### syslog
+                    if ($restarted) {
+                        &test_syslog_config($syslog_str);
+                    }
+                }
+            }
+        }
     }
 
     ### see if there are any "_CHANGEME_" strings left and give the
@@ -1146,6 +1167,20 @@ sub query_preserve_config() {
     return 0;
 }
 
+sub query_init_script_restart_syslog() {
+    my $ans = '';
+    while ($ans ne 'y' && $ans ne 'n') {
+        &logr("[+] Is it ok to restart the syslog daemon ([y]/n)?  ");
+        $ans = <STDIN>;
+        $ans = 'y' if $ans eq "\n";
+        chomp $ans;
+    }
+    if ($ans eq 'y') {
+        return 1;
+    }
+    return 0;
+}
+
 sub query_preserve_sigs_autodl() {
     my $file = shift;
     my $ans = '';
@@ -1315,7 +1350,7 @@ sub test_syslog_config() {
     if ($uprv) {
         &logr("[-] Could not bring up the loopback interface.\n" .
             "    Hoping the syslog reconfig will work anyway.\n");
-        return;
+        return 0;
     }
 
     ### make sure we can see the loopback interface with
@@ -1325,7 +1360,7 @@ sub test_syslog_config() {
     unless (@if_out) {
         &logr("[-] Could not see the loopback interface with ifconfig.  " .
             "Hoping\n    syslog reconfig will work anyway.\n");
-        return;
+        return 0;
     }
 
     my $lo_ip = '127.0.0.1';
@@ -1342,7 +1377,7 @@ sub test_syslog_config() {
     unless ($found_ip) {
         &logr("[-] The loopback interface does not have an IP.\n" .
             "    Hoping the syslog reconfig will work anyway.\n");
-        return;
+        return 0;
     }
 
     ### remove any "test_DROP" lines from fwdata file and ipt_prefix_ctr
@@ -1366,7 +1401,7 @@ sub test_syslog_config() {
         unless (((system "${USRSBIN_DIR}/kmsgsd")>>8) == 0) {
             &logr("[-] Could not start kmsgsd to test syslog.\n" .
                 "    Send email to Michael Rash (mbr\@cipherdyne.org)\n");
-            return;
+            return 0;
         }
     }
 
@@ -1419,15 +1454,14 @@ sub test_syslog_config() {
     }
 
     if ($start_kmsgsd && -e "${RUNDIR}/kmsgsd.pid") {
-        open PID, "${RUNDIR}/kmsgsd.pid" or return;
+        open PID, "${RUNDIR}/kmsgsd.pid" or return 0;
         my $pid = <PID>;
         close PID;
         chomp $pid;
-        if (kill 0, $pid) {
-            kill 9, $pid;
-        }
+        kill 9, $pid if kill 0, $pid;
     }
-    return;
+    return 1 if $found;
+    return 0;
 }
 
 sub scrub_prefix_ctr() {

@@ -18,7 +18,7 @@
 #
 # Credits: (see the CREDITS file bundled with the psad sources.)
 #
-# Version: 1.4.6
+# Version: 1.4.7-pre1
 #
 # Copyright (C) 1999-2006 Michael Rash (mbr@cipherdyne.org)
 #
@@ -149,7 +149,7 @@ use strict;
 ### ========================== main =================================
 
 ### set the current psad version number
-my $version = '1.4.6';
+my $version = '1.4.7-pre1';
 
 ### default config file for psad (can be changed with
 ### --config switch)
@@ -1856,6 +1856,7 @@ sub dshield_email_log() {
             and ((time() - $last_dshield_alert) >= 2*3600))) {
         my $dshield_version = $version;
         $dshield_version =~ s/^(\d+\.\d+)\.\d+/$1/;
+        $dshield_version =~ s/-pre\d+//;
         my $subject = "FORMAT DSHIELD USERID $config{'DSHIELD_USER_ID'} " .
             "TZ $timezone psad Version $dshield_version";
         if ($config{'DSHIELD_USER_EMAIL'} eq 'NONE') {

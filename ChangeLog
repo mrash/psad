@@ -1,4 +1,20 @@
 psad-1.4.7 (//2006):
+    - Completely re-worked IPTables::ChainMgr to support the return of
+      iptables error messages that are collected via stderr.  This is critical
+      to fixing a bug where psad would sometimes die on an iptables command
+      but no information would be returned to the user.
+    - Added the ability to specify the position for both the jump rule into
+      the psad chains as well as the position for new rules within the psad
+      chains via the -I argument to iptables.  This fixes a bug where the user
+      was given the impression that the IPTABLES_AUTO_RULENUM would accomplish
+      this.
+    - Populated the _debug option in the IPTables::ChainMgr module, and also
+      added a _verbose option so that the specific iptables commands can
+      actually be seen as IPTables::ChainMgr functions are called.
+    - Added code to install.pl to ask the user if a manual restart of syslog
+      is ok upon an unsuccessful test of the syslog reconfiguration.  This
+      fixes a bug where some syslog daemons might not re-import their
+      configurations after receiving a HUP signal.
     - Bugfix for incorrect config variable name that gated Netfilter
       prerequisite checks.
 

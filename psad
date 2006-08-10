@@ -1098,8 +1098,12 @@ sub check_scan() {
         }
 
         ### see if there is a logging prefix (used for scan email alert even
-        ### if we are running with FW_SEARCH_ALL = Y).
-        if ($pkt =~ /kernel:\s+(.*?)\s*IN=/) {
+        ### if we are running with FW_SEARCH_ALL = Y).  Note that sometimes
+        ### there is a buffering issue in the kernel ring buffer that is used
+        ### to hold the Netfilter log message, so we want to get only the
+        ### very last possible candidate for the log prefix (this is why the
+        ### "kernel:" string is preceded by .*).
+        if ($pkt =~ /.*kernel:\s+(.*?)\s*IN=/) {
             $log_prefix = $1;
             if ($log_prefix =~ /\S/) {
                 if ($config{'IGNORE_LOG_PREFIXES'} ne 'NONE') {

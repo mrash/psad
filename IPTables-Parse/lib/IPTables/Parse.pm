@@ -38,7 +38,47 @@ sub new() {
     bless $self, $class;
 }
 
+sub chain_policy() {
+    my $self   = shift;
+    my $table  = shift || croak '[*] Specify a table, e.g. "nat"';
+    my $chain  = shift || croak '[*] Specify a chain, e.g. "OUTPUT"';
+    my $file   = shift || '';
+    my $iptables  = $self->{'_iptables'};
+    my @ipt_lines;
+
+    if ($file) {
+        ### read the iptables rules out of $file instead of executing
+        ### the iptables command.
+        open F, "< $file" or croak "[*] Could not open file $file: $!";
+        @ipt_lines = <F>;
+        close F;
+    } else {
+        eval {
+            open IPT, "$iptables -t $table -n -L $chain -v |"
+                or croak "[*] Could not execute $iptables -t $table -n -L $chain -v";
+            @ipt_lines = <IPT>;
+            close IPT;
+        };
+    }
+
+    my $policy = '';
+
+    for my $line (@ipt_lines) {
+        ### Chain INPUT (policy ACCEPT 16 packets, 800 bytes)
+        if ($line =~ /^\s*Chain\s+$chain\s+\(policy\s+(\w+)/) {
+            $policy = $1;
+            last;
+        }
+    }
+
+    return $policy;
+}
+
 sub chain_action_rules() {
+    return &chain_rules();
+}
+
+sub chain_rules() {
     my $self   = shift;
     my $table  = shift || croak '[*] Specify a table, e.g. "nat"';
     my $chain  = shift || croak '[*] Specify a chain, e.g. "OUTPUT"';
@@ -66,7 +106,8 @@ sub chain_action_rules() {
     ### array of hash refs
     my @chain = ();
 
-    ### determine the output style (e.g. "-nL -v" or just plain "-nL")
+    ### determine the output style (e.g. "-nL -v" or just plain "-nL"; if the
+    ### policy data came from a file then -v might not have been used)
     my $ipt_verbose = 0;
     for my $line (@ipt_lines) {
         if ($line =~ /^\s*pkts\s+bytes\s+target/) {
@@ -97,12 +138,15 @@ sub chain_action_rules() {
             'bytes'    => '',
             'target'   => '',
             'protocol' => '',
+            'proto'    => '',
             'intf_in'  => '',
             'intf_out' => '',
             'src'      => '',
             's_port'   => '',
+            'sport'    => '',
             'dst'      => '',
             'd_port'   => '',
+            'dport'    => '',
             'extended' => '',
             'raw'      => ''  ### only used if regex doesn't match
         );
@@ -117,7 +161,7 @@ sub chain_action_rules() {
                 $rule{'packets'}  = $1;
                 $rule{'bytes'}    = $2;
                 $rule{'target'}   = $3;
-                $rule{'protocol'} = $4;
+                $rule{'protocol'} = $rule{'proto'} = $4;
                 $rule{'intf_in'}  = $5;
                 $rule{'intf_out'} = $6;
                 $rule{'src'}      = $7;
@@ -135,7 +179,9 @@ sub chain_action_rules() {
                         $s_port = $1;
                     }
                     $rule{'s_port'} = $s_port;
+                    $rule{'sport'}  = $s_port;
                     $rule{'d_port'} = $d_port;
+                    $rule{'dport'}  = $d_port;
                 }
             } else {
                 $rule{'raw'} = $line;
@@ -154,7 +200,7 @@ sub chain_action_rules() {
 
             if ($line =~ m|^\s*(\S+)\s+(\S+)\s+\-\-\s+(\S+)\s+(\S+)\s*(.*)|) {
                 $rule{'target'}   = $1;
-                $rule{'protocol'} = $2;
+                $rule{'protocol'} = $rule{'proto'} = $2;
                 $rule{'src'}      = $3;
                 $rule{'dst'}      = $4;
                 $rule{'extended'} = $5;
@@ -169,8 +215,8 @@ sub chain_action_rules() {
                     if ($rule{'extended'} =~ /spts?:(\S+)/) {
                         $s_port = $1;
                     }
-                    $rule{'s_port'} = $s_port;
-                    $rule{'d_port'} = $d_port;
+                    $rule{'s_port'} = $rule{'sport'} = $s_port;
+                    $rule{'d_port'} = $rule{'dport'} = $d_port;
                 }
             } else {
                 $rule{'raw'} = $line;
@@ -196,6 +242,7 @@ sub default_drop() {
         @ipt_lines = <F>;
         close F;
     } else {
+### FIXME -v for interfaces?
         eval {
             open IPT, "$iptables -t $table -n -L $chain |"
                 or croak "[*] Could not execute $iptables -t $table -n -L $chain";

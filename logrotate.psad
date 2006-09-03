@@ -1,0 +1,19 @@
+#***********************************************************************
+#
+# PSAD Log Rotation config
+#
+#  Copyright (c) 2006, Albert Whale, ABS Computer Technology, Inc.
+#  All rights reserved.
+#
+# This program may be distributed under the terms of the GNU General
+# Public License, Version 2, or (at your option) any later version.
+#
+#***********************************************************************
+/var/log/psad/fwdata {
+   missingok
+   rotate 5
+   weekly
+   postrotate
+        psad --HUP
+   endscript
+}

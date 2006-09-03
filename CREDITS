@@ -142,6 +142,7 @@ Albert E. Whale
     - Lots of great testing for auto-blocking code... even contributed
       root access on some systems to help troubleshoot.
     - Suggested socket communication in --fw-block mode.
+    - Contributed the logrotate.psad file.
 
 David Krider
     - Discovered iptables path bug on SuSE 8.2.
@@ -227,9 +228,10 @@ Joshua Jensen
       FW_SEARCH_ALL was set to "Y").
 
 Mate Wierdl
-    - Found bug in EMAIL_ADDRESSES format (psad needed to allow addressed
+    - Found bug in EMAIL_ADDRESSES format (psad needed to allow addresses
       separated by commas).
     - Submitted patch for new init-scripts directory for psad.spec file.
+    - Contributed patch for building the psad RPM on x86_64 platforms.
 
 Stefan <unknown>
     - Sugggested permissions fix for world readable files in /var/log/psad.

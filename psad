@@ -4554,7 +4554,7 @@ sub ipt_block() {
             $dst = $ip;
         }
 
-        my ($rv, $out_aref, $err_aref) = $ipt->find_ip_rule($src, $dst,
+        my ($rv, $num_chain_rules) = $ipt->find_ip_rule($src, $dst,
                 $table, $to_chain, $target);
 
         if ($rv) {
@@ -4562,7 +4562,7 @@ sub ipt_block() {
                 "already exists.\n" if $debug;
             $already_blocked = 1;
         } else {
-            ($rv, $out_aref, $err_aref) = $ipt->add_ip_rule($src, $dst,
+            my ($rv, $out_aref, $err_aref) = $ipt->add_ip_rule($src, $dst,
                 $auto_rule_position, $table, $to_chain, $target);
             if ($rv) {
                 print STDERR "[+] Test1 block success.\n" if $debug;
@@ -4581,7 +4581,7 @@ sub ipt_block() {
             ### need to add reverse rule for FORWARD chain
             my $src2 = $dst;
             my $dst2 = $src;
-            my ($rv, $out_aref, $err_aref) = $ipt->find_ip_rule($src2,
+            my ($rv, $num_chain_rules) = $ipt->find_ip_rule($src2,
                     $dst2, $table, $to_chain, $target);
 
             if ($rv) {
@@ -4589,7 +4589,7 @@ sub ipt_block() {
                     "already exists.\n" if $debug;
                 $already_blocked = 1;
             } else {
-                ($rv, $out_aref, $err_aref) = $ipt->add_ip_rule($src2, $dst2,
+                my ($rv, $out_aref, $err_aref) = $ipt->add_ip_rule($src2, $dst2,
                     $auto_rule_position, $table, $to_chain, $target);
                 if ($rv) {
                     print STDERR "[+] Test2 block success.\n" if $debug;

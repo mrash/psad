@@ -17,6 +17,17 @@ psad-1.4.7 (//2006):
       configurations after receiving a HUP signal.
     - Bugfix for incorrect config variable name that gated Netfilter
       prerequisite checks.
+    - Added code to install.pl to update command paths in psad.conf and
+      psadwatchd.conf if any of the paths are broken (i.e. the local system
+      does not conform to the default paths).  By default this only happens if
+      the user does not want old configs to be merged, but to override this
+      use the new --path-update command line argument to install.pl.
+    - Added the --Skip-mod-install command line argument to install.pl to
+      allow all perl module installs to be skipped.
+    - Added the --force-mod-regex command line argument to install.pl to allow
+      a regex match on perl module names to force matching modules to be
+      installed.
+    - Added the logrotate.psad file (contributed by Albert Whale).
 
 psad-1.4.6 (06/13/2006):
     - Added ENABLE_AUTO_IDS_REGEX and AUTO_BLOCK_REGEX to allow filtering on

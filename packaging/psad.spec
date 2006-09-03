@@ -1,7 +1,7 @@
 %define name psad
 %define version 1.4.6
 %define release 1
-%define psadlibdir /usr/lib/psad
+%define psadlibdir %_libdir/%name
 %define psadlogdir /var/log/psad
 %define psadrundir /var/run/psad
 %define psadvarlibdir /var/lib/psad
@@ -47,6 +47,11 @@ iptables string match module to detect application layer signatures.
 [ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
 
 %setup -q
+
+for i in $(grep -r "use lib" . | cut -d: -f1); do
+	awk '/use lib/ { sub("/usr/lib/psad", "%_libdir/%name") } { print }' $i > $i.tmp
+	mv $i.tmp $i
+done
 
 cd Psad && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
 cd ..
@@ -236,6 +241,10 @@ fi
 %_libdir/%name
 
 %changelog
+* Sat Sep 02 2006 Michael Rash <mbr@cipherydne.org>
+- Added updates from Mate Wierdl to get psad RPM building on x86_64
+  platforms.
+
 * Tue Jun 13 2006 Michael Rash <mbr@cipherydne.org>
 - Added installation of snort_rule_dl file.
 - psad-1.4.6 release.

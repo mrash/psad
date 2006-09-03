@@ -1,7 +1,6 @@
 #!/usr/bin/perl -w
 
 use lib '/usr/lib/psad';
-use Psad;
 use IPTables::ChainMgr;
 use IPTables::Parse;
 use strict;
@@ -60,7 +59,7 @@ print for @$out_aref;
 print for @$err_aref;
 
 ($rv, $out_aref, $err_aref) = $ipt->run_ipt_cmd('/sbin/iptables -nL INPU');
-print "bogus list on 'INPU' chain rv: $rv\n";
+print "bogus list on 'INPU' chain rv: $rv (this is expected).\n";
 print for @$out_aref;
 print for @$err_aref;
 

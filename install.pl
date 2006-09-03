@@ -84,40 +84,42 @@ my $psadCmd      = "${USRSBIN_DIR}/psad";
 ### map perl modules to versions
 my %required_perl_modules = (
     'Unix::Syslog' => {
-        'version' => '0.100',
-        'force-lib-install' => 0,
+        'force-install' => 0,
         'mod-dir' => 'Unix-Syslog'
     },
     'Bit::Vector' => {
-        'version' => '6.3',
-        'force-lib-install' => 0,
+        'force-install' => 0,
         'mod-dir' => 'Bit-Vector'
     },
     'Date::Calc', => {
-        'version' => '5.3',
-        'force-lib-install' => 0,
+        'force-install' => 0,
         'mod-dir' => 'Date-Calc'
     },
     'Net::IPv4Addr' => {
-        'version' => '0.10',
-        'force-lib-install' => 0,
+        'force-install' => 0,
         'mod-dir' => 'Net-IPv4Addr'
     },
     'IPTables::Parse' => {
-        'version' => '0.3',
-        'force-lib-install' => 1,
+        'force-install' => 1,
         'mod-dir' => 'IPTables-Parse'
     },
     'IPTables::ChainMgr' => {
-        'version' => '0.2',
-        'force-lib-install' => 1,
+        'force-install' => 1,
         'mod-dir' => 'IPTables-ChainMgr'
     },
     'Psad' => {
-        'version' => '1.4.1',
-        'force-lib-install' => 1,
+        'force-install' => 1,
         'mod-dir' => 'Psad'
     }
+);
+
+my @cmd_search_paths = qw(
+    /bin
+    /sbin
+    /usr/bin
+    /usr/sbin
+    /usr/local/bin
+    /usr/local/sbin
 );
 
 ### IP regex
@@ -161,11 +163,17 @@ my $noarchive   = 0;
 my $uninstall   = 0;
 my $help        = 0;
 my $skip_syslog_test = 0;
+my $skip_module_install   = 0;
 my $cmdline_force_install = 0;
+my $force_path_update = 0;
+my $force_install_re  = '';
 my $syslog_conf = '';
 
 &usage(1) unless (GetOptions(
     'force-mod-install' => \$cmdline_force_install,  ### force install of all modules
+    'force-mod-regex=s' => \$force_install_re,  ### force specific mod install with regex
+    'path-update'       => \$force_path_update, ### update command paths
+    'Skip-mod-install'  => \$skip_module_install,
     'no-preserve'       => \$noarchive,   ### Don't preserve existing configs.
     'syslog-conf=s'     => \$syslog_conf, ### specify path to syslog config file.
     'no-syslog-test'    => \$skip_syslog_test,
@@ -339,8 +347,10 @@ sub install() {
     print "\n\n";
 
     ### install perl modules
-    for my $module (keys %required_perl_modules) {
-        &install_perl_module($module);
+    unless ($skip_module_install) {
+        for my $module (keys %required_perl_modules) {
+            &install_perl_module($module);
+        }
     }
 
     &logr("[+] Installing Snort-2.3.3 signatures in $SNORT_DIR\n");
@@ -480,6 +490,12 @@ sub install() {
                 &preserve_old_fw_msg_search();
             }
         }
+
+        if ($force_path_update or not $preserve_rv) {
+            &update_command_paths("$PSAD_CONFDIR/$file")
+                if ($file eq 'psad.conf' or $file eq 'psadwatchd.conf');
+        }
+
         &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
     }
 
@@ -892,21 +908,34 @@ sub stop_psad() {
 sub install_perl_module() {
     my $mod_name = shift;
 
-    die '[*] Missing version key in required_perl_modules hash.'
-        unless defined $required_perl_modules{$mod_name}{'version'};
-    die '[*] Missing force-lib-install key in required_perl_modules hash.'
-        unless defined $required_perl_modules{$mod_name}{'force-lib-install'};
+    die '[*] Missing force-install key in required_perl_modules hash.'
+        unless defined $required_perl_modules{$mod_name}{'force-install'};
     die '[*] Missing mod-dir key in required_perl_modules hash.'
         unless defined $required_perl_modules{$mod_name}{'mod-dir'};
 
-    my $version = $required_perl_modules{$mod_name}{'version'};
+    my $version = '(NA)';
+
+    my $mod_dir = $required_perl_modules{$mod_name}{'mod-dir'};
+
+    if (-e "$mod_dir/VERSION") {
+        open F, "< $mod_dir/VERSION" or
+            die "[*] Could not open $mod_dir/VERSION: $!";
+        $version = <F>;
+        close F;
+        chomp $version;
+    } else {
+        print "[-] Warning: VERSION file does not exist in $mod_dir\n";
+    }
 
     my $install_module = 0;
 
-    if ($required_perl_modules{$mod_name}{'force-lib-install'}
+    if ($required_perl_modules{$mod_name}{'force-install'}
             or $cmdline_force_install) {
         ### install regardless of whether the module may already be
         ### installed
+        $install_module = 1;
+    } elsif ($force_install_re and $force_install_re =~ /$mod_name/) {
+        print "[+] Forcing installation of $mod_name module.\n";
         $install_module = 1;
     } else {
         if (has_perl_module($mod_name)) {
@@ -939,7 +968,7 @@ sub install_perl_module() {
         system $Cmds{'make'};
 #        system "$Cmds{'make'} test";
         system "$Cmds{'make'} install";
-        chdir $src_dir;
+        chdir $src_dir or die "[*] Could not chdir $src_dir: $!";
 
         print "\n\n";
     }
@@ -1828,18 +1857,10 @@ sub enable_psad_at_boot() {
 
 ### check paths to commands and attempt to correct if any are wrong.
 sub check_commands() {
-    my @path = qw(
-        /bin
-        /sbin
-        /usr/bin
-        /usr/sbin
-        /usr/local/bin
-        /usr/local/sbin
-    );
     CMD: for my $cmd (keys %Cmds) {
         unless (-x $Cmds{$cmd}) {
             my $found = 0;
-            PATH: for my $dir (@path) {
+            PATH: for my $dir (@cmd_search_paths) {
                 if (-x "${dir}/${cmd}") {
                     $Cmds{$cmd} = "${dir}/${cmd}";
                     $found = 1;
@@ -1933,6 +1954,57 @@ sub has_perl_module() {
     return $@ ? 0 : 1;
 }
 
+sub update_command_paths() {
+    my $file = shift;
+
+    open F, "< $file" or die "[*] Could not open file: $!";
+    my @lines = <F>;
+    close F;
+
+    my @newlines = ();
+    my $new_cmd = 0;
+    for my $line (@lines) {
+        my $found = 0;
+        if ($line =~ /^\s*(\w+)Cmd(\s+)(\S+);/) {
+            my $cmd    = $1;
+            my $spaces = $2;
+            my $path   = $3;
+            unless (-e $path and -x $path) {
+                ### the command is not at this path, try to find it
+                my $cmd_minor_name = $cmd;
+                if ($path =~ m|.*/(\S+)|) {
+                    $cmd_minor_name = $cmd if $cmd ne $1;
+                }
+                DIR: for my $dir (@cmd_search_paths) {
+                    if (-e "$dir/$cmd_minor_name"
+                            and -x "$dir/$cmd_minor_name") {
+                        ### found the command
+                        push @newlines,
+                            "${cmd}Cmd${spaces}${dir}/${cmd_minor_name};\n";
+                        $found   = 1;
+                        $new_cmd = 1;
+                        last DIR;
+                    }
+                }
+                unless ($found) {
+                    &logr("[-] Could not find the path to the $cmd command, " .
+                        "you will need to manually\n    edit the path for " .
+                        "the ${cmd}Cmd variable in $file\n");
+                }
+            }
+        }
+        unless ($found) {
+            push @newlines, $line;
+        }
+    }
+    if ($new_cmd) {
+        open C, "> $file" or die "[*] Could not open file: $!";
+        print C for @newlines;
+        close C;
+    }
+    return;
+}
+
 ### logging subroutine that handles multiple filehandles
 sub logr() {
     my $msg = shift;
@@ -1955,17 +2027,22 @@ sub usage() {
     my $exitcode = shift;
     print <<_HELP_;
 
-Usage: install.pl [-f] [-s <file>] [-u] [--no-syslog-test]
-                  [--no-preserve] [-h]
+Usage: install.pl [-f] [-s <file>] [-u] [--no-syslog-test] [-S] [-p]
+                  [--force-mod-install] [--no-preserve] [-h]
 
-    -u  --uninstall     - Uninstall psad.
-    -f  --force-mod     - Force all perl modules to be installed
-                          even if some already exist in the system
-                          /usr/lib/perl5 tree.
-    -s  <file>          - Specify path to syslog.conf file.
-    --no-syslog-test    - Skip syslog reconfiguration test.
-    --no-preserve       - Disable preservation of old configs.
-    -h  --help          - Prints this help message.
+    -u,  --uninstall        - Uninstall psad.
+    --force-mod-install     - Force all perl modules to be installed
+                              even if some already exist in the system
+                              /usr/lib/perl5 tree.
+    --force-mod-regex <re>  - Specify a regex to match a module name
+                              and force the installation of such modules.
+    -p, --path-update       - Run path update code regardless of whether
+                              a previous config is being merged.
+    -S, --Skip-mod-install  - Do not install any perl modules.
+    -s  <file>              - Specify path to syslog.conf file.
+    --no-syslog-test        - Skip syslog reconfiguration test.
+    --no-preserve           - Disable preservation of old configs.
+    -h  --help              - Prints this help message.
 
 _HELP_
     exit $exitcode;

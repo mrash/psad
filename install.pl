@@ -171,7 +171,7 @@ my $syslog_conf = '';
 
 &usage(1) unless (GetOptions(
     'force-mod-install' => \$cmdline_force_install,  ### force install of all modules
-    'force-mod-regex=s' => \$force_install_re,  ### force specific mod install with regex
+    'Force-mod-regex=s' => \$force_install_re,  ### force specific mod install with regex
     'path-update'       => \$force_path_update, ### update command paths
     'Skip-mod-install'  => \$skip_module_install,
     'no-preserve'       => \$noarchive,   ### Don't preserve existing configs.
@@ -2034,7 +2034,7 @@ Usage: install.pl [-f] [-s <file>] [-u] [--no-syslog-test] [-S] [-p]
     --force-mod-install     - Force all perl modules to be installed
                               even if some already exist in the system
                               /usr/lib/perl5 tree.
-    --force-mod-regex <re>  - Specify a regex to match a module name
+    --Force-mod-regex <re>  - Specify a regex to match a module name
                               and force the installation of such modules.
     -p, --path-update       - Run path update code regardless of whether
                               a previous config is being merged.

@@ -263,7 +263,7 @@ sub find_ip_rule() {
     my $ipt_parse = new IPTables::Parse('iptables' => $iptables)
         or croak "[*] Could not acquire IPTables::Parse object";
 
-    my $chain_aref = $ipt_parse->chain_action_rules($table, $chain);
+    my $chain_aref = $ipt_parse->chain_rules($table, $chain);
 
     my $rulenum = 1;
     for my $rule_href (@$chain_aref) {
@@ -302,7 +302,7 @@ sub find_ip_rule() {
         }
         $rulenum++;
     }
-    return 0, $#$chain_aref;
+    return 0, $#$chain_aref+1;
 }
 
 sub normalize_net() {

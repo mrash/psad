@@ -169,6 +169,9 @@ my $force_path_update = 0;
 my $force_install_re  = '';
 my $syslog_conf = '';
 
+### make Getopts case sensitive
+Getopt::Long::Configure('no_ignore_case');
+
 &usage(1) unless (GetOptions(
     'force-mod-install' => \$cmdline_force_install,  ### force install of all modules
     'Force-mod-regex=s' => \$force_install_re,  ### force specific mod install with regex

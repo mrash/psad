@@ -2031,7 +2031,7 @@ sub usage() {
     print <<_HELP_;
 
 Usage: install.pl [-f] [-s <file>] [-u] [--no-syslog-test] [-S] [-p]
-                  [--force-mod-install] [--no-preserve] [-h]
+                  [-F] [--no-preserve] [-h]
 
     -u,  --uninstall        - Uninstall psad.
     --force-mod-install     - Force all perl modules to be installed

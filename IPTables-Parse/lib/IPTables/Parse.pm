@@ -7,7 +7,7 @@
 #
 # Author: Michael Rash (mbr@cipherdyne.org)
 #
-# Version: 0.3
+# Version: 0.4
 #
 ##################################################################
 #
@@ -22,7 +22,7 @@ use strict;
 use warnings;
 use vars qw($VERSION);
 
-$VERSION = '0.3';
+$VERSION = '0.4';
 
 sub new() {
     my $class = shift;
@@ -178,10 +178,8 @@ sub chain_rules() {
                     if ($rule{'extended'} =~ /spts?:(\S+)/) {
                         $s_port = $1;
                     }
-                    $rule{'s_port'} = $s_port;
-                    $rule{'sport'}  = $s_port;
-                    $rule{'d_port'} = $d_port;
-                    $rule{'dport'}  = $d_port;
+                    $rule{'s_port'} = $rule{'sport'} = $s_port;
+                    $rule{'d_port'} = $rule{'dport'} = $d_port;
                 }
             } else {
                 $rule{'raw'} = $line;

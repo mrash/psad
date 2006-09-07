@@ -2033,19 +2033,20 @@ sub usage() {
 Usage: install.pl [-f] [-s <file>] [-u] [--no-syslog-test] [-S] [-p]
                   [-F] [--no-preserve] [-h]
 
-    -u,  --uninstall        - Uninstall psad.
-    --force-mod-install     - Force all perl modules to be installed
-                              even if some already exist in the system
-                              /usr/lib/perl5 tree.
-    --Force-mod-regex <re>  - Specify a regex to match a module name
-                              and force the installation of such modules.
-    -p, --path-update       - Run path update code regardless of whether
-                              a previous config is being merged.
-    -S, --Skip-mod-install  - Do not install any perl modules.
-    -s  <file>              - Specify path to syslog.conf file.
-    --no-syslog-test        - Skip syslog reconfiguration test.
-    --no-preserve           - Disable preservation of old configs.
-    -h  --help              - Prints this help message.
+    -u,  --uninstall            - Uninstall psad.
+    -f, --force-mod-install     - Force all perl modules to be installed
+                                  even if some already exist in the system
+                                  /usr/lib/perl5 tree.
+    -F, --Force-mod-regex <re>  - Specify a regex to match a module name
+                                  and force the installation of such
+                                  modules.
+    -p, --path-update           - Run path update code regardless of whether
+                                  a previous config is being merged.
+    -S, --Skip-mod-install      - Do not install any perl modules.
+    -s  <file>                  - Specify path to syslog.conf file.
+    --no-syslog-test            - Skip syslog reconfiguration test.
+    --no-preserve               - Disable preservation of old configs.
+    -h  --help                  - Prints this help message.
 
 _HELP_
     exit $exitcode;

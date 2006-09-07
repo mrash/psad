@@ -239,7 +239,8 @@ sub ipt_chk_chain() {
     my $chain = shift;
     my $rv = 1;
 
-    my $ipt = new IPTables::Parse 'iptables' => $cmds{'iptables'};
+    my $ipt = new IPTables::Parse 'iptables' => $cmds{'iptables'}
+        or die "[*] Could not acquite IPTables::Parse object: $!";
 
     if ($fw_analyze) {
         print "[+] Parsing iptables $chain chain rules.\n";
@@ -248,12 +249,7 @@ sub ipt_chk_chain() {
     if ($fw_search_all) {
         ### we are not looking for specific log
         ### prefixes, but we need _some_ logging rule
-        my $ipt_log;
-        if ($fw_file) {
-            $ipt_log = $ipt->default_log('filter', $chain, $fw_file);
-        } else {
-            $ipt_log = $ipt->default_log('filter', $chain);
-        }
+        my $ipt_log = $ipt->default_log('filter', $chain, $fw_file);
         return 0 unless $ipt_log;
         if (defined $ipt_log->{'all'}) {
             ### found real default logging rule (assuming it is above a default
@@ -282,12 +278,7 @@ sub ipt_chk_chain() {
         ### for now we are only looking at the filter table, so if
         ### the iptables ruleset includes the log and drop rules in
         ### a user defined chain then psad will not see this.
-        my $ld_hr;
-        if ($fw_file) {
-            $ld_hr = $ipt->default_drop('filter', $chain, $fw_file);
-        } else {
-            $ld_hr = $ipt->default_drop('filter', $chain);
-        }
+        my $ld_hr = $ipt->default_drop('filter', $chain, $fw_file);
 
         my $num_keys = 0;
         if (defined $ld_hr and keys %$ld_hr) {

@@ -241,6 +241,9 @@ fi
 %_libdir/%name
 
 %changelog
+* Sun Sep 10 2006 Michael Rash <mbr@cipherdyne.org>
+- psad-1.4.7 release.
+
 * Sat Sep 02 2006 Michael Rash <mbr@cipherdyne.org>
 - Added updates from Mate Wierdl to get psad RPM building on x86_64
   platforms.

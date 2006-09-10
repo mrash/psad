@@ -1,5 +1,5 @@
 %define name psad
-%define version 1.4.6
+%define version 1.4.7
 %define release 1
 %define psadlibdir %_libdir/%name
 %define psadlogdir /var/log/psad
@@ -241,62 +241,62 @@ fi
 %_libdir/%name
 
 %changelog
-* Sat Sep 02 2006 Michael Rash <mbr@cipherydne.org>
+* Sat Sep 02 2006 Michael Rash <mbr@cipherdyne.org>
 - Added updates from Mate Wierdl to get psad RPM building on x86_64
   platforms.
 
-* Tue Jun 13 2006 Michael Rash <mbr@cipherydne.org>
+* Tue Jun 13 2006 Michael Rash <mbr@cipherdyne.org>
 - Added installation of snort_rule_dl file.
 - psad-1.4.6 release.
 
-* Fri Jan 13 2006 Michael Rash <mbr@cipherydne.org>
+* Fri Jan 13 2006 Michael Rash <mbr@cipherdyne.org>
 - psad-1.4.5 release.
 
-* Sun Nov 27 2005 Michael Rash <mbr@cipherydne.org>
+* Sun Nov 27 2005 Michael Rash <mbr@cipherdyne.org>
 - psad-1.4.4 release.
 
-* Tue Nov 22 2005 Michael Rash <mbr@cipherydne.org>
+* Tue Nov 22 2005 Michael Rash <mbr@cipherdyne.org>
 - Removed smtpdaemon dependency since psad can be run without sending
   email alerts by configuring /etc/psad/alert.conf appropriately.
 
-* Tue Jul 12 2005 Michael Rash <mbr@cipherydne.org>
+* Tue Jul 12 2005 Michael Rash <mbr@cipherdyne.org>
 - Updated to only update syslog.conf if it actually exists. Psad
   is now comptable with other syslog daemons, and also with ulogd.
 
-* Thu Mar 10 2005 Michael Rash <mbr@cipherydne.org>
+* Thu Mar 10 2005 Michael Rash <mbr@cipherdyne.org>
 - Updated to new IPTables-Parse and IPTables-ChainMgr modules.
 - psad-1.4.1 release.
 
-* Fri Nov 26 2004 Michael Rash <mbr@cipherydne.org>
+* Fri Nov 26 2004 Michael Rash <mbr@cipherdyne.org>
 - Added ps.os file.
 - psad-1.4.0 release.
 
-* Sun Oct 17 2004 Michael Rash <mbr@cipherydne.org>
+* Sun Oct 17 2004 Michael Rash <mbr@cipherdyne.org>
 - psad-1.3.4 release.
 
-* Sat Sep 25 2004 Michael Rash <mbr@cipherydne.org>
+* Sat Sep 25 2004 Michael Rash <mbr@cipherdyne.org>
 - Added Bit::Vector back since not having it causes dependency
   problems with Date::Calc even though psad does not require any
   Date::Calc functions that require Bit::Vector functions.
 
-* Mon Sep 06 2004 Michael Rash <mbr@cipherydne.org>
+* Mon Sep 06 2004 Michael Rash <mbr@cipherdyne.org>
 - Updated to psad-1.3.3.
 - Fixed path to psad-init.redhat (Mate Wierdl)
 
-* Thu Jun 24 2004 Michael Rash <mbr@cipherydne.org>
+* Thu Jun 24 2004 Michael Rash <mbr@cipherdyne.org>
 - Updated to psad-1.3.2 (added fwcheck_psad.pl and fw_search.conf
   installation).
 
-* Mon Oct 14 2003 Michael Rash <mbr@cipherydne.org>
+* Mon Oct 14 2003 Michael Rash <mbr@cipherdyne.org>
 - Removed ipchains text from description.
 - Added test and config warning message for HOME_NET variable.
 - Updated to version 1.3
 
-* Mon Oct 14 2003 Michael Rash <mbr@cipherydne.org>
+* Mon Oct 14 2003 Michael Rash <mbr@cipherdyne.org>
 - Removed diskmond since psad handles disk space thresholds
   directly.
 
-* Sat Oct 11 2003 Michael Rash <mbr@cipherydne.org>
+* Sat Oct 11 2003 Michael Rash <mbr@cipherdyne.org>
 - Updated spec file to build properly on both Red Hat 7.2 and
   Red Hat 9 systems.
 

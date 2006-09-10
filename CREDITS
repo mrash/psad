@@ -1,3 +1,25 @@
+Albert E. Whale
+    - Discovered bug in 1.1 that made fw_check() too strict with looking for
+      precisely FW_MSG_SEARCH in a logging prefix instead of just looking
+      for FW_MSG_SEARCH _within_ the logging prefix.
+    - Suggested use of CPAN downloads of perl modules in install.pl.
+    - Bugfix for "-" character missing from Mandrake version of ps.
+    - Bugfix for duplicate lines for tcpwrapper auto block IPs in
+      /etc/hosts.deny.
+    - Lots of great testing and feedback on new versions and -pre releases.
+    - Suggested the ability to re-import scanning IP directories.
+    - Bugfix for zero print_scale_factor in --Analyze-msgs mode.
+    - Bugfix for auto-ignored addresses appearing in DShield alerts.
+    - Bugfix for not timing-out blocked IP addresses from a previous psad
+      execution.
+    - Suggested putting -pre release versions in psad to make
+      troubleshooting easier.
+    - Discovered bug in syslog() message generation and --fw-block arg.
+    - Lots of great testing for auto-blocking code... even contributed
+      root access on some systems to help troubleshoot.
+    - Suggested socket communication in --fw-block mode.
+    - Contributed the logrotate.psad file.
+
 Manual Caphina
     - Greatly assisting in the first version of Bastille-NIDS which
       eventually became psad.
@@ -121,28 +143,6 @@ Nick Temple
 James N. Winner
     - Discovered bug that prevented psad from detecting scans through the
       iptables FORWARD chain.
-
-Albert E. Whale
-    - Discovered bug in 1.1 that made fw_check() too strict with looking for
-      precisely FW_MSG_SEARCH in a logging prefix instead of just looking
-      for FW_MSG_SEARCH _within_ the logging prefix.
-    - Suggested use of CPAN downloads of perl modules in install.pl.
-    - Bugfix for "-" character missing from Mandrake version of ps.
-    - Bugfix for duplicate lines for tcpwrapper auto block IPs in
-      /etc/hosts.deny.
-    - Lots of great testing and feedback on new versions and -pre releases.
-    - Suggested the ability to re-import scanning IP directories.
-    - Bugfix for zero print_scale_factor in --Analyze-msgs mode.
-    - Bugfix for auto-ignored addresses appearing in DShield alerts.
-    - Bugfix for not timing-out blocked IP addresses from a previous psad
-      execution.
-    - Suggested putting -pre release versions in psad to make
-      troubleshooting easier.
-    - Discovered bug in syslog() message generation and --fw-block arg.
-    - Lots of great testing for auto-blocking code... even contributed
-      root access on some systems to help troubleshoot.
-    - Suggested socket communication in --fw-block mode.
-    - Contributed the logrotate.psad file.
 
 David Krider
     - Discovered iptables path bug on SuSE 8.2.
@@ -310,7 +310,7 @@ Torkel Hasle
     - Suggested the ability to assign danger levels based on ports in
       addition to the protocol in auto_dl.  Suggested better sweep detection
       by calculating scan danger levels over all destinations (i.e. 5 packets
-      to different detestinations should trigger danger level 1).
+      to different destinations should trigger danger level 1).
 
 SiO
     - Reported bug with zero masks in auto_dl file.

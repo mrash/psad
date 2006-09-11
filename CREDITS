@@ -314,3 +314,14 @@ Torkel Hasle
 
 SiO
     - Reported bug with zero masks in auto_dl file.
+
+Jeroen Vermeulen
+    - Suggested that psad collect and report errors that are returned by
+      broken iptables commands to the user. This resulted in a redesign of the
+      IPTables::ChaingMgr module to collect both stdout and stderr from all
+      iptables commands.
+    - Found bug where IPTABLES_AUTO_RULENUM misled the user into thinking that
+      it governed where the jump rule into a custom chain is added within the
+      calling chain.  This resulted in the IPT_AUTO_CHAIN{n} variables being
+      updated to support the rule position for both the jump rule and any new
+      rules within the chain.

@@ -4636,16 +4636,18 @@ sub ipt_block() {
             $mail_msg = "added $mail_msg";
         }
 
-        if ($renewed_status) {
-            if ($config{'ENABLE_RENEW_BLOCK_EMAILS'} eq 'Y') {
+        if ($config{'ENABLE_AUTO_IDS_EMAILS'} eq 'Y') {
+            if ($renewed_status) {
+                if ($config{'ENABLE_RENEW_BLOCK_EMAILS'} eq 'Y') {
+                    &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} $mail_msg",
+                        '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+                        unless $no_email_alerts;
+                }
+            } else {
                 &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} $mail_msg", '',
                     $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
                     unless $no_email_alerts;
             }
-        } else {
-            &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} $mail_msg", '',
-                $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
-                unless $no_email_alerts;
         }
         &Psad::psyslog('psad', $mail_msg) unless $no_syslog_alerts;
 
@@ -4742,10 +4744,12 @@ sub ipt_rm_block() {
             ### the auto-block rules from the command line with --Flush.
             &Psad::psyslog('psad', "removed Netfilter auto-block against " .
                 $ip) unless $no_syslog_alerts;
-            &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} removed Netfilter " .
-                "block against $ip", '',
-                $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
-                unless $no_email_alerts;
+            if ($config{'ENABLE_AUTO_IDS_EMAILS'} eq 'Y') {
+                &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} removed " .
+                    "Netfilter block against $ip", '',
+                    $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+                    unless $no_email_alerts;
+            }
         }
         print STDERR "[+] ipt_rm_block(): removed Netfilter block ",
             "against $ip\n" if $debug;
@@ -4984,10 +4988,12 @@ sub tcpwr_rm_block() {
         chomp $line;
         if ($line =~ /ALL:\s+$ip$/) {
             &diskwrite_rm_blocked_ip($ip, $config{'AUTO_BLOCK_TCPWR_FILE'});
-            &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} removed " .
-                "tcpwrappers block against $ip (timeout expired).", '',
-                $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
-                unless $no_email_alerts;
+            if ($config{'ENABLE_AUTO_IDS_EMAILS'} eq 'Y') {
+                &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} removed " .
+                    "tcpwrappers block against $ip (timeout expired).", '',
+                    $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+                    unless $no_email_alerts;
+            }
             $rv = 1;
         } else {
             print T "$line\n";
@@ -5051,10 +5057,12 @@ sub auto_psad_response() {
             if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
                 &Psad::psyslog('psad', 'initiating tcpwrappers auto-block ' .
                     "against $src $timeout_str") unless $no_syslog_alerts;
-                &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} tcpwrappers " .
-                    "AUTO-BLOCK against $src $timeout_str", '',
-                    $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
-                    unless $no_email_alerts;
+                if ($config{'ENABLE_AUTO_IDS_EMAILS'} eq 'Y') {
+                    &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} " .
+                        "tcpwrappers AUTO-BLOCK against $src $timeout_str",
+                        '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+                        unless $no_email_alerts;
+                }
                 my $found = 0;
                 open H, "< $config{'ETC_HOSTS_DENY'}" or die
                     "[*] Could not open $config{'ETC_HOSTS_DENY'}: $!";
@@ -6701,8 +6709,8 @@ sub disk_space_exceeded() {
             "$config{'PSAD_DIR'} exceeded " .
             "$config{'DISK_MAX_PERCENTAGE'} prct utilization.")
             unless $no_syslog_alerts;
-        &Psad::sendmail("$config{'MAIL_ERROR_PREFIX'} Exceeded max disk utilization for " .
-            "$config{'PSAD_DIR'} on $config{'HOSTNAME'}", '',
+        &Psad::sendmail("$config{'MAIL_ERROR_PREFIX'} Exceeded max disk " .
+            "utilization for $config{'PSAD_DIR'} on $config{'HOSTNAME'}", '',
             $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
             unless $no_email_alerts;
         &Psad::psyslog('psad', "removing data in $config{'PSAD_DIR'}")
@@ -6880,7 +6888,7 @@ sub required_vars() {
         PSAD_DIR PSAD_RUN_DIR PSAD_LIB_DIR ENABLE_FW_LOGGING_CHECK
         ENABLE_RENEW_BLOCK_EMAILS DSHIELD_LATEST_EMAIL AUTO_BLOCK_REGEX
         ENABLE_AUTO_IDS_REGEX IPTABLES_PREREQ_CHECK SNORT_RULE_DL_FILE
-        IPT_OUTPUT_FILE IPT_ERROR_FILE
+        IPT_OUTPUT_FILE IPT_ERROR_FILE ENABLE_AUTO_IDS_EMAILS
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

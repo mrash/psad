@@ -4,45 +4,38 @@
 # $Header$
 
 depend() {
-        need logger
+	need logger
 }
 
 checkconfig() {
-        if [ ! -f /etc/psad/psad.conf ] ; then
-                eerror "Please create /etc/psad/psad.conf"
-                eerror "You can find a sample config file at /etc/psad/psad.conf.sample"
-                return 1
-        fi
-        return 0
+	if [ ! -f /etc/psad/psad.conf ] ; then
+	eerror "Please create /etc/psad/psad.conf"
+	eerror "You can find a sample config file at /etc/psad/psad.conf.sample"
+	return 1
+	fi
+	return 0
 }
 
 start() {
-        checkconfig || return $?
+	checkconfig || return 1
 
-        ebegin "Starting psad"
-        start-stop-daemon --start --quiet --pidfile /var/run/psad/psad.pid \
-                --exec /usr/sbin/psad
-        eend $? "Failed to start psad"
+	ebegin "Starting ${SVCNAME}"
+	start-stop-daemon --start --quiet --exec /usr/sbin/psad
+	eend $? "Failed to start ${SVCNAME}"
 }
 
 stop() {
-        ebegin "Stopping psadwatchd"
-        start-stop-daemon --stop --quiet --pidfile /var/run/psad/psadwatchd.pid
-        eend $? "Failed to stop psadwatchd"
+	ebegin "Stopping psadwatchd"
+	start-stop-daemon --stop --quiet --pidfile /var/run/psad/psadwatchd.pid
+	eend $? "Failed to stop psadwatchd"
 
-        if [ -f /var/run/psad/kmsgsd.pid ] ; then
-            ebegin "Stopping kmsgsd"
-            start-stop-daemon --stop --quiet --pidfile /var/run/psad/kmsgsd.pid
-            eend $? "Failed to stop kmsgsd"
-        fi
+	if [ -f /var/run/psad/kmsgsd.pid ] ; then
+		ebegin "Stopping kmsgsd"
+		start-stop-daemon --stop --quiet --pidfile /var/run/psad/kmsgsd.pid
+		eend $? "Failed to stop kmsgsd"
+	fi
 
-        ebegin "Stopping psad"
-        start-stop-daemon --stop --quiet --pidfile /var/run/psad/psad.pid
-        eend $? "Failed to stop psad"
-
-        # clean stale pidfiles
-        [ -f /var/run/psad/kmsgsd.pid ] && rm -f /var/run/psad/kmsgsd.pid
-        [ -f /var/run/psad/psadwatchd.pid ] && rm -f /var/run/psad/psadwatchd.pid
-        [ -f /var/run/psad/psad.pid ] && rm -f /var/run/psad/psad.pid
+	ebegin "Stopping ${SVCNAME}"
+	start-stop-daemon --stop --quiet --pidfile /var/run/psad/psad.pid
+	eend $? "Failed to stop ${SVCNAME}"
 }
-

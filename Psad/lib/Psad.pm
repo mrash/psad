@@ -40,7 +40,7 @@ require Exporter;
     print_sys_msg
 );
 
-$VERSION = '1.4.3';
+$VERSION = '1.4.8';
 
 ### subroutines ###
 sub buildconf() {
@@ -94,9 +94,6 @@ sub check_commands() {
         /usr/local/sbin
     );
     CMD: for my $cmd (keys %$cmds_href) {
-        ### syslog is a special case (see SYSLOG_DAEMON var in psad code)
-        next if $cmd =~ /syslog/i;
-
         ### both mail and sendmail are special cases, mail is not required
         ### if "nomail" is set in REPORT_METHOD, and sendmail is only
         ### required if DShield alerting is enabled and a DShield user

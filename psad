@@ -5844,7 +5844,7 @@ sub status_psad_daemon() {
 
     ### print block status of IP addresses blocked by Netfilter
     unless ($analyze_msgs) {
-        &print_blocked_ip_status();
+        &print_blocked_ip_status('');
     }
 
     if ($analyze_msgs) {
@@ -5896,6 +5896,8 @@ sub status_psad_daemon() {
 }
 
 sub print_blocked_ip_status() {
+    my $specific_ip = shift;
+
     return unless -e $config{'AUTO_BLOCK_IPT_FILE'};
 
     unlink "$config{'AUTO_BLOCK_IPT_FILE'}.status"
@@ -5911,7 +5913,11 @@ sub print_blocked_ip_status() {
 
     unlink "$config{'AUTO_BLOCK_IPT_FILE'}.status";
 
-    print "\n    Iptables auto-blocked IPs:\n";
+    if ($specific_ip) {
+        print "    Iptables auto-blocking status for: $specific_ip: \n";
+    } else {
+        print "\n    Iptables auto-blocked IPs:\n";
+    }
 
     my %ipt_opts = (
         'iptables' => $cmds{'iptables'},
@@ -5930,6 +5936,9 @@ sub print_blocked_ip_status() {
         if ($line =~ /^\s*(\S+)/) {
             my $ip = $1;  ### this may be a subnet
             next unless $ip =~ /$ip_re/;
+            if ($specific_ip) {
+                next unless $ip eq $specific_ip;
+            }
             my $timestamp = '';
             ### older versions do not have the timestamp
             if ($line =~ /^\s*\S+\s+(\d+)/) {
@@ -5972,38 +5981,37 @@ sub print_blocked_ip_status() {
 }
 
 sub status_ip() {
-    my $rv = 0;
-    my @match_ip;
-    die "[*] $fw_data_file does not exist yet.  Exiting."
-        unless -e $fw_data_file;
-    die "[*] No data yet in $fw_data_file.  Exiting."
-        unless -s $fw_data_file > 0;
-    die "[*] No scans from $status_ip have been detected.\n",
-        "    See 'psad --Status' for a complete list."
-        unless -d "$config{'PSAD_DIR'}/$status_ip";
-    open FW, "< $fw_data_file" or die "[*] Could not open ",
-        "$fw_data_file: $!";
-    while (<FW>) {
-        push @match_ip, $_ if $_ =~ /SRC=$status_ip\s/
-            || $_ =~ /DST=$status_ip\s/;
+
+    my @match_ip = ();
+    if (-e $fw_data_file) {
+        open FW, "< $fw_data_file" or die "[*] Could not open ",
+            "$fw_data_file: $!";
+        while (<FW>) {
+            push @match_ip, $_ if $_ =~ /SRC=$status_ip\s/
+                || $_ =~ /DST=$status_ip\s/;
+        }
+        close FW;
+
+        if (@match_ip) {
+            open D, "> $config{'PSAD_DIR'}/$status_ip/fwdata" or
+                die "[*] Could not open $config{'PSAD_DIR'}/$status_ip/fwdata";
+            print D for @match_ip;
+            close D;
+            for (my $i=$#match_ip; $i>=$#match_ip-10; $i--) {
+                print STDOUT $match_ip[$i] if defined $match_ip[$i];
+            }
+            print STDOUT "\n[+] The above packet output shows up to 10 of the ",
+                "most recently\n    logged packets for $status_ip.\n",
+                "[+] All packets logged by Netfilter specifically ",
+                "for $status_ip\n    can be viewed here: ",
+                "$config{'PSAD_DIR'}/$status_ip/fwdata\n";
+        }
     }
-    close FW;
-    die "[*] Could not match $status_ip to packets in ",
-        "$fw_data_file.  Exiting." unless @match_ip;
-    open D, "> $config{'PSAD_DIR'}/$status_ip/fwdata" or
-        die "[*] Could not open $config{'PSAD_DIR'}/$status_ip/fwdata";
-    for my $line (@match_ip) {
-        print D $line;
-    }
-    close D;
-    for (my $i=$#match_ip; $i>=$#match_ip-10; $i--) {
-        print STDOUT $match_ip[$i] if defined $match_ip[$i];
-    }
-    print STDOUT "\n[+] The above packet output shows up to 10 of the ",
-        "most recently\n    logged packets for $status_ip.\n",
-        "[+] All packets logged by Netfilter specifically ",
-        "for $status_ip\n    can be viewed here: ",
-        "$config{'PSAD_DIR'}/$status_ip/fwdata\n";
+
+    ### print auto-blocking status for this IP
+    &print_blocked_ip_status($status_ip);
+
+    exit 0 unless -d "$config{'PSAD_DIR'}/$status_ip";
 
     opendir D, "$config{'PSAD_DIR'}/$status_ip" or
         die "[*] Could not open dir: $config{'PSAD_DIR'}/$status_ip: $!";
@@ -6044,7 +6052,7 @@ sub status_ip() {
         chomp $dl;
         print STDOUT "[+] Current danger level: $dl\n";
     }
-    exit $rv;
+    exit 0;
 }
 
 sub import_old_scans() {

@@ -327,7 +327,7 @@ static void parse_fw_search_file(char *fw_search_file)
         if ((*index != '#') && (*index != '\n') &&
                 (*index != ';') && (index != NULL)) {
 
-            if (find_char_var("FW_MSG_SEARCH", tmp_fw_search_buf, index)) {
+            if (find_char_var("FW_MSG_SEARCH ", tmp_fw_search_buf, index)) {
                 fw_msg_search[num_fw_search_strings]
                     = (char *) malloc(strlen(tmp_fw_search_buf));
                 strlcpy(fw_msg_search[num_fw_search_strings],

@@ -4377,7 +4377,11 @@ sub sockwrite_flush_auto_rules() {
 
 sub flush_auto_blocked_ips() {
 
-    my %ipt_opts = ('iptables' => $cmds{'iptables'});
+    my %ipt_opts = (
+        'iptables' => $cmds{'iptables'},
+        'iptout'   => $config{'IPT_OUTPUT_FILE'},
+        'ipterr'   => $config{'IPT_ERROR_FILE'}
+    );
     $ipt_opts{'debug'}   = 1 if $debug;
     $ipt_opts{'verbose'} = 1 if $verbose;
 
@@ -4476,7 +4480,11 @@ sub ipt_block() {
 
     print STDERR "[+] ipt_block($ip)\n" if $debug;
 
-    my %ipt_opts = ('iptables' => $cmds{'iptables'});
+    my %ipt_opts = (
+        'iptables' => $cmds{'iptables'},
+        'iptout'   => $config{'IPT_OUTPUT_FILE'},
+        'ipterr'   => $config{'IPT_ERROR_FILE'}
+    );
     $ipt_opts{'debug'}   = 1 if $debug;
     $ipt_opts{'verbose'} = 1 if $verbose;
 
@@ -4659,7 +4667,11 @@ sub ipt_block() {
 sub ipt_rm_block() {
     my $ip = shift;
 
-    my %ipt_opts = ('iptables' => $cmds{'iptables'});
+    my %ipt_opts = (
+        'iptables' => $cmds{'iptables'},
+        'iptout'   => $config{'IPT_OUTPUT_FILE'},
+        'ipterr'   => $config{'IPT_ERROR_FILE'}
+    );
     $ipt_opts{'debug'}   = 1 if $debug;
     $ipt_opts{'verbose'} = 1 if $verbose;
 
@@ -4752,7 +4764,11 @@ sub ipt_rm_block() {
 
 sub ipt_list_auto_chains() {
 
-    my %ipt_opts = ('iptables' => $cmds{'iptables'});
+    my %ipt_opts = (
+        'iptables' => $cmds{'iptables'},
+        'iptout'   => $config{'IPT_OUTPUT_FILE'},
+        'ipterr'   => $config{'IPT_ERROR_FILE'}
+    );
     $ipt_opts{'debug'}   = 1 if $debug;
     $ipt_opts{'verbose'} = 1 if $verbose;
 
@@ -5108,7 +5124,11 @@ sub timeout_auto_blocked_ips() {
 
 sub build_ipt_config() {
 
-    my %ipt_opts = ('iptables' => $cmds{'iptables'});
+    my %ipt_opts = (
+        'iptables' => $cmds{'iptables'},
+        'iptout'   => $config{'IPT_OUTPUT_FILE'},
+        'ipterr'   => $config{'IPT_ERROR_FILE'}
+    );
     $ipt_opts{'debug'}   = 1 if $debug;
     $ipt_opts{'verbose'} = 1 if $verbose;
 
@@ -5885,7 +5905,11 @@ sub print_blocked_ip_status() {
 
     print "\n    Iptables auto-blocked IPs:\n";
 
-    my %ipt_opts = ('iptables' => $cmds{'iptables'});
+    my %ipt_opts = (
+        'iptables' => $cmds{'iptables'},
+        'iptout'   => $config{'IPT_OUTPUT_FILE'},
+        'ipterr'   => $config{'IPT_ERROR_FILE'}
+    );
     $ipt_opts{'debug'}   = 1 if $debug;
     $ipt_opts{'verbose'} = 1 if $verbose;
 
@@ -5917,7 +5941,9 @@ sub print_blocked_ip_status() {
             }
             my $blocked = 0;
             for my $hr (@ipt_config) {
-                if ($ipt->find_ip_rule($ip, '0.0.0.0/0',
+                if ($ipt->find_ip_rule(
+                        $ip,
+                        '0.0.0.0/0',
                         $hr->{'table'},
                         $hr->{'to_chain'},
                         $hr->{'target'})) {

@@ -2,6 +2,9 @@ psad-1.4.8 (10//2006):
     - Bugfix to use the IPT_OUTPUT_FILE and IPT_ERROR_FILE configuration
       variables in fwknopd.
     - Bugfix to restore "start" functionality in Gentoo init script.
+    - Added the ability to selectively disable psad auto-blocking emails.
+    - Added more rigorous IP matching regex from Sebastien J. (contributed
+      originally for fwknop).
 
 psad-1.4.7 (09/10/2006):
     - Completely re-worked IPTables::ChainMgr to support the return of

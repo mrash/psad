@@ -306,7 +306,7 @@ my %local_ports = ();
 my %local_ips = ();
 
 ### regex to match an ip address
-my $ip_re = '(?:\d{1,3}\.){3}\d{1,3}';
+my $ip_re = qr|(?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2}|;
 
 ### ttl values are decremented depending on the number of hops
 ### the packet has taken before it hits the firewall.  We will

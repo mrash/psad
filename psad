@@ -5191,6 +5191,14 @@ sub build_ipt_config() {
                     if $debug;
                 next VAR;
             }
+            if ($hsh{'from_chain'} eq $hsh{'to_chain'}) {
+                my $msg = "cannot have identical from_chain and to_chain " .
+                    "in IPT_AUTO_CHAIN$ctr keyword";
+                &Psad::psyslog('psad', $msg) unless $no_syslog_alerts;
+                print STDERR "[-] build_ipt_config(): $msg\n"
+                    if $debug;
+                next VAR;
+            }
             my ($rv, $out_aref, $err_aref)
                 = $ipt->chain_exists($hsh{'table'}, $hsh{'from_chain'});
 

@@ -335,6 +335,11 @@ sub add_jump_rule() {
     my $iptables = $self->{'_iptables'};
     my $idx_err = '';
 
+    if ($from_chain eq $to_chain) {
+        return 0, ["Identical from_chain and to_chain ($from_chain) " .
+            "not allowed."], [];
+    }
+
     ### first check to see if the jump rule already exists
     my ($rule_position, $num_chain_rules)
         = $self->find_ip_rule('0.0.0.0/0', '0.0.0.0/0', $table,

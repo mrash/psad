@@ -148,8 +148,11 @@ use strict;
 
 ### ========================== main =================================
 
-### set the current psad version number
+### set the current psad version and file revision numbers
 my $version = '1.4.8';
+my $revision_svn = '$Revision$';
+my $rev_num = '1';
+($rev_num) = $revision_svn =~ m|\$Rev.*:\s+(\S+)|;
 
 ### default config file for psad (can be changed with
 ### --config switch)
@@ -542,8 +545,8 @@ Getopt::Long::Configure('no_ignore_case');
 
 ### Print the version number and exit if -V given on the command line.
 if ($ver) {
-    print "[+] psad v$version, by Michael Rash ",
-        "<mbr\@cipherdyne.org>\n";
+    print "[+] psad v$version (file revision: $rev_num)\n",
+        "      by Michael Rash <mbr\@cipherdyne.org>\n";
     exit 0;
 }
 
@@ -6915,7 +6918,7 @@ sub usage() {
     print <<_HELP_;
 
 psad; the Port Scan Attack Detector
-[+] Version: $version
+[+] Version: $version (file revision: $rev_num)
 [+] By Michael Rash (mbr\@cipherdyne.org, http://www.cipherdyne.org)
 
 Usage: psad [-a <auto ips file>] [-c <config file>] [-l] [-i <interval>]

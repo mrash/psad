@@ -42,13 +42,17 @@ use strict;
 
 ### establish the default path to the config file (can be
 ### over-ridden with the -c <file> command line option.
-my $CONFIG_FILE = '/etc/psad/kmsgsd.conf';
+my $CONFIG_FILE    = '/etc/psad/kmsgsd.conf';
+my $fw_search_file = '/etc/psad/fw_search.conf';
 
 ### configuration hash
 my %config;
 
 ### commands hash
 my %cmds;
+
+### specific fw msg search strings
+my @fw_search = ();
 
 ### flag used for HUP signal
 my $hup_flag = 0;
@@ -84,10 +88,11 @@ open LOG, ">> $config{'FW_DATA_FILE'}" or
 ### main loop
 for (;;) {
     open FIFO, "< $config{'PSAD_FIFO'}" or die "Can't open file : $!\n";
-    my $service = <FIFO>;  ### don't chomp for better performance
+    my $service = <FIFO>;
     if (defined $service
         && ($service =~ /Packet\slog/ || $service =~ /IN.+?OUT/)
         && ($service =~ /$config{'FW_MSG_SEARCH'}/
+        && (&found_fw_msg($service))
         || $service =~ /$config{'SNORT_SID_STR'}/)) {
         ### log to the fwdata file
         my $old_fh = select LOG;
@@ -111,10 +116,27 @@ close LOG;
 close FIFO;
 exit 0;
 #==================== end main =====================
+
+sub found_fw_msg() {
+    my $str = shift;
+    return 1 if $config{'FW_SEARCH_ALL'} eq 'Y';
+    for my $pattern (@fw_search) {
+        my $pat = qr|$pattern|;
+        return 1 if $str =~ m|$pat|;
+    }
+    return 0;
+}
+
 sub import_config() {
 
     ### read in the configuration file
     &Psad::buildconf(\%config, \%cmds, $CONFIG_FILE);
+
+    ### import FW_MSG_SEARCH strings
+    &import_fw_search();
+
+    ### expand any embedded vars within config values
+    &Psad::expand_vars(\%config, \%cmds);
 
     ### make sure the configuration is complete
     &required_vars();
@@ -123,6 +145,40 @@ sub import_config() {
     ### are in the right place, and attempt to correct automatically if not.
     &Psad::check_commands(\%cmds);
 
+    return;
+}
+
+sub import_fw_search() {
+    open F, "< $fw_search_file" or die "[*] Could not open fw search ",
+        "string file $fw_search_file: $!";
+    my @lines = <F>;
+    close F;
+    my $found_fw_search = 0;
+    for my $line (@lines) {
+        next unless $line =~ /\S/;
+        next if $line =~ /^\s*#/;
+        if ($line =~ /^\s*FW_MSG_SEARCH\s+(.*?);/) {
+            push @fw_search, $1;
+            $found_fw_search = 1;
+        } elsif ($line =~ /^\s*FW_SEARCH_ALL\s+(\w+);/) {
+            my $strategy = $1;
+            if ($strategy eq 'Y' or $strategy eq 'N') {
+                $config{'FW_SEARCH_ALL'} = $strategy;
+            }
+        }
+    }
+
+    $config{'FW_SEARCH_ALL'} = 'Y'
+        unless defined $config{'FW_SEARCH_ALL'};
+
+    unless ($config{'FW_SEARCH_ALL'} eq 'Y' or
+            $config{'FW_SEARCH_ALL'} eq 'N') {
+        $config{'FW_SEARCH_ALL'} = 'Y';
+    }
+
+    if ($config{'FW_SEARCH_ALL'} eq 'N' and not $found_fw_search) {
+        push @fw_search, 'DROP';
+    }
     return;
 }
 

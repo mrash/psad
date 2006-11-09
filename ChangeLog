@@ -1,6 +1,14 @@
 psad-1.4.9 (11//2006):
+    - Added the ability to expand embedded variables within the psad
+      configuration files.  For example, the path to the FW_DATA_FILE is
+      defined in psad.conf as "$PSAD_DIR/fwdata", which resolves to
+      /var/log/psad/fwdata when the PSAD_DIR variable is expanded.  This
+      feature allows a consistent set of file paths to easily be defined
+      instead of using the full path for each file path.
     - Better validation of IPT_AUTO_CHAIN{n} variables so that the from_chain
       cannot be identical to the to_chain.
+    - Added dump_config() to psadwatchd.c and kmsgsd.c when compiled with
+      debugging support.
 
 psad-1.4.8 (10/15/2006):
     - Added the ability to get the auto-blocking status for a specific IP

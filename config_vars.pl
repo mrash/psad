@@ -61,7 +61,7 @@ PROG: for my $prog (keys %config) {
     ### variable
     for my $line (@prog_lines) {
         if ($prog =~ /\.c/) {  ### C code file
-            if ($line =~ m|\"(\w+)\s+\"|) {
+            if ($line =~ m|find_char_var\(\"(\w+)\"|) {
                 my $var = $1;
                 unless (defined $config_vars{$var}) {
                     print "[-] Config var: $var (line $line_num) ",

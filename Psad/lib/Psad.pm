@@ -8,7 +8,7 @@
 #
 # Author: Michael Rash (mbr@cipherdyne.org)
 #
-# Version: 1.4.3
+# Version: 1.4.9
 #
 ##################################################################
 #
@@ -29,6 +29,7 @@ require Exporter;
 @ISA = qw(Exporter);
 @EXPORT = qw(
     buildconf
+    expand_vars
     defined_vars
     pidrunning
     writepid
@@ -61,6 +62,31 @@ sub buildconf() {
                 $cmds_hr->{$1} = $val;
             } else {
                 $config_hr->{$varname} = $val;
+            }
+        }
+    }
+    return;
+}
+
+sub expand_vars() {
+    my ($config_hr, $cmds_hr) = @_;
+
+    for my $hr ($config_hr, $cmds_hr) {
+        for my $var (keys %$hr) {
+            my $val = $hr->{$var};
+            croak "[*] Multiple variable expansion not supported yet ",
+                "(var $var)." if $val =~ m|\$.+\$|;
+            if ($val =~ m|\$(\w+)|) {
+                my $sub_var = $1;
+                croak "[*] sub-ver $sub_var not allowed within same ",
+                    "variable $var" if $sub_var eq $var;
+                if (defined $config_hr->{$sub_var}) {
+                    $val =~ s|\$$sub_var|$config_hr->{$sub_var}|;
+                    $hr->{$var} = $val;
+                } else {
+                    croak "[*] sub-var \"$sub_var\" not defined in ",
+                        "config for var: $var."
+                }
             }
         }
     }

@@ -2210,13 +2210,6 @@ sub psad_init() {
     ### import alerting config (psadwatchd also references this file)
     &Psad::buildconf(\%config, \%cmds, $alert_conf_file);
 
-    ### make sure all necessary configuration variables
-    ### are defined
-    &required_vars();
-
-    ### store the psad command line.
-    $cmdline_file = $config{'CMDLINE_FILE'};
-
     ### import FW_MSG_SEARCH strings
     &import_fw_search();
 
@@ -2226,6 +2219,19 @@ sub psad_init() {
         'psad'       => $config{'PID_FILE'},
         'kmsgsd'     => $config{'KMSGSD_PID_FILE'},
     );
+
+    ### expand any embedded vars within config values
+    &Psad::expand_vars(\%config, \%cmds);
+
+    ### dump configuration to STDOUT
+    exit &dump_conf() if $dump_conf;
+
+    ### make sure all necessary configuration variables
+    ### are defined
+    &required_vars();
+
+    ### store the psad command line.
+    $cmdline_file = $config{'CMDLINE_FILE'};
 
     ### make sure the values in the config file make sense
     &validate_config();
@@ -2265,9 +2271,6 @@ sub psad_init() {
 
     ### The --USR1 command line switch was given.
     exit &usr1() if $usr1;
-
-    ### dump configuration to STDOUT
-    exit &dump_conf() if $dump_conf;
 
     ### The --Flush command line switch was given.
     exit &sockwrite_flush_auto_rules() if $flush_fw;
@@ -6477,6 +6480,7 @@ sub setup() {
         PSAD_DIR
         PSAD_RUN_DIR
         PSAD_LIB_DIR
+        PSAD_CONF_DIR
         ERROR_DIR
     ) {
         next if -d $config{$dir};
@@ -6907,7 +6911,7 @@ sub required_vars() {
         PSAD_DIR PSAD_RUN_DIR PSAD_LIB_DIR ENABLE_FW_LOGGING_CHECK
         ENABLE_RENEW_BLOCK_EMAILS DSHIELD_LATEST_EMAIL AUTO_BLOCK_REGEX
         ENABLE_AUTO_IDS_REGEX IPTABLES_PREREQ_CHECK SNORT_RULE_DL_FILE
-        IPT_OUTPUT_FILE IPT_ERROR_FILE PROC_FORWARD_FILE
+        IPT_OUTPUT_FILE IPT_ERROR_FILE PROC_FORWARD_FILE PSAD_CONF_DIR
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

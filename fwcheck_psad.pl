@@ -101,12 +101,15 @@ if ($fw_file) {
 ### import alerting config (psadwatchd also references this file
 &Psad::buildconf(\%config, \%cmds, $alert_conf_file);
 
+### import FW_MSG_SEARCH strings
+&import_fw_search();
+
+### expand any embedded vars within config values
+&Psad::expand_vars(\%config, \%cmds);
+
 ### check to make sure the commands specified in the config section
 ### are in the right place, and attempt to correct automatically if not.
 &Psad::check_commands(\%cmds);
-
-### import FW_MSG_SEARCH strings
-&import_fw_search();
 
 open FWCHECK, "> $config{'FW_CHECK_FILE'}" or die "[*] Could not ",
     "open $config{'FW_CHECK_FILE'}: $!";

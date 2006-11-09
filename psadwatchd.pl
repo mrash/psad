@@ -206,6 +206,9 @@ sub import_config() {
     ### import alerting config (psadwatchd also references this file
     &Psad::buildconf(\%config, \%cmds, $alerting_config_file);
 
+    ### expand any embedded vars within config values
+    &Psad::expand_vars(\%config, \%cmds);
+
     ### make sure the configuration is complete
     &required_vars();
 
@@ -222,10 +225,10 @@ sub import_config() {
 sub required_vars() {
     my @required_vars = qw(
         PSAD_PID_FILE PSAD_CMDLINE_FILE
-        DISKMOND_PID_FILE KMSGSD_PID_FILE
         PSADWATCHD_PID_FILE EMAIL_ADDRESSES
         PSADWATCHD_CHECK_INTERVAL
         PSADWATCHD_MAX_RETRIES
+        KMSGSD_PID_FILE
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

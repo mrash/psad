@@ -50,27 +50,31 @@ char hostname[MAX_GEN_LEN];
 char mail_addrs[MAX_GEN_LEN];
 char shCmd[MAX_GEN_LEN];
 char mailCmd[MAX_GEN_LEN];
+char config_file[MAX_PATH_LEN];
+char alert_config_file[MAX_PATH_LEN];
+char alerting_methods[MAX_GEN_LEN];
+char psadCmd[MAX_PATH_LEN];
+char psad_pid_file[MAX_PATH_LEN];
+char psad_cmdline_file[MAX_PATH_LEN];
+char psad_run_dir[MAX_PATH_LEN];
+char kmsgsdCmd[MAX_PATH_LEN];
+char kmsgsd_pid_file[MAX_PATH_LEN];
+char psadwatchd_pid_file[MAX_PATH_LEN];
+char char_psadwatchd_check_interval[MAX_NUM_LEN];
+char char_psadwatchd_max_retries[MAX_NUM_LEN];
+unsigned int psadwatchd_check_interval = 5;  /* default to 5 seconds */
+unsigned int psadwatchd_max_retries = 10; /* default to 10 tries */
 static volatile sig_atomic_t received_sighup = 0;
 
 /* prototypes */
-static void parse_config(
-    char *config_file,
-    char *hostname,
-    char *psad_binary,
-    char *psad_pid_file,
-    char *psad_cmdline_file,
-    char *kmsgsd_binary,
-    char *kmsgsd_pid_file,
-    char *shCmd,
-    char *mailCmd,
-    char *mail_addrs,
-    char *psadwatchd_pid_file,
-    unsigned int *psadwatchd_check_interval,
-    unsigned int *psadwatchd_max_retries
-);
-static void parse_alert_config(
-    char *alert_config_file,
-    char *alerting_methods
+static void parse_config(void);
+static void parse_alert_config(void);
+static void expand_config_vars(void);
+static void find_sub_var_value(
+    char *value,
+    char *sub_var,
+    char *pre_str,
+    char *post_str
 );
 static void check_process(
     const char *pid_name,
@@ -85,20 +89,12 @@ static void reset_syscall_ctr(const char *pid_name);
 static void give_up(const char *pid_name);
 static void exec_binary(const char *binary_path, const char *cmdline_file);
 static void sighup_handler(int sig);
+#ifdef DEBUG
+static void dump_config(void);
+#endif
 
 /* main */
 int main(int argc, char *argv[]) {
-    char config_file[MAX_PATH_LEN];
-    char alert_config_file[MAX_PATH_LEN];
-    char alerting_methods[MAX_GEN_LEN];
-    char psadCmd[MAX_PATH_LEN];
-    char psad_pid_file[MAX_PATH_LEN];
-    char psad_cmdline_file[MAX_PATH_LEN];
-    char kmsgsdCmd[MAX_PATH_LEN];
-    char kmsgsd_pid_file[MAX_PATH_LEN];
-    char psadwatchd_pid_file[MAX_PATH_LEN];
-    unsigned int psadwatchd_check_interval = 5;  /* default to 5 seconds */
-    unsigned int psadwatchd_max_retries = 10; /* default to 10 tries */
     int cmdlopt;
 
 #ifdef DEBUG
@@ -128,24 +124,13 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "[+] parsing config_file: %s\n", config_file);
 #endif
 
-    /* parse the config file */
-    parse_config(
-        config_file,
-        hostname,
-        psadCmd,
-        psad_pid_file,
-        psad_cmdline_file,
-        kmsgsdCmd,
-        kmsgsd_pid_file,
-        shCmd,
-        mailCmd,
-        mail_addrs,
-        psadwatchd_pid_file,
-        &psadwatchd_check_interval,
-        &psadwatchd_max_retries
-    );
+    /* parse the config files */
+    parse_config();
+    parse_alert_config();
 
-    parse_alert_config(alert_config_file, alerting_methods);
+#ifdef DEBUG
+    dump_config();
+#endif
 
     /* see if we are suppose to disable all email alerts */
     if (strncmp("noemail", alerting_methods, MAX_GEN_LEN) == 0) {
@@ -187,21 +172,9 @@ int main(int argc, char *argv[]) {
 #endif
             /* reparse the config file since we received a
              * HUP signal */
-            parse_config(
-                config_file,
-                hostname,
-                psadCmd,
-                psad_pid_file,
-                psad_cmdline_file,
-                kmsgsdCmd,
-                kmsgsd_pid_file,
-                shCmd,
-                mailCmd,
-                mail_addrs,
-                psadwatchd_pid_file,
-                &psadwatchd_check_interval,
-                &psadwatchd_max_retries
-            );
+            parse_config();
+            parse_alert_config();
+
             slogr("psad(psadwatchd)",
                     "received HUP signal, re-imported psadwatchd.conf");
         }
@@ -227,7 +200,7 @@ static void check_process(
 
     if ((pidfile_ptr = fopen(pid_file, "r")) == NULL) {
 #ifdef DEBUG
-    fprintf(stderr, "[-] Could not open pid_file: %s\n", pid_file);
+    fprintf(stderr, "[-] Could not open pid file: %s\n", pid_file);
 #endif
         /* the pid file must not exist (or we can't read it), so
          * setup to start the appropriate process */
@@ -239,7 +212,8 @@ static void check_process(
     if (! restart) {
         if (fgets(pid_line, MAX_PID_SIZE, pidfile_ptr) == NULL) {
 #ifdef DEBUG
-            fprintf(stderr, "[-] Could not read the pid_file: %s\n", pid_file);
+            fprintf(stderr, "[-] Could not read the pid file: %s\n",
+                pid_file);
 #endif
             /* see if we need to give up */
             incr_syscall_ctr(pid_name, max_retries);
@@ -429,26 +403,11 @@ static void exec_binary(const char *binary, const char *cmdlinefile)
     return;
 }
 
-static void parse_config(
-    char *config_file,
-    char *hostname,
-    char *psadCmd,
-    char *psad_pid_file,
-    char *psad_cmdline_file,
-    char *kmsgsdCmd,
-    char *kmsgsd_pid_file,
-    char *shCmd,
-    char *mailCmd,
-    char *mail_addrs,
-    char *psadwatchd_pid_file,
-    unsigned int *psadwatchd_check_interval,
-    unsigned int *psadwatchd_max_retries)
+static void parse_config(void)
 {
     FILE *config_ptr;         /* FILE pointer to the config file */
     int linectr = 0;
     char config_buf[MAX_LINE_BUF];
-    char char_psadwatchd_check_interval[MAX_NUM_LEN];
-    char char_psadwatchd_max_retries[MAX_NUM_LEN];
     char *index;
 
     /* check to see if kmsgsd needs to be running */
@@ -473,25 +432,155 @@ static void parse_config(
         if ((*index != '#') && (*index != '\n') &&
                 (*index != ';') && (index != NULL)) {
 
-            find_char_var("psadCmd ", psadCmd, index);
-            find_char_var("HOSTNAME ", hostname, index);
-            find_char_var("PSAD_PID_FILE ", psad_pid_file, index);
-            find_char_var("PSAD_CMDLINE_FILE ", psad_cmdline_file, index);
-            find_char_var("kmsgsdCmd ", kmsgsdCmd, index);
-            find_char_var("KMSGSD_PID_FILE ", kmsgsd_pid_file, index);
-            find_char_var("shCmd ", shCmd, index);
-            find_char_var("mailCmd ", mailCmd, index);
-            find_char_var("EMAIL_ADDRESSES ", mail_addrs, index);
-            find_char_var("PSADWATCHD_CHECK_INTERVAL ",
+            find_char_var("EMAIL_ADDRESSES", mail_addrs, index);
+            find_char_var("HOSTNAME", hostname, index);
+            find_char_var("PSAD_RUN_DIR", psad_run_dir, index);
+            find_char_var("PSAD_PID_FILE", psad_pid_file, index);
+            find_char_var("PSAD_CMDLINE_FILE", psad_cmdline_file, index);
+            find_char_var("KMSGSD_PID_FILE", kmsgsd_pid_file, index);
+            find_char_var("PSADWATCHD_PID_FILE", psadwatchd_pid_file, index);
+            find_char_var("PSADWATCHD_CHECK_INTERVAL",
                 char_psadwatchd_check_interval, index);
-            find_char_var("PSADWATCHD_MAX_RETRIES ",
+            find_char_var("PSADWATCHD_MAX_RETRIES",
                 char_psadwatchd_max_retries, index);
-            find_char_var("PSADWATCHD_PID_FILE ", psadwatchd_pid_file, index);
+
+            /* commands */
+            find_char_var("kmsgsdCmd", kmsgsdCmd, index);
+            find_char_var("mailCmd", mailCmd, index);
+            find_char_var("shCmd", shCmd, index);
+            find_char_var("psadCmd", psadCmd, index);
         }
     }
-    *psadwatchd_check_interval = atoi(char_psadwatchd_check_interval);
-    *psadwatchd_max_retries    = atoi(char_psadwatchd_max_retries);
     fclose(config_ptr);
+
+    /* resolve any embedded variables */
+    expand_config_vars();
+
+    psadwatchd_check_interval = atoi(char_psadwatchd_check_interval);
+    psadwatchd_max_retries    = atoi(char_psadwatchd_max_retries);
+
+    return;
+}
+
+static void expand_config_vars(void)
+{
+    char sub_var[MAX_GEN_LEN]  = "";
+    char pre_str[MAX_GEN_LEN]  = "";
+    char post_str[MAX_GEN_LEN] = "";
+
+    if (has_sub_var("EMAIL_ADDRESSES", mail_addrs, sub_var,
+            pre_str, post_str))
+        find_sub_var_value(mail_addrs, sub_var, pre_str, post_str);
+
+    if (has_sub_var("HOSTNAME", hostname, sub_var,
+            pre_str, post_str))
+        find_sub_var_value(hostname, sub_var, pre_str, post_str);
+
+    if (has_sub_var("PSAD_RUN_DIR", psad_run_dir, sub_var,
+            pre_str, post_str))
+        find_sub_var_value(psad_run_dir, sub_var, pre_str, post_str);
+
+    if (has_sub_var("PSAD_PID_FILE", psad_pid_file, sub_var,
+            pre_str, post_str))
+        find_sub_var_value(psad_pid_file, sub_var, pre_str, post_str);
+
+    if (has_sub_var("PSAD_CMDLINE_FILE", psad_cmdline_file, sub_var,
+            pre_str, post_str))
+        find_sub_var_value(psad_cmdline_file, sub_var, pre_str, post_str);
+
+    if (has_sub_var("KMSGSD_PID_FILE", kmsgsd_pid_file, sub_var,
+            pre_str, post_str))
+        find_sub_var_value(kmsgsd_pid_file, sub_var, pre_str, post_str);
+
+    if (has_sub_var("PSADWATCHD_PID_FILE", psadwatchd_pid_file, sub_var,
+            pre_str, post_str))
+        find_sub_var_value(psadwatchd_pid_file, sub_var, pre_str, post_str);
+
+    if (has_sub_var("PSADWATCHD_CHECK_INTERVAL",
+            char_psadwatchd_check_interval, sub_var,
+            pre_str, post_str))
+        find_sub_var_value(char_psadwatchd_check_interval,
+            sub_var, pre_str, post_str);
+
+    if (has_sub_var("PSADWATCHD_MAX_RETRIES", char_psadwatchd_max_retries,
+            sub_var, pre_str, post_str))
+        find_sub_var_value(char_psadwatchd_max_retries,
+            sub_var, pre_str, post_str);
+
+    if (has_sub_var("mailCmd", mailCmd, sub_var,
+            pre_str, post_str))
+        find_sub_var_value(mailCmd, sub_var, pre_str, post_str);
+
+    if (has_sub_var("shCmd", shCmd, sub_var,
+            pre_str, post_str))
+        find_sub_var_value(shCmd, sub_var, pre_str, post_str);
+
+    if (has_sub_var("ksmgsdCmd", kmsgsdCmd, sub_var,
+            pre_str, post_str))
+        find_sub_var_value(kmsgsdCmd, sub_var, pre_str, post_str);
+
+    if (has_sub_var("psadCmd", psadCmd, sub_var,
+            pre_str, post_str))
+        find_sub_var_value(psadCmd, sub_var, pre_str, post_str);
+
+    return;
+}
+
+static void find_sub_var_value(char *value, char *sub_var, char *pre_str,
+    char *post_str)
+{
+    int found_var = 0;
+    if (strncmp(sub_var, "EMAIL_ADDRESSES", MAX_GEN_LEN) == 0) {
+        strlcpy(sub_var, mail_addrs, MAX_GEN_LEN);
+        found_var = 1;
+    } else if (strncmp(sub_var, "HOSTNAME", MAX_GEN_LEN) == 0) {
+        strlcpy(sub_var, hostname, MAX_GEN_LEN);
+        found_var = 1;
+    } else if (strncmp(sub_var, "PSAD_RUN_DIR", MAX_GEN_LEN) == 0) {
+        strlcpy(sub_var, psad_run_dir, MAX_GEN_LEN);
+        found_var = 1;
+    } else if (strncmp(sub_var, "PSAD_PID_FILE", MAX_GEN_LEN) == 0) {
+        strlcpy(sub_var, psad_pid_file, MAX_GEN_LEN);
+        found_var = 1;
+    } else if (strncmp(sub_var, "PSAD_CMDLINE_FILE", MAX_GEN_LEN) == 0) {
+        strlcpy(sub_var, psad_cmdline_file, MAX_GEN_LEN);
+        found_var = 1;
+    } else if (strncmp(sub_var, "KMSGSD_PID_FILE", MAX_GEN_LEN) == 0) {
+        strlcpy(sub_var, kmsgsd_pid_file, MAX_GEN_LEN);
+        found_var = 1;
+    } else if (strncmp(sub_var, "PSADWATCHD_PID_FILE", MAX_GEN_LEN) == 0) {
+        strlcpy(sub_var, psadwatchd_pid_file, MAX_GEN_LEN);
+        found_var = 1;
+    } else if (strncmp(sub_var, "PSADWATCHD_CHECK_INTERVAL", MAX_GEN_LEN) == 0) {
+        strlcpy(sub_var, char_psadwatchd_check_interval, MAX_GEN_LEN);
+        found_var = 1;
+    } else if (strncmp(sub_var, "PSADWATCHD_MAX_RETRIES", MAX_GEN_LEN) == 0) {
+        strlcpy(sub_var, char_psadwatchd_max_retries, MAX_GEN_LEN);
+        found_var = 1;
+    } else if (strncmp(sub_var, "mailCmd", MAX_GEN_LEN) == 0) {
+        strlcpy(sub_var, mailCmd, MAX_GEN_LEN);
+        found_var = 1;
+    } else if (strncmp(sub_var, "shCmd", MAX_GEN_LEN) == 0) {
+        strlcpy(sub_var, shCmd, MAX_GEN_LEN);
+        found_var = 1;
+    } else if (strncmp(sub_var, "kmsgsdCmd", MAX_GEN_LEN) == 0) {
+        strlcpy(sub_var, kmsgsdCmd, MAX_GEN_LEN);
+        found_var = 1;
+    } else if (strncmp(sub_var, "psadCmd", MAX_GEN_LEN) == 0) {
+        strlcpy(sub_var, psadCmd, MAX_GEN_LEN);
+        found_var = 1;
+    }
+
+    if (found_var)
+
+        /* substitute the variable value */
+        expand_sub_var_value(value, sub_var, pre_str, post_str);
+
+    else {
+        printf("[*] Could not resolve sub-var: %s to a value.\n",
+            sub_var);
+        exit(EXIT_FAILURE);
+    }
     return;
 }
 
@@ -535,9 +624,7 @@ static void check_data_input_mode(void)
     return;
 }
 
-static void parse_alert_config(
-    char *alert_config_file,
-    char *alerting_methods)
+static void parse_alert_config(void)
 {
     FILE *config_ptr;         /* FILE pointer to the config file */
     int linectr = 0;
@@ -563,12 +650,36 @@ static void parse_alert_config(
         if ((*index != '#') && (*index != '\n') &&
                 (*index != ';') && (index != NULL)) {
 
-            find_char_var("ALERTING_METHODS ", alerting_methods, index);
+            find_char_var("ALERTING_METHODS", alerting_methods, index);
         }
     }
     fclose(config_ptr);
+
     return;
 }
+
+#ifdef DEBUG
+static void dump_config(void)
+{
+    fprintf(stderr, "[+] dump_config()\n");
+    fprintf(stderr, "    EMAIL_ADDRESSES: %s\n", mail_addrs);
+    fprintf(stderr, "    HOSTNAME: %s\n", hostname);
+    fprintf(stderr, "    PSAD_RUN_DIR: %s\n", psad_run_dir);
+    fprintf(stderr, "    PSAD_PID_FILE: %s\n", psad_pid_file);
+    fprintf(stderr, "    PSAD_CMDLINE_FILE: %s\n", psad_cmdline_file);
+    fprintf(stderr, "    KMSGSD_PID_FILE: %s\n", kmsgsd_pid_file);
+    fprintf(stderr, "    PSADWATCHD_PID_FILE: %s\n", psadwatchd_pid_file);
+    fprintf(stderr, "    PSADWATCHD_CHECK_INTERVAL: %u\n",
+        psadwatchd_check_interval);
+    fprintf(stderr, "    PSADWATCHD_MAX_RETRIES: %u\n",
+        psadwatchd_max_retries);
+    fprintf(stderr, "    kmsgsdCmd: %s\n", kmsgsdCmd);
+    fprintf(stderr, "    mailCmd: %s\n", mailCmd);
+    fprintf(stderr, "    shCmd: %s\n", shCmd);
+    fprintf(stderr, "    psadCmd: %s\n", psadCmd);
+    return;
+}
+#endif
 
 static void sighup_handler(int sig)
 {

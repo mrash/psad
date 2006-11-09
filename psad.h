@@ -44,6 +44,7 @@
 #include <sys/types.h>
 #include <signal.h>
 #include <syslog.h>
+#include <ctype.h>
 
 /* DEFINES ********************************************************************/
 #define MAX_LINE_BUF 1024
@@ -60,6 +61,10 @@ void check_unique_pid(const char *, const char *);
 void write_pid(const char *, pid_t);
 void daemonize_process(const char *);
 void send_alert_email(const char *, const char *, const char *);
+int has_sub_var(char *var_name, char *value, char *sub_var,
+    char *pre_str, char *post_str);
+void expand_sub_var_value(char *value, const char *sub_var,
+    const char *pre_str, const char *post_str);
 int find_char_var(char *, char *, char *);
 int check_import_config(time_t *config_mtime, char *config_file);
 

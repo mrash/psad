@@ -1,6 +1,6 @@
 /*
 ********************************************************************************
-*
+
 *  File: psad_funcs.c
 *
 *  Purpose: psad_funcs.c contains several functions that are needed by
@@ -122,6 +122,10 @@ int find_char_var(char *search_str, char *charvar, char *line)
         if (index_tmp[i] != search_str[i])
             return 0;
 
+    /* require trailing space char */
+    if (index_tmp[i] != ' ')
+        return 0;
+
 #ifdef DEBUG
     fprintf(stderr, "[+] find_char_var(): found %s in line: %s",
             search_str, line);
@@ -160,6 +164,82 @@ int find_char_var(char *search_str, char *charvar, char *line)
     strncpy(charvar, index_tmp, char_ctr);
     charvar[char_ctr] = '\0';  /* replace the ';' with the NULL character */
     return 1;
+}
+
+int has_sub_var(char *var_name, char *value, char *sub_var,
+    char *pre_str, char *post_str)
+{
+    unsigned int i, sub_var_ctr = 0, found_sub_var = 0;
+    unsigned int pre_str_ctr = 0, found_pre_str = 1;
+    unsigned int post_str_ctr = 0, found_post_str = 0;
+
+    sub_var[0] = '\0';
+    pre_str[0] = '\0';
+    post_str[0] = '\0';
+
+    for (i=0; i < strlen(value); i++) {
+        if (found_sub_var) {
+            if (! isdigit(value[i])
+                    && ! isalpha(value[i]) && value[i] != '_') {
+                found_sub_var = 0;
+                found_post_str = 1;
+            } else {
+                sub_var[sub_var_ctr] = value[i];
+                sub_var_ctr++;
+            }
+        }
+
+        if (found_pre_str && value[i] != '$') {
+            pre_str[pre_str_ctr] = value[i];
+            pre_str_ctr++;
+        }
+
+        if (found_post_str) {
+            post_str[post_str_ctr] = value[i];
+            post_str_ctr++;
+        }
+
+        if (value[i] == '$') {
+            if (found_sub_var) {
+                printf("[*] Multiple sub-vars not supported (var: %s)\n",
+                    var_name);
+                exit(EXIT_FAILURE);
+            }
+            found_sub_var = 1;
+            found_pre_str = 0;
+        }
+    }
+    if (sub_var_ctr == MAX_GEN_LEN - 1) {
+        printf("[*] Sub-var length exceeds maximum of %d chars within var: %s\n",
+                MAX_GEN_LEN, var_name);
+        exit(EXIT_FAILURE);
+    }
+    if (sub_var[0] != '\0') {
+        sub_var[sub_var_ctr] = '\0';
+        if (strncmp(sub_var, var_name, MAX_GEN_LEN) == 0) {
+            printf("[*] Cannot have identical var to sub-var: %s\n",
+                    sub_var);
+            exit(EXIT_FAILURE);
+        }
+        return 1;
+    }
+
+    return 0;
+}
+
+void expand_sub_var_value(char *value, const char *sub_var,
+    const char *pre_str, const char *post_str)
+{
+    if (strlen(sub_var) + strlen(pre_str) + strlen(post_str)
+            > MAX_GEN_LEN) {
+        printf("[*] Variable value too long: %s%s%s\n",
+            sub_var, pre_str, post_str);
+        exit(EXIT_FAILURE);
+    }
+    strlcpy(value, pre_str, MAX_GEN_LEN);
+    strlcat(value, sub_var, MAX_GEN_LEN);
+    strlcat(value, post_str, MAX_GEN_LEN);
+    return;
 }
 
 /*

@@ -162,6 +162,7 @@ unless ($found) {
 my $noarchive   = 0;
 my $uninstall   = 0;
 my $help        = 0;
+my $archived_old = 0;
 my $skip_syslog_test = 0;
 my $skip_module_install   = 0;
 my $cmdline_force_install = 0;
@@ -512,20 +513,13 @@ sub install() {
     for my $file qw(signatures icmp_types posf auto_dl snort_rule_dl pf.os) {
         if (-e "${PSAD_CONFDIR}/$file") {
             &archive("${PSAD_CONFDIR}/$file") unless $noarchive;
-            unless (&query_preserve_sigs_autodl("${PSAD_CONFDIR}/$file")) {
-                ### keep the installed file intact (the user must have
-                ### modified it).
-                &logr("[+] Copying $file -> ${PSAD_CONFDIR}/$file\n");
-                copy $file, "${PSAD_CONFDIR}/$file" or die "[*] Could not ",
-                    "copy $file -> ${PSAD_CONFDIR}/$file: $!";
-                &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
-            }
-        } else {
-            &logr("[+] Copying $file -> ${PSAD_CONFDIR}/$file\n");
-            copy $file, "${PSAD_CONFDIR}/$file" or die "[*] Could not copy ",
-                "$file -> ${PSAD_CONFDIR}/$file: $!";
-            &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
+### FIXME, need a real config preservation routine for these files.
+#            unless (&query_preserve_sigs_autodl("${PSAD_CONFDIR}/$file")) {
         }
+        &logr("[+] Copying $file -> ${PSAD_CONFDIR}/$file\n");
+        copy $file, "${PSAD_CONFDIR}/$file" or die "[*] Could not ",
+            "copy $file -> ${PSAD_CONFDIR}/$file: $!";
+        &perms_ownership("${PSAD_CONFDIR}/$file", 0600);
     }
     &logr("\n");
 
@@ -711,8 +705,12 @@ sub install() {
     }
 
     &logr("\n========================================================\n");
+    if ($archived_old) {
+        &logr("[+] Copies of your original configs have been made " .
+            "in: $CONF_ARCHIVE\n");
+    }
     if ($preserve_rv) {
-        &logr("\n[+] Psad has been installed (with your original config).\n");
+        &logr("\n[+] Psad has been installed (with your original config merged).\n");
     } else {
         &logr("\n[+] Psad has been installed.\n");
     }
@@ -1820,6 +1818,7 @@ sub archive() {
         "$file -> ${base}1: $!";
     system "$Cmds{'gzip'} ${base}1";
     chdir $curr_pwd or die $!;
+    $archived_old = 1;
     return;
 }
 

@@ -2,12 +2,14 @@ psad-1.6.0 (11//2006):
     - Completely refactored the Snort rule matching support in psad.  Added
       many header field tests with full range matching support.  These tests
       include the following keywords from Snort: ttl, id, seq, ack, window,
-      icmp_id, icmp_seq, itype, icode, and ip_proto.
-    - Added Snort "sameip" support.
+      icmp_id, icmp_seq, itype, icode, ip_proto, and sameip.
     - Refactored all signatures in /etc/psad/signatures to conform to new
       signature matching support in this release.  There are now about 190
       signatures that psad can run directly against Netfilter logging
       messages (i.e. without the help of fwsnort).
+    - Added "MISC Windows popup spam" signature.  This allows psad to detect
+      when attempts are made to send spam via the Windows popup messenger
+      service.
     - Added emulation of the Snort "dsize" test through the use of the IP
       length field for TCP/ICMP signatures, and the UDP length field for UDP
       signatures.
@@ -25,6 +27,13 @@ psad-1.6.0 (11//2006):
       cannot be identical to the to_chain.
     - Added dump_config() to psadwatchd.c and kmsgsd.c when compiled with
       debugging support.
+    - Added ENABLE_INTF_LOCAL_NETS to have psad automatically treat all IP
+      addresses that are part of the local system as belonging to the HOME_NET
+      for signature matching.
+    - Added ENABLE_SNORT_SIG_STRICT to have psad exit if there are any
+      problems found with Snort rules in the /etc/psad/signatures file.  If
+      this feature is disabled (this is the default), then psad generates
+      syslog warnings for improperly formatted signatures).
 
 psad-1.4.8 (10/15/2006):
     - Added the ability to get the auto-blocking status for a specific IP

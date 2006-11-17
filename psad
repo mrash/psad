@@ -642,7 +642,7 @@ unless ($no_fwcheck or $syslog_server or $benchmark
 if ($benchmark) {
     $test_pkt = 'Feb 15 16:42:58 orthanc kernel: DROP IN=eth0 ' .
         'OUT= MAC=00:a0:cc:28:42:5a:00:03:6c:00:98:54:08:00 ' .
-        'SRC=10.0.0.1 DST=10.0.0.2 LEN=48 TOS=0x00 PREC=0x00 ' .
+        'SRC=192.168.10.2 DST=192.168.10.1 LEN=48 TOS=0x00 PREC=0x00 ' .
         'TTL=110 ID=13383 DF PROTO=TCP SPT=1389 ';
     $test_pktend = 'WINDOW=16384 RES=0x00 SYN URGP=0';
 }
@@ -7255,16 +7255,7 @@ psad; the Port Scan Attack Detector
 [+] Version: $version (file revision: $rev_num)
 [+] By Michael Rash (mbr\@cipherdyne.org, http://www.cipherdyne.org)
 
-Usage: psad [-a <auto ips file>] [-c <config file>] [-l] [-i <interval>]
-       [-h] [-B] [-A] [-F] [-S] [-K] [-R] [-U] [-v] [-V] [-o] [-p] [-D]
-       [-d] [--signatures <sig file>] [--passive-os-sigs <posf file>]
-       [--snort-type <type>] [--snort-rdir <rules dir>] [--fw-analyze]
-       [--fw-file <file>] [--fw-search <file>] [--fw-list-auto]
-       [--fw-block-ip <ip>] [--fw-rm-block-ip <ip>] [--fw-dump]
-       [-m <messages file>] [--interval <seconds>] [--status-brief]
-       [--status-ip <ip>] [--status-sort-dl] [--no-fwcheck] [--no-daemon]
-       [--no-rdns] [--no-whois] [--no-netstat] [--no-ipt-errors]
-       [--no-passiveos] [--no-snort-sids] [--no-signatures] [--no-kmsgsd]
+Usage: psad [options]
 
 Options:
     --signatures <sigs file>      - Manually specify the path to the

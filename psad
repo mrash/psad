@@ -2236,6 +2236,18 @@ sub add_snort_sid() {
         $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{$pkt_hr->{'proto'}}
             {'sid'}{$sid}{$pkt_hr->{'chain'}}{'is_fwsnort'} = 1;
 
+        if ($pkt_hr->{'proto'} eq 'tcp' or $pkt_hr->{'proto'} eq 'udp') {
+
+            $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{$pkt_hr->{'proto'}}
+                {'sid'}{$sid}{$pkt_hr->{'chain'}}{'dp'}
+                    = $pkt_hr->{'dp'};
+
+            if ($pkt_hr->{'proto'} eq 'tcp') {
+                $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{$pkt_hr->{'proto'}}
+                    {'sid'}{$sid}{$pkt_hr->{'chain'}}{'flags'}
+                        = $pkt_hr->{'flags'};
+            }
+        }
 
         return &get_largest_sid_dl($sid, 2, $fwsnort_sigs{$sid}{'classtype'});
 
@@ -4386,18 +4398,20 @@ sub scan_logr_signatures() {
                         if ($chain eq 'INPUT') {
                             if (defined $local_ports{$proto}
                                     and defined $local_ports{$dp}) {
-                                print $fh "       dst port:  $dp (server bound to port!)\n";
+                                print $fh "       dst port:  $dp (server ",
+                                    "bound to local port!)\n";
                                 print $fh "       flags:     $flags\n"
-                                    if $flags;
+                                    if $proto eq 'tcp';
                             } else {
-                                print $fh "       dst port:  $dp (no server bound to port)\n";
+                                print $fh "       dst port:  $dp (no server ",
+                                    "bound to local port)\n";
                                 print $fh "       flags:     $flags\n"
-                                    if $flags;
+                                    if $proto eq 'tcp';
                             }
                         } else {
                             print $fh "       dst port:  $dp\n";
-                            print $fh "          flags:  $flags\n"
-                                if $flags;
+                            print $fh "       flags:     $flags\n"
+                                if $proto eq 'tcp';
                         }
                     }
 

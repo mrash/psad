@@ -134,7 +134,7 @@ alert udp $HOME_NET 500 -> $EXTERNAL_NET 500 (msg:"MISC isakmp login failed"; cl
 alert tcp $EXTERNAL_NET any -> $HOME_NET 1723 (msg:"MISC Microsoft PPTP communication ttempt"; flags:S; reference:bugtraq,5807; reference:cve,2002-1214; classtype:attempted-admin; psad_id:100082; psad_dl:2; psad_derived_sids:2126,2044;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 639 (msg:"MISC LDAP communication attempt"; flags:S; reference:bugtraq,10116; reference:cve,2003-0719; reference:url,www.microsoft.com/technet/security/bulletin/MS04-011.mspx; classtype:attempted-admin; psad_id:100083; psad_dl:2; psad_derived_sids:2516,2532,2533,2534;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 8000 (msg:"MISC HP Web JetAdmin communication attempt"; flags:S; reference:bugtraq,9978; classtype:web-application-activity; psad_id:100084; psad_dl:2; psad_derived_sids:2547,2548,2549,2655;)
-alert udp $EXTERNAL_NET any -> $HOME_NET 1026:1029 (msg:"MISC Windows popup spam attempt"; classtype:misc-activity; psad_dsize:>100; sid:2043; psad_id:100196; psad_dl:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 1026:1029 (msg:"MISC Windows popup spam attempt"; classtype:misc-activity; reference:url,www.linklogger.com/UDP1026.htm; psad_dsize:>100; psad_id:100196; psad_dl:2;)
 
 ### shellcode.rules
 

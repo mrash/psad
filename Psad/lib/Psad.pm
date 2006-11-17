@@ -223,7 +223,7 @@ sub psyslog() {
 sub print_sys_msg() {
     my ($msg, $file) = @_;
     open F, ">> $file" or croak "[*] Could not open $file: $!";
-    print F scalar localtime(), " $msg";
+    print F scalar localtime(), " pid: $$ $msg";
     close F;
     return;
 }

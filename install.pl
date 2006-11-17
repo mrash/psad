@@ -669,12 +669,9 @@ sub install() {
             next if $line =~ /^\s*#/;
             if ($line =~ /^\s*(\S+)\s+_?CHANGE.?ME_?\;/) {
                 my $var = $1;
-                ### only two possible vars are set to _CHANGEME_ by
-                ### default as of psad-1.3
-                if ($var eq 'HOME_NET') {
-                    &logr("[-] HOME_NET is not defined in $file.\n");
-                    &set_home_net($file);
-                } elsif ($var eq 'HOSTNAME') {
+                ### only the HOSTNAME variable is set to _CHANGEME_ by
+                ### default as of psad-1.6.0
+                if ($var eq 'HOSTNAME') {
                     &logr("[-] set_hostname() failed.  Edit the HOSTNAME " .
                         " variable in $file\n");
                 } else {
@@ -981,6 +978,9 @@ sub install_perl_module() {
 sub set_home_net() {
     my $file = shift;
 
+    ### first see if the admin will accept the default 'any' value
+    return if &query_use_home_net_default();
+
     ### get all interfaces; even those that are down since they may
     ### brought up any time.
     my @ifconfig_out = `$Cmds{'ifconfig'} -a`;
@@ -1074,6 +1074,29 @@ sub set_home_net() {
         &put_string('HOME_NET', 'NOT_USED', $file);
     }
     return;
+}
+
+sub query_use_home_net_default() {
+    &logr(
+"[+] By default, psad matches Snort rules against any IP addresses, but psad\n");
+    &logr(
+"    offers the ability to restrict signature matches to specific networks\n");
+    &logr(
+"    with a similar concept to the HOME_NET variable in Snort.  Would you like\n");
+    &logr(
+"    limit the networks psad uses to enumerate the home network(s)?\n");
+
+    my $ans = '';
+    while ($ans ne 'y' && $ans ne 'n') {
+        &logr("(y/[n])?  ");
+        $ans = <STDIN>;
+        $ans = 'n' if $ans eq "\n";
+        chomp $ans;
+    }
+    if ($ans eq 'y') {
+        return 0;
+    }
+    return 1;
 }
 
 sub set_hostname() {

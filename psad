@@ -3021,7 +3021,9 @@ sub import_signatures() {
 
         ### make sure the signature does not contain any unsupported
         ### Snort rule options
-        &check_unsupported_options($rule_options, $line_num);
+        unless (&check_supported_options($rule_options, $line_num)) {
+            next SIG;
+        }
 
         ### parse rule options
         if ($rule_options =~ /[\s;]psad_id:\s*(\d+)\s*;/) {
@@ -3033,8 +3035,15 @@ sub import_signatures() {
             $psad_ids{$psad_id} = '';
             $sig{'psad_id'} = $psad_id;
         } else {
-            die "[*] import_signatures(): could not find signature",
-                qq|"psad_id" on line: $line_num|;
+            my $msg = "[*] import_signatures(): could not find signature" .
+                qq| "psad_id" on line: $line_num|;
+            if ($config{'ENABLE_SNORT_SIG_STRICT'} eq 'Y') {
+                die $msg;
+            } else {
+                &Psad::psyslog('psad', $msg)
+                    unless $no_syslog_alerts;
+                next SIG;
+            }
         }
 
         ### original Snort sid
@@ -3047,8 +3056,8 @@ sub import_signatures() {
             $sids{$sid} = '';
             $sig{'sid'} = $sid;
         } else {
-            $sig{'sid'} = $sig{'psad_id'};
             ### the signature was derived from several Snort rules
+            $sig{'sid'} = $sig{'psad_id'};
         }
 
         ### msg field
@@ -3067,7 +3076,6 @@ sub import_signatures() {
         }
 
         ### reference field
-
         while ($rule_options =~ /[\s;]reference:\s*(.*?)\s*;/g) {
             my $ref = $1;
             if ($ref =~ /^(\w+),(\S+)/) {
@@ -3249,16 +3257,23 @@ sub import_signatures() {
     return;
 }
 
-sub check_unsupported_options() {
+sub check_supported_options() {
     my ($rule_options, $line_num) = @_;
     for my $opt (@unsupported_snort_opts) {
         ### see if we match a regex belonging to an supported option
         if ($rule_options =~ m|[\s;]$opt:\s*.*?\s*;|) {
-            die qq|[*] import_signatures(): Unsupported rule option: "$opt" |,
-                    "at line: $line_num";
+            my $msg = '[*] import_signatures(): Unsupported rule option: ' .
+                    qq|"$opt" at line: $line_num|;
+            if ($config{'ENABLE_SNORT_SIG_STRICT'} eq 'Y') {
+                die $msg;
+            } else {
+                &Psad::psyslog('psad', $msg)
+                    unless $no_syslog_alerts;
+                return 0;
+            }
         }
     }
-    return;
+    return 1;
 }
 
 sub import_icmp_types() {
@@ -3373,6 +3388,10 @@ sub build_sig_int_range() {
     if ($val =~ m|^\s*(\d+)\s*:\s*(\d+)|) {
         $sig_hr->{$start_key} = $1;
         $sig_hr->{$end_key}   = $2;
+    } elsif ($val =~ m|^\s*(\d+)\s*:|) {
+        $sig_hr->{$start_key} = $1;
+    } elsif ($val =~ m|^\s*:(\d+)|) {
+        $sig_hr->{$end_key} = $1;
     } elsif ($val =~ m|^\s*\<=\s*(\d+)|) {
         $sig_hr->{$end_key} = $1;
     } elsif ($val =~ m|^\s*\<\s*(\d+)|) {
@@ -7208,7 +7227,7 @@ sub required_vars() {
         IPT_OUTPUT_FILE IPT_ERROR_FILE PROC_FORWARD_FILE PSAD_CONF_DIR
         EXTERNAL_NET HTTP_SERVERS SMTP_SERVERS DNS_SERVERS SQL_SERVERS
         TELNET_SERVERS AIM_SERVERS HTTP_PORTS SHELLCODE_PORTS
-        ORACLE_PORTS ENABLE_INTF_LOCAL_NETS
+        ORACLE_PORTS ENABLE_INTF_LOCAL_NETS ENABLE_SNORT_SIG_STRICT
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

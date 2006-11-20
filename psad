@@ -1049,7 +1049,6 @@ sub check_scan() {
             'syslog_host' => '',
         );
 
-
         if ($analyze_msgs) {
             $pkt_ctr++;
             if ($pkt_ctr % $print_scale_factor == 0) {
@@ -1686,7 +1685,6 @@ sub match_snort_keywords() {
         ### values (at least for ipv4, see
         ### linux/net/ipv4/netfilter/ipt_LOG.c)
         my $dl_tmp = &match_snort_ip_keywords($pkt_hr, $sig_hr);
-        next SIG unless $dl_tmp;
 
         $dl = $dl_tmp if $dl_tmp > $dl;
 
@@ -1880,7 +1878,7 @@ sub match_snort_ip_keywords() {
         return &get_largest_sid_dl($sig_hr->{'sid'},
                 $sig_hr->{'dl'}, $sig_hr->{'classtype'});
     }
-    return 1;
+    return 0;
 }
 
 sub check_sig_int_range() {
@@ -3656,8 +3654,8 @@ sub assign_danger_level() {
 
         my $changed_dl = 0;
 
-        print STDERR "[+] assign_danger_level(): source ip: $src\n"
-            if $debug;
+        print STDERR "[+] assign_danger_level(): source ip: $src (dl: ",
+            "$scan_dl{$src})\n" if $debug;
 
         if (defined $curr_sigs_dl_hr->{$src}) {
             if ($scan_dl{$src} < $curr_sigs_dl_hr->{$src}) {
@@ -3738,9 +3736,9 @@ sub assign_danger_level() {
                     $scan_dl{$src} = 5;
                 }
             }
-            print STDERR '[+] assign_danger_level(): DL (after assignment) = ',
-                "$scan_dl{$src}\n" if $debug;
         }
+        print STDERR '[+] assign_danger_level(): DL (after assignment) = ',
+            "$scan_dl{$src}\n" if $debug;
     }
     return;
 }
@@ -7011,7 +7009,7 @@ sub setup() {
 sub get_scale_factor() {
     my $num_packets = shift;
 
-    return 0 if $analyze_msgs;
+    return 0 unless $analyze_msgs;
 
     my $val = 0;
 

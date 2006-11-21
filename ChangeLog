@@ -38,6 +38,11 @@ psad-1.6.0 (11//2006):
       analysis mode.  This is useful to get a sense for how long the disk IO
       might take to write out all of the /var/log/psad/ipt_analysis/<IP>
       directories.
+    - Added code to restart kmsgsd at psad start up if a previous kmsgsd
+      process is still running and TRUNCATE_FWDATA is set to 'Y' (this is the
+      default).  This probably isn't strictly necessary because kmsgsd is
+      capable of writing to the fwdata file even if another process truncates
+      it.
 
 psad-1.4.8 (10/15/2006):
     - Added the ability to get the auto-blocking status for a specific IP

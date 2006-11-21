@@ -34,6 +34,10 @@ psad-1.6.0 (11//2006):
       problems found with Snort rules in the /etc/psad/signatures file.  If
       this feature is disabled (this is the default), then psad generates
       syslog warnings for improperly formatted signatures).
+    - Update to print the number of IP addresses at each danger level in -A
+      analysis mode.  This is useful to get a sense for how long the disk IO
+      might take to write out all of the /var/log/psad/ipt_analysis/<IP>
+      directories.
 
 psad-1.4.8 (10/15/2006):
     - Added the ability to get the auto-blocking status for a specific IP

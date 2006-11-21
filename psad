@@ -2362,15 +2362,15 @@ sub psad_init() {
     ### import FW_MSG_SEARCH strings
     &import_fw_search();
 
+    ### expand any embedded vars within config values
+    &Psad::expand_vars(\%config, \%cmds);
+
     ### pid file hash
     %pidfiles = (
         'psadwatchd' => $config{'PSADWATCHD_PID_FILE'},
         'psad'       => $config{'PID_FILE'},
         'kmsgsd'     => $config{'KMSGSD_PID_FILE'},
     );
-
-    ### expand any embedded vars within config values
-    &Psad::expand_vars(\%config, \%cmds);
 
     ### dump configuration to STDOUT
     exit &dump_conf() if $dump_conf;
@@ -6805,18 +6805,23 @@ sub setup() {
 
     unless ($hup_flag) {
         my $truncate_or_create = 0;
+        my $restart_kmsgsd     = 0;
         if ($config{'TRUNCATE_FWDATA'} eq 'Y') {
             $truncate_or_create = 1;
+            $restart_kmsgsd     = 1;
         } else {
             unless (-e $fw_data_file) {
                 $truncate_or_create = 1;
             }
         }
-        if ($truncate_or_create) {
-            ### create the Netfilter data file if it doesn't exist
-            ### (this is better than dying because it isn't there).
-            &truncate_file($fw_data_file);
-        }
+
+        ### create the Netfilter data file if it doesn't exist
+        ### (this is better than dying because it isn't there).
+        &truncate_file($fw_data_file) if $truncate_or_create;
+
+        ### if we truncate fwdata then we have to restart
+        ### any running kmsgsd process
+        &restart_kmsgsd() if $restart_kmsgsd;
 
         ### unlink socket file if it exists from a previous run (only
         ### if we have not received a HUP signal)
@@ -7002,6 +7007,23 @@ sub setup() {
                 unless $no_email_alerts;
         }
     }
+
+    return;
+}
+
+sub restart_kmsgsd() {
+
+    return if $no_kmsgsd or $config{'SYSLOG_DAEMON'} =~ /ulog/i;
+    return unless -e $pidfiles{'kmsgsd'};
+
+    my $pid = &Psad::pidrunning($pidfiles{'kmsgsd'});
+
+    return unless $pid;
+
+    &Psad::psyslog('psad', 'restarting kmsgsd since TRUNCATE_FWDATA is ' .
+        'enabled') unless $no_syslog_alerts;
+    kill 9, $pid unless kill 15, $pid;
+    system $cmds{'kmsgsd'};
 
     return;
 }

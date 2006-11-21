@@ -1273,12 +1273,14 @@ sub check_scan() {
     print "[+] Assigning danger levels.\n" if $analyze_msgs;
     &assign_danger_level(\%curr_scan, \%curr_sigs_dl, \%curr_sids_dl);
 
+    my $tot_scan_ips = 0;
     if ($analyze_msgs) {
         for (my $dl=1; $dl < 6; $dl++) {
             my $num_ips = 0;
             for my $src (keys %curr_scan) {
                 $num_ips++ if $scan_dl{$src} == $dl;
             }
+            $tot_scan_ips += $num_ips;
             print "    Level $dl: $num_ips IP addresses\n";
         }
         print "\n";
@@ -1286,7 +1288,8 @@ sub check_scan() {
 
     ### Log and send email and syslog alerts
     if ($analyze_msgs) {
-        print "[+] Writing $config{'PSAD_DIR'}/<ip> directories.\n";
+        print "[+] Writing $config{'PSAD_DIR'}/<IP> directories ",
+            "($tot_scan_ips IPs).\n";
         if ($analysis_emails) {
             print "[+] Generating email alerts.\n";
             unless ($no_whois) {

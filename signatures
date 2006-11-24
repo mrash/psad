@@ -112,6 +112,7 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN SYN FIN"; flags:SF; refe
 alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN XMAS"; flags:SRAFPU; reference:arachnids,144; classtype:attempted-recon; sid:625; psad_id:100069; psad_dl:2;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN nmap XMAS"; flags:FPU; reference:arachnids,30; classtype:attempted-recon; sid:1228; psad_id:100070; psad_dl:2;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN synscan portscan"; flags:SF; id:39426; reference:arachnids,441; classtype:attempted-recon; sid:630; psad_id:100071; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN ipEye SYN scan"; flags:S; seq:1958810375; reference:arachnids,236; classtype:attempted-recon; sid:622; psad_id:100197)
 
 ### x11.rules
 
@@ -179,7 +180,7 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 3535 (msg:"FTP Yak! FTP server communic
 ### bad-traffic.rules
 alert tcp $EXTERNAL_NET any <> $HOME_NET 0 (msg:"BAD-TRAFFIC tcp port 0 traffic"; classtype:misc-activity; sid:524; psad_id:100101; psad_dl:2;)
 alert udp $EXTERNAL_NET any <> $HOME_NET 0 (msg:"BAD-TRAFFIC udp port 0 traffic"; reference:bugtraq,576; reference:cve,1999-0675; reference:nessus,10074; classtype:misc-activity; sid:525; psad_id:100102; psad_dl:2;)
-#alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"BAD-TRAFFIC data in TCP SYN packet"; dsize:>6; flags:S; reference:url,www.cert.org/incident_notes/IN-99-07.html; classtype:misc-activity; sid:207; psad_id:100000; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"BAD-TRAFFIC data in TCP SYN packet"; dsize:>20; flags:S; reference:url,www.cert.org/incident_notes/IN-99-07.html; classtype:misc-activity; sid:207; psad_id:100000; psad_dl:2;)
 ### traffic may be logged over the loopback interface via iptables
 ### much more readily than running Snort on a loopback interface,
 ### so disable this sig.

@@ -1021,6 +1021,7 @@ sub check_scan() {
             'dst'    => '',
             'proto'  => '',
             'ip_id'  => -1,
+            'ip_opt' => '',
             'ttl'    => -1,
             'tos'    => '',
             'ip_len' => -1,
@@ -1394,6 +1395,12 @@ sub parse_NF_pkt_str() {
             $matched = 1 if $pkt_str =~ /$fw_search_str/;
         }
         return $PKT_IGNORE unless $matched;
+    }
+
+    ### get IP options if --log-ip-options is used
+    ### (they appear before the PROTO= field).
+    if ($pkt_str =~ /OPT\s+\((\S+)\)\s+PROTO=/) {
+        $pkt_hr->{'ip_opt'} = $1;
     }
 
     ### May 18 22:21:26 orthanc kernel: DROP IN=eth2 OUT=
@@ -3124,31 +3131,36 @@ sub import_signatures() {
             $sig{'sameip'} = 1;
         }
 
-        ### psad_dsize value
+        ### psad_dsize keyword
         if ($rule_options =~ /[\s;]psad_dsize:\s*(.+?)\s*;/i) {
             $sig{'psad_dsize'} = $1;
             &build_sig_int_range(\%sig, 'psad_dsize', 1, 1514, $line_num);
         }
 
-        ### Snort dsize value
+        ### dsize keyword
         if ($rule_options =~ /[\s;]dsize:\s*(.+?)\s*;/i) {
             $sig{'dsize'} = $1;
             &build_sig_int_range(\%sig, 'dsize', 1, 1514, $line_num);
         }
 
-        ### TTL value
+        ### ttl keyword
         if ($rule_options =~ /[\s;]ttl:\s*(.+?)\s*;/i) {
             $sig{'ttl'} = $1;
             &build_sig_int_range(\%sig, 'ttl', 1, 255, $line_num);
         }
 
-        ### IP ID
+        ### id keyword (for IP ID value)
         if ($rule_options =~ /[\s;]id:\s*(.+?)\s*;/i) {
             $sig{'id'} = $1;
             &build_sig_int_range(\%sig, 'id', 1, 65535, $line_num);
         }
 
-        ### TCP options
+        ### ipopts keyword (for IP options)
+        if ($rule_options =~ /[\s;]ipopts:\s*(.+?)\s*;/i) {
+            $sig{'ipopts'} = $1;
+        }
+
+        ### TCP keywords
         if ($sig{'proto'} eq 'tcp') {
             my $require_ack = 0;
             if ($rule_options =~ /[\s;]flow:\s*established\s*\;/i) {
@@ -3184,21 +3196,21 @@ sub import_signatures() {
                 $sig{'flags'} = $flags;
             }
 
-            ### TCP sequence number
+            ### seq keyword (TCP sequence number)
             if ($rule_options =~ /[\s;]seq:\s*(.+?)\s*;/i) {
                 $sig{'seq'} = $1;
                 &build_sig_int_range(\%sig, 'seq', 1,
                         4294967296, $line_num);
             }
 
-            ### TCP acknowledgement number
+            ### ack keyword (TCP acknowledgement number)
             if ($rule_options =~ /[\s;]ack:\s*(.+?)\s*;/i) {
                 $sig{'ack'} = $1;
                 &build_sig_int_range(\%sig, 'ack', 1,
                         4294967296, $line_num);
             }
 
-            ### TCP window number
+            ### window keyword (TCP window size)
             if ($rule_options =~ /[\s;]window:\s*(.+?)\s*;/i) {
                 $sig{'window'} = $1;
                 &build_sig_int_range(\%sig, 'window', 1,
@@ -3214,16 +3226,22 @@ sub import_signatures() {
                 &build_sig_int_range(\%sig, 'itype', 1,
                         255, $line_num);
             }
+
+            ### itype keyword (ICMP type)
             if ($rule_options =~ /[\s;]icode:\s*(.+?)\s*;/i) {
                 $sig{'icode'} = $1;
                 &build_sig_int_range(\%sig, 'icode', 1,
                         255, $line_num);
             }
+
+            ### icmp_seq keyword (ICMP sequence value)
             if ($rule_options =~ /[\s;]icmp_seq:\s*(.+?)\s*;/i) {
                 $sig{'icmp_seq'} = $1;
                 &build_sig_int_range(\%sig, 'icmp_seq',
                         1, 255, $line_num);
             }
+
+            ### icmp_id keyword (ICMP ID value)
             if ($rule_options =~ /[\s;]icmp_id:\s*(.+?)\s*;/i) {
                 $sig{'icmp_id'} = $1;
                 &build_sig_int_range(\%sig, 'icmp_id',
@@ -3232,6 +3250,8 @@ sub import_signatures() {
             }
 
         } elsif ($sig{'proto'} eq 'ip') {
+
+            ### ip_proto keyword (IP protocol value)
             if ($rule_options =~ /[\s;]ip_proto:\s*(.+?)\s*;/i) {
                 $sig{'ip_proto'} = $1;
                 &build_sig_int_range(\%sig, 'ip_proto',

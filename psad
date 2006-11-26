@@ -420,6 +420,8 @@ my %tcp_p0f_opt_types = (
     'T' => $tcp_timestamp_type
 );
 
+my %ip_options = ();
+
 ### These are not directly support by psad because they
 ### do not appear in Netfilter logs; however, several of
 ### these options are supported if fwsnort is also running.
@@ -1021,12 +1023,12 @@ sub check_scan() {
             'dst'    => '',
             'proto'  => '',
             'ip_id'  => -1,
-            'ip_opt' => '',
             'ttl'    => -1,
             'tos'    => '',
             'ip_len' => -1,
             'itype'  => -1,
             'icode'  => -1,
+            'ip_opts'  => '',
             'icmp_seq' => -1,
             'icmp_id'  => -1,
             'frag_bit' => 0,
@@ -1036,10 +1038,10 @@ sub check_scan() {
             'dp'  => -1,
             'win' => -1,
             'flags' => -1,
-            'tcp_seq' => -1,
-            'tcp_ack' => -1,
-            'tcp_opt' => '',
-            'udp_len' => -1,
+            'tcp_seq'  => -1,
+            'tcp_ack'  => -1,
+            'tcp_opts' => '',
+            'udp_len'  => -1,
 
             ### extra fields for psad internals (DShield reporting, fwsnort
             ### sid matching, Netfilter logging prefixes and chains, etc.)
@@ -1228,11 +1230,11 @@ sub check_scan() {
             ### and if we have been unsuccessful in guessing
             ### the OS after 100 packets don't keep trying.
             if ($pkt{'proto'} eq 'tcp' and $pkt{'flags'} =~ /SYN/) {
-                if ($pkt{'tcp_opt'}) {  ### got the tcp options portion of the header
+                if ($pkt{'tcp_opts'}) {  ### got the tcp options portion of the header
 
                     ### p0f based fingerprinting
                     &p0f($pkt{'src'}, $pkt{'ip_len'}, $pkt{'frag_bit'},
-                            $pkt{'ttl'}, $pkt{'win'}, $pkt{'tcp_opt'});
+                            $pkt{'ttl'}, $pkt{'win'}, $pkt{'tcp_opts'});
 
                 } elsif (not defined $posf{$pkt{'src'}}{'guess'}
                         and $scan{$pkt{'src'}}{$pkt{'dst'}}{'absnum'} < 100) {
@@ -1311,7 +1313,7 @@ sub check_scan() {
 sub parse_NF_pkt_str() {
     my ($pkt_hr, $pkt_str) = @_;
 
-    print STDERR $pkt_str, "\n" if $debug;
+    print STDERR "\n", $pkt_str if $debug;
 
     ### see if there is a logging prefix (used for scan email alert even
     ### if we are running with FW_SEARCH_ALL = Y).  Note that sometimes
@@ -1400,7 +1402,7 @@ sub parse_NF_pkt_str() {
     ### get IP options if --log-ip-options is used
     ### (they appear before the PROTO= field).
     if ($pkt_str =~ /OPT\s+\((\S+)\)\s+PROTO=/) {
-        $pkt_hr->{'ip_opt'} = $1;
+        $pkt_hr->{'ip_opts'} = $1;
     }
 
     ### May 18 22:21:26 orthanc kernel: DROP IN=eth2 OUT=
@@ -1464,7 +1466,7 @@ sub parse_NF_pkt_str() {
         ### don't pickup IP options if --log-ip-options is used
         ### (they appear before the PROTO= field).
         if ($pkt_str =~ /URGP=\S+\s+OPT\s+\((\S+)\)/) {
-            $pkt_hr->{'tcp_opt'} = $1;
+            $pkt_hr->{'tcp_opts'} = $1;
         }
 
         ### make sure we have a "reasonable" packet (note that nmap
@@ -1879,9 +1881,12 @@ sub match_snort_ip_keywords() {
     ### modified to handle packets besides TCP, UDP, and ICMP.
     return 0 if defined $sig_hr->{'ip_proto'};
 
+    ### handle the sameip keyword
     if (defined $sig_hr->{'sameip'} and $sig_hr->{'sameip'}) {
         return 0 unless $pkt_hr->{'src'} eq $pkt_hr->{'dst'};
     }
+
+    return 0 unless &check_sig_ipopts($pkt_hr->{'ip_opts'}, 'ipopts', $sig_hr);
 
     if ($sig_hr->{'proto'} eq 'ip') {
         ### signature match
@@ -1917,6 +1922,20 @@ sub check_sig_int_range() {
         return 0 if $pkt_val < $sig_hr->{"${keyword}_s"};
         return 0 if $pkt_val > $sig_hr->{"${keyword}_e"};
     }
+    return 1;
+}
+
+sub check_sig_ipopts() {
+    my ($pkt_val, $keyword, $sig_hr) = @_;
+
+    return 1 unless defined $sig_hr->{$keyword};
+    return 1 unless $pkt_val;
+
+    my $pkt_opts_hr = &parse_ip_options($pkt_val);
+
+    return 1 if $sig_hr->{$keyword} eq 'any';
+
+    return 0 unless defined $pkt_opts_hr->{$sig_hr->{$keyword}};
     return 1;
 }
 
@@ -2092,8 +2111,8 @@ sub parse_tcp_options() {
     my @hex_nums = ();
     my $debug_str = '';
 
-    if (length($tcp_options) % 2 != 0) {  ### make sure length a multiple of two
-        print 'tcp options length not a multiple of two.' if $debug;
+    if (length($tcp_options) % 2 != 0) {  ### make sure length is a multiple of two
+        print STDERR 'tcp options length not a multiple of two.' if $debug;
         return '';
     }
     ### $tcp_options is a hex string like "020405B401010402" from the Netfilter
@@ -2154,6 +2173,48 @@ sub parse_tcp_options() {
         print STDERR "[+] $debug_str\n" if $debug;
     }
     return \@opts;
+}
+
+sub parse_ip_options() {
+    my $ip_opts_str = shift;
+
+    my %ip_opts  = ();
+    my @hex_nums = ();
+
+    if (length($ip_opts_str) % 2 != 0) {  ### make sure length is a multiple of two
+        print STDERR 'IP options length not a multiple of two.' if $debug;
+        return '';
+    }
+
+    push @hex_nums, $1 while $ip_opts_str =~ m|(.{2})|g;
+
+    OPT: for (my $i=0; $i <= $#hex_nums; $i++) {
+        my $val = hex($hex_nums[$i]);
+
+        for my $rfc_opt_val (keys %ip_options) {
+            next unless $val == $rfc_opt_val;
+            if ($ip_options{$rfc_opt_val}{'len'} ne '-1') {
+                $i += $ip_options{$rfc_opt_val}{'len'};
+            } else {
+                return \%ip_opts if ($i+1 > $#hex_nums);
+                my $pkt_opt_len = hex($hex_nums[$i+1]);
+                if ($i + $pkt_opt_len > $#hex_nums) {
+                    ### this should not happen unless the IP packet
+                    ### was truncated (i.e. the length argument for
+                    ### this option is past the IP options portion
+                    ### of the header).
+                    return \%ip_opts;
+                }
+                $i += $pkt_opt_len;
+            }
+            print STDERR "[+] parse_ip_options(): matched ",
+                "$ip_options{$rfc_opt_val}{'sig_keyword'} option.\n"
+                if $debug;
+
+            $ip_opts{$ip_options{$rfc_opt_val}{'sig_keyword'}} = '';
+        }
+    }
+    return \%ip_opts;
 }
 
 sub posf() {
@@ -2683,6 +2744,31 @@ sub validate_home_net() {
     return;
 }
 
+sub import_ip_options() {
+    %ip_options = ();
+
+    open O, "< $config{'IP_OPTS_FILE'}" or die
+        "[*] Couild not open IP options file $config{'IP_OPTS_FILE'}: $!";
+    while (<O>) {
+        next unless /\S/;
+        next if /^\s*#/;
+        ### 136  4   satid       Stream Identifier
+        ### 145  -1  extproto    Extended Internet Proto
+        if (/^\s*(\d+)\s+(\S+)\s+(\w+)\s+(.*)\s*/) {
+            $ip_options{$1}{'len'}         = $2;
+            $ip_options{$1}{'sig_keyword'} = $3;
+            $ip_options{$1}{'desc'}        = $4;
+        } else {
+        }
+    }
+    close O;
+
+    print STDERR "[+] IP options:\n", Dumper(\%ip_options)
+        if $debug and $verbose;
+
+    return;
+}
+
 sub import_fw_search() {
     open F, "< $fw_search_file" or die "[*] Could not open fw search ",
         "string file $fw_search_file: $!";
@@ -2971,6 +3057,11 @@ sub import_snort_rule_dl() {
 
 sub import_signatures() {
 
+    ### import the ip_options file so that psad can make use of the
+    ### ipopts keyword in Snort rules (requires --log-ip-options to
+    ### iptables)
+    &import_ip_options();
+
     ### undef so we don't leave old signatures around if
     ### we execute this code after receiving a HUP signal.
     %sigs = ();
@@ -3086,9 +3177,11 @@ sub import_signatures() {
             }
             $sids{$sid} = '';
             $sig{'sid'} = $sid;
+            $sig{'is_psad_id'} = 0;
         } else {
             ### the signature was derived from several Snort rules
             $sig{'sid'} = $sig{'psad_id'};
+            $sig{'is_psad_id'} = 1;
         }
 
         ### msg field
@@ -3096,7 +3189,7 @@ sub import_signatures() {
             $sig{'msg'} = $1;
         } else {
             die "[*] import_signatures(): could not find ",
-                qq|"msg" on line: $line_num|;
+                qq|"msg" keyword on line: $line_num|;
         }
 
         ### classtype field
@@ -3157,7 +3250,19 @@ sub import_signatures() {
 
         ### ipopts keyword (for IP options)
         if ($rule_options =~ /[\s;]ipopts:\s*(.+?)\s*;/i) {
-            $sig{'ipopts'} = $1;
+            $sig{'ipopts'} = lc($1);
+
+            ### make sure the IP option is defined in the ip_options
+            ### file
+            my $found = 0;
+            for my $opt_val (keys %ip_options) {
+                $found = 1
+                    if $sig{'ipopts'} eq $ip_options{$opt_val}{'sig_keyword'};
+            }
+            unless ($found) {
+                print STDERR qq|[-] Invalid argument "$sig{'ipopts'}" to |,
+                    "ipopts keyword\n" if $debug;
+            }
         }
 
         ### TCP keywords
@@ -3292,9 +3397,8 @@ sub import_signatures() {
     }
     close SIGS;
     if ($debug and $verbose) {
-        print STDERR "[+] Main signatures hash:\n";
-        print STDERR Dumper \%sig_search;
-        print STDERR Dumper \%sigs;
+        print STDERR "[+] Main signatures hash:\n",
+            Dumper(\%sig_search), Dumper(\%sigs);
     }
     &Psad::psyslog('psad', "imported $sig_ctr psad Snort signatures")
         unless $no_syslog_alerts;
@@ -3304,7 +3408,7 @@ sub import_signatures() {
 sub check_supported_options() {
     my ($rule_options, $line_num) = @_;
     for my $opt (@unsupported_snort_opts) {
-        ### see if we match a regex belonging to an supported option
+        ### see if we match a regex belonging to an unsupported option
         if ($rule_options =~ m|[\s;]$opt:\s*.*?\s*;|) {
             my $msg = '[*] import_signatures(): Unsupported rule option: ' .
                     qq|"$opt" at line: $line_num|;
@@ -4325,7 +4429,7 @@ sub scan_logr() {
                 unless $no_syslog_alerts or $analyze_msgs;
 
             unless ($no_whois) {
-                print $fh  "\n[+] Whois Information:\n";
+                print $fh "\n[+] Whois Information:\n";
                 for my $line (@$whois_info_aref) {
                     print $fh $line;
                 }
@@ -4452,7 +4556,12 @@ sub scan_logr_signatures() {
                             print $fh qq(       content:   "$content"\n);
                         }
                     }
-                    my $sid_str = "       sid:       $sid";
+                    my $sid_str = '';
+                    if ($sig_hr->{'is_psad_id'}) {
+                        $sid_str = "       sid:       $sid";
+                    } else {
+                        $sid_str = "       psad_id:   $sid";
+                    }
                     if (defined $sig_hr->{'psad_derived_sids'}) {
                         $sid_str .= ' (derived from: ';
                         $sid_str .= "$_ "
@@ -5651,12 +5760,12 @@ sub print_scan() {  ### this should primarily be used for debugging
     my $scanfile = "$config{'PRINT_SCAN_HASH'}.$$";
     open PSCAN, "> $scanfile" or warn '[-] Could not open ',
         "$scanfile: $!" and return;
-    print PSCAN "[+] Passive OS fingerprinting hash:\n";
-    print PSCAN Dumper \%posf;
-    print PSCAN "[+] Scan danger level hash:\n";
-    print PSCAN Dumper %scan_dl;
-    print PSCAN "[+] Main scan hash:\n";
-    print PSCAN Dumper \%scan;
+    print PSCAN "[+] Passive OS fingerprinting hash:\n",
+        Dumper(\%posf),
+        "[+] Scan danger level hash:\n",
+        Dumper(\%scan_dl),
+        "[+] Main scan hash:\n",
+        Dumper(\%scan);
     close PSCAN;
     chmod 0600, $scanfile;
     return;
@@ -6046,7 +6155,7 @@ sub status_psad_daemon() {
             }
         }
     }
-    print STDOUT "\n";
+    print "\n";
 
     my $src_ctr = 0;
     my $dst_ctr = 0;
@@ -6111,7 +6220,7 @@ sub status_psad_daemon() {
                     $uniq_srcs{$src} = ''
                 }
                 unless ($found_equal_status) {
-                    print STDOUT "    [No level $status_dl scans detected]\n";
+                    print "    [No level $status_dl scans detected]\n";
                 }
             }
         } else {
@@ -6165,13 +6274,13 @@ sub status_psad_daemon() {
                 $uniq_srcs{$src} = '';
             }
             unless ($found_equal_status) {
-                print STDOUT "    [No level $status_dl scans detected]\n";
+                print "    [No level $status_dl scans detected]\n";
             }
         }
         $src_ctr++ for keys %uniq_srcs;
         $dst_ctr++ for keys %uniq_dsts;
     } else {
-        print STDOUT "    [No scans detected]\n";
+        print "    [No scans detected]\n";
     }
     if (not $analyze_msgs) {
         if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
@@ -6179,7 +6288,7 @@ sub status_psad_daemon() {
             print "\n    DShield stats:\n";
             open F, "< $config{'DSHIELD_COUNTER_FILE'}" or
                 die "[*] $config{'DSHIELD_COUNTER_FILE'}: $!";
-            print STDOUT "        $_" while (<F>);
+            print "        $_" while (<F>);
             close F;
         }
     }
@@ -6213,7 +6322,7 @@ sub status_psad_daemon() {
                     }
                 }
             } else {
-                print STDOUT "        [NONE]\n";
+                print "        [NONE]\n";
             }
         }
     }
@@ -6230,7 +6339,7 @@ sub status_psad_daemon() {
             print "\n    Total packet counters:\n";
             open F, "< $config{'PACKET_COUNTER_FILE'}" or
                 die "[*] $config{'PACKET_COUNTER_FILE'}: $!";
-            print STDOUT "        $_" while (<F>);
+            print "        $_" while (<F>);
             close F;
         }
     }
@@ -6340,9 +6449,9 @@ sub status_ip() {
             print D for @match_ip;
             close D;
             for (my $i=$#match_ip; $i>=$#match_ip-10; $i--) {
-                print STDOUT $match_ip[$i] if defined $match_ip[$i];
+                print $match_ip[$i] if defined $match_ip[$i];
             }
-            print STDOUT "\n[+] The above packet output shows up to 10 of the ",
+            print "\n[+] The above packet output shows up to 10 of the ",
                 "most recently\n    logged packets for $status_ip.\n",
                 "[+] All packets logged by Netfilter specifically ",
                 "for $status_ip\n    can be viewed here: ",
@@ -6368,11 +6477,11 @@ sub status_ip() {
             next;
         }
         if (-e "$config{'PSAD_DIR'}/$status_ip/${dst}_packet_ctr") {
-            print STDOUT "[+] Packet counters against dst: $dst:\n";
+            print "[+] Packet counters against dst: $dst:\n";
             open F, "< $config{'PSAD_DIR'}/$status_ip/${dst}_packet_ctr" or
                 die "[*] Could not open $config{'PSAD_DIR'}/$status_ip/",
                     "${dst}_packet_ctr: $!";
-            print STDOUT "        $_" for <F>;
+            print "        $_" for <F>;
             close F;
         }
     }
@@ -6383,7 +6492,7 @@ sub status_ip() {
         my $ec = <F>;
         close F;
         chomp $ec;
-        print STDOUT "[+] Email alerts sent: $ec\n";
+        print "[+] Email alerts sent: $ec\n";
     }
     if (-e "$config{'PSAD_DIR'}/$status_ip/danger_level") {
         open F, "< $config{'PSAD_DIR'}/$status_ip/danger_level" or
@@ -6392,7 +6501,7 @@ sub status_ip() {
         my $dl = <F>;
         close F;
         chomp $dl;
-        print STDOUT "[+] Current danger level: $dl\n";
+        print "[+] Current danger level: $dl\n";
     }
     exit 0;
 }
@@ -7191,7 +7300,7 @@ sub dump_conf() {
     my @perl_info = @{&run_command('perl', '-V')};
     if (@perl_info) {
         print $fh $_ for @perl_info;
-        print "\n";
+        print $fh "\n";
     }
     print $fh "[+] Dumping psad config from: $config_file\n";
     for my $var (sort keys %config) {
@@ -7296,6 +7405,7 @@ sub required_vars() {
         EXTERNAL_NET HTTP_SERVERS SMTP_SERVERS DNS_SERVERS SQL_SERVERS
         TELNET_SERVERS AIM_SERVERS HTTP_PORTS SHELLCODE_PORTS
         ORACLE_PORTS ENABLE_INTF_LOCAL_NETS ENABLE_SNORT_SIG_STRICT
+        IP_OPTS_FILE
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

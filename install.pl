@@ -248,6 +248,7 @@ exit 0;
 #================= end main =================
 
 sub install() {
+
     ### make sure install.pl is being called from the source directory
     unless (-e 'psad' && -e 'Psad/lib/Psad.pm') {
         die "[*] install.pl can only be executed from the directory\n",
@@ -627,7 +628,9 @@ sub install() {
         ### make sure we actually see packets being logged by
         ### the firewall.
         if ($syslog_str ne 'ulogd') {
-            unless (&test_syslog_config($syslog_str)) {
+            if (&test_syslog_config($syslog_str)) {
+                &logr("[+] Successful $syslog_str reconfiguration.\n\n");
+            } else {
                 if (&query_init_script_restart_syslog()) {
 
                     my $restarted = 0;
@@ -643,35 +646,16 @@ sub install() {
                     ### instead of relying on a HUP signal to
                     ### syslog
                     if ($restarted) {
-                        &test_syslog_config($syslog_str);
+                        if (&test_syslog_config($syslog_str)) {
+                            &logr("[+] Successful $syslog_str reconfiguration.\n\n");
+                        } else {
+                            &logr("[-] Unsuccessful $syslog_str reconfiguration.\n");
+                            &logr("    Consult the psad man page for the basic " .
+                                "$syslog_str requirement to get psad to work.\n\n");
+                        }
                     }
-                }
-            }
-        }
-    }
-
-    ### see if there are any "_CHANGEME_" strings left and give the
-    ### admin a chance to correct (this can happen if a new config
-    ### variable is introduced in a new version of psad but the
-    ### admin chose to preserve the old config).
-    for my $file ("${PSAD_CONFDIR}/psad.conf",
-            "${PSAD_CONFDIR}/kmsgsd.conf",
-            "${PSAD_CONFDIR}/psadwatchd.conf") {
-        open F, "< $file" or die "[*] Could not open file: $file\n";
-        my @lines = <F>;
-        close F;
-        for my $line (@lines) {
-            next if $line =~ /^\s*#/;
-            if ($line =~ /^\s*(\S+)\s+_?CHANGE.?ME_?\;/) {
-                my $var = $1;
-                ### only the HOSTNAME variable is set to _CHANGEME_ by
-                ### default as of psad-1.6.0
-                if ($var eq 'HOSTNAME') {
-                    &logr("[-] set_hostname() failed.  Edit the HOSTNAME " .
-                        " variable in $file\n");
                 } else {
-                    &logr("[-] Var $var is set to _CHANGEME_ in " .
-                        "$file, edit manually.\n");
+                    &logr("[-] Ok, hoping that psad can get packet data anyway.\n");
                 }
             }
         }
@@ -1087,7 +1071,7 @@ sub query_use_home_net_default() {
 
     my $ans = '';
     while ($ans ne 'y' && $ans ne 'n') {
-        &logr("(y/[n])?  ");
+        &logr("    (y/[n])?  ");
         $ans = <STDIN>;
         $ans = 'n' if $ans eq "\n";
         chomp $ans;
@@ -1115,10 +1099,39 @@ sub set_hostname() {
             }
         }
         close PH;
+        &check_hostname($file);
     } else {
         die "[*] Your source directory appears to be incomplete!  $file ",
             "is missing.\n    Download the latest sources from ",
             "http://www.cipherdyne.org/\n";
+    }
+    return;
+}
+
+### see if there are any "_CHANGEME_" strings left and give the
+### admin a chance to correct (this can happen if a new config
+### variable is introduced in a new version of psad but the
+### admin chose to preserve the old config).
+sub check_hostname() {
+    my $file = shift;
+
+    open F, "< $file" or die "[*] Could not open file: $file\n";
+    my @lines = <F>;
+    close F;
+    for my $line (@lines) {
+        next if $line =~ /^\s*#/;
+        if ($line =~ /^\s*(\S+)\s+_?CHANGE.?ME_?\;/) {
+            my $var = $1;
+            ### only the HOSTNAME variable is set to _CHANGEME_ by
+            ### default as of psad-1.6.0
+            if ($var eq 'HOSTNAME') {
+                &logr("[-] set_hostname() failed.  Edit the HOSTNAME " .
+                    " variable in $file\n");
+            } else {
+                &logr("[-] Var $var is set to _CHANGEME_ in " .
+                    "$file, edit manually.\n");
+            }
+        }
     }
     return;
 }
@@ -1501,11 +1514,7 @@ sub test_syslog_config() {
     &scrub_prefix_ctr();
 
     if ($found) {
-        &logr("[+] Successful $syslog_str reconfiguration.\n\n");
     } else {
-        &logr("[-] Unsuccessful $syslog_str reconfiguration.\n");
-        &logr("    Consult the psad man page for the basic " .
-            "$syslog_str requirement to get psad to work.\n\n");
     }
 
     if ($start_kmsgsd && -e "${RUNDIR}/kmsgsd.pid") {
@@ -1515,8 +1524,7 @@ sub test_syslog_config() {
         chomp $pid;
         kill 9, $pid if kill 0, $pid;
     }
-    return 1 if $found;
-    return 0;
+    return $found;
 }
 
 sub scrub_prefix_ctr() {

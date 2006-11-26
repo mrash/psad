@@ -86,7 +86,9 @@ src_install() {
 	insinto /etc/psad
 	doins *.conf
 	doins signatures
+	doins ip_options
 	doins auto_dl
+	doins snort_rule_dl
 	doins posf
 	doins icmp_types
 

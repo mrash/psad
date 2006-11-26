@@ -351,6 +351,7 @@ my $verbose          = 0;
 my $ver              = 0;
 my $help             = 0;
 my $dump_conf        = 0;
+my $download_sigs    = 0;
 my $status_brief     = 0;
 my $chk_interval     = 0;
 my $log_len          = 23;  ### used in scan_logr()
@@ -364,8 +365,8 @@ my $kmsgsd_started   = 0;
 my $warn_msg         = '';
 my $die_msg          = '';
 my $messages_file    = '/var/log/messages';
+my $skip_first_loop  = 1;
 my $local_ips_lkup_ctr = 0;
-my $skip_first_loop = 1;
 
 ### these flags are used to disable several features
 ### in psad if specified from the command line
@@ -476,6 +477,8 @@ Getopt::Long::Configure('no_ignore_case');
 
 &usage(1) unless (GetOptions(
     'signatures=s'      => \$sigs_file,       # Path to psad signatures file.
+    'sig-update'        => \$download_sigs,   # Download the latest signatures from
+                                              # http://www.cipherdyne.org/psad/signatures
     'passive-os-sigs=s' => \$posf_file,       # Path to passive os fingerprinting
                                               #   signatures.
     'snort-type=s'      => \$srules_type,     # Only process snort rules of
@@ -2469,9 +2472,23 @@ sub psad_init() {
         $fw_data_file = $config{'FW_DATA_FILE'};
     }
 
+    my %command_exceptions = (
+        ### both mail and sendmail are special cases, mail is not required
+        ### if "nomail" is set in REPORT_METHOD, and sendmail is only
+        ### required if DShield alerting is enabled and a DShield user
+        ### email is set.
+        'sendmail' => '',
+        'mail'     => '',
+        'wget'     => '',  ### wget is only needed in --sig-update mode
+    );
+
     ### check to make sure the commands specified in the config section
     ### are in the right place, and attempt to correct automatically if not.
-    &Psad::check_commands(\%cmds);
+    &Psad::check_commands(\%cmds, \%command_exceptions);
+
+    ### download latest signatures from
+    ### http://www.cipherdyne.org/psad/signatures
+    exit &download_signatures() if $download_sigs;
 
     ### the usage of the mail and sendmail commands depends on the reporting
     ### config.  I.e., we don't require that the mail command is installed
@@ -2965,8 +2982,9 @@ sub import_snort_rules() {
     &import_snort_rule_dl();
 
     print STDERR Dumper %fwsnort_sigs if $debug and $verbose;
-    &Psad::psyslog('psad', "imported reference Snort rules in " .
-        "$config{'SNORT_RULES_DIR'}/") unless $no_syslog_alerts;
+    &Psad::psyslog('psad', "imported original Snort rules in " .
+        "$config{'SNORT_RULES_DIR'}/ for reference info")
+        unless $no_syslog_alerts;
     return;
 }
 
@@ -6918,6 +6936,7 @@ sub setup() {
         PSAD_RUN_DIR
         PSAD_LIB_DIR
         PSAD_CONF_DIR
+        CONF_ARCHIVE_DIR
         ERROR_DIR
     ) {
         next if -d $config{$dir};
@@ -7375,6 +7394,65 @@ sub run_command() {
     return \@lines;
 }
 
+sub download_signatures() {
+
+    &archive_conf($config{'SIGS_FILE'});
+
+    chdir '/tmp' or die $!;
+
+    print "[+] Downloading latest signatures from:\n",
+        "        $config{'SIG_UPDATE_URL'}\n";
+
+    die "[*] $cmds{'wget'} does not exist." unless -e $cmds{'wget'};
+    die "[*] $cmds{'wget'} is not executable." unless -x $cmds{'wget'};
+
+    unlink 'signatures' if -e 'signatures';
+
+    ### download the file
+    system "$cmds{'wget'} $config{'SIG_UPDATE_URL'}";
+
+    die "[*] Could not download signature file" unless -e 'signatures';
+
+    unlink $config{'SIGS_FILE'} if -e $config{'SIGS_FILE'};
+    move 'signatures', $config{'SIGS_FILE'};
+
+    print
+"[+] New signature file $config{'SIGS_FILE'} has been put in\n",
+"    place. You can restart psad (or use 'psad -H') to import the\n",
+"    new sigs.\n";
+
+    return 0;
+}
+
+sub archive_conf() {
+    my $file = shift;
+
+    require Cwd;
+    my $curr_pwd = getcwd();
+    chdir $config{'CONF_ARCHIVE_DIR'} or die $!;
+    my ($filename) = ($file =~ m|.*/(.*)|);
+    my $base = "${filename}.old";
+    for (my $i = 5; $i > 1; $i--) {  ### keep five copies of old config files
+        my $j = $i - 1;
+        unlink "${base}${i}.gz" if -e "${base}${i}.gz";
+        if (-e "${base}${j}.gz") {
+            move "${base}${j}.gz", "${base}${i}.gz" or die "[*] Could not ",
+                "move ${base}${j}.gz -> ${base}${i}.gz: $!";
+        }
+    }
+    print "[+] Archiving original $file -> ${base}1\n";
+
+    unlink "${base}1.gz" if -e "${base}1.gz";
+    ### move $file into the archive directory
+    copy $file, "${base}1" or die "[*] Could not copy ",
+        "$file -> ${base}1: $!";
+
+    system "$cmds{'gzip'} ${base}1";
+    chdir $curr_pwd or die $!;
+
+    return;
+}
+
 sub required_vars() {
     my @required_vars = qw(
         EMAIL_ADDRESSES CHECK_INTERVAL FW_DATA_FILE FW_ERROR_LOG
@@ -7407,7 +7485,7 @@ sub required_vars() {
         EXTERNAL_NET HTTP_SERVERS SMTP_SERVERS DNS_SERVERS SQL_SERVERS
         TELNET_SERVERS AIM_SERVERS HTTP_PORTS SHELLCODE_PORTS
         ORACLE_PORTS ENABLE_INTF_LOCAL_NETS ENABLE_SNORT_SIG_STRICT
-        IP_OPTS_FILE
+        IP_OPTS_FILE SIG_UPDATE_URL CONF_ARCHIVE_DIR
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;
@@ -7426,6 +7504,9 @@ Usage: psad [options]
 Options:
     --signatures <sigs file>      - Manually specify the path to the
                                     psad signatures file.
+    --sig-update                  - Download the latest set of psad
+                                    signatures from:
+                                    http://www.cipherdyne.org/
     --passive-os-sigs <sigs file> - Manually specify the path to the
                                     passive os fingerprinting sigs.
     --snort-type                  - Enable psad to look for specific

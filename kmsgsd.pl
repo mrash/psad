@@ -143,7 +143,7 @@ sub import_config() {
 
     ### Check to make sure the commands specified in the config section
     ### are in the right place, and attempt to correct automatically if not.
-    &Psad::check_commands(\%cmds);
+    &Psad::check_commands(\%cmds, {});
 
     return;
 }

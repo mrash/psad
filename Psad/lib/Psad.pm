@@ -109,7 +109,7 @@ sub defined_vars() {
 
 ### check paths to commands and attempt to correct if any are wrong.
 sub check_commands() {
-    my $cmds_href = shift;
+    my ($cmds_hr, $exceptions_hr) = @_;
     my $caller = $0;
     my @path = qw(
         /bin
@@ -119,31 +119,36 @@ sub check_commands() {
         /usr/local/bin
         /usr/local/sbin
     );
-    CMD: for my $cmd (keys %$cmds_href) {
+    CMD: for my $cmd (keys %$cmds_hr) {
         ### both mail and sendmail are special cases, mail is not required
         ### if "nomail" is set in REPORT_METHOD, and sendmail is only
         ### required if DShield alerting is enabled and a DShield user
         ### email is set.
         next if $cmd =~ /mail/i;
-        unless (-x $cmds_href->{$cmd}) {
+        next if $cmd eq 'wget';  ### only used in --sig-update mode
+        unless (-x $cmds_hr->{$cmd}) {
             my $found = 0;
             PATH: for my $dir (@path) {
                 if (-x "${dir}/${cmd}") {
-                    $cmds_href->{$cmd} = "${dir}/${cmd}";
+                    $cmds_hr->{$cmd} = "${dir}/${cmd}";
                     $found = 1;
                     last PATH;
                 }
             }
             unless ($found) {
-                croak "[*] ($caller): Could not find $cmd ",
-                    "anywhere!!!\n    Please edit the config section ",
-                     "to include the path to $cmd.";
+                unless (defined $exceptions_hr->{$cmd}) {
+                    croak "[*] ($caller): Could not find $cmd ",
+                        "anywhere!!!\n    Please edit the config section ",
+                         "to include the path to $cmd.";
+                }
             }
         }
-        unless (-x $cmds_href->{$cmd}) {
-            croak "[*] ($caller): $cmd is located at ",
-                "$cmds_href->{$cmd}, but is not executable\n",
-                "    by uid: $<";
+        unless (-x $cmds_hr->{$cmd}) {
+            unless (defined $exceptions_hr->{$cmd}) {
+                croak "[*] ($caller): $cmd is located at ",
+                    "$cmds_hr->{$cmd}, but is not executable\n",
+                    "    by uid: $<";
+            }
         }
     }
     return;

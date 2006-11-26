@@ -75,9 +75,6 @@ die "[*] Specify the path to the psad.conf file with " .
 ### import config
 &import_config();
 
-### Make sure the commands are where the config says they are
-&Psad::check_commands(\%cmds);
-
 ### make sure this is the only psadwatchd running on this system
 &Psad::unique_pid($config{'PSADWATCHD_PID_FILE'});
 
@@ -217,7 +214,7 @@ sub import_config() {
 
     ### Check to make sure the commands specified in the config section
     ### are in the right place, and attempt to correct automatically if not.
-    &Psad::check_commands(\%cmds);
+    &Psad::check_commands(\%cmds, {'mail' => ''});
 
     return;
 }

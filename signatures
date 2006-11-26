@@ -113,7 +113,7 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN SYN FIN"; flags:SF; refe
 alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN XMAS"; flags:SRAFPU; reference:arachnids,144; classtype:attempted-recon; sid:625; psad_id:100069; psad_dl:2;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN nmap XMAS"; flags:FPU; reference:arachnids,30; classtype:attempted-recon; sid:1228; psad_id:100070; psad_dl:2;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN synscan portscan"; flags:SF; id:39426; reference:arachnids,441; classtype:attempted-recon; sid:630; psad_id:100071; psad_dl:2;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN ipEye SYN scan"; flags:S; seq:1958810375; reference:arachnids,236; classtype:attempted-recon; sid:622; psad_id:100197)
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN ipEye SYN scan"; flags:S; seq:1958810375; reference:arachnids,236; classtype:attempted-recon; sid:622; psad_id:100197; psad_dl:2;)
 
 ### x11.rules
 

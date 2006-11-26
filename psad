@@ -360,6 +360,7 @@ my $rm_data_ctr      = 0;
 my $analysis_emails  = 0;
 my $analysis_whois   = 0;
 my $netstat_lkup_ctr = 0;
+my $kmsgsd_started   = 0;
 my $warn_msg         = '';
 my $die_msg          = '';
 my $messages_file    = '/var/log/messages';
@@ -675,7 +676,10 @@ unless ($no_daemon or $debug or $benchmark) {
 ### to PID_FILE above.
 unless ($benchmark or $fw_analyze) {
     system $cmds{'kmsgsd'}
-        unless $no_kmsgsd or $config{'SYSLOG_DAEMON'} =~ /ulog/i;
+        unless $no_kmsgsd
+        or $config{'SYSLOG_DAEMON'} =~ /ulog/i
+        or $kmsgsd_started;
+
     system $cmds{'psadwatchd'}
         unless $debug or $no_daemon;
 }
@@ -7168,6 +7172,8 @@ sub restart_kmsgsd() {
         'enabled') unless $no_syslog_alerts;
     kill 9, $pid unless kill 15, $pid;
     system $cmds{'kmsgsd'};
+
+    $kmsgsd_started = 1;
 
     return;
 }

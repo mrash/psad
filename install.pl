@@ -510,7 +510,8 @@ sub install() {
     }
 
     ### install auto_dl, signatures, icmp_types, posf, and pf.os files
-    for my $file qw(signatures icmp_types posf auto_dl snort_rule_dl pf.os) {
+    for my $file qw(signatures icmp_types
+            posf auto_dl snort_rule_dl pf.os ip_options) {
         if (-e "${PSAD_CONFDIR}/$file") {
             &archive("${PSAD_CONFDIR}/$file") unless $noarchive;
 ### FIXME, need a real config preservation routine for these files.
@@ -1466,8 +1467,6 @@ sub test_syslog_config() {
     open FWDATA, "${PSAD_DIR}/fwdata" or
         die "[*] Could not open ${PSAD_DIR}/fwdata: $!";
 
-    ### sleep to give kmsgsd a chance to pick up the packet
-    ### log message from syslog
     seek FWDATA,0,2;  ### seek to the end of the file
 
     ### try to connect to $test_port to generate an iptables
@@ -1480,6 +1479,9 @@ sub test_syslog_config() {
         'Timeout'  => 1
     );
     undef $sock if defined $sock;
+
+    ### sleep to give kmsgsd a chance to pick up the packet
+    ### log message from syslog
     sleep 2;
 
     my $found = 0;
@@ -1501,7 +1503,7 @@ sub test_syslog_config() {
     if ($found) {
         &logr("[+] Successful $syslog_str reconfiguration.\n\n");
     } else {
-        &logr("[-] unsuccessful $syslog_str reconfiguration.\n");
+        &logr("[-] Unsuccessful $syslog_str reconfiguration.\n");
         &logr("    Consult the psad man page for the basic " .
             "$syslog_str requirement to get psad to work.\n\n");
     }

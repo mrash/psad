@@ -51,6 +51,7 @@ alert icmp any any -> any any (msg:"ICMP Destination Unreachable Communication A
 alert icmp any any -> any any (msg:"ICMP Destination Unreachable Communication with Destination Host is Administratively Prohibited"; icode:10; itype:3; classtype:misc-activity; sid:486; psad_id:100022; psad_dl:2;)
 alert icmp any any -> any any (msg:"ICMP Destination Unreachable Communication with Destination Network is Administratively Prohibited"; icode:9; itype:3; classtype:misc-activity; sid:487; psad_id:100023; psad_dl:2;)
 alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Large ICMP Packet"; dsize:>800; reference:arachnids,246; classtype:bad-unknown; sid:499; psad_id:100024; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP traceroute ipopts"; ipopts:rr; itype:0; reference:arachnids,238; classtype:attempted-recon; sid:475; psad_id:100198; psad_dl:2;)
 
 ### dns.rules
 
@@ -136,6 +137,9 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 1723 (msg:"MISC Microsoft PPTP communic
 alert tcp $EXTERNAL_NET any -> $HOME_NET 639 (msg:"MISC LDAP communication attempt"; flags:S; reference:bugtraq,10116; reference:cve,2003-0719; reference:url,www.microsoft.com/technet/security/bulletin/MS04-011.mspx; classtype:attempted-admin; psad_id:100083; psad_dl:2; psad_derived_sids:2516,2532,2533,2534;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 8000 (msg:"MISC HP Web JetAdmin communication attempt"; flags:S; reference:bugtraq,9978; classtype:web-application-activity; psad_id:100084; psad_dl:2; psad_derived_sids:2547,2548,2549,2655;)
 alert udp $EXTERNAL_NET any -> $HOME_NET 1026:1029 (msg:"MISC Windows popup spam attempt"; classtype:misc-activity; reference:url,www.linklogger.com/UDP1026.htm; psad_dsize:>100; psad_id:100196; psad_dl:2;)
+alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"MISC source route lssr"; ipopts:lsrr; reference:arachnids,418; reference:bugtraq,646; reference:cve,1999-0909; classtype:bad-unknown; sid:500; psad_id:100199; psad_dl:2;);
+alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"MISC source route lssre"; ipopts:lsrre; reference:arachnids,420; reference:bugtraq,646; reference:cve,1999-0909; classtype:bad-unknown; sid:501; psad_id:100200; psad_dl:2;)
+alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"MISC source route ssrr"; ipopts:ssrr ; reference:arachnids,422; classtype:bad-unknown; sid:502; psad_id:100201; psad_dl:2;);
 
 ### shellcode.rules
 

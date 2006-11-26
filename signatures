@@ -9,7 +9,11 @@
 #
 #          psad_id:     Unique ID number (analogous to the Snort sid field).
 #          psad_dl:     The psad danger level
-#          psad_dsize:  Requires a size on application layer data that
+#          psad_dsize:  Requires a size on application layer data. The size
+#                       in this case is derived from the IP header length
+#                       for TCP and ICMP packets (by assuming a bound on the
+#                       average header sizes) and from the length field in
+#                       the UDP header for UDP packets.
 #
 ##############################################################################
 #

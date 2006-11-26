@@ -1334,13 +1334,13 @@ sub parse_NF_pkt_str() {
 
     ### get the in/out interface and Netfilter chain
     if ($pkt_str =~ /IN=(\S+)\s+OUT=\s/) {
-        $pkt_hr->{'intf'} = $1;
+        $pkt_hr->{'intf'}  = $1;
         $pkt_hr->{'chain'} = 'INPUT';
     } elsif ($pkt_str =~ /IN=(\S+)\s+OUT=\S/) {
-        $pkt_hr->{'intf'} = $1;
+        $pkt_hr->{'intf'}  = $1;
         $pkt_hr->{'chain'} = 'FORWARD';
     } elsif ($pkt_str =~ /IN=\s+OUT=(\S+)/) {
-        $pkt_hr->{'intf'} = $1;
+        $pkt_hr->{'intf'}  = $1;
         $pkt_hr->{'chain'} = 'OUTPUT';
     }
 
@@ -1882,7 +1882,8 @@ sub match_snort_ip_keywords() {
     return 0 if defined $sig_hr->{'ip_proto'};
 
     ### handle the sameip keyword
-    if (defined $sig_hr->{'sameip'} and $sig_hr->{'sameip'}) {
+    if (defined $sig_hr->{'sameip'} and $sig_hr->{'sameip'}
+            and $pkt_hr->{'intf'} ne 'lo') {
         return 0 unless $pkt_hr->{'src'} eq $pkt_hr->{'dst'};
     }
 

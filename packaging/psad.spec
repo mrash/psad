@@ -125,7 +125,7 @@ install -m 500 fwcheck_psad.pl $RPM_BUILD_ROOT%_sbindir/fwcheck_psad
 install -m 755 whois/whois $RPM_BUILD_ROOT/usr/bin/whois_psad
 install -m 755 init-scripts/psad-init.redhat $RPM_BUILD_ROOT/etc/rc.d/init.d/psad
 install -m 644 {psad.conf,kmsgsd.conf,psadwatchd.conf,fw_search.conf,alert.conf} $RPM_BUILD_ROOT%_sysconfdir/%name/
-install -m 644 {signatures,icmp_types,auto_dl,snort_rule_dl,posf,pf.os} $RPM_BUILD_ROOT%_sysconfdir/%name/
+install -m 644 {signatures,icmp_types,ip_options,auto_dl,snort_rule_dl,posf,pf.os} $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 *.8 $RPM_BUILD_ROOT%{_mandir}/man8/
 
 ### install perl modules used by psad
@@ -230,6 +230,7 @@ fi
 %config(noreplace) %_sysconfdir/%name/*.conf
 %config(noreplace) %_sysconfdir/%name/signatures
 %config(noreplace) %_sysconfdir/%name/auto_dl
+%config(noreplace) %_sysconfdir/%name/ip_options
 %config(noreplace) %_sysconfdir/%name/snort_rule_dl
 %config(noreplace) %_sysconfdir/%name/posf
 %config(noreplace) %_sysconfdir/%name/pf.os
@@ -243,6 +244,7 @@ fi
 %changelog
 * Sun Nov 19 2006 Michael Rash <mbr@cipherdyne.org>
 - psad-1.6.0 release.
+- Added ip_options file for the Snort ipopts rule keyword.
 
 * Sun Oct 15 2006 Michael Rash <mbr@cipherdyne.org>
 - psad-1.4.8 release.

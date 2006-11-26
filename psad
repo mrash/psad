@@ -1799,13 +1799,11 @@ sub match_snort_tcp_keywords() {
 
     return 0 unless &check_sig_int_range(
             ($pkt_hr->{'ip_len'}-$IP_HEADER_LEN-$TCP_HEADER_LEN),
-            'dsize', $sig_hr
-    );
+            'dsize', $sig_hr);
 
     return 0 unless &check_sig_int_range(
             ($pkt_hr->{'ip_len'}-$IP_HEADER_LEN-$TCP_HEADER_LEN),
-            'psad_dsize', $sig_hr
-    );
+            'psad_dsize', $sig_hr);
 
     return 0 unless &check_sig_int_range($pkt_hr->{'win'}, 'window', $sig_hr);
     return 0 unless &check_sig_int_range($pkt_hr->{'tcp_seq'}, 'seq', $sig_hr);
@@ -1827,13 +1825,11 @@ sub match_snort_udp_keywords() {
 
     return 0 unless &check_sig_int_range(
             ($pkt_hr->{'udp_len'}-$UDP_HEADER_LEN),
-            'dsize', $sig_hr
-    );
+            'dsize', $sig_hr);
 
     return 0 unless &check_sig_int_range(
             ($pkt_hr->{'udp_len'}-$UDP_HEADER_LEN),
-            'psad_dsize', $sig_hr
-    );
+            'psad_dsize', $sig_hr);
 
     ### matched the signature
     if ($debug) {
@@ -1851,13 +1847,11 @@ sub match_snort_icmp_keywords() {
 
     return 0 unless &check_sig_int_range(
             ($pkt_hr->{'ip_len'}-$IP_HEADER_LEN-$ICMP_HEADER_LEN),
-            'dsize', $sig_hr
-    );
+            'dsize', $sig_hr);
 
     return 0 unless &check_sig_int_range(
             ($pkt_hr->{'ip_len'}-$IP_HEADER_LEN-$ICMP_HEADER_LEN),
-            'psad_dsize', $sig_hr
-    );
+            'psad_dsize', $sig_hr);
 
     return 0 unless &check_sig_int_range($pkt_hr->{'itype'}, 'itype', $sig_hr);
     return 0 unless &check_sig_int_range($pkt_hr->{'icode'}, 'icode', $sig_hr);
@@ -1886,8 +1880,8 @@ sub match_snort_ip_keywords() {
     return 0 if defined $sig_hr->{'ip_proto'};
 
     ### handle the sameip keyword
-    if (defined $sig_hr->{'sameip'} and $sig_hr->{'sameip'}
-            and $pkt_hr->{'intf'} ne 'lo') {
+    if (defined $sig_hr->{'sameip'} and $sig_hr->{'sameip'}) {
+        return 0 if $pkt_hr->{'intf'} eq 'lo';
         return 0 unless $pkt_hr->{'src'} eq $pkt_hr->{'dst'};
     }
 
@@ -2199,10 +2193,12 @@ sub parse_ip_options() {
         for my $rfc_opt_val (keys %ip_options) {
             next unless $val == $rfc_opt_val;
             if ($ip_options{$rfc_opt_val}{'len'} ne '-1') {
-                $i += $ip_options{$rfc_opt_val}{'len'};
+                $i += $ip_options{$rfc_opt_val}{'len'}
+                    unless $ip_options{$rfc_opt_val}{'len'} == 1;
             } else {
                 return \%ip_opts if ($i+1 > $#hex_nums);
-                my $pkt_opt_len = hex($hex_nums[$i+1]);
+                ### subtract out the option and length fields
+                my $pkt_opt_len = hex($hex_nums[$i+1]) - 2;
                 if ($i + $pkt_opt_len > $#hex_nums) {
                     ### this should not happen unless the IP packet
                     ### was truncated (i.e. the length argument for

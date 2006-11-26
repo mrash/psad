@@ -28,7 +28,6 @@
     - Summary report emails like dshield does.
     - Ability to elevate scan danger level based on specific iptables
       prefixes.
-    - Ability to download latest signatures from cipherdyne.org.
     - Replace full ascii signature listings in <ip>_signatures with sid
       numbers and packet counts.
     - Rework IGNORE_CONNTRACK_BUG_PKTS strategy to maximze signature
@@ -40,7 +39,6 @@
     - Custom logging line upon auto-blocking an ip.
     - Add difference notification (via syslog) for changed variables
       after receiving a HUP signal.
-    - Signature based auto block rules.
     - Include the ability to specify a network in CIDR notation with
       --Status output.
     - Drop root privileges if not running in auto-blocking mode.
@@ -55,9 +53,6 @@
       actually resolve to something in the IANA spec.
     - Packet grapher mode with annotated scan alerts.
     - Mysql database support?
-    - Make use of other logging options available in iptables to detect
-      more tcp signatures.  (E.g. --log-tcp-options, --log-ip-options,
-      --log-tcp-sequence, etc.) for better signature recognition.
     - psad.conf option to disable signature detection; useful if fwsnort is
       already deployed for this.
     - Include a verbose message in the body of certain emails that as
@@ -82,8 +77,4 @@
       denied without requiring overly complicated firewall rules to detect
       odd tcp flag combinations.
     - perldoc
-    - Ability to auto-respond if certain criteria are met, such as a
-      signature match against an established TCP session (SIDnnn ESTABLISHED
-      from fwsnort).
-    - More IGNORE_* keywords.
     - Configurable Netfilter prerequisite checks.

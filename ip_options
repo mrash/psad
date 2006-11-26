@@ -1,0 +1,42 @@
+#
+############################################################################
+#
+# File: ip_options
+#
+# Purpose: To define the signature language interface for psad to detect
+#          suspicious IP options (source routing, etc.).  This emulates
+#          (and extends) the "ipopts" keyword functionality available in
+#          the Snort IDS.
+#
+############################################################################
+#
+# $Id$
+#
+
+#  <option value> <length (-1 for variable)> <ipopts argument> <description>
+0    1   eol         End of options list
+1    1   nop         NOP
+130  11  sec         Security
+131  -1  lsrr        Loose Source Route
+### (lsrre is included in Snort but not documented anywhere else)
+132  -1  lsrre       Loose Source Route
+68   -1  ts          Timestamp
+133  -1  extsec      Extended Security
+134  -1  comsec      Commercial Security
+7    -1  rr          Record Route
+136  4   satid       Stream Identifier
+137  -1  ssrr        Strict Source Route
+10   -1  expm        Experimental Measurement
+11   4   mtu         MTU Probe
+12   4   mtur        MTU Reply
+205  -1  expflow     Experimental Flow Control
+142  -1  expaccess   Experimental Access Control
+144  -1  imitraf     IMI Traffic Descriptor
+145  -1  extproto    Extended Internet Proto
+82   12  traceroute  Traceroute
+147  10  addrext     Address Extension
+148  4   ralert      Router Alert
+149  -1  sbrdcast    Selective Directed Broadcast Mode
+150  -1  nsapaddr    NSAP Addresses
+151  -1  dpktstate   Dynamic Packet State
+152  -1  umcast      Upstream Multicast Packet

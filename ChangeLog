@@ -2,7 +2,7 @@ psad-1.6.0 (11//2006):
     - Completely refactored the Snort rule matching support in psad.  Added
       many header field tests with full range matching support.  These tests
       include the following keywords from Snort: ttl, id, seq, ack, window,
-      icmp_id, icmp_seq, itype, icode, ip_proto, and sameip.
+      icmp_id, icmp_seq, itype, icode, ip_proto, ipopts, and sameip.
     - Refactored all signatures in /etc/psad/signatures to conform to new
       signature matching support in this release.  There are now about 190
       signatures that psad can run directly against Netfilter logging
@@ -17,6 +17,13 @@ psad-1.6.0 (11//2006):
       signatures.
     - Added the psad_id, psad_dsize, and psad_derived_sids fields for the new
       Snort rule support.
+    - Added the ability to decode IP options, which are included within Snort
+      rules as the "ipopts" keyword.  This functionality requires that the
+      --log-ip-options command line argument is given to iptables when
+      building a rule that uses the LOG target.
+    - Added Snort rules (sids 475, 500, 501, and 502) that detect IP options
+      usage such as source routing and the traceroute IP option with the new
+      IP options decoder.
     - Enhanced psad email alert output to include sid values that have been
       derived from existing Snort rules.
     - Added the ability to expand embedded variables within the psad

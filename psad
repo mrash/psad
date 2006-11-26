@@ -4559,9 +4559,9 @@ sub scan_logr_signatures() {
                     }
                     my $sid_str = '';
                     if ($sig_hr->{'is_psad_id'}) {
-                        $sid_str = "       sid:       $sid";
-                    } else {
                         $sid_str = "       psad_id:   $sid";
+                    } else {
+                        $sid_str = "       sid:       $sid";
                     }
                     if (defined $sig_hr->{'psad_derived_sids'}) {
                         $sid_str .= ' (derived from: ';

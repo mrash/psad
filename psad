@@ -2287,21 +2287,10 @@ sub get_largest_sid_dl() {
     ### see if /etc/psad/snort_rule_dl gives a higher DL
     if (defined $snort_rule_dl{$sid}) {
         if ($snort_rule_dl{$sid} > $dl) {
-            print STDERR "[+] get_largest_sid_dl() snort_rule_dl ",
+            print STDERR "[+] get_largest_sid_dl(): snort_rule_dl ",
                 "assigning SID $sid a danger level of ",
                 "$snort_rule_dl{$sid}\n" if $debug;
             $dl = $snort_rule_dl{$sid};
-        }
-    }
-
-    ### see if /etc/psad/snort_rules/classification.config gives
-    ### a higher DL
-    if (defined $snort_class_dl{$classtype}) {
-        if ($snort_class_dl{$classtype} > $dl) {
-            print STDERR "[+] get_largest_sid_dl() classification.config ",
-                "assigning SID $sid a danger level of ",
-                "$snort_class_dl{$classtype}\n" if $debug;
-            $dl = $snort_class_dl{$classtype};
         }
     }
 
@@ -2534,11 +2523,6 @@ sub psad_init() {
     ### the local system.
     &validate_home_net();
 
-    ### import psad signatures (note that these signatures have been
-    ### adapted from the Snort IDS and contain several keywords that
-    ### were added by the psad project).
-    &import_signatures() unless $no_signatures;
-
     ### import icmp types and codes from psad_icmp_types; icmp "type"
     ### and "code" fields will be validated against the values in this
     ### file.
@@ -2558,6 +2542,11 @@ sub psad_init() {
     ### messages that include snort SID's (see "fwsnort":
     ### http://www.cipherdyne.org/fwsnort).
     &import_snort_rules() unless $no_snort_sids;
+
+    ### import psad signatures (note that these signatures have been
+    ### adapted from the Snort IDS and contain several keywords that
+    ### were added by the psad project).
+    &import_signatures() unless $no_signatures;
 
     ### there is a set of ports that should be ignored
     &parse_ignore_ports();
@@ -2976,8 +2965,8 @@ sub import_snort_rules() {
     &import_snort_rule_dl();
 
     print STDERR Dumper %fwsnort_sigs if $debug and $verbose;
-    &Psad::psyslog('psad', 'imported Snort rules')
-        unless $no_syslog_alerts;
+    &Psad::psyslog('psad', "imported reference Snort rules in " .
+        "$config{'SNORT_RULES_DIR'}/") unless $no_syslog_alerts;
     return;
 }
 
@@ -3217,6 +3206,12 @@ sub import_signatures() {
         $sig{'dl'} = 2;  ### default danger level
         if ($rule_options =~ /[\s;]psad_dl:\s*(\d+)/) {
             $sig{'dl'} = $1;
+        } elsif ($sig{'classtype'}) {
+            ### assign the danger level from the classification.config
+            ### file if the psad_dl field does not exist
+            if (defined $snort_class_dl{$sig{'classtype'}}) {
+                $sig{'dl'} = $snort_class_dl{$sig{'classtype'}};
+            }
         }
 
         ### see the signature was derived from a set of Snort rules
@@ -3405,8 +3400,8 @@ sub import_signatures() {
         print STDERR "[+] Main signatures hash:\n",
             Dumper(\%sig_search), Dumper(\%sigs);
     }
-    &Psad::psyslog('psad', "imported $sig_ctr psad Snort signatures")
-        unless $no_syslog_alerts;
+    &Psad::psyslog('psad', "imported $sig_ctr psad Snort signatures " .
+        "from $config{'SIGS_FILE'}") unless $no_syslog_alerts;
     return;
 }
 

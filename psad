@@ -1708,6 +1708,7 @@ sub match_snort_keywords() {
         ### values (at least for ipv4, see
         ### linux/net/ipv4/netfilter/ipt_LOG.c)
         my $dl_tmp = &match_snort_ip_keywords($pkt_hr, $sig_hr);
+        next SIG unless $dl_tmp;
 
         $dl = $dl_tmp if $dl_tmp > $dl;
 
@@ -1813,7 +1814,8 @@ sub match_snort_tcp_keywords() {
     ### matched the signature
     if ($debug) {
         print STDERR "[+] packet matched matched tcp keywords for sid: ",
-            "$sig_hr->{'sid'} (psad_id: $sig_hr->{'psad_id'})\n";
+            "$sig_hr->{'sid'} (psad_id: $sig_hr->{'psad_id'})\n",
+            "    $sig_hr->{'msg'}\n";
     }
 
     return &get_largest_sid_dl($sig_hr->{'sid'},
@@ -1836,7 +1838,8 @@ sub match_snort_udp_keywords() {
     ### matched the signature
     if ($debug) {
         print STDERR "[+] packet matched udp keywords for sid: ",
-            "$sig_hr->{'sid'} (psad_id: $sig_hr->{'psad_id'})\n";
+            "$sig_hr->{'sid'} (psad_id: $sig_hr->{'psad_id'})\n",
+            "    $sig_hr->{'msg'}\n";
     }
 
     return &get_largest_sid_dl($sig_hr->{'sid'},
@@ -1864,7 +1867,8 @@ sub match_snort_icmp_keywords() {
     ### matched the signature
     if ($debug) {
         print STDERR "[+] packet matched icmp keywords for sid: ",
-            "$sig_hr->{'sid'} (psad_id: $sig_hr->{'psad_id'})\n";
+            "$sig_hr->{'sid'} (psad_id: $sig_hr->{'psad_id'})\n",
+            "    $sig_hr->{'msg'}\n";
     }
 
     return &get_largest_sid_dl($sig_hr->{'sid'},
@@ -1893,7 +1897,8 @@ sub match_snort_ip_keywords() {
         ### signature match
         if ($debug) {
             print STDERR "[+] packet matched ip keywords for sid: ",
-                "$sig_hr->{'sid'} (psad_id: $sig_hr->{'psad_id'})\n";
+                "$sig_hr->{'sid'} (psad_id: $sig_hr->{'psad_id'})\n",
+                "    $sig_hr->{'msg'}\n";
         }
 
         $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'ip'}{'sid'}
@@ -1905,7 +1910,7 @@ sub match_snort_ip_keywords() {
         return &get_largest_sid_dl($sig_hr->{'sid'},
                 $sig_hr->{'dl'}, $sig_hr->{'classtype'});
     }
-    return 0;
+    return 1;
 }
 
 sub check_sig_int_range() {
@@ -1930,11 +1935,10 @@ sub check_sig_ipopts() {
     my ($pkt_val, $keyword, $sig_hr) = @_;
 
     return 1 unless defined $sig_hr->{$keyword};
-    return 1 unless $pkt_val;
+    return 0 unless $pkt_val;
+    return 1 if $sig_hr->{$keyword} eq 'any';
 
     my $pkt_opts_hr = &parse_ip_options($pkt_val);
-
-    return 1 if $sig_hr->{$keyword} eq 'any';
 
     return 0 unless defined $pkt_opts_hr->{$sig_hr->{$keyword}};
     return 1;

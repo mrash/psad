@@ -12,7 +12,7 @@
 .I config-file
 .B ] [-l] [-h] [-B] [-A] [-F] [-S] [-K] [-R] [-U] [-H] [-V] [-p] [-e] [-w] [-D] [-d] [--signatures
 .I sig-file
-.B ] [--interval
+.B ] [--sig-update] [--interval
 .I interval
 .B ] [-m
 .I messages-file
@@ -108,7 +108,7 @@ can be made to
 override this path by specifying a different file on the command
 line with the --config option.
 .TP
-.BR \-s "\fR,\fP " \-\^\-signatures\ \<signatures-file>
+.BR \-\^\-signatures\ \<signatures-file>
 The iptables firewalling code included within the linux 2.4.x kernel
 series has the ability to distinguish and log any of the tcp flags
 present within tcp packets that traverse the firewall interfaces.
@@ -125,6 +125,13 @@ option) without having to restart the psad process.
 .B psad
 also detects
 many udp and icmp signatures that were originally included within snort.
+.TP
+.BR \-\^\-sig-update
+Instruct
+.B psad
+to download the latest set of modified Snort signatures from
+http://www.cipherdyne.org/psad/signatures so that psad can take advantage of
+signature updates before a new release is made.
 .TP
 .BR \-A ", " \-\^\-Analyze-msgs
 Analyze an iptables logfile for scans and exit.  This will generate email alerts

@@ -65,7 +65,7 @@
 #
 # Scan hash key explanation:
 #   absnum    - Total number of packets from $src to $dst
-#   chain     - Netfilter chain under which the scan packets appear in the
+#   chain     - iptables chain under which the scan packets appear in the
 #               logs.
 #   s_time    - Start time for the first packet seen from src to dst.
 #   alerted   - An alert has been sent.
@@ -80,13 +80,13 @@
 #
 # Sample Netfilter log messages:
 #
-#  Sample tcp packet (rejected by Netfilter... --log-prefix = "DROP ")
+#  Sample tcp packet (rejected by iptables... --log-prefix = "DROP ")
 #
 #  Mar 11 13:15:52 orthanc kernel: DROP IN=lo OUT= MAC=00:00:00:00:00:00:00:00:
 #  00:00:00:00:08:00 SRC=127.0.0.1 DST=127.0.0.1 LEN=60 TOS=0x00 PREC=0x00
 #  TTL=64 ID=0 DF PROTO=TCP SPT=44847 DPT=35 WINDOW=32304 RES=0x00 SYN URGP=0
 #
-#  Sample icmp packet rejected by Netfilter INPUT chain:
+#  Sample icmp packet rejected by iptables INPUT chain:
 #
 #  Nov 27 15:45:51 orthanc kernel: DROP IN=eth1 OUT= MAC=00:a0:cc:e2:1f:f2:00:
 #  20:78:10:70:e7:08:00 SRC=192.168.10.20 DST=192.168.10.1 LEN=84 TOS=0x00
@@ -181,7 +181,7 @@ my $debug = 0;
 
 my $flush_fw = 0;
 
-### build the Netfilter blocking configuration out of the
+### build the iptables blocking configuration out of the
 ### IPT_AUTO_CHAIN variable
 my @ipt_config = ();
 
@@ -224,7 +224,7 @@ my %posf_sigs = ();
 my %valid_icmp_types = ();
 
 ### Cache snort rule messages unless --no-snort-sids switch was
-### given.  This is only useful if Netfilter includes rule
+### given.  This is only useful if iptables includes rules
 ### that log things like "SID123".  "fwsnort"
 ### (http://www.cipherdyne.org/fwsnort/) will automatically
 ### build such a ruleset from snort signatures.
@@ -285,7 +285,7 @@ my %auto_assigned_msg = ();
 ### (if ENABLE_AUTO_IDS == 'Y')
 my %auto_blocked_ips = ();
 
-### counter to check psad Netfilter chains and jump rules
+### counter to check psad iptables chains and jump rules
 my $netfilter_prereq_check = 0;
 
 ### cache the addresses we have issued dns lookups against.
@@ -462,6 +462,10 @@ my @port_types = (
 my $PKT_ERROR   = 0;
 my $PKT_SUCCESS = 1;
 my $PKT_IGNORE  = 2;
+
+### icmp header validation
+my $BAD_ICMP_TYPE = 1;
+my $BAD_ICMP_CODE = 2;
 
 ### header lengths
 my $TCP_HEADER_LEN  = 20;  ### excludes options
@@ -687,7 +691,7 @@ unless ($benchmark or $fw_analyze) {
         unless $debug or $no_daemon;
 }
 
-if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
+if ($config{'ENABLE_AUTO_IDS'} eq 'Y' and not $benchmark) {
     ### always flush old rules (the subsequent renew_auto_blocked_ips()
     ### will re-instantiate any that should not have been expired).
     &flush_auto_blocked_ips() if $config{'FLUSH_IPT_AT_INIT'} eq 'Y';
@@ -768,15 +772,8 @@ unless ($benchmark) {
     open FWDATA, $fw_data_file or die '[*] Could not open ',
         "$fw_data_file: $!";
 
-    if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
-        $ipt_sock = IO::Socket::UNIX->new(
-            Type   => SOCK_STREAM,
-            Local  => $config{'AUTO_IPT_SOCK'},
-            Listen => SOMAXCONN,
-            Timeout => .1
-        ) or die "[*] Could not acquire auto-response domain ",
-            "socket $config{'AUTO_IPT_SOCK'}: $!";
-    }
+    &get_auto_response_domain_sock()
+        if $config{'ENABLE_AUTO_IDS'} eq 'Y' and not $benchmark;
 }
 
 ###=========================================================###
@@ -819,12 +816,7 @@ MAIN: for (;;) {
             if ($orig_ipt_sockfile ne $config{'AUTO_IPT_SOCK'}) {
                 close $ipt_sock;
 
-                $ipt_sock = IO::Socket::UNIX->new(
-                    Type   => SOCK_STREAM,
-                    Local  => $config{'AUTO_IPT_SOCK'},
-                    Listen => SOMAXCONN,
-                    Timeout => .1
-                ) or die "[*] Could not acquire auto-response domain socket: $!";
+                &get_auto_response_domain_sock();
 
                 $skip_first_loop = 1;
             }
@@ -956,6 +948,9 @@ MAIN: for (;;) {
         }
         $last_disk_check = time();
     }
+
+    &check_auto_response_sock()
+        if $config{'ENABLE_AUTO_IDS'} eq 'Y' and not $benchmark;
 
     ### Print the number of new packets we saw in FW_DATA_FILE if we are
     ### running in debug mode
@@ -1763,7 +1758,7 @@ sub match_snort_keywords() {
             ### message text and danger levels.
             my $type_code_rv = &check_icmp_type($pkt_hr->{'itype'},
                     $pkt_hr->{'icode'});
-            if ($type_code_rv == 1) {  ### bad type
+            if ($type_code_rv == $BAD_ICMP_TYPE) {  ### bad type
 
                 $dl = 2 if $dl < 2;
 
@@ -1771,7 +1766,7 @@ sub match_snort_keywords() {
                     {'invalid_type'}{$pkt_hr->{'itype'}}
                     {$pkt_hr->{'chain'}}{'pkts'}++;
 
-            } elsif ($type_code_rv == 2) {
+            } elsif ($type_code_rv == $BAD_ICMP_CODE) {
 
                 $dl = 2 if $dl < 2;
 
@@ -2419,8 +2414,9 @@ sub dshield_email_log() {
 
 sub check_icmp_type() {
     my ($type, $code) = @_;
-    return 1 if not defined $valid_icmp_types{$type};
-    return 2 if not defined $valid_icmp_types{$type}{'codes'}{$code};
+    return $BAD_ICMP_TYPE if not defined $valid_icmp_types{$type};
+    return $BAD_ICMP_CODE if not defined
+            $valid_icmp_types{$type}{'codes'}{$code};
     return 0;
 }
 
@@ -4928,6 +4924,38 @@ sub flush_auto_blocked_ips() {
     return;
 }
 
+sub get_auto_response_domain_sock() {
+
+    ### $ipt_sock is global
+    $ipt_sock = IO::Socket::UNIX->new(
+        Type   => SOCK_STREAM,
+        Local  => $config{'AUTO_IPT_SOCK'},
+        Listen => SOMAXCONN,
+        Timeout => .1
+    ) or die "[*] Could not acquire auto-response domain ",
+        "socket $config{'AUTO_IPT_SOCK'}: $!";
+    return;
+}
+
+sub check_auto_response_sock() {
+
+    ### we expect that the AUTO_IPT_SOCK file should exist
+    ### in the filesystem.  If not, then something deleted it
+    ### and we can recover by reopening it.
+    return if -e $config{'AUTO_IPT_SOCK'};
+
+    &Psad::psyslog('psad', "domain socket $config{'AUTO_IPT_SOCK'} does not " .
+        "exist (a separate process must have deleted it), recreating it.")
+        unless $no_syslog_alerts;
+
+    close $ipt_sock;
+
+    ### reopen the socket
+    &get_auto_response_domain_sock();
+
+    return;
+}
+
 sub ipt_block() {
     my ($ip, $renewed_status) = @_;
 
@@ -4983,7 +5011,7 @@ sub ipt_block() {
 
         if ($config{'IPTABLES_PREREQ_CHECK'} == 1
                 or $netfilter_prereq_check == 1) {
-            print STDERR "[+] Netfilter chains and jump rule check.\n"
+            print STDERR "[+] iptables chains and jump rule check.\n"
                 if $debug;
 
             ### make sure "to_chain" exists
@@ -5090,7 +5118,7 @@ sub ipt_block() {
         $auto_blocked_ips{$ip} = time()
             unless defined $auto_blocked_ips{$ip};
 
-        my $mail_msg = "Netfilter auto-block against $ip $timeout_str";
+        my $mail_msg = "iptables auto-block against $ip $timeout_str";
         if ($renewed_status) {
             $mail_msg = "renewed $mail_msg";
         } else {
@@ -5119,9 +5147,9 @@ sub ipt_block() {
         print STDERR "[+] ipt_block(): added block for $ip\n"
             if $debug;
     } else {
-        &Psad::psyslog('psad', "could not add Netfilter " .
+        &Psad::psyslog('psad', "could not add iptables " .
             "block rule for: $ip") unless $no_syslog_alerts;
-        print STDERR "[-] Could not add Netfilter block rule for: $ip\n"
+        print STDERR "[-] Could not add iptables block rule for: $ip\n"
             if $debug;
     }
     return;
@@ -5203,16 +5231,16 @@ sub ipt_rm_block() {
         if (not $flush_fw) {
             ### don't send timeout email if we are manually flushing
             ### the auto-block rules from the command line with --Flush.
-            &Psad::psyslog('psad', "removed Netfilter auto-block against " .
+            &Psad::psyslog('psad', "removed iptables auto-block against " .
                 $ip) unless $no_syslog_alerts;
             if ($config{'ENABLE_AUTO_IDS_EMAILS'} eq 'Y') {
                 &Psad::sendmail("$config{'MAIL_STATUS_PREFIX'} removed " .
-                    "Netfilter block against $ip", '',
+                    "iptables block against $ip", '',
                     $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
                     unless $no_email_alerts;
             }
         }
-        print STDERR "[+] ipt_rm_block(): removed Netfilter block ",
+        print STDERR "[+] ipt_rm_block(): removed iptables block ",
             "against $ip\n" if $debug;
 
         &diskwrite_rm_blocked_ip($ip, $config{'AUTO_BLOCK_IPT_FILE'});
@@ -5220,9 +5248,9 @@ sub ipt_rm_block() {
         return 1;
     }
 
-    &Psad::psyslog('psad', 'could not remove Netfilter ' .
+    &Psad::psyslog('psad', 'could not remove iptables ' .
         "block rule for $ip") unless $no_syslog_alerts;
-    print STDERR "[-] Could not remove Netfilter block rule for $ip\n"
+    print STDERR "[-] Could not remove iptables block rule for $ip\n"
         if $debug;
     return 0;
 }
@@ -5998,7 +6026,7 @@ sub analysis_mode() {
             }
         }
     }
-    print "[+] Found $#ipt_msgs Netfilter messages out of ",
+    print "[+] Found $#ipt_msgs Netfilter log messages out of ",
         "$#lines total lines.\n";
     print "    This may take a while...\n"
         if $#lines > 10000;
@@ -6318,7 +6346,7 @@ sub status_psad_daemon() {
 
     if ($analyze_msgs) {
         if (%ipt_prefixes) {
-            print "\n    Netfilter prefix counters:\n";
+            print "\n    Netfilter log prefix counters:\n";
             for my $prefix (keys %ipt_prefixes) {
                 my $count = $ipt_prefixes{$prefix};
                 print "        \"$prefix\": $count\n";
@@ -6328,7 +6356,7 @@ sub status_psad_daemon() {
         }
     } else {
         if (-e $config{'IPT_PREFIX_COUNTER_FILE'}) {
-            print "\n    Netfilter prefix counters:\n";
+            print "\n    Netfilter log prefix counters:\n";
             open F, "< $config{'IPT_PREFIX_COUNTER_FILE'}" or
                 die "[*] $config{'IPT_PREFIX_COUNTER_FILE'}: $!";
             my @lines = <F>;
@@ -6383,9 +6411,9 @@ sub print_blocked_ip_status() {
     unlink "$config{'AUTO_BLOCK_IPT_FILE'}.status";
 
     if ($specific_ip) {
-        print "    Iptables auto-blocking status for: $specific_ip: \n";
+        print "    iptables auto-blocking status for: $specific_ip: \n";
     } else {
-        print "\n    Iptables auto-blocked IPs:\n";
+        print "\n    iptables auto-blocked IPs:\n";
     }
 
     my %ipt_opts = (
@@ -7349,7 +7377,7 @@ sub dump_conf() {
 sub dump_ipt_policy() {
     my $fh = *STDOUT;
     $fh = *STDERR if $debug;
-    print $fh "\n[+] Netfilter policy dump:\n";
+    print $fh "\n[+] iptables policy dump:\n";
     if (defined $cmds{'iptables'} and -x $cmds{'iptables'}) {
         my @ipt_ver = @{&run_command($cmds{'iptables'}, '-V')};
         if (@ipt_ver) {
@@ -7533,22 +7561,22 @@ Options:
                                     --Analyze-msgs).
     --fw-search <file>            - Use <file> instead of the normal
                                     fw-search file: $fw_search_file.
-    --fw-analyze                  - Analyze the local Netfilter ruleset
+    --fw-analyze                  - Analyze the local iptables ruleset
                                     and exit.
-    --fw-list-auto                - List the contents of any Netfilter
+    --fw-list-auto                - List the contents of any iptables
                                     chains use for auto-blocking rules.
     --fw-block-ip  <ip>           - Add an IP/network to the auto-
                                     blocking chains.
     --fw-rm-block-ip  <ip>        - Remove an IP/network from the auto-
                                     blocking chains.
-    --fw-file <rules file>        - Analyze the Netfilter ruleset
+    --fw-file <rules file>        - Analyze the iptables ruleset
                                     contained within <rules file>
                                     instead of a running policy.
-    --fw-del-chains               - Delete Netfilter chains used by
+    --fw-del-chains               - Delete iptables chains used by
                                     psad for auto-blocking rules.
     --fw-dump                     - Dump a sanitized version of the local
-                                    Netfilter policy.
-    --fw-include-ips              - Include all IPs/nets in Netfilter
+                                    iptables policy.
+    --fw-include-ips              - Include all IPs/nets in iptables
                                     dump (--fw-dump) output.
     -snort-rdir <rule dir>        - Path to snort rules directory.
     -d,  --debug                  - Run psad in debugging mode.
@@ -7583,7 +7611,7 @@ Options:
 
     --no-snort-sids               - Disable examination for snort sids
                                     (such as those generated by fwsnort)
-                                    in Netfilter messages.
+                                    in Netfilter log messages.
     --no-signatures               - Disable psad signature processing
                                     (independent of snort sid matching).
     --no-icmp-types               - Disable icmp type/code validation.
@@ -7597,7 +7625,7 @@ Options:
                                     scanning IP addresses.
     --no-kmsgsd                   - Disable startup of kmsgsd (useful
                                     for debugging with an existing file
-                                    of Netfilter messages).
+                                    of Netfilter log messages).
     --no-netstat                  - Disable local port lookups for scan
                                     signatures.
     -h   --help                   - Display usage on STDOUT and exit.

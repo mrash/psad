@@ -7,6 +7,9 @@ psad-1.6.0 (11//2006):
       signature matching support in this release.  There are now about 190
       signatures that psad can run directly against Netfilter logging
       messages (i.e. without the help of fwsnort).
+    - Added the ability to download the latest signatures file from
+      http://www.cipherdyne.org/psad/signatures with the --sig-update command
+      line argument to psad.
     - Added "MISC Windows popup spam" signature.  This allows psad to detect
       when attempts are made to send spam via the Windows popup messenger
       service.
@@ -52,6 +55,8 @@ psad-1.6.0 (11//2006):
       default).  This probably isn't strictly necessary because kmsgsd is
       capable of writing to the fwdata file even if another process truncates
       it.
+    - Added code to recreate the AUTO_IPT_SOCK (/var/run/psad/auto_ipt.sock)
+      file if some other process happens to delete it out of /var/run/psad/
 
 psad-1.4.8 (10/15/2006):
     - Added the ability to get the auto-blocking status for a specific IP

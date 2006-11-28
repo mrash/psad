@@ -1912,6 +1912,8 @@ sub match_snort_ip_keywords() {
 sub check_sig_int_range() {
     my ($pkt_val, $keyword, $sig_hr) = @_;
 
+    $pkt_val = 0 if $pkt_val < 0;
+
     ### if the Snort signature does not have this keyword then
     ### return true
     return 1 unless defined $sig_hr->{"${keyword}_s"};
@@ -3501,7 +3503,8 @@ sub expand_sig_ips() {
         }
     } elsif ($ip_str =~ m|($ip_re/\d+)| or $ip_str =~ m|($ip_re)|) {
         push @arr, $1;
-    } elsif ($ip_str eq 'any') {
+    } elsif ($ip_str eq 'any' or $ip_str =~ m|NOT_?USED|i) {
+        ### handle NOT_USED case from older psad versions
         push @arr, 'any';
     } else {
         die "[*] import_signatures(): Unrecognized src/dst: $ip_str ",
@@ -5227,8 +5230,10 @@ sub ipt_rm_block() {
     delete $auto_blocked_ips{$ip}
         if defined $auto_blocked_ips{$ip};
 
+    &diskwrite_rm_blocked_ip($ip, $config{'AUTO_BLOCK_IPT_FILE'});
+
     if ($rm_block) {
-        if (not $flush_fw) {
+        unless ($flush_fw) {
             ### don't send timeout email if we are manually flushing
             ### the auto-block rules from the command line with --Flush.
             &Psad::psyslog('psad', "removed iptables auto-block against " .
@@ -5243,12 +5248,10 @@ sub ipt_rm_block() {
         print STDERR "[+] ipt_rm_block(): removed iptables block ",
             "against $ip\n" if $debug;
 
-        &diskwrite_rm_blocked_ip($ip, $config{'AUTO_BLOCK_IPT_FILE'});
-
         return 1;
     }
 
-    &Psad::psyslog('psad', 'could not remove iptables ' .
+    &Psad::psyslog('psad', 'warning: could not remove iptables ' .
         "block rule for $ip") unless $no_syslog_alerts;
     print STDERR "[-] Could not remove iptables block rule for $ip\n"
         if $debug;
@@ -5620,6 +5623,8 @@ sub timeout_auto_blocked_ips() {
 }
 
 sub build_ipt_config() {
+
+    &make_psad_dirs() unless -d $config{'PSAD_DIR'};
 
     my %ipt_opts = (
         'iptables' => $cmds{'iptables'},
@@ -6437,11 +6442,12 @@ sub print_blocked_ip_status() {
                 next unless $ip eq $specific_ip;
             }
             my $timestamp = '';
+            my $time_remain = 0;
             ### older versions do not have the timestamp
             if ($line =~ /^\s*\S+\s+(\d+)/) {
                 $timestamp = $1;
                 if ($config{'AUTO_BLOCK_TIMEOUT'} > 0) {
-                    my $time_remain = $config{'AUTO_BLOCK_TIMEOUT'}
+                    $time_remain = $config{'AUTO_BLOCK_TIMEOUT'}
                         - (time() - $timestamp);
                     $time_remain = 0 if $time_remain < 0;
 
@@ -6467,8 +6473,18 @@ sub print_blocked_ip_status() {
                 }
             }
             $found_line = 1;
-            unless ($blocked) {
-                print '            [not currently blocked]';
+
+            if ($time_remain > 0) {
+                ### we should see that the IP is still blocked
+                unless ($blocked) {
+                    print '            [not currently blocked, sending ',
+                        "cleanup message]\n";
+                    system "$cmds{'psad'} --fw-rm-block-ip $ip";
+                }
+            } else {
+                print '            [expired timeout, sending ',
+                    "cleanup message]\n";
+                system "$cmds{'psad'} --fw-rm-block-ip $ip";
             }
         }
     }
@@ -6949,8 +6965,7 @@ sub handle_cmdline() {
     return;
 }
 
-sub setup() {
-
+sub make_psad_dirs() {
     for my $dir qw(
         /var/lib
         /var/run
@@ -6971,6 +6986,12 @@ sub setup() {
         mkdir $config{$dir}, 0500 or
             die "[*] Could not mkdir $config{$dir}: $!";
     }
+    return;
+}
+
+sub setup() {
+
+    &make_psad_dirs();
 
     unless (-e $config{'PSAD_FIFO'}) {
         system "$cmds{'mknod'} -m 600 $config{'PSAD_FIFO'} p";
@@ -7426,13 +7447,13 @@ sub download_signatures() {
 
     &archive_conf($config{'SIGS_FILE'});
 
+    ### for wget
+    &Psad::check_commands(\%cmds, {'sendmail'=>'', 'mail'=>''});
+
     chdir '/tmp' or die $!;
 
     print "[+] Downloading latest signatures from:\n",
         "        $config{'SIG_UPDATE_URL'}\n";
-
-    die "[*] $cmds{'wget'} does not exist." unless -e $cmds{'wget'};
-    die "[*] $cmds{'wget'} is not executable." unless -x $cmds{'wget'};
 
     unlink 'signatures' if -e 'signatures';
 

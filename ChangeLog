@@ -57,6 +57,12 @@ psad-1.6.0 (11//2006):
       it.
     - Added code to recreate the AUTO_IPT_SOCK (/var/run/psad/auto_ipt.sock)
       file if some other process happens to delete it out of /var/run/psad/
+    - Bugfix to allow backwards compatibility with old NOT_USED value
+      for the HOME_NET variable.
+    - Bugfix to cleanup any lost blocking rules from the running psad
+      timeouts (a separate process might have deleted rules from the psad
+      chains).
+
 
 psad-1.4.8 (10/15/2006):
     - Added the ability to get the auto-blocking status for a specific IP

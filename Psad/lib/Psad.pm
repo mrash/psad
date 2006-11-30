@@ -17,7 +17,6 @@
 
 package Psad;
 
-use lib '/usr/lib/psad';
 use Exporter;
 use Unix::Syslog qw(:subs :macros);
 use Carp;

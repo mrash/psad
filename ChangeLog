@@ -62,7 +62,15 @@ psad-1.6.0 (11//2006):
     - Bugfix to cleanup any lost blocking rules from the running psad
       timeouts (a separate process might have deleted rules from the psad
       chains).
-
+    - Bugfix to allow Netfilter log messages to include the PHYSDEV (i.e.
+      PHYSIN and PHYSOUT) interfaces.
+    - Updated to read architecture-dependent perl module installation
+      directory out of /usr/lib/psad (e.g. "/usr/lib/psad/x86_64-linux")
+      before importing psad perl modules such as IPTables::Parse, etc. These
+      modules are now imported via "require" after the appropriate
+      directories have been added to @INC. This allows the RPM files to be
+      built on one system that builds @INC differently than the system where
+      psad is actually installed since psad can now compensate for this.
 
 psad-1.4.8 (10/15/2006):
     - Added the ability to get the auto-blocking status for a specific IP

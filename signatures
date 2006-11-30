@@ -128,6 +128,7 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN ipEye SYN scan"; flags:S
 ### misc.rules
 alert tcp $EXTERNAL_NET any -> $HOME_NET 1417 (msg:"MISC Insecure TIMBUKTU communication attempt"; flags:S; reference:arachnids,229; classtype:bad-unknown; sid:505; psad_id:100072; psad_dl:2;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 5631:5632 (msg:"MISC PCAnywhere communication attempt"; flags:S; classtype:attempted-admin; psad_id:100073; psad_dl:2; psad_derived_sids:507,512;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 5900 (msg:"MISC VNC communication attempt"; flags:S; reference:url,http://isc.sans.org/port_details.php?port=5900; reference:url,http://secunia.com/advisories/20107; classtype:bad-unknown; psad_id:100202; psad_dl:2;)
 #alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"MISC Tiny Fragments"; dsize:< 25; fragbits:M; classtype:bad-unknown; sid:100; psad_id:100000; psad_dl:2;)
 alert udp $EXTERNAL_NET any -> $HOME_NET 1900 (msg:"SCAN UPnP communication attempt"; classtype:misc-attack; psad_dsize:>8; psad_id:100074; psad_dl:2; psad_derived_sids:1917,1384,1388;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 32000 (msg:"MISC Xtramail communication attempt"; flags:S; reference:bugtraq,791; reference:cve,1999-1511; reference:nessus,10323; classtype:attempted-admin; sid:1636; psad_id:100075; psad_dl:2;)

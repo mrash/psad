@@ -120,7 +120,9 @@ mkdir -p $RPM_BUILD_ROOT%_sysconfdir/%name
 ### psad init script
 mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
 
-install -m 500 {psad,kmsgsd,psadwatchd} $RPM_BUILD_ROOT%_sbindir/
+### the 700 permissions mode is fixed in the
+### %post phase
+install -m 700 {psad,kmsgsd,psadwatchd} $RPM_BUILD_ROOT%_sbindir/
 install -m 500 fwcheck_psad.pl $RPM_BUILD_ROOT%_sbindir/fwcheck_psad
 install -m 755 whois/whois $RPM_BUILD_ROOT/usr/bin/whois_psad
 install -m 755 init-scripts/psad-init.redhat $RPM_BUILD_ROOT/etc/rc.d/init.d/psad
@@ -178,6 +180,9 @@ perl -p -i -e 'use Sys::Hostname; my $hostname = hostname(); s/HOSTNAME(\s+)_?CH
 
 /bin/touch %psadlogdir/fwdata
 chown root.root %psadlogdir/fwdata
+chmod 0500 %_sbindir/psad
+chmod 0500 %_sbindir/kmsgsd
+chmod 0500 %_sbindir/psadwatchd
 chmod 0600 %psadlogdir/fwdata
 if [ ! -p %psadvarlibdir/psadfifo ];
 then [ -e %psadvarlibdir/psadfifo ] && /bin/rm -f %psadvarlibdir/psadfifo

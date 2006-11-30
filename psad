@@ -134,13 +134,8 @@
 #
 
 ### modules used by psad
-use lib '/usr/lib/psad';
-use Psad;
-use IPTables::ChainMgr;
-use Net::IPv4Addr qw(ipv4_network ipv4_in_network ipv4_broadcast);
 use File::Copy;
 use File::Path;
-use Date::Calc qw(Timezone This_Year Decode_Month);
 use IO::Socket;
 use Socket;
 use POSIX;
@@ -175,6 +170,9 @@ my $fw_data_file = '';
 ### allows email alerting or syslog alerting (or both) to be
 ### disabled.
 my $alert_conf_file = '/etc/psad/alert.conf';
+
+### path to psad library directory for psad perl modules
+my $psad_lib_dir = '/usr/lib/psad';
 
 ### disable debugging by default
 my $debug = 0;
@@ -387,21 +385,6 @@ my $no_kmsgsd     = 0;
 my $no_email_alerts  = 0;
 my $no_syslog_alerts = 0;
 
-### old command line options
-my $oldarg_snort_sids;
-my $oldarg_autoips;
-my $oldarg_nerrs;
-my $oldarg_nerrs2;
-my $oldarg_rdns;
-my $oldarg_nrdns;
-my $oldarg_whois;
-my $oldarg_nwhois;
-my $oldarg_nlport;
-my $oldarg_fwcheck;
-my $oldarg_nfwchk;
-my $oldarg_daemon;
-my $oldarg_logserv;
-
 ### used in --Benchmark test
 my $b_time;
 my $test_pkt;
@@ -554,6 +537,7 @@ Getopt::Long::Configure('no_ignore_case');
                                               # USR1 signal (useful for debugging).
     'HUP'               => \$hup,             # Send psad processes a HUP signal
                                               #   to re-import config.
+    'Lib-dir=s'         => \$psad_lib_dir,    # Specify path to psad lib directory.
     'no-snort-sids'     => \$no_snort_sids,   # Disable search for snort SID's
                                               #   in Netfilter messages.
     'no-whois'          => \$no_whois,        # Do not issue whois lookups against
@@ -579,16 +563,6 @@ Getopt::Long::Configure('no_ignore_case');
                                               #   and debug info).
     'Version'           => \$ver,             # Print the psad version and exit.
     'help'              => \$help,            # Display help.
-    ### old args
-    'Logging_server'    => \$oldarg_logserv, # old command line arg
-    'no_fw_check'       => \$oldarg_nfwchk,  # old command line arg
-    'snort-sids'        => \$oldarg_snort_sids, # old command line arg
-    'reversedns'        => \$oldarg_rdns,    # old command line arg
-    'no_errors'         => \$oldarg_nerrs,   # old command line arg
-    'no-errors'         => \$oldarg_nerrs2,  # old command line arg
-    'no_whois'          => \$oldarg_nwhois,  # old command line arg
-    'no_rdns'           => \$oldarg_nrdns,   # old command line arg
-    'no_localport'      => \$oldarg_nlport,  # old command line arg
 ));
 &usage(0) if $help;
 
@@ -599,15 +573,15 @@ if ($ver) {
     exit 0;
 }
 
-### check for any old command line arguments
-&check_old_cmdargs();
-
 ### Everthing after this point must be executed as root (psad
 ### only needs root if run in auto-blocking mode; should take
 ### this into account and drop privileges).
 $< == 0 && $> == 0 or
     die '[*] psad: You must be root (or equivalent ',
         "UID 0 account) to execute psad!  Exiting.\n";
+
+### import psad perl modules
+&import_psad_perl_modules();
 
 ### Import all psad configuration and signatures files
 ### (psad.conf, posf, signatures, psad_icmp_types,
@@ -1334,14 +1308,19 @@ sub parse_NF_pkt_str() {
         }
     }
 
-    ### get the in/out interface and Netfilter chain
-    if ($pkt_str =~ /IN=(\S+)\s+OUT=\s/) {
+    ### get the in/out interface and Netfilter chain (the code below
+    ### allows the Netfilter log message to contain the PHYSDEV stuff):
+    ### Feb 25 12:13:27 bridge kernel: INBOUND TCP: IN=br0 PHYSIN=eth0 OUT=br0
+    ### PHYSOUT=eth1 SRC=63.147.183.21 DST=11.11.79.100 LEN=48 TOS=0x00
+    ### PREC=0x00 TTL=113 ID=19664 DF PROTO=TCP SPT=4918 DPT=135 WINDOW=64240
+    ### RES=0x00 SYN URGP=0
+    if ($pkt_str =~ /\sIN=(\S+).*\sOUT=\s/) {
         $pkt_hr->{'intf'}  = $1;
         $pkt_hr->{'chain'} = 'INPUT';
-    } elsif ($pkt_str =~ /IN=(\S+)\s+OUT=\S/) {
+    } elsif ($pkt_str =~ /\sIN=(\S+).*\sOUT=\S/) {
         $pkt_hr->{'intf'}  = $1;
         $pkt_hr->{'chain'} = 'FORWARD';
-    } elsif ($pkt_str =~ /IN=\s+OUT=(\S+)/) {
+    } elsif ($pkt_str =~ /\sIN=\s+.*\sOUT=(\S+)/) {
         $pkt_hr->{'intf'}  = $1;
         $pkt_hr->{'chain'} = 'OUTPUT';
     }
@@ -2420,6 +2399,53 @@ sub check_icmp_type() {
     return $BAD_ICMP_CODE if not defined
             $valid_icmp_types{$type}{'codes'}{$code};
     return 0;
+}
+
+sub import_psad_perl_modules() {
+
+    my $mod_paths_ar = &get_psad_mod_paths();
+
+    splice @INC, 0, $#$mod_paths_ar+1, @$mod_paths_ar;
+
+    require Psad;
+    require IPTables::Parse;
+    require IPTables::ChainMgr;
+    require Net::IPv4Addr;
+    require Date::Calc;
+
+    Net::IPv4Addr->import(qw(ipv4_network ipv4_in_network ipv4_broadcast));
+    Date::Calc->import(qw(Timezone This_Year Decode_Month));
+
+    return;
+}
+
+sub get_psad_mod_paths() {
+
+    my @paths = ();
+
+    unless (-d $psad_lib_dir) {
+        my $dir_tmp = $psad_lib_dir;
+        $dir_tmp =~ s|lib/|lib64/|;
+        if (-d $dir_tmp) {
+            $psad_lib_dir = $dir_tmp;
+        } else {
+            die "[*] psad lib directory: $psad_lib_dir does not exist, ",
+                "use --Lib-dir <dir>";
+        }
+    }
+
+    opendir D, $psad_lib_dir or die "[*] Could not open $psad_lib_dir: $!";
+    my @dirs = readdir D;
+    closedir D;
+    shift @dirs; shift @dirs;
+
+    push @paths, $psad_lib_dir;
+
+    for my $dir (@dirs) {
+        ### get directories like "/usr/lib/psad/x86_64-linux"
+        push @paths, "$psad_lib_dir/$dir" if $dir =~ m|linux|;
+    }
+    return \@paths;
 }
 
 sub psad_init() {
@@ -6892,32 +6918,6 @@ sub archive_data() {
     print AR $_ for @fwlines;
     close AR;
     return;
-}
-
-sub check_old_cmdargs() {
-    if ($oldarg_snort_sids) {
-        print "[-] The --snort-sids capability is enabled by\n",
-            "default (see the --no-snort-sids option).\n";
-        &usage(1);
-    }
-    &print_old_arg('auto-ips', 'auto-dl') if $oldarg_autoips;
-    &print_old_arg('Logging_server', 'log-server') if $oldarg_logserv;
-    &print_old_arg('no_errors', 'no-ipt-errors') if $oldarg_nerrs;
-    &print_old_arg('no-errors', 'no-ipt-errors') if $oldarg_nerrs2;
-    &print_old_arg('reversedns', 'no-rdns') if $oldarg_rdns;
-    &print_old_arg('no_rdns', 'no-rdns') if $oldarg_nrdns;
-    &print_old_arg('whois', 'no-whois') if $oldarg_whois;
-    &print_old_arg('no_whois', 'no-whois') if $oldarg_nwhois;
-    &print_old_arg('no_localport', 'no-netstat') if $oldarg_nlport;
-    &print_old_arg('no_fw_check', 'no-fwcheck') if $oldarg_nfwchk;
-    &print_old_arg('Daemon', 'no-daemon') if $oldarg_daemon;
-    return;
-}
-
-sub print_old_arg() {
-    my ($oldarg, $newarg) = @_;
-    print qq([*] The "$oldarg" option has been changed to "$newarg"\n);
-    &usage(1);  ### this exits
 }
 
 sub handle_cmdline() {

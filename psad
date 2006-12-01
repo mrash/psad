@@ -364,6 +364,7 @@ my $warn_msg         = '';
 my $die_msg          = '';
 my $messages_file    = '/var/log/messages';
 my $skip_first_loop  = 1;
+my $cmdl_interface   = '';
 my $local_ips_lkup_ctr = 0;
 
 ### these flags are used to disable several features
@@ -450,6 +451,9 @@ my $PKT_IGNORE  = 2;
 my $BAD_ICMP_TYPE = 1;
 my $BAD_ICMP_CODE = 2;
 
+my $SIG_MATCH    = 1;
+my $NO_SIG_MATCH = 0;
+
 ### header lengths
 my $TCP_HEADER_LEN  = 20;  ### excludes options
 my $UDP_HEADER_LEN  = 8;
@@ -488,8 +492,10 @@ Getopt::Long::Configure('no_ignore_case');
                                               #   default).
     'debug'             => \$debug,           # Run in debug mode.
     'Dump-conf'         => \$dump_conf,       # Dump config and exit.
-    'interval=i'        => \$chk_interval,    # Set $chk_interval from the
+    'Interval=i'        => \$chk_interval,    # Set $chk_interval from the
                                               #   command line.
+    'interface=s'       => \$cmdl_interface,  # Specify the IN interface manually
+                                              #   and ignore packets on all others.
     'config=s'          => \$config_file,     # Specify path to configuration file.
     'fw-search=s'       => \$fw_search_file,  # Specify path to fw_search.conf.
     'fw-analyze'        => \$fw_analyze,      # Analyze the firewall ruleset and
@@ -1325,6 +1331,11 @@ sub parse_NF_pkt_str() {
         $pkt_hr->{'chain'} = 'OUTPUT';
     }
 
+    ### -I was used on the command line to require a specific interface
+    if ($cmdl_interface) {
+        return $PKT_IGNORE unless $pkt_hr->{'intf'} eq $cmdl_interface;
+    }
+
     if ($pkt_str =~ /\sMAC=(\S+)/) {
         my $mac_str = $1;
         if ($mac_str =~ /^((?:\w{2}\:){6})((?:\w{2}\:){6})/) {
@@ -1688,8 +1699,20 @@ sub match_snort_keywords() {
         ### Netfilter logging messages always include TTL and IP_ID
         ### values (at least for ipv4, see
         ### linux/net/ipv4/netfilter/ipt_LOG.c)
-        my $dl_tmp = &match_snort_ip_keywords($pkt_hr, $sig_hr);
-        next SIG unless $dl_tmp;
+        my $dl_tmp = 0;
+
+        my ($rv, $sig_match_rv) = &match_snort_ip_keywords($pkt_hr, $sig_hr);
+
+        if (not $rv and $sig_match_rv == $NO_SIG_MATCH) {
+            ### there were network-layer keywords that did not match
+            next SIG;
+        } elsif ($rv and $sig_match_rv == $NO_SIG_MATCH) {
+            ### there were no network-layer keywords so continue on
+            $dl_tmp = 0;
+        } elsif ($rv and $sig_match_rv == $SIG_MATCH) {
+            ### there were network-layer keywords, and they matched
+            $dl_tmp = $rv;
+        }
 
         $dl = $dl_tmp if $dl_tmp > $dl;
 
@@ -1713,6 +1736,8 @@ sub match_snort_keywords() {
                 $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'tcp'}
                     {'sid'}{$sid}{$pkt_hr->{'chain'}}{'is_fwsnort'} = 0;
 
+                $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'tcp'}
+                    {'sid'}{$sid}{$pkt_hr->{'chain'}}{'time'} = time();
             }
         } elsif ($sig_hr->{'proto'} eq 'udp') {
 
@@ -1729,6 +1754,9 @@ sub match_snort_keywords() {
 
                 $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'udp'}
                     {'sid'}{$sid}{$pkt_hr->{'chain'}}{'is_fwsnort'} = 0;
+
+                $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'udp'}
+                    {'sid'}{$sid}{$pkt_hr->{'chain'}}{'time'} = time();
             }
         } elsif ($sig_hr->{'proto'} eq 'icmp') {
 
@@ -1764,6 +1792,9 @@ sub match_snort_keywords() {
 
                 $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'icmp'}{'sid'}
                     {$sid}{$pkt_hr->{'chain'}}{'is_fwsnort'} = 0;
+
+                $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'icmp'}{'sid'}
+                    {$sid}{$pkt_hr->{'chain'}}{'time'} = time();
             }
         }
 
@@ -1797,8 +1828,7 @@ sub match_snort_tcp_keywords() {
             "    $sig_hr->{'msg'}\n";
     }
 
-    return &get_largest_sid_dl($sig_hr->{'sid'},
-            $sig_hr->{'dl'}, $sig_hr->{'classtype'});
+    return &get_largest_sid_dl($sig_hr->{'sid'}, $sig_hr->{'dl'});
 }
 
 sub match_snort_udp_keywords() {
@@ -1819,8 +1849,7 @@ sub match_snort_udp_keywords() {
             "    $sig_hr->{'msg'}\n";
     }
 
-    return &get_largest_sid_dl($sig_hr->{'sid'},
-            $sig_hr->{'dl'}, $sig_hr->{'classtype'});
+    return &get_largest_sid_dl($sig_hr->{'sid'}, $sig_hr->{'dl'});
 }
 
 sub match_snort_icmp_keywords() {
@@ -1846,27 +1875,30 @@ sub match_snort_icmp_keywords() {
             "    $sig_hr->{'msg'}\n";
     }
 
-    return &get_largest_sid_dl($sig_hr->{'sid'},
-            $sig_hr->{'dl'}, $sig_hr->{'classtype'});
+    return &get_largest_sid_dl($sig_hr->{'sid'}, $sig_hr->{'dl'});
 }
 
 sub match_snort_ip_keywords() {
     my ($pkt_hr, $sig_hr) = @_;
 
-    return 0 unless &check_sig_int_range($pkt_hr->{'ttl'}, 'ttl', $sig_hr);
-    return 0 unless &check_sig_int_range($pkt_hr->{'ip_id'}, 'id', $sig_hr);
+    return 0, $NO_SIG_MATCH
+        unless &check_sig_int_range($pkt_hr->{'ttl'}, 'ttl', $sig_hr);
+
+    return 0, $NO_SIG_MATCH
+        unless &check_sig_int_range($pkt_hr->{'ip_id'}, 'id', $sig_hr);
 
     ### to handle the ip_proto keyword parse_NF_pkt_str() would have to be
     ### modified to handle packets besides TCP, UDP, and ICMP.
-    return 0 if defined $sig_hr->{'ip_proto'};
+    return 0, $NO_SIG_MATCH if defined $sig_hr->{'ip_proto'};
 
     ### handle the sameip keyword
     if (defined $sig_hr->{'sameip'} and $sig_hr->{'sameip'}) {
-        return 0 if $pkt_hr->{'intf'} eq 'lo';
-        return 0 unless $pkt_hr->{'src'} eq $pkt_hr->{'dst'};
+        return 0, $NO_SIG_MATCH if $pkt_hr->{'intf'} eq 'lo';
+        return 0, $NO_SIG_MATCH unless $pkt_hr->{'src'} eq $pkt_hr->{'dst'};
     }
 
-    return 0 unless &check_sig_ipopts($pkt_hr->{'ip_opts'}, 'ipopts', $sig_hr);
+    return 0, $NO_SIG_MATCH
+        unless &check_sig_ipopts($pkt_hr->{'ip_opts'}, 'ipopts', $sig_hr);
 
     if ($sig_hr->{'proto'} eq 'ip') {
         ### signature match
@@ -1882,10 +1914,15 @@ sub match_snort_ip_keywords() {
         $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'ip'}{'sid'}
             {$sig_hr->{'sid'}}{$pkt_hr->{'chain'}}{'is_fwsnort'} = 0;
 
-        return &get_largest_sid_dl($sig_hr->{'sid'},
-                $sig_hr->{'dl'}, $sig_hr->{'classtype'});
+        $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'ip'}{'sid'}
+            {$sig_hr->{'sid'}}{$pkt_hr->{'chain'}}{'is_fwsnort'} = time();
+
+        my $dl_tmp = &get_largest_sid_dl($sig_hr->{'sid'},
+                $sig_hr->{'dl'});
+
+        return $dl_tmp, $SIG_MATCH;
     }
-    return 1;
+    return 1, $NO_SIG_MATCH;
 }
 
 sub check_sig_int_range() {
@@ -2259,7 +2296,7 @@ sub ttl_range() {
 }
 
 sub get_largest_sid_dl() {
-    my ($sid, $sig_dl, $classtype) = @_;
+    my ($sid, $sig_dl) = @_;
 
     my $dl = $sig_dl;
 
@@ -2302,7 +2339,7 @@ sub add_snort_sid() {
             }
         }
 
-        return &get_largest_sid_dl($sid, 2, $fwsnort_sigs{$sid}{'classtype'});
+        return &get_largest_sid_dl($sid, 2);
 
     }
     return 0;
@@ -2443,7 +2480,8 @@ sub get_psad_mod_paths() {
 
     for my $dir (@dirs) {
         ### get directories like "/usr/lib/psad/x86_64-linux"
-        push @paths, "$psad_lib_dir/$dir" if $dir =~ m|linux|;
+        push @paths, "$psad_lib_dir/$dir"
+            if $dir =~ m|linux| or $dir =~ m|thread|;
     }
     return \@paths;
 }
@@ -4529,148 +4567,164 @@ sub scan_logr() {
 }
 
 sub scan_logr_signatures() {
-    my ($src, $dst, $email_fh, $log_sigs) = @_;
-    my $dst_ip_is_local = 0;
-    $dst_ip_is_local = 1 if defined $local_ips{$dst};
-    open LS, ">> $log_sigs" or die "[*] Could not open $log_sigs: $!";
-    my @print_fh = ($email_fh, *LS);
+    my ($src, $dst, $email_fh, $log_sigs_file) = @_;
 
-    for my $fh (@print_fh) {
-        for my $proto qw(tcp udp icmp ip) {
-            next unless defined $scan{$src}{$dst}{$proto};
-            my $href = $scan{$src}{$dst}{$proto};
+    my @del_sigs = ();
+    my @log_sigs = ();
 
-            next unless (defined $href->{'sid'}
+    for my $proto qw(tcp udp icmp ip) {
+        next unless defined $scan{$src}{$dst}{$proto};
+        my $href = $scan{$src}{$dst}{$proto};
+
+        next unless (defined $href->{'sid'}
                 or defined $href->{'invalid_type'}
                 or defined $href->{'invalid_code'});
 
-            print $fh "\n\n[+] $proto scan signatures:\n\n";
-            print STDERR "[+] scan_logr_signatures(): src: $src dst: $dst ",
-                "proto: $proto\n" if $debug;
 
-            for my $sid (keys %{$href->{'sid'}}) {
-                for my $chain (keys %{$href->{'sid'}->{$sid}}) {
+        print $email_fh "\n\n[+] $proto scan signatures:\n\n";
+        print STDERR "[+] scan_logr_signatures(): src: $src dst: $dst ",
+            "proto: $proto\n" if $debug;
 
-                    my $sig_hr = '';
-                    my $is_fwsnort = $href->{'sid'}->{$sid}
-                            ->{$chain}->{'is_fwsnort'};
+        for my $sid (keys %{$href->{'sid'}}) {
+            for my $chain (keys %{$href->{'sid'}->{$sid}}) {
 
-                    if ($is_fwsnort) {
-                        next unless defined $fwsnort_sigs{$sid};
-                        $sig_hr = $fwsnort_sigs{$sid};
-                    } else {
-                        next unless defined $sigs{$sid};
-                        $sig_hr = $sigs{$sid};
+                my $sig_hr = '';
+                my $is_fwsnort = $href->{'sid'}->{$sid}
+                    ->{$chain}->{'is_fwsnort'};
+
+                if ($is_fwsnort) {
+                    next unless defined $fwsnort_sigs{$sid};
+                    $sig_hr = $fwsnort_sigs{$sid};
+                } else {
+                    next unless defined $sigs{$sid};
+                    $sig_hr = $sigs{$sid};
+                }
+
+                my $dp    = 0;
+                my $flags = 'NA';
+                if ($proto eq 'tcp' or $proto eq 'udp') {
+                    $dp = $href->{'sid'}->{$sid}->{$chain}->{'dp'};
+                    if ($proto eq 'tcp') {
+                        $flags = $href->{'sid'}->{$sid}->{$chain}->{'flags'};
                     }
+                }
 
-                    my $dp    = -1;
-                    my $flags = '';
-                    if ($proto eq 'tcp' or $proto eq 'udp') {
-                        $dp    = $href->{'sid'}->{$sid}->{$chain}->{'dp'};
-                        $flags = $href->{'sid'}->{$sid}->{$chain}->{'flags'}
-                            if $proto eq 'tcp';
-                    }
-                    my $pkts = $href->{'sid'}->{$sid}->{$chain}->{'pkts'};
+                my $pkts = $href->{'sid'}->{$sid}->{$chain}->{'pkts'};
 
-                    print $fh qq|   "$sig_hr->{'msg'}"\n|;
-                    if ($proto eq 'tcp' or $proto eq 'udp') {
-                        if ($chain eq 'INPUT') {
-                            if (defined $local_ports{$proto}
-                                    and defined $local_ports{$dp}) {
-                                print $fh "       dst port:  $dp (server ",
-                                    "bound to local port!)\n";
-                                print $fh "       flags:     $flags\n"
-                                    if $proto eq 'tcp';
-                            } else {
-                                print $fh "       dst port:  $dp (no server ",
-                                    "bound to local port)\n";
-                                print $fh "       flags:     $flags\n"
-                                    if $proto eq 'tcp';
-                            }
+                ### string for the <ip>_signatures file
+                push @log_sigs, "$href->{'sid'}->{$sid}->{$chain}->{'time'} " .
+                    "$sid $is_fwsnort $chain $proto $dp $flags $pkts";
+
+                print $email_fh qq|   "$sig_hr->{'msg'}"\n|;
+
+                if ($proto eq 'tcp' or $proto eq 'udp') {
+                    if ($chain eq 'INPUT') {
+                        if (defined $local_ports{$proto}
+                                and defined $local_ports{$dp}) {
+                            print $email_fh "       dst port:  $dp (server ",
+                                  "bound to local port!)\n";
+                            print $email_fh "       flags:     $flags\n"
+                                if $proto eq 'tcp';
                         } else {
-                            print $fh "       dst port:  $dp\n";
-                            print $fh "       flags:     $flags\n"
+                            print $email_fh "       dst port:  $dp (no server ",
+                                  "bound to local port)\n";
+                            print $email_fh "       flags:     $flags\n"
                                 if $proto eq 'tcp';
                         }
-                    }
-
-                    if ($is_fwsnort) {
-                        for my $content (@{$sig_hr->{'content'}}) {
-                            print $fh qq(       content:   "$content"\n);
-                        }
-                    }
-                    my $sid_str = '';
-                    if ($sig_hr->{'is_psad_id'}) {
-                        $sid_str = "       psad_id:   $sid";
                     } else {
-                        $sid_str = "       sid:       $sid";
+                        print $email_fh "       dst port:  $dp\n";
+                        print $email_fh "       flags:     $flags\n"
+                            if $proto eq 'tcp';
                     }
-                    if (defined $sig_hr->{'psad_derived_sids'}) {
-                        $sid_str .= ' (derived from: ';
-                        $sid_str .= "$_ "
-                            for @{$sig_hr->{'psad_derived_sids'}};
-                        $sid_str =~ s|\s*$||;
-                        $sid_str .= ')';
-                    }
-                    print $fh "$sid_str\n",
-                        "       chain:     $chain\n",
-                        "       packets:   $pkts\n";
+                }
 
-                    if ($sig_hr->{'classtype'}) {
-                        print $fh "       classtype: $sig_hr->{'classtype'}\n";
+                if ($is_fwsnort) {
+                    for my $content (@{$sig_hr->{'content'}}) {
+                        print $email_fh qq(       content:   "$content"\n);
                     }
-                    if (defined $sig_hr->{'reference'}
-                            and $sig_hr->{'reference'}) {
-                        for my $reftype (keys %{$sig_hr->{'reference'}}) {
-                            my $baseurl = '';
-                            if (defined $snort_ref_baseurl{$reftype}) {
-                                $baseurl = $snort_ref_baseurl{$reftype};
-                            } else {
-                                next;
-                            }
-                            for my $ref (@{$sig_hr->{'reference'}->{$reftype}}) {
-                                print $fh "       reference: ($reftype) ",
-                                    "${baseurl}$ref\n";
-                            }
+                }
+                my $sid_str = '';
+                if ($sig_hr->{'is_psad_id'}) {
+                    $sid_str = "       psad_id:   $sid";
+                } else {
+                    $sid_str = "       sid:       $sid";
+                }
+                if (defined $sig_hr->{'psad_derived_sids'}) {
+                    $sid_str .= ' (derived from: ';
+                    $sid_str .= "$_ " for @{$sig_hr->{'psad_derived_sids'}};
+                    $sid_str =~ s|\s*$||;
+                    $sid_str .= ')';
+                }
+                print $email_fh "$sid_str\n",
+                    "       chain:     $chain\n",
+                    "       packets:   $pkts\n";
+
+                if ($sig_hr->{'classtype'}) {
+                    print $email_fh "       classtype: $sig_hr->{'classtype'}\n";
+                }
+                if (defined $sig_hr->{'reference'}
+                        and $sig_hr->{'reference'}) {
+                    for my $reftype (keys %{$sig_hr->{'reference'}}) {
+                        my $baseurl = '';
+                        if (defined $snort_ref_baseurl{$reftype}) {
+                            $baseurl = $snort_ref_baseurl{$reftype};
+                        } else {
+                            next;
                         }
-                    }
-                    print $fh "\n";
-                }
-            }
-            if (defined $href->{'invalid_type'}) {
-                for my $type (keys %{$href->{'invalid_type'}}) {
-                    for my $chain (keys %{$href->{'invalid_type'}->{$type}}) {
-                        my $pkts = $href->{'invalid_type'}->
-                            {$type}->{$chain}->{'pkts'};
-                        print $fh
-                            qq|   Invalid ICMP type "$type" chain=$chain packets=$pkts\n|;
-                    }
-                }
-            }
-            if (defined $href->{'invalid_code'}) {
-                for my $type (keys %{$href->{'invalid_code'}}) {
-                    for my $code (keys %{$href->{'invalid_code'}->{$type}}) {
-                        for my $chain (keys %{$href->{'invalid_code'}->{$type}->{$code}}) {
-                            my $pkts = $href->{'invalid_code'}->
-                                {$type}->{$code}->{$chain}->{'pkts'};
-                            print $fh qq|   Invalid ICMP code "$code" for ICMP |,
-                                qq|"$valid_icmp_types{$type}{'text'}" packet\n|,
-                                "       chain=$chain packets=$pkts\n";
+                        for my $ref (@{$sig_hr->{'reference'}->{$reftype}}) {
+                            print $email_fh "       reference: ($reftype) ",
+                                  "${baseurl}$ref\n";
                         }
                     }
                 }
+                print $email_fh "\n";
             }
+        }
+        if (defined $href->{'invalid_type'}) {
+            for my $type (keys %{$href->{'invalid_type'}}) {
+                for my $chain (keys %{$href->{'invalid_type'}->{$type}}) {
+                    my $pkts = $href->{'invalid_type'}->
+                    {$type}->{$chain}->{'pkts'};
+                    print $email_fh
+                        qq|   Invalid ICMP type "$type" chain=$chain packets=$pkts\n|;
+                }
+            }
+        }
+        if (defined $href->{'invalid_code'}) {
+            for my $type (keys %{$href->{'invalid_code'}}) {
+                for my $code (keys %{$href->{'invalid_code'}->{$type}}) {
+                    for my $chain (keys %{$href->{'invalid_code'}->{$type}->{$code}}) {
+                        my $pkts = $href->{'invalid_code'}->
+                        {$type}->{$code}->{$chain}->{'pkts'};
+                        print $email_fh qq|   Invalid ICMP code "$code" for ICMP |,
+                              qq|"$valid_icmp_types{$type}{'text'}" packet\n|,
+                              "       chain=$chain packets=$pkts\n";
+                    }
+                }
+            }
+        }
+        push @del_sigs, $href;
+    }
 
+    if (@log_sigs) {
+        open LS, ">> $log_sigs_file.tmp" or
+            die "[*] Could not open $log_sigs_file: $!";
+        for my $str (@log_sigs) {
+            print LS $str, "\n";
+        }
+        close LS;
+        move "$log_sigs_file.tmp", $log_sigs_file;
+    }
+    unless ($config{'SHOW_ALL_SIGNATURES'} eq 'Y') {
+        for my $href (@del_sigs) {
             ### need to delete the current signature so it
             ### won't show up in the next alert
-            unless ($config{'SHOW_ALL_SIGNATURES'} eq 'Y') {
-                delete $href->{'sid'}
-                    if defined $href->{'sid'};
-                delete $href->{'invalid_type'}
-                    if defined $href->{'invalid_type'};
-                delete $href->{'invalid_code'}
-                    if defined $href->{'invalid_code'};
-            }
+            delete $href->{'sid'}
+                if defined $href->{'sid'};
+            delete $href->{'invalid_type'}
+                if defined $href->{'invalid_type'};
+            delete $href->{'invalid_code'}
+                if defined $href->{'invalid_code'};
         }
     }
     close LS;
@@ -7551,27 +7605,6 @@ psad; the Port Scan Attack Detector
 Usage: psad [options]
 
 Options:
-    --signatures <sigs file>      - Manually specify the path to the
-                                    psad signatures file.
-    --sig-update                  - Download the latest set of psad
-                                    signatures from:
-                                    http://www.cipherdyne.org/
-    --passive-os-sigs <sigs file> - Manually specify the path to the
-                                    passive os fingerprinting sigs.
-    --snort-type                  - Enable psad to look for specific
-                                    snort sids such as those in
-                                    ddos.rules or backdoor.rules.
-    --interval                    - Configure the check interval from
-                                    the command line to override the 15
-                                    second default.
-    --auto-dl <dl file>           - Import auto-danger level file for
-                                    automatic IP danger level
-                                    increases/decreses.
-    --alert-conf <file>           - Manually specify path to alert.conf
-                                    file.
-    -c,  --config <config file>   - Use <config file> instead of the
-                                    normal config file located at
-                                    $config_file.
     -A,  --Analyze-msgs           - Analyze Netfilter logfile and exit.
     -e,  --email-analysis         - Send emails for scans detected in
                                     offline analysis mode.
@@ -7580,6 +7613,9 @@ Options:
     -m,  --messages-file <file>   - Specify the path to the Netfilter
                                     logfile (use in conjunction with
                                     --Analyze-msgs).
+    --sig-update                  - Download the latest set of psad
+                                    signatures from:
+                                    http://www.cipherdyne.org/
     --fw-search <file>            - Use <file> instead of the normal
                                     fw-search file: $fw_search_file.
     --fw-analyze                  - Analyze the local iptables ruleset
@@ -7627,6 +7663,24 @@ Options:
                                     data structures on STDOUT).
     -H,  --HUP                    - Send all psad daemons a HUP signal
                                     to have them re-import configs.
+    --signatures <sigs file>      - Manually specify the path to the
+                                    psad signatures file.
+    --snort-type                  - Restrict psad to look for specific
+                                    snort sids such as those in
+                                    ddos.rules or backdoor.rules.
+    --passive-os-sigs <sigs file> - Manually specify the path to the
+                                    passive os fingerprinting sigs.
+    --auto-dl <dl file>           - Import auto-danger level file for
+                                    automatic IP danger level
+                                    increases/decreses.
+    --alert-conf <file>           - Manually specify path to alert.conf
+                                    file.
+    -c,  --config <config file>   - Use <config file> instead of the
+                                    normal config file located at
+                                    $config_file.
+    -I,  --Interval <interval>    - Configure the check interval from
+                                    the command line to override the 5
+                                    second default.
     -v,  --verbose                - Run in verbose mode.
     -V,  --Version                - Print the psad version and exit.
 

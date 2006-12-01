@@ -7613,6 +7613,9 @@ Options:
     -m,  --messages-file <file>   - Specify the path to the Netfilter
                                     logfile (use in conjunction with
                                     --Analyze-msgs).
+    -i,  --interface <intf>       - Restrict detection to IN interface
+                                    (for INPUT and FORWARD chains) or
+                                    OUT interface (for OUPUT chain).
     --sig-update                  - Download the latest set of psad
                                     signatures from:
                                     http://www.cipherdyne.org/
@@ -7678,7 +7681,7 @@ Options:
     -c,  --config <config file>   - Use <config file> instead of the
                                     normal config file located at
                                     $config_file.
-    -I,  --Interval <interval>    - Configure the check interval from
+    -I,  --Interval <seconds>     - Configure the check interval from
                                     the command line to override the 5
                                     second default.
     -v,  --verbose                - Run in verbose mode.

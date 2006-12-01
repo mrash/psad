@@ -12,8 +12,10 @@
 .I config-file
 .B ] [-l] [-h] [-B] [-A] [-F] [-S] [-K] [-R] [-U] [-H] [-V] [-p] [-e] [-w] [-D] [-d] [--signatures
 .I sig-file
-.B ] [--sig-update] [--interval
-.I interval
+.B ] [--interface
+.I interface
+.B ] [--sig-update] [--Interval
+.I seconds
 .B ] [-m
 .I messages-file
 .B ] [--snort-type
@@ -125,6 +127,21 @@ option) without having to restart the psad process.
 .B psad
 also detects
 many udp and icmp signatures that were originally included within snort.
+.TP
+.BR \-i "\fR,\fP " \-\^\-interface\ \<interface>
+Specify the interface that
+.B psad
+will examine for Netfilter log messages.  This interface will be the
+.B IN=
+interface for packets that are logged in the
+.B INPUT
+and
+.B FORWARD
+chains, and the
+.B OUT=
+interface for packets logged in the
+.B OUTPUT
+chain.
 .TP
 .BR \-\^\-sig-update
 Instruct
@@ -295,7 +312,7 @@ Analyze the iptables ruleset contained within
 .B policy-file
 instead of the ruleset currently loaded on the local system.
 .TP
-.BR \-\^\-interval\ \<seconds>
+.BR \-I "\fR,\fP " \-\^\-Interval\ \<seconds>
 Specify the interval (in seconds) that psad should use to
 check whether or not packets have been logged by the
 firewall.

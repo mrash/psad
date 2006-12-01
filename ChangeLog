@@ -71,6 +71,12 @@ psad-1.6.0 (11//2006):
       directories have been added to @INC. This allows the RPM files to be
       built on one system that builds @INC differently than the system where
       psad is actually installed since psad can now compensate for this.
+    - Added new code to populate the <dst>_signature file in each of the
+      /var/log/psad/<ip> directories with verbose information including the
+      signature time, sid, protocol, dst port, and packet count.
+    - Changed --interval to --Interval, and added --interface to allow
+      psad's detection to be limited to a specific IN interface for the INPUT
+      and FORWARD chains (or OUT interface for the OUTPUT chain).
 
 psad-1.4.8 (10/15/2006):
     - Added the ability to get the auto-blocking status for a specific IP

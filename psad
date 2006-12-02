@@ -305,7 +305,8 @@ my %local_ports = ();
 my %local_ips = ();
 
 ### cache the top scanned ports
-my %top_ports = ();
+my %top_tcp_ports = ();
+my %top_udp_ports = ();
 
 ### cache the top signature matches
 my %top_sigs = ();
@@ -1063,13 +1064,11 @@ sub check_scan() {
         }
 
         if ($pkt{'proto'} eq 'tcp') {
+            $top_tcp_ports{$pkt{'dp'}}++;
             $tcp_ctr++;
-            $top_ports{$pkt{'dp'}}{'tcp'}++;
         } elsif ($pkt{'proto'} eq 'udp') {
+            $top_udp_ports{$pkt{'dp'}}++;
             $udp_ctr++;
-            $top_ports{$pkt{'dp'}}{'udp'}++;
-            $top_ports{$pkt{'dp'}}{'tcp'} = 0
-                unless defined $top_ports{$pkt{'dp'}}{'tcp'};
         } elsif ($pkt{'proto'} eq 'icmp') {
             $icmp_ctr++;
         }
@@ -4141,14 +4140,26 @@ sub log_top_scans() {
     ### top scanned ports
     open P, "> $config{'TOP_SCANNED_PORTS_FILE'}.tmp" or
         die "[*] Could not open $config{'TOP_SCANNED_PORTS_FILE'}: $!";
-    print P "#\n#<proto> <port> <packets>\n#\n\n";
-    for my $dp (sort {$top_ports{$b} <=> $top_ports{$a}}
-            keys %top_ports) {
-        if (defined $top_ports{$dp}{'udp'} and $top_ports{$dp}{'udp'}
-                > $top_ports{$dp}{'tcp'}) {
-            print P "udp $dp $top_ports{$dp}{'udp'}\n";
-        } else {
-            print P "tcp $dp $top_ports{$dp}{'tcp'}\n";
+    print P "#\n# Format: <proto> <port> <packets>\n#\n\n";
+
+    if (%top_tcp_ports) {
+        print P "# Top scanned TCP ports:\n";
+        my $ctr = 0;
+        for my $dp (sort {$top_tcp_ports{$b} <=> $top_tcp_ports{$a}}
+                keys %top_tcp_ports) {
+            print P "tcp $dp $top_tcp_ports{$dp}\n";
+            $ctr++;
+            last if $ctr == $config{'TOP_PORTS_LOG_THRESHOLD'};
+        }
+    }
+    if (%top_udp_ports) {
+        my $ctr = 0;
+        print P "# Top scanned UDP ports:\n";
+        for my $dp (sort {$top_udp_ports{$b} <=> $top_udp_ports{$a}}
+                keys %top_tcp_ports) {
+            print P "udp $dp $top_udp_ports{$dp}\n";
+            $ctr++;
+            last if $ctr == $config{'TOP_PORTS_LOG_THRESHOLD'};
         }
     }
     close P;
@@ -4158,14 +4169,20 @@ sub log_top_scans() {
     ### top signature matches
     open S, "> $config{'TOP_SIGS_FILE'}.tmp" or
         die "[*] Could not open $config{'TOP_SIGS_FILE'}: $!";
-    print S "#\n#<sid> <count> <msg>\n#\n\n";
+    print S "#\n# Format: <sid> <count> <msg>\n#\n\n";
+    my $ctr = 0;
     for my $sid (sort {$top_sigs{$b} <=> $top_sigs{$a}} keys %top_sigs) {
+        my $found = 0;
         if (defined $sigs{$sid} and defined $sigs{$sid}{'msg'}) {
             print S qq|$sid $top_sigs{$sid} "$sigs{$sid}{'msg'}"\n|;
+            $found = 1;
         } elsif (defined $fwsnort_sigs{$sid}
                 and defined $fwsnort_sigs{$sid}{'msg'}) {
             print S qq|$sid $top_sigs{$sid} "$fwsnort_sigs{$sid}{'msg'}"\n|;
+            $found = 1;
         }
+        $ctr++ if $found;
+        last if $ctr == $config{'TOP_SIGS_LOG_THRESHOLD'};
     }
     close S;
     move "$config{'TOP_SIGS_FILE'}.tmp",

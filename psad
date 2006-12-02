@@ -7198,6 +7198,8 @@ sub setup() {
             &truncate_file($config{'PACKET_COUNTER_FILE'});
             &truncate_file($config{'IPT_PREFIX_COUNTER_FILE'});
             &truncate_file($config{'DSHIELD_COUNTER_FILE'});
+            &truncate_file($config{'TOP_SIGS_FILE'});
+            &truncate_file($config{'TOP_SCANNED_PORTS_FILE'});
         }
 
         ### make sure the permissions on these files is 0600

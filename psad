@@ -4151,12 +4151,13 @@ sub log_top_scans() {
             $ctr++;
             last if $ctr == $config{'TOP_PORTS_LOG_THRESHOLD'};
         }
+        print "\n" if %top_udp_ports;
     }
     if (%top_udp_ports) {
         my $ctr = 0;
         print P "# Top scanned UDP ports:\n";
         for my $dp (sort {$top_udp_ports{$b} <=> $top_udp_ports{$a}}
-                keys %top_tcp_ports) {
+                keys %top_udp_ports) {
             print P "udp $dp $top_udp_ports{$dp}\n";
             $ctr++;
             last if $ctr == $config{'TOP_PORTS_LOG_THRESHOLD'};

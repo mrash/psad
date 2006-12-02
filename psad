@@ -822,12 +822,6 @@ MAIN: for (;;) {
         ### send email/syslog alerts.
         &check_scan(\@fw_packets);
 
-        ### Write the number of tcp/udp/icmp packets out
-        ### to the global packet counters file
-        &write_global_packet_counters();
-
-        ### Write out log prefix counters
-        &write_prefix_counters();
     }
 
     if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
@@ -2952,6 +2946,7 @@ sub import_snort_rules() {
 
             $fwsnort_sigs{$sid}{'msg'} = $1
                 if $line =~ /msg:\s*\"(.*?)\"\s*;/;
+            $fwsnort_sigs{$sid}{'is_psad_id'} = 0;
 
             if ($line =~ /[\s;]classtype:\s*(.*?)\s*;/) {
                 $fwsnort_sigs{$sid}{'classtype'} = $1;
@@ -4087,16 +4082,17 @@ sub log_top_scans() {
     ### top signature matches
     open S, "> $config{'TOP_SIGS_FILE'}.tmp" or
         die "[*] Could not open $config{'TOP_SIGS_FILE'}: $!";
-    print S "#\n# Format: <sid> <count> <msg>\n#\n\n";
+    print S "#\n# Format: <sid> <matches> \"<msg>\" <is_fwsnort> <is_psad>\n#\n\n";
     my $ctr = 0;
     for my $sid (sort {$top_sigs{$b} <=> $top_sigs{$a}} keys %top_sigs) {
         my $found = 0;
         if (defined $sigs{$sid} and defined $sigs{$sid}{'msg'}) {
-            print S qq|$sid $top_sigs{$sid} "$sigs{$sid}{'msg'}"\n|;
+            print S qq|$sid $top_sigs{$sid} "$sigs{$sid}{'msg'}" 0 | .
+                qq|$sigs{$sid}{'is_psad_id'}\n|;
             $found = 1;
         } elsif (defined $fwsnort_sigs{$sid}
                 and defined $fwsnort_sigs{$sid}{'msg'}) {
-            print S qq|$sid $top_sigs{$sid} "$fwsnort_sigs{$sid}{'msg'}"\n|;
+            print S qq|$sid $top_sigs{$sid} "$fwsnort_sigs{$sid}{'msg'}" 1 0\n|;
             $found = 1;
         }
         $ctr++ if $found;
@@ -4114,6 +4110,7 @@ sub scan_logr() {
 
     return if $benchmark;
 
+    ### log top scans data
     if ($check_interval_ctr % $config{'TOP_SCANS_CTR_THRESHOLD'} == 0) {
 
         ### log the top port and signature matches
@@ -4121,6 +4118,13 @@ sub scan_logr() {
 
         $check_interval_ctr = 0;
     }
+
+    ### Write the number of tcp/udp/icmp packets out
+    ### to the global packet counters file
+    &write_global_packet_counters();
+
+    ### Write out log prefix counters
+    &write_prefix_counters();
 
     SRC: for my $src (keys %$curr_scan_hr) {
         print STDERR "[+] scan_logr(): source ip: $src\n" if $debug;
@@ -4629,7 +4633,8 @@ sub scan_logr_signatures() {
 
                 ### string for the <ip>_signatures file
                 push @log_sigs, "$href->{'sid'}->{$sid}->{$chain}->{'time'} " .
-                    "$sid $is_fwsnort $chain $proto $dp $flags $pkts";
+                    qq|$sid $pkts "$sig_hr->{'msg'}" $chain $proto $dp $flags | .
+                    "$is_fwsnort $sig_hr->{'is_psad_id'}";
 
                 print $email_fh qq|   "$sig_hr->{'msg'}"\n|;
 
@@ -4725,6 +4730,8 @@ sub scan_logr_signatures() {
     if (@log_sigs) {
         open LS, ">> $log_sigs_file.tmp" or
             die "[*] Could not open $log_sigs_file: $!";
+        print LS "#\n# Format: <sig time> <sid> <matches> \"<msg\" <chain> ",
+            "<proto> <dst port> <flags> <is_fwsnort> <is_psad>\n#\n\n";
         for my $str (@log_sigs) {
             print LS $str, "\n";
         }
@@ -6085,6 +6092,8 @@ sub restart() {
 
 sub analysis_mode() {
 
+    &make_psad_dirs();
+
     unless (-d $config{'PSAD_DIR'}) {
         mkdir $config{'PSAD_DIR'} or die "[*] Could not mkdir ",
             "$config{'PSAD_DIR'}: $!";
@@ -6098,6 +6107,18 @@ sub analysis_mode() {
 
     mkdir $config{'ANALYSIS_MODE_DIR'} or die "[*] Could not mkdir ",
         $config{'ANALYSIS_MODE_DIR'};
+
+    ### change path for counter files, etc.
+    for my $var (keys %config) {
+        next if $var eq 'PSAD_DIR';
+        next if $var eq 'ANALYSIS_MODE_DIR';
+        my $val = $config{$var};
+        if ($val =~ m|$config{'PSAD_DIR'}/|) {
+            $val =~ s|$config{'PSAD_DIR'}|$config{'ANALYSIS_MODE_DIR'}|;
+            $config{$var} = $val;
+        }
+    }
+    &make_psad_dirs();  ### one more time now that paths are updated
 
     ### setup to put all <ip> files in the ANALYSIS_MODE_DIR
     ### (by setting PSAD_DIR to ANALYSIS_MODE_DIR subroutines
@@ -6127,8 +6148,8 @@ sub analysis_mode() {
             }
         }
     }
-    print "[+] Found $#ipt_msgs Netfilter log messages out of ",
-        "$#lines total lines.\n";
+    print "[+] Found ", ($#ipt_msgs+1), " Netfilter log messages out of ",
+        ($#lines+1), " total lines.\n";
     print "    This may take a while...\n"
         if $#lines > 10000;
 
@@ -6203,7 +6224,7 @@ sub fw_analyze_mode() {
     my $exit_status = 0;
     if ($run_fw_check) {
         my $opts = "-c $config_file --fw-search $fw_search_file";
-        $opts .= " --fw-analyze";
+        $opts .= " --fw-analyze" if $fw_analyze;
         $opts .= " --fw-file $fw_file" if $fw_file;
         $opts .= " -a $alert_conf_file";
         $opts .= " --no-fw-search-all" if $config{'FW_SEARCH_ALL'} eq 'N';

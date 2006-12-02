@@ -397,11 +397,6 @@ my $no_kmsgsd     = 0;
 my $no_email_alerts  = 0;
 my $no_syslog_alerts = 0;
 
-### used in --Benchmark test
-my $b_time;
-my $test_pkt;
-my $test_pktend;
-
 ### tcp option types
 my $tcp_nop_type       = 1;
 my $tcp_mss_type       = 2;
@@ -606,8 +601,7 @@ $< == 0 && $> == 0 or
 &psad_init();
 
 ### check to make sure another psad process is not already running.
-&Psad::unique_pid($config{'PID_FILE'})
-    unless $fw_analyze or $benchmark;
+&Psad::unique_pid($config{'PID_FILE'});
 
 ### get the ip addresses that are local to this machine
 &get_local_ips();
@@ -623,34 +617,9 @@ unless ($no_whois) {
     }
 }
 
-### if psad is running on a syslog server, do not check the firewall
-### rules since they may not be local.  Also, do not check the
-### firewall if psad is configured to parse all Netfilter messages.
-unless ($no_fwcheck or $syslog_server or $benchmark
-        or $config{'ENABLE_FW_LOGGING_CHECK'} eq 'N') {
-    my $opts = "-c $config_file --fw-search $fw_search_file";
-    $opts .= " --fw-analyze" if $fw_analyze;
-    $opts .= " --fw-file $fw_file" if $fw_file;
-    $opts .= " -a $alert_conf_file";
-    $opts .= " --no-fw-search-all" if $config{'FW_SEARCH_ALL'} eq 'N';
-    my $es = (system "$cmds{'fwcheck_psad'} $opts") >> 8;
-
-    exit $es if $fw_analyze;  ### finished analyzing ruleset so exit.
-}
-
-### initialize benchmarking test packets if we are running
-### in benchmark mode
-if ($benchmark) {
-    $test_pkt = 'Feb 15 16:42:58 orthanc kernel: DROP IN=eth0 ' .
-        'OUT= MAC=00:a0:cc:28:42:5a:00:03:6c:00:98:54:08:00 ' .
-        'SRC=192.168.10.2 DST=192.168.10.1 LEN=48 TOS=0x00 PREC=0x00 ' .
-        'TTL=110 ID=13383 DF PROTO=TCP SPT=1389 ';
-    $test_pktend = 'WINDOW=16384 RES=0x00 SYN URGP=0';
-}
-
 ### daemonize psad unless running with --no-daemon or an
 ### analysis mode
-unless ($no_daemon or $debug or $benchmark) {
+unless ($no_daemon or $debug) {
     my $pid = fork();
     exit 0 if $pid;
     die "[*] $0: Couldn't fork: $!" unless defined $pid;
@@ -658,12 +627,11 @@ unless ($no_daemon or $debug or $benchmark) {
 }
 
 ### write the current pid associated with psad to the psad pid file
-&Psad::writepid($config{'PID_FILE'})
-    unless $benchmark;
+&Psad::writepid($config{'PID_FILE'});
 
 ### write the command line args used to start psad to $cmdline_file
 &Psad::writecmdline(\@args_cp, $cmdline_file)
-    unless $benchmark or $debug;
+    unless $debug;
 
 ### psad _requires_ that kmsgsd is running to receive any data (unless
 ### SYSLOG_DAEMON is set to ulogd), so let's start it here for good
@@ -672,17 +640,15 @@ unless ($no_daemon or $debug or $benchmark) {
 ### we're at it, start psadwatchd as well.  Note that this is the best
 ### place to start the other daemons since we just wrote the psad pid
 ### to PID_FILE above.
-unless ($benchmark or $fw_analyze) {
-    system $cmds{'kmsgsd'}
-        unless $no_kmsgsd
-        or $config{'SYSLOG_DAEMON'} =~ /ulog/i
-        or $kmsgsd_started;
+system $cmds{'kmsgsd'}
+    unless $no_kmsgsd
+    or $config{'SYSLOG_DAEMON'} =~ /ulog/i
+    or $kmsgsd_started;
 
-    system $cmds{'psadwatchd'}
-        unless $debug or $no_daemon;
-}
+system $cmds{'psadwatchd'}
+    unless $debug or $no_daemon;
 
-if ($config{'ENABLE_AUTO_IDS'} eq 'Y' and not $benchmark) {
+if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
     ### always flush old rules (the subsequent renew_auto_blocked_ips()
     ### will re-instantiate any that should not have been expired).
     &flush_auto_blocked_ips() if $config{'FLUSH_IPT_AT_INIT'} eq 'Y';
@@ -697,31 +663,12 @@ if ($config{'ENABLE_AUTO_IDS'} eq 'Y' and not $benchmark) {
 }
 
 ### Install signal handlers for debugging %scan with Data::Dumper,
-### and for reaping zombie whois processes.  Only install signal
-### handlers if we are not running in benchmark mode
-unless ($benchmark or $fw_analyze) {
-    $SIG{'__WARN__'} = \&warn_handler;
-    $SIG{'__DIE__'}  = \&die_handler;
-    $SIG{'CHLD'}     = \&REAPER;
-    $SIG{'USR1'}     = \&usr1_handler;
-    $SIG{'HUP'}      = \&hup_handler;
-}
-
-if ($benchmark) {
-    print scalar localtime(), " [+] Entering benchmark mode.\n";
-    $no_rdns  = 1;  ### turn off network related functions
-    $no_whois = 1;
-    if ($b_packets) {
-        print scalar localtime(),
-            " [+] Executing a $b_packets packet test.\n";
-    } else {
-        print scalar localtime(), ' [+] The --packets command line ',
-            "option was not specified.\n";
-        print scalar localtime(),
-            " [+] Defaulting to a 10,000 packet test.\n";
-        $b_packets = 10000;
-    }
-}
+### and for reaping zombie whois processes.
+$SIG{'__WARN__'} = \&warn_handler;
+$SIG{'__DIE__'}  = \&die_handler;
+$SIG{'CHLD'}     = \&REAPER;
+$SIG{'USR1'}     = \&usr1_handler;
+$SIG{'HUP'}      = \&hup_handler;
 
 if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
     $last_dshield_alert = time() unless $last_dshield_alert;
@@ -730,42 +677,36 @@ if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
 ### Initialize current time for disk space checking.
 my $last_disk_check = time();
 
-unless ($benchmark) {
-    if ($config{'IMPORT_OLD_SCANS'} eq 'Y') {
-        ### import old scans and counters from /var/log/psad/
-        &import_old_scans();
-    } elsif ($config{'ENABLE_SCAN_ARCHIVE'} eq 'Y') {
-        &archive_data();
-    } else {
-        &remove_old_scans();
-    }
+if ($config{'IMPORT_OLD_SCANS'} eq 'Y') {
+    ### import old scans and counters from /var/log/psad/
+    &import_old_scans();
+} elsif ($config{'ENABLE_SCAN_ARCHIVE'} eq 'Y') {
+    &archive_data();
+} else {
+    &remove_old_scans();
 }
 
-unless ($fw_analyze or $benchmark) {
-    ### zero out the packet counter file (the counters
-    ### are all zero at this point anyway unless we
-    ### imported old scans).
-    &write_global_packet_counters();
+### zero out the packet counter file (the counters
+### are all zero at this point anyway unless we
+### imported old scans).
+&write_global_packet_counters();
 
-    ### zero out prefix counters
-    &write_prefix_counters();
+### zero out prefix counters
+&write_prefix_counters();
 
-    ### zero out dshield alert stats (note we do this here regardless of
-    ### whether DShield alerting is enabled since if it isn't we will
-    ### just zero out the counters).
-    &write_dshield_stats();
-}
+### zero out dshield alert stats (note we do this here regardless of
+### whether DShield alerting is enabled since if it isn't we will
+### just zero out the counters).
+&write_dshield_stats();
 
 ### Get an open filehandle for the main firewall data file FW_DATA_FILE.
 ### All firewall drop/reject log messages are written to FW_DATA_FILE
 ### by kmsgsd (or by ulogd directly).
-unless ($benchmark) {
-    open FWDATA, $fw_data_file or die '[*] Could not open ',
-        "$fw_data_file: $!";
+open FWDATA, $fw_data_file or die '[*] Could not open ',
+    "$fw_data_file: $!";
 
-    &get_auto_response_domain_sock()
-        if $config{'ENABLE_AUTO_IDS'} eq 'Y' and not $benchmark;
-}
+&get_auto_response_domain_sock()
+    if $config{'ENABLE_AUTO_IDS'} eq 'Y';
 
 ###=========================================================###
 ######                    MAIN LOOP                      ######
@@ -828,30 +769,21 @@ MAIN: for (;;) {
         &print_scan();
     }
 
-    ### Get any new packets have been written to
-    ### FW_DATA_FILE by kmsgsd for psad analysis.
-    if ($benchmark) {
-        $b_time = time();
-        print scalar localtime(), " [+] Creating packet array.\n";
-        my $dp = 1000;
-        for (my $i=0; $i <= $b_packets; $i++) {
-            push @fw_packets, "$test_pkt DPT=$dp $test_pktend";
-            $dp++ if $dp < 50000;
-        }
-    }
-
     ### allow the contents of the fwdata file to be processed only after
     ### the first loop has been executed.
     if ($skip_first_loop) {
-        unless ($benchmark) {
-            $skip_first_loop = 0;
-            seek FWDATA,0,2;  ### seek to the end of the file
-            next MAIN;
-        }
+
+        $skip_first_loop = 0;
+        seek FWDATA,0,2;  ### seek to the end of the file
+        next MAIN;
+
     } else {
+
+        ### Get any new packets have been written to
+        ### FW_DATA_FILE by kmsgsd for psad analysis.
         @fw_packets = <FWDATA>;
 
-        if ($config{'ENABLE_AUTO_IDS'} eq 'Y' and not $benchmark) {
+        if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
 
             ### get IP from the domain socket
             my $ipt_add_connection = $ipt_sock->accept();
@@ -862,9 +794,8 @@ MAIN: for (;;) {
     }
 
     if (@fw_packets) {
-        print scalar localtime(), " [+] check_scan()\n" if $benchmark;
 
-        if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y' and not $benchmark) {
+        if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
             ### calculate the timezone offset
             $timezone = sprintf("%.2d", (Timezone())[3]) . ':00';
             $year     = This_Year();
@@ -891,17 +822,15 @@ MAIN: for (;;) {
         ### send email/syslog alerts.
         &check_scan(\@fw_packets);
 
-        unless ($benchmark or $analyze_msgs) {
-            ### Write the number of tcp/udp/icmp packets out
-            ### to the global packet counters file
-            &write_global_packet_counters();
+        ### Write the number of tcp/udp/icmp packets out
+        ### to the global packet counters file
+        &write_global_packet_counters();
 
-            ### Write out log prefix counters
-            &write_prefix_counters();
-        }
+        ### Write out log prefix counters
+        &write_prefix_counters();
     }
 
-    if ($config{'ENABLE_AUTO_IDS'} eq 'Y' and not $benchmark) {
+    if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
         ### Timeout any auto-blocked IPs that are past due (need to
         ### check the timeouts against existing IPs in the scan hash
         ### even if new packets are not found).
@@ -915,16 +844,14 @@ MAIN: for (;;) {
     }
 
     ### Send logs to dshield in dshield format
-    if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
-            and not $benchmark) {
+    if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
         &dshield_email_log();
     }
 
     ### Allow disk space utilization checks to be disabled by
     ### setting DISK_MAX_PERCENTAGE = 0.
     if ($config{'DISK_MAX_PERCENTAGE'} > 0
-            and (time() - $last_disk_check) > $config{'DISK_CHECK_INTERVAL'}
-            and not $benchmark) {
+            and (time() - $last_disk_check) > $config{'DISK_CHECK_INTERVAL'}) {
         ### See how we are doing on disk space, and remove data
         ### if necessary.
         if (&disk_space_exceeded()) {
@@ -941,19 +868,12 @@ MAIN: for (;;) {
     }
 
     &check_auto_response_sock()
-        if $config{'ENABLE_AUTO_IDS'} eq 'Y' and not $benchmark;
+        if $config{'ENABLE_AUTO_IDS'} eq 'Y';
 
     ### Print the number of new packets we saw in FW_DATA_FILE if we are
     ### running in debug mode
     if ($debug) {
         print STDERR "[+] MAIN: number of new packets: $#fw_packets\n";
-    }
-
-    if ($benchmark) {
-        print scalar localtime(), " [+] Packet creation and processing time: ",
-            time() - $b_time, " sec.\n";
-        print scalar localtime(), " [+] Exiting benchmark mode.\n";
-        exit 0;
     }
 
     if ($die_msg) {
@@ -1270,7 +1190,7 @@ sub check_scan() {
     }
 
     ### Assign a danger level to the scan
-    print "[+] Assigning danger levels.\n" if $analyze_msgs;
+    print "[+] Assigning scan danger levels...\n" if $analyze_msgs;
     &assign_danger_level(\%curr_scan, \%curr_sigs_dl, \%curr_sids_dl);
 
     my $tot_scan_ips = 0;
@@ -1289,7 +1209,7 @@ sub check_scan() {
     ### Log and send email and syslog alerts
     if ($analyze_msgs) {
         print "[+] Writing $config{'PSAD_DIR'}/<IP> directories ",
-            "($tot_scan_ips IPs).\n";
+            "($tot_scan_ips IP addresses).\n";
         if ($analysis_emails) {
             print "[+] Generating email alerts.\n";
             unless ($no_whois) {
@@ -1302,7 +1222,7 @@ sub check_scan() {
     ### remember that ENABLE_AUTO_IDS may have been set to 'N' if we
     ### are running on a syslog server, of if we are running in -A mode.
     &auto_psad_response(\%curr_scan, \%auto_block_regex_match)
-        if $config{'ENABLE_AUTO_IDS'} eq 'Y';
+        if $config{'ENABLE_AUTO_IDS'} eq 'Y' and not $analyze_msgs;
 
     return;
 }
@@ -2658,12 +2578,15 @@ sub psad_init() {
     ### there is a set of interfaces that should be ignored
     &parse_ignore_interfaces();
 
-    ### don't continue with init if we are running in firewall
-    ### analysis mode or benchmarking mode
-    return if $fw_analyze or $benchmark;
-
     ### enter Netfilter analysis mode.
     exit &analysis_mode() if $analyze_msgs;
+
+    ### enter benchmarking mode
+    exit &benchmark_mode() if $benchmark;
+
+    ### analyze the iptables policy and exit
+    my $rv = &fw_analyze_mode();
+    exit $rv if $fw_analyze;
 
     ### make sure PSAD_DIR, FW_DATA_FILE, and /var/lib/psad/psadfifo, etc.
     ### actually exist
@@ -4147,7 +4070,7 @@ sub log_top_scans() {
         my $ctr = 0;
         for my $dp (sort {$top_tcp_ports{$b} <=> $top_tcp_ports{$a}}
                 keys %top_tcp_ports) {
-            print P "tcp $dp $top_tcp_ports{$dp}\n";
+            printf P "tcp %-5d $top_tcp_ports{$dp}\n", $dp;
             $ctr++;
             last if $ctr == $config{'TOP_PORTS_LOG_THRESHOLD'};
         }
@@ -4158,7 +4081,7 @@ sub log_top_scans() {
         print P "# Top scanned UDP ports:\n";
         for my $dp (sort {$top_udp_ports{$b} <=> $top_udp_ports{$a}}
                 keys %top_udp_ports) {
-            print P "udp $dp $top_udp_ports{$dp}\n";
+            printf P "udp %-5d $top_udp_ports{$dp}\n", $dp;
             $ctr++;
             last if $ctr == $config{'TOP_PORTS_LOG_THRESHOLD'};
         }
@@ -6214,11 +6137,85 @@ sub analysis_mode() {
         "$#lines total lines.\n";
     print "    This may take a while...\n"
         if $#lines > 10000;
+
+    ### analyze all packets
     &check_scan(\@ipt_msgs);
+
     print "[+] Displaying status output.\n";
     &status_psad_daemon();
+
     print "\n[+] Finished --Analyze cycle.\n";
     return 0;
+}
+
+sub benchmark_mode() {
+
+    my @fw_packets = ();
+
+    print scalar localtime(), " [+] Entering benchmark mode.\n";
+
+    if ($b_packets) {
+        print scalar localtime(),
+            " [+] Executing a $b_packets packet test.\n";
+    } else {
+        print scalar localtime(), ' [+] The --packets command line ',
+            "option was not specified.\n";
+        print scalar localtime(),
+            " [+] Defaulting to a 10,000 packet test.\n";
+        $b_packets = 10000;
+    }
+
+    ### initialize benchmarking test packets if we are running
+    ### in benchmark mode
+    ### FIXME better random packet data tests, add IP and TCP options, etc.
+    my $test_pkt = 'Feb 15 16:42:58 orthanc kernel: DROP IN=eth0 ' .
+        'OUT= MAC=00:a0:cc:28:42:5a:00:03:6c:00:98:54:08:00 ' .
+        'SRC=192.168.10.2 DST=192.168.10.1 LEN=48 TOS=0x00 PREC=0x00 ' .
+        'TTL=110 ID=13383 DF PROTO=TCP SPT=1389 ';
+    my $test_pktend = 'WINDOW=16384 RES=0x00 SYN URGP=0';
+
+    my $b_time = time();
+    print scalar localtime(), " [+] Creating packet array.\n";
+    my $dp = 1000;
+    for (my $i=0; $i <= $b_packets; $i++) {
+        push @fw_packets, "$test_pkt DPT=$dp $test_pktend";
+        $dp++ if $dp < 50000;
+    }
+
+    print scalar localtime(), " [+] check_scan()\n" if $benchmark;
+    &check_scan(\@fw_packets);
+
+    print scalar localtime(), " [+] Packet creation and processing time: ",
+        time() - $b_time, " sec.\n";
+    print scalar localtime(), " [+] Exiting benchmark mode.\n";
+    return 0;
+}
+
+sub fw_analyze_mode() {
+    my $run_fw_check = 0;
+
+    if ($fw_analyze) {
+        $run_fw_check = 1;
+    } else {
+        ### if psad is running on a syslog server, do not check the firewall
+        ### rules since they may not be local.  Also, do not check the
+        ### firewall if psad is configured to parse all Netfilter messages.
+        unless ($no_fwcheck or $syslog_server
+                or $config{'ENABLE_FW_LOGGING_CHECK'} eq 'N') {
+            $run_fw_check = 1;
+        }
+    }
+
+    my $exit_status = 0;
+    if ($run_fw_check) {
+        my $opts = "-c $config_file --fw-search $fw_search_file";
+        $opts .= " --fw-analyze";
+        $opts .= " --fw-file $fw_file" if $fw_file;
+        $opts .= " -a $alert_conf_file";
+        $opts .= " --no-fw-search-all" if $config{'FW_SEARCH_ALL'} eq 'N';
+        $exit_status = (system "$cmds{'fwcheck_psad'} $opts") >> 8;
+    }
+    return $exit_status;
 }
 
 ### display the status of all four psad daemons

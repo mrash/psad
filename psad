@@ -2599,10 +2599,10 @@ sub psad_init() {
 }
 
 sub validate_config() {
-    die '[*] PORT_RANGE_SCAN_THRESHOLD must be between 0 and 65535 '
-        unless (($config{'PORT_RANGE_SCAN_THRESHOLD'} =~ m|^\d+$|)
-            and 0 <= $config{'PORT_RANGE_SCAN_THRESHOLD'}
-            and $config{'PORT_RANGE_SCAN_THRESHOLD'} < 65535);
+
+    &is_digit_range('PORT_RANGE_SCAN_THRESHOLD', 0, 65535);
+    &is_digit_range('TOP_SCANS_CTR_THRESHOLD', 0, 500);
+    &is_digit_range('DSHIELD_ALERT_INTERVAL', 1, 24);
 
     die qq([*] Invalid EMAIL_ADDRESSES value: "$config{'EMAIL_ADDRESSES'}")
         unless $config{'EMAIL_ADDRESSES'} =~ /\S+\@\S+/;
@@ -2610,10 +2610,6 @@ sub validate_config() {
     ### translate commas into spaces
     $config{'EMAIL_ADDRESSES'} =~ s/\s*\,\s/ /g;
 
-    die '[*] DSHIELD_ALERT_INTERVAL must be between 1 and 24 '
-        unless (($config{'DSHIELD_ALERT_INTERVAL'} =~ m|^\d+$|)
-            and 0 < $config{'DSHIELD_ALERT_INTERVAL'}
-            and $config{'DSHIELD_ALERT_INTERVAL'} < 25);
     if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
             and $config{'IPTABLES_BLOCK_METHOD'} eq 'N'
             and $config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'N') {
@@ -2649,8 +2645,6 @@ sub validate_config() {
                 'an IP address or network.';
         }
     }
-
-    &is_digit_range('TOP_SCANS_CTR_THRESHOLD', 0, 500);
 
     return;
 }

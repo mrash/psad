@@ -274,6 +274,10 @@ my $timezone;
 ### get the current year for dshield
 my $year;
 
+### keep track of how many CHECK_INTERVALS have elapsed; this is
+### useful for TOP_SCANS_CTR_THRESHOLD
+my $check_interval_ctr = 0;
+
 ### %auto_dl holds all ip addresses that should automatically
 ### be assigned a danger level (or ignored).
 my %auto_dl = ();
@@ -299,6 +303,12 @@ my %local_ports = ();
 ### cache the ip addresses associated with each interface on the
 ### local machine.
 my %local_ips = ();
+
+### cache the top scanned ports
+my %top_ports = ();
+
+### cache the top signature matches
+my %top_sigs = ();
 
 ### regex to match an ip address
 my $ip_re = qr|(?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2}|;
@@ -955,6 +965,8 @@ MAIN: for (;;) {
         $warn_msg = '';
     }
 
+    $check_interval_ctr++;
+
     ### clearerr() on the FWDATA filehandle to be ready for new packets
     FWDATA->clearerr();
 
@@ -1052,16 +1064,20 @@ sub check_scan() {
 
         if ($pkt{'proto'} eq 'tcp') {
             $tcp_ctr++;
+            $top_ports{$pkt{'dp'}}{'tcp'}++;
         } elsif ($pkt{'proto'} eq 'udp') {
             $udp_ctr++;
+            $top_ports{$pkt{'dp'}}{'udp'}++;
+            $top_ports{$pkt{'dp'}}{'tcp'} = 0
+                unless defined $top_ports{$pkt{'dp'}}{'tcp'};
         } elsif ($pkt{'proto'} eq 'icmp') {
             $icmp_ctr++;
         }
 
         ### If we made it here then we correctly matched packets
         ### that the firewall logged.
-        print STDERR "[+] valid packet: $pkt{'src'} -> $pkt{'dst'} ",
-            "$pkt{'proto'}\n" if $debug;
+        print STDERR "[+] valid packet: $pkt{'src'} ($pkt{'sp'}) -> ",
+            "$pkt{'dst'} ($pkt{'dp'}) $pkt{'proto'}\n" if $debug;
 
         ### initialize the danger level to 0 if it is not already defined
         ### (note the same source address might have already scanned a
@@ -1738,6 +1754,8 @@ sub match_snort_keywords() {
 
                 $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'tcp'}
                     {'sid'}{$sid}{$pkt_hr->{'chain'}}{'time'} = time();
+
+                $top_sigs{$sid}++;
             }
         } elsif ($sig_hr->{'proto'} eq 'udp') {
 
@@ -2326,6 +2344,11 @@ sub add_snort_sid() {
         $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{$pkt_hr->{'proto'}}
             {'sid'}{$sid}{$pkt_hr->{'chain'}}{'is_fwsnort'} = 1;
 
+        $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{$pkt_hr->{'proto'}}
+            {'sid'}{$sid}{$pkt_hr->{'chain'}}{'time'} = time();
+
+        $top_sigs{$sid}++;
+
         if ($pkt_hr->{'proto'} eq 'tcp' or $pkt_hr->{'proto'} eq 'udp') {
 
             $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{$pkt_hr->{'proto'}}
@@ -2704,6 +2727,17 @@ sub validate_config() {
                 'an IP address or network.';
         }
     }
+
+    &is_digit_range('TOP_SCANS_CTR_THRESHOLD', 0, 500);
+
+    return;
+}
+
+sub is_digit_range() {
+    my ($key, $min, $max) = @_;
+    die "[*] $key must be an integer >= $min and <= $max"
+        unless $config{$key} =~ m|^\d+$| and $config{$key} >= $min
+            and $config{$key} <= $max;
     return;
 }
 
@@ -4102,10 +4136,57 @@ sub collect_errors() {
     return;
 }
 
+sub log_top_scans() {
+
+    ### top scanned ports
+    open P, "> $config{'TOP_SCANNED_PORTS_FILE'}.tmp" or
+        die "[*] Could not open $config{'TOP_SCANNED_PORTS_FILE'}: $!";
+    print P "#\n#<proto> <port> <packets>\n#\n\n";
+    for my $dp (sort {$top_ports{$b} <=> $top_ports{$a}}
+            keys %top_ports) {
+        if (defined $top_ports{$dp}{'udp'} and $top_ports{$dp}{'udp'}
+                > $top_ports{$dp}{'tcp'}) {
+            print P "udp $dp $top_ports{$dp}{'udp'}\n";
+        } else {
+            print P "tcp $dp $top_ports{$dp}{'tcp'}\n";
+        }
+    }
+    close P;
+    move "$config{'TOP_SCANNED_PORTS_FILE'}.tmp",
+        $config{'TOP_SCANNED_PORTS_FILE'};
+
+    ### top signature matches
+    open S, "> $config{'TOP_SIGS_FILE'}.tmp" or
+        die "[*] Could not open $config{'TOP_SIGS_FILE'}: $!";
+    print S "#\n#<sid> <count> <msg>\n#\n\n";
+    for my $sid (sort {$top_sigs{$b} <=> $top_sigs{$a}} keys %top_sigs) {
+        if (defined $sigs{$sid} and defined $sigs{$sid}{'msg'}) {
+            print S qq|$sid $top_sigs{$sid} "$sigs{$sid}{'msg'}"\n|;
+        } elsif (defined $fwsnort_sigs{$sid}
+                and defined $fwsnort_sigs{$sid}{'msg'}) {
+            print S qq|$sid $top_sigs{$sid} "$fwsnort_sigs{$sid}{'msg'}"\n|;
+        }
+    }
+    close S;
+    move "$config{'TOP_SIGS_FILE'}.tmp",
+        $config{'TOP_SIGS_FILE'};
+
+    return;
+}
+
 sub scan_logr() {
     my $curr_scan_hr = shift;
 
     return if $benchmark;
+
+    if ($check_interval_ctr % $config{'TOP_SCANS_CTR_THRESHOLD'} == 0) {
+
+        ### log the top port and signature matches
+        &log_top_scans();
+
+        $check_interval_ctr = 0;
+    }
+
     SRC: for my $src (keys %$curr_scan_hr) {
         print STDERR "[+] scan_logr(): source ip: $src\n" if $debug;
         ### only send alerts for scans that are at least at
@@ -6174,7 +6255,8 @@ sub status() {
 
 sub status_psad_daemon() {
     my $cmdline;
-    if (not $analyze_msgs) {
+
+    unless ($analyze_msgs) {
         ### get any command line args
         if (-e $cmdline_file) {
             open CMD, "< $cmdline_file" or die '[*] Could not open ',
@@ -6190,6 +6272,7 @@ sub status_psad_daemon() {
         print "    Alert email address(es): ",
             "$config{'EMAIL_ADDRESSES'}\n";
     }
+
     ### sort and print the scan source ips
     my %scan_srcs;
     my %scan_os;
@@ -7588,7 +7671,9 @@ sub required_vars() {
         EXTERNAL_NET HTTP_SERVERS SMTP_SERVERS DNS_SERVERS SQL_SERVERS
         TELNET_SERVERS AIM_SERVERS HTTP_PORTS SHELLCODE_PORTS
         ORACLE_PORTS ENABLE_INTF_LOCAL_NETS ENABLE_SNORT_SIG_STRICT
-        IP_OPTS_FILE SIG_UPDATE_URL CONF_ARCHIVE_DIR
+        IP_OPTS_FILE SIG_UPDATE_URL CONF_ARCHIVE_DIR TOP_SIGS_FILE
+        TOP_PORTS_LOG_THRESHOLD TOP_SIGS_LOG_THRESHOLD
+        TOP_SCANNED_PORTS_FILE
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

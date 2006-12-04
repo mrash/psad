@@ -72,10 +72,10 @@ PROG: for my $prog (keys %config) {
         } else {
             my $var1 = '';
             my $var2 = '';
-            if ($line =~ m|\$config\{\'(\S+)\'\}|) {
+            if ($line =~ m|\$config\{\'(\S+?)\'\}|) {
                 $var1 = $1;
             }
-            if ($line =~ m|\$cmds\{\'(\S+)\'\}|) {
+            if ($line =~ m|\$cmds\{\'(\S+?)\'\}|) {
                 $var2 = "$1Cmd";
             }
             if ($var1) {

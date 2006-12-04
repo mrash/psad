@@ -68,7 +68,8 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 32771 (msg:"RPC portmap listing TCP 327
 alert udp $EXTERNAL_NET any -> $HOME_NET 32771 (msg:"RPC portmap listing UDP 32771"; reference:arachnids,429; classtype:rpc-portmap-decode; psad_dsize:>12; sid:1281; psad_id:100026; psad_dl:2;)
 
 ### backdoor.rules
-alert tcp $EXTERNAL_NET any -> $HOME_NET 16959 (msg:"BACKDOOR subseven DEFCON8 2.1 Connection Cttempt"; flags:S; classtype:trojan-activity; sid:107; psad_id:100027; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 16959 (msg:"BACKDOOR Subseven DEFCON8 2.1 connection Attempt"; flags:S; classtype:trojan-activity; sid:107; psad_id:100027; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 27374 (msg:"BACKDOOR Subseven connection attempt"; flags:S; classtype:trojan-activity; sid:107; psad_id:100207; psad_dl:2;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 12345:12346 (msg:"BACKDOOR netbus Connection Cttempt"; flags:S; reference:arachnids,401; classtype:misc-activity; psad_id:100028; psad_dl:2; psad_derived_sids:109,110;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 20034 (msg:"BACKDOOR NetBus Pro 2.0 Connection Cttempt"; flags:S; classtype:misc-activity; psad_id:100029; psad_dl:2; psad_derived_sids:115,3009;)
 alert udp $EXTERNAL_NET any -> $HOME_NET 2140 (msg:"BACKDOOR DeepThroat 3.1 Connection attempt"; reference:mcafee,98574; reference:nessus,10053; classtype:misc-activity; psad_dsize:>1; sid:1980; psad_id:100030; psad_dl:2;)
@@ -125,8 +126,11 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN ipEye SYN scan"; flags:S
 
 ### web-frontpage.rules
 
+### PSAD-CUSTOM rules
+alert tcp $EXTERNAL_NET any -> $HOME_NET 17300 (msg:"PSAD-CUSTOM Kuang2 virus communication attempt"; flags:S; reference:url,isc.sans.org/port_details.php?port=17300; classtype:trojan-activity; psad_id:100206; psad_dl:2;)
+
 ### misc.rules
-alert tcp $EXTERNAL_NET any -> $HOME_NET 1433 (msg:"MISC Microsoft SQL Server communication attempt"; flags:S; reference:url,http://www.linklogger.com/TCP1433.htm; classtype:attempted-admin; psad_id:100205; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 1433 (msg:"MISC Microsoft SQL Server communication attempt"; flags:S; reference:url,www.linklogger.com/TCP1433.htm; classtype:attempted-admin; psad_id:100205; psad_dl:2;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 1417 (msg:"MISC Insecure TIMBUKTU communication attempt"; flags:S; reference:arachnids,229; classtype:bad-unknown; sid:505; psad_id:100072; psad_dl:2;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 5631:5632 (msg:"MISC PCAnywhere communication attempt"; flags:S; classtype:attempted-admin; psad_id:100073; psad_dl:2; psad_derived_sids:507,512;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 5900 (msg:"MISC VNC communication attempt"; flags:S; reference:url,isc.sans.org/port_details.php?port=5900; reference:url,secunia.com/advisories/20107; classtype:attempted-admin; psad_id:100202; psad_dl:2;)

@@ -14,13 +14,16 @@ psad-2.0 (12//2006):
       when attempts are made to send spam via the Windows popup messenger
       service.
     - Completely reworked --Status and --Analyze output, signature matches
-      are included now, along with a listing of top sig matches and top
-      scanned ports.
-    - Added ipEye signature.
+      are included now, along with a listing of top sig matches, top scanned
+      ports, and top attackers.
+    - Added ipEye, Subversion, Kuang2, Microsoft SQL, Radmin, and Ghostsurf
+      signatures.
     - Added 'data in TCP SYN packet' signature.
     - Added emulation of the Snort "dsize" test through the use of the IP
       length field for TCP/ICMP signatures, and the UDP length field for UDP
-      signatures.
+      signatures.  For SYN packets, TCP options are included so psad
+      automatically adds 44 bytes (the maximum length for TCP options) so the
+      dsize test corresponds to the estimated payload length.
     - Added the psad_id, psad_dsize, and psad_derived_sids fields for the new
       Snort rule support.
     - Added the ability to decode IP options, which are included within Snort
@@ -85,7 +88,9 @@ psad-2.0 (12//2006):
     - Removed unnecessary --status-sort-dl option.
     - Added STATUS_OUTPUT_FILE so the --Status and --Analyze output is
       captured instead of just being lost if the output was not piped to
-      'less' or something.
+      'less' or another similar program.
+    - Added --restrict-ip so that psad will restrict its attack detection
+      operations to a specific IP or network.
 
 psad-1.4.8 (10/15/2006):
     - Added the ability to get the auto-blocking status for a specific IP

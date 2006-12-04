@@ -530,8 +530,7 @@ sub install() {
         ### get email address(es)
         my $email_str = &query_email();
         if ($email_str) {
-            for my $file qw(psad.conf psadwatchd.conf
-                    kmsgsd.conf) {
+            for my $file qw(psad.conf psadwatchd.conf) {
                 &put_string('EMAIL_ADDRESSES', $email_str,
                     "${PSAD_CONFDIR}/$file");
             }

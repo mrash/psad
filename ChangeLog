@@ -1,4 +1,4 @@
-psad-1.6.0 (11//2006):
+psad-2.0 (12//2006):
     - Completely refactored the Snort rule matching support in psad.  Added
       many header field tests with full range matching support.  These tests
       include the following keywords from Snort: ttl, id, seq, ack, window,
@@ -13,6 +13,9 @@ psad-1.6.0 (11//2006):
     - Added "MISC Windows popup spam" signature.  This allows psad to detect
       when attempts are made to send spam via the Windows popup messenger
       service.
+    - Completely reworked --Status and --Analyze output, signature matches
+      are included now, along with a listing of top sig matches and top
+      scanned ports.
     - Added ipEye signature.
     - Added 'data in TCP SYN packet' signature.
     - Added emulation of the Snort "dsize" test through the use of the IP
@@ -77,6 +80,9 @@ psad-1.6.0 (11//2006):
     - Changed --interval to --Interval, and added --interface to allow
       psad's detection to be limited to a specific IN interface for the INPUT
       and FORWARD chains (or OUT interface for the OUTPUT chain).
+    - Replaced --status-brief with --status-summary, but changed it so that
+      only the detailed IP status information is omitted.
+    - Removed unnecessary --status-sort-dl option.
 
 psad-1.4.8 (10/15/2006):
     - Added the ability to get the auto-blocking status for a specific IP

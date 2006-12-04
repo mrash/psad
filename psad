@@ -461,10 +461,11 @@ my $SIG_MATCH    = 1;
 my $NO_SIG_MATCH = 0;
 
 ### header lengths
-my $TCP_HEADER_LEN  = 20;  ### excludes options
-my $UDP_HEADER_LEN  = 8;
-my $ICMP_HEADER_LEN = 4;
-my $IP_HEADER_LEN   = 20;  ### excludes options
+my $TCP_HEADER_LEN   = 20;  ### excludes options
+my $TCP_MAX_OPTS_LEN = 44;
+my $UDP_HEADER_LEN   = 8;
+my $ICMP_HEADER_LEN  = 4;
+my $IP_HEADER_LEN    = 20;  ### excludes options
 
 ### save a copy of the command line arguments
 my @args_cp = @ARGV;
@@ -1744,13 +1745,17 @@ sub match_snort_tcp_keywords() {
         return 0 unless $pkt_hr->{'flags'} eq $sig_hr->{'flags'};
     }
 
+    my $header_len = $IP_HEADER_LEN + $TCP_HEADER_LEN;
+
+    if ($pkt_hr->{'flags'} =~ m|SYN|) {
+        ### extend the header length to compensate for TCP options
+        $header_len += $TCP_MAX_OPTS_LEN;
+    }
     return 0 unless &check_sig_int_range(
-            ($pkt_hr->{'ip_len'}-$IP_HEADER_LEN-$TCP_HEADER_LEN),
-            'dsize', $sig_hr);
+            ($pkt_hr->{'ip_len'}-$header_len), 'dsize', $sig_hr);
 
     return 0 unless &check_sig_int_range(
-            ($pkt_hr->{'ip_len'}-$IP_HEADER_LEN-$TCP_HEADER_LEN),
-            'psad_dsize', $sig_hr);
+            ($pkt_hr->{'ip_len'}-$header_len), 'psad_dsize', $sig_hr);
 
     return 0 unless &check_sig_int_range($pkt_hr->{'win'}, 'window', $sig_hr);
     return 0 unless &check_sig_int_range($pkt_hr->{'tcp_seq'}, 'seq', $sig_hr);

@@ -192,7 +192,11 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 3535 (msg:"FTP Yak! FTP server communic
 ### bad-traffic.rules
 alert tcp $EXTERNAL_NET any <> $HOME_NET 0 (msg:"BAD-TRAFFIC tcp port 0 traffic"; classtype:misc-activity; sid:524; psad_id:100101; psad_dl:2;)
 alert udp $EXTERNAL_NET any <> $HOME_NET 0 (msg:"BAD-TRAFFIC udp port 0 traffic"; reference:bugtraq,576; reference:cve,1999-0675; reference:nessus,10074; classtype:misc-activity; sid:525; psad_id:100102; psad_dl:2;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"BAD-TRAFFIC data in TCP SYN packet"; psad_dsize:>100; flags:S; reference:url,www.cert.org/incident_notes/IN-99-07.html; classtype:misc-activity; sid:207; psad_id:100000; psad_dl:2;)
+### note that psad derives the payload length of a TCP packet from the
+### IP header, so it treats TCP SYN packets (which contain options) as
+### being 44 bytes longer (this is the maximum possible) than other
+### TCP packets.
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"BAD-TRAFFIC data in TCP SYN packet"; psad_dsize:>20; flags:S; reference:url,www.cert.org/incident_notes/IN-99-07.html; classtype:misc-activity; sid:207; psad_id:100000; psad_dl:2;)
 ### traffic may be logged over the loopback interface via iptables
 ### much more readily than running Snort on a loopback interface,
 ### so disable this sig.

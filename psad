@@ -6185,7 +6185,7 @@ sub analysis_mode() {
     ### analyze all packets
     &check_scan(\@ipt_msgs);
 
-    print "[+] Displaying status output.\n";
+    print "[+] Displaying status output:\n\n";
     &status_psad_daemon();
 
     print "\n[+] Finished --Analyze cycle.\n";
@@ -6346,6 +6346,8 @@ sub status_psad_daemon() {
     my %scan_os     = ();
     my %scan_alerts = ();
     my %sig_matches = ();
+    my %uniq_srcs = ();
+    my %uniq_dsts = ();
 
     IPDIR: for my $file (@files) {
 
@@ -6444,6 +6446,9 @@ sub status_psad_daemon() {
             if ($file =~ /($ip_re)_packet_ctr/) {
                 my $dst = $1;
                 next FILE unless (-e "${src}/${dst}_packet_ctr");
+
+                $uniq_srcs{$src} = '';
+                $uniq_dsts{$dst} = '';
                 open F, "< ${src}/${dst}_packet_ctr" or
                     die "[*] Could not open ",
                         "${src}/${dst}_packet_ctr: $!";
@@ -6478,13 +6483,6 @@ sub status_psad_daemon() {
             }
         }
     }
-    print "\n";
-
-    my $src_ctr = 0;
-    my $dst_ctr = 0;
-
-    my %uniq_srcs = ();
-    my %uniq_dsts = ();
 
     if (-e $config{'TOP_SIGS_FILE'}) {
         if ($config{'TOP_STATUS_THRESHOLD'} > 0) {
@@ -6507,7 +6505,7 @@ sub status_psad_daemon() {
                 my $num_sources = $4;
                 my $proto       = $5;
                 my $is_fwsnort  = $6;
-                my $is_posad    = $7;
+                my $is_psad     = $7;
                 $ctr++;
                 if ($config{'TOP_STATUS_THRESHOLD'} > 0) {
                     last if $ctr == $config{'TOP_STATUS_THRESHOLD'};
@@ -6559,7 +6557,7 @@ sub status_psad_daemon() {
 
     if ($analyze_msgs) {
         if (%ipt_prefixes) {
-            print "\n[+] Netfilter log prefix counters:\n";
+            print "[+] Netfilter log prefix counters:\n";
             for my $prefix (keys %ipt_prefixes) {
                 my $count = $ipt_prefixes{$prefix};
                 print "      \"$prefix\": $count\n";
@@ -6567,9 +6565,10 @@ sub status_psad_daemon() {
         } else {
             print "        [NONE]\n";
         }
+        print "\n";
     } else {
         if (-e $config{'IPT_PREFIX_COUNTER_FILE'}) {
-            print "\n[+] Netfilter log prefix counters:\n";
+            print "[+] Netfilter log prefix counters:\n";
             open F, "< $config{'IPT_PREFIX_COUNTER_FILE'}" or
                 die "[*] $config{'IPT_PREFIX_COUNTER_FILE'}: $!";
             my @lines = <F>;
@@ -6583,17 +6582,18 @@ sub status_psad_daemon() {
             } else {
                 print "        [NONE]\n";
             }
+            print "\n";
         }
     }
 
-    print "\n[+] Total scan sources: $src_ctr\n",
-        "    Total scan destinations: $dst_ctr\n";
+    print "[+] Total scan sources: " . (keys %uniq_srcs) . "\n",
+        "    Total scan destinations: " . (keys %uniq_dsts) . "\n\n";
 
     if ($analyze_msgs) {
-        print "\n[+] Total packet counters:\n",
+        print "[+] Total packet counters:\n",
             "      tcp: $tcp_ctr\n",
             "      udp: $udp_ctr\n",
-            "      icmp: $icmp_ctr\n";
+            "      icmp: $icmp_ctr\n\n";
     } else {
         if (-e $config{'PACKET_COUNTER_FILE'}) {
             print "\n[+] Total packet counters:\n";
@@ -6601,17 +6601,19 @@ sub status_psad_daemon() {
                 die "[*] $config{'PACKET_COUNTER_FILE'}: $!";
             print "      $_" while (<F>);
             close F;
+            print "\n";
         }
     }
 
     unless ($analyze_msgs) {
         if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
                 and -e $config{'DSHIELD_COUNTER_FILE'}) {
-            print "\n[+] DShield stats:\n";
+            print "[+] DShield stats:\n";
             open F, "< $config{'DSHIELD_COUNTER_FILE'}" or
                 die "[*] $config{'DSHIELD_COUNTER_FILE'}: $!";
             print "      $_" while (<F>);
             close F;
+            print "\n";
         }
     }
 
@@ -6620,14 +6622,14 @@ sub status_psad_daemon() {
         if ($status_ip) {
             &print_blocked_ip_status($status_ip);
         } else {
-            &print_blocked_ip_status($status_ip);
+            &print_blocked_ip_status('');
         }
     }
 
     return if $status_summary;
 
     my $found_scan = 0;
-    print "\n[+] IP Status Detail:\n";
+    print "[+] IP Status Detail:\n";
     for my $dl (sort {$b <=> $a} keys %scan_srcs) {
 
         if ($status_min_dl) {
@@ -6794,6 +6796,7 @@ sub print_blocked_ip_status() {
     }
     print "        [NONE]\n"
         unless $found_line;
+    print "\n";
     return;
 }
 

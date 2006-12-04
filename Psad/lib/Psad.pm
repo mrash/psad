@@ -8,7 +8,7 @@
 #
 # Author: Michael Rash (mbr@cipherdyne.org)
 #
-# Version: 1.6.0
+# Version: 2.0
 #
 ##################################################################
 #
@@ -40,7 +40,7 @@ require Exporter;
     print_sys_msg
 );
 
-$VERSION = '1.4.8';
+$VERSION = '2.0';
 
 ### subroutines ###
 sub buildconf() {

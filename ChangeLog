@@ -83,6 +83,9 @@ psad-2.0 (12//2006):
     - Replaced --status-brief with --status-summary, but changed it so that
       only the detailed IP status information is omitted.
     - Removed unnecessary --status-sort-dl option.
+    - Added STATUS_OUTPUT_FILE so the --Status and --Analyze output is
+      captured instead of just being lost if the output was not piped to
+      'less' or something.
 
 psad-1.4.8 (10/15/2006):
     - Added the ability to get the auto-blocking status for a specific IP

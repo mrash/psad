@@ -1200,6 +1200,7 @@ sub check_scan() {
     if ($analyze_msgs) {
         print "[+] Writing $config{'PSAD_DIR'}/<IP> directories ",
             "($tot_scan_ips IP addresses).\n";
+        print "    This may take a while...\n";
         if ($analysis_emails) {
             print "[+] Generating email alerts.\n";
             unless ($no_whois) {
@@ -6179,8 +6180,6 @@ sub analysis_mode() {
     }
     print "[+] Found ", ($#ipt_msgs+1), " Netfilter log messages out of ",
         ($#lines+1), " total lines.\n";
-    print "    This may take a while...\n"
-        if $#lines > 10000;
 
     ### analyze all packets
     &check_scan(\@ipt_msgs);

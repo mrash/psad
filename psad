@@ -171,7 +171,7 @@ my $fw_data_file = '';
 ### disabled.
 my $alert_conf_file = '/etc/psad/alert.conf';
 
-### path to psad library directory for psad perl modules
+### path to default psad library directory for psad perl modules
 my $psad_lib_dir = '/usr/lib/psad';
 
 ### disable debugging by default
@@ -2453,6 +2453,7 @@ sub get_psad_mod_paths() {
 
     for my $dir (@dirs) {
         ### get directories like "/usr/lib/psad/x86_64-linux"
+        next unless -d "$psad_lib_dir/$dir";
         push @paths, "$psad_lib_dir/$dir"
             if $dir =~ m|linux| or $dir =~ m|thread|;
     }
@@ -4232,6 +4233,11 @@ sub analysis_display() {
     }
     $ctr = 0;
     for my $src (sort {$scan_dl{$b} cmp $scan_dl{$a}} keys %scan_dl) {
+        if ($status_min_dl) {
+            next unless $scan_dl{$src} >= $status_min_dl;
+        } else {
+            next unless $scan_dl{$src} >= 1;
+        }
         my $str = sprintf "      %-15s DL: %d", $src, $scan_dl{$src};
         if (defined $top_packet_counts{$src}) {
             $str .= ", Packets: $top_packet_counts{$src}";
@@ -6877,6 +6883,11 @@ sub status_psad_daemon() {
                 my $tot_pkts = $3;
                 my $uniq_sigs = $4;
                 my $sig_matches = $5;
+                if ($status_min_dl) {
+                    next unless $dl >= $status_min_dl;
+                } else {
+                    next unless $dl >= 1;
+                }
                 my $str = sprintf "      %-15s  DL: $dl, Packets: $tot_pkts, " .
                     "Sig count: $sig_matches\n", $ip;
                 $scan_pkt_count{$ip} += $tot_pkts;

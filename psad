@@ -309,6 +309,7 @@ my %top_tcp_ports = ();
 my %top_udp_ports = ();
 my %top_sigs    = ();
 my %sig_sources = ();
+my %uniq_sig_srcs = ();
 my %top_sig_counts = ();
 my %top_packet_counts = ();
 
@@ -377,6 +378,7 @@ my $die_msg          = '';
 my $messages_file    = '/var/log/messages';
 my $skip_first_loop  = 1;
 my $cmdl_interface   = '';
+my $analyze_write_data = 0;
 my $local_ips_lkup_ctr = 0;
 
 ### these flags are used to disable several features
@@ -492,6 +494,9 @@ Getopt::Long::Configure('no_ignore_case');
                                               #   messages in the psad fwdata file
                                               #   (or messages file; see
                                               #   --messages).
+    'analysis-write-data' => \$analyze_write_data, # Write data to filesystem from
+                                                   # -A mode (this can take a long
+                                                   # time.
     'whois-analysis'    => \$analysis_whois,  # Issue whois lookups in analysis
                                               #   mode.
     'email-analysis'    => \$analysis_emails, # Send analysis mode emails.
@@ -964,7 +969,7 @@ sub check_scan() {
         if ($analyze_msgs) {
             $pkt_ctr++;
             if ($pkt_ctr % $print_scale_factor == 0) {
-                print "[+] Processed $pkt_ctr packets.\n";
+                print "[+] Processed $pkt_ctr packets...\n";
             }
         }
 
@@ -1200,21 +1205,13 @@ sub check_scan() {
             $tot_scan_ips += $num_ips;
             print "    Level $dl: $num_ips IP addresses\n";
         }
-        print "\n";
+        print "\n    Tracking $tot_scan_ips total IP addresses\n";
     }
 
-    ### Log and send email and syslog alerts
-    if ($analyze_msgs) {
-        print "[+] Writing $config{'PSAD_DIR'}/<IP> directories ",
-            "($tot_scan_ips IP addresses).\n";
-        print "    This may take a while...\n";
-        if ($analysis_emails) {
-            print "[+] Generating email alerts.\n";
-            unless ($no_whois) {
-                print "[+] Issuing whois lookups (may take several seconds).\n";
-            }
-        }
-    }
+    ### display the scan analysis
+    &analysis_display(\%curr_scan) if $analyze_msgs;
+
+    ### log scan data to the filesystem
     &scan_logr(\%curr_scan);
 
     ### remember that ENABLE_AUTO_IDS may have been set to 'N' if we
@@ -1686,6 +1683,7 @@ sub match_snort_keywords() {
                 $sig_sources{$sid}{$pkt_hr->{'src'}} = '';
                 $top_sigs{$sid}++;
                 $top_sig_counts{$pkt_hr->{'src'}}++;
+                $uniq_sig_srcs{$pkt_hr->{'src'}}{$sid} = '';
             }
         } elsif ($sig_hr->{'proto'} eq 'udp') {
 
@@ -1709,6 +1707,7 @@ sub match_snort_keywords() {
                 $sig_sources{$sid}{$pkt_hr->{'src'}} = '';
                 $top_sigs{$sid}++;
                 $top_sig_counts{$pkt_hr->{'src'}}++;
+                $uniq_sig_srcs{$pkt_hr->{'src'}}{$sid} = '';
             }
         } elsif ($sig_hr->{'proto'} eq 'icmp') {
 
@@ -1751,6 +1750,7 @@ sub match_snort_keywords() {
                 $sig_sources{$sid}{$pkt_hr->{'src'}} = '';
                 $top_sigs{$sid}++;
                 $top_sig_counts{$pkt_hr->{'src'}}++;
+                $uniq_sig_srcs{$pkt_hr->{'src'}}{$sid} = '';
             }
         }
 
@@ -1785,7 +1785,7 @@ sub match_snort_tcp_keywords() {
     if ($debug) {
         print STDERR "[+] packet matched matched tcp keywords for sid: ",
             "$sig_hr->{'sid'} (psad_id: $sig_hr->{'psad_id'})\n",
-            "    $sig_hr->{'msg'}\n";
+            qq|    "$sig_hr->{'msg'}"\n|;
     }
 
     return &get_largest_sid_dl($sig_hr->{'sid'}, $sig_hr->{'dl'});
@@ -1880,6 +1880,7 @@ sub match_snort_ip_keywords() {
         $sig_sources{$sig_hr->{'sid'}}{$pkt_hr->{'src'}} = '';
         $top_sigs{$sig_hr->{'sid'}}++;
         $top_sig_counts{$pkt_hr->{'src'}}++;
+        $uniq_sig_srcs{$pkt_hr->{'src'}}{$sig_hr->{'sid'}} = '';
 
         my $dl_tmp = &get_largest_sid_dl($sig_hr->{'sid'},
                 $sig_hr->{'dl'});
@@ -2296,6 +2297,7 @@ sub add_snort_sid() {
         $sig_sources{$sid}{$pkt_hr->{'src'}} = '';
         $top_sigs{$sid}++;
         $top_sig_counts{$pkt_hr->{'src'}}++;
+        $uniq_sig_srcs{$pkt_hr->{'src'}}{$sid} = '';
 
         if ($pkt_hr->{'proto'} eq 'tcp' or $pkt_hr->{'proto'} eq 'udp') {
 
@@ -2632,11 +2634,14 @@ sub validate_config() {
     &is_digit_range('PORT_RANGE_SCAN_THRESHOLD', 0, 65535);
     &is_digit_range('TOP_SCANS_CTR_THRESHOLD', 0, 500);
     &is_digit_range('DSHIELD_ALERT_INTERVAL', 1, 24);
-    &is_digit_range('TOP_STATUS_THRESHOLD', 0, 10000);
     &is_digit_range('TOP_PORTS_LOG_THRESHOLD', 0, 65535);
+    &is_digit_range('STATUS_PORTS_THRESHOLD', 0, 65535);
+    &is_digit_range('TOP_IP_LOG_THRESHOLD', 0, 10000);
+    &is_digit_range('STATUS_IP_THRESHOLD', 0, 10000);
 
     ### it will be a long time before there are 100000 signatures
     &is_digit_range('TOP_SIGS_LOG_THRESHOLD', 0, 100000);
+    &is_digit_range('STATUS_SIGS_THRESHOLD', 0, 10000);
 
     die qq([*] Invalid EMAIL_ADDRESSES value: "$config{'EMAIL_ADDRESSES'}")
         unless $config{'EMAIL_ADDRESSES'} =~ /\S+\@\S+/;
@@ -4155,11 +4160,16 @@ sub log_top_scans() {
     ### top attackers
     open A, "> $config{'TOP_ATTACKERS_FILE'}" or
         die "[*] Could not open $config{'TOP_ATTACKERS_FILE'}: $!";
-    print A "#\n# Format: <IP> <DL> <total_packets> <sig_matches>\n#\n\n";
+    print A "#\n# Format: <IP> <DL> <total_packets> <uniq_sigs> <sig_matches>\n#\n\n";
     for my $src (sort {$scan_dl{$b} cmp $scan_dl{$a}} keys %scan_dl) {
         my $str = sprintf "%-15s %d", $src, $scan_dl{$src};
         if (defined $top_packet_counts{$src}) {
             $str .= " $top_packet_counts{$src}";
+        } else {
+            $str .= " 0";
+        }
+        if (defined $uniq_sig_srcs{$src}) {
+            $str .= ' ' . (keys %{$uniq_sig_srcs{$src}});
         } else {
             $str .= " 0";
         }
@@ -4174,10 +4184,294 @@ sub log_top_scans() {
     return;
 }
 
+sub analysis_display() {
+    my $curr_scan_hr = shift;
+
+    my @lines = ();
+
+    push @lines, "\n";
+
+    ### top signature matches
+    if ($config{'STATUS_SIGS_THRESHOLD'} > 0) {
+        push @lines, "[+] Top $config{'STATUS_SIGS_THRESHOLD'} " .
+            "signature matches:\n";
+    } else {
+        push @lines, "[+] Top signature matches:\n";
+    }
+
+    my $ctr = 0;
+    for my $sid (sort {$top_sigs{$b} <=> $top_sigs{$a}} keys %top_sigs) {
+        my $found = 0;
+        my $num_sources = keys %{$sig_sources{$sid}};
+        if (defined $sigs{$sid} and defined $sigs{$sid}{'msg'}) {
+            push @lines, qq|      "$sigs{$sid}{'msg'}" | .
+                qq|($sigs{$sid}{'proto'}),  | .
+                qq|Count: $top_sigs{$sid},  Unique sources: | .
+                qq|$num_sources,  Sid: $sid\n|;
+            $found = 1;
+        } elsif (defined $fwsnort_sigs{$sid}
+                and defined $fwsnort_sigs{$sid}{'msg'}) {
+            push @lines,  qq|      "$fwsnort_sigs{$sid}{'msg'}" | .
+                qq|($fwsnort_sigs{$sid}{'proto'}),  | .
+                qq|Count: $top_sigs{$sid},  Unique sources: | .
+                qq|$num_sources,  Sid: $sid|;
+            $found = 1;
+        }
+        $ctr++ if $found;
+        if ($config{'STATUS_SIGS_THRESHOLD'} > 0) {
+            last if $ctr == $config{'STATUS_SIGS_THRESHOLD'};
+        }
+    }
+    push @lines, "\n";
+
+    ### top attackers
+    if ($config{'STATUS_IP_THRESHOLD'} > 0) {
+        push @lines, "[+] Top $config{'STATUS_IP_THRESHOLD'} attackers:\n";
+    } else {
+        push @lines, "[+] Top attackers:\n";
+    }
+    $ctr = 0;
+    for my $src (sort {$scan_dl{$b} cmp $scan_dl{$a}} keys %scan_dl) {
+        my $str = sprintf "      %-15s DL: %d", $src, $scan_dl{$src};
+        if (defined $top_packet_counts{$src}) {
+            $str .= ", Packets: $top_packet_counts{$src}";
+        } else {
+            $str .= ", Packets: 0";
+        }
+        if (defined $top_sig_counts{$src}) {
+            $str .= ", Sig count: $top_sig_counts{$src}";
+        } else {
+            $str .= ", Sig count: 0";
+        }
+        $ctr++;
+        if ($config{'STATUS_IP_THRESHOLD'} > 0) {
+            last if $ctr == $config{'STATUS_IP_THRESHOLD'};
+        }
+        push @lines, $str, "\n";
+    }
+    push @lines, "\n";
+
+    if ($config{'STATUS_PORTS_THRESHOLD'} > 0) {
+        push @lines, "[+] Top $config{'STATUS_PORTS_THRESHOLD'} scanned ports:\n";
+    } else {
+        push @lines, "[+] Top scanned ports:\n";
+    }
+
+    if (%top_tcp_ports) {
+        my $ctr = 0;
+        push @lines, "      TCP:\n";
+        for my $dp (sort {$top_tcp_ports{$b} <=> $top_tcp_ports{$a}}
+                keys %top_tcp_ports) {
+            my $str = sprintf "      tcp %-5d $top_tcp_ports{$dp} packets\n", $dp;
+            push @lines, $str;
+            $ctr++;
+            if ($config{'STATUS_PORTS_THRESHOLD'} > 0) {
+                last if $ctr == $config{'STATUS_PORTS_THRESHOLD'};
+            }
+        }
+        push @lines, "\n";
+    }
+
+    if (%top_udp_ports) {
+        my $ctr = 0;
+        push @lines, "      UDP:\n";
+        for my $dp (sort {$top_udp_ports{$b} <=> $top_udp_ports{$a}}
+                keys %top_udp_ports) {
+            my $str = sprintf "      udp %-5d $top_udp_ports{$dp} packets\n", $dp;
+            push @lines, $str;
+            $ctr++;
+            if ($config{'STATUS_PORTS_THRESHOLD'} > 0) {
+                last if $ctr == $config{'STATUS_PORTS_THRESHOLD'};
+            }
+        }
+        push @lines, "\n";
+    }
+
+    if (%ipt_prefixes) {
+        push @lines, "    Netfilter log prefix counters:\n";
+        for my $prefix (keys %ipt_prefixes) {
+            my $count = $ipt_prefixes{$prefix};
+            push @lines, "      \"$prefix\": $count\n";
+        }
+    } else {
+        push @lines, "        [NONE]\n";
+    }
+    push @lines, "\n";
+
+    my %uniq_srcs = ();
+    my %uniq_dsts = ();
+    my %scan_pkt_count = ();
+    my %scan_sig_count = ();
+    my %scan_alerts    = ();
+    my $tcp_ctr   = 0;
+    my $udp_ctr   = 0;
+    my $icmp_ctr  = 0;
+
+    SRC: for my $src (keys %$curr_scan_hr) {
+        next SRC unless $scan_dl{$src} >= 1;
+        $uniq_srcs{$src} = '';
+        DST: for my $dst (keys %{$curr_scan_hr->{$src}}) {
+            $uniq_dsts{$dst} = '';
+            for my $proto (keys %{$curr_scan_hr->{$src}->{$dst}}) {
+                if ($proto eq 'tcp') {
+                    $tcp_ctr += $curr_scan_hr->{$src}
+                            ->{$dst}->{$proto}->{'pkts'};
+                    $scan_pkt_count{$src} += $tcp_ctr;
+                } elsif ($proto eq 'udp') {
+                    $udp_ctr += $curr_scan_hr->{$src}
+                            ->{$dst}->{$proto}->{'pkts'};
+                    $scan_pkt_count{$src} += $udp_ctr;
+                } elsif ($proto eq 'icmp') {
+                    $icmp_ctr += $curr_scan_hr->{$src}
+                            ->{$dst}->{$proto}->{'pkts'};
+                    $scan_pkt_count{$src} += $icmp_ctr;
+                }
+                my $uniq_sig_count = 0;
+                if (defined $scan{$src}
+                        and defined $scan{$src}{$dst}
+                        and defined $scan{$src}{$dst}{$proto}
+                        and defined $scan{$src}{$dst}{$proto}{'sid'}) {
+                    $uniq_sig_count += (keys %{$scan{$src}{$dst}{$proto}{'sid'}});
+                }
+                $scan_sig_count{$src} += $uniq_sig_count;
+            }
+        }
+    }
+
+    push @lines, "    Total scan sources: " . (keys %uniq_srcs) . "\n";
+    push @lines, "    Total scan destinations: " . (keys %uniq_dsts) . "\n";
+    push @lines, "    Total packet counters: tcp: $tcp_ctr, udp: " .
+        "$udp_ctr, icmp: $icmp_ctr\n\n";
+
+    push @lines, "[+] IP Status Detail:\n";
+
+    my $found_scan = 0;
+    for my $src (sort {$scan_dl{$b} cmp $scan_dl{$a}} keys %scan_dl) {
+        my $dl = $scan_dl{$src};
+        next unless $dl >= 1;
+        next unless defined $curr_scan_hr->{$src};
+        if ($status_min_dl) {
+            next unless $dl >= $status_min_dl;
+            $found_scan = 1;
+        } else {
+            $found_scan = 1;
+        }
+        my $total_dsts = 0;
+        $total_dsts++ for (keys %{$curr_scan_hr->{$src}});
+        my $src_str = "\nSRC:  $src, DL: $dl, Dsts: $total_dsts";
+        if (defined $scan_pkt_count{$src}) {
+            $src_str .= ", Pkts: $scan_pkt_count{$src}";
+        }
+        if (defined $scan_sig_count{$src}) {
+            $src_str .= ", Unique sigs: $scan_sig_count{$src}";
+        }
+        push @lines, "$src_str\n";
+        if (defined $p0f{$src}) {
+            push @lines, "    Source OS fingerprint(s):\n";
+            for my $os (keys %{$p0f{$src}}) {
+                push @lines, "        $os\n";
+            }
+        } elsif (defined $posf{$src} and defined $posf{$src}{'guess'}) {
+            push @lines, "    Source OS fingerprint:\n",
+                "        $posf{$src}{'guess'}\n";
+        }
+        next unless $total_dsts > 0;
+        push @lines, "\n";
+        for my $dst (keys %{$curr_scan_hr->{$src}}) {
+            push @lines, "    $dst\n";
+
+            ### scanned ports
+            next unless defined $scan{$src}
+                    and defined $scan{$src}{$dst}
+                    and defined $scan{$src}{$dst}{'chain'};
+            for my $chain (keys %{$scan{$src}{$dst}{'chain'}}) {
+                for my $intf (keys %{$scan{$src}{$dst}{'chain'}{$chain}}) {
+                    for my $proto (keys %{$scan{$src}{$dst}{'chain'}{$chain}{$intf}}) {
+                        next unless $proto eq 'tcp' or $proto eq 'icmp';
+                        my $start_port = $scan{$src}{$dst}{$proto}{'abs_sp'};
+                        my $end_port   = $scan{$src}{$dst}{$proto}{'abs_ep'};
+                        my $ctr = $scan{$src}{$dst}{'chain'}{$chain}{$intf}{$proto};
+                        if ($start_port == $end_port) {
+                            push @lines, "        Scanned ports: $chain $intf " .
+                                "$proto $start_port ($ctr packets)\n";
+                        } else {
+                            push @lines, "        Scanned ports: $chain $intf " .
+                                "$proto $start_port-$end_port ($ctr packets)\n";
+                        }
+                    }
+                }
+            }
+
+            ### signature matches
+            next unless defined $scan{$src} and defined $scan{$src}{$dst};
+            for my $proto qw/tcp udp icmp ip/ {
+                    next unless defined $scan{$src}{$dst}{$proto}
+                        and defined $scan{$src}{$dst}{$proto}{'sid'};
+                for my $sid (keys %{$scan{$src}{$dst}{$proto}{'sid'}}) {
+                    for my $chain (keys %{$scan{$src}{$dst}{$proto}{'sid'}{$sid}}) {
+
+                        my $sig_hr = '';
+                        if ($scan{$src}{$dst}{$proto}{'sid'}{$sid}{$chain}{'is_fwsnort'}) {
+                            if (defined $fwsnort_sigs{$sid}) {
+                                $sig_hr = $fwsnort_sigs{$sid};
+                            }
+                        } else {
+                            if (defined $sigs{$sid}) {
+                                $sig_hr = $sigs{$sid};
+                            }
+                        }
+                        next unless $sig_hr;
+
+                        my $matches = $scan{$src}{$dst}{$proto}{'sid'}{$sid}{$chain}{'pkts'};
+
+                        my $sig_str = qq|        Signature match: "$sig_hr->{'msg'}" | .
+                            qq|($proto), Chain: $chain, Count: $matches|;
+                        if ($proto eq 'tcp' or $proto eq 'udp') {
+                            my $dp = $scan{$src}{$dst}{$proto}{'sid'}{$sid}{$chain}{'dp'};
+                            $sig_str .= ", DP: $dp";
+                            if ($proto eq 'tcp') {
+                                my $flags = $scan{$src}{$dst}{$proto}{'sid'}{$sid}{$chain}{'flags'};
+                                $sig_str .= ", $flags";
+                            }
+                        }
+                        $sig_str .= ", Sid: $sid";
+                        push @lines, $sig_str, "\n";
+                    }
+                }
+            }
+        }
+    }
+
+    open S, "> $config{'ANALYSIS_OUTPUT_FILE'}" or die "[*] Could not open ",
+        "$config{'ANALYSIS_OUTPUT_FILE'}: $!";
+    for my $line (@lines) {
+        print $line;
+        print S $line;
+    }
+    close S;
+    print "\n[+] These results are available in: $config{'ANALYSIS_OUTPUT_FILE'}\n";
+
+    return;
+}
+
 sub scan_logr() {
     my $curr_scan_hr = shift;
 
     return if $benchmark;
+
+    if ($analyze_msgs) {
+        return unless $analyze_write_data;
+
+        ### Log scan data
+        print "[+] Writing $config{'PSAD_DIR'}/<IP> directories.\n";
+        print "    This may take a while...\n";
+        if ($analysis_emails) {
+            print "[+] Generating email alerts...\n";
+            unless ($no_whois) {
+                print "[+] Issuing whois lookups (may take several seconds).\n";
+            }
+        }
+    }
 
     ### log top scans data
     my $do_log = 0;
@@ -6230,9 +6524,6 @@ sub analysis_mode() {
     ### analyze all packets
     &check_scan(\@ipt_msgs);
 
-    print "[+] Displaying status output:\n\n";
-    &status_psad_daemon();
-
     print "\n[+] Finished --Analyze cycle.\n";
     return 0;
 }
@@ -6357,22 +6648,20 @@ sub status() {
 sub status_psad_daemon() {
     my $cmdline;
 
-    unless ($analyze_msgs) {
-        ### get any command line args
-        if (-e $cmdline_file) {
-            open CMD, "< $cmdline_file" or die '[*] Could not open ',
-                "$cmdline_file: $!";
-            $cmdline = <CMD>;
-            chomp $cmdline;
-        }
-        if ($cmdline) {
-            print "    Command line arguments: $cmdline\n";
-        } else {
-            print "    Command line arguments: [none specified]\n";
-        }
-        print "    Alert email address(es): ",
-            "$config{'EMAIL_ADDRESSES'}\n\n";
+    ### get any command line args
+    if (-e $cmdline_file) {
+        open CMD, "< $cmdline_file" or die '[*] Could not open ',
+            "$cmdline_file: $!";
+        $cmdline = <CMD>;
+        chomp $cmdline;
     }
+    if ($cmdline) {
+        print "    Command line arguments: $cmdline\n";
+    } else {
+        print "    Command line arguments: [none specified]\n";
+    }
+    print "    Alert email address(es): ",
+        "$config{'EMAIL_ADDRESSES'}\n\n";
 
     chdir $config{'PSAD_DIR'} or
         die "[*] Could not chdir $config{'PSAD_DIR'}: $!";
@@ -6395,6 +6684,7 @@ sub status_psad_daemon() {
     my %uniq_dsts   = ();
     my %scan_pkt_count = ();
     my %scan_sig_count = ();
+    my %uniq_sig_count = ();
 
     IPDIR: for my $file (@files) {
 
@@ -6534,8 +6824,8 @@ sub status_psad_daemon() {
     my @lines = ();
 
     if (-e $config{'TOP_SIGS_FILE'}) {
-        if ($config{'TOP_STATUS_THRESHOLD'} > 0) {
-            push @lines, "[+] Top $config{'TOP_STATUS_THRESHOLD'} signature matches:\n";
+        if ($config{'STATUS_SIGS_THRESHOLD'} > 0) {
+            push @lines, "[+] Top $config{'STATUS_SIGS_THRESHOLD'} signature matches:\n";
         } else {
             push @lines, "[+] Top signature matches:\n";
         }
@@ -6556,8 +6846,8 @@ sub status_psad_daemon() {
                 my $is_fwsnort  = $6;
                 my $is_psad     = $7;
                 $ctr++;
-                if ($config{'TOP_STATUS_THRESHOLD'} > 0) {
-                    last if $ctr == $config{'TOP_STATUS_THRESHOLD'};
+                if ($config{'STATUS_SIGS_THRESHOLD'} > 0) {
+                    last if $ctr == $config{'STATUS_SIGS_THRESHOLD'};
                 }
                 push @lines, qq|      "$msg" ($proto),  Count: $count,  |,
                     "Unique sources: $num_sources,  Sid: $sid\n";
@@ -6569,8 +6859,8 @@ sub status_psad_daemon() {
 
     if (-e $config{'TOP_ATTACKERS_FILE'}) {
 
-        if ($config{'TOP_STATUS_THRESHOLD'} > 0) {
-            push @lines, "[+] Top $config{'TOP_STATUS_THRESHOLD'} attackers:\n";
+        if ($config{'STATUS_IP_THRESHOLD'} > 0) {
+            push @lines, "[+] Top $config{'STATUS_IP_THRESHOLD'} attackers:\n";
         } else {
             push @lines, "[+] Top attackers:\n";
         }
@@ -6580,16 +6870,18 @@ sub status_psad_daemon() {
         while (<F>) {
             next unless /\S/;
             next if /^\s*#\s*$/;
-            ###  Format: <IP> <DL> <total_packets> <sig_matches>
-            if (/^\s*($ip_re)\s+(\d+)\s+(\d+)\s+(\d+)/) {
+            ###  Format: <IP> <DL> <total_packets> <uniq_sigs> <sig_matches>
+            if (/^\s*($ip_re)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/) {
                 my $ip = $1;
                 my $dl = $2;
-                my $tot_pkts = $2;
-                my $sig_matches = $3;
+                my $tot_pkts = $3;
+                my $uniq_sigs = $4;
+                my $sig_matches = $5;
                 my $str = sprintf "      %-15s  DL: $dl, Packets: $tot_pkts, " .
-                    "Sig matches: $sig_matches\n", $ip;
-                $scan_sig_count{$ip}++;
-                $scan_pkt_count{$ip}++;
+                    "Sig count: $sig_matches\n", $ip;
+                $scan_pkt_count{$ip} += $tot_pkts;
+                $uniq_sig_count{$ip} += $uniq_sigs;
+                $scan_sig_count{$ip} += $sig_matches;
                 push @lines, $str;
             }
         }
@@ -6599,8 +6891,8 @@ sub status_psad_daemon() {
 
     if (-e $config{'TOP_SCANNED_PORTS_FILE'}) {
 
-        if ($config{'TOP_STATUS_THRESHOLD'} > 0) {
-            push @lines, "[+] Top $config{'TOP_STATUS_THRESHOLD'} scanned ports:\n";
+        if ($config{'STATUS_PORTS_THRESHOLD'} > 0) {
+            push @lines, "[+] Top $config{'STATUS_PORTS_THRESHOLD'} scanned ports:\n";
         } else {
             push @lines, "[+] Top scanned ports:\n";
         }
@@ -6620,7 +6912,7 @@ sub status_psad_daemon() {
                 my $port  = $2;
                 my $count = $3;
                 $port_ctr{$proto}++;
-                if ($port_ctr{$proto} >= $config{'TOP_STATUS_THRESHOLD'}) {
+                if ($port_ctr{$proto} >= $config{'STATUS_PORTS_THRESHOLD'}) {
                     $port_stop{$proto} = '';
                 }
                 next if defined $port_stop{$proto};
@@ -6635,77 +6927,55 @@ sub status_psad_daemon() {
         push @lines, "\n";
     }
 
-    if ($analyze_msgs) {
-        if (%ipt_prefixes) {
-            push @lines, "    Netfilter log prefix counters:\n";
-            for my $prefix (keys %ipt_prefixes) {
-                my $count = $ipt_prefixes{$prefix};
-                push @lines, "      \"$prefix\": $count\n";
+    if (-e $config{'IPT_PREFIX_COUNTER_FILE'}) {
+        push @lines, "    Netfilter log prefix counters:\n";
+        open F, "< $config{'IPT_PREFIX_COUNTER_FILE'}" or
+            die "[*] $config{'IPT_PREFIX_COUNTER_FILE'}: $!";
+        my @ipt_lines = <F>;
+        close F;
+        if (@ipt_lines) {
+            for my $line (@ipt_lines) {
+                if ($line =~ /^\s*(.*):\s*(\d+)/) {
+                    push @lines, "      \"$1\": $2\n";
+                }
             }
         } else {
             push @lines, "        [NONE]\n";
         }
         push @lines, "\n";
-    } else {
-        if (-e $config{'IPT_PREFIX_COUNTER_FILE'}) {
-            push @lines, "    Netfilter log prefix counters:\n";
-            open F, "< $config{'IPT_PREFIX_COUNTER_FILE'}" or
-                die "[*] $config{'IPT_PREFIX_COUNTER_FILE'}: $!";
-            my @ipt_lines = <F>;
-            close F;
-            if (@ipt_lines) {
-                for my $line (@ipt_lines) {
-                    if ($line =~ /^\s*(.*):\s*(\d+)/) {
-                        push @lines, "      \"$1\": $2\n";
-                    }
-                }
-            } else {
-                push @lines, "        [NONE]\n";
+    }
+
+    if (-e $config{'PACKET_COUNTER_FILE'}) {
+        my $str = "    Total packet counters:";
+        open F, "< $config{'PACKET_COUNTER_FILE'}" or
+            die "[*] $config{'PACKET_COUNTER_FILE'}: $!";
+        while (<F>) {
+            if (/^\s*(\w+):\s+(\d+)/) {
+                $str .= " $1: $2,";
             }
-            push @lines, "\n";
         }
+        close F;
+        $str =~ s|,$||;
+        push @lines, "$str\n\n";
     }
 
-    push @lines, "    Total scan sources: " . (keys %uniq_srcs) . "\n";
-    push @lines, "    Total scan destinations: " . (keys %uniq_dsts) . "\n\n";
-
-    if ($analyze_msgs) {
-        push @lines, "    Total packet counters:\n",
-            "      tcp: $tcp_ctr\n",
-            "      udp: $udp_ctr\n",
-            "      icmp: $icmp_ctr\n\n";
-    } else {
-        if (-e $config{'PACKET_COUNTER_FILE'}) {
-            push @lines, "    Total packet counters:\n";
-            open F, "< $config{'PACKET_COUNTER_FILE'}" or
-                die "[*] $config{'PACKET_COUNTER_FILE'}: $!";
-            push @lines, "      $_" while (<F>);
-            close F;
-            push @lines, "\n";
-        }
-    }
-
-    unless ($analyze_msgs) {
-        if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
-                and -e $config{'DSHIELD_COUNTER_FILE'}) {
-            push @lines, "    DShield stats:\n";
-            open F, "< $config{'DSHIELD_COUNTER_FILE'}" or
-                die "[*] $config{'DSHIELD_COUNTER_FILE'}: $!";
-            push @lines, "      $_" while (<F>);
-            close F;
-            push @lines, "\n";
-        }
+    if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
+            and -e $config{'DSHIELD_COUNTER_FILE'}) {
+        push @lines, "    DShield stats:\n";
+        open F, "< $config{'DSHIELD_COUNTER_FILE'}" or
+            die "[*] $config{'DSHIELD_COUNTER_FILE'}: $!";
+        push @lines, "      $_" while (<F>);
+        close F;
+        push @lines, "\n";
     }
 
     ### print block status of IP addresses blocked by Netfilter
-    unless ($analyze_msgs) {
-        if ($status_ip) {
-            my $ar = &print_blocked_ip_status($status_ip);
-            push @lines, $_ for @$ar;
-        } else {
-            my $ar = &print_blocked_ip_status('');
-            push @lines, $_ for @$ar;
-        }
+    if ($status_ip) {
+        my $ar = &print_blocked_ip_status($status_ip);
+        push @lines, $_ for @$ar;
+    } else {
+        my $ar = &print_blocked_ip_status('');
+        push @lines, $_ for @$ar;
     }
 
     return if $status_summary;
@@ -6732,14 +7002,15 @@ sub status_psad_daemon() {
                 $src_str .= ", Pkts: $scan_pkt_count{$src}";
             }
             if (defined $scan_sig_count{$src}) {
-                $src_str .= ", Sig matches: $scan_sig_count{$src}";
+                $src_str .= ", Unique sigs: $scan_sig_count{$src}";
             }
             if (defined $scan_alerts{$src}) {
                 $src_str .= ", Email alerts: $scan_alerts{$src}";
             }
             push @lines, $src_str, "\n";
             if (defined $scan_os{$src}) {
-                push @lines, "    Source OS fingerprint:   $scan_os{$src}\n";
+                push @lines, "    Source OS fingerprint:\n",
+                    "        $scan_os{$src}\n";
             }
             push @lines, "\n";
             for my $dst (sort keys %{$scan_srcs{$dl}{$src}}) {
@@ -6765,7 +7036,7 @@ sub status_psad_daemon() {
                         for my $sid (keys %{$sig_matches{$src}{$dst}{$chain}}) {
                             my $sig_hr = $sig_matches{$src}{$dst}{$chain}{$sid};
                             my $sig_str = qq|        Signature match: "$sig_hr->{'msg'}" | .
-                                "($sig_hr->{'proto'}), Count: $sig_hr->{'count'}";
+                                "($sig_hr->{'proto'}), Chain: $chain, Count: $sig_hr->{'count'}";
                             if ($sig_hr->{'proto'} eq 'tcp'
                                     or $sig_hr->{'proto'} eq 'udp') {
                                 $sig_str .= ", DP: $sig_hr->{'dp'}";
@@ -6798,7 +7069,7 @@ sub status_psad_daemon() {
         print S $line;
     }
     close S;
-    print "[+] These results are available in: $config{'STATUS_OUTPUT_FILE'}\n";
+    print "\n[+] These results are available in: $config{'STATUS_OUTPUT_FILE'}\n";
     return;
 }
 
@@ -7229,9 +7500,8 @@ sub archive_data() {
 sub handle_cmdline() {
 
     if ($analysis_emails and not $analyze_msgs) {
-        print "[*] Can only specify --email-analysis flag ",
+        die "[*] Can only specify --email-analysis flag ",
             "when run in --Analyze mode.";
-        &usage(1);
     }
 
     ### be absolutely sure to disable auto-response for various
@@ -7239,7 +7509,7 @@ sub handle_cmdline() {
     $config{'ENABLE_AUTO_IDS'} = 'N'
         if $analyze_msgs or $syslog_server or $benchmark;
 
-    ### The -i switch was given
+    ### The -I switch was given
     $config{'CHECK_INTERVAL'} = $chk_interval if $chk_interval;
 
     ### The --snort-rdir switch was given
@@ -7843,8 +8113,9 @@ sub required_vars() {
         ORACLE_PORTS ENABLE_INTF_LOCAL_NETS ENABLE_SNORT_SIG_STRICT
         IP_OPTS_FILE SIG_UPDATE_URL CONF_ARCHIVE_DIR TOP_SIGS_FILE
         TOP_PORTS_LOG_THRESHOLD TOP_SIGS_LOG_THRESHOLD
-        TOP_SCANNED_PORTS_FILE TOP_STATUS_THRESHOLD STATUS_OUTPUT_FILE
-        TOP_ATTACKERS_FILE
+        TOP_SCANNED_PORTS_FILE STATUS_OUTPUT_FILE TOP_ATTACKERS_FILE
+        STATUS_PORTS_THRESHOLD STATUS_SIGS_THRESHOLD STATUS_IP_THRESHOLD
+        ANALYSIS_OUTPUT_FILE
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;
@@ -7934,6 +8205,9 @@ Options:
                                     increases/decreses.
     --alert-conf <file>           - Manually specify path to alert.conf
                                     file.
+    --analysis-write-data         - Write data to filesystem from -A mode
+                                    (the disk IO involved in this step
+                                    can take a long time).
     -c,  --config <config file>   - Use <config file> instead of the
                                     normal config file located at
                                     $config_file.

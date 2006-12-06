@@ -1,9 +1,12 @@
 #!/usr/bin/perl -w
 
-use lib '/usr/lib/psad';
-use IPTables::ChainMgr;
-use IPTables::Parse;
 use strict;
+
+### path to default psad library directory for psad perl modules
+my $psad_lib_dir = '/usr/lib/psad';
+
+### import psad perl modules
+&import_psad_perl_modules();
 
 my $ipt = new IPTables::ChainMgr(
     'iptables' => '/sbin/iptables',
@@ -64,3 +67,47 @@ print for @$out_aref;
 print for @$err_aref;
 
 exit 0;
+
+sub import_psad_perl_modules() {
+
+    my $mod_paths_ar = &get_psad_mod_paths();
+
+    splice @INC, 0, $#$mod_paths_ar+1, @$mod_paths_ar;
+
+    require IPTables::Parse;
+    require IPTables::ChainMgr;
+
+    return;
+}
+
+sub get_psad_mod_paths() {
+
+    my @paths = ();
+
+    unless (-d $psad_lib_dir) {
+        my $dir_tmp = $psad_lib_dir;
+        $dir_tmp =~ s|lib/|lib64/|;
+        if (-d $dir_tmp) {
+            $psad_lib_dir = $dir_tmp;
+        } else {
+            die "[*] psad lib directory: $psad_lib_dir does not exist, ",
+                "use --Lib-dir <dir>";
+        }
+    }
+
+    opendir D, $psad_lib_dir or die "[*] Could not open $psad_lib_dir: $!";
+    my @dirs = readdir D;
+    closedir D;
+    shift @dirs; shift @dirs;
+
+    push @paths, $psad_lib_dir;
+
+    for my $dir (@dirs) {
+        ### get directories like "/usr/lib/psad/x86_64-linux"
+        next unless -d "$psad_lib_dir/$dir";
+        push @paths, "$psad_lib_dir/$dir"
+            if $dir =~ m|linux| or $dir =~ m|thread|;
+    }
+    return \@paths;
+}
+

@@ -33,12 +33,13 @@
 # $Id$
 #
 
-use lib '/usr/lib/psad';
-use Psad;
 use POSIX qw(setsid);
 use Getopt::Long 'GetOptions';
 use Sys::Hostname 'hostname';
 use strict;
+
+### path to default psad library directory for psad perl modules
+my $psad_lib_dir = '/usr/lib/psad';
 
 ### establish the default path to the config file (can be
 ### over-ridden with the -c <file> command line option.
@@ -71,6 +72,9 @@ die "[*] Specify the path to the psad.conf file with " .
     "\"-c <file>\".\n\n" unless (GetOptions (
     'config=s' => \$config_file
 ));
+
+### import psad perl modules
+&import_psad_perl_modules();
 
 ### import config
 &import_config();
@@ -162,6 +166,48 @@ sub check_process() {
         system "$cmds{$pidname} $pidcmdline";
     }
     return;
+}
+
+sub import_psad_perl_modules() {
+
+    my $mod_paths_ar = &get_psad_mod_paths();
+
+    splice @INC, 0, $#$mod_paths_ar+1, @$mod_paths_ar;
+
+    require Psad;
+
+    return;
+}
+
+sub get_psad_mod_paths() {
+
+    my @paths = ();
+
+    unless (-d $psad_lib_dir) {
+        my $dir_tmp = $psad_lib_dir;
+        $dir_tmp =~ s|lib/|lib64/|;
+        if (-d $dir_tmp) {
+            $psad_lib_dir = $dir_tmp;
+        } else {
+            die "[*] psad lib directory: $psad_lib_dir does not exist, ",
+                "use --Lib-dir <dir>";
+        }
+    }
+
+    opendir D, $psad_lib_dir or die "[*] Could not open $psad_lib_dir: $!";
+    my @dirs = readdir D;
+    closedir D;
+    shift @dirs; shift @dirs;
+
+    push @paths, $psad_lib_dir;
+
+    for my $dir (@dirs) {
+        ### get directories like "/usr/lib/psad/x86_64-linux"
+        next unless -d "$psad_lib_dir/$dir";
+        push @paths, "$psad_lib_dir/$dir"
+            if $dir =~ m|linux| or $dir =~ m|thread|;
+    }
+    return \@paths;
 }
 
 sub get_psad_Cmdline() {

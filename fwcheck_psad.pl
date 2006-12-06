@@ -32,11 +32,11 @@
 # $Id$
 #
 
-use lib '/usr/lib/psad';
-use Psad;
-use IPTables::Parse;
 use Getopt::Long 'GetOptions';
 use strict;
+
+### path to default psad library directory for psad perl modules
+my $psad_lib_dir = '/usr/lib/psad';
 
 ### default psad config file.
 my $config_file  = '/etc/psad/psad.conf';
@@ -89,6 +89,9 @@ $fw_search_all = 0 if $no_fw_search_all;
 $< == 0 && $> == 0 or
     die '[*] fwcheck_psad.pl: You must be root (or equivalent ',
         "UID 0 account) to execute fwcheck_psad.pl!  Exiting.\n";
+
+### import psad perl modules
+&import_psad_perl_modules();
 
 if ($fw_file) {
     die "[*] iptables dump file: $fw_file does not exist."
@@ -355,6 +358,49 @@ sub ipt_chk_chain() {
         return 0 unless $num_keys > 0;
     }
     return $rv;
+}
+
+sub import_psad_perl_modules() {
+
+    my $mod_paths_ar = &get_psad_mod_paths();
+
+    splice @INC, 0, $#$mod_paths_ar+1, @$mod_paths_ar;
+
+    require Psad;
+    require IPTables::Parse;
+
+    return;
+}
+
+sub get_psad_mod_paths() {
+
+    my @paths = ();
+
+    unless (-d $psad_lib_dir) {
+        my $dir_tmp = $psad_lib_dir;
+        $dir_tmp =~ s|lib/|lib64/|;
+        if (-d $dir_tmp) {
+            $psad_lib_dir = $dir_tmp;
+        } else {
+            die "[*] psad lib directory: $psad_lib_dir does not exist, ",
+                "use --Lib-dir <dir>";
+        }
+    }
+
+    opendir D, $psad_lib_dir or die "[*] Could not open $psad_lib_dir: $!";
+    my @dirs = readdir D;
+    closedir D;
+    shift @dirs; shift @dirs;
+
+    push @paths, $psad_lib_dir;
+
+    for my $dir (@dirs) {
+        ### get directories like "/usr/lib/psad/x86_64-linux"
+        next unless -d "$psad_lib_dir/$dir";
+        push @paths, "$psad_lib_dir/$dir"
+            if $dir =~ m|linux| or $dir =~ m|thread|;
+    }
+    return \@paths;
 }
 
 sub import_fw_search() {

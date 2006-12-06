@@ -15,7 +15,9 @@ psad-2.0 (12//2006):
       service.
     - Completely reworked --Status and --Analyze output, signature matches
       are included now, along with a listing of top sig matches, top scanned
-      ports, and top attackers.
+      ports, and top attackers.  Also, scan data is not written to
+      /var/log/psad/ipt_analysis/ before display analysis output in -A mode;
+      analysis results are displayed much faster this way.
     - Added ipEye, Subversion, Kuang2, Microsoft SQL, Radmin, and Ghostsurf
       signatures.
     - Added 'data in TCP SYN packet' signature.

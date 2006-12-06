@@ -128,6 +128,7 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN ipEye SYN scan"; flags:S
 
 ### PSAD-CUSTOM rules
 alert tcp $EXTERNAL_NET any -> $HOME_NET 17300 (msg:"PSAD-CUSTOM Kuang2 virus communication attempt"; flags:S; reference:url,isc.sans.org/port_details.php?port=17300; classtype:trojan-activity; psad_id:100206; psad_dl:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 1434 (msg:"PSAD-CUSTOM Slammer communication attempt"; reference:url,www.linklogger.com/UDP1434.htm; classtype:trojan-activity; psad_id:100208; psad_dl:2;)
 
 ### misc.rules
 alert tcp $EXTERNAL_NET any -> $HOME_NET 1433 (msg:"MISC Microsoft SQL Server communication attempt"; flags:S; reference:url,www.linklogger.com/TCP1433.htm; classtype:attempted-admin; psad_id:100205; psad_dl:2;)

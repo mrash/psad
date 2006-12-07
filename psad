@@ -829,6 +829,29 @@ MAIN: for (;;) {
 
     }
 
+    ### log top scans data
+    my $do_log = 0;
+    if ($config{'TOP_SCANS_CTR_THRESHOLD'} == 0) {
+        $do_log = 1;
+    } elsif ($check_interval_ctr % $config{'TOP_SCANS_CTR_THRESHOLD'} == 0) {
+        $do_log = 1;
+    }
+
+    if ($do_log) {
+
+        ### log the top port and signature matches
+        &log_top_scans();
+
+        $check_interval_ctr = 0;
+    }
+
+    ### Write the number of tcp/udp/icmp packets out
+    ### to the global packet counters file
+    &write_global_packet_counters();
+
+    ### Write out log prefix counters
+    &write_prefix_counters();
+
     if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
         ### Timeout any auto-blocked IPs that are past due (need to
         ### check the timeouts against existing IPs in the scan hash
@@ -4399,7 +4422,7 @@ sub analysis_display() {
             for my $chain (keys %{$scan{$src}{$dst}{'chain'}}) {
                 for my $intf (keys %{$scan{$src}{$dst}{'chain'}{$chain}}) {
                     for my $proto (keys %{$scan{$src}{$dst}{'chain'}{$chain}{$intf}}) {
-                        next unless $proto eq 'tcp' or $proto eq 'icmp';
+                        next unless $proto eq 'tcp' or $proto eq 'udp';
                         my $start_port = $scan{$src}{$dst}{$proto}{'abs_sp'};
                         my $end_port   = $scan{$src}{$dst}{$proto}{'abs_ep'};
                         my $ctr = $scan{$src}{$dst}{'chain'}{$chain}{$intf}{$proto};
@@ -4484,29 +4507,6 @@ sub scan_logr() {
             }
         }
     }
-
-    ### log top scans data
-    my $do_log = 0;
-    if ($config{'TOP_SCANS_CTR_THRESHOLD'} == 0) {
-        $do_log = 1;
-    } elsif ($check_interval_ctr % $config{'TOP_SCANS_CTR_THRESHOLD'} == 0) {
-        $do_log = 1;
-    }
-
-    if ($do_log) {
-
-        ### log the top port and signature matches
-        &log_top_scans();
-
-        $check_interval_ctr = 0;
-    }
-
-    ### Write the number of tcp/udp/icmp packets out
-    ### to the global packet counters file
-    &write_global_packet_counters();
-
-    ### Write out log prefix counters
-    &write_prefix_counters();
 
     SRC: for my $src (keys %$curr_scan_hr) {
         print STDERR "[+] scan_logr(): source ip: $src\n" if $debug;
@@ -6500,6 +6500,7 @@ sub analysis_mode() {
     for my $var (keys %config) {
         next if $var eq 'PSAD_DIR';
         next if $var eq 'ANALYSIS_MODE_DIR';
+        next if $var eq 'ANALYSIS_OUTPUT_FILE';
         my $val = $config{$var};
         if ($val =~ m|$config{'PSAD_DIR'}/|) {
             $val =~ s|$config{'PSAD_DIR'}|$config{'ANALYSIS_MODE_DIR'}|;

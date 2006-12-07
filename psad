@@ -4161,8 +4161,10 @@ sub log_top_scans() {
     ### top attackers
     open A, "> $config{'TOP_ATTACKERS_FILE'}" or
         die "[*] Could not open $config{'TOP_ATTACKERS_FILE'}: $!";
+    $ctr = 0;
     print A "#\n# Format: <IP> <DL> <total_packets> <uniq_sigs> <sig_matches>\n#\n\n";
     for my $src (sort {$scan_dl{$b} cmp $scan_dl{$a}} keys %scan_dl) {
+        next unless $scan_dl{$src} >= 1;
         my $str = sprintf "%-15s %d", $src, $scan_dl{$src};
         if (defined $top_packet_counts{$src}) {
             $str .= " $top_packet_counts{$src}";
@@ -4180,6 +4182,10 @@ sub log_top_scans() {
             $str .= " 0";
         }
         print A $str, "\n";
+        $ctr++;
+        if ($config{'TOP_IP_LOG_THRESHOLD'} > 0) {
+            last if $ctr == $config{'TOP_IP_LOG_THRESHOLD'};
+        }
     }
     close A;
     return;

@@ -4191,6 +4191,7 @@ sub analysis_display() {
     my @lines = ();
 
     push @lines, "\n";
+    push @lines, "[+] Version: psad v$version\n\n";
 
     ### top signature matches
     if ($config{'STATUS_SIGS_THRESHOLD'} > 0) {
@@ -4265,7 +4266,6 @@ sub analysis_display() {
 
     if (%top_tcp_ports) {
         my $ctr = 0;
-        push @lines, "      TCP:\n";
         for my $dp (sort {$top_tcp_ports{$b} <=> $top_tcp_ports{$a}}
                 keys %top_tcp_ports) {
             my $str = sprintf "      tcp %-5d $top_tcp_ports{$dp} packets\n", $dp;
@@ -4280,7 +4280,7 @@ sub analysis_display() {
 
     if (%top_udp_ports) {
         my $ctr = 0;
-        push @lines, "      UDP:\n";
+        push @lines, "\n";
         for my $dp (sort {$top_udp_ports{$b} <=> $top_udp_ports{$a}}
                 keys %top_udp_ports) {
             my $str = sprintf "      udp %-5d $top_udp_ports{$dp} packets\n", $dp;
@@ -4384,7 +4384,7 @@ sub analysis_display() {
         next unless $total_dsts > 0;
         push @lines, "\n";
         for my $dst (keys %{$curr_scan_hr->{$src}}) {
-            push @lines, "    $dst\n";
+            push @lines, "    DST: $dst\n";
 
             ### scanned ports
             next unless defined $scan{$src}
@@ -4541,7 +4541,7 @@ sub scan_logr() {
             my $curr_dl = $scan_dl{$src};
 
             unless (defined $scan{$src}{$dst}{'email_ctr'}) {
-                $scan{$src}{$dst}{'email_ctr'} = 1;
+                $scan{$src}{$dst}{'email_ctr'} = 0;
             } elsif ($config{'EMAIL_LIMIT'} > 0
                     and $scan{$src}{$dst}{'email_ctr'}
                     > $config{'EMAIL_LIMIT'}) {
@@ -5857,6 +5857,9 @@ sub sockwrite_add_ipt_block_ip() {
     }
 
     if (-e $config{'PID_FILE'}) {
+        if ($config{'ENABLE_AUTO_IDS'} ne 'Y') {
+            die "[*] ENABLE_AUTO_IDS is not set to 'Y', exiting.";
+        }
         if (&Psad::pidrunning($config{'PID_FILE'})) {
             print "[+] Writing $fw_block_ip to socket. Psad will add the IP\n",
                 "    within $config{'CHECK_INTERVAL'} seconds.\n";
@@ -5908,6 +5911,9 @@ sub sockwrite_rm_ipt_block_ip() {
     }
 
     if (-e $config{'PID_FILE'}) {
+        if ($config{'ENABLE_AUTO_IDS'} ne 'Y') {
+            die "[*] ENABLE_AUTO_IDS is not set to 'Y', exiting.";
+        }
         if (&Psad::pidrunning($config{'PID_FILE'})) {
             print "[+] Writing $fw_rm_block_ip to socket. Psad will remove the IP\n",
                 "    within $config{'CHECK_INTERVAL'} seconds.\n";
@@ -6829,6 +6835,8 @@ sub status_psad_daemon() {
 
     my @lines = ();
 
+    push @lines, "[+] Version: psad v$version\n\n";
+
     if (-e $config{'TOP_SIGS_FILE'}) {
         if ($config{'STATUS_SIGS_THRESHOLD'} > 0) {
             push @lines, "[+] Top $config{'STATUS_SIGS_THRESHOLD'} signature matches:\n";
@@ -6912,6 +6920,7 @@ sub status_psad_daemon() {
         my %port_stop = ();
         open F, "< $config{'TOP_SCANNED_PORTS_FILE'}" or die "[*] Could not open ",
             "$config{'TOP_SCANNED_PORTS_FILE'}: $!";
+        my $printed_udp_newline = 0;
         while (<F>) {
             next unless /\S/;
             next if /^\s*#\s*$/;
@@ -6927,11 +6936,11 @@ sub status_psad_daemon() {
                     $port_stop{$proto} = '';
                 }
                 next if defined $port_stop{$proto};
+                if ($proto eq 'udp' and not $printed_udp_newline) {
+                    push @lines, "\n";
+                    $printed_udp_newline = 1;
+                }
                 push @lines, "      $_ packets\n";
-            } elsif (/TCP\s+ports/) {
-                push @lines, "      TCP:\n";
-            } elsif (/UDP\s+ports/) {
-                push @lines, "\n      UDP:\n";
             }
         }
         close F;
@@ -7026,7 +7035,7 @@ sub status_psad_daemon() {
             push @lines, "\n";
             for my $dst (sort keys %{$scan_srcs{$dl}{$src}}) {
                 for my $chain (keys %{$scan_srcs{$dl}{$src}{$dst}}) {
-                    push @lines, "    $dst\n";
+                    push @lines, "    DST: $dst\n";
                     for my $intf (keys %{$scan_srcs{$dl}{$src}{$dst}{$chain}}) {
                         for my $proto (keys %{$scan_srcs{$dl}{$src}
                                 {$dst}{$chain}{$intf}}) {
@@ -7632,6 +7641,7 @@ sub setup() {
             &truncate_file($config{'DSHIELD_COUNTER_FILE'});
             &truncate_file($config{'TOP_SIGS_FILE'});
             &truncate_file($config{'TOP_SCANNED_PORTS_FILE'});
+            &truncate_file($config{'TOP_ATTACKERS_FILE'});
         }
 
         ### make sure the permissions on these files is 0600
@@ -8126,7 +8136,7 @@ sub required_vars() {
         TOP_PORTS_LOG_THRESHOLD TOP_SIGS_LOG_THRESHOLD
         TOP_SCANNED_PORTS_FILE STATUS_OUTPUT_FILE TOP_ATTACKERS_FILE
         STATUS_PORTS_THRESHOLD STATUS_SIGS_THRESHOLD STATUS_IP_THRESHOLD
-        ANALYSIS_OUTPUT_FILE
+        ANALYSIS_OUTPUT_FILE TOP_IP_LOG_THRESHOLD
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

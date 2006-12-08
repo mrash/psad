@@ -21,6 +21,10 @@ psad-2.0 (12//2006):
     - Added ipEye, Subversion, Kuang2, Microsoft SQL, Radmin, and Ghostsurf
       signatures.
     - Added 'data in TCP SYN packet' signature.
+    - Added --CSV mode so that psad can be used to generate comma-separated
+      value output suitable for the AfterGlow project (see
+      http://afterglow.sourceforge.net/index.html) for graphical
+      representations of Netfilter logs and associated scan data.
     - Added emulation of the Snort "dsize" test through the use of the IP
       length field for TCP/ICMP signatures, and the UDP length field for UDP
       signatures.  For SYN packets, TCP options are included so psad

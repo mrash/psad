@@ -1,5 +1,5 @@
 %define name psad
-%define version 1.6.0
+%define version 2.0
 %define release 1
 %define psadlibdir %_libdir/%name
 %define psadlogdir /var/log/psad
@@ -248,8 +248,8 @@ fi
 %_libdir/%name
 
 %changelog
-* Sun Nov 19 2006 Michael Rash <mbr@cipherdyne.org>
-- psad-1.6.0 release.
+* Sun Dec 08 2006 Michael Rash <mbr@cipherdyne.org>
+- psad-2.0 release.
 - Added ip_options file for the Snort ipopts rule keyword.
 
 * Sun Oct 15 2006 Michael Rash <mbr@cipherdyne.org>

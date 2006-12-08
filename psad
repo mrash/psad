@@ -456,7 +456,7 @@ my @port_types = (
 );
 
 ### main packet data structure
-my %pkt_NF = (
+my %pkt_NF_init = (
 
     ### data link layer
     'src_mac' => '',
@@ -553,7 +553,7 @@ Getopt::Long::Configure('no_ignore_case');
     'CSV'               => \$csv_mode,        # CSV mode.
     'CSV-fields=s'      => \$csv_fields,      # Specify list of CSV fields.
     'CSV-uniq-lines'    => \$csv_print_uniq,  # Only print uniq lines in CSV output.
-    'CSV-line-limit=i'  => \$csv_line_limit,  # Limit the number of CSV output lines.
+    'CSV-max-lines=i'  => \$csv_line_limit,  # Limit the number of CSV output lines.
     'debug'             => \$debug,           # Run in debug mode.
     'Dump-conf'         => \$dump_conf,       # Dump config and exit.
     'Interval=i'        => \$chk_interval,    # Set $chk_interval from the
@@ -999,7 +999,7 @@ sub check_scan() {
     PKT: for my $pkt_str (@$fw_packets_aref) {
 
         ### main packet data structure
-        my %pkt = %pkt_NF;
+        my %pkt = %pkt_NF_init;
 
         if ($analyze_msgs) {
             $pkt_ctr++;
@@ -1512,6 +1512,7 @@ sub parse_NF_pkt_str() {
                 = ($1,$2,$3,$4,$5,$6,$7,$8,$9);
 
         $pkt_hr->{'proto'} = 'icmp';
+        $pkt_hr->{'sp'} = $pkt_hr->{'dp'} = 0;
 
         unless ($pkt_hr->{'ip_len'} >= 0 and $pkt_hr->{'ttl'} >= 0
                 and $pkt_hr->{'proto'} and $pkt_hr->{'itype'} >= 0
@@ -6565,17 +6566,167 @@ sub analysis_mode() {
 
 sub csv_mode() {
 
+    ### see what we should be searching for
+    my ($tokens_ar, $match_criteria_ar) = &csv_tokens();
+
+    my %csv_uniq_lines = ();
+
+    open MSGS, "< $messages_file" or die "[*] Could not open ",
+        "$messages_file: $!";
+    my $ctr = 0;
+    MSG: while (<MSGS>) {
+        my $pkt_str = $_;
+        next MSG unless $pkt_str =~ /IN.*OUT/;
+        my %pkt = %pkt_NF_init;
+        if ($config{'FW_SEARCH_ALL'} eq 'Y') {
+            my $rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
+            next MSG if $rv == $PKT_ERROR or $rv == $PKT_IGNORE;
+        } else {
+            if ($pkt_str =~ /$config{'SNORT_SID_STR'}/) {
+                my $rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
+                next MSG if $rv == $PKT_ERROR or $rv == $PKT_IGNORE;
+            } else {
+                for my $fw_search_str (@fw_search) {
+                    if ($pkt_str =~ /$fw_search_str/) {
+                        my $rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
+                        next MSG if $rv == $PKT_ERROR or $rv == $PKT_IGNORE;
+                    }
+                }
+            }
+        }
+        $pkt{'log_prefix'} =~ s/\W//g;
+        $pkt{'log_prefix'} =~ s/\s//g;
+        my @matched_fields = ();
+        for (my $i=0; $i <= $#$tokens_ar; $i++) {
+            my $tok = $tokens_ar->[$i];
+            if ($match_criteria_ar) {
+                my $match_hr = $match_criteria_ar->[$i];
+                if (defined $match_hr->{'num'}) {
+                    unless ($pkt{$tok} =~ m|^\d+$|
+                            and $pkt{$tok} == $match_hr->{'num'}) {
+                        next MSG;
+                    }
+                } elsif (defined $match_hr->{'gt'}) {
+                    unless ($pkt{$tok} =~ m|^\d+$|
+                            and $pkt{$tok} > $match_hr->{'gt'}) {
+                        next MSG;
+                    }
+                } elsif (defined $match_hr->{'lt'}) {
+                    unless ($pkt{$tok} =~ m|^\d+$|
+                            and $pkt{$tok} < $match_hr->{'lt'}) {
+                        next MSG;
+                    }
+                } elsif (defined $match_hr->{'str'}) {
+                    unless ($pkt{$tok} eq $match_hr->{'str'}) {
+                        next MSG;
+                    }
+                } elsif (defined $match_hr->{'re'}) {
+                    unless ($pkt{$tok} =~ m|$match_hr->{'re'}m|) {
+                        next MSG;
+                    }
+                } elsif (defined $match_hr->{'net'}) {
+                    if ($pkt{$tok} =~ m|$ip_re|) {
+                        unless (ipv4_in_network($match_hr->{'net'}, $pkt{$tok})) {
+                            next MSG;
+                        }
+                    } else {
+                        next MSG;
+                    }
+                } elsif (defined $match_hr->{'ip'}) {
+                    unless ($pkt{$tok} eq $match_hr->{'ip'}) {
+                        next MSG;
+                    }
+                }
+                push @matched_fields, $pkt{$tok};
+            } else {
+                push @matched_fields, $pkt{$tok};
+            }
+        }
+        next MSG unless @matched_fields;
+        my $str = '';
+        if ($csv_fields) {
+            $str .= "$_, " for @matched_fields;
+        } else {
+            $str .= "$_ " for @matched_fields;
+        }
+        $str =~ s/,\s*$//;
+        $str =~ s/\s*$//;
+        $ctr++;
+        if ($csv_print_uniq) {
+            $csv_uniq_lines{$str} = '';
+        } else {
+            print $str, "\n";
+        }
+        if ($csv_line_limit > 0) {
+            last if $ctr >= $csv_line_limit;
+        }
+    }
+    close MSGS;
+    if ($csv_print_uniq) {
+        print "$_\n" for keys %csv_uniq_lines;
+    }
+    return 0;
+}
+
+sub csv_tokens() {
+
     my @tokens = ();
+    my @match_criteria = ();
+
     if ($csv_fields) {
-        @tokens = split /\s+/, $csv_fields;
-        for my $tok (@tokens) {
-            unless (defined $pkt_NF{$tok}) {
-                print "[*] $tok is not a valid packet field; valid ",
+        my @tok_tmp = split /\s+/, $csv_fields;
+        for my $tok_str (@tok_tmp) {
+            my $token  = $tok_str;
+            my $search = '';
+            if ($tok_str =~ m|(\w+):(\S+)|) {
+                $token  = $1;
+                $search = $2;
+            }
+            $token = 'src' if $token eq 'SRC';
+            $token = 'dst' if $token eq 'DST';
+            $token = 'sp'  if $token eq 'SPT';
+            $token = 'dp'  if $token eq 'DPT';
+            $token = 'proto' if $token eq 'PROTO';
+            $token = 'ip_len' if $token eq 'LEN';
+            $token = 'intf' if $token eq 'IN' or $token eq 'OUT';
+            unless (defined $pkt_NF_init{$token}) {
+                print "[*] $token is not a valid packet field; valid ",
                     "fields are:\n";
-                for my $key (sort keys %pkt_NF) {
+                for my $key (sort keys %pkt_NF_init) {
                     print "    $key\n";
                 }
                 die;
+            }
+            push @tokens, $token;
+
+            if ($search) {
+                my %search_hsh = ();
+                if ($search =~ m|^\d+$|) {
+                    $search_hsh{'num'} = $search;
+                } elsif ($search =~ m|^>(\d+)$|) {
+                    $search_hsh{'gt'} = $1;
+                    die "[*] $token value must be >= 0"
+                        unless $1 >= 0;
+                } elsif ($search =~ m|^<(\d+)$|) {
+                    $search_hsh{'lt'} = $1;
+                    die "[*] $token value must be >= 0"
+                        unless $1 >= 0;
+                } elsif ($search =~ m|^/(.*?)/$|) {
+                    $search_hsh{'re'} = qr|$1|;
+                } elsif ($search =~ m|^\"(.*?)\"$|) {
+                    $search_hsh{'str'} = $1;
+                } elsif ($search =~ m|^$ip_re/$ip_re$|) {
+                    $search_hsh{'net'} = $search;
+                } elsif ($search =~ m|^$ip_re/\d+$|) {
+                    $search_hsh{'net'} = $search;
+                } elsif ($search =~ m|^$ip_re$|) {
+                    $search_hsh{'ip'} = $search;
+                } else {
+                    die "[*] Unrecognized value for $token";
+                }
+                push @match_criteria, \%search_hsh;
+            } else {
+                push @match_criteria, {};
             }
         }
     } else {
@@ -6593,58 +6744,7 @@ sub csv_mode() {
             log_prefix
         );
     }
-
-    my %csv_uniq_lines = ();
-
-    open MSGS, "< $messages_file" or die "[*] Could not open ",
-        "$messages_file: $!";
-    my $ctr = 0;
-    while (<MSGS>) {
-        my $pkt_str = $_;
-        next unless $pkt_str =~ /IN.*OUT/;
-        my %pkt = %pkt_NF;
-        if ($config{'FW_SEARCH_ALL'} eq 'Y') {
-            my $rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
-            next if $rv == $PKT_ERROR or $rv == $PKT_IGNORE;
-        } else {
-            if ($pkt_str =~ /$config{'SNORT_SID_STR'}/) {
-                my $rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
-                next if $rv == $PKT_ERROR or $rv == $PKT_IGNORE;
-            } else {
-                for my $fw_search_str (@fw_search) {
-                    if ($pkt_str =~ /$fw_search_str/) {
-                        my $rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
-                        next if $rv == $PKT_ERROR or $rv == $PKT_IGNORE;
-                    }
-                }
-            }
-        }
-        $pkt{'log_prefix'} =~ s/\W//g;
-        $pkt{'log_prefix'} =~ s/\s//g;
-        my $str = '';
-        if ($csv_fields) {
-            $str .= "$pkt{$_}, " for @tokens;
-            $str =~ s/,\s*$//;
-        } else {
-            $str .= "$pkt{$_} " for @tokens;
-            $str =~ s/\s*$//;
-        }
-        next unless $str;
-        $ctr++;
-        if ($csv_print_uniq) {
-            $csv_uniq_lines{$str} = '';
-        } else {
-            print $str, "\n";
-        }
-        if ($csv_line_limit > 0) {
-            last if $ctr >= $csv_line_limit;
-        }
-    }
-    close MSGS;
-    if ($csv_print_uniq) {
-        print "$_\n" for keys %csv_uniq_lines;
-    }
-    return 0;
+    return \@tokens, \@match_criteria;
 }
 
 sub benchmark_mode() {
@@ -8327,7 +8427,7 @@ Options:
                                     specfic fields.
     --CSV-uniq-lines              - Only print unique lines in CSV
                                     output.
-    --CSV-line-limit              - Specify the maximum number of CSV
+    --CSV-max-lines               - Specify the maximum number of CSV
                                     output lines to print.
     --signatures <sigs file>      - Manually specify the path to the
                                     psad signatures file.

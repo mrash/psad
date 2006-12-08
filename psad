@@ -355,6 +355,8 @@ my $csv_mode         = 0;
 my $csv_fields       = '';
 my $csv_print_uniq   = 0;
 my $csv_line_limit   = 0;
+my $csv_start_line   = 0;
+my $csv_end_line     = 0;
 my $dump_ipt_policy  = 0;
 my $fw_include_ips   = 0;
 my $benchmark        = 0;
@@ -553,7 +555,9 @@ Getopt::Long::Configure('no_ignore_case');
     'CSV'               => \$csv_mode,        # CSV mode.
     'CSV-fields=s'      => \$csv_fields,      # Specify list of CSV fields.
     'CSV-uniq-lines'    => \$csv_print_uniq,  # Only print uniq lines in CSV output.
-    'CSV-max-lines=i'  => \$csv_line_limit,  # Limit the number of CSV output lines.
+    'CSV-max-lines=i'   => \$csv_line_limit,  # Limit the number of CSV output lines.
+    'CSV-start-line=i'  => \$csv_start_line,  # Starting line in CSV file.
+    'CSV-end-line=i'    => \$csv_end_line,    # Ending line in CSV file.
     'debug'             => \$debug,           # Run in debug mode.
     'Dump-conf'         => \$dump_conf,       # Dump config and exit.
     'Interval=i'        => \$chk_interval,    # Set $chk_interval from the
@@ -6571,11 +6575,23 @@ sub csv_mode() {
 
     my %csv_uniq_lines = ();
 
+    if ($csv_start_line) {
+        die "[*] Cannot have start line > end line."
+            if $csv_start_line > $csv_end_line;
+    }
     open MSGS, "< $messages_file" or die "[*] Could not open ",
         "$messages_file: $!";
     my $ctr = 0;
+    my $line_ctr = 0;
     MSG: while (<MSGS>) {
         my $pkt_str = $_;
+        $line_ctr++;
+        if ($csv_start_line) {
+            next MSG unless $line_ctr >= $csv_start_line;
+        }
+        if ($csv_end_line) {
+            last MSG if $line_ctr == $csv_end_line;
+        }
         next MSG unless $pkt_str =~ /IN.*OUT/;
         my %pkt = %pkt_NF_init;
         if ($config{'FW_SEARCH_ALL'} eq 'Y') {
@@ -8429,6 +8445,10 @@ Options:
                                     output.
     --CSV-max-lines               - Specify the maximum number of CSV
                                     output lines to print.
+    --CSV-start-line <line>       - Starting line within Netfilter log
+                                    file.
+    --CSV-end-line <line>         - Ending line within Netfilter log
+                                    file.
     --signatures <sigs file>      - Manually specify the path to the
                                     psad signatures file.
     --snort-type                  - Restrict psad to look for specific

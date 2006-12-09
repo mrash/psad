@@ -356,6 +356,7 @@ my $csv_print_uniq   = 0;
 my $csv_line_limit   = 0;
 my $csv_start_line   = 0;
 my $csv_end_line     = 0;
+my $csv_regex        = 0;
 my $dump_ipt_policy  = 0;
 my $fw_include_ips   = 0;
 my $benchmark        = 0;
@@ -557,6 +558,7 @@ Getopt::Long::Configure('no_ignore_case');
     'CSV-max-lines=i'   => \$csv_line_limit,  # Limit the number of CSV output lines.
     'CSV-start-line=i'  => \$csv_start_line,  # Starting line in CSV file.
     'CSV-end-line=i'    => \$csv_end_line,    # Ending line in CSV file.
+    'CSV-regex=s'       => \$csv_regex,       # Require additional regex match.
     'debug'             => \$debug,           # Run in debug mode.
     'Dump-conf'         => \$dump_conf,       # Dump config and exit.
     'Interval=i'        => \$chk_interval,    # Set $chk_interval from the
@@ -1267,6 +1269,8 @@ sub parse_NF_pkt_str() {
     my ($pkt_hr, $pkt_str) = @_;
 
     print STDERR "\n", $pkt_str if $debug;
+
+    $pkt_hr->{'raw'} = $pkt_str if $csv_mode;
 
     ### see if there is a logging prefix (used for scan email alert even
     ### if we are running with FW_SEARCH_ALL = Y).  Note that sometimes
@@ -6590,6 +6594,8 @@ sub csv_mode() {
     ### see what we should be searching for
     my ($tokens_ar, $match_criteria_ar) = &csv_tokens();
 
+    $csv_regex = qr/$csv_regex/ if $csv_regex;
+
     my %csv_uniq_lines = ();
 
     if ($csv_start_line) {
@@ -6626,6 +6632,9 @@ sub csv_mode() {
                     }
                 }
             }
+        }
+        if ($csv_regex) {
+            next MSG unless $pkt{'raw'} =~ m|$csv_regex|;
         }
         $pkt{'log_prefix'} =~ s/\W//g;
         $pkt{'log_prefix'} =~ s/\s//g;
@@ -8530,6 +8539,9 @@ Options:
                                     file.
     --CSV-end-line <line>         - Ending line within Netfilter log
                                     file.
+    --CSV-regex <regex>           - Require Netfilter log messages to
+                                    match an additional regex in --CSV
+                                    mode.
     --signatures <sigs file>      - Manually specify the path to the
                                     psad signatures file.
     --snort-type                  - Restrict psad to look for specific

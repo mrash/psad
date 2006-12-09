@@ -320,6 +320,12 @@ Analyze the iptables ruleset contained within
 .B policy-file
 instead of the ruleset currently loaded on the local system.
 .TP
+.BR \-\^\-CSV-regex\ \<regex>
+Instruct
+.B psad
+to only print CSV data that matches the supplied regex.  This regex is
+used to match against each of the entire Netfilter log messages.
+.TP
 .BR \-\^\-CSV-uniq-lines
 Instruct
 .B psad

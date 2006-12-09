@@ -43,7 +43,8 @@ my $psad_lib_dir = '/usr/lib/psad';
 
 ### establish the default path to the config file (can be
 ### over-ridden with the -c <file> command line option.
-my $config_file = '/etc/psad/psadwatchd.conf';
+my $config_file      = '/etc/psad/psadwatchd.conf';
+my $psad_config_file = '/etc/psad/psad.conf';  ### for EMAIL_ADDRESSES
 
 ### default config file for ALERTING_METHODS keyword, which
 #### is referenced by both psad and psadwatchd.  This keyword
@@ -245,6 +246,9 @@ sub import_config() {
 
     ### read in the configuration file
     &Psad::buildconf(\%config, \%cmds, $config_file);
+
+    ### for EMAIL_ADDRESSES
+    &Psad::buildconf(\%config, \%cmds, $psad_config_file);
 
     ### import alerting config (psadwatchd also references this file
     &Psad::buildconf(\%config, \%cmds, $alerting_config_file);

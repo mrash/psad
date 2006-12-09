@@ -47,7 +47,7 @@ unsigned short int no_email     = 0;
 unsigned short int check_kmsgsd = 1;
 const char mail_redr[] = " < /dev/null > /dev/null 2>&1";
 char hostname[MAX_GEN_LEN];
-char mail_addrs[MAX_GEN_LEN];
+char mail_addrs[MAX_EMAIL_LEN];
 char shCmd[MAX_GEN_LEN];
 char mailCmd[MAX_GEN_LEN];
 char config_file[MAX_PATH_LEN];
@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
     strlcpy(config_file, PSADWATCHD_CONF, MAX_PATH_LEN);
     strlcpy(alert_config_file, ALERT_CONF, MAX_PATH_LEN);
 
-    while((cmdlopt = getopt(argc, argv, "c:k:")) != -1) {
+    while((cmdlopt = getopt(argc, argv, "c:a:")) != -1) {
         switch(cmdlopt) {
             case 'c':
                 strlcpy(config_file, optarg, MAX_PATH_LEN);
@@ -411,7 +411,7 @@ static void parse_config(void)
     char *index;
 
     /* check to see if kmsgsd needs to be running */
-    check_data_input_mode();
+    check_data_input_mode();  /* note that this also gets EMAIL_ADDRESSES */
 
     if ((config_ptr = fopen(config_file, "r")) == NULL) {
         perror("[*] Could not open config file");
@@ -432,7 +432,6 @@ static void parse_config(void)
         if ((*index != '#') && (*index != '\n') &&
                 (*index != ';') && (index != NULL)) {
 
-            find_char_var("EMAIL_ADDRESSES", mail_addrs, index);
             find_char_var("HOSTNAME", hostname, index);
             find_char_var("PSAD_RUN_DIR", psad_run_dir, index);
             find_char_var("PSAD_PID_FILE", psad_pid_file, index);
@@ -613,6 +612,7 @@ static void check_data_input_mode(void)
                 (*index != ';') && (index != NULL)) {
 
             find_char_var("SYSLOG_DAEMON", data_input_mode, index);
+            find_char_var("EMAIL_ADDRESSES", mail_addrs, index);
         }
     }
     fclose(config_ptr);

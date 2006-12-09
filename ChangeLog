@@ -99,6 +99,8 @@ psad-2.0 (12//2006):
       operations to a specific IP or network.
     - Updated psadwatchd.c to parse EMAIL_ADDRESSES out of
       /etc/psad/psad.conf to avoid duplication of variables.
+    - Bugfix to clear old @ipt_config array after receiving a HUP signal.
+      This bug broke the auto-blocking mode.
 
 psad-1.4.8 (10/15/2006):
     - Added the ability to get the auto-blocking status for a specific IP

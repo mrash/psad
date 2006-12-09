@@ -101,6 +101,8 @@ psad-2.0 (12//2006):
       /etc/psad/psad.conf to avoid duplication of variables.
     - Bugfix to clear old @ipt_config array after receiving a HUP signal.
       This bug broke the auto-blocking mode.
+    - Bugfix for syslog-ng config so that any custom source for /proc/kmsg is
+      used for the psadfifo path.
 
 psad-1.4.8 (10/15/2006):
     - Added the ability to get the auto-blocking status for a specific IP

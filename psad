@@ -8024,18 +8024,20 @@ sub setup() {
 
             my $found = 0;
             for my $line (@lines) {
-                if ($line =~ m/$config{'PSAD_FIFO'}/) {
+                if ($line =~ m/$config{'PSAD_FIFO'}/ or $line =~ /psadfifo/) {
                     $found = 1;
                     last;
                 }
             }
             unless ($found) {
-                open SYSLOGNG, "> $config{'ETC_SYSLOGNG_CONF'}" or
+                open SYSLOGNG, ">> $config{'ETC_SYSLOGNG_CONF'}" or
                     die "[*] Unable to open $config{'ETC_SYSLOGNG_CONF'}: $!";
-                ### this loop removes any old location for psadfifo
+                my $src = 'src';
+                ### see if a different source name is defined for /proc/kmsg
                 for my $line (@lines) {
-                    unless ($line =~ /psadfifo/i) {
-                        print SYSLOGNG $line;
+                    ### source kernsrc { file("/proc/kmsg"); };
+                    if ($line =~ m|^\s*source\s+(\w+)\s+.*file\(\"/proc/kmsg\"\);|) {
+                        $src = $1;
                     }
                 }
                 print SYSLOGNG "\n",
@@ -8044,7 +8046,7 @@ sub setup() {
                     "filter f_kerninfo { facility(kern); };\n",
 #                    "filter f_kerninfo { facility(kern) ",
 #                    "and level(info); };\n",
-                    'log { source(src); ',
+                    "log { source($src); ",
                     "filter(f_kerninfo); destination(psadpipe); };\n";
                 close SYSLOGNG;
                 &Psad::psyslog('psad', 'reconfiguring syslog-ng to write ' .

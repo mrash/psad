@@ -52,6 +52,7 @@
 #define MAX_PATH_LEN 100
 #define MAX_MSG_LEN 120
 #define MAX_GEN_LEN 80
+#define MAX_EMAIL_LEN 300
 #define MAX_ARG_LEN 30
 #define MAX_NUM_LEN 6
 

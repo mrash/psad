@@ -183,7 +183,7 @@ my $flush_fw = 0;
 ### IPT_AUTO_CHAIN variable
 my @ipt_config = ();
 
-### configuration hash
+### main configuration hash
 my %config = ();
 
 ### fw search string array
@@ -782,6 +782,9 @@ MAIN: for (;;) {
 
         &Psad::psyslog('psad', 'received HUP signal, ' .
             're-importing psad.conf') unless $no_syslog_alerts;
+
+        print STDERR "[+] Received HUP signal, re-importing config...\n"
+            if $debug;
 
         my $orig_fwdata = $fw_data_file;
         my $orig_ipt_sockfile = '';
@@ -2497,6 +2500,9 @@ sub get_psad_mod_paths() {
 
 sub psad_init() {
 
+    %config = ();
+    %cmds   = ();
+
     ### set umask to -rw-------
     umask 0077;
 
@@ -2571,7 +2577,7 @@ sub psad_init() {
     ### set some config variables based on command line input
     &handle_cmdline();
 
-    ### build iptable block config hash out of IPT_AUTO_CHAIN keywords
+    ### build iptables block config hash out of IPT_AUTO_CHAIN keywords
     ### (we don't check ENABLE_AUTO_IDS here since someone may have turned
     ### it off but still want to run --Status checks or use --Flush).
     &build_ipt_config() unless $syslog_server;
@@ -2871,6 +2877,9 @@ sub import_ip_options() {
 }
 
 sub import_fw_search() {
+
+    @fw_search = ();
+
     open F, "< $fw_search_file" or die "[*] Could not open fw search ",
         "string file $fw_search_file: $!";
     my @lines = <F>;
@@ -3001,6 +3010,9 @@ sub parse_ignore_interfaces() {
 }
 
 sub import_snort_rules() {
+
+    %fwsnort_sigs = ();
+
     opendir D, $config{'SNORT_RULES_DIR'}
         or die "[*] Could not open $config{'SNORT_RULES_DIR'}";
     my @rfiles = readdir D;
@@ -3534,7 +3546,9 @@ sub check_supported_options() {
 }
 
 sub import_icmp_types() {
+
     %valid_icmp_types = ();
+
     open TYPES, "< $config{'ICMP_TYPES_FILE'}" or die
         "[*] Could not open $config{'ICMP_TYPES_FILE'}: $!";
     my @lines = <TYPES>;
@@ -3668,7 +3682,9 @@ sub build_sig_int_range() {
 }
 
 sub import_auto_dl() {
+
     %auto_dl = ();  ### undef so we don't leave old ips in %auto_dl
+
     open A, "< $config{'AUTO_DL_FILE'}" or die '[*] Could not open ',
         "$config{'AUTO_DL_FILE'}: $!";
     my @lines = <A>;
@@ -3765,6 +3781,9 @@ sub import_auto_dl() {
 }
 
 sub import_p0f_sigs() {
+
+    %p0f_sigs = ();
+
     my $p0f_file = $config{'P0F_FILE'};
     open P, "< $p0f_file" or die '[*] Could not open ',
         "$p0f_file: $!";
@@ -3805,7 +3824,9 @@ sub import_p0f_sigs() {
 }
 
 sub import_posf_sigs() {
+
     %posf_sigs = ();
+
     my $posf_file = $config{'POSF_FILE'};
     open P, "< $posf_file" or die '[*] Could not open ',
         "$posf_file: $!";
@@ -3902,7 +3923,7 @@ sub assign_danger_level() {
 
         my $changed_dl = 0;
 
-        print STDERR "[+] assign_danger_level(): source ip: $src (dl: ",
+        print STDERR "[+] assign_danger_level(): source IP: $src (dl: ",
             "$scan_dl{$src})\n" if $debug;
 
         if (defined $curr_sigs_dl_hr->{$src}) {
@@ -4524,7 +4545,7 @@ sub scan_logr() {
     }
 
     SRC: for my $src (keys %$curr_scan_hr) {
-        print STDERR "[+] scan_logr(): source ip: $src\n" if $debug;
+        print STDERR "[+] scan_logr(): source IP: $src\n" if $debug;
         ### only send alerts for scans that are at least at
         ### danger level 1 or above.
         next SRC unless $scan_dl{$src} >= 1;
@@ -4573,7 +4594,7 @@ sub scan_logr() {
                 }
                 next DST;
             }
-            print STDERR "[+] scan_logr(): dst ip: $dst\n" if $debug;
+            print STDERR "[+] scan_logr(): dst IP: $dst\n" if $debug;
 
             ### make $src directory here in /var/log/psad
             ### unless it already exists
@@ -5606,9 +5627,9 @@ sub ipt_block() {
         }
     }
     if ($already_blocked) {
-        &Psad::psyslog('psad', "block rule for ip: $ip already exists")
+        &Psad::psyslog('psad', "block rule for IP: $ip already exists")
             unless $no_syslog_alerts;
-        print STDERR "[-] Block rule for ip: $ip already exists\n"
+        print STDERR "[-] Block rule for IP: $ip already exists\n"
             if $debug;
     } elsif ($block_success) {
 
@@ -6129,6 +6150,8 @@ sub timeout_auto_blocked_ips() {
 }
 
 sub build_ipt_config() {
+
+    @ipt_config = ();
 
     &make_psad_dirs() unless -d $config{'PSAD_DIR'};
 

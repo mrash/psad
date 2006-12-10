@@ -426,6 +426,21 @@ sub install() {
     }
     print "\n\n";
 
+    ### install nf2csv
+    print "\n\n";
+    &logr("[+] Verifying compilation of nf2csv script:\n");
+    unless (((system "$Cmds{'perl'} -c nf2csv")>>8) == 0) {
+        die "[*] nf2csv does not compile with \"perl -c\".  Download ",
+            "the latest sources from:\n\nhttp://www.cipherdyne.org/\n";
+    }
+
+    ### put the nf2csv script in place
+    &logr("[+] Copying nf2csv -> ${USRSBIN_DIR}/nf2csv\n");
+    unlink "${USRSBIN_DIR}/nf2csv" if -e "${USRSBIN_DIR}/nf2csv";
+    copy 'nf2csv', "${USRSBIN_DIR}/nf2csv" or die "[*] Could ",
+        "not copy nf2csv -> ${USRSBIN_DIR}/nf2csv: $!";
+    &perms_ownership("${USRSBIN_DIR}/nf2csv", 0755);
+
     ### put the fwcheck_psad.pl script in place
     &logr("[+] Copying fwcheck_psad.pl -> ${USRSBIN_DIR}/fwcheck_psad\n");
     unlink "${USRSBIN_DIR}/fwcheck_psad" if -e "${USRSBIN_DIR}/fwcheck_psad";
@@ -741,6 +756,10 @@ sub uninstall() {
     if (-e "${USRSBIN_DIR}/fwcheck_psad") {
         print "[+] Removing ${USRSBIN_DIR}/fwcheck_psad\n";
         unlink "${USRSBIN_DIR}/fwcheck_psad";
+    }
+    if (-e "${USRSBIN_DIR}/nf2csv") {
+        print "[+] Removing ${USRSBIN_DIR}/nf2csv\n";
+        unlink "${USRSBIN_DIR}/nf2csv";
     }
     if (-e "${USRSBIN_DIR}/psad") {
         print "[+] Removing psad daemons: ${USRSBIN_DIR}/",

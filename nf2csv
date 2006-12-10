@@ -134,9 +134,15 @@ if ($csv_start_line) {
 }
 my $ctr = 0;
 my $line_ctr = 0;
-open MSGS, "< $nf_log_file" or die "[*] Could not open ",
-        "$nf_log_file: $!";
-MSG: while (<MSGS>) {
+
+my $fh = *STDIN;
+if ($nf_log_file) {
+    open MSGS, "< $nf_log_file" or die "[*] Could not open ",
+            "$nf_log_file: $!";
+    $fh = *MSGS;
+}
+
+MSG: while (<$fh>) {
     my $pkt_str = $_;
     $line_ctr++;
     if ($csv_start_line) {
@@ -146,7 +152,10 @@ MSG: while (<MSGS>) {
         last MSG if $line_ctr == $csv_end_line;
     }
     next MSG unless $pkt_str =~ /IN.*OUT/;
+
+    ### init pkt hash
     my %pkt = %pkt_NF_init;
+
     my $rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
     next MSG unless $rv;
 
@@ -223,12 +232,13 @@ MSG: while (<MSGS>) {
         last if $ctr >= $csv_line_limit;
     }
 }
-close MSGS;
+close $fh;
 if ($csv_print_uniq) {
     print "$_\n" for keys %csv_uniq_lines;
 }
 
 exit 0;
+#============================= end main ===============================
 
 sub csv_tokens() {
 

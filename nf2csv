@@ -4,10 +4,10 @@
 #
 # File: nf2csv
 #
-# Purpose: nf2csv parses Netfilter log messages and prints them on stdout
+# Purpose: nf2csv parses iptables log messages and prints them on stdout
 #          in comma separated value format.  This is most useful for
 #          generating data for the AfterGlow project
-#          (http://afterglow.sourceforge.net) to visualize Netfilter log
+#          (http://afterglow.sourceforge.net) to visualize iptables log
 #          data.
 #
 #          nf2csv is part of the psad project (http://www.cipherdyne.org/psad)
@@ -265,6 +265,13 @@ sub csv_tokens() {
             $token = 'dst' if $token eq 'DST';
             $token = 'sp'  if $token eq 'SPT';
             $token = 'dp'  if $token eq 'DPT';
+            $token = 'tos' if $token eq 'TOS';
+            $token = 'win' if $token eq 'WIN';
+            $token = 'itype' if $token eq 'TYPE';
+            $token = 'icode' if $token eq 'CODE';
+            $token = 'ttl'   if $token eq 'TTL';
+            $token = 'ip_id' if $token eq 'ID';
+            $token = 'icmp_seq' if $token eq 'SEQ';
             $token = 'proto' if $token eq 'PROTO';
             $token = 'ip_len' if $token eq 'LEN';
             $token = 'intf' if $token eq 'IN' or $token eq 'OUT';
@@ -337,8 +344,8 @@ sub parse_NF_pkt_str() {
         $pkt_hr->{'log_prefix'} = $1;
     }
 
-    ### get the in/out interface and Netfilter chain (the code below
-    ### allows the Netfilter log message to contain the PHYSDEV stuff):
+    ### get the in/out interface and iptables chain (the code below
+    ### allows the iptables log message to contain the PHYSDEV stuff):
     ### Feb 25 12:13:27 bridge kernel: INBOUND TCP: IN=br0 PHYSIN=eth0 OUT=br0
     ### PHYSOUT=eth1 SRC=63.147.183.21 DST=11.11.79.100 LEN=48 TOS=0x00
     ### PREC=0x00 TTL=113 ID=19664 DF PROTO=TCP SPT=4918 DPT=135 WINDOW=64240
@@ -413,7 +420,7 @@ sub parse_NF_pkt_str() {
                 = ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
 
         ### the reserve bits are not reported by ulogd, but normal
-        ### Netfilter syslog messages contain them.
+        ### iptables syslog messages contain them.
         $pkt_hr->{'flags'} =~ s/\s*RES=\S+\s*//;
 
         $pkt_hr->{'proto'} = 'tcp';
@@ -442,7 +449,7 @@ sub parse_NF_pkt_str() {
         }
 
         ### make sure we have a "reasonable" packet (note that nmap
-        ### can scan port 0 and Netfilter can report this fact)
+        ### can scan port 0 and iptables can report this fact)
         unless ($pkt_hr->{'ip_len'} >= 0 and $pkt_hr->{'tos'}
                 and $pkt_hr->{'ttl'} >= 0 and $pkt_hr->{'ip_id'} >= 0
                 and $pkt_hr->{'proto'} and $pkt_hr->{'sp'} >= 0
@@ -468,7 +475,7 @@ sub parse_NF_pkt_str() {
         $pkt_hr->{'proto'} = 'udp';
 
         ### make sure we have a "reasonable" packet (note that nmap
-        ### can scan port 0 and Netfilter can report this fact)
+        ### can scan port 0 and iptables can report this fact)
         unless ($pkt_hr->{'ip_len'} >= 0
                 and $pkt_hr->{'tos'} and $pkt_hr->{'ttl'} >= 0
                 and $pkt_hr->{'ip_id'} >= 0 and $pkt_hr->{'proto'}
@@ -503,7 +510,7 @@ sub parse_NF_pkt_str() {
         }
 
     } else {
-        ### Sometimes the Netfilter log entry gets messed up due to
+        ### Sometimes the iptables log entry gets messed up due to
         ### buffering issues so we write it to the error log.
         print STDERR "[-] err packet: no regex match.\n" if $debug;
         return 0;
@@ -522,21 +529,21 @@ nf2csv
 Usage: nf2csv [options]
 
 Options:
-    -M,  --messages-file <file>   - Specify the path to the Netfilter
-                                    logfile (use in conjunction with
-                                    --Analyze-msgs).
     -f, --fields <fields>         - Restrict output to a list of
                                     specfic fields.
     -u, --uniq-lines              - Only print unique lines
     -m, --max-lines <num>         - Specify the maximum number of
                                     output lines to print.
-    -s, --start-line <line>       - Starting line within Netfilter log
+    -M,  --messages-file <file>   - Specify the path to the iptables
+                                    logfile (use in conjunction with
+                                    --Analyze-msgs).
+    -s, --start-line <line>       - Starting line within iptables log
                                     file.
-    -e, --end-line <line>         - Ending line within Netfilter log
+    -e, --end-line <line>         - Ending line within iptables log
                                     file.
-    -r, --regex <regex>           - Require Netfilter log messages to
+    -r, --regex <regex>           - Require iptables log messages to
                                     match an additional regex.
-    -n, --neg-regex <regex>       - Require Netfilter log messages to
+    -n, --neg-regex <regex>       - Require iptables log messages to
                                     not match an additional regex.
     -d,  --debug                  - Run in debugging mode.
     -V,  --Version                - Print the version and exit.

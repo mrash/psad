@@ -1,0 +1,530 @@
+#!/usr/bin/perl -w
+#
+###########################################################################
+#
+# File: nf2csv
+#
+# Purpose: nf2csv parses Netfilter log messages and prints them on stdout
+#          in comma separated value format.  This is most useful for
+#          generating data for the AfterGlow project
+#          (http://afterglow.sourceforge.net) to visualize Netfilter log
+#          data.
+#
+#          nf2csv is part of the psad project (http://www.cipherdyne.org/psad)
+#
+# Author: Michael Rash (mbr@cipherdyne.org)
+#
+# Credits:  (see the CREDITS file)
+#
+# Copyright (C) 2006 Michael Rash (mbr@cipherdyne.org)
+#
+# License (GNU Public License):
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
+#    USA
+#
+###########################################################################
+#
+# $Id$
+#
+
+use Getopt::Long 'GetOptions';
+use strict;
+
+my $version = '2.0-pre3';
+my $revision_svn = '$Revision: 1793 $';
+my $rev_num = '1';
+($rev_num) = $revision_svn =~ m|\$Rev.*:\s+(\S+)|;
+
+### regex to match an ip address
+my $ip_re = qr|(?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2}|;
+
+### main packet data structure
+my %pkt_NF_init = (
+
+    ### data link layer
+    'src_mac' => '',
+    'dst_mac' => '',
+    'intf'    => '',   ### FIXME in and out interfaces?
+
+    ### network layer
+    'src'    => '',
+    'dst'    => '',
+    'proto'  => '',
+    'ip_id'  => -1,
+    'ttl'    => -1,
+    'tos'    => '',
+    'ip_len' => -1,
+    'itype'  => -1,
+    'icode'  => -1,
+    'ip_opts'  => '',
+    'icmp_seq' => -1,
+    'icmp_id'  => -1,
+    'frag_bit' => 0,
+
+    ### transport layer
+    'sp'  => -1,
+    'dp'  => -1,
+    'win' => -1,
+    'flags' => -1,
+    'tcp_seq'  => -1,
+    'tcp_ack'  => -1,
+    'tcp_opts' => '',
+    'udp_len'  => -1,
+
+    ### extra fields for internals (fwsnort sid matching,
+    ### Netfilter logging prefixes and chains, etc.)
+    'fwsnort_sid' => 0,
+    'chain'       => '',
+    'log_prefix'  => '',
+    'syslog_host' => '',
+    'timestamp'   => ''
+);
+
+my $csv_fields     = '';
+my $csv_print_uniq = 0;
+my $csv_line_limit = 0;
+my $csv_start_line = 0;
+my $csv_end_line   = 0;
+my $csv_regex      = 0;
+my $csv_neg_regex  = 0;
+my $nf_log_file = '';
+my $print_ver   = 0;
+my $debug = 0;
+my $help  = 0;
+
+### make Getopts case sensitive
+Getopt::Long::Configure('no_ignore_case');
+
+&usage(1) unless (GetOptions(
+    'Messages-file=s' => \$nf_log_file,   # Specify the path to file containing
+    'fields=s'      => \$csv_fields,      # Specify list of CSV fields.
+    'uniq-lines'    => \$csv_print_uniq,  # Only print unique lines in CSV
+                                          #   output.
+    'max-lines=i'   => \$csv_line_limit,  # Limit the number of CSV output
+                                          #   lines.
+    'start-line=i'  => \$csv_start_line,  # Starting line in CSV file.
+    'end-line=i'    => \$csv_end_line,    # Ending line in CSV file.
+    'regex=s'       => \$csv_regex,       # Require additional regex match.
+    'neg-regex=s'   => \$csv_neg_regex,   # Require additional negative regex
+    'debug'         => \$debug,           # Run in debug mode.
+    'Version'       => \$print_ver,       # Print the nf2csv version and exit.
+    'help'          => \$help,            # Display help.
+));
+&usage(0) if $help;
+
+### see what we should be searching for
+my ($tokens_ar, $match_criteria_ar) = &csv_tokens();
+
+$csv_regex = qr/$csv_regex/ if $csv_regex;
+$csv_neg_regex = qr/$csv_neg_regex/ if $csv_neg_regex;
+
+my %csv_uniq_lines = ();
+
+if ($csv_start_line) {
+    die "[*] Cannot have start line > end line."
+        if $csv_start_line > $csv_end_line;
+}
+my $ctr = 0;
+my $line_ctr = 0;
+open MSGS, "< $nf_log_file" or die "[*] Could not open ",
+        "$nf_log_file: $!";
+MSG: while (<MSGS>) {
+    my $pkt_str = $_;
+    $line_ctr++;
+    if ($csv_start_line) {
+        next MSG unless $line_ctr >= $csv_start_line;
+    }
+    if ($csv_end_line) {
+        last MSG if $line_ctr == $csv_end_line;
+    }
+    next MSG unless $pkt_str =~ /IN.*OUT/;
+    my %pkt = %pkt_NF_init;
+    my $rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
+    next MSG unless $rv;
+
+    if ($csv_regex) {
+        next MSG unless $pkt{'raw'} =~ m|$csv_regex|;
+    }
+    if ($csv_neg_regex) {
+        next MSG unless $pkt{'raw'} !~ m|$csv_neg_regex|;
+    }
+    $pkt{'log_prefix'} =~ s/\W//g;
+    $pkt{'log_prefix'} =~ s/\s//g;
+    my @matched_fields = ();
+    for (my $i=0; $i <= $#$tokens_ar; $i++) {
+        my $tok = $tokens_ar->[$i];
+        if ($match_criteria_ar) {
+            my $match_hr = $match_criteria_ar->[$i];
+            if (defined $match_hr->{'num'}) {
+                unless ($pkt{$tok} =~ m|^\d+$|
+                        and $pkt{$tok} == $match_hr->{'num'}) {
+                    next MSG;
+                }
+            } elsif (defined $match_hr->{'gt'}) {
+                unless ($pkt{$tok} =~ m|^\d+$|
+                        and $pkt{$tok} > $match_hr->{'gt'}) {
+                    next MSG;
+                }
+            } elsif (defined $match_hr->{'lt'}) {
+                unless ($pkt{$tok} =~ m|^\d+$|
+                        and $pkt{$tok} < $match_hr->{'lt'}) {
+                    next MSG;
+                }
+            } elsif (defined $match_hr->{'str'}) {
+                unless ($pkt{$tok} eq $match_hr->{'str'}) {
+                    next MSG;
+                }
+            } elsif (defined $match_hr->{'re'}) {
+                unless ($pkt{$tok} =~ m|$match_hr->{'re'}m|) {
+                    next MSG;
+                }
+            } elsif (defined $match_hr->{'net'}) {
+                if ($pkt{$tok} =~ m|$ip_re|) {
+                    unless (ipv4_in_network($match_hr->{'net'}, $pkt{$tok})) {
+                        next MSG;
+                    }
+                } else {
+                    next MSG;
+                }
+            } elsif (defined $match_hr->{'ip'}) {
+                unless ($pkt{$tok} eq $match_hr->{'ip'}) {
+                    next MSG;
+                }
+            }
+            push @matched_fields, $pkt{$tok};
+        } else {
+            push @matched_fields, $pkt{$tok};
+        }
+    }
+    next MSG unless @matched_fields;
+    my $str = '';
+    if ($csv_fields) {
+        $str .= "$_, " for @matched_fields;
+    } else {
+        $str .= "$_ " for @matched_fields;
+    }
+    $str =~ s/,\s*$//;
+    $str =~ s/\s*$//;
+    $ctr++;
+    if ($csv_print_uniq) {
+        $csv_uniq_lines{$str} = '';
+    } else {
+        print $str, "\n";
+    }
+    if ($csv_line_limit > 0) {
+        last if $ctr >= $csv_line_limit;
+    }
+}
+close MSGS;
+if ($csv_print_uniq) {
+    print "$_\n" for keys %csv_uniq_lines;
+}
+
+exit 0;
+
+sub csv_tokens() {
+
+    my @tokens = ();
+    my @match_criteria = ();
+
+    if ($csv_fields) {
+        my @tok_tmp = split /\s+/, $csv_fields;
+        for my $tok_str (@tok_tmp) {
+            my $token  = $tok_str;
+            my $search = '';
+            if ($tok_str =~ m|(\w+):(\S+)|) {
+                $token  = $1;
+                $search = $2;
+            }
+            $token = 'src' if $token eq 'SRC';
+            $token = 'dst' if $token eq 'DST';
+            $token = 'sp'  if $token eq 'SPT';
+            $token = 'dp'  if $token eq 'DPT';
+            $token = 'proto' if $token eq 'PROTO';
+            $token = 'ip_len' if $token eq 'LEN';
+            $token = 'intf' if $token eq 'IN' or $token eq 'OUT';
+            unless (defined $pkt_NF_init{$token}) {
+                print "[*] $token is not a valid packet field; valid ",
+                    "fields are:\n";
+                for my $key (sort keys %pkt_NF_init) {
+                    print "    $key\n";
+                }
+                die;
+            }
+            push @tokens, $token;
+
+            if ($search) {
+                my %search_hsh = ();
+                if ($search =~ m|^\d+$|) {
+                    $search_hsh{'num'} = $search;
+                } elsif ($search =~ m|^>(\d+)$|) {
+                    $search_hsh{'gt'} = $1;
+                    die "[*] $token value must be >= 0"
+                        unless $1 >= 0;
+                } elsif ($search =~ m|^<(\d+)$|) {
+                    $search_hsh{'lt'} = $1;
+                    die "[*] $token value must be >= 0"
+                        unless $1 >= 0;
+                } elsif ($search =~ m|^/(.*?)/$|) {
+                    $search_hsh{'re'} = qr|$1|;
+                } elsif ($search =~ m|^\"(.*?)\"$|) {
+                    $search_hsh{'str'} = $1;
+                } elsif ($search =~ m|^$ip_re/$ip_re$|) {
+                    $search_hsh{'net'} = $search;
+                } elsif ($search =~ m|^$ip_re/\d+$|) {
+                    $search_hsh{'net'} = $search;
+                } elsif ($search =~ m|^$ip_re$|) {
+                    $search_hsh{'ip'} = $search;
+                } else {
+                    die "[*] Unrecognized value for $token";
+                }
+                push @match_criteria, \%search_hsh;
+            } else {
+                push @match_criteria, {};
+            }
+        }
+    } else {
+        @tokens = qw(
+            timestamp
+            src
+            dst
+            sp
+            dp
+            proto
+            flags
+            ip_len
+            intf
+            chain
+            log_prefix
+        );
+    }
+    return \@tokens, \@match_criteria;
+}
+
+sub parse_NF_pkt_str() {
+    my ($pkt_hr, $pkt_str) = @_;
+
+    print STDERR "\n", $pkt_str if $debug;
+
+    $pkt_hr->{'raw'} = $pkt_str;
+
+    if ($pkt_str =~ /.*kernel:\s+(.*?)\s*IN=/) {
+        $pkt_hr->{'log_prefix'} = $1;
+    }
+
+    ### get the in/out interface and Netfilter chain (the code below
+    ### allows the Netfilter log message to contain the PHYSDEV stuff):
+    ### Feb 25 12:13:27 bridge kernel: INBOUND TCP: IN=br0 PHYSIN=eth0 OUT=br0
+    ### PHYSOUT=eth1 SRC=63.147.183.21 DST=11.11.79.100 LEN=48 TOS=0x00
+    ### PREC=0x00 TTL=113 ID=19664 DF PROTO=TCP SPT=4918 DPT=135 WINDOW=64240
+    ### RES=0x00 SYN URGP=0
+    if ($pkt_str =~ /\sIN=(\S+).*\sOUT=\s/) {
+        $pkt_hr->{'intf'}  = $1;
+        $pkt_hr->{'chain'} = 'INPUT';
+    } elsif ($pkt_str =~ /\sIN=(\S+).*\sOUT=\S/) {
+        $pkt_hr->{'intf'}  = $1;
+        $pkt_hr->{'chain'} = 'FORWARD';
+    } elsif ($pkt_str =~ /\sIN=\s+.*\sOUT=(\S+)/) {
+        $pkt_hr->{'intf'}  = $1;
+        $pkt_hr->{'chain'} = 'OUTPUT';
+    }
+
+    if ($pkt_str =~ /\sMAC=(\S+)/) {
+        my $mac_str = $1;
+        if ($mac_str =~ /^((?:\w{2}\:){6})((?:\w{2}\:){6})/) {
+            $pkt_hr->{'dst_mac'} = $1;
+            $pkt_hr->{'src_mac'} = $2;
+        }
+    }
+    if ($pkt_hr->{'src_mac'}) {
+        $pkt_hr->{'src_mac'} =~ s/:$//;
+        print STDERR "[+] src mac addr: $pkt_hr->{'src_mac'}\n" if $debug;
+    }
+    if ($pkt_hr->{'dst_mac'}) {
+        $pkt_hr->{'dst_mac'} =~ s/:$//;
+        print STDERR "[+] dst mac addr: $pkt_hr->{'dst_mac'}\n" if $debug;
+    }
+
+    unless ($pkt_hr->{'intf'} and $pkt_hr->{'chain'}) {
+        print STDERR "[-] err packet: could not determine ",
+            "interface and chain.\n" if $debug;
+        return 0;
+    }
+
+    ### get the syslog logging host for this packet
+    if ($pkt_str =~ /^\s*((?:\S+\s+){2}\S+)\s+(\S+)\s+kernel:/) {
+        $pkt_hr->{'timestamp'}   = $1;
+        $pkt_hr->{'syslog_host'} = $2;
+    } else {
+        $pkt_hr->{'timestamp'}   = localtime();
+        $pkt_hr->{'syslog_host'} = 'unknown';
+    }
+
+    ### try to extract a snort sid (generated by fwsnort) from
+    ### the packet
+    if ($pkt_str =~ /SID(\d+)/) {
+        $pkt_hr->{'fwsnort_sid'} = $1;
+    }
+
+    ### get IP options if --log-ip-options is used
+    ### (they appear before the PROTO= field).
+    if ($pkt_str =~ /OPT\s+\((\S+)\)\s+PROTO=/) {
+        $pkt_hr->{'ip_opts'} = $1;
+    }
+
+    ### May 18 22:21:26 orthanc kernel: DROP IN=eth2 OUT=
+    ### MAC=00:60:1d:23:d0:01:00:60:1d:23:d3:0e:08:00 SRC=192.168.20.25
+    ### DST=192.168.20.1 LEN=60 TOS=0x10 PREC=0x00 TTL=64 ID=47300 DF
+    ### PROTO=TCP SPT=34111 DPT=6345 WINDOW=5840 RES=0x00 SYN URGP=0
+    if ($pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+)\s+TOS=(\S+)
+                \s*.*\s+TTL=(\d+)\s+ID=(\d+)\s*.*\s+PROTO=TCP\s+
+                SPT=(\d+)\s+DPT=(\d+)\s.*\s*WINDOW=(\d+)\s+
+                (.*)\s+URGP=/x) {
+
+        ($pkt_hr->{'src'}, $pkt_hr->{'dst'}, $pkt_hr->{'ip_len'},
+            $pkt_hr->{'tos'}, $pkt_hr->{'ttl'}, $pkt_hr->{'ip_id'},
+            $pkt_hr->{'sp'}, $pkt_hr->{'dp'}, $pkt_hr->{'win'},
+            $pkt_hr->{'flags'})
+                = ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
+
+        ### the reserve bits are not reported by ulogd, but normal
+        ### Netfilter syslog messages contain them.
+        $pkt_hr->{'flags'} =~ s/\s*RES=\S+\s*//;
+
+        $pkt_hr->{'proto'} = 'tcp';
+
+        ### default to NULL
+        $pkt_hr->{'flags'} = 'NULL' unless $pkt_hr->{'flags'};
+
+        unless ($pkt_hr->{'flags'} !~ /WIN/ &&
+                $pkt_hr->{'flags'} =~ /ACK/ ||
+                $pkt_hr->{'flags'} =~ /SYN/ ||
+                $pkt_hr->{'flags'} =~ /RST/ ||
+                $pkt_hr->{'flags'} =~ /URG/ ||
+                $pkt_hr->{'flags'} =~ /PSH/ ||
+                $pkt_hr->{'flags'} =~ /FIN/ ||
+                $pkt_hr->{'flags'} eq 'NULL') {
+
+            print STDERR "[-] err packet: bad tcp flags.\n" if $debug;
+            return 0;
+        }
+        $pkt_hr->{'frag_bit'} = 1 if $pkt_str =~ /\sDF\s+PROTO/;
+
+        ### don't pickup IP options if --log-ip-options is used
+        ### (they appear before the PROTO= field).
+        if ($pkt_str =~ /URGP=\S+\s+OPT\s+\((\S+)\)/) {
+            $pkt_hr->{'tcp_opts'} = $1;
+        }
+
+        ### make sure we have a "reasonable" packet (note that nmap
+        ### can scan port 0 and Netfilter can report this fact)
+        unless ($pkt_hr->{'ip_len'} >= 0 and $pkt_hr->{'tos'}
+                and $pkt_hr->{'ttl'} >= 0 and $pkt_hr->{'ip_id'} >= 0
+                and $pkt_hr->{'proto'} and $pkt_hr->{'sp'} >= 0
+                and $pkt_hr->{'dp'} >= 0 and $pkt_hr->{'win'} >= 0
+                and $pkt_hr->{'flags'}) {
+            return 0;
+        }
+
+    ### May 18 22:21:26 orthanc kernel: DROP IN=eth2 OUT=
+    ### MAC=00:60:1d:23:d0:01:00:60:1d:23:d3:0e:08:00
+    ### SRC=192.168.20.25 DST=192.168.20.1 LEN=28 TOS=0x00 PREC=0x00
+    ### TTL=40 ID=47523 PROTO=UDP SPT=57339 DPT=305 LEN=8
+
+    } elsif ($pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+)\s+TOS=(\S+)
+                      \s.*TTL=(\d+)\s+ID=(\d+)\s*.*\s+PROTO=UDP\s+
+                      SPT=(\d+)\s+DPT=(\d+)\s+LEN=(\d+)/x) {
+
+        ($pkt_hr->{'src'}, $pkt_hr->{'dst'}, $pkt_hr->{'ip_len'},
+            $pkt_hr->{'tos'}, $pkt_hr->{'ttl'}, $pkt_hr->{'ip_id'},
+            $pkt_hr->{'sp'}, $pkt_hr->{'dp'}, $pkt_hr->{'udp_len'})
+                = ($1,$2,$3,$4,$5,$6,$7,$8,$9);
+
+        $pkt_hr->{'proto'} = 'udp';
+
+        ### make sure we have a "reasonable" packet (note that nmap
+        ### can scan port 0 and Netfilter can report this fact)
+        unless ($pkt_hr->{'ip_len'} >= 0
+                and $pkt_hr->{'tos'} and $pkt_hr->{'ttl'} >= 0
+                and $pkt_hr->{'ip_id'} >= 0 and $pkt_hr->{'proto'}
+                and $pkt_hr->{'sp'} >= 0 and $pkt_hr->{'dp'} >= 0
+                and $pkt_hr->{'udp_len'} >= 0) {
+
+            return 0;
+        }
+
+    ### Nov 27 15:45:51 orthanc kernel: DROP IN=eth1 OUT= MAC=00:a0:cc:e2:1f:f2:00:
+    ### 20:78:10:70:e7:08:00 SRC=192.168.10.20 DST=192.168.10.1 LEN=84 TOS=0x00
+    ### PREC=0x00 TTL=64 ID=0 DF PROTO=ICMP TYPE=8 CODE=0 ID=61055 SEQ=256
+
+    } elsif ($pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+).*
+                      TTL=(\d+)\s+ID=(\d+).*PROTO=ICMP\s+TYPE=(\d+)\s+
+                      CODE=(\d+)\s+ID=(\d+)\s+SEQ=(\d+)/x) {
+
+        ($pkt_hr->{'src'}, $pkt_hr->{'dst'}, $pkt_hr->{'ip_len'},
+            $pkt_hr->{'ttl'}, $pkt_hr->{'ip_id'}, $pkt_hr->{'itype'},
+            $pkt_hr->{'icode'}, $pkt_hr->{'icmp_id'}, $pkt_hr->{'icmp_seq'})
+                = ($1,$2,$3,$4,$5,$6,$7,$8,$9);
+
+        $pkt_hr->{'proto'} = 'icmp';
+        $pkt_hr->{'sp'} = $pkt_hr->{'dp'} = 0;
+
+        unless ($pkt_hr->{'ip_len'} >= 0 and $pkt_hr->{'ttl'} >= 0
+                and $pkt_hr->{'proto'} and $pkt_hr->{'itype'} >= 0
+                and $pkt_hr->{'icode'} >= 0 and $pkt_hr->{'ip_id'} >= 0
+                and $pkt_hr->{'icmp_seq'} >= 0) {
+
+            return 0;
+        }
+
+    } else {
+        ### Sometimes the Netfilter log entry gets messed up due to
+        ### buffering issues so we write it to the error log.
+        print STDERR "[-] err packet: no regex match.\n" if $debug;
+        return 0;
+    }
+    return 1;
+}
+
+sub usage() {
+    my $exitcode = shift;
+    print <<_HELP_;
+
+nf2csv
+[+] Version: $version (file revision: $rev_num)
+[+] By Michael Rash (mbr\@cipherdyne.org, http://www.cipherdyne.org)
+
+Usage: nf2csv [options]
+
+Options:
+    -M,  --messages-file <file>   - Specify the path to the Netfilter
+                                    logfile (use in conjunction with
+                                    --Analyze-msgs).
+    -f, --fields <fields>         - Restrict output to a list of
+                                    specfic fields.
+    -u, --uniq-lines              - Only print unique lines
+    -m, --max-lines <num>         - Specify the maximum number of
+                                    output lines to print.
+    -s, --start-line <line>       - Starting line within Netfilter log
+                                    file.
+    -e, --end-line <line>         - Ending line within Netfilter log
+                                    file.
+    -r, --regex <regex>           - Require Netfilter log messages to
+                                    match an additional regex.
+    -n, --neg-regex <regex>       - Require Netfilter log messages to
+                                    not match an additional regex.
+    -d,  --debug                  - Run in debugging mode.
+    -V,  --Version                - Print the version and exit.
+    -h   --help                   - Display usage on STDOUT and exit.
+
+_HELP_
+    exit $exitcode;
+}

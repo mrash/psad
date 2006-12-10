@@ -126,6 +126,7 @@ mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
 install -m 700 {psad,kmsgsd,psadwatchd} $RPM_BUILD_ROOT%_sbindir/
 install -m 500 fwcheck_psad.pl $RPM_BUILD_ROOT%_sbindir/fwcheck_psad
 install -m 755 whois/whois $RPM_BUILD_ROOT/usr/bin/whois_psad
+install -m 755 nf2csv $RPM_BUILD_ROOT/usr/bin/nf2csv
 install -m 755 init-scripts/psad-init.redhat $RPM_BUILD_ROOT/etc/rc.d/init.d/psad
 install -m 644 {psad.conf,kmsgsd.conf,psadwatchd.conf,fw_search.conf,alert.conf} $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 {signatures,icmp_types,ip_options,auto_dl,snort_rule_dl,posf,pf.os} $RPM_BUILD_ROOT%_sysconfdir/%name/
@@ -251,6 +252,8 @@ fi
 * Sun Dec 08 2006 Michael Rash <mbr@cipherdyne.org>
 - psad-2.0 release.
 - Added ip_options file for the Snort ipopts rule keyword.
+- Added nf2csv so that normal users can get CSV output from
+  Netfilter log messages.
 
 * Sun Oct 15 2006 Michael Rash <mbr@cipherdyne.org>
 - psad-1.4.8 release.

@@ -186,6 +186,9 @@ my @ipt_config = ();
 ### main configuration hash
 my %config = ();
 
+### local subnets
+my @local_nets = ();
+
 ### fw search string array
 my @fw_search = ();
 
@@ -311,6 +314,7 @@ my %top_sigs    = ();
 my %sig_sources = ();
 my %top_sig_counts = ();
 my %top_packet_counts = ();
+my %local_src = ();
 
 ### regex to match an ip address
 my $ip_re = qr|(?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2}|;
@@ -351,6 +355,7 @@ my $fw_block_ip      = '';
 my $fw_rm_block_ip   = '';
 my $fw_del_chains    = 0;
 my $csv_mode         = 0;
+my $csv_stdin        = 0;
 my $csv_fields       = '';
 my $csv_print_uniq   = 0;
 my $csv_line_limit   = 0;
@@ -555,13 +560,15 @@ Getopt::Long::Configure('no_ignore_case');
                                               #   default).
     'CSV'               => \$csv_mode,        # CSV mode.
     'CSV-fields=s'      => \$csv_fields,      # Specify list of CSV fields.
-    'CSV-uniq-lines'    => \$csv_print_uniq,  # Only print unique lines in CSV output.
+    'CSV-unique-lines'  => \$csv_print_uniq,  # Only print unique lines in CSV output.
     'CSV-max-lines=i'   => \$csv_line_limit,  # Limit the number of CSV output lines.
     'CSV-start-line=i'  => \$csv_start_line,  # Starting line in CSV file.
     'CSV-end-line=i'    => \$csv_end_line,    # Ending line in CSV file.
     'CSV-regex=s'       => \$csv_regex,       # Require additional regex match.
     'CSV-neg-regex=s'   => \$csv_neg_regex,   # Require additional negative regex
                                               #   match.
+    'CSV-stdin'         => \$csv_stdin,       # Acquire Netfilter log data from
+                                              #   stdin.
     'debug'             => \$debug,           # Run in debug mode.
     'Dump-conf'         => \$dump_conf,       # Dump config and exit.
     'Interval=i'        => \$chk_interval,    # Set $chk_interval from the
@@ -1046,6 +1053,17 @@ sub check_scan() {
         print STDERR "[+] valid packet: $pkt{'src'} ($pkt{'sp'}) -> ",
             "$pkt{'dst'} ($pkt{'dp'}) $pkt{'proto'}\n" if $debug;
 
+        if ($config{'HOME_NET'} ne 'any') {
+            if ($pkt{'chain'} eq 'INPUT') {
+                $local_src{$pkt{'dst'}} = '';
+            } elsif ($pkt{'chain'} eq 'OUTPUT') {
+                $local_src{$pkt{'src'}} = '';
+            } elsif ($pkt{'chain'} eq 'FORWARD') {
+                $local_src{$pkt{'src'}} = ''
+                    if &is_local($pkt{'src'});
+            }
+        }
+
         ### initialize the danger level to 0 if it is not already defined
         ### (note the same source address might have already scanned a
         ### different destination IP, so the danger level represents the
@@ -1212,8 +1230,8 @@ sub check_scan() {
         unless ($no_snort_sids) {
             if ($pkt{'fwsnort_sid'}) {
 
-                ### found a snort sid in the packet log message
-                my $dl = &add_snort_sid(\%pkt);
+                ### found a fwsnort sid in the packet log message
+                my $dl = &add_fwsnort_sid(\%pkt);
 
                 $curr_sids_dl{$pkt{'src'}} = $dl if $dl;
 
@@ -1342,7 +1360,7 @@ sub parse_NF_pkt_str() {
         }
     }
 
-    ### get the syslog logging host for this packet
+    ### get the syslog logging host and timestamp for this packet
     if ($pkt_str =~ /^\s*((?:\S+\s+){2}\S+)\s+(\S+)\s+kernel:/) {
         $pkt_hr->{'timestamp'}   = $1;
         $pkt_hr->{'syslog_host'} = $2;
@@ -1753,7 +1771,7 @@ sub match_snort_keywords() {
                 $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'udp'}
                     {'sid'}{$sid}{$pkt_hr->{'chain'}}{'time'} = time();
 
-                $sig_sources{$sid}{$pkt_hr->{'src'}} = '';
+                $sig_sources{$sid}{$pkt_hr->{'src'}} = 0; ### not fwsnort
                 $top_sigs{$sid}++;
                 $top_sig_counts{$pkt_hr->{'src'}}++;
             }
@@ -1795,7 +1813,7 @@ sub match_snort_keywords() {
                 $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'icmp'}{'sid'}
                     {$sid}{$pkt_hr->{'chain'}}{'time'} = time();
 
-                $sig_sources{$sid}{$pkt_hr->{'src'}} = '';
+                $sig_sources{$sid}{$pkt_hr->{'src'}} = 0; ### not fwsnort
                 $top_sigs{$sid}++;
                 $top_sig_counts{$pkt_hr->{'src'}}++;
             }
@@ -1922,9 +1940,9 @@ sub match_snort_ip_keywords() {
             {$sig_hr->{'sid'}}{$pkt_hr->{'chain'}}{'is_fwsnort'} = 0;
 
         $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'ip'}{'sid'}
-            {$sig_hr->{'sid'}}{$pkt_hr->{'chain'}}{'is_fwsnort'} = time();
+            {$sig_hr->{'sid'}}{$pkt_hr->{'chain'}}{'time'} = time();
 
-        $sig_sources{$sig_hr->{'sid'}}{$pkt_hr->{'src'}} = '';
+        $sig_sources{$sig_hr->{'sid'}}{$pkt_hr->{'src'}} = 0; ### not fwsnort
         $top_sigs{$sig_hr->{'sid'}}++;
         $top_sig_counts{$pkt_hr->{'src'}}++;
 
@@ -2324,7 +2342,7 @@ sub get_largest_sid_dl() {
     return $dl;
 }
 
-sub add_snort_sid() {
+sub add_fwsnort_sid() {
     my $pkt_hr = shift;
 
     my $sid = $pkt_hr->{'fwsnort_sid'};
@@ -2340,7 +2358,7 @@ sub add_snort_sid() {
         $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{$pkt_hr->{'proto'}}
             {'sid'}{$sid}{$pkt_hr->{'chain'}}{'time'} = time();
 
-        $sig_sources{$sid}{$pkt_hr->{'src'}} = '';
+        $sig_sources{$sid}{$pkt_hr->{'src'}} = 1; ### is an fwsnort sid
         $top_sigs{$sid}++;
         $top_sig_counts{$pkt_hr->{'src'}}++;
 
@@ -2794,6 +2812,8 @@ sub check_mail_commands() {
 
 sub validate_home_net() {
 
+    @local_nets = ();
+
     return if $config{'HOME_NET'} eq 'any';
 
     my @ifconfig_out = @{&run_command($cmds{'ifconfig'}, '-a')};
@@ -2817,10 +2837,13 @@ sub validate_home_net() {
         }
     }
 
-    if ($config{'ENABLE_INTF_LOCAL_NETS'} eq 'Y') {
+    if ($config{'ENABLE_INTF_LOCAL_NETS'} eq 'Y' and not $analyze_msgs) {
 
         my $connected_str = '';
-        $connected_str .= "$_, " for @connected_subnets_cidr;
+        for my $net (@connected_subnets_cidr) {
+            push @local_nets, $net;
+            $connected_str .= "$_, ";
+        }
         $connected_str =~ s|,\s*$||;
 
         $config{'HOME_NET'} = $connected_str;
@@ -2836,15 +2859,30 @@ sub validate_home_net() {
             return;
         }
         my @home_nets = split /\s*\,\s*/, $config{'HOME_NET'};
-        for my $home_net (@home_nets) {
+        for my $net (@home_nets) {
+            my $home_net = '';
+            if ($net =~ m|($ip_re/$ip_re)|) {
+                $home_net = $1;
+            } elsif ($net =~ m|($ip_re/\d+)|) {
+                $home_net = $1;
+            } elsif ($net =~ m|($ip_re)|) {
+                $home_net = $1;
+            } else {
+                next;
+            }
+            push @local_nets, $net;
             my $found = 0;
             for my $net (@connected_subnets) {
-                $found = 1 if $home_net eq $net;
+                if ($home_net eq $net) {
+                    $found = 1;
+                }
             }
             for my $net (@connected_subnets_cidr) {
-                $found = 1 if $home_net eq $net;
+                if ($home_net eq $net) {
+                    $found = 1;
+                }
             }
-            unless ($found) {
+            unless ($found or $analyze_msgs) {
                 ### note that this might be ok if psad is running on a syslog
                 ### server, but the most likely explanation is that there was a
                 ### typo in the HOME_NET variable defintion.
@@ -2858,7 +2896,20 @@ sub validate_home_net() {
     return;
 }
 
+sub is_local() {
+    my $ip = shift;
+    my $found = 0;
+    for my $net (@local_nets) {
+        if (ipv4_in_network($net, $ip)) {
+            $found = 1;
+            last;
+        }
+    }
+    return $found;
+}
+
 sub import_ip_options() {
+
     %ip_options = ();
 
     open O, "< $config{'IP_OPTS_FILE'}" or die
@@ -3050,6 +3101,10 @@ sub import_snort_rules() {
             $fwsnort_sigs{$sid}{'msg'} = $1
                 if $line =~ /msg:\s*\"(.*?)\"\s*;/;
             $fwsnort_sigs{$sid}{'is_psad_id'} = 0;
+
+            if ($line =~ /^\s*alert\s+(\w+)/) {
+                $fwsnort_sigs{$sid}{'proto'} = lc($1);
+            }
 
             if ($line =~ /[\s;]classtype:\s*(.*?)\s*;/) {
                 $fwsnort_sigs{$sid}{'classtype'} = $1;
@@ -4199,20 +4254,19 @@ sub log_top_scans() {
     open S, "> $config{'TOP_SIGS_FILE'}.tmp" or
         die "[*] Could not open $config{'TOP_SIGS_FILE'}: $!";
     print S "#\n# Format: <sid> \"<msg>\" <matches> <num_sources> ",
-        "<sig_proto> <is_fwsnort> <is_psad>\n#\n\n";
+        "<sig_proto>\n#\n\n";
     my $ctr = 0;
     for my $sid (sort {$top_sigs{$b} <=> $top_sigs{$a}} keys %top_sigs) {
         my $found = 0;
         my $num_sources = keys %{$sig_sources{$sid}};
         if (defined $sigs{$sid} and defined $sigs{$sid}{'msg'}) {
             print S qq|$sid "$sigs{$sid}{'msg'}" $top_sigs{$sid} | .
-                qq|$num_sources $sigs{$sid}{'proto'} 0 | .
-                qq|$sigs{$sid}{'is_psad_id'}\n|;
+                qq|$num_sources $sigs{$sid}{'proto'}\n|;
             $found = 1;
         } elsif (defined $fwsnort_sigs{$sid}
                 and defined $fwsnort_sigs{$sid}{'msg'}) {
             print S qq|$sid "$fwsnort_sigs{$sid}{'msg'}" $top_sigs{$sid} | .
-                qq|$num_sources $fwsnort_sigs{$sid}{'proto'} 1 0\n|;
+                qq|$num_sources $fwsnort_sigs{$sid}{'proto'}\n|;
             $found = 1;
         }
         $ctr++ if $found;
@@ -4228,7 +4282,7 @@ sub log_top_scans() {
     open A, "> $config{'TOP_ATTACKERS_FILE'}" or
         die "[*] Could not open $config{'TOP_ATTACKERS_FILE'}: $!";
     $ctr = 0;
-    print A "#\n# Format: <IP> <DL> <total_packets> <uniq_sigs> <sig_matches>\n#\n\n";
+    print A "#\n# Format: <IP> <DL> <total_packets> <uniq_sigs> <sig_matches> <is_local>\n#\n\n";
     for my $src (sort {$scan_dl{$b} cmp $scan_dl{$a}} keys %scan_dl) {
         next unless $scan_dl{$src} >= 1;
         my $str = sprintf "%-15s %d", $src, $scan_dl{$src};
@@ -4244,6 +4298,11 @@ sub log_top_scans() {
         $str .= " $uniq_sigs";
         if (defined $top_sig_counts{$src}) {
             $str .= " $top_sig_counts{$src}";
+        } else {
+            $str .= " 0";
+        }
+        if (defined $local_src{$src}) {
+            $str .= " 1";
         } else {
             $str .= " 0";
         }
@@ -4321,6 +4380,9 @@ sub analysis_display() {
             $str .= ", Sig count: $top_sig_counts{$src}";
         } else {
             $str .= ", Sig count: 0";
+        }
+        if (defined $local_src{$src}) {
+            $str .= ", local IP!";
         }
         $ctr++;
         if ($config{'STATUS_IP_THRESHOLD'} > 0) {
@@ -4442,6 +4504,9 @@ sub analysis_display() {
         }
         if (defined $scan_sig_count{$src}) {
             $src_str .= ", Unique sigs: $scan_sig_count{$src}";
+        }
+        if (defined $local_src{$src}) {
+            $src_str .= ", local IP!";
         }
         push @lines, "$src_str\n";
         if (defined $p0f{$src}) {
@@ -6606,11 +6671,18 @@ sub csv_mode() {
         die "[*] Cannot have start line > end line."
             if $csv_start_line > $csv_end_line;
     }
-    open MSGS, "< $messages_file" or die "[*] Could not open ",
-        "$messages_file: $!";
+
+    my $fh = '';
+    if ($csv_stdin) {
+        $fh = *STDIN;
+    } else {
+        open MSGS, "< $messages_file" or die "[*] Could not open ",
+            "$messages_file: $!";
+        $fh = *MSGS;
+    }
     my $ctr = 0;
     my $line_ctr = 0;
-    MSG: while (<MSGS>) {
+    MSG: while (<$fh>) {
         my $pkt_str = $_;
         $line_ctr++;
         if ($csv_start_line) {
@@ -6736,6 +6808,13 @@ sub csv_tokens() {
             $token = 'sp'  if $token eq 'SPT';
             $token = 'dp'  if $token eq 'DPT';
             $token = 'proto' if $token eq 'PROTO';
+            $token = 'tos' if $token eq 'TOS';
+            $token = 'win' if $token eq 'WIN';
+            $token = 'itype' if $token eq 'TYPE';
+            $token = 'icode' if $token eq 'CODE';
+            $token = 'ttl'   if $token eq 'TTL';
+            $token = 'ip_id' if $token eq 'ID';
+            $token = 'icmp_seq' if $token eq 'SEQ';
             $token = 'ip_len' if $token eq 'LEN';
             $token = 'intf' if $token eq 'IN' or $token eq 'OUT';
             unless (defined $pkt_NF_init{$token}) {
@@ -7102,19 +7181,17 @@ sub status_psad_daemon() {
         open F, "< $config{'TOP_SIGS_FILE'}" or die "[*] Could not open ",
             "$config{'TOP_SIGS_FILE'}: $!";
         my $ctr = 0;
-        ### Format: <sid> "<msg>" <matches> <num_sources> <sig_proto> <is_fwsnort> <is_psad>
+        ### Format: <sid> "<msg>" <matches> <num_sources> <sig_proto>
         while (<F>) {
             next unless /\S/;
             next if /^\s*#/;
             if (/^\s*(\d+)\s+\"(.*?)\"\s+(\d+)\s+(\d+)
-                    \s+(\w+)\s+(\d)\s+(\d)/x) {
+                    \s+(\w+)/x) {
                 my $sid   = $1;
                 my $msg   = $2;
                 my $count = $3;
                 my $num_sources = $4;
                 my $proto       = $5;
-                my $is_fwsnort  = $6;
-                my $is_psad     = $7;
                 $ctr++;
                 if ($config{'STATUS_SIGS_THRESHOLD'} > 0) {
                     last if $ctr == $config{'STATUS_SIGS_THRESHOLD'};
@@ -7140,24 +7217,28 @@ sub status_psad_daemon() {
         while (<F>) {
             next unless /\S/;
             next if /^\s*#\s*$/;
-            ###  Format: <IP> <DL> <total_packets> <uniq_sigs> <sig_matches>
-            if (/^\s*($ip_re)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/) {
+            ###  Format: <IP> <DL> <total_packets> <uniq_sigs> <sig_matches> <is_local>
+            if (/^\s*($ip_re)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d)/) {
                 my $ip = $1;
                 my $dl = $2;
                 my $tot_pkts = $3;
                 my $uniq_sigs = $4;
                 my $sig_matches = $5;
+                my $is_local = $6;
                 if ($status_min_dl) {
                     next unless $dl >= $status_min_dl;
                 } else {
                     next unless $dl >= 1;
                 }
                 my $str = sprintf "      %-15s  DL: $dl, Packets: $tot_pkts, " .
-                    "Sig count: $sig_matches\n", $ip;
+                    "Sig count: $sig_matches", $ip;
                 $scan_pkt_count{$ip} += $tot_pkts;
                 $uniq_sig_count{$ip} += $uniq_sigs;
                 $scan_sig_count{$ip} += $sig_matches;
-                push @lines, $str;
+                if ($is_local) {
+                    $str .= " (local IP!)";
+                }
+                push @lines, "$str\n";
             }
         }
         close F;
@@ -7282,6 +7363,9 @@ sub status_psad_daemon() {
             }
             if (defined $scan_alerts{$src}) {
                 $src_str .= ", Email alerts: $scan_alerts{$src}";
+            }
+            if (defined $local_src{$src}) {
+                $src_str .= ", local IP!";
             }
             push @lines, $src_str, "\n";
             if (defined $scan_os{$src}) {
@@ -7651,16 +7735,20 @@ sub import_old_scans() {
         while (<F>) {
             next unless /\S/;
             next if /^\s*#/;
-            if (/^\s*($ip_re)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/) {
+            if (/^\s*($ip_re)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d)/) {
                 my $src = $1;
                 my $dl  = $2;
                 my $tot_pkts    = $3;
                 my $uniq_sigs   = $4;
                 my $sig_matches = $5;
+                my $is_ip_local = $6;
 
                 $scan_dl{$src} = $dl;
                 $top_packet_counts{$src} = $tot_pkts;
                 $top_sig_counts{$src}    = $sig_matches;
+                if ($is_ip_local) {
+                    $local_src{$src} = '';
+                }
             }
         }
         close F;
@@ -8538,7 +8626,7 @@ Options:
                                     dump fields to stdout in csv format.
     --CSV-fields <fields>         - Restrict --CSV output to a list of
                                     specfic fields.
-    --CSV-uniq-lines              - Only print unique lines in CSV
+    --CSV-unique-lines            - Only print unique lines in CSV
                                     output.
     --CSV-max-lines <num>         - Specify the maximum number of CSV
                                     output lines to print.

@@ -683,6 +683,7 @@ sub install() {
     &install_manpage('psad.8');
     &install_manpage('psadwatchd.8');
     &install_manpage('kmsgsd.8');
+    &install_manpage('nf2csv.1');
 
     my $init_file = '';
     if ($distro eq 'redhat') {
@@ -1944,13 +1945,24 @@ sub check_commands() {
 
 sub install_manpage() {
     my $manpage = shift;
+
+    my $name;
+    my $section;
+
+    if ($manpage =~ m|(\w+)\.(\d)|) {
+        $name = $1;
+        $section = $2;
+    } else {
+        die "[*] Improper man page name, should be \"pagename.section\"";
+    }
+
     ### remove old man page
-    unlink "/usr/local/man/man8/${manpage}" if
-        (-e "/usr/local/man/man8/${manpage}");
+    unlink "/usr/local/man/man$section/${manpage}" if
+        (-e "/usr/local/man/man$section/${manpage}");
 
     ### default location to put the psad man page, but check with
     ### /etc/man.config
-    my $mpath = '/usr/share/man/man8';
+    my $mpath = "/usr/share/man/man$section";
     if (-e '/etc/man.config') {
         ### prefer to install $manpage in /usr/local/man/man8 if
         ### this directory is configured in /etc/man.config
@@ -1972,7 +1984,7 @@ sub install_manpage() {
             for my $line (@lines) {
                 chomp $line;
                 if ($line =~ m|^MANPATH\s+/usr/local/man|) {
-                    $mpath = '/usr/local/man/man8';
+                    $mpath = "/usr/local/man/man$section";
                     $found = 1;
                     last;
                 }

@@ -115,6 +115,7 @@ mkdir -p $RPM_BUILD_ROOT%psadlibdir/IPTables
 ### whois_psad binary
 mkdir -p $RPM_BUILD_ROOT%_bindir
 mkdir -p $RPM_BUILD_ROOT%{_mandir}/man8
+mkdir -p $RPM_BUILD_ROOT%{_mandir}/man1
 mkdir -p $RPM_BUILD_ROOT%_sbindir
 ### psad config
 mkdir -p $RPM_BUILD_ROOT%_sysconfdir/%name
@@ -131,6 +132,7 @@ install -m 755 init-scripts/psad-init.redhat $RPM_BUILD_ROOT/etc/rc.d/init.d/psa
 install -m 644 {psad.conf,kmsgsd.conf,psadwatchd.conf,fw_search.conf,alert.conf} $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 {signatures,icmp_types,ip_options,auto_dl,snort_rule_dl,posf,pf.os} $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 *.8 $RPM_BUILD_ROOT%{_mandir}/man8/
+install -m 644 nf2csv $RPM_BUILD_ROOT%{_mandir}/man1/
 
 ### install perl modules used by psad
 install -m 555 Bit-Vector/blib/arch/auto/Bit/Vector/Vector.so $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Bit/Vector/Vector.so

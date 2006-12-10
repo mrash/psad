@@ -120,6 +120,13 @@ Getopt::Long::Configure('no_ignore_case');
 ));
 &usage(0) if $help;
 
+### Print the version number and exit if -V given on the command line.
+if ($print_ver) {
+    print "[+] psad v$version (file revision: $rev_num)\n",
+        "      by Michael Rash <mbr\@cipherdyne.org>\n";
+    exit 0;
+}
+
 ### see what we should be searching for
 my ($tokens_ar, $match_criteria_ar) = &csv_tokens();
 

@@ -356,7 +356,8 @@ my $csv_print_uniq   = 0;
 my $csv_line_limit   = 0;
 my $csv_start_line   = 0;
 my $csv_end_line     = 0;
-my $csv_regex        = 0;
+my $csv_regex        = '';
+my $csv_neg_regex    = '';
 my $dump_ipt_policy  = 0;
 my $fw_include_ips   = 0;
 my $benchmark        = 0;
@@ -366,7 +367,7 @@ my $hup              = 0;
 my $usr1_flag        = 0;
 my $hup_flag         = 0;
 my $verbose          = 0;
-my $ver              = 0;
+my $print_ver        = 0;
 my $help             = 0;
 my $dump_conf        = 0;
 my $download_sigs    = 0;
@@ -554,11 +555,13 @@ Getopt::Long::Configure('no_ignore_case');
                                               #   default).
     'CSV'               => \$csv_mode,        # CSV mode.
     'CSV-fields=s'      => \$csv_fields,      # Specify list of CSV fields.
-    'CSV-uniq-lines'    => \$csv_print_uniq,  # Only print uniq lines in CSV output.
+    'CSV-uniq-lines'    => \$csv_print_uniq,  # Only print unique lines in CSV output.
     'CSV-max-lines=i'   => \$csv_line_limit,  # Limit the number of CSV output lines.
     'CSV-start-line=i'  => \$csv_start_line,  # Starting line in CSV file.
     'CSV-end-line=i'    => \$csv_end_line,    # Ending line in CSV file.
     'CSV-regex=s'       => \$csv_regex,       # Require additional regex match.
+    'CSV-neg-regex=s'   => \$csv_neg_regex,   # Require additional negative regex
+                                              #   match.
     'debug'             => \$debug,           # Run in debug mode.
     'Dump-conf'         => \$dump_conf,       # Dump config and exit.
     'Interval=i'        => \$chk_interval,    # Set $chk_interval from the
@@ -634,13 +637,13 @@ Getopt::Long::Configure('no_ignore_case');
                                               #   debugging).
     'verbose'           => \$verbose,         # Verbose output (for both alerts
                                               #   and debug info).
-    'Version'           => \$ver,             # Print the psad version and exit.
+    'Version'           => \$print_ver,       # Print the psad version and exit.
     'help'              => \$help,            # Display help.
 ));
 &usage(0) if $help;
 
 ### Print the version number and exit if -V given on the command line.
-if ($ver) {
+if ($print_ver) {
     print "[+] psad v$version (file revision: $rev_num)\n",
         "      by Michael Rash <mbr\@cipherdyne.org>\n";
     exit 0;
@@ -6595,6 +6598,7 @@ sub csv_mode() {
     my ($tokens_ar, $match_criteria_ar) = &csv_tokens();
 
     $csv_regex = qr/$csv_regex/ if $csv_regex;
+    $csv_neg_regex = qr/$csv_neg_regex/ if $csv_neg_regex;
 
     my %csv_uniq_lines = ();
 
@@ -6635,6 +6639,9 @@ sub csv_mode() {
         }
         if ($csv_regex) {
             next MSG unless $pkt{'raw'} =~ m|$csv_regex|;
+        }
+        if ($csv_neg_regex) {
+            next MSG unless $pkt{'raw'} !~ m|$csv_neg_regex|;
         }
         $pkt{'log_prefix'} =~ s/\W//g;
         $pkt{'log_prefix'} =~ s/\s//g;
@@ -8533,7 +8540,7 @@ Options:
                                     specfic fields.
     --CSV-uniq-lines              - Only print unique lines in CSV
                                     output.
-    --CSV-max-lines               - Specify the maximum number of CSV
+    --CSV-max-lines <num>         - Specify the maximum number of CSV
                                     output lines to print.
     --CSV-start-line <line>       - Starting line within Netfilter log
                                     file.
@@ -8542,6 +8549,9 @@ Options:
     --CSV-regex <regex>           - Require Netfilter log messages to
                                     match an additional regex in --CSV
                                     mode.
+    --CSV-neg-regex <regex>       - Require Netfilter log messages to
+                                    not match an additional regex in
+                                    --CSV mode.
     --signatures <sigs file>      - Manually specify the path to the
                                     psad signatures file.
     --snort-type                  - Restrict psad to look for specific

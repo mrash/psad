@@ -32,14 +32,14 @@
 #
 ###########################################################################
 #
-# $Id$
+# $Id: nf2csv 1800 2006-12-10 04:51:40Z mbr $
 #
 
 use Getopt::Long 'GetOptions';
 use strict;
 
 my $version = '2.0-pre3';
-my $revision_svn = '$Revision: 1793 $';
+my $revision_svn = '$Revision$';
 my $rev_num = '1';
 ($rev_num) = $revision_svn =~ m|\$Rev.*:\s+(\S+)|;
 

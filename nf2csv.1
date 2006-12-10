@@ -97,6 +97,10 @@ Display instances of the MyDoom worm:
 .PP
 .B $ nfcsv -f "src dst dp:3127"
 .PP
+Display packets that have low TTL values:
+.PP
+.B $ nfcsv -f "src dst ttl:<10"
+.PP
 Display all traffic to or from the host 11.11.11.67 (this sets up an OR condition
 between the src and dst fields):
 .PP

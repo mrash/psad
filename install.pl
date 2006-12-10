@@ -343,7 +343,7 @@ sub install() {
         if (-e 'whois/whois') {
             &logr("[+] Copying whois binary to $WHOIS_PSAD\n");
             copy "whois/whois", $WHOIS_PSAD or die "[*] Could not copy ",
-                "whois/whois -> $WHOIS_PSAD";
+                "whois/whois -> $WHOIS_PSAD: $!";
         } else {
             die "[*] Could not compile whois";
         }
@@ -363,7 +363,7 @@ sub install() {
         mkdir $SNORT_DIR, 0500 or die "[*] Could not create $SNORT_DIR: $!";
     }
     opendir D, 'snort_rules' or die "[*] Could not open ",
-        'the snort_rules directory';
+        "the snort_rules directory: $!";
     my @files = readdir D;
     closedir D;
     shift @files; shift @files;
@@ -1134,7 +1134,7 @@ sub set_hostname() {
 sub check_hostname() {
     my $file = shift;
 
-    open F, "< $file" or die "[*] Could not open file: $file\n";
+    open F, "< $file" or die "[*] Could not open $file: $!\n";
     my @lines = <F>;
     close F;
     for my $line (@lines) {

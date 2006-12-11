@@ -132,7 +132,7 @@ install -m 755 init-scripts/psad-init.redhat $RPM_BUILD_ROOT/etc/rc.d/init.d/psa
 install -m 644 {psad.conf,kmsgsd.conf,psadwatchd.conf,fw_search.conf,alert.conf} $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 {signatures,icmp_types,ip_options,auto_dl,snort_rule_dl,posf,pf.os} $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 *.8 $RPM_BUILD_ROOT%{_mandir}/man8/
-install -m 644 nf2csv $RPM_BUILD_ROOT%{_mandir}/man1/
+install -m 644 nf2csv.1 $RPM_BUILD_ROOT%{_mandir}/man1/
 
 ### install perl modules used by psad
 install -m 555 Bit-Vector/blib/arch/auto/Bit/Vector/Vector.so $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Bit/Vector/Vector.so
@@ -234,6 +234,7 @@ fi
 %_sbindir/*
 %_bindir/*
 %{_mandir}/man8/*
+%{_mandir}/man1/*
 
 %dir %_sysconfdir/%name
 %config(noreplace) %_sysconfdir/%name/*.conf
@@ -251,7 +252,7 @@ fi
 %_libdir/%name
 
 %changelog
-* Sun Dec 08 2006 Michael Rash <mbr@cipherdyne.org>
+* Sun Dec 10 2006 Michael Rash <mbr@cipherdyne.org>
 - psad-2.0 release.
 - Added ip_options file for the Snort ipopts rule keyword.
 - Added nf2csv so that normal users can get CSV output from

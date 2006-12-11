@@ -2510,7 +2510,6 @@ sub get_psad_mod_paths() {
     opendir D, $psad_lib_dir or die "[*] Could not open $psad_lib_dir: $!";
     my @dirs = readdir D;
     closedir D;
-    shift @dirs; shift @dirs;
 
     push @paths, $psad_lib_dir;
 
@@ -3075,7 +3074,6 @@ sub import_snort_rules() {
         or die "[*] Could not open $config{'SNORT_RULES_DIR'}";
     my @rfiles = readdir D;
     closedir D;
-    shift @rfiles; shift @rfiles;
 
     FILE: for my $rfile (@rfiles) {
         next FILE unless $rfile =~ /\.rules$/;
@@ -7536,7 +7534,7 @@ sub import_old_scans() {
         die "[*] Could not open dir: $config{'PSAD_DIR'}: $!";
     my @files = readdir D;
     closedir D;
-    shift @files; shift @files;
+
     my $import_ctr = 0;
     chdir $config{'PSAD_DIR'} or die $!;
     SRCIP: for my $src (@files) {
@@ -7577,7 +7575,7 @@ sub import_old_scans() {
         opendir IPDIR, $src or next SRCIP;
         my @scan_files = readdir IPDIR;
         closedir IPDIR;
-        shift @scan_files; shift @scan_files;
+
         ### get all of the destination ip addresses
         my %dst_ips;
         for my $scan_file (@scan_files) {
@@ -7767,7 +7765,7 @@ sub remove_old_scans() {
         die "[*] Could not open dir: $config{'PSAD_DIR'}: $!";
     my @files = readdir D;
     closedir D;
-    shift @files; shift @files;
+
     chdir $config{'PSAD_DIR'} or die $!;
     SRCIP: for my $src (@files) {
         next SRCIP unless ($src =~ /$ip_re/ and -d $src);
@@ -7877,7 +7875,6 @@ sub archive_data() {
         "$config{'PSAD_DIR'}: $!";
     my @files = readdir D;
     closedir D;
-    shift @files; shift @files;
 
     IPDIR: for my $file (@files) {
         if ($file =~ /$ip_re/ and -d $file) {
@@ -8316,14 +8313,14 @@ sub disk_space_exceeded() {
             die "[*] Could not open dir: $config{'PSAD_DIR'}: $!";
         my @ipdirs = readdir D;
         closedir D;
-        shift @ipdirs; shift @ipdirs;
+
         chdir $config{'PSAD_DIR'} or die $!;
         for my $ipdir (@ipdirs) {
             if ($ipdir =~ /$ip_re/ and -d $ipdir) {
                 opendir IP, $ipdir or die $!;
                 my @scanfiles = readdir IP;
                 closedir IP;
-                shift @scanfiles; shift @scanfiles;
+
                 for my $file (@scanfiles) {
                     if (-e "${ipdir}/$file" and $file =~ /_signatures/) {
                         unlink "${ipdir}/$file";

@@ -390,7 +390,6 @@ sub get_psad_mod_paths() {
     opendir D, $psad_lib_dir or die "[*] Could not open $psad_lib_dir: $!";
     my @dirs = readdir D;
     closedir D;
-    shift @dirs; shift @dirs;
 
     push @paths, $psad_lib_dir;
 

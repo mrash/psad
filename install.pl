@@ -366,7 +366,7 @@ sub install() {
         "the snort_rules directory: $!";
     my @files = readdir D;
     closedir D;
-    shift @files; shift @files;
+
     for my $file (@files) {
         next unless $file =~ /\.rules$/ or $file =~ /\.config$/;
         &logr("[+] Installing snort_rules/${file}\n");

@@ -92,7 +92,6 @@ if ($ARGV[0]) {
     opendir D, $rules_dir or die " ** Could not open $rules_dir";
     @files = readdir D;
     closedir D;
-    shift @files; shift @files;
 }
 
 FILE: for my $file (@files) {

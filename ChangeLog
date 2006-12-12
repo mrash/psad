@@ -1,3 +1,11 @@
+psad-2.0.1 (12/11/2006):
+    - Added Nachi worm reconnaisannce icmp signature
+    - Added the psad_ip_len signature keyword to allow the length field in the
+      IP header to be explicitly tested.
+    - Bugfix for inappropriately removing some directories in @INC when
+      splicing in psad perl module paths.
+    - Switched nf2csv installation path in install.pl to /usr/bin/.
+
 psad-2.0 (12/10/2006):
     - Completely refactored the Snort rule matching support in psad.  Added
       many header field tests with full range matching support.  These tests

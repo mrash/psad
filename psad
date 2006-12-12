@@ -1842,6 +1842,9 @@ sub match_snort_tcp_keywords() {
     return 0 unless &check_sig_int_range(
             ($pkt_hr->{'ip_len'}-$header_len), 'psad_dsize', $sig_hr);
 
+    return 0 unless &check_sig_int_range(
+            $pkt_hr->{'ip_len'}, 'psad_ip_len', $sig_hr);
+
     return 0 unless &check_sig_int_range($pkt_hr->{'win'}, 'window', $sig_hr);
     return 0 unless &check_sig_int_range($pkt_hr->{'tcp_seq'}, 'seq', $sig_hr);
     return 0 unless &check_sig_int_range($pkt_hr->{'tcp_ack'}, 'ack', $sig_hr);
@@ -3410,6 +3413,13 @@ sub import_signatures() {
         if ($rule_options =~ /[\s;]psad_dsize:\s*(.+?)\s*;/i) {
             $sig{'psad_dsize'} = $1;
             &build_sig_int_range(\%sig, 'psad_dsize', 1, 1514, $line_num);
+        }
+
+        ### psad_ip_len keyword
+        if ($rule_options =~ /[\s;]psad_ip_len:\s*(.+?)\s*;/i) {
+            $sig{'psad_ip_len'} = $1;
+            ### technically, the minimum length must be $IP_HEADER_LEN
+            &build_sig_int_range(\%sig, 'psad_ip_len', 1, 65536, $line_num);
         }
 
         ### dsize keyword

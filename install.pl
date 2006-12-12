@@ -57,11 +57,12 @@ my $PSAD_FIFO    = "${VARLIBDIR}/psadfifo";
 my $INIT_DIR     = '/etc/init.d';
 my $USRSBIN_DIR  = '/usr/sbin';  ### consistent with FHS (Filesystem
                                  ### Hierarchy Standard)
+my $USRBIN_DIR   = '/usr/bin';  ### consistent with FHS (Filesystem
 my $CONF_ARCHIVE = "${PSAD_CONFDIR}/archive";
 my @LOGR_FILES   = (*STDOUT, $INSTALL_LOG);
 my $RUNLEVEL;    ### This should only be set if install.pl
                  ### cannot determine the correct runlevel
-my $WHOIS_PSAD   = '/usr/bin/whois_psad';
+my $WHOIS_PSAD   = "${USRBIN_DIR}/whois_psad";
 
 ### directory in which to install snort rules
 my $SNORT_DIR    = "${PSAD_CONFDIR}/snort_rules";
@@ -435,11 +436,12 @@ sub install() {
     }
 
     ### put the nf2csv script in place
-    &logr("[+] Copying nf2csv -> ${USRSBIN_DIR}/nf2csv\n");
-    unlink "${USRSBIN_DIR}/nf2csv" if -e "${USRSBIN_DIR}/nf2csv";
-    copy 'nf2csv', "${USRSBIN_DIR}/nf2csv" or die "[*] Could ",
-        "not copy nf2csv -> ${USRSBIN_DIR}/nf2csv: $!";
-    &perms_ownership("${USRSBIN_DIR}/nf2csv", 0755);
+    unlink '/usr/sbin/nf2csv' if -e '/usr/sbin/nf2csv';  ### old path
+    &logr("[+] Copying nf2csv -> ${USRBIN_DIR}/nf2csv\n");
+    unlink "${USRBIN_DIR}/nf2csv" if -e "${USRBIN_DIR}/nf2csv";
+    copy 'nf2csv', "${USRBIN_DIR}/nf2csv" or die "[*] Could ",
+        "not copy nf2csv -> ${USRBIN_DIR}/nf2csv: $!";
+    &perms_ownership("${USRBIN_DIR}/nf2csv", 0755);
 
     ### put the fwcheck_psad.pl script in place
     &logr("[+] Copying fwcheck_psad.pl -> ${USRSBIN_DIR}/fwcheck_psad\n");
@@ -758,9 +760,9 @@ sub uninstall() {
         print "[+] Removing ${USRSBIN_DIR}/fwcheck_psad\n";
         unlink "${USRSBIN_DIR}/fwcheck_psad";
     }
-    if (-e "${USRSBIN_DIR}/nf2csv") {
-        print "[+] Removing ${USRSBIN_DIR}/nf2csv\n";
-        unlink "${USRSBIN_DIR}/nf2csv";
+    if (-e "${USRBIN_DIR}/nf2csv") {
+        print "[+] Removing ${USRBIN_DIR}/nf2csv\n";
+        unlink "${USRBIN_DIR}/nf2csv";
     }
     if (-e "${USRSBIN_DIR}/psad") {
         print "[+] Removing psad daemons: ${USRSBIN_DIR}/",

@@ -72,6 +72,7 @@ sub import_psad_perl_modules() {
 
     my $mod_paths_ar = &get_psad_mod_paths();
 
+    push @$mod_paths_ar, @INC;
     splice @INC, 0, $#$mod_paths_ar+1, @$mod_paths_ar;
 
     require IPTables::Parse;

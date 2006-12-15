@@ -2845,7 +2845,7 @@ sub validate_home_net() {
         my $connected_str = '';
         for my $net (@connected_subnets_cidr) {
             push @local_nets, $net;
-            $connected_str .= "$_, ";
+            $connected_str .= "$net, ";
         }
         $connected_str =~ s|,\s*$||;
 

@@ -18,10 +18,12 @@
 package Psad;
 
 use Exporter;
-use Unix::Syslog qw(:subs :macros);
 use Carp;
 use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
+
+require Unix::Syslog;
+Unix::Syslog->import(qw(:subs :macros));
 
 require Exporter;
 

@@ -1,4 +1,7 @@
 psad-2.0.2 (12//2006):
+    - Added print statements for @INC array in debug mode so that the user can
+      see the additional /usr/lib/psad/* directories added by
+      import_psad_perl_modules().
     - Bugfix for not properly including elements of the
       @connected_subnets_cidr array.
 

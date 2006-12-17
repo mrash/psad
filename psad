@@ -1600,17 +1600,24 @@ sub match_sigs() {
 
     my $dl = 0;
 
+    print STDERR "[+] match_sigs()\n" if $debug and $verbose;
+
     ### always run the IP protocol sigs
     for my $proto ($pkt_hr->{'proto'}, 'ip') {
 
         return 0 unless defined $sig_search{$proto};
 
         SRC: for my $src (keys %{$sig_search{$proto}}) {
+            print STDERR "[+] SRC: sig_ip: $src, pkt src: $pkt_hr->{'src'}\n"
+                if $debug and $verbose;
             next SRC unless &check_sig_ip($pkt_hr->{'src'}, $src);
 
             DST: for my $dst (keys %{$sig_search{$proto}{$src}}) {
+                print STDERR "[+] DST: sig_ip: $dst, pkt src: $pkt_hr->{'dst'}\n"
+                    if $debug and $verbose;
                 next DST unless &check_sig_ip($pkt_hr->{'dst'}, $dst);
-
+                print STDERR "    Matched sig IP criteria.\n"
+                    if $debug and $verbose;
                 if ($proto eq 'tcp' or $proto eq 'udp') {
 
                     TYPE: for my $href (@port_types) {

@@ -3317,7 +3317,6 @@ sub import_signatures() {
                 $dst = $5;
                 $sig{'sp'} = $3;
                 $sig{'dp'} = $6;
-
             }
 
             $sig{'src'} = &expand_sig_ips($src, $line_num);
@@ -3687,11 +3686,15 @@ sub expand_sig_ips() {
     if ($ip_str =~ m|,|) {
         my @ips = split /\s*,\s*/, $ip_str;
         for my $ip (@ips) {
-            if ($ip =~ m|($ip_re/\d+)| or $ip =~ m|($ip_re)|) {
+            if ($ip =~ m|($ip_re/$ip_re)|
+                    or $ip =~ m|($ip_re/\d+)|
+                    or $ip =~ m|($ip_re)|) {
                 push @arr, $1;
             }
         }
-    } elsif ($ip_str =~ m|($ip_re/\d+)| or $ip_str =~ m|($ip_re)|) {
+    } elsif ($ip_str =~ m|($ip_re/$ip_re)|
+            or $ip_str =~ m|($ip_re/\d+)|
+            or $ip_str =~ m|($ip_re)|) {
         push @arr, $1;
     } elsif ($ip_str eq 'any' or $ip_str =~ m|NOT_?USED|i) {
         ### handle NOT_USED case from older psad versions
@@ -7603,7 +7606,7 @@ sub import_old_scans() {
         my %dst_ips;
         for my $scan_file (@scan_files) {
             if ($scan_file =~ /($ip_re)/) {
-                $dst_ips{$1} = ''
+                $dst_ips{$1} = '';
             }
         }
         for my $dst (keys %dst_ips) {

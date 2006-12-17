@@ -7,6 +7,8 @@ psad-2.0.2 (12//2006):
       run (psad ran fine without this, but it is more consistent this way).
     - Bugfix for not properly including elements of the
       @connected_subnets_cidr array.
+    - IP subnet bugfix to make sure to get the entire subnet in signature
+      import routine if it is not in CIDR format
 
 psad-2.0.1 (12/12/2006):
     - Added Nachi worm reconnaisannce icmp signature

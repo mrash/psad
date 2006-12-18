@@ -18,7 +18,7 @@
 #
 # Credits: (see the CREDITS file bundled with the psad sources.)
 #
-# Version: 2.0.2-pre3
+# Version: 2.0.2-pre4
 #
 # Copyright (C) 1999-2006 Michael Rash (mbr@cipherdyne.org)
 #
@@ -36,24 +36,17 @@
 #
 # TODO: (see the TODO file bundled with the psad sources.)
 #
-# Default Command Line Arguments:  As of the 1.0.0-pre3 release, psad by
-#   by default will have the --signatures and --auto-dl options set even
-#   if these options are not specified on the command line, and psad
-#   will use the default locations for the signatures and auto_dl files.
-#   The default file locations can be changed by manually specifying the
-#   locations to these files with the --signatures and --auto-dl options.
-#   The signature matching and the auto_dl danger level assignments can
-#   be disabled by using the --no-signatures and --no-auto-dl options
-#   respectively.  In addition, psad adheres to the following defaults:
+# Default behavior is as follows.  Each of these features can be disabled
+# with command line arguments:
 #
-#       -passive OS fingerprinting            = yes
-#       -snort sid signature matching         = yes
-#       -write fw errors to error log         = yes
-#       -daemon mode                          = yes
-#       -reverse dns lookups                  = yes
-#       -validate firewall rules              = yes
-#       -whois lookups of scanning IPs        = yes
-#       -parse netstat output for local ports = yes
+#       - passive OS fingerprinting            = yes
+#       - snort sid signature matching         = yes
+#       - write fw errors to error log         = yes
+#       - daemon mode                          = yes
+#       - reverse dns lookups                  = yes
+#       - validate firewall rules              = yes
+#       - whois lookups of scanning IPs        = yes
+#       - parse netstat output for local ports = yes
 #
 # Coding Style:  All configuration variables from psad.conf are stored in
 #   the %config hash by keys that are in capital letters.  This is
@@ -147,7 +140,7 @@ use strict;
 ### ========================== main =================================
 
 ### set the current psad version and file revision numbers
-my $version = '2.0.2-pre3';
+my $version = '2.0.2-pre4';
 my $revision_svn = '$Revision$';
 my $rev_num = '1';
 ($rev_num) = $revision_svn =~ m|\$Rev.*:\s+(\S+)|;

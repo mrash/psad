@@ -2415,7 +2415,10 @@ sub dshield_email_log() {
             if ($config{'DSHIELD_DL_THRESHOLD'} > 0) {
                 for my $line (@dshield_data) {
                     if ($line =~ /^.*?($ip_re)/) {
-                        if ($scan_dl{$1} >= $config{'DSHIELD_DL_THRESHOLD'}) {
+                        my $src = $1;
+                        if (defined $scan_dl{$src}
+                                and ($scan_dl{$src}
+                                    >= $config{'DSHIELD_DL_THRESHOLD'})) {
                             print MAIL $line;
                             print DSSAVE $line;
                         }
@@ -2442,7 +2445,10 @@ sub dshield_email_log() {
             if ($config{'DSHIELD_DL_THRESHOLD'} > 0) {
                 for my $line (@dshield_data) {
                     if ($line =~ /^.*?($ip_re)/) {
-                        if ($scan_dl{$1} >= $config{'DSHIELD_DL_THRESHOLD'}) {
+                        my $src = $1;
+                        if (defined $scan_dl{$src}
+                                and ($scan_dl{$src}
+                                    >= $config{'DSHIELD_DL_THRESHOLD'})) {
                             print MAIL $line;
                             print DSSAVE $line;
                         }
@@ -4253,7 +4259,7 @@ sub log_top_scans() {
             printf P "tcp %-5d $top_tcp_ports{$dp}\n", $dp;
             $ctr++;
             if ($config{'TOP_PORTS_LOG_THRESHOLD'} > 0) {
-                last if $ctr == $config{'TOP_PORTS_LOG_THRESHOLD'};
+                last if $ctr >= $config{'TOP_PORTS_LOG_THRESHOLD'};
             }
         }
         print P "\n" if %top_udp_ports;
@@ -4266,7 +4272,7 @@ sub log_top_scans() {
             printf P "udp %-5d $top_udp_ports{$dp}\n", $dp;
             $ctr++;
             if ($config{'TOP_PORTS_LOG_THRESHOLD'} > 0) {
-                last if $ctr == $config{'TOP_PORTS_LOG_THRESHOLD'};
+                last if $ctr >= $config{'TOP_PORTS_LOG_THRESHOLD'};
             }
         }
     }
@@ -4295,7 +4301,7 @@ sub log_top_scans() {
         }
         $ctr++ if $found;
         if ($config{'TOP_SIGS_LOG_THRESHOLD'} > 0) {
-            last if $ctr == $config{'TOP_SIGS_LOG_THRESHOLD'};
+            last if $ctr >= $config{'TOP_SIGS_LOG_THRESHOLD'};
         }
     }
     close S;
@@ -4309,22 +4315,16 @@ sub log_top_scans() {
     print A "#\n# Format: <IP> <DL> <total_packets> <uniq_sigs> <sig_matches> <is_local>\n#\n\n";
     for my $src (sort {$scan_dl{$b} cmp $scan_dl{$a}} keys %scan_dl) {
         next unless $scan_dl{$src} >= 1;
+        next unless defined $top_packet_counts{$src}
+                or defined $top_sig_counts{$src};
         my $str = sprintf "%-15s %d", $src, $scan_dl{$src};
-        if (defined $top_packet_counts{$src}) {
-            $str .= " $top_packet_counts{$src}";
-        } else {
-            $str .= " 0";
-        }
+        $str .= " $top_packet_counts{$src}";
         my $uniq_sigs = 0;
         for my $sid (keys %sig_sources) {
             $uniq_sigs++ if defined $sig_sources{$sid}{$src};
         }
         $str .= " $uniq_sigs";
-        if (defined $top_sig_counts{$src}) {
-            $str .= " $top_sig_counts{$src}";
-        } else {
-            $str .= " 0";
-        }
+        $str .= " $top_sig_counts{$src}";
         if (defined $local_src{$src}) {
             $str .= " 1";
         } else {
@@ -4333,7 +4333,7 @@ sub log_top_scans() {
         print A $str, "\n";
         $ctr++;
         if ($config{'TOP_IP_LOG_THRESHOLD'} > 0) {
-            last if $ctr == $config{'TOP_IP_LOG_THRESHOLD'};
+            last if $ctr >= $config{'TOP_IP_LOG_THRESHOLD'};
         }
     }
     close A;
@@ -4376,7 +4376,7 @@ sub analysis_display() {
         }
         $ctr++ if $found;
         if ($config{'STATUS_SIGS_THRESHOLD'} > 0) {
-            last if $ctr == $config{'STATUS_SIGS_THRESHOLD'};
+            last if $ctr >= $config{'STATUS_SIGS_THRESHOLD'};
         }
     }
     push @lines, "\n";
@@ -4410,7 +4410,7 @@ sub analysis_display() {
         }
         $ctr++;
         if ($config{'STATUS_IP_THRESHOLD'} > 0) {
-            last if $ctr == $config{'STATUS_IP_THRESHOLD'};
+            last if $ctr >= $config{'STATUS_IP_THRESHOLD'};
         }
         push @lines, $str, "\n";
     }
@@ -4430,7 +4430,7 @@ sub analysis_display() {
             push @lines, $str;
             $ctr++;
             if ($config{'STATUS_PORTS_THRESHOLD'} > 0) {
-                last if $ctr == $config{'STATUS_PORTS_THRESHOLD'};
+                last if $ctr >= $config{'STATUS_PORTS_THRESHOLD'};
             }
         }
         push @lines, "\n";
@@ -4445,7 +4445,7 @@ sub analysis_display() {
             push @lines, $str;
             $ctr++;
             if ($config{'STATUS_PORTS_THRESHOLD'} > 0) {
-                last if $ctr == $config{'STATUS_PORTS_THRESHOLD'};
+                last if $ctr >= $config{'STATUS_PORTS_THRESHOLD'};
             }
         }
         push @lines, "\n";
@@ -7202,9 +7202,9 @@ sub status_psad_daemon() {
         } else {
             push @lines, "[+] Top signature matches:\n";
         }
+        my $ctr = 0;
         open F, "< $config{'TOP_SIGS_FILE'}" or die "[*] Could not open ",
             "$config{'TOP_SIGS_FILE'}: $!";
-        my $ctr = 0;
         ### Format: <sid> "<msg>" <matches> <num_sources> <sig_proto>
         while (<F>) {
             next unless /\S/;
@@ -7218,7 +7218,7 @@ sub status_psad_daemon() {
                 my $proto       = $5;
                 $ctr++;
                 if ($config{'STATUS_SIGS_THRESHOLD'} > 0) {
-                    last if $ctr == $config{'STATUS_SIGS_THRESHOLD'};
+                    last if $ctr >= $config{'STATUS_SIGS_THRESHOLD'};
                 }
                 push @lines, qq|      "$msg" ($proto),  Count: $count,  |,
                     "Unique sources: $num_sources,  Sid: $sid\n";
@@ -7236,6 +7236,7 @@ sub status_psad_daemon() {
             push @lines, "[+] Top attackers:\n";
         }
 
+        my $ctr = 0;
         open F, "< $config{'TOP_ATTACKERS_FILE'}" or die "[*] Could not open ",
             "$config{'TOP_ATTACKERS_FILE'}: $!";
         while (<F>) {
@@ -7262,6 +7263,10 @@ sub status_psad_daemon() {
                 if ($is_local) {
                     $str .= " (local IP!)";
                 }
+                $ctr++;
+                if ($config{'STATUS_IP_THRESHOLD'} > 0) {
+                    last if $ctr >= $config{'STATUS_IP_THRESHOLD'};
+                }
                 push @lines, "$str\n";
             }
         }
@@ -7279,9 +7284,10 @@ sub status_psad_daemon() {
 
         my %port_ctr  = ();
         my %port_stop = ();
+        my $printed_udp_newline = 0;
+        my $ctr = 0;
         open F, "< $config{'TOP_SCANNED_PORTS_FILE'}" or die "[*] Could not open ",
             "$config{'TOP_SCANNED_PORTS_FILE'}: $!";
-        my $printed_udp_newline = 0;
         while (<F>) {
             next unless /\S/;
             next if /^\s*#\s*$/;
@@ -7300,6 +7306,10 @@ sub status_psad_daemon() {
                 if ($proto eq 'udp' and not $printed_udp_newline) {
                     push @lines, "\n";
                     $printed_udp_newline = 1;
+                }
+                $ctr++;
+                if ($config{'STATUS_PORTS_THRESHOLD'} > 0) {
+                    last if $ctr >= $config{'STATUS_PORTS_THRESHOLD'};
                 }
                 push @lines, "      $_ packets\n";
             }
@@ -7563,6 +7573,7 @@ sub import_old_scans() {
 
     my $import_ctr = 0;
     chdir $config{'PSAD_DIR'} or die $!;
+    my %prev_sources = ();
     SRCIP: for my $src (@files) {
         next SRCIP unless ($src =~ /$ip_re/ and -d $src);
         ### define as many hash keys as we can (older versions
@@ -7573,7 +7584,9 @@ sub import_old_scans() {
             my $dl = <DL>;
             close DL;
             chomp $dl;
+            next SRCIP unless $dl >= 1;
             $scan_dl{$src} = $dl;  ### set the dl for $src
+            $prev_sources{$src} = '';
         }
         if (-e "${src}/email_count") {
             open E, "< ${src}/email_count" or next SRCIP;
@@ -7611,7 +7624,7 @@ sub import_old_scans() {
         }
         for my $dst (keys %dst_ips) {
             ### we have probably already sent alerts for these
-            ### ips since we are importing data from a previous run.
+            ### IPs since we are importing data from a previous run.
             $scan{$src}{$dst}{'alerted'} = 1;
             if (-e "${src}/${dst}_packet_ctr") {
                 open PKTS, "< ${src}/${dst}_packet_ctr" or next SRCIP;
@@ -7767,6 +7780,7 @@ sub import_old_scans() {
                 my $sig_matches = $5;
                 my $is_ip_local = $6;
 
+                next unless defined $prev_sources{$src};
                 $scan_dl{$src} = $dl;
                 $top_packet_counts{$src} = $tot_pkts;
                 $top_sig_counts{$src}    = $sig_matches;
@@ -7777,7 +7791,6 @@ sub import_old_scans() {
         }
         close F;
     }
-
     if ($import_ctr) {
         &Psad::psyslog('psad', "imported $import_ctr scanning IP " .
                 "addresses from previous psad instance")

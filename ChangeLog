@@ -9,6 +9,10 @@ psad-2.0.2 (12//2006):
       @connected_subnets_cidr array.
     - IP subnet bugfix to make sure to get the entire subnet in signature
       import routine if it is not in CIDR format
+    - Bugfix to not print an IP addresses in the "top attackers" section that
+      do not have at least one packet or signature match (for any reason).
+    - Bugfix to not print more than TOP_IP_LOG_THRESHOLD IP addresses in thet
+      top attackers section.
 
 psad-2.0.1 (12/12/2006):
     - Added Nachi worm reconnaisannce icmp signature

@@ -6666,6 +6666,7 @@ sub analysis_mode() {
     }
     print "[+] Found ", ($#ipt_msgs+1), " Netfilter log messages out of ",
         ($#lines+1), " total lines.\n";
+    print "    This may take a while...\n" if $#ipt_msgs > 15000;
 
     ### analyze all packets
     &check_scan(\@ipt_msgs);

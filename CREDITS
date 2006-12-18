@@ -24,8 +24,12 @@ Albert E. Whale
     - Suggested psadwatchd parse EMAIL_ADDRESSES from psad.conf.
     - Found bug where auto-blocking stops working after receiving a HUP
       signal.
-    - Bugfix for not properly including elements of the
+    - Found bug for not properly including elements of the
       @connected_subnets_cidr array.
+    - Found bug for not using thresholds in "top attackers" section of
+      --Status output.
+    - Helped troubleshoot the PL_sv_undef issue for installation on Mandriva
+      systems.
 
 Manual Caphina
     - Greatly assisting in the first version of Bastille-NIDS which

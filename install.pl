@@ -168,7 +168,9 @@ my $skip_syslog_test = 0;
 my $skip_module_install   = 0;
 my $cmdline_force_install = 0;
 my $force_path_update = 0;
-my $force_install_re  = '';
+my $force_mod_re = '';
+my $exclude_mod_re = '';
+my $rm_old_lib_dir = 0;
 my $syslog_conf = '';
 
 ### make Getopts case sensitive
@@ -176,9 +178,11 @@ Getopt::Long::Configure('no_ignore_case');
 
 &usage(1) unless (GetOptions(
     'force-mod-install' => \$cmdline_force_install,  ### force install of all modules
-    'Force-mod-regex=s' => \$force_install_re,  ### force specific mod install with regex
+    'Force-mod-regex=s' => \$force_mod_re,  ### force specific mod install with regex
+    'Exclude-mod-regex=s' => \$exclude_mod_re, ### exclude a particular perl module
     'path-update'       => \$force_path_update, ### update command paths
     'Skip-mod-install'  => \$skip_module_install,
+    'rm-lib-dir'        => \$rm_old_lib_dir, ### remove any old /usr/lib/psad dir
     'no-preserve'       => \$noarchive,   ### Don't preserve existing configs.
     'syslog-conf=s'     => \$syslog_conf, ### specify path to syslog config file.
     'no-syslog-test'    => \$skip_syslog_test,
@@ -186,6 +190,9 @@ Getopt::Long::Configure('no_ignore_case');
     'help'              => \$help         ### Display help.
 ));
 &usage(0) if $help;
+
+$force_mod_re = qr|$force_mod_re| if $force_mod_re;
+$exclude_mod_re = qr|$exclude_mod_re| if $exclude_mod_re;
 
 my %Cmds = (
     'gzip'     => $gzipCmd,
@@ -251,7 +258,7 @@ exit 0;
 sub install() {
 
     ### make sure install.pl is being called from the source directory
-    unless (-e 'psad' && -e 'Psad/lib/Psad.pm') {
+    unless (-e 'psad' and -e 'Psad/lib/Psad.pm') {
         die "[*] install.pl can only be executed from the directory\n",
             "    that contains the psad sources!  Exiting.";
     }
@@ -296,8 +303,11 @@ sub install() {
             "${PSAD_CONFDIR}/psad_icmp_types -> ${PSAD_CONFDIR}/icmp_types: $!";
     }
 
-    ### change any existing psad module directory to allow anyone to execute
-    chmod 0755, $LIBDIR;
+    ### change any existing psad module directory to allow anyone to import
+    if (-d $LIBDIR) {
+        chmod 0755, $LIBDIR;
+        rmtree $LIBDIR if $rm_old_lib_dir;
+    }
     unless (-d $PSAD_CONFDIR) {
         &logr("[+] Creating $PSAD_CONFDIR\n");
         mkdir $PSAD_CONFDIR, 0500;
@@ -917,6 +927,11 @@ sub install_perl_module() {
     die '[*] Missing mod-dir key in required_perl_modules hash.'
         unless defined $required_perl_modules{$mod_name}{'mod-dir'};
 
+    if ($exclude_mod_re and $exclude_mod_re =~ /$mod_name/) {
+        print "[+] Excluding installation of $mod_name module.\n";
+        return;
+    }
+
     my $version = '(NA)';
 
     my $mod_dir = $required_perl_modules{$mod_name}{'mod-dir'};
@@ -938,7 +953,7 @@ sub install_perl_module() {
         ### install regardless of whether the module may already be
         ### installed
         $install_module = 1;
-    } elsif ($force_install_re and $force_install_re =~ /$mod_name/) {
+    } elsif ($force_mod_re and $force_mod_re =~ /$mod_name/) {
         print "[+] Forcing installation of $mod_name module.\n";
         $install_module = 1;
     } else {
@@ -2103,23 +2118,26 @@ sub usage() {
     my $exitcode = shift;
     print <<_HELP_;
 
-Usage: install.pl [-f] [-s <file>] [-u] [--no-syslog-test] [-S] [-p]
-                  [-F] [--no-preserve] [-h]
+Usage: install.pl [options]
 
-    -u,  --uninstall            - Uninstall psad.
-    -f, --force-mod-install     - Force all perl modules to be installed
-                                  even if some already exist in the system
-                                  /usr/lib/perl5 tree.
-    -F, --Force-mod-regex <re>  - Specify a regex to match a module name
-                                  and force the installation of such
-                                  modules.
-    -p, --path-update           - Run path update code regardless of whether
-                                  a previous config is being merged.
-    -S, --Skip-mod-install      - Do not install any perl modules.
-    -s  <file>                  - Specify path to syslog.conf file.
-    --no-syslog-test            - Skip syslog reconfiguration test.
-    --no-preserve               - Disable preservation of old configs.
-    -h  --help                  - Prints this help message.
+    -u,  --uninstall             - Uninstall psad.
+    -f, --force-mod-install      - Force all perl modules to be installed
+                                   even if some already exist in the system
+                                   /usr/lib/perl5 tree.
+    -F, --Force-mod-regex <re>   - Specify a regex to match a module name
+                                   and force the installation of such
+                                   modules.
+    -E, --Exclude-mod-regex <re> - Exclude a perl module that matches this
+                                   regular expression.
+    -p, --path-update            - Run path update code regardless of whether
+                                   a previous config is being merged.
+    -S, --Skip-mod-install       - Do not install any perl modules.
+    -s  <file>                   - Specify path to syslog.conf file.
+    -r, --rm-lib-dir             - Remove any /usr/lib/psad/ directory
+                                   before installing psad.
+    --no-syslog-test             - Skip syslog reconfiguration test.
+    --no-preserve                - Disable preservation of old configs.
+    -h  --help                   - Prints this help message.
 
 _HELP_
     exit $exitcode;

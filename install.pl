@@ -50,6 +50,7 @@ my $PSAD_CONFDIR = '/etc/psad';
 my $VARLIBDIR    = '/var/lib/psad';
 my $RUNDIR       = '/var/run/psad';
 my $LIBDIR       = '/usr/lib/psad';
+my $LIBDIR64     = '/usr/lib64/psad';
 
 #============== config ===============
 my $INSTALL_LOG  = "${PSAD_DIR}/install.log";
@@ -170,7 +171,7 @@ my $cmdline_force_install = 0;
 my $force_path_update = 0;
 my $force_mod_re = '';
 my $exclude_mod_re = '';
-my $rm_old_lib_dir = 0;
+my $no_rm_old_lib_dir = 0;
 my $syslog_conf = '';
 
 ### make Getopts case sensitive
@@ -182,7 +183,7 @@ Getopt::Long::Configure('no_ignore_case');
     'Exclude-mod-regex=s' => \$exclude_mod_re, ### exclude a particular perl module
     'path-update'       => \$force_path_update, ### update command paths
     'Skip-mod-install'  => \$skip_module_install,
-    'rm-lib-dir'        => \$rm_old_lib_dir, ### remove any old /usr/lib/psad dir
+    'no-rm-lib-dir'     => \$no_rm_old_lib_dir, ### remove any old /usr/lib/psad dir
     'no-preserve'       => \$noarchive,   ### Don't preserve existing configs.
     'syslog-conf=s'     => \$syslog_conf, ### specify path to syslog config file.
     'no-syslog-test'    => \$skip_syslog_test,
@@ -304,9 +305,15 @@ sub install() {
     }
 
     ### change any existing psad module directory to allow anyone to import
-    if (-d $LIBDIR) {
-        chmod 0755, $LIBDIR;
-        rmtree $LIBDIR if $rm_old_lib_dir;
+    for my $dir ($LIBDIR, $LIBDIR64) {
+        if (-d $dir) {
+            chmod 0755, $dir;
+            unless ($no_rm_old_lib_dir) {
+                &logr("[+] Removing $dir/ directory from previous " .
+                    "psad installation.\n");
+                rmtree $dir;
+            }
+        }
     }
     unless (-d $PSAD_CONFDIR) {
         &logr("[+] Creating $PSAD_CONFDIR\n");
@@ -821,9 +828,11 @@ sub uninstall() {
         print "[+] Removing $RUNDIR\n";
         rmtree $RUNDIR;
     }
-    if (-d $LIBDIR) {
-        print "[+] Removing $LIBDIR\n";
-        rmtree $LIBDIR;
+    for my $dir ($LIBDIR, $LIBDIR64) {
+        if (-d $dir) {
+            print "[+] Removing $dir\n";
+            rmtree $dir;
+        }
     }
     my $running_syslogd = 0;
     my $running_syslog_ng = 0;

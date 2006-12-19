@@ -1,19 +1,28 @@
 #
 ##############################################################################
 #
-# File: signatures
+# File: signatures (/etc/psad/signatures)
 #
 # Purpose: To provide a set of approximations to the Snort rule set for psad.
 #          These signatures are the closest representations to Snort rules
-#          that are possible given the Netfilter logging format.
+#          that are possible given the Netfilter logging format.  Note that
+#          with the Netfilter string match extension, iptables along with
+#          fwsnort is able to detect (and optionally block) attacks based on
+#          application layer data, but this is not addressed within the
+#          signatures file itself.
 #
-#          psad_id:     Unique ID number (analogous to the Snort sid field).
-#          psad_dl:     The psad danger level
-#          psad_dsize:  Requires a size on application layer data. The size
-#                       in this case is derived from the IP header length
-#                       for TCP and ICMP packets (by assuming a bound on the
-#                       average header sizes) and from the length field in
-#                       the UDP header for UDP packets.
+#          psad_id:     - Unique ID number (analogous to the Snort sid field).
+#          psad_derived_sids:
+#                       - This field tracks all Snort rules that were used to
+#                         construct and approximate psad signature.
+#          psad_dl:     - The psad danger level
+#          psad_dsize:  - Requires a size on application layer data. The size
+#                         in this case is derived from the IP header length
+#                         for TCP and ICMP packets (by assuming a bound on the
+#                         average header sizes) and from the length field in
+#                         the UDP header for UDP packets.
+#          psad_ip_len: - This allows psad to test the length field in the IP
+#                         header (logged as "LEN") within Netfilter logs.
 #
 ##############################################################################
 #

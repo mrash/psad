@@ -2,7 +2,7 @@
 #
 ###############################################################################
 #
-# File: fwcheck_psad.pl
+# File: fwcheck_psad.pl (/usr/sbin/fwcheck_psad)
 #
 # Purpose: To parse the iptables ruleset on the underlying system to see if
 #          iptables has been configured to log and block unwanted packets by

@@ -2,7 +2,7 @@
 #
 #########################################################################
 #
-# File: psadwatchd
+# File: psadwatchd.pl
 #
 # Purpose: psadwatchd checks on an interval of every five seconds to make
 #          sure that both kmsgsd and psad are running on the box.  If

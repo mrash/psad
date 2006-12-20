@@ -511,6 +511,9 @@ my $BAD_ICMP_CODE = 2;
 my $SIG_MATCH    = 1;
 my $NO_SIG_MATCH = 0;
 
+my $STATUS_PRINT = 1;
+my $NO_STATUS    = 0;
+
 ### header lengths
 my $TCP_HEADER_LEN   = 20;  ### excludes options
 my $TCP_MAX_OPTS_LEN = 44;
@@ -1090,7 +1093,7 @@ sub check_scan() {
                 and not $benchmark
                 and not $analyze_msgs
                 and $pkt{'dshield_str'}) {
-            if ($pkt_str =~ /^\s*(\w+)\s+(\d+)\s+(\S+)/) {
+            if ($pkt{'timestamp'} =~ /^\s*(\w+)\s+(\d+)\s+(\S+)/) {
                 my $month   = Decode_Month($1);
                 my $day     = sprintf("%.2d", $2);
                 my $time_24 = $3;
@@ -4311,17 +4314,25 @@ sub log_top_scans() {
         next unless defined $top_packet_counts{$src}
                 or defined $top_sig_counts{$src};
         my $str = sprintf "%-15s %d", $src, $scan_dl{$src};
-        $str .= " $top_packet_counts{$src}";
+        if (defined $top_packet_counts{$src}) {
+            $str .= " $top_packet_counts{$src}";
+        } else {
+            $str .= ' 0';
+        }
         my $uniq_sigs = 0;
         for my $sid (keys %sig_sources) {
             $uniq_sigs++ if defined $sig_sources{$sid}{$src};
         }
         $str .= " $uniq_sigs";
-        $str .= " $top_sig_counts{$src}";
-        if (defined $local_src{$src}) {
-            $str .= " 1";
+        if (defined $top_sig_counts{$src}) {
+            $str .= " $top_sig_counts{$src}";
         } else {
-            $str .= " 0";
+            $str .= ' 0';
+        }
+        if (defined $local_src{$src}) {
+            $str .= ' 1';
+        } else {
+            $str .= ' 0';
         }
         print A $str, "\n";
         $ctr++;
@@ -4387,19 +4398,21 @@ sub analysis_display() {
         } else {
             next unless $scan_dl{$src} >= 1;
         }
+        next unless defined $top_packet_counts{$src}
+                or defined $top_sig_counts{$src};
         my $str = sprintf "      %-15s DL: %d", $src, $scan_dl{$src};
         if (defined $top_packet_counts{$src}) {
             $str .= ", Packets: $top_packet_counts{$src}";
         } else {
-            $str .= ", Packets: 0";
+            $str .= ', Packets: 0';
         }
         if (defined $top_sig_counts{$src}) {
             $str .= ", Sig count: $top_sig_counts{$src}";
         } else {
-            $str .= ", Sig count: 0";
+            $str .= ', Sig count: 0';
         }
         if (defined $local_src{$src}) {
-            $str .= ", local IP!";
+            $str .= ', local IP!';
         }
         $ctr++;
         if ($config{'STATUS_IP_THRESHOLD'} > 0) {
@@ -7190,127 +7203,14 @@ sub status_psad_daemon() {
 
     push @lines, "[+] Version: psad v$version\n\n";
 
-    if (-e $config{'TOP_SIGS_FILE'}) {
-        if ($config{'STATUS_SIGS_THRESHOLD'} > 0) {
-            push @lines, "[+] Top $config{'STATUS_SIGS_THRESHOLD'} signature matches:\n";
-        } else {
-            push @lines, "[+] Top signature matches:\n";
-        }
-        my $ctr = 0;
-        open F, "< $config{'TOP_SIGS_FILE'}" or die "[*] Could not open ",
-            "$config{'TOP_SIGS_FILE'}: $!";
-        ### Format: <sid> "<msg>" <matches> <num_sources> <sig_proto>
-        while (<F>) {
-            next unless /\S/;
-            next if /^\s*#/;
-            if (/^\s*(\d+)\s+\"(.*?)\"\s+(\d+)\s+(\d+)
-                    \s+(\w+)/x) {
-                my $sid   = $1;
-                my $msg   = $2;
-                my $count = $3;
-                my $num_sources = $4;
-                my $proto       = $5;
-                $ctr++;
-                if ($config{'STATUS_SIGS_THRESHOLD'} > 0) {
-                    last if $ctr >= $config{'STATUS_SIGS_THRESHOLD'};
-                }
-                push @lines, qq|      "$msg" ($proto),  Count: $count,  |,
-                    "Unique sources: $num_sources,  Sid: $sid\n";
-            }
-        }
-        close F;
-        push @lines, "\n";
-    }
+    ### print top signature matches
+    &import_top_sigs($STATUS_PRINT);
 
-    if (-e $config{'TOP_ATTACKERS_FILE'}) {
+    ### print top attackers
+    &import_top_attackers($STATUS_PRINT);
 
-        if ($config{'STATUS_IP_THRESHOLD'} > 0) {
-            push @lines, "[+] Top $config{'STATUS_IP_THRESHOLD'} attackers:\n";
-        } else {
-            push @lines, "[+] Top attackers:\n";
-        }
-
-        my $ctr = 0;
-        open F, "< $config{'TOP_ATTACKERS_FILE'}" or die "[*] Could not open ",
-            "$config{'TOP_ATTACKERS_FILE'}: $!";
-        while (<F>) {
-            next unless /\S/;
-            next if /^\s*#\s*$/;
-            ###  Format: <IP> <DL> <total_packets> <uniq_sigs> <sig_matches> <is_local>
-            if (/^\s*($ip_re)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d)/) {
-                my $ip = $1;
-                my $dl = $2;
-                my $tot_pkts = $3;
-                my $uniq_sigs = $4;
-                my $sig_matches = $5;
-                my $is_local = $6;
-                if ($status_min_dl) {
-                    next unless $dl >= $status_min_dl;
-                } else {
-                    next unless $dl >= 1;
-                }
-                my $str = sprintf "      %-15s  DL: $dl, Packets: $tot_pkts, " .
-                    "Sig count: $sig_matches", $ip;
-                $scan_pkt_count{$ip} += $tot_pkts;
-                $uniq_sig_count{$ip} += $uniq_sigs;
-                $scan_sig_count{$ip} += $sig_matches;
-                if ($is_local) {
-                    $str .= " (local IP!)";
-                }
-                $ctr++;
-                if ($config{'STATUS_IP_THRESHOLD'} > 0) {
-                    last if $ctr >= $config{'STATUS_IP_THRESHOLD'};
-                }
-                push @lines, "$str\n";
-            }
-        }
-        close F;
-        push @lines, "\n";
-    }
-
-    if (-e $config{'TOP_SCANNED_PORTS_FILE'}) {
-
-        if ($config{'STATUS_PORTS_THRESHOLD'} > 0) {
-            push @lines, "[+] Top $config{'STATUS_PORTS_THRESHOLD'} scanned ports:\n";
-        } else {
-            push @lines, "[+] Top scanned ports:\n";
-        }
-
-        my %port_ctr  = ();
-        my %port_stop = ();
-        my $printed_udp_newline = 0;
-        my $ctr = 0;
-        open F, "< $config{'TOP_SCANNED_PORTS_FILE'}" or die "[*] Could not open ",
-            "$config{'TOP_SCANNED_PORTS_FILE'}: $!";
-        while (<F>) {
-            next unless /\S/;
-            next if /^\s*#\s*$/;
-            next if /^\s*#\s*Format/;
-            chomp;
-            ### Format: <proto> <port> <packets>
-            if (/^\s*(\w+)\s+(\d+)\s+(\d+)/) {
-                my $proto = $1;
-                my $port  = $2;
-                my $count = $3;
-                $port_ctr{$proto}++;
-                if ($port_ctr{$proto} >= $config{'STATUS_PORTS_THRESHOLD'}) {
-                    $port_stop{$proto} = '';
-                }
-                next if defined $port_stop{$proto};
-                if ($proto eq 'udp' and not $printed_udp_newline) {
-                    push @lines, "\n";
-                    $printed_udp_newline = 1;
-                }
-                $ctr++;
-                if ($config{'STATUS_PORTS_THRESHOLD'} > 0) {
-                    last if $ctr >= $config{'STATUS_PORTS_THRESHOLD'};
-                }
-                push @lines, "      $_ packets\n";
-            }
-        }
-        close F;
-        push @lines, "\n";
-    }
+    ### print top scanned ports
+    &import_top_scanned_ports($STATUS_PRINT);
 
     if (-e $config{'IPT_PREFIX_COUNTER_FILE'}) {
         push @lines, "    Netfilter log prefix counters:\n";
@@ -7718,78 +7618,183 @@ sub import_old_scans() {
             }
         }
     }
-    ### import top scanned ports
-    if (-e $config{'TOP_SCANNED_PORTS_FILE'}) {
-        open F, "< $config{'TOP_SCANNED_PORTS_FILE'}" or die "[*] Could not ",
-            "open $config{'TOP_SCANNED_PORTS_FILE'}: $!";
-        while (<F>) {
-            next unless /\S/;
-            next if /^\s*#/;
-            if (/^\s*(\w+)\s+(\d+)\s+(\d+)/) {
-                my $proto = $1;
-                my $port  = $2;
-                my $count = $3;
-                if ($proto eq 'tcp') {
-                    $top_tcp_ports{$port} = $count;
-                } elsif ($proto eq 'udp') {
-                    $top_udp_ports{$port} = $count;
-                }
-            }
-        }
-        close F;
-    }
-    ### import top signatures
-    if (-e $config{'TOP_SIGS_FILE'}) {
-        open F, "< $config{'TOP_SIGS_FILE'}" or die "[*] Could not ",
-            "open $config{'TOP_SIGS_FILE'}: $!";
-        while (<F>) {
-            next unless /\S/;
-            next if /^\s*#/;
-            if (/^\s*(\d+)\s+\".*?\"\s+(\d+)\s+(\d+)/) {
-                my $sid = $1;
-                my $matches = $2;
-                my $sources = $3;
-                $top_sigs{$sid} = $matches;
-                for (my $i=0; $i<$sources; $i++) {
-                    ### this is a hack since we can't recover
-                    ### the specific IP addresses
-                    $sig_sources{$sid}{$i} = '';
-                }
-            }
-        }
-        close F;
-    }
-    ### import top attackers
-    if (-e $config{'TOP_ATTACKERS_FILE'}) {
-        open F, "< $config{'TOP_ATTACKERS_FILE'}" or die "[*] Could not ",
-            "open $config{'TOP_ATTACKERS_FILE'}: $!";
-        while (<F>) {
-            next unless /\S/;
-            next if /^\s*#/;
-            if (/^\s*($ip_re)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d)/) {
-                my $src = $1;
-                my $dl  = $2;
-                my $tot_pkts    = $3;
-                my $uniq_sigs   = $4;
-                my $sig_matches = $5;
-                my $is_ip_local = $6;
 
-                next unless defined $prev_sources{$src};
-                $scan_dl{$src} = $dl;
-                $top_packet_counts{$src} = $tot_pkts;
-                $top_sig_counts{$src}    = $sig_matches;
-                if ($is_ip_local) {
-                    $local_src{$src} = '';
-                }
-            }
-        }
-        close F;
-    }
+    ### import top scanned ports
+    &import_top_scanned_ports($NO_STATUS);
+
+    ### import top signatures
+    &import_top_sigs($NO_STATUS);
+
+    ### import top attackers
+    &import_top_attackers($NO_STATUS);
+
     if ($import_ctr) {
         &Psad::psyslog('psad', "imported $import_ctr scanning IP " .
                 "addresses from previous psad instance")
             unless $no_syslog_alerts;
     }
+    return;
+}
+
+sub import_top_sigs() {
+    my $status_print = shift;
+    return unless -e $config{'TOP_SIGS_FILE'};
+
+    if ($status_print == $STATUS_PRINT) {
+        if ($config{'STATUS_SIGS_THRESHOLD'} > 0) {
+            print "[+] Top $config{'STATUS_SIGS_THRESHOLD'} signature matches:\n";
+        } else {
+            print "[+] Top signature matches:\n";
+        }
+    }
+
+    my $ctr = 0;
+    open F, "< $config{'TOP_SIGS_FILE'}" or die "[*] Could not ",
+        "open $config{'TOP_SIGS_FILE'}: $!";
+    while (<F>) {
+        next unless /\S/;
+        next if /^\s*#/;
+        if (/^\s*(\d+)\s+\"(.*?)\"\s+(\d+)\s+(\d+)\s+(\w+)/) {
+            my $sid = $1;
+            my $msg = $2;
+            my $matches = $3;
+            my $sources = $4;
+            my $proto   = $5;
+            $top_sigs{$sid} = $matches;
+            for (my $i=0; $i<$sources; $i++) {
+                ### this is a hack since we can't recover
+                ### the specific IP addresses
+                $sig_sources{$sid}{$i} = '';
+            }
+            $ctr++;
+            if ($status_print == $STATUS_PRINT) {
+                if ($config{'STATUS_SIGS_THRESHOLD'} > 0) {
+                    last if $ctr >= $config{'STATUS_SIGS_THRESHOLD'};
+                }
+                print qq|      "$msg" ($proto),  Count: $matches,  |,
+                    "Unique sources: $sources,  Sid: $sid\n";
+            }
+        }
+    }
+    close F;
+    print "\n" if $status_print == $STATUS_PRINT;
+    return;
+}
+
+sub import_top_scanned_ports() {
+    my $status_print = shift;
+    return unless -e $config{'TOP_SCANNED_PORTS_FILE'};
+
+    if ($status_print == $STATUS_PRINT) {
+        if ($config{'STATUS_PORTS_THRESHOLD'} > 0) {
+            print "[+] Top $config{'STATUS_PORTS_THRESHOLD'} scanned ports:\n";
+        } else {
+            print "[+] Top scanned ports:\n";
+        }
+    }
+
+    my %port_ctr  = ();
+    my %port_stop = ();
+    my $printed_udp_newline = 0;
+    my $ctr = 0;
+    open F, "< $config{'TOP_SCANNED_PORTS_FILE'}" or die "[*] Could not open ",
+        "$config{'TOP_SCANNED_PORTS_FILE'}: $!";
+    while (<F>) {
+        next unless /\S/;
+        next if /^\s*#\s*$/;
+        next if /^\s*#\s*Format/;
+        chomp;
+        ### Format: <proto> <port> <packets>
+        if (/^\s*(\w+)\s+(\d+)\s+(\d+)/) {
+            my $proto = $1;
+            my $port  = $2;
+            my $count = $3;
+            if ($proto eq 'tcp') {
+                $top_tcp_ports{$port} = $count;
+            } elsif ($proto eq 'udp') {
+                $top_udp_ports{$port} = $count;
+            }
+            $port_ctr{$proto}++;
+            if ($status_print == $STATUS_PRINT) {
+                if ($port_ctr{$proto} >= $config{'STATUS_PORTS_THRESHOLD'}) {
+                    $port_stop{$proto} = '';
+                }
+                next if defined $port_stop{$proto};
+                if ($proto eq 'udp' and not $printed_udp_newline) {
+                    print "\n";
+                    $printed_udp_newline = 1;
+                }
+                if ($config{'STATUS_PORTS_THRESHOLD'} > 0) {
+                    last if $ctr >= $config{'STATUS_PORTS_THRESHOLD'};
+                }
+                print "      $_ packets\n";
+            }
+            $ctr++;
+        }
+    }
+    close F;
+    print "\n" if $status_print == $STATUS_PRINT;
+    return;
+}
+
+sub import_top_attackers() {
+    my $status_print = shift;
+    return unless -e $config{'TOP_ATTACKERS_FILE'};
+
+    if ($status_print == $STATUS_PRINT) {
+        if ($config{'STATUS_IP_THRESHOLD'} > 0) {
+            print "[+] Top $config{'STATUS_IP_THRESHOLD'} attackers:\n";
+        } else {
+            print "[+] Top attackers:\n";
+        }
+    }
+
+    my $ctr = 0;
+    open F, "< $config{'TOP_ATTACKERS_FILE'}" or die "[*] Could not open ",
+        "$config{'TOP_ATTACKERS_FILE'}: $!";
+    while (<F>) {
+        next unless /\S/;
+        next if /^\s*#\s*$/;
+        ###  Format: <IP> <DL> <total_packets> <uniq_sigs> <sig_matches> <is_local>
+        if (/^\s*($ip_re)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d)/) {
+            my $ip = $1;
+            my $dl = $2;
+            my $tot_pkts = $3;
+            my $uniq_sigs = $4;
+            my $sig_matches = $5;
+            my $is_local = $6;
+            if ($status_print == $STATUS_PRINT) {
+                if ($status_min_dl) {
+                    next unless $dl >= $status_min_dl;
+                } else {
+                    next unless $dl >= 1;
+                }
+            }
+            if (defined $scan_dl{$ip}) {
+                $scan_dl{$ip} = $dl
+                    if $scan_dl{$ip} < $dl;
+            } else {
+                $scan_dl{$ip} = $dl;
+            }
+            $local_src{$ip} = '' if $is_local;
+            $top_packet_counts{$ip} = $tot_pkts;
+            $top_sig_counts{$ip}    = $sig_matches;
+            $ctr++;
+            if ($status_print == $STATUS_PRINT) {
+                my $str = sprintf "      %-15s  DL: $dl, Packets: $tot_pkts, " .
+                    "Sig count: $sig_matches", $ip;
+                if ($is_local) {
+                    $str .= " (local IP!)";
+                }
+                if ($config{'STATUS_IP_THRESHOLD'} > 0) {
+                    last if $ctr >= $config{'STATUS_IP_THRESHOLD'};
+                }
+                print $str, "\n";
+            }
+        }
+    }
+    close F;
+    print "\n" if $status_print == $STATUS_PRINT;
     return;
 }
 

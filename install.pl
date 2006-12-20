@@ -65,6 +65,8 @@ my $RUNLEVEL;    ### This should only be set if install.pl
                  ### cannot determine the correct runlevel
 my $WHOIS_PSAD   = "${USRBIN_DIR}/whois_psad";
 
+my $SIG_UPDATE_URL  = 'http://www.cipherdyne.org/psad/signatures';
+
 ### directory in which to install snort rules
 my $SNORT_DIR    = "${PSAD_CONFDIR}/snort_rules";
 
@@ -79,6 +81,7 @@ my $mknodCmd     = '/bin/mknod';
 my $makeCmd      = '/usr/bin/make';
 my $killallCmd   = '/usr/bin/killall';
 my $perlCmd      = '/usr/bin/perl';
+my $wgetCmd      = '/usr/bin/wget';
 my $iptablesCmd  = '/sbin/iptables';
 my $psadCmd      = "${USRSBIN_DIR}/psad";
 #============ end config ============
@@ -125,7 +128,7 @@ my @cmd_search_paths = qw(
 );
 
 ### IP regex
-my $ip_re = '(?:\d{1,3}\.){3}\d{1,3}';
+my $ip_re = qr|(?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2}|;
 
 ### used to preserve old FW_MSG_SEARCH vars from previous
 ### psad installation.  This is only needed when upgrading
@@ -146,6 +149,11 @@ if (-e $INSTALL_LOG) {
 
 ### scope these vars
 my $PERL_INSTALL_DIR;  ### This is used to find pre-0.9.2 installations of psad
+
+### for user answers
+my $ACCEPT_YES_DEFAULT = 1;
+my $ACCEPT_NO_DEFAULT  = 2;
+my $NO_ANS_DEFAULT     = 0;
 
 ### set the install directory for the Psad.pm module
 my $found = 0;
@@ -694,6 +702,9 @@ sub install() {
         }
     }
 
+    ### download signatures?
+    &download_signatures() if &query_signatures();
+
     ### make sure the PSAD_DIR and PSAD_FIFO variables are correctly defined
     ### in psad.conf and kmsgsd.conf
     &put_string('PSAD_DIR', $PSAD_DIR, "${PSAD_CONFDIR}/psad.conf");
@@ -744,14 +755,9 @@ sub install() {
 sub uninstall() {
     &logr("\n[+] Uninstalling psad from $HOSTNAME: " . localtime() . "\n");
 
-    my $ans = '';
-    while ($ans ne 'y' && $ans ne 'n') {
-        print '[+] This will completely remove psad ',
-            "from your system.\n    Are you sure (y/n)? ";
-        $ans = <STDIN>;
-        chomp $ans;
-    }
-    if ($ans eq 'n') {
+    unless (&query_yes_no('[+] This will completely remove psad ' .
+                "from your system.\n    Are you sure (y/n)? ",
+                $NO_ANS_DEFAULT)) {
         &logr("[*] User aborted uninstall by answering \"n\" to the remove " .
             "question!  Exiting.\n");
         exit 0;
@@ -884,16 +890,8 @@ sub ask_to_stop_psad() {
         chomp $pid;
         if (kill 0, $pid) {
             print "[+] An existing psad daemon is running.\n";
-            my $ans = '';
-            while ($ans ne 'y' && $ans ne 'n') {
-                print "    Can I stop the existing psad daemon ([y]/n)?  ";
-                $ans = <STDIN>;
-                if ($ans eq "\n") {  ### allow the default of "y" to take over
-                    $ans = 'y';
-                }
-                chomp $ans;
-            }
-            if ($ans eq 'y') {
+            if (&query_yes_no("    Can I stop the existing psad " .
+                        "daemon ([y]/n)?  ", $ACCEPT_YES_DEFAULT)) {
                 return 1;
             } else {
                 die "[*] Aborting install.";
@@ -1105,6 +1103,44 @@ sub set_home_net() {
     return;
 }
 
+sub query_signatures() {
+    &logr("[+] The latest psad signatures can be installed with " .
+        qq|"psad --sig-update"\n    or installed now with install.pl.\n\n|);
+    &logr("    If you decide to answer 'y' to the next question, install.pl\n" .
+        "    will require DNS and network access.\n\n");
+    return &query_yes_no("    Would you like to install the latest " .
+            "signatures from\n    $SIG_UPDATE_URL " .
+            "(y/n)?  ", $NO_ANS_DEFAULT);
+}
+
+sub download_signatures() {
+
+    my $curr_pwd = cwd() or die $!;
+    chdir '/tmp' or die $!;
+
+    print "[+] Downloading latest signatures from:\n",
+        "        $SIG_UPDATE_URL\n";
+
+    unlink 'signatures' if -e 'signatures';
+
+    ### download the file
+    unless (-x $wgetCmd) {
+        &logr("[-] The $wgetCmd var is not a valid path for wget, " .
+            "skipping sig install.\n");
+    }
+    system "$wgetCmd $SIG_UPDATE_URL";
+
+    unless (-e 'signatures') {
+        &logr("[-] Could not download signatures, continuing with install.\n");
+    }
+
+    unlink "${PSAD_CONFDIR}/signatures" if -e "${PSAD_CONFDIR}/signatures";
+    move 'signatures', "${PSAD_CONFDIR}/signatures";
+    chdir $curr_pwd or die $!;
+
+    return;
+}
+
 sub query_use_home_net_default() {
     &logr(
 "[+] By default, psad matches Snort rules against any IP addresses, but psad\n");
@@ -1115,17 +1151,7 @@ sub query_use_home_net_default() {
     &logr(
 "    limit the networks psad uses to enumerate the home network(s)?\n");
 
-    my $ans = '';
-    while ($ans ne 'y' && $ans ne 'n') {
-        &logr("    (y/[n])?  ");
-        $ans = <STDIN>;
-        $ans = 'n' if $ans eq "\n";
-        chomp $ans;
-    }
-    if ($ans eq 'y') {
-        return 0;
-    }
-    return 1;
+    return &query_yes_no("    (y/[n])?  ", $ACCEPT_NO_DEFAULT);
 }
 
 sub set_hostname() {
@@ -1272,50 +1298,38 @@ sub config_metalog() {
     return;
 }
 
-sub query_preserve_config() {
+sub query_yes_no() {
+    my ($msg, $style) = @_;
     my $ans = '';
-    while ($ans ne 'y' && $ans ne 'n') {
-        &logr('[+] Would you like to merge the config from the ' .
-            "existing\n");
-        &logr("    psad installation ([y]/n)?  ");
-        $ans = <STDIN>;
-        $ans = 'y' if $ans eq "\n";
+    while ($ans ne 'y' and $ans ne 'n') {
+        &logr($msg);
+        $ans = lc(<STDIN>);
+        if ($style == $ACCEPT_YES_DEFAULT) {
+            $ans = 'y' if $ans eq "\n";
+        } elsif ($style == $ACCEPT_NO_DEFAULT) {
+            $ans = 'n' if $ans eq "\n";
+        }
         chomp $ans;
     }
-    if ($ans eq 'y') {
-        return 1;
-    }
+    return 1 if $ans eq 'y';
     return 0;
 }
 
+sub query_preserve_config() {
+    return &query_yes_no("[+] Would you like to merge the " .
+            "config from the existing\n    psad installation ([y]/n)?  ",
+            $ACCEPT_YES_DEFAULT);
+}
+
 sub query_init_script_restart_syslog() {
-    my $ans = '';
-    while ($ans ne 'y' && $ans ne 'n') {
-        &logr("[+] Is it ok to restart the syslog daemon ([y]/n)?  ");
-        $ans = <STDIN>;
-        $ans = 'y' if $ans eq "\n";
-        chomp $ans;
-    }
-    if ($ans eq 'y') {
-        return 1;
-    }
-    return 0;
+    return &query_yes_no("[+] Is it ok to restart the syslog " .
+            "daemon ([y]/n)?  ", $ACCEPT_YES_DEFAULT);
 }
 
 sub query_preserve_sigs_autodl() {
     my $file = shift;
-    my $ans = '';
-    while ($ans ne 'y' && $ans ne 'n') {
-        &logr("\n");
-        &logr("[+] Merge any user modfications in $file ([y]/n)?  ");
-        $ans = <STDIN>;
-        $ans = 'y' if $ans eq "\n";
-        chomp $ans;
-    }
-    if ($ans eq 'y') {
-        return 1;
-    }
-    return 0;
+    return &query_yes_no("[+] Merge any user modfications " .
+            "in $file ([y]/n)?  ", $ACCEPT_YES_DEFAULT);
 }
 
 sub preserve_old_fw_msg_search() {
@@ -1668,20 +1682,10 @@ sub get_fw_search_strings() {
 "    that match particular strings (that are specified in your iptables\n",
 "    ruleset with the --log-prefix option).\n";
 
-    my $ans = '';
-    while ($ans ne 'y' and $ans ne 'n') {
-        print
-"\n    Would you like psad to only parse specific strings in iptables\n",
-"    messages (y/[n])?  ";
-        $ans = <STDIN>;
-        if ($ans eq "\n") {  ### allow the default answer to take over
-            $ans = 'n';
-        }
-        chomp $ans;
-    }
-    print "\n";
+    if (&query_yes_no("\n    Would you like psad to only parse " .
+            "specific strings in iptables\n    messages (y/[n])?  ",
+            $ACCEPT_NO_DEFAULT)) {
 
-    if ($ans eq 'y') {
 
         ### we are only searching for specific iptables log prefixes
         &put_string('FW_SEARCH_ALL', 'N', "${PSAD_CONFDIR}/fw_search.conf");
@@ -1724,7 +1728,6 @@ sub get_fw_search_strings() {
 }
 
 sub query_dshield() {
-    my $ans = '';
     &logr("\n");
     &logr("[+] Psad has the capability of sending scan data via email alerts " .
         "to the\n");
@@ -1739,16 +1742,9 @@ sub query_dshield() {
     &logr("    have a DShield user id you can edit the \"DSHIELD_USER_ID\" " .
         "variable\n");
     &logr("    in $PSAD_CONFDIR/psad.conf\n\n");
-    while ($ans ne 'y' && $ans ne 'n') {
-        &logr('    Would you like to enable DShield alerts (y/[n])?  ');
-        $ans = <STDIN>;
-        $ans = 'n' if $ans eq "\n";
-        chomp $ans;
-    }
-    if ($ans eq 'y') {
-        return 1;
-    }
-    return 0;
+
+    return &query_yes_no('    Would you like to enable DShield alerts (y/[n])?  ',
+            $ACCEPT_NO_DEFAULT);
 }
 
 sub query_email() {
@@ -1770,18 +1766,9 @@ sub query_email() {
     }
     &logr("[+] psad alerts will be sent to:\n\n");
     &logr("       $email_addresses\n\n");
-    my $ans = '';
-    while ($ans ne 'y' and $ans ne 'n') {
-        &logr("[+] Would you like alerts sent to a different address ([y]/n)?  ");
-        $ans = <STDIN>;
-        if ($ans eq "\n") {  ### allow the default of "y" to take over
-                             ### when just "Enter" is pressed.
-            $ans = 'y';
-        }
-        chomp $ans;
-    }
-    print "\n";
-    if ($ans eq 'y') {
+
+    if (&query_yes_no("[+] Would you like alerts sent to a different " .
+                "address ([y]/n)?  ", $ACCEPT_YES_DEFAULT)) {
         print "\n";
         &logr("[+] To which email address(es) would you like " .
             "psad alerts to be sent?\n");
@@ -1863,7 +1850,7 @@ sub put_string() {
 
 sub archive() {
     my $file = shift;
-    my $curr_pwd = cwd();
+    my $curr_pwd = cwd() or die $!;
     chdir $CONF_ARCHIVE or die $!;
     my ($filename) = ($file =~ m|.*/(.*)|);
     my $base = "${filename}.old";
@@ -1888,16 +1875,9 @@ sub archive() {
 
 sub enable_psad_at_boot() {
     my $distro = shift;
-    my $ans = '';
-    while ($ans ne 'y' && $ans ne 'n') {
-        &logr("[+] Enable psad at boot time ([y]/n)?  ");
-        $ans = <STDIN>;
-        if ($ans eq "\n") {  ### allow the default of "y" to take over
-            $ans = 'y';
-        }
-        chomp $ans;
-    }
-    if ($ans eq 'y') {
+
+    if (&query_yes_no("[+] Enable psad at boot time ([y]/n)?  ",
+                $ACCEPT_YES_DEFAULT)) {
         if ($distro eq 'redhat' or $distro eq 'fedora') {
             system "$Cmds{'chkconfig'} --add psad";
         } elsif ($distro eq 'gentoo') {

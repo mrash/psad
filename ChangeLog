@@ -15,6 +15,9 @@ psad-2.0.2 (12//2006):
       do not have at least one packet or signature match (for any reason).
     - Bugfix to not print more than TOP_IP_LOG_THRESHOLD IP addresses in thet
       top attackers section.
+    - Updated install.pl to reference configuration paths directly from
+      psad.conf instead of defining them separately.  This should fix Debian
+      bug #403566.
 
 psad-2.0.1 (12/12/2006):
     - Added Nachi worm reconnaisannce icmp signature

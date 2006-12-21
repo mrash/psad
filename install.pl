@@ -1287,17 +1287,17 @@ sub config_metalog() {
         open METALOG, "> $syslog_conf" or
             die "[*] Unable to open $syslog_conf: $!";
 
-        print METALOG "\n";
-        print METALOG "\nPSAD :\n",
-            "  facility = \"kern\"\n";
-        print METALOG '  command  = ',
+        print METALOG "\n",
+            "\nPSAD :\n",
+            "  facility = \"kern\"\n",
+            '  command  = ',
             "\"/usr/sbin/psadpipe.sh\"\n";
         close METALOG;
 
         open PIPESCRIPT, '> /usr/sbin/psadpipe.sh' or
             die "[*] Unable to open /usr/sbin/psadpipe.sh: $!";
-        print PIPESCRIPT "#!/bin/sh\n\n";
-        print PIPESCRIPT "echo \"\$3\" >> $config{'PSAD_FIFO_FILE'}\n";
+        print PIPESCRIPT "#!/bin/sh\n\n",
+            "echo \"\$3\" >> $config{'PSAD_FIFO_FILE'}\n";
         close PIPESCRIPT;
         chmod 0700, '/usr/sbin/psadpipe.sh';
         &logr('[+] Generated /usr/sbin/psadpipe.sh ' .
@@ -2137,6 +2137,9 @@ Usage: install.pl [options]
                                    a previous config is being merged.
     -S, --Skip-mod-install       - Do not install any perl modules.
     -s  <file>                   - Specify path to syslog.conf file.
+    -c, --config <file>          - Specify alternate path to psad.conf from
+                                   which default installation paths are
+                                   derived.
     --no-rm-lib-dir              - Do not remove the /usr/lib/psad/
                                    directory before installing psad.
     --no-syslog-test             - Skip syslog reconfiguration test.

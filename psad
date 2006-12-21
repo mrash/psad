@@ -668,7 +668,7 @@ $< == 0 && $> == 0 or
 &psad_init();
 
 ### check to make sure another psad process is not already running.
-&Psad::unique_pid($config{'PID_FILE'});
+&Psad::unique_pid($config{'PSAD_PID_FILE'});
 
 ### get the ip addresses that are local to this machine
 &get_local_ips();
@@ -694,7 +694,7 @@ unless ($no_daemon or $debug) {
 }
 
 ### write the current pid associated with psad to the psad pid file
-&Psad::writepid($config{'PID_FILE'});
+&Psad::writepid($config{'PSAD_PID_FILE'});
 
 ### write the command line args used to start psad to $cmdline_file
 &Psad::writecmdline(\@args_cp, $cmdline_file)
@@ -964,12 +964,14 @@ MAIN: for (;;) {
     }
 
     if ($die_msg) {
-        &Psad::print_sys_msg($die_msg, "$config{'PSAD_DIR'}/errs/psad.die");
+        &Psad::print_sys_msg($die_msg,
+            "$config{'PSAD_DIR'}/errs/psad.die");
         $die_msg = '';
     }
 
     if ($warn_msg) {
-        &Psad::print_sys_msg($warn_msg, "$config{'PSAD_DIR'}/errs/psad.warn");
+        &Psad::print_sys_msg($warn_msg,
+            "$config{'PSAD_DIR'}/errs/psad.warn");
         $warn_msg = '';
     }
 
@@ -2406,8 +2408,8 @@ sub dshield_email_log() {
                 $config{'DSHIELD_ALERT_EMAIL'} or die '[*] Could not send ',
                 'dshield alert email.';
             ### save this email to disk also
-            open DSSAVE, "> $config{'DSHIELD_LATEST_EMAIL'}" or die '[*] ',
-                "Could not open $config{'DSHIELD_LATEST_EMAIL'}: $!";
+            open DSSAVE, "> $config{'DSHIELD_EMAIL_FILE'}" or die '[*] ',
+                "Could not open $config{'DSHIELD_EMAIL_FILE'}: $!";
             if ($config{'DSHIELD_DL_THRESHOLD'} > 0) {
                 for my $line (@dshield_data) {
                     if ($line =~ /^.*?($ip_re)/) {
@@ -2430,8 +2432,8 @@ sub dshield_email_log() {
             open MAIL, "| $cmds{'sendmail'} -oi -t" or die '[*] Could not ',
                 'send dshield alert email.';
             ### save this email to disk also
-            open DSSAVE, "> $config{'DSHIELD_LATEST_EMAIL'}" or die '[*] ',
-                "Could not open $config{'DSHIELD_LATEST_EMAIL'}: $!";
+            open DSSAVE, "> $config{'DSHIELD_EMAIL_FILE'}" or die '[*] ',
+                "Could not open $config{'DSHIELD_EMAIL_FILE'}: $!";
             print MAIL "From: $config{'DSHIELD_USER_EMAIL'}\n",
                 "To: $config{'DSHIELD_ALERT_EMAIL'}\n",
                 "Subject: $subject\n";
@@ -2566,7 +2568,7 @@ sub psad_init() {
     ### pid file hash
     %pidfiles = (
         'psadwatchd' => $config{'PSADWATCHD_PID_FILE'},
-        'psad'       => $config{'PID_FILE'},
+        'psad'       => $config{'PSAD_PID_FILE'},
         'kmsgsd'     => $config{'KMSGSD_PID_FILE'},
     );
 
@@ -2578,7 +2580,7 @@ sub psad_init() {
     &required_vars();
 
     ### store the psad command line.
-    $cmdline_file = $config{'CMDLINE_FILE'};
+    $cmdline_file = $config{'PSAD_CMDLINE_FILE'};
 
     ### make sure the values in the config file make sense
     &validate_config();
@@ -2706,8 +2708,7 @@ sub psad_init() {
     my $rv = &fw_analyze_mode();
     exit $rv if $fw_analyze;
 
-    ### make sure PSAD_DIR, FW_DATA_FILE, and /var/lib/psad/psadfifo, etc.
-    ### actually exist
+    ### make sure we are setup to run
     &setup();
 
     ### dump config
@@ -5361,9 +5362,9 @@ sub renew_auto_blocked_ips() {
         }
     }
     if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y'
-            && -e $config{'ETC_HOSTS_DENY'}) {
-        open B, "< $config{'ETC_HOSTS_DENY'}" or
-            die "[*] Could not open $config{'ETC_HOSTS_DENY'}: $!";
+            && -e $config{'ETC_HOSTS_DENY_FILE'}) {
+        open B, "< $config{'ETC_HOSTS_DENY_FILE'}" or
+            die "[*] Could not open $config{'ETC_HOSTS_DENY_FILE'}: $!";
         my @lines = <B>;
         close B;
         for my $line (@lines) {
@@ -5425,8 +5426,8 @@ sub renew_auto_blocked_ips() {
 }
 
 sub sockwrite_flush_auto_rules() {
-    if (-e $config{'PID_FILE'}) {
-        if (&Psad::pidrunning($config{'PID_FILE'})
+    if (-e $config{'PSAD_PID_FILE'}) {
+        if (&Psad::pidrunning($config{'PSAD_PID_FILE'})
                 and $config{'ENABLE_AUTO_IDS'} eq 'Y') {
             print "[+] Flushing psad chains via running psad daemon within\n",
                 "    $config{'CHECK_INTERVAL'} seconds.\n";
@@ -6000,11 +6001,11 @@ sub sockwrite_add_ipt_block_ip() {
         }
     }
 
-    if (-e $config{'PID_FILE'}) {
+    if (-e $config{'PSAD_PID_FILE'}) {
         if ($config{'ENABLE_AUTO_IDS'} ne 'Y') {
             die "[*] ENABLE_AUTO_IDS is not set to 'Y', exiting.";
         }
-        if (&Psad::pidrunning($config{'PID_FILE'})) {
+        if (&Psad::pidrunning($config{'PSAD_PID_FILE'})) {
             print "[+] Writing $fw_block_ip to socket. Psad will add the IP\n",
                 "    within $config{'CHECK_INTERVAL'} seconds.\n";
 
@@ -6054,11 +6055,11 @@ sub sockwrite_rm_ipt_block_ip() {
         $fw_rm_block_ip = "$rm_block_ip/$rm_block_mask";
     }
 
-    if (-e $config{'PID_FILE'}) {
+    if (-e $config{'PSAD_PID_FILE'}) {
         if ($config{'ENABLE_AUTO_IDS'} ne 'Y') {
             die "[*] ENABLE_AUTO_IDS is not set to 'Y', exiting.";
         }
-        if (&Psad::pidrunning($config{'PID_FILE'})) {
+        if (&Psad::pidrunning($config{'PSAD_PID_FILE'})) {
             print "[+] Writing $fw_rm_block_ip to socket. Psad will remove the IP\n",
                 "    within $config{'CHECK_INTERVAL'} seconds.\n";
 
@@ -6076,8 +6077,8 @@ sub sockwrite_rm_ipt_block_ip() {
 
 sub tcpwr_test_block() {
     my $ip = shift;
-    open T, "< $config{'ETC_HOSTS_DENY'}" or die "[*] Could not open ",
-        "$config{'ETC_HOSTS_DENY'}: $!";
+    open T, "< $config{'ETC_HOSTS_DENY_FILE'}" or die "[*] Could not open ",
+        "$config{'ETC_HOSTS_DENY_FILE'}: $!";
     my @lines = <T>;
     close T;
     for my $line (@lines) {
@@ -6089,8 +6090,8 @@ sub tcpwr_test_block() {
 
 sub tcpwr_block() {
     my $ip = shift;
-    open T, ">> $config{'ETC_HOSTS_DENY'}" or die "[*] Could not open ",
-        "$config{'ETC_HOSTS_DENY'}: $!";
+    open T, ">> $config{'ETC_HOSTS_DENY_FILE'}" or die "[*] Could not open ",
+        "$config{'ETC_HOSTS_DENY_FILE'}: $!";
     print T "ALL: $ip\n";
     close T;
     return;
@@ -6099,12 +6100,12 @@ sub tcpwr_block() {
 sub tcpwr_rm_block() {
     my $ip = shift;
     my $rv = 0;
-    open T, "< $config{'ETC_HOSTS_DENY'}" or die '[*] Could not open ',
-        "$config{'ETC_HOSTS_DENY'}: $!";
+    open T, "< $config{'ETC_HOSTS_DENY_FILE'}" or die '[*] Could not open ',
+        "$config{'ETC_HOSTS_DENY_FILE'}: $!";
     my @lines = <T>;
     close T;
-    open T, "> $config{'ETC_HOSTS_DENY'}.tmp" or die '[*] Could not open ',
-        "$config{'ETC_HOSTS_DENY'}.tmp: $!";
+    open T, "> $config{'ETC_HOSTS_DENY_FILE'}.tmp" or die '[*] Could not open ',
+        "$config{'ETC_HOSTS_DENY_FILE'}.tmp: $!";
     for my $line (@lines) {
         chomp $line;
         if ($line =~ /ALL:\s+$ip$/) {
@@ -6121,9 +6122,9 @@ sub tcpwr_rm_block() {
         }
     }
     close T;
-    move "$config{'ETC_HOSTS_DENY'}.tmp", $config{'ETC_HOSTS_DENY'} or die
-        "[*] Could not move $config{'ETC_HOSTS_DENY'}.tmp -> ",
-        "$config{'ETC_HOSTS_DENY'}";
+    move "$config{'ETC_HOSTS_DENY_FILE'}.tmp", $config{'ETC_HOSTS_DENY_FILE'}
+        or die "[*] Could not move $config{'ETC_HOSTS_DENY_FILE'}.tmp -> ",
+        "$config{'ETC_HOSTS_DENY_FILE'}";
 
     ### delete the ip from the hash (if new packets are seen
     ### from the same ip, then the hash will be updated again
@@ -6185,8 +6186,8 @@ sub auto_psad_response() {
                         unless $no_email_alerts;
                 }
                 my $found = 0;
-                open H, "< $config{'ETC_HOSTS_DENY'}" or die
-                    "[*] Could not open $config{'ETC_HOSTS_DENY'}: $!";
+                open H, "< $config{'ETC_HOSTS_DENY_FILE'}" or die
+                    "[*] Could not open $config{'ETC_HOSTS_DENY_FILE'}: $!";
                 my @lines = <H>;
                 close H;
                 for my $line (@lines) {
@@ -6194,8 +6195,8 @@ sub auto_psad_response() {
                     $found = 1 if $line =~ /ALL:\s+$src$/;
                 }
                 unless ($found) {
-                    open H, ">> $config{'ETC_HOSTS_DENY'}" or die
-                        "[*] Could not open $config{'ETC_HOSTS_DENY'}: $!";
+                    open H, ">> $config{'ETC_HOSTS_DENY_FILE'}" or die
+                        "[*] Could not open $config{'ETC_HOSTS_DENY_FILE'}: $!";
                     print H "ALL: $src\n";
                     close H;
                     $auto_blocked_ips{$src} = time()
@@ -8013,10 +8014,10 @@ sub make_psad_dirs() {
     for my $dir qw(
         PSAD_DIR
         PSAD_RUN_DIR
-        PSAD_LIB_DIR
+        PSAD_FIFO_DIR
         PSAD_CONF_DIR
         CONF_ARCHIVE_DIR
-        ERROR_DIR
+        PSAD_ERR_DIR
     ) {
         next if -d $config{$dir};
         mkdir $config{$dir}, 0500 or
@@ -8029,8 +8030,8 @@ sub setup() {
 
     &make_psad_dirs();
 
-    unless (-e $config{'PSAD_FIFO'}) {
-        system "$cmds{'mknod'} -m 600 $config{'PSAD_FIFO'} p";
+    unless (-e $config{'PSAD_FIFO_FILE'}) {
+        system "$cmds{'mknod'} -m 600 $config{'PSAD_FIFO_FILE'} p";
     }
     ### make sure the new whois path exists
     if (-x '/usr/bin/whois.psad' && ! -x $cmds{'whois'}
@@ -8116,7 +8117,7 @@ sub setup() {
             close RS;
             my $found = 0;
             for my $line (@lines) {
-                if ($line =~ m/\|\s*$config{'PSAD_FIFO'}/) {
+                if ($line =~ m/\|\s*$config{'PSAD_FIFO_FILE'}/) {
                     $found = 1;
                     last;
                 }
@@ -8133,10 +8134,10 @@ sub setup() {
                 ### reinstate kernel logging to our named pipe
                 print SYSLOG '### Send kern.info messages to psadfifo for ',
                     "analysis by kmsgsd\n";
-                print SYSLOG "kern.info\t\t|$config{'PSAD_FIFO'}\n";
+                print SYSLOG "kern.info\t\t|$config{'PSAD_FIFO_FILE'}\n";
                 close SYSLOG;
                 &Psad::psyslog('psad', 'reconfiguring syslogd to write ' .
-                    "kern.info messages to $config{'PSAD_FIFO'}")
+                    "kern.info messages to $config{'PSAD_FIFO_FILE'}")
                     unless $no_syslog_alerts;
                 system "$cmds{'killall'} -HUP syslogd";
             }
@@ -8163,7 +8164,7 @@ sub setup() {
 
             my $found = 0;
             for my $line (@lines) {
-                if ($line =~ m/$config{'PSAD_FIFO'}/ or $line =~ /psadfifo/) {
+                if ($line =~ m/$config{'PSAD_FIFO_FILE'}/ or $line =~ /psadfifo/) {
                     $found = 1;
                     last;
                 }
@@ -8181,7 +8182,7 @@ sub setup() {
                 }
                 print SYSLOGNG "\n",
                     'destination psadpipe { pipe(',
-                    "\"$config{'PSAD_FIFO'}\"); };\n",
+                    "\"$config{'PSAD_FIFO_FILE'}\"); };\n",
                     "filter f_kerninfo { facility(kern); };\n",
 #                    "filter f_kerninfo { facility(kern) ",
 #                    "and level(info); };\n",
@@ -8189,7 +8190,7 @@ sub setup() {
                     "filter(f_kerninfo); destination(psadpipe); };\n";
                 close SYSLOGNG;
                 &Psad::psyslog('psad', 'reconfiguring syslog-ng to write ' .
-                    "kern.info messages to $config{'PSAD_FIFO'}")
+                    "kern.info messages to $config{'PSAD_FIFO_FILE'}")
                     unless $no_syslog_alerts;
                 system "$cmds{'killall'} -HUP syslog-ng";
             }
@@ -8238,11 +8239,11 @@ sub setup() {
                 open PIPESCRIPT, '> /usr/sbin/psadpipe.sh' or
                     die "[*] Unable to open /usr/sbin/psadpipe.sh: $!";
                 print PIPESCRIPT "#!/bin/sh\n\n",
-                    "echo \"\$3\" >> $config{'PSAD_FIFO'}\n";
+                    "echo \"\$3\" >> $config{'PSAD_FIFO_FILE'}\n";
                 close PIPESCRIPT;
                 chmod 0700, '/usr/sbin/psadpipe.sh';
                 &Psad::psyslog('psad', 'generated /usr/sbin/psadpipe.sh ' .
-                        "which writes to $config{'PSAD_FIFO'}")
+                        "which writes to $config{'PSAD_FIFO_FILE'}")
                     unless $no_syslog_alerts;
 
                 ### Metalog seems to simply die on SIGHUP and SIGALRM, and I
@@ -8332,8 +8333,8 @@ sub disk_space_exceeded() {
             "$config{'DISK_MAX_PERCENTAGE'} prct utilization.")
             unless $no_syslog_alerts;
         &Psad::sendmail("$config{'MAIL_ERROR_PREFIX'} Exceeded max disk " .
-            "utilization for $config{'PSAD_DIR'} on $config{'HOSTNAME'}", '',
-            $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
+            "utilization for $config{'PSAD_DIR'} on $config{'HOSTNAME'}",
+            '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'})
             unless $no_email_alerts;
         &Psad::psyslog('psad', "removing data in $config{'PSAD_DIR'}")
             unless $no_syslog_alerts;
@@ -8550,7 +8551,7 @@ sub required_vars() {
         SCAN_TIMEOUT DANGER_LEVEL1 DANGER_LEVEL2 DANGER_LEVEL3
         DANGER_LEVEL4 DANGER_LEVEL5 PORT_RANGE_SCAN_THRESHOLD ALERT_ALL
         EMAIL_LIMIT IPTABLES_BLOCK_METHOD TCPWRAPPERS_BLOCK_METHOD
-        EMAIL_ALERT_DANGER_LEVEL PSAD_FIFO WHOIS_LOOKUP_THRESHOLD
+        EMAIL_ALERT_DANGER_LEVEL PSAD_FIFO_FILE WHOIS_LOOKUP_THRESHOLD
         DNS_LOOKUP_THRESHOLD WHOIS_TIMEOUT SNORT_RULES_DIR HOSTNAME
         PACKET_COUNTER_FILE DSHIELD_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR
         ENABLE_PERSISTENCE AUTO_BLOCK_IPT_FILE AUTO_BLOCK_TCPWR_FILE
@@ -8559,7 +8560,7 @@ sub required_vars() {
         ENABLE_DSHIELD_ALERTS SYSLOG_DAEMON DSHIELD_ALERT_INTERVAL
         DSHIELD_ALERT_EMAIL DSHIELD_USER_ID DSHIELD_USER_EMAIL
         DSHIELD_DL_THRESHOLD DISK_CHECK_INTERVAL DISK_MAX_PERCENTAGE
-        DISK_MAX_RM_RETRIES ETC_HOSTS_DENY ETC_SYSLOG_CONF
+        DISK_MAX_RM_RETRIES ETC_HOSTS_DENY_FILE ETC_SYSLOG_CONF
         ETC_SYSLOGNG_CONF MIN_ARCHIVE_DANGER_LEVEL ANALYSIS_MODE_DIR
         IMPORT_OLD_SCANS ICMP_TYPES_FILE SHOW_ALL_SIGNATURES
         IPT_PREFIX_COUNTER_FILE IGNORE_PORTS ENABLE_SCAN_ARCHIVE
@@ -8568,8 +8569,8 @@ sub required_vars() {
         ULOG_DATA_FILE MAIL_ALERT_PREFIX MAIL_STATUS_PREFIX
         MAIL_ERROR_PREFIX MAIL_FATAL_PREFIX ENABLE_AUTO_IDS_EMAILS
         FLUSH_IPT_AT_INIT ENABLE_MAC_ADDR_REPORTING TRUNCATE_FWDATA
-        PSAD_DIR PSAD_RUN_DIR PSAD_LIB_DIR ENABLE_FW_LOGGING_CHECK
-        ENABLE_RENEW_BLOCK_EMAILS DSHIELD_LATEST_EMAIL AUTO_BLOCK_REGEX
+        PSAD_DIR PSAD_RUN_DIR PSAD_FIFO_DIR ENABLE_FW_LOGGING_CHECK
+        ENABLE_RENEW_BLOCK_EMAILS DSHIELD_EMAIL_FILE AUTO_BLOCK_REGEX
         ENABLE_AUTO_IDS_REGEX IPTABLES_PREREQ_CHECK SNORT_RULE_DL_FILE
         IPT_OUTPUT_FILE IPT_ERROR_FILE PROC_FORWARD_FILE PSAD_CONF_DIR
         EXTERNAL_NET HTTP_SERVERS SMTP_SERVERS DNS_SERVERS SQL_SERVERS
@@ -8579,7 +8580,8 @@ sub required_vars() {
         TOP_PORTS_LOG_THRESHOLD TOP_SIGS_LOG_THRESHOLD
         TOP_SCANNED_PORTS_FILE STATUS_OUTPUT_FILE TOP_ATTACKERS_FILE
         STATUS_PORTS_THRESHOLD STATUS_SIGS_THRESHOLD STATUS_IP_THRESHOLD
-        ANALYSIS_OUTPUT_FILE TOP_IP_LOG_THRESHOLD
+        ANALYSIS_OUTPUT_FILE TOP_IP_LOG_THRESHOLD PSAD_LIBS_DIR
+        PSAD_PID_FILE PSAD_CMDLINE_FILE PSAD_ERR_DIR
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

@@ -1,0 +1,51 @@
+
+Building RPM files that are compatible with all possible Linux distributions
+is a difficult task.  If a given RPM file that is downloaded from
+http://www.cipherdyne.org/ is not compatible with your particular Linux
+distro, then you can use the "cd_rpmbuilder" ("CipherDyne RPM Builder") to
+build an RPM file for you on your own system.
+
+The command line interface to cd_rpmbuilder is simple, and one command line
+argument is always required "-p <project>" so that cd_rpmbuilder knows which
+CipherDyne software project you want to build:
+
+# cd_rpmbuilder -p <project>
+
+Note that cd_rpmbuilder is normally as root because it builds RPM's within
+the /usr/src/redhat/ directory by default.  However, if you would like to
+build as a normal user within a directory of your choosing you can do:
+
+# cd_rpmbuilder -p <project> -r <dir>
+
+By default, cd_rpmbuilder builds the latest version of the specified project,
+but if you want to build an older version, use the -b flag:
+
+# cd_rpmbuilder -p <project> -b <version>
+
+If you want to see verbose output (including all output of the system
+rpmbuild command), then use the -v flag:
+
+# cd_rpmbuilder -p <project> -v
+
+Finally, here is some sample output for building the psad project available
+at http://www.cipherdyne.org/psad/:
+
+# ./cd_rpmbuilder -p psad
+[+] Getting latest version file:
+      http://www.cipherdyne.org/psad/psad-latest
+[+] Downloading file:
+      http://www.cipherdyne.org/psad/download/psad-2.0.1.spec
+[+] Downloading file:
+      http://www.cipherdyne.org/psad/download/psad-2.0.1.spec.md5
+[+] Valid md5 sum check for psad-2.0.1.spec
+[+] Downloading file:
+      http://www.cipherdyne.org/psad/download/psad-2.0.1.tar.gz
+[+] Downloading file:
+      http://www.cipherdyne.org/psad/download/psad-2.0.1.tar.gz.md5
+[+] Valid md5 sum check for psad-2.0.1.tar.gz
+[+] Building RPM, this may take a little while...
+
+[+] The following RPMS were successfully built:
+
+      /usr/src/redhat/SRPMS/psad-2.0.1-1.src.rpm (source RPM)
+      /usr/src/redhat/RPMS/i386/psad-2.0.1-1.i386.rpm

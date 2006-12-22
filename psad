@@ -7208,7 +7208,7 @@ sub status_psad_daemon() {
     &import_top_sigs($STATUS_PRINT);
 
     ### print top attackers
-    &import_top_attackers($STATUS_PRINT);
+    &import_top_attackers($STATUS_PRINT, {});
 
     ### print top scanned ports
     &import_top_scanned_ports($STATUS_PRINT);
@@ -7627,7 +7627,7 @@ sub import_old_scans() {
     &import_top_sigs($NO_STATUS);
 
     ### import top attackers
-    &import_top_attackers($NO_STATUS);
+    &import_top_attackers($NO_STATUS, \%prev_sources);
 
     if ($import_ctr) {
         &Psad::psyslog('psad', "imported $import_ctr scanning IP " .
@@ -7739,7 +7739,7 @@ sub import_top_scanned_ports() {
 }
 
 sub import_top_attackers() {
-    my $status_print = shift;
+    my ($status_print, $prev_source_hr) = @_;
     return unless -e $config{'TOP_ATTACKERS_FILE'};
 
     if ($status_print == $STATUS_PRINT) {
@@ -7770,6 +7770,12 @@ sub import_top_attackers() {
                 } else {
                     next unless $dl >= 1;
                 }
+            }
+            if ($status_print == $NO_STATUS) {
+                ### do not add any IP from the top_attackers file
+                ### that does not have a /var/log/psad/<ip>
+                ### directory
+                next unless defined $prev_source_hr->{$ip};
             }
             if (defined $scan_dl{$ip}) {
                 $scan_dl{$ip} = $dl

@@ -18,6 +18,10 @@ psad-2.0.2 (12//2006):
     - Updated install.pl to reference configuration paths directly from
       psad.conf instead of defining them separately.  This should fix Debian
       bug #403566.
+    - Added -c argument to install.pl so that the path to a psad.conf file
+      can be altered from the command line.
+    - Bugfix to not import any IP from the top_attackers file from a previous
+      psad run that does not have a /var/log/psad/<ip> directory.
 
 psad-2.0.1 (12/12/2006):
     - Added Nachi worm reconnaisannce icmp signature

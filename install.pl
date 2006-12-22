@@ -1155,6 +1155,8 @@ sub download_signatures() {
 }
 
 sub query_change_home_net_default() {
+### FIXME: need to give the admin the chance to enable/disable
+### ENABLE_INTF_LOCAL_NETS
     &logr(
 "\n[+] By default, psad matches Snort rules against any IP addresses, but psad\n");
     &logr(
@@ -1715,7 +1717,7 @@ sub get_fw_search_strings() {
 "    whatever string you configure psad to look for must be logged via the\n",
 "    --log-prefix option in iptables.\n\n";
         print "\n";
-        &logr("[+] Add as many search strings as you like; " .
+        &logr("    Add as many search strings as you like; " .
             "each on its own line.\n\n");
         &logr("    End with a \".\" on a line by itself.\n\n");
         my $ans = '';
@@ -1735,8 +1737,8 @@ sub get_fw_search_strings() {
                 &logr("[-] Invalid string\n");
             }
         }
-        &logr("    All firewall search strings used by psad are located " .
-            "in the file: $config{'PSAD_CONF_DIR'}/fw_search.conf\n");
+        &logr("\n    All firewall search strings used by psad are located " .
+            "in the file:\n    $config{'PSAD_CONF_DIR'}/fw_search.conf\n");
     }
     return \@fw_search_strings;
 }

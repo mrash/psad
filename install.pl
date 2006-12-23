@@ -692,9 +692,9 @@ sub install() {
             "in: $config{'CONF_ARCHIVE_DIR'}\n");
     }
     if ($preserve_rv) {
-        &logr("\n[+] Psad has been installed (with your original config merged).\n");
+        &logr("\n[+] psad has been installed (with your original config merged).\n");
     } else {
-        &logr("\n[+] Psad has been installed.\n");
+        &logr("\n[+] psad has been installed.\n");
     }
     if ($init_dir) {
         &logr("\n[+] To start psad, run \"${init_dir}/psad start\"\n");
@@ -887,7 +887,7 @@ sub uninstall() {
         system "$cmds{'killall'} -HUP syslog-ng";
     }
     print "\n";
-    print "[+] Psad has been uninstalled!\n";
+    print "[+] psad has been uninstalled!\n";
     return;
 }
 
@@ -1018,7 +1018,20 @@ sub set_home_net() {
     my $file = shift;
 
     ### first see if the admin will accept the default 'any' value
-    return unless &query_change_home_net_default();
+    return if &query_use_home_net_default();
+
+    my $str =
+"\n    Ok, would you like psad to automatically get the local subnets by\n" .
+"    parsing ifconfig output?  (This is probably best for most situations).\n";
+    &logr($str);
+    if (&query_yes_no('    ([y]/n)?  ', $ACCEPT_YES_DEFAULT)) {
+        return;
+    }
+
+    ### if we make it here, then the admin wants to completely enumerate the
+    ### HOME_NET var, so we have to disable ENABLE_INTF_LOCAL_NETS
+    &put_string('ENABLE_INTF_LOCAL_NETS', 'N',
+        "$config{'PSAD_CONF_DIR'}/psad.conf");
 
     ### get all interfaces; even those that are down since they may
     ### brought up any time.
@@ -1064,54 +1077,39 @@ sub set_home_net() {
             $net_ctr++;
         }
     }
-    if ($net_ctr > 1) {
-        ### found two or more subnets, so forwarding traffic becomes
-        ### possible through the box.
-        &logr("\n    It appears your machine is connected to " .
-            "$net_ctr subnets:\n");
-        for my $intf (keys %connected_subnets) {
-            &logr("      $intf -> $connected_subnets{$intf}\n");
-        }
-        &logr("\n");
-        &logr("    Specify which subnets are part of your internal network.  " .
-            "Note that\n");
-        &logr("    you can correct anything you enter here by editing the " .
-            "\"HOME_NET\"\n");
-        &logr("    variable in: $file.\n\n");
-        &logr("    Enter each of the subnets (except for the external " .
-            "subnet)\n");
-        &logr("    on a line by itself.  Each of the subnets should be in the " .
-            "form\n");
-        &logr("    <net>/<mask>.  E.g. in CIDR notation: 192.168.10.0/24 " .
-            "(preferrable),\n");
-        &logr("    or regularly: 192.168.10.0/255.255.255.0\n\n");
-        &logr("    End with a \".\" on a line by itself.\n\n");
-        my $ans = '';
-        while ($ans !~ /^\s*\.\s*$/) {
-            &logr("    Subnet: ");
-            $ans = <STDIN>;
-            chomp $ans;
-            if ($ans =~ m|^\s*($ip_re/\d+)\s*$|) {
-                ### hard to test this directly without ipv4_network()
-                ### and this module may not be installed, so just use it.
-                $home_net_str .= "$1, ";
-            } elsif ($ans =~ m|^\s*($ip_re/$ip_re)\s*$|) {
-                $home_net_str .= "$1, ";
-            } elsif ($ans !~ /^\s*\.\s*$/) {
-                &logr("[-] Invalid subnet \"$ans\"\n");
-            }
-        }
-    } else {
-        ### forwarding is not possible, so set HOME_NET to a dummy
-        ### value.
-        $home_net_str = 'NOT_USED';
+    ### found two or more subnets, so forwarding traffic becomes
+    ### possible through the box.
+    &logr("\n    It appears your machine is connected to " .
+        "$net_ctr subnets:\n");
+    for my $intf (keys %connected_subnets) {
+        &logr("      $intf -> $connected_subnets{$intf}\n");
     }
-    if ($home_net_str) {
-        $home_net_str =~ s/\,\s*$//;
-        &put_string('HOME_NET', $home_net_str, $file);
-    } else {
-        &put_string('HOME_NET', 'NOT_USED', $file);
+    $str =
+"\n    Specify which subnets are part of your internal network.  Note that\n" .
+"    you can correct anything you enter here by editing the \"HOME_NET\"\n" .
+"    variable in: $file.\n\n" .
+"    Enter each of the subnets (except for the external subnet) on a line by\n" .
+"    itself.  Each of the subnets should be in the form <net>/<mask>.  E.g.\n" .
+"    in CIDR notation: 192.168.10.0/24 (preferrable), or regular notation:\n" .
+"    192.168.10.0/255.255.255.0\n\n    End with a \".\" on a line by itself.\n\n";
+    &logr($str);
+    my $ans = '';
+    while ($ans !~ /^\s*\.\s*$/) {
+        &logr("    Subnet: ");
+        $ans = <STDIN>;
+        chomp $ans;
+        if ($ans =~ m|^\s*($ip_re/\d+)\s*$|) {
+            ### hard to test this directly without ipv4_network()
+            ### and this module may not be installed, so just use it.
+            $home_net_str .= "$1, ";
+        } elsif ($ans =~ m|^\s*($ip_re/$ip_re)\s*$|) {
+            $home_net_str .= "$1, ";
+        } elsif ($ans !~ /^\s*\.\s*$/) {
+            &logr("[-] Invalid subnet \"$ans\"\n");
+        }
     }
+    $home_net_str =~ s/\,\s*$//;
+    &put_string('HOME_NET', $home_net_str, $file);
     return;
 }
 
@@ -1154,19 +1152,18 @@ sub download_signatures() {
     return;
 }
 
-sub query_change_home_net_default() {
-### FIXME: need to give the admin the chance to enable/disable
-### ENABLE_INTF_LOCAL_NETS
-    &logr(
-"\n[+] By default, psad matches Snort rules against any IP addresses, but psad\n");
-    &logr(
-"    offers the ability to restrict signature matches to specific networks\n");
-    &logr(
-"    with a similar concept to the HOME_NET variable in Snort.  Would you like\n");
-    &logr(
-"    limit the networks psad uses to enumerate the home network(s)?\n");
-
-    return &query_yes_no("    (y/[n])?  ", $ACCEPT_NO_DEFAULT);
+sub query_use_home_net_default() {
+    my $str =
+"\n[+] By default, psad matches Snort rules against any IP addresses, but\n" .
+"    psad offers the ability to restrict signature matches to specific\n" .
+"    networks with the HOME_NET variable (similar to Snort).  However, psad\n" .
+"    also offers the ability to acquire all local subnets on the local system\n" .
+"    by parsing the output of \"ifconfig\", or the subnets can be restricted\n" .
+"    to a limited set of networks.\n\n";
+    &logr($str);
+    return &query_yes_no(
+"    First, is it ok to leave the HOME_NET setting as \"any\" ([y]/n)?  ",
+        $ACCEPT_YES_DEFAULT);
 }
 
 sub set_hostname() {
@@ -1706,17 +1703,17 @@ sub get_fw_search_strings() {
         &put_string('FW_SEARCH_ALL', 'N',
             "$config{'PSAD_CONF_DIR'}/fw_search.conf");
 
-        print
-"\n    psad checks the firewall configuration on the underlying machine\n",
-"    to see if packets will be logged and dropped that have not\n",
-"    explicitly allowed through.  By default, psad looks for the string\n",
-"    \"DROP\". However, if your particular firewall configuration logs\n",
-"    blocked packets with the string \"Audit\" for example, psad can be\n",
-"    configured here to look for this string.  In addition, psad can also\n",
-"    be configured here to look for multiple strings if needed.  Remember,\n",
-"    whatever string you configure psad to look for must be logged via the\n",
+    my $str =
+"\n    psad checks the firewall configuration on the underlying machine\n" .
+"    to see if packets will be logged and dropped that have not\n" .
+"    explicitly allowed through.  By default, psad looks for the string\n" .
+"    \"DROP\". However, if your particular firewall configuration logs\n" .
+"    blocked packets with the string \"Audit\" for example, psad can be\n" .
+"    configured here to look for this string.  In addition, psad can also\n" .
+"    be configured here to look for multiple strings if needed.  Remember,\n" .
+"    whatever string you configure psad to look for must be logged via the\n" .
 "    --log-prefix option in iptables.\n\n";
-        print "\n";
+        &logr($str);
         &logr("    Add as many search strings as you like; " .
             "each on its own line.\n\n");
         &logr("    End with a \".\" on a line by itself.\n\n");
@@ -1744,21 +1741,15 @@ sub get_fw_search_strings() {
 }
 
 sub query_dshield() {
-    &logr("\n");
-    &logr("[+] Psad has the capability of sending scan data via email alerts " .
-        "to the\n");
-    &logr("    DShield distributed intrusion detection system (www.dshield.org)." .
-        "  By\n");
-    &logr("    default this feature is not enabled since firewall log data is " .
-        "sensitive,\n");
-    &logr("    but submitting logs to DShield provides a valuable service and " .
-        "assists in\n");
-    &logr("    generally enhancing internet security.  As an optional step, if " .
-        "you\n");
-    &logr("    have a DShield user id you can edit the \"DSHIELD_USER_ID\" " .
-        "variable\n");
-    &logr("    in $config{'PSAD_CONF_DIR'}/psad.conf\n\n");
-
+    my $str =
+"\n[+] psad has the capability of sending scan data via email alerts to the\n" .
+"    DShield distributed intrusion detection system (www.dshield.org).  By\n" .
+"    default this feature is not enabled since firewall log data is sensitive,\n" .
+"    but submitting logs to DShield provides a valuable service and assists\n" .
+"    in generally enhancing internet security.  As an optional step, if you\n" .
+"    have a DShield user id you can edit the \"DSHIELD_USER_ID\" variable\n" .
+"    in $config{'PSAD_CONF_DIR'}/psad.conf\n\n";
+    &logr($str);
     return &query_yes_no('    Would you like to enable DShield alerts (y/[n])?  ',
             $ACCEPT_NO_DEFAULT);
 }

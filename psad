@@ -1259,7 +1259,7 @@ sub check_scan() {
 
     my $tot_scan_ips = 0;
     if ($analyze_msgs) {
-        for (my $dl=1; $dl < 6; $dl++) {
+        for (my $dl=1; $dl <= 5; $dl++) {
             my $num_ips = 0;
             for my $src (keys %curr_scan) {
                 $num_ips++ if $scan_dl{$src} == $dl;
@@ -2877,6 +2877,7 @@ sub validate_home_net() {
             return;
         }
         my @home_nets = split /\s*\,\s*/, $config{'HOME_NET'};
+        my $found_one_net = 0;
         for my $net (@home_nets) {
             my $home_net = '';
             if ($net =~ m|($ip_re/$ip_re)|) {
@@ -2891,13 +2892,13 @@ sub validate_home_net() {
             push @local_nets, $net;
             my $found = 0;
             for my $net (@connected_subnets) {
-                if ($home_net eq $net) {
-                    $found = 1;
+                if (ipv4_in_network($net, $home_net)) {
+                    $found = $found_one_net = 1;
                 }
             }
             for my $net (@connected_subnets_cidr) {
-                if ($home_net eq $net) {
-                    $found = 1;
+                if (ipv4_in_network($net, $home_net)) {
+                    $found = $found_one_net = 1;
                 }
             }
             unless ($found or $analyze_msgs) {
@@ -2910,6 +2911,7 @@ sub validate_home_net() {
                     unless $no_syslog_alerts;
             }
         }
+        $config{'HOME_NET'} = 'any' unless $found_one_net;
     }
     return;
 }
@@ -3706,7 +3708,6 @@ sub expand_sig_ips() {
         die "[*] import_signatures(): Unrecognized src/dst: $ip_str ",
             "at line: $line_num";
     }
-
     return \@arr;
 }
 
@@ -4311,7 +4312,7 @@ sub log_top_scans() {
     $ctr = 0;
     print A "#\n# Format: <IP> <DL> <total_packets> <uniq_sigs> <sig_matches> <is_local>\n#\n\n";
     for my $src (sort {$scan_dl{$b} cmp $scan_dl{$a}} keys %scan_dl) {
-        next unless $scan_dl{$src} >= 1;
+        next unless $scan_dl{$src} >= $config{'MIN_DANGER_LEVEL'};
         next unless defined $top_packet_counts{$src}
                 or defined $top_sig_counts{$src};
         my $str = sprintf "%-15s %d", $src, $scan_dl{$src};
@@ -4397,7 +4398,7 @@ sub analysis_display() {
         if ($status_min_dl) {
             next unless $scan_dl{$src} >= $status_min_dl;
         } else {
-            next unless $scan_dl{$src} >= 1;
+            next unless $scan_dl{$src} >= $config{'MIN_DANGER_LEVEL'};
         }
         next unless defined $top_packet_counts{$src}
                 or defined $top_sig_counts{$src};
@@ -4479,7 +4480,7 @@ sub analysis_display() {
     my $icmp_ctr  = 0;
 
     SRC: for my $src (keys %$curr_scan_hr) {
-        next SRC unless $scan_dl{$src} >= 1;
+        next SRC unless $scan_dl{$src} >= $config{'MIN_DANGER_LEVEL'};
         $uniq_srcs{$src} = '';
         DST: for my $dst (keys %{$curr_scan_hr->{$src}}) {
             $uniq_dsts{$dst} = '';
@@ -4519,7 +4520,7 @@ sub analysis_display() {
     my $found_scan = 0;
     for my $src (sort {$scan_dl{$b} cmp $scan_dl{$a}} keys %scan_dl) {
         my $dl = $scan_dl{$src};
-        next unless $dl >= 1;
+        next unless $dl >= $config{'MIN_DANGER_LEVEL'};
         next unless defined $curr_scan_hr->{$src};
         if ($status_min_dl) {
             next unless $dl >= $status_min_dl;
@@ -4651,7 +4652,11 @@ sub scan_logr() {
         print STDERR "[+] scan_logr(): source IP: $src\n" if $debug;
         ### only send alerts for scans that are at least at
         ### danger level 1 or above.
-        next SRC unless $scan_dl{$src} >= 1;
+        unless ($scan_dl{$src} >= $config{'MIN_DANGER_LEVEL'}) {
+            print STDERR "    No alerts sent for $src; danger ",
+                "level $scan_dl{$src} not high enough\n" if $debug;
+            next SRC;
+        }
 
         DST: for my $dst (keys %{$curr_scan_hr->{$src}}) {
 
@@ -4855,7 +4860,7 @@ sub scan_logr() {
                 $s_time = $abs_s_time;
             } else {
                 $s_time = scalar localtime((time()
-                    - $config{'CHECK_INTERVAL'}));
+                        - $config{'CHECK_INTERVAL'}));
             }
             my $time = scalar localtime();
 
@@ -6142,7 +6147,7 @@ sub auto_psad_response() {
     SRC: for my $src (keys %$curr_scan_hr) {
 
         ### make sure we are not attempting to block 0.0.0.0
-        ### or 127.0.0.1 or any of the interface ips.
+        ### or 127.0.0.1 or any of the interface IP's.
         next SRC if &auto_block_ignore_ip($src);
 
         if ($config{'ENABLE_AUTO_IDS_REGEX'} eq 'Y'
@@ -6483,30 +6488,19 @@ sub get_listening_ports() {
 
 sub get_dns_info() {
     my $ip = shift;
-    my $dns_str;
-    my $rdns;
-    if ($ip =~ /$ip_re/) {
-        if (defined $dns_cache{$ip}
-                and $dns_cache{$ip}{'ctr'}
-                < $config{'DNS_LOOKUP_THRESHOLD'}) {
-            $dns_str = $dns_cache{$ip}{'hostname'};
-            $dns_cache{$ip}{'ctr'}++;
-        } else {
-            my $ipaddr = gethostbyname $ip;
-            ### my $rdns = gethostbyaddr($ipaddr, AF_INET);
-            if ($rdns = gethostbyaddr $ipaddr, 2) {
-                $dns_str = $rdns;
-            } else {
-                $dns_str = '';
-            }
-            $dns_cache{$ip}{'ctr'}      = 0;
-            $dns_cache{$ip}{'hostname'} = $dns_str;
-        }
+    my $dns_str = '';
+    if (defined $dns_cache{$ip}
+            and $dns_cache{$ip}{'ctr'}
+            < $config{'DNS_LOOKUP_THRESHOLD'}) {
+        $dns_str = $dns_cache{$ip}{'hostname'};
+        $dns_cache{$ip}{'ctr'}++;
     } else {
-        ### $ipaddr was already reported as
-        ### a host name by Netfilter (does this actually
-        ### happen?)
-        $dns_str  = $ip;
+        my $ipaddr = gethostbyname($ip);
+        ### gethostbyaddr($ipaddr, AF_INET);
+        my $dns_tmp = gethostbyaddr($ipaddr, 2);
+        $dns_str = $dns_tmp if $dns_tmp;
+        $dns_cache{$ip}{'ctr'}      = 0;
+        $dns_cache{$ip}{'hostname'} = $dns_str;
     }
     return $dns_str;
 }
@@ -8587,7 +8581,7 @@ sub required_vars() {
         TOP_SCANNED_PORTS_FILE STATUS_OUTPUT_FILE TOP_ATTACKERS_FILE
         STATUS_PORTS_THRESHOLD STATUS_SIGS_THRESHOLD STATUS_IP_THRESHOLD
         ANALYSIS_OUTPUT_FILE TOP_IP_LOG_THRESHOLD PSAD_LIBS_DIR
-        PSAD_PID_FILE PSAD_CMDLINE_FILE PSAD_ERR_DIR
+        PSAD_PID_FILE PSAD_CMDLINE_FILE PSAD_ERR_DIR MIN_DANGER_LEVEL
     );
     &Psad::defined_vars(\%config, $config_file, \@required_vars);
     return;

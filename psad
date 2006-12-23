@@ -2865,6 +2865,7 @@ sub validate_home_net() {
         $connected_str =~ s|,\s*$||;
 
         $config{'HOME_NET'} = $connected_str;
+        $config{'HOME_NET'} = 'any' unless $connected_str;
 
     } else {
 

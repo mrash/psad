@@ -25,6 +25,11 @@ psad-2.0.2 (12//2006):
       can be altered from the command line.
     - Bugfix to not import any IP from the top_attackers file from a previous
       psad run that does not have a /var/log/psad/<ip> directory.
+    - Added MIN_DANGER_LEVEL to allow all alerts and /var/log/psad/<ip>
+      tracking to be disabled unless an attacker reaches at least this
+      danger level.
+    - Added text in install.pl to mention ifconfig parsing for HOME_NET
+      derivation.
 
 psad-2.0.1 (12/12/2006):
     - Added Nachi worm reconnaisannce icmp signature

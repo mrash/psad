@@ -252,6 +252,9 @@ fi
 %_libdir/%name
 
 %changelog
+* Sat Dec 23 2006 Michael Rash <mbr@cipherdyne.org>
+- psad-2.0.2 release
+
 * Mon Dec 12 2006 Michael Rash <mbr@cipherdyne.org>
 - psad-2.0.1 release
 

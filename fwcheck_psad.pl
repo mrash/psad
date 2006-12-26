@@ -35,9 +35,6 @@
 use Getopt::Long 'GetOptions';
 use strict;
 
-### path to default psad library directory for psad perl modules
-my $psad_lib_dir = '/usr/lib/psad';
-
 ### default psad config file.
 my $config_file  = '/etc/psad/psad.conf';
 
@@ -67,6 +64,7 @@ my $fw_analyze = 0;
 my $fw_file    = '';
 my $fw_search_all = 1;
 my $no_fw_search_all = 0;
+my $psad_lib_dir = '';
 
 &usage(1) unless (GetOptions(
     'config=s'    => \$config_file, # Specify path to configuration file.
@@ -79,6 +77,7 @@ my $no_fw_search_all = 0;
                                     # and exit.
     'no-fw-search-all' => \$no_fw_search_all, # looking for specific log
                                               # prefixes
+    'Lib-dir=s'   => \$psad_lib_dir,# Specify path to psad lib directory.
     'help'        => \$help,        # Display help.
 ));
 &usage(0) if $help;
@@ -90,29 +89,29 @@ $< == 0 && $> == 0 or
     die '[*] fwcheck_psad.pl: You must be root (or equivalent ',
         "UID 0 account) to execute fwcheck_psad.pl!  Exiting.\n";
 
-### import psad perl modules
-&import_psad_perl_modules();
-
 if ($fw_file) {
     die "[*] iptables dump file: $fw_file does not exist."
         unless -e $fw_file;
 }
 
 ### import psad.conf
-&Psad::buildconf(\%config, \%cmds, $config_file);
+&import_config($config_file);
 
 ### import alerting config (psadwatchd also references this file
-&Psad::buildconf(\%config, \%cmds, $alert_conf_file);
+&import_config($alert_conf_file);
 
 ### import FW_MSG_SEARCH strings
 &import_fw_search();
 
 ### expand any embedded vars within config values
-&Psad::expand_vars(\%config, \%cmds);
+&expand_vars();
 
 ### check to make sure the commands specified in the config section
 ### are in the right place, and attempt to correct automatically if not.
-&Psad::check_commands(\%cmds);
+&check_commands({});
+
+### import psad perl modules
+&import_psad_perl_modules();
 
 open FWCHECK, "> $config{'FW_CHECK_FILE'}" or die "[*] Could not ",
     "open $config{'FW_CHECK_FILE'}: $!";
@@ -166,7 +165,7 @@ sub fw_check() {
         }
 
         unless ($config{'ALERTING_METHODS'} =~ /no.?e?mail/i) {
-            &Psad::sendmail("[psad-status] firewall setup warning on " .
+            &send_mail("[psad-status] firewall setup warning on " .
                 "$config{'HOSTNAME'}!", $config{'FW_CHECK_FILE'},
                 $config{'EMAIL_ADDRESSES'},
                 $cmds{'mail'}
@@ -364,10 +363,11 @@ sub import_psad_perl_modules() {
 
     my $mod_paths_ar = &get_psad_mod_paths();
 
-    push @$mod_paths_ar, @INC;
-    splice @INC, 0, $#$mod_paths_ar+1, @$mod_paths_ar;
+    if ($#$mod_paths_ar > -1) {  ### /usr/lib/psad/ exists
+        push @$mod_paths_ar, @INC;
+        splice @INC, 0, $#$mod_paths_ar+1, @$mod_paths_ar;
+    }
 
-    require Psad;
     require IPTables::Parse;
 
     return;
@@ -377,27 +377,29 @@ sub get_psad_mod_paths() {
 
     my @paths = ();
 
-    unless (-d $psad_lib_dir) {
-        my $dir_tmp = $psad_lib_dir;
+    $config{'PSAD_LIBS_DIR'} = $psad_lib_dir if $psad_lib_dir;
+
+    unless (-d $config{'PSAD_LIBS_DIR'}) {
+        my $dir_tmp = $config{'PSAD_LIBS_DIR'};
         $dir_tmp =~ s|lib/|lib64/|;
         if (-d $dir_tmp) {
-            $psad_lib_dir = $dir_tmp;
+            $config{'PSAD_LIBS_DIR'} = $dir_tmp;
         } else {
-            die "[*] psad lib directory: $psad_lib_dir does not exist, ",
-                "use --Lib-dir <dir>";
+            return [];
         }
     }
 
-    opendir D, $psad_lib_dir or die "[*] Could not open $psad_lib_dir: $!";
+    opendir D, $config{'PSAD_LIBS_DIR'}
+        or die "[*] Could not open $config{'PSAD_LIBS_DIR'}: $!";
     my @dirs = readdir D;
     closedir D;
 
-    push @paths, $psad_lib_dir;
+    push @paths, $config{'PSAD_LIBS_DIR'};
 
     for my $dir (@dirs) {
         ### get directories like "/usr/lib/psad/x86_64-linux"
-        next unless -d "$psad_lib_dir/$dir";
-        push @paths, "$psad_lib_dir/$dir"
+        next unless -d "$config{'PSAD_LIBS_DIR'}/$dir";
+        push @paths, "$config{'PSAD_LIBS_DIR'}/$dir"
             if $dir =~ m|linux| or $dir =~ m|thread|;
     }
     return \@paths;
@@ -413,6 +415,118 @@ sub import_fw_search() {
         next if $line =~ /^\s*#/;
         if ($line =~ /^\s*FW_MSG_SEARCH\s+(.*?);/) {
             push @fw_search, $1;
+        }
+    }
+    return;
+}
+
+### send mail message to all addresses contained in the
+### EMAIL_ADDRESSES variable within psad.conf ($addr_str).
+### TODO:  Would it be better to use Net::SMTP here?
+sub send_mail() {
+    my ($subject, $body_file, $addr_str, $mailCmd) = @_;
+    open MAIL, "| $mailCmd -s \"$subject\" $addr_str > /dev/null" or die
+        "[*] Could not send mail: $mailCmd -s \"$subject\" $addr_str: $!";
+    if ($body_file) {
+        open F, "< $body_file" or die "[*] Could not open mail file: ",
+            "$body_file: $!";
+        my @lines = <F>;
+        close F;
+        print MAIL for @lines;
+    }
+    close MAIL;
+    return;
+}
+
+sub import_config() {
+    my $conf_file = shift;
+
+    open C, "< $conf_file" or die "[*] Could not open " .
+        "config file $conf_file: $!";
+    my @lines = <C>;
+    close C;
+    for my $line (@lines) {
+        chomp $line;
+        next if ($line =~ /^\s*#/);
+        if ($line =~ /^\s*(\S+)\s+(.*?)\;/) {
+            my $varname = $1;
+            my $val     = $2;
+            if ($val =~ m|/.+| && $varname =~ /^\s*(\S+)Cmd$/) {
+                ### found a command
+                $cmds{$1} = $val;
+            } else {
+                $config{$varname} = $val;
+            }
+        }
+    }
+    return;
+}
+
+sub expand_vars() {
+    for my $hr (\%config, \%cmds) {
+        for my $var (keys %$hr) {
+            my $val = $hr->{$var};
+            die "[*] Multiple variable expansion not supported yet ",
+                "(var $var)." if $val =~ m|\$.+\$|;
+            if ($val =~ m|\$(\w+)|) {
+                my $sub_var = $1;
+                die "[*] sub-ver $sub_var not allowed within same ",
+                    "variable $var" if $sub_var eq $var;
+                if (defined $config{$sub_var}) {
+                    $val =~ s|\$$sub_var|$config{$sub_var}|;
+                    $hr->{$var} = $val;
+                } else {
+                    die "[*] sub-var \"$sub_var\" not defined in ",
+                        "config for var: $var."
+                }
+            }
+        }
+    }
+    return;
+}
+
+### check paths to commands and attempt to correct if any are wrong.
+sub check_commands() {
+    my $exceptions_hr = shift;
+    my $caller = $0;
+    my @path = qw(
+        /bin
+        /sbin
+        /usr/bin
+        /usr/sbin
+        /usr/local/bin
+        /usr/local/sbin
+    );
+    CMD: for my $cmd (keys %cmds) {
+        ### both mail and sendmail are special cases, mail is not required
+        ### if "nomail" is set in REPORT_METHOD, and sendmail is only
+        ### required if DShield alerting is enabled and a DShield user
+        ### email is set.
+        next if $cmd =~ /mail/i;
+        next if $cmd eq 'wget';  ### only used in --sig-update mode
+        unless (-x $cmds{$cmd}) {
+            my $found = 0;
+            PATH: for my $dir (@path) {
+                if (-x "${dir}/${cmd}") {
+                    $cmds{$cmd} = "${dir}/${cmd}";
+                    $found = 1;
+                    last PATH;
+                }
+            }
+            unless ($found) {
+                unless (defined $exceptions_hr->{$cmd}) {
+                    die "[*] ($caller): Could not find $cmd ",
+                        "anywhere!!!\n    Please edit the config section ",
+                         "to include the path to $cmd.";
+                }
+            }
+        }
+        unless (-x $cmds{$cmd}) {
+            unless (defined $exceptions_hr->{$cmd}) {
+                die "[*] ($caller): $cmd is located at ",
+                    "$cmds{$cmd}, but is not executable\n",
+                    "    by uid: $<";
+            }
         }
     }
     return;

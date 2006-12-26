@@ -107,10 +107,6 @@ my %required_perl_modules = (
         'force-install' => 1,
         'mod-dir' => 'IPTables-ChainMgr'
     },
-    'Psad' => {
-        'force-install' => 1,
-        'mod-dir' => 'Psad'
-    }
 );
 
 my %config = ();
@@ -244,7 +240,7 @@ exit 0;
 sub install() {
 
     ### make sure install.pl is being called from the source directory
-    unless (-e 'psad' and -e 'Psad/lib/Psad.pm') {
+    unless (-e 'psad' and -d 'IPTables-ChainMgr') {
         die "[*] install.pl can only be executed from the directory\n",
             "    that contains the psad sources!  Exiting.";
     }
@@ -372,27 +368,8 @@ sub install() {
 
     ### compile the C psad daemons
     system $cmds{'make'};
-    if (! -e 'kmsgsd' && -e 'kmsgsd.pl') {
-        &logr("[-] Could not compile kmsgsd.c.  Installing perl kmsgsd.\n");
-        unless (((system "$cmds{'perl'} -c kmsgsd.pl")>>8) == 0) {
-            die "[*] kmsgsd.pl does not compile with \"perl -c\".  ",
-                "Download the latest sources " .
-                "from:\n\nhttp://www.cipherdyne.org/\n";
-        }
-        copy 'kmsgsd.pl', 'kmsgsd' or die "[*] Could not copy ",
-            "kmsgsd.pl -> kmsgsd: $!";
-    }
-    if (! -e 'psadwatchd' && -e 'psadwatchd.pl') {
-        &logr("[-] Could not compile psadwatchd.c.  " .
-            "Installing perl psadwatchd.\n");
-        unless (((system "$cmds{'perl'} -c psadwatchd.pl")>>8) == 0) {
-            die "[*] psadwatchd.pl does not compile with \"perl -c\".  ",
-                "Download the latest sources " .
-                "from:\n\nhttp://www.cipherdyne.org/\n";
-        }
-        copy 'psadwatchd.pl', 'psadwatchd' or die "[*] Could not copy ",
-            "psadwatchd.pl -> psadwatchd: $!";
-    }
+    &logr("[-] Could not compile kmsgsd.c.\n") unless (-e 'kmsgsd');
+    &logr("[-] Could not compile psadwatchd.c.\n") unless (-e 'psadwatchd');
 
     ### install fwcheck_psad.pl
     print "\n\n";

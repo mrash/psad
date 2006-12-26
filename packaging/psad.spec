@@ -12,7 +12,7 @@
 ### This may be 'i386-linux', or 'i686-linux-thread-multi', etc.
 %define psadmoddir `perl -e '$path='i386-linux'; for (@INC) { if($_ =~ m|.*/(.*linux.*)|) {$path = $1; last; }} print $path'`
 
-Summary: Psad analyzes iptables log messages for suspect traffic
+Summary: psad analyzes iptables log messages for suspect traffic
 Name: %name
 Version: %version
 Release: %release
@@ -54,8 +54,6 @@ for i in $(grep -r "use lib" . | cut -d: -f1); do
 	mv $i.tmp $i
 done
 
-cd Psad && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
-cd ..
 cd IPTables-Parse && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
 cd ..
 cd IPTables-ChainMgr && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
@@ -77,7 +75,6 @@ make OPTS="$RPM_OPT_FLAGS"
 make OPTS="$RPM_OPT_FLAGS" -C whois
 
 ### build perl modules used by psad
-make OPTS="$RPM_OPT_FLAGS" -C Psad
 make OPTS="$RPM_OPT_FLAGS" -C IPTables-Parse
 make OPTS="$RPM_OPT_FLAGS" -C IPTables-ChainMgr
 make OPTS="$RPM_OPT_FLAGS" -C Bit-Vector
@@ -98,7 +95,6 @@ mkdir -p $RPM_BUILD_ROOT%psadrundir
 ### psad module dirs
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Bit/Vector
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Bit
-mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Psad
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Unix/Syslog
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Date/Calc
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Net/IPv4Addr
@@ -160,7 +156,6 @@ install -m 444 Net-IPv4Addr/blib/lib/auto/Net/IPv4Addr/autosplit.ix $RPM_BUILD_R
 install -m 444 Net-IPv4Addr/blib/lib/Net/IPv4Addr.pm $RPM_BUILD_ROOT%psadlibdir/Net/IPv4Addr.pm
 install -m 444 IPTables-Parse/blib/lib/IPTables/Parse.pm $RPM_BUILD_ROOT%psadlibdir/IPTables/Parse.pm
 install -m 444 IPTables-ChainMgr/blib/lib/IPTables/ChainMgr.pm $RPM_BUILD_ROOT%psadlibdir/IPTables/ChainMgr.pm
-install -m 444 Psad/blib/lib/Psad.pm $RPM_BUILD_ROOT%psadlibdir/Psad.pm
 
 ### install snort rules files
 cp -r snort_rules $RPM_BUILD_ROOT%_sysconfdir/%name
@@ -289,7 +284,7 @@ fi
   email alerts by configuring /etc/psad/alert.conf appropriately.
 
 * Tue Jul 12 2005 Michael Rash <mbr@cipherdyne.org>
-- Updated to only update syslog.conf if it actually exists. Psad
+- Updated to only update syslog.conf if it actually exists. psad
   is now comptable with other syslog daemons, and also with ulogd.
 
 * Thu Mar 10 2005 Michael Rash <mbr@cipherdyne.org>

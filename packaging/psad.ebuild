@@ -24,10 +24,6 @@ RDEPEND="virtual/logger
 	net-firewall/iptables"
 
 src_compile() {
-	cd ${S}/Psad
-	SRC_PREP="no" perl-module_src_compile
-	emake test
-
 	cd ${S}/Net-IPv4Addr
 	SRC_PREP="no" perl-module_src_compile
 	emake test
@@ -53,8 +49,6 @@ src_install() {
 
 	keepdir /var/lib/psad /var/log/psad /var/run/psad /var/lock/subsys/${PN}
 	dodir /etc/psad
-	cd ${S}/Psad
-	emake install DESTDIR=${D} || die "Install failed: Psad.pm"
 
 	cd ${S}/Net-IPv4Addr
 	emake install DESTDIR=${D} || die "Install failed: Net-IPv4Addr.pm"

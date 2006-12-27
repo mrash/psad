@@ -232,7 +232,7 @@ int main(int argc, char *argv[]) {
                 matched_ipt_log_msg = 0;
             } else {
                 puts(buf);
-                printf("[-] Line did not match search strings.\n");
+                fprintf(stderr, "[-] Line did not match search strings.\n");
             }
 #endif
         }
@@ -301,23 +301,40 @@ static void expand_config_vars(void)
     char sub_var[MAX_GEN_LEN]  = "";
     char pre_str[MAX_GEN_LEN]  = "";
     char post_str[MAX_GEN_LEN] = "";
+    int found_sub_var = 1, resolve_ctr = 0;
 
-    if (has_sub_var("SNORT_SID_STR", snort_sid_str, sub_var,
-            pre_str, post_str))
-        find_sub_var_value(snort_sid_str, sub_var, pre_str, post_str);
+    while (found_sub_var) {
+        resolve_ctr++;
+        if (resolve_ctr >= 20) {
+            fprintf(stderr, "[*] Exceeded maximum variable resolution attempts.\n");
+            exit(EXIT_FAILURE);
+        }
+        found_sub_var = 0;
 
-    if (has_sub_var("FW_DATA_FILE", fwdata_file, sub_var,
-            pre_str, post_str))
-        find_sub_var_value(fwdata_file, sub_var, pre_str, post_str);
+        if (has_sub_var("SNORT_SID_STR", snort_sid_str, sub_var,
+                pre_str, post_str)) {
+            find_sub_var_value(snort_sid_str, sub_var, pre_str, post_str);
+            found_sub_var = 1;
+        }
 
-    if (has_sub_var("PSAD_FIFO", psadfifo_file, sub_var,
-            pre_str, post_str))
-        find_sub_var_value(psadfifo_file, sub_var, pre_str, post_str);
+        if (has_sub_var("FW_DATA_FILE", fwdata_file, sub_var,
+                pre_str, post_str)) {
+            find_sub_var_value(fwdata_file, sub_var, pre_str, post_str);
+            found_sub_var = 1;
+        }
 
-    if (has_sub_var("KMSGSD_PID_FILE", kmsgsd_pid_file, sub_var,
-            pre_str, post_str))
-        find_sub_var_value(kmsgsd_pid_file, sub_var, pre_str, post_str);
+        if (has_sub_var("PSAD_FIFO", psadfifo_file, sub_var,
+                pre_str, post_str)) {
+            find_sub_var_value(psadfifo_file, sub_var, pre_str, post_str);
+            found_sub_var = 1;
+        }
 
+        if (has_sub_var("KMSGSD_PID_FILE", kmsgsd_pid_file, sub_var,
+                pre_str, post_str)) {
+            find_sub_var_value(kmsgsd_pid_file, sub_var, pre_str, post_str);
+            found_sub_var = 1;
+        }
+    }
     return;
 }
 
@@ -345,7 +362,7 @@ static void find_sub_var_value(char *value, char *sub_var, char *pre_str,
         expand_sub_var_value(value, sub_var, pre_str, post_str);
 
     else {
-        printf("[*] Could not resolve sub-var: %s to a value.\n",
+        fprintf(stderr, "[*] Could not resolve sub-var: %s to a value.\n",
             sub_var);
         exit(EXIT_FAILURE);
     }

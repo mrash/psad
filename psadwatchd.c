@@ -466,61 +466,96 @@ static void expand_config_vars(void)
     char sub_var[MAX_GEN_LEN]  = "";
     char pre_str[MAX_GEN_LEN]  = "";
     char post_str[MAX_GEN_LEN] = "";
+    int found_sub_var = 1, resolve_ctr = 0;
 
-    if (has_sub_var("EMAIL_ADDRESSES", mail_addrs, sub_var,
-            pre_str, post_str))
-        find_sub_var_value(mail_addrs, sub_var, pre_str, post_str);
+    while (found_sub_var) {
+        resolve_ctr++;
+        if (resolve_ctr >= 20) {
+            fprintf(stderr, "[*] Exceeded maximum variable resolution attempts.\n");
+            exit(EXIT_FAILURE);
+        }
+        found_sub_var = 0;
+        if (has_sub_var("EMAIL_ADDRESSES", mail_addrs, sub_var,
+                pre_str, post_str)) {
+            find_sub_var_value(mail_addrs, sub_var, pre_str, post_str);
+            found_sub_var = 1;
+        }
 
-    if (has_sub_var("HOSTNAME", hostname, sub_var,
-            pre_str, post_str))
-        find_sub_var_value(hostname, sub_var, pre_str, post_str);
+        if (has_sub_var("HOSTNAME", hostname, sub_var,
+                pre_str, post_str)) {
+            find_sub_var_value(hostname, sub_var, pre_str, post_str);
+            found_sub_var = 1;
+        }
 
-    if (has_sub_var("PSAD_RUN_DIR", psad_run_dir, sub_var,
-            pre_str, post_str))
-        find_sub_var_value(psad_run_dir, sub_var, pre_str, post_str);
+        if (has_sub_var("PSAD_RUN_DIR", psad_run_dir, sub_var,
+                pre_str, post_str)) {
+            find_sub_var_value(psad_run_dir, sub_var, pre_str, post_str);
+            found_sub_var = 1;
+        }
 
-    if (has_sub_var("PSAD_PID_FILE", psad_pid_file, sub_var,
-            pre_str, post_str))
-        find_sub_var_value(psad_pid_file, sub_var, pre_str, post_str);
+        if (has_sub_var("PSAD_PID_FILE", psad_pid_file, sub_var,
+                pre_str, post_str)) {
+            find_sub_var_value(psad_pid_file, sub_var, pre_str, post_str);
+            found_sub_var = 1;
+        }
 
-    if (has_sub_var("PSAD_CMDLINE_FILE", psad_cmdline_file, sub_var,
-            pre_str, post_str))
-        find_sub_var_value(psad_cmdline_file, sub_var, pre_str, post_str);
+        if (has_sub_var("PSAD_CMDLINE_FILE", psad_cmdline_file, sub_var,
+                pre_str, post_str)) {
+            find_sub_var_value(psad_cmdline_file, sub_var, pre_str, post_str);
+            found_sub_var = 1;
+        }
 
-    if (has_sub_var("KMSGSD_PID_FILE", kmsgsd_pid_file, sub_var,
-            pre_str, post_str))
-        find_sub_var_value(kmsgsd_pid_file, sub_var, pre_str, post_str);
+        if (has_sub_var("KMSGSD_PID_FILE", kmsgsd_pid_file, sub_var,
+                pre_str, post_str)) {
+            find_sub_var_value(kmsgsd_pid_file, sub_var, pre_str, post_str);
+            found_sub_var = 1;
+        }
 
-    if (has_sub_var("PSADWATCHD_PID_FILE", psadwatchd_pid_file, sub_var,
-            pre_str, post_str))
-        find_sub_var_value(psadwatchd_pid_file, sub_var, pre_str, post_str);
+        if (has_sub_var("PSADWATCHD_PID_FILE", psadwatchd_pid_file, sub_var,
+                pre_str, post_str)) {
+            find_sub_var_value(psadwatchd_pid_file, sub_var, pre_str, post_str);
+            found_sub_var = 1;
+        }
 
-    if (has_sub_var("PSADWATCHD_CHECK_INTERVAL",
-            char_psadwatchd_check_interval, sub_var,
-            pre_str, post_str))
-        find_sub_var_value(char_psadwatchd_check_interval,
-            sub_var, pre_str, post_str);
+        if (has_sub_var("PSADWATCHD_CHECK_INTERVAL",
+                char_psadwatchd_check_interval, sub_var,
+                pre_str, post_str)) {
+            find_sub_var_value(char_psadwatchd_check_interval,
+                sub_var, pre_str, post_str);
+            found_sub_var = 1;
+        }
 
-    if (has_sub_var("PSADWATCHD_MAX_RETRIES", char_psadwatchd_max_retries,
-            sub_var, pre_str, post_str))
-        find_sub_var_value(char_psadwatchd_max_retries,
-            sub_var, pre_str, post_str);
+        if (has_sub_var("PSADWATCHD_MAX_RETRIES", char_psadwatchd_max_retries,
+                sub_var, pre_str, post_str)) {
+            find_sub_var_value(char_psadwatchd_max_retries,
+                sub_var, pre_str, post_str);
+            found_sub_var = 1;
+        }
 
-    if (has_sub_var("mailCmd", mailCmd, sub_var,
-            pre_str, post_str))
-        find_sub_var_value(mailCmd, sub_var, pre_str, post_str);
+        if (has_sub_var("mailCmd", mailCmd, sub_var,
+                pre_str, post_str)) {
+            find_sub_var_value(mailCmd, sub_var, pre_str, post_str);
+            found_sub_var = 1;
+        }
 
-    if (has_sub_var("shCmd", shCmd, sub_var,
-            pre_str, post_str))
-        find_sub_var_value(shCmd, sub_var, pre_str, post_str);
+        if (has_sub_var("shCmd", shCmd, sub_var,
+                pre_str, post_str)) {
+            find_sub_var_value(shCmd, sub_var, pre_str, post_str);
+            found_sub_var = 1;
+        }
 
-    if (has_sub_var("ksmgsdCmd", kmsgsdCmd, sub_var,
-            pre_str, post_str))
-        find_sub_var_value(kmsgsdCmd, sub_var, pre_str, post_str);
+        if (has_sub_var("ksmgsdCmd", kmsgsdCmd, sub_var,
+                pre_str, post_str)) {
+            find_sub_var_value(kmsgsdCmd, sub_var, pre_str, post_str);
+            found_sub_var = 1;
+        }
 
-    if (has_sub_var("psadCmd", psadCmd, sub_var,
-            pre_str, post_str))
-        find_sub_var_value(psadCmd, sub_var, pre_str, post_str);
+        if (has_sub_var("psadCmd", psadCmd, sub_var,
+                pre_str, post_str)) {
+            find_sub_var_value(psadCmd, sub_var, pre_str, post_str);
+            found_sub_var = 1;
+        }
+    }
 
     return;
 }
@@ -576,7 +611,7 @@ static void find_sub_var_value(char *value, char *sub_var, char *pre_str,
         expand_sub_var_value(value, sub_var, pre_str, post_str);
 
     else {
-        printf("[*] Could not resolve sub-var: %s to a value.\n",
+        fprintf(stderr, "[*] Could not resolve sub-var: %s to a value.\n",
             sub_var);
         exit(EXIT_FAILURE);
     }

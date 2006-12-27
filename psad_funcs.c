@@ -172,20 +172,24 @@ int has_sub_var(char *var_name, char *value, char *sub_var,
     unsigned int i, sub_var_ctr = 0, found_sub_var = 0;
     unsigned int pre_str_ctr = 0, found_pre_str = 1;
     unsigned int post_str_ctr = 0, found_post_str = 0;
+    unsigned int found_one_var = 0;
 
-    sub_var[0] = '\0';
-    pre_str[0] = '\0';
+    sub_var[0]  = '\0';
+    pre_str[0]  = '\0';
     post_str[0] = '\0';
 
     for (i=0; i < strlen(value); i++) {
         if (found_sub_var) {
             if (! isdigit(value[i])
                     && ! isalpha(value[i]) && value[i] != '_') {
-                found_sub_var = 0;
+                found_sub_var  = 0;
                 found_post_str = 1;
+                found_one_var  = 1;
             } else {
-                sub_var[sub_var_ctr] = value[i];
-                sub_var_ctr++;
+                if (! found_one_var) {
+                    sub_var[sub_var_ctr] = value[i];
+                    sub_var_ctr++;
+                }
             }
         }
 
@@ -200,22 +204,19 @@ int has_sub_var(char *var_name, char *value, char *sub_var,
         }
 
         if (value[i] == '$') {
-            if (found_sub_var) {
-                printf("[*] Multiple sub-vars not supported (var: %s)\n",
-                    var_name);
-                exit(EXIT_FAILURE);
-            }
             found_sub_var = 1;
             found_pre_str = 0;
+            pre_str[pre_str_ctr] = '\0';
         }
     }
-    if (sub_var_ctr == MAX_GEN_LEN - 1) {
+    if (sub_var_ctr >= MAX_GEN_LEN - 1) {
         printf("[*] Sub-var length exceeds maximum of %d chars within var: %s\n",
                 MAX_GEN_LEN, var_name);
         exit(EXIT_FAILURE);
     }
     if (sub_var[0] != '\0') {
-        sub_var[sub_var_ctr] = '\0';
+        sub_var[sub_var_ctr]   = '\0';
+        post_str[post_str_ctr] = '\0';
         if (strncmp(sub_var, var_name, MAX_GEN_LEN) == 0) {
             printf("[*] Cannot have identical var to sub-var: %s\n",
                     sub_var);

@@ -4,7 +4,7 @@
 #
 # File: psad (/usr/sbin/psad)
 #
-# Purpose: psad makes use of Netfilter logs to detect port scans,
+# Purpose: psad makes use of iptables logs to detect port scans,
 #          probes for backdoors and DDoS tools, and other suspect traffic
 #          (many signatures were adapted from the snort intrusion
 #          detection system).  Data is provided by kmsgsd which reads
@@ -71,7 +71,7 @@
 #   strtp     - Starting port.
 #   endp      - Ending port.
 #
-# Sample Netfilter log messages:
+# Sample iptables log messages:
 #
 #  Sample tcp packet (rejected by iptables... --log-prefix = "DROP ")
 #
@@ -99,9 +99,9 @@
 #  00:00:00:00:00:08:00 SRC=127.0.0.1 DST=127.0.0.1 LEN=60 TOS=0x00 PREC=0x00
 #  TTL=64 ID=0 DF PROTO=TCP SPT=39935 DINDOW=32304 RES=0x00 SYN URGP=0
 #
-# Note on Netfilter tcp log messages:
+# Note on iptables tcp log messages:
 #
-#   Netfilter reports tcp flags in the following order:
+#   iptables reports tcp flags in the following order:
 #
 #       URG ACK PSH RST SYN FIN
 #
@@ -235,7 +235,7 @@ my %snort_ref_baseurl = ();
 my %sigs = ();
 my %sig_search = ();
 
-### cache Netfilter prefixes
+### cache iptables prefixes
 my %ipt_prefixes = ();
 
 ### ignore ports
@@ -421,7 +421,7 @@ my %tcp_p0f_opt_types = (
 my %ip_options = ();
 
 ### These are not directly support by psad because they
-### do not appear in Netfilter logs; however, several of
+### do not appear in iptables logs; however, several of
 ### these options are supported if fwsnort is also running.
 my @unsupported_snort_opts = qw(
     pcre
@@ -488,7 +488,7 @@ my %pkt_NF_init = (
     'udp_len'  => -1,
 
     ### extra fields for psad internals (DShield reporting, fwsnort
-    ### sid matching, Netfilter logging prefixes and chains, etc.)
+    ### sid matching, iptables logging prefixes and chains, etc.)
     'fwsnort_sid' => 0,
     'chain'       => '',
     'log_prefix'  => '',
@@ -539,7 +539,7 @@ Getopt::Long::Configure('no_ignore_case');
     'auto-dl=s'         => \$auto_dl_file,    # Path to psad auto IPs file for
                                               #   auto-setting IP danger level.
     'alert-conf=s'      => \$alert_conf_file, # Path to psad alert.conf file.
-    'Analyze-msgs'      => \$analyze_msgs,    # Analysis mode for old Netfilter
+    'Analyze-msgs'      => \$analyze_msgs,    # Analysis mode for old iptables
                                               #   messages in the psad fwdata file
                                               #   (or messages file; see
                                               #   --messages).
@@ -550,7 +550,7 @@ Getopt::Long::Configure('no_ignore_case');
                                               #   mode.
     'email-analysis'    => \$analysis_emails, # Send analysis mode emails.
     'messages-file=s'   => \$messages_file,   # Specify the path to file containing
-                                              #   old Netfilter messages (fwdata by
+                                              #   old iptables messages (fwdata by
                                               #   default).
     'CSV'               => \$csv_mode,        # CSV mode.
     'CSV-fields=s'      => \$csv_fields,      # Specify list of CSV fields.
@@ -561,7 +561,7 @@ Getopt::Long::Configure('no_ignore_case');
     'CSV-regex=s'       => \$csv_regex,       # Require additional regex match.
     'CSV-neg-regex=s'   => \$csv_neg_regex,   # Require additional negative regex
                                               #   match.
-    'CSV-stdin'         => \$csv_stdin,       # Acquire Netfilter log data from
+    'CSV-stdin'         => \$csv_stdin,       # Acquire iptables log data from
                                               #   stdin.
     'debug'             => \$debug,           # Run in debug mode.
     'Dump-conf'         => \$dump_conf,       # Dump config and exit.
@@ -576,7 +576,7 @@ Getopt::Long::Configure('no_ignore_case');
     'fw-file=s'         => \$fw_file,         # Analyze ruleset contained within
                                               #   $fw_file instead of a running
                                               #   policy.
-    'fw-list-auto'      => \$fw_list_auto,    # Display Netfilter chains used by
+    'fw-list-auto'      => \$fw_list_auto,    # Display iptables chains used by
                                               #   psad in auto blocking code.
     'fw-block-ip=s'     => \$fw_block_ip,     # Add an IP/net to the psad auto-
                                               #   blocking chains.  Then psad can
@@ -585,9 +585,9 @@ Getopt::Long::Configure('no_ignore_case');
     'fw-del-chains'     => \$fw_del_chains,   # Delete psad chains in addition to
                                               #   flushing them (requires --F as
                                               #   well).
-    'fw-dump'           => \$dump_ipt_policy, # Dump the Netfilter policy
+    'fw-dump'           => \$dump_ipt_policy, # Dump the iptables policy
                                               #   (requires -D as well).
-    'fw-include-ips'    => \$fw_include_ips,  # Include all IPs/nets in Netfilter
+    'fw-include-ips'    => \$fw_include_ips,  # Include all IPs/nets in iptables
                                               # dump (--fw-dump) output.
     'log-server'        => \$syslog_server,   # We are running psad on a syslog
                                               #   logging server.
@@ -616,7 +616,7 @@ Getopt::Long::Configure('no_ignore_case');
                                               #   to re-import config.
     'Lib-dir=s'         => \$psad_lib_dir,    # Specify path to psad lib directory.
     'no-snort-sids'     => \$no_snort_sids,   # Disable search for snort SID's
-                                              #   in Netfilter messages.
+                                              #   in iptables messages.
     'no-whois'          => \$no_whois,        # Do not issue whois lookups against
     'no-passiveos'      => \$no_posf,         # Do not attempt to passively
     'no-passive-os'     => \$no_posf,         # Do not attempt to passively
@@ -987,7 +987,7 @@ exit 0;
 
 ### Keeps track of scanning ip's, increments packet counters,
 ### keeps track of tcp flags for each scan, test for snort sid
-### values in Netfilter packets (if fwsnort is being used).
+### values in iptables packets (if fwsnort is being used).
 sub check_scan() {
     my $fw_packets_aref = shift;
 
@@ -1002,7 +1002,7 @@ sub check_scan() {
     my $print_scale_factor = &get_scale_factor($#$fw_packets_aref);
 
     ### loop through all of the packet log messages we have just acquired
-    ### from Netfilter/iptables
+    ### from iptables
 
     PKT: for my $pkt_str (@$fw_packets_aref) {
 
@@ -1016,7 +1016,7 @@ sub check_scan() {
             }
         }
 
-        ### main parsing routine for the Netfilter packet logging message
+        ### main parsing routine for the iptables packet logging message
         my $pkt_parse_rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
         if ($pkt_parse_rv == $PKT_ERROR) {
             push @err_pkts, $pkt_str;
@@ -1156,7 +1156,7 @@ sub check_scan() {
             $pkt{'log_prefix'} = '*noprfx*';
         }
 
-        ### keep track of Netfilter chain and logging prefix
+        ### keep track of iptables chain and logging prefix
         $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}{'chain'}
                 {$pkt{'chain'}}{$pkt{'log_prefix'}}++;
 
@@ -1286,11 +1286,13 @@ sub parse_NF_pkt_str() {
     ### see if there is a logging prefix (used for scan email alert even
     ### if we are running with FW_SEARCH_ALL = Y).  Note that sometimes
     ### there is a buffering issue in the kernel ring buffer that is used
-    ### to hold the Netfilter log message, so we want to get only the
+    ### to hold the iptables log message, so we want to get only the
     ### very last possible candidate for the log prefix (this is why the
     ### "kernel:" string is preceded by .*).
     if ($pkt_str =~ /.*kernel:\s+(.*?)\s*IN=/) {
         $pkt_hr->{'log_prefix'} = $1;
+        $pkt_hr->{'log_prefix'} =~ s|\[\d+\.\d+\]\s*||
+            if ($config{'IGNORE_KERNEL_TIMESTAMP'} eq 'Y');
         if ($pkt_hr->{'log_prefix'} =~ /\S/) {
             if ($config{'IGNORE_LOG_PREFIXES'} ne 'NONE') {
                 return $PKT_IGNORE if $pkt_hr->{'log_prefix'}
@@ -1300,8 +1302,8 @@ sub parse_NF_pkt_str() {
         }
     }
 
-    ### get the in/out interface and Netfilter chain (the code below
-    ### allows the Netfilter log message to contain the PHYSDEV stuff):
+    ### get the in/out interface and iptables chain (the code below
+    ### allows the iptables log message to contain the PHYSDEV stuff):
     ### Feb 25 12:13:27 bridge kernel: INBOUND TCP: IN=br0 PHYSIN=eth0 OUT=br0
     ### PHYSOUT=eth1 SRC=63.147.183.21 DST=11.11.79.100 LEN=48 TOS=0x00
     ### PREC=0x00 TTL=113 ID=19664 DF PROTO=TCP SPT=4918 DPT=135 WINDOW=64240
@@ -1401,7 +1403,7 @@ sub parse_NF_pkt_str() {
                 = ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
 
         ### the reserve bits are not reported by ulogd, but normal
-        ### Netfilter syslog messages contain them.
+        ### iptables syslog messages contain them.
         $pkt_hr->{'flags'} =~ s/\s*RES=\S+\s*//;
 
         $pkt_hr->{'proto'} = 'tcp';
@@ -1418,7 +1420,7 @@ sub parse_NF_pkt_str() {
             ### FIXME: ignore TCP packets that have the ACK or RST
             ### bits set (unless we matched a snort sid) since
             ### _usually_ we see these packets as a result of the
-            ### Netfilter connection tracking bug.  Also, note that
+            ### iptables connection tracking bug.  Also, note that
             ### no signatures make use of the RST flag.
 
             print STDERR "[-] err packet: matched ACK or RST flag.\n"
@@ -1449,7 +1451,7 @@ sub parse_NF_pkt_str() {
         }
 
         ### make sure we have a "reasonable" packet (note that nmap
-        ### can scan port 0 and Netfilter can report this fact)
+        ### can scan port 0 and iptables can report this fact)
         unless ($pkt_hr->{'ip_len'} >= 0 and $pkt_hr->{'tos'}
                 and $pkt_hr->{'ttl'} >= 0 and $pkt_hr->{'ip_id'} >= 0
                 and $pkt_hr->{'proto'} and $pkt_hr->{'sp'} >= 0
@@ -1492,7 +1494,7 @@ sub parse_NF_pkt_str() {
         $pkt_hr->{'proto'} = 'udp';
 
         ### make sure we have a "reasonable" packet (note that nmap
-        ### can scan port 0 and Netfilter can report this fact)
+        ### can scan port 0 and iptables can report this fact)
         unless ($pkt_hr->{'ip_len'} >= 0
                 and $pkt_hr->{'tos'} and $pkt_hr->{'ttl'} >= 0
                 and $pkt_hr->{'ip_id'} >= 0 and $pkt_hr->{'proto'}
@@ -1556,7 +1558,7 @@ sub parse_NF_pkt_str() {
         }
 
     } else {
-        ### Sometimes the Netfilter log entry gets messed up due to
+        ### Sometimes the iptables log entry gets messed up due to
         ### buffering issues so we write it to the error log.
         print STDERR "[-] err packet: no regex match.\n" if $debug;
         return $PKT_ERROR;
@@ -1702,7 +1704,7 @@ sub match_snort_keywords() {
 
         my $sig_hr = $sigs{$sid};
 
-        ### Netfilter logging messages always include TTL and IP_ID
+        ### iptables logging messages always include TTL and IP_ID
         ### values (at least for ipv4, see
         ### linux/net/ipv4/netfilter/ipt_LOG.c)
         my $dl_tmp = 0;
@@ -2163,7 +2165,7 @@ sub parse_tcp_options() {
         print STDERR 'tcp options length not a multiple of two.' if $debug;
         return '';
     }
-    ### $tcp_options is a hex string like "020405B401010402" from the Netfilter
+    ### $tcp_options is a hex string like "020405B401010402" from the iptables
     ### log message
     my @chars = split //, $tcp_options;
     for (my $i=0; $i <= $#chars; $i += 2) {
@@ -2582,7 +2584,7 @@ sub psad_init() {
     ### make sure the values in the config file make sense
     &validate_config();
 
-    ### setup the appropriate Netfilter data file depending on whether
+    ### setup the appropriate iptables data file depending on whether
     ### SYSLOG_DAEMON is set to ulogd
     if ($config{'SYSLOG_DAEMON'} =~ /ulog/i) {
         $fw_data_file = $config{'ULOG_DATA_FILE'};
@@ -2628,7 +2630,7 @@ sub psad_init() {
     ### the --Restart command line switch was given
     exit &restart() if $restart;
 
-    ### list any existing Netfilter IPT_AUTO_CHAIN chains
+    ### list any existing iptables IPT_AUTO_CHAIN chains
     exit &ipt_list_auto_chains() if $fw_list_auto;
 
     ### add an IP/network to the psad auto blocking chains via the
@@ -2660,7 +2662,7 @@ sub psad_init() {
     ### level assignment
     &import_auto_dl() unless $no_auto_dl;
 
-    ### parse snort rules if we enable psad to match on Netfilter log
+    ### parse snort rules if we enable psad to match on iptables log
     ### messages that include snort SID's (see "fwsnort":
     ### http://www.cipherdyne.org/fwsnort).
     &import_snort_rules() unless $no_snort_sids;
@@ -2679,7 +2681,7 @@ sub psad_init() {
     ### there is a set of interfaces that should be ignored
     &parse_ignore_interfaces();
 
-    ### enter Netfilter analysis mode.
+    ### enter iptables analysis mode.
     exit &analysis_mode() if $analyze_msgs;
 
     ### enter CSV output mode.
@@ -3069,7 +3071,7 @@ sub import_snort_rules() {
                 if $line =~ /[\s;]priority:\s*(\d+)\s*;/;
 
             ### import multiple content fields; someone could have built
-            ### a series of custom Netfilter chains in order to detect
+            ### a series of custom iptables chains in order to detect
             ### multiple content strings.
             while ($line =~ /[\s;](?:uri)?content:\s*\"(.*?)\"\s*;/g) {
                 push @{$fwsnort_sigs{$sid}{'content'}}, $1;
@@ -3179,7 +3181,7 @@ sub import_snort_rule_dl() {
     return;
 }
 
-### for signatures that psad is able to detect with Netfilter logs that do
+### for signatures that psad is able to detect with iptables logs that do
 ### not contain "SIDnnn" messages generated by fwsnort (and hence have no
 ### application layer matching criteria)
 
@@ -3415,8 +3417,8 @@ sub import_signatures() {
             if ($rule_options =~ /[\s;]flags:\s*(.+?)\s*;/) {
                 my $sig_flags = $1;
                 my $flags     = '';
-                ### make flags identical to what Netfilter log messages
-                ### would report (check in Netfilter flag reporting order).
+                ### make flags identical to what iptables log messages
+                ### would report (check in iptables flag reporting order).
                 if ($sig_flags =~ /U/) {
                     if ($flags) {
                         $flags = 'URG ' . $flags;
@@ -3432,7 +3434,7 @@ sub import_signatures() {
                 $flags .= 'SYN ' if $sig_flags =~ /S/;
                 $flags .= 'FIN ' if $sig_flags =~ /F/;
 
-                ### if no flags are set Netfilter simply reports no flags
+                ### if no flags are set iptables simply reports no flags
                 ### at all instead of reporting "NULL".
                 $flags = 'NULL' if $sig_flags =~ /N/;
                 $flags =~ s/\s*$// if $flags;
@@ -4278,112 +4280,16 @@ sub analysis_display() {
     push @lines, "[+] Version: psad v$version\n\n";
 
     ### top signature matches
-    if ($config{'STATUS_SIGS_THRESHOLD'} > 0) {
-        push @lines, "[+] Top $config{'STATUS_SIGS_THRESHOLD'} " .
-            "signature matches:\n";
-    } else {
-        push @lines, "[+] Top signature matches:\n";
-    }
-
-    my $ctr = 0;
-    for my $sid (sort {$top_sigs{$b} <=> $top_sigs{$a}} keys %top_sigs) {
-        my $found = 0;
-        my $num_sources = keys %{$sig_sources{$sid}};
-        if (defined $sigs{$sid} and defined $sigs{$sid}{'msg'}) {
-            push @lines, qq|      "$sigs{$sid}{'msg'}" | .
-                qq|($sigs{$sid}{'proto'}),  | .
-                qq|Count: $top_sigs{$sid},  Unique sources: | .
-                qq|$num_sources,  Sid: $sid\n|;
-            $found = 1;
-        } elsif (defined $fwsnort_sigs{$sid}
-                and defined $fwsnort_sigs{$sid}{'msg'}) {
-            push @lines,  qq|      "$fwsnort_sigs{$sid}{'msg'}" | .
-                qq|($fwsnort_sigs{$sid}{'proto'}),  | .
-                qq|Count: $top_sigs{$sid},  Unique sources: | .
-                qq|$num_sources,  Sid: $sid|;
-            $found = 1;
-        }
-        $ctr++ if $found;
-        if ($config{'STATUS_SIGS_THRESHOLD'} > 0) {
-            last if $ctr >= $config{'STATUS_SIGS_THRESHOLD'};
-        }
-    }
-    push @lines, "\n";
+    push @lines, $_ for @{&print_top_sigs()};
 
     ### top attackers
-    if ($config{'STATUS_IP_THRESHOLD'} > 0) {
-        push @lines, "[+] Top $config{'STATUS_IP_THRESHOLD'} attackers:\n";
-    } else {
-        push @lines, "[+] Top attackers:\n";
-    }
-    $ctr = 0;
-    for my $src (sort {$scan_dl{$b} cmp $scan_dl{$a}} keys %scan_dl) {
-        if ($status_min_dl) {
-            next unless $scan_dl{$src} >= $status_min_dl;
-        } else {
-            next unless $scan_dl{$src} >= $config{'MIN_DANGER_LEVEL'};
-        }
-        next unless defined $top_packet_counts{$src}
-                or defined $top_sig_counts{$src};
-        my $str = sprintf "      %-15s DL: %d", $src, $scan_dl{$src};
-        if (defined $top_packet_counts{$src}) {
-            $str .= ", Packets: $top_packet_counts{$src}";
-        } else {
-            $str .= ', Packets: 0';
-        }
-        if (defined $top_sig_counts{$src}) {
-            $str .= ", Sig count: $top_sig_counts{$src}";
-        } else {
-            $str .= ', Sig count: 0';
-        }
-        if (defined $local_src{$src}) {
-            $str .= ', local IP!';
-        }
-        $ctr++;
-        if ($config{'STATUS_IP_THRESHOLD'} > 0) {
-            last if $ctr >= $config{'STATUS_IP_THRESHOLD'};
-        }
-        push @lines, $str, "\n";
-    }
-    push @lines, "\n";
+    push @lines, $_ for @{&print_top_attackers()};
 
-    if ($config{'STATUS_PORTS_THRESHOLD'} > 0) {
-        push @lines, "[+] Top $config{'STATUS_PORTS_THRESHOLD'} scanned ports:\n";
-    } else {
-        push @lines, "[+] Top scanned ports:\n";
-    }
+    ### top ports
+    push @lines, $_ for @{&print_top_scanned_ports()};
 
-    if (%top_tcp_ports) {
-        my $ctr = 0;
-        for my $dp (sort {$top_tcp_ports{$b} <=> $top_tcp_ports{$a}}
-                keys %top_tcp_ports) {
-            my $str = sprintf "      tcp %-5d $top_tcp_ports{$dp} packets\n", $dp;
-            push @lines, $str;
-            $ctr++;
-            if ($config{'STATUS_PORTS_THRESHOLD'} > 0) {
-                last if $ctr >= $config{'STATUS_PORTS_THRESHOLD'};
-            }
-        }
-        push @lines, "\n";
-    }
-
-    if (%top_udp_ports) {
-        my $ctr = 0;
-        push @lines, "\n";
-        for my $dp (sort {$top_udp_ports{$b} <=> $top_udp_ports{$a}}
-                keys %top_udp_ports) {
-            my $str = sprintf "      udp %-5d $top_udp_ports{$dp} packets\n", $dp;
-            push @lines, $str;
-            $ctr++;
-            if ($config{'STATUS_PORTS_THRESHOLD'} > 0) {
-                last if $ctr >= $config{'STATUS_PORTS_THRESHOLD'};
-            }
-        }
-        push @lines, "\n";
-    }
-
+    push @lines, "[+] iptables log prefix counters:\n";
     if (%ipt_prefixes) {
-        push @lines, "    Netfilter log prefix counters:\n";
         for my $prefix (keys %ipt_prefixes) {
             my $count = $ipt_prefixes{$prefix};
             push @lines, "      \"$prefix\": $count\n";
@@ -4441,99 +4347,102 @@ sub analysis_display() {
     push @lines, "[+] IP Status Detail:\n";
 
     my $found_scan = 0;
-    for my $src (sort {$scan_dl{$b} cmp $scan_dl{$a}} keys %scan_dl) {
-        my $dl = $scan_dl{$src};
-        next unless $dl >= $config{'MIN_DANGER_LEVEL'};
-        next unless defined $curr_scan_hr->{$src};
-        if ($status_min_dl) {
-            next unless $dl >= $status_min_dl;
-            $found_scan = 1;
-        } else {
-            $found_scan = 1;
-        }
-        my $total_dsts = 0;
-        $total_dsts++ for (keys %{$curr_scan_hr->{$src}});
-        my $src_str = "\nSRC:  $src, DL: $dl, Dsts: $total_dsts";
-        if (defined $scan_pkt_count{$src}) {
-            $src_str .= ", Pkts: $scan_pkt_count{$src}";
-        }
-        if (defined $scan_sig_count{$src}) {
-            $src_str .= ", Unique sigs: $scan_sig_count{$src}";
-        }
-        if (defined $local_src{$src}) {
-            $src_str .= ", local IP!";
-        }
-        push @lines, "$src_str\n";
-        if (defined $p0f{$src}) {
-            push @lines, "    Source OS fingerprint(s):\n";
-            for my $os (keys %{$p0f{$src}}) {
-                push @lines, "        $os\n";
-            }
-        } elsif (defined $posf{$src} and defined $posf{$src}{'guess'}) {
-            push @lines, "    Source OS fingerprint:\n",
-                "        $posf{$src}{'guess'}\n";
-        }
-        next unless $total_dsts > 0;
-        push @lines, "\n";
-        for my $dst (keys %{$curr_scan_hr->{$src}}) {
-            push @lines, "    DST: $dst\n";
+    for my $dl qw/5 4 3 2 1/ {
+        for my $src (sort keys %scan_dl) {
+            next unless $scan_dl{$src} == $dl;
 
-            ### scanned ports
-            next unless defined $scan{$src}
-                    and defined $scan{$src}{$dst}
-                    and defined $scan{$src}{$dst}{'chain'};
-            for my $chain (keys %{$scan{$src}{$dst}{'chain'}}) {
-                for my $intf (keys %{$scan{$src}{$dst}{'chain'}{$chain}}) {
-                    for my $proto (keys %{$scan{$src}{$dst}{'chain'}{$chain}{$intf}}) {
-                        next unless $proto eq 'tcp' or $proto eq 'udp';
-                        my $start_port = $scan{$src}{$dst}{$proto}{'abs_sp'};
-                        my $end_port   = $scan{$src}{$dst}{$proto}{'abs_ep'};
-                        my $ctr = $scan{$src}{$dst}{'chain'}{$chain}{$intf}{$proto};
-                        if ($start_port == $end_port) {
-                            push @lines, "        Scanned ports: $chain $intf " .
-                                "$proto $start_port ($ctr packets)\n";
-                        } else {
-                            push @lines, "        Scanned ports: $chain $intf " .
-                                "$proto $start_port-$end_port ($ctr packets)\n";
+            next unless $dl >= $config{'MIN_DANGER_LEVEL'};
+            next unless defined $curr_scan_hr->{$src};
+            if ($status_min_dl) {
+                next unless $dl >= $status_min_dl;
+            $found_scan = 1;
+            } else {
+                $found_scan = 1;
+            }
+            my $total_dsts = 0;
+            $total_dsts++ for (keys %{$curr_scan_hr->{$src}});
+            my $src_str = "\nSRC:  $src, DL: $dl, Dsts: $total_dsts";
+            if (defined $scan_pkt_count{$src}) {
+                $src_str .= ", Pkts: $scan_pkt_count{$src}";
+            }
+            if (defined $scan_sig_count{$src}) {
+                $src_str .= ", Unique sigs: $scan_sig_count{$src}";
+            }
+            if (defined $local_src{$src}) {
+                $src_str .= ", local IP!";
+            }
+            push @lines, "$src_str\n";
+            if (defined $p0f{$src}) {
+                push @lines, "    Source OS fingerprint(s):\n";
+                for my $os (keys %{$p0f{$src}}) {
+                    push @lines, "        $os\n";
+                }
+            } elsif (defined $posf{$src} and defined $posf{$src}{'guess'}) {
+                push @lines, "    Source OS fingerprint:\n",
+                    "        $posf{$src}{'guess'}\n";
+            }
+            next unless $total_dsts > 0;
+            push @lines, "\n";
+            for my $dst (keys %{$curr_scan_hr->{$src}}) {
+                push @lines, "    DST: $dst\n";
+
+                ### scanned ports
+                next unless defined $scan{$src}
+                        and defined $scan{$src}{$dst}
+                        and defined $scan{$src}{$dst}{'chain'};
+                for my $chain (keys %{$scan{$src}{$dst}{'chain'}}) {
+                    for my $intf (keys %{$scan{$src}{$dst}{'chain'}{$chain}}) {
+                        for my $proto (keys %{$scan{$src}{$dst}{'chain'}{$chain}{$intf}}) {
+                            next unless $proto eq 'tcp' or $proto eq 'udp';
+                            my $start_port = $scan{$src}{$dst}{$proto}{'abs_sp'};
+                            my $end_port   = $scan{$src}{$dst}{$proto}{'abs_ep'};
+                            my $ctr = $scan{$src}{$dst}{'chain'}{$chain}{$intf}{$proto};
+                            if ($start_port == $end_port) {
+                                push @lines, "        Scanned ports: $chain $intf " .
+                                    "$proto $start_port ($ctr packets)\n";
+                            } else {
+                                push @lines, "        Scanned ports: $chain $intf " .
+                                    "$proto $start_port-$end_port ($ctr packets)\n";
+                            }
                         }
                     }
                 }
-            }
 
-            ### signature matches
-            next unless defined $scan{$src} and defined $scan{$src}{$dst};
-            for my $proto qw/tcp udp icmp ip/ {
-                    next unless defined $scan{$src}{$dst}{$proto}
-                        and defined $scan{$src}{$dst}{$proto}{'sid'};
-                for my $sid (keys %{$scan{$src}{$dst}{$proto}{'sid'}}) {
-                    for my $chain (keys %{$scan{$src}{$dst}{$proto}{'sid'}{$sid}}) {
+                ### signature matches
+                next unless defined $scan{$src} and defined $scan{$src}{$dst};
+                for my $proto qw/tcp udp icmp ip/ {
+                        next unless defined $scan{$src}{$dst}{$proto}
+                            and defined $scan{$src}{$dst}{$proto}{'sid'};
+                    for my $sid (keys %{$scan{$src}{$dst}{$proto}{'sid'}}) {
+                        for my $chain (keys %{$scan{$src}{$dst}{$proto}{'sid'}{$sid}}) {
 
-                        my $sig_hr = '';
-                        if ($scan{$src}{$dst}{$proto}{'sid'}{$sid}{$chain}{'is_fwsnort'}) {
-                            if (defined $fwsnort_sigs{$sid}) {
-                                $sig_hr = $fwsnort_sigs{$sid};
+                            my $sig_hr = '';
+                            if ($scan{$src}{$dst}{$proto}{'sid'}{$sid}{$chain}{'is_fwsnort'}) {
+                                if (defined $fwsnort_sigs{$sid}) {
+                                    $sig_hr = $fwsnort_sigs{$sid};
+                                }
+                            } else {
+                                if (defined $sigs{$sid}) {
+                                    $sig_hr = $sigs{$sid};
+                                }
                             }
-                        } else {
-                            if (defined $sigs{$sid}) {
-                                $sig_hr = $sigs{$sid};
+                            next unless $sig_hr;
+
+                            my $matches = $scan{$src}{$dst}{$proto}{'sid'}{$sid}{$chain}{'pkts'};
+
+                            my $sig_str = qq|        Signature match: "$sig_hr->{'msg'}" | .
+                                qq|($proto), Chain: $chain, Count: $matches|;
+                            if ($proto eq 'tcp' or $proto eq 'udp') {
+                                my $dp = $scan{$src}{$dst}{$proto}{'sid'}{$sid}{$chain}{'dp'};
+                                $sig_str .= ", DP: $dp";
+                                if ($proto eq 'tcp') {
+                                    my $flags = $scan{$src}{$dst}{$proto}{'sid'}{$sid}{$chain}{'flags'};
+                                    $sig_str .= ", $flags";
+                                }
                             }
+                            $sig_str .= ", Sid: $sid";
+                            push @lines, $sig_str, "\n";
                         }
-                        next unless $sig_hr;
-
-                        my $matches = $scan{$src}{$dst}{$proto}{'sid'}{$sid}{$chain}{'pkts'};
-
-                        my $sig_str = qq|        Signature match: "$sig_hr->{'msg'}" | .
-                            qq|($proto), Chain: $chain, Count: $matches|;
-                        if ($proto eq 'tcp' or $proto eq 'udp') {
-                            my $dp = $scan{$src}{$dst}{$proto}{'sid'}{$sid}{$chain}{'dp'};
-                            $sig_str .= ", DP: $dp";
-                            if ($proto eq 'tcp') {
-                                my $flags = $scan{$src}{$dst}{$proto}{'sid'}{$sid}{$chain}{'flags'};
-                                $sig_str .= ", $flags";
-                            }
-                        }
-                        $sig_str .= ", Sid: $sid";
-                        push @lines, $sig_str, "\n";
                     }
                 }
             }
@@ -5207,10 +5116,10 @@ sub print_chains_and_prefixes() {
         for my $prefix (keys %{$chain_hr->{$chain}}) {
             my $count = $chain_hr->{$chain}->{$prefix};
             if ($prefix eq '*noprfx*') {
-                printf $fh "%${log_len}s%s\n", 'Netfilter chain: ',
+                printf $fh "%${log_len}s%s\n", 'iptables chain: ',
                     "$chain, $count packets";
             } else {
-                printf $fh "%${log_len}s%s\n", 'Netfilter chain: ',
+                printf $fh "%${log_len}s%s\n", 'iptables chain: ',
                     qq/$chain (prefix "$prefix"), $count packets/;
             }
         }
@@ -5645,7 +5554,7 @@ sub ipt_block() {
 
         ### make sure the ip is in the auto_blocked_ips cache (the ip
         ### may have come from the command line with --fw-block-ip
-        ### instead of through the Netfilter log).  Also, don't re-define
+        ### instead of through the iptables log).  Also, don't re-define
         ### the block time if it has already been defined (note that we
         ### may instantiated multiple block actions in the for loop
         ### above).
@@ -5876,7 +5785,7 @@ sub sockwrite_add_ipt_block_ip() {
 
     if ($block_mask ne '32') {
         ### a subnet was given on the command line, so make
-        ### sure we were also given a network address (Netfilter
+        ### sure we were also given a network address (iptables
         ### converts to the network address in -nL output)
         my ($tmpnetaddr, $tmpnetmask) =
             ipv4_network($block_ip, $block_mask);
@@ -5946,7 +5855,7 @@ sub sockwrite_rm_ipt_block_ip() {
 
     if ($rm_block_mask ne '32') {
         ### a subnet was given on the command line, so make
-        ### sure we were also given a network address (Netfilter
+        ### sure we were also given a network address (iptables
         ### converts to the network address in -nL output)
         my ($tmpnetaddr, $tmpnetmask) =
             ipv4_network($rm_block_ip, $rm_block_mask);
@@ -6119,7 +6028,7 @@ sub auto_block_ignore_ip() {
         }
     }
     ### matching the following two addresses is less likely (assuming
-    ### Netfilter is not logging traffic from localhost) than matching
+    ### iptables is not logging traffic from localhost) than matching
     ### a legitimate interface address
     if ($ip eq '127.0.0.1' or $ip eq '0.0.0.0') {
         print STDERR "[+] Skipping IP $ip from auto-block.\n"
@@ -6563,7 +6472,7 @@ sub analysis_mode() {
             }
         }
     }
-    print "[+] Found ", ($#ipt_msgs+1), " Netfilter log messages out of ",
+    print "[+] Found ", ($#ipt_msgs+1), " iptables log messages out of ",
         ($#lines+1), " total lines.\n";
     print "    This may take a while...\n" if $#ipt_msgs > 15000;
 
@@ -6843,7 +6752,7 @@ sub fw_analyze_mode() {
     } else {
         ### if psad is running on a syslog server, do not check the firewall
         ### rules since they may not be local.  Also, do not check the
-        ### firewall if psad is configured to parse all Netfilter messages.
+        ### firewall if psad is configured to parse all iptables messages.
         unless ($no_fwcheck or $syslog_server
                 or $config{'ENABLE_FW_LOGGING_CHECK'} eq 'N') {
             $run_fw_check = 1;
@@ -7091,16 +7000,16 @@ sub status_psad_daemon() {
     push @lines, "[+] Version: psad v$version\n\n";
 
     ### print top signature matches
-    &import_top_sigs($STATUS_PRINT);
+    push @lines, $_ for @{&print_top_sigs()};
 
     ### print top attackers
-    &import_top_attackers($STATUS_PRINT, {});
+    push @lines, $_ for @{&print_top_attackers()};
 
     ### print top scanned ports
-    &import_top_scanned_ports($STATUS_PRINT);
+    push @lines, $_ for @{&print_top_scanned_ports()};
 
     if (-e $config{'IPT_PREFIX_COUNTER_FILE'}) {
-        push @lines, "    Netfilter log prefix counters:\n";
+        push @lines, "    iptables log prefix counters:\n";
         open F, "< $config{'IPT_PREFIX_COUNTER_FILE'}" or
             die "[*] $config{'IPT_PREFIX_COUNTER_FILE'}: $!";
         my @ipt_lines = <F>;
@@ -7141,7 +7050,7 @@ sub status_psad_daemon() {
         push @lines, "\n";
     }
 
-    ### print block status of IP addresses blocked by Netfilter
+    ### print block status of IP addresses blocked by iptables
     if ($status_ip) {
         my $ar = &print_blocked_ip_status($status_ip);
         push @lines, $_ for @$ar;
@@ -7154,14 +7063,15 @@ sub status_psad_daemon() {
 
     my $found_scan = 0;
     push @lines, "[+] IP Status Detail:\n";
-    for my $dl (sort {$b <=> $a} keys %scan_srcs) {
 
+    for my $dl qw/5 4 3 2 1/ {
         if ($status_min_dl) {
             next unless $dl >= $status_min_dl;
             $found_scan = 1;
         } else {
             $found_scan = 1;
         }
+        next unless defined $scan_srcs{$dl};
 
         for my $src (sort keys %{$scan_srcs{$dl}}) {
             if ($status_ip) {
@@ -7491,7 +7401,7 @@ sub import_old_scans() {
             }
         }
     }
-    ### import Netfilter prefix stats
+    ### import iptables prefix stats
     if (-e $config{'IPT_PREFIX_COUNTER_FILE'}) {
         open F, "< $config{'IPT_PREFIX_COUNTER_FILE'}" or die "[*] Could not ",
             "open $config{'IPT_PREFIX_COUNTER_FILE'}: $!";
@@ -7507,13 +7417,13 @@ sub import_old_scans() {
     }
 
     ### import top scanned ports
-    &import_top_scanned_ports($NO_STATUS);
+    &import_top_scanned_ports();
 
     ### import top signatures
-    &import_top_sigs($NO_STATUS);
+    &import_top_sigs();
 
     ### import top attackers
-    &import_top_attackers($NO_STATUS, \%prev_sources);
+    &import_top_attackers(\%prev_sources);
 
     if ($import_ctr) {
         &sys_log('psad', "imported $import_ctr scanning IP " .
@@ -7523,18 +7433,8 @@ sub import_old_scans() {
 }
 
 sub import_top_sigs() {
-    my $status_print = shift;
     return unless -e $config{'TOP_SIGS_FILE'};
 
-    if ($status_print == $STATUS_PRINT) {
-        if ($config{'STATUS_SIGS_THRESHOLD'} > 0) {
-            print "[+] Top $config{'STATUS_SIGS_THRESHOLD'} signature matches:\n";
-        } else {
-            print "[+] Top signature matches:\n";
-        }
-    }
-
-    my $ctr = 0;
     open F, "< $config{'TOP_SIGS_FILE'}" or die "[*] Could not ",
         "open $config{'TOP_SIGS_FILE'}: $!";
     while (<F>) {
@@ -7552,37 +7452,52 @@ sub import_top_sigs() {
                 ### the specific IP addresses
                 $sig_sources{$sid}{$i} = '';
             }
-            $ctr++;
-            if ($status_print == $STATUS_PRINT) {
-                if ($config{'STATUS_SIGS_THRESHOLD'} > 0) {
-                    last if $ctr >= $config{'STATUS_SIGS_THRESHOLD'};
-                }
-                print qq|      "$msg" ($proto),  Count: $matches,  |,
-                    "Unique sources: $sources,  Sid: $sid\n";
-            }
         }
     }
     close F;
-    print "\n" if $status_print == $STATUS_PRINT;
     return;
 }
 
-sub import_top_scanned_ports() {
-    my $status_print = shift;
-    return unless -e $config{'TOP_SCANNED_PORTS_FILE'};
+sub print_top_sigs() {
+    my @lines = ();
 
-    if ($status_print == $STATUS_PRINT) {
-        if ($config{'STATUS_PORTS_THRESHOLD'} > 0) {
-            print "[+] Top $config{'STATUS_PORTS_THRESHOLD'} scanned ports:\n";
-        } else {
-            print "[+] Top scanned ports:\n";
-        }
+    if ($config{'STATUS_SIGS_THRESHOLD'} > 0) {
+        push @lines, "[+] Top $config{'STATUS_SIGS_THRESHOLD'} " .
+            "signature matches:\n";
+    } else {
+        push @lines, "[+] Top signature matches:\n";
     }
 
-    my %port_ctr  = ();
-    my %port_stop = ();
-    my $printed_udp_newline = 0;
     my $ctr = 0;
+    for my $sid (sort {$top_sigs{$b} <=> $top_sigs{$a}} keys %top_sigs) {
+        my $found = 0;
+        my $num_sources = keys %{$sig_sources{$sid}};
+        if (defined $sigs{$sid} and defined $sigs{$sid}{'msg'}) {
+            push @lines, qq|      "$sigs{$sid}{'msg'}" | .
+                qq|($sigs{$sid}{'proto'}),  | .
+                qq|Count: $top_sigs{$sid},  Unique sources: | .
+                qq|$num_sources,  Sid: $sid\n|;
+            $found = 1;
+        } elsif (defined $fwsnort_sigs{$sid}
+                and defined $fwsnort_sigs{$sid}{'msg'}) {
+            push @lines,  qq|      "$fwsnort_sigs{$sid}{'msg'}" | .
+                qq|($fwsnort_sigs{$sid}{'proto'}),  | .
+                qq|Count: $top_sigs{$sid},  Unique sources: | .
+                qq|$num_sources,  Sid: $sid|;
+            $found = 1;
+        }
+        $ctr++ if $found;
+        if ($config{'STATUS_SIGS_THRESHOLD'} > 0) {
+            last if $ctr >= $config{'STATUS_SIGS_THRESHOLD'};
+        }
+    }
+    push @lines, "\n";
+    return \@lines;
+}
+
+sub import_top_scanned_ports() {
+    return unless -e $config{'TOP_SCANNED_PORTS_FILE'};
+
     open F, "< $config{'TOP_SCANNED_PORTS_FILE'}" or die "[*] Could not open ",
         "$config{'TOP_SCANNED_PORTS_FILE'}: $!";
     while (<F>) {
@@ -7600,42 +7515,58 @@ sub import_top_scanned_ports() {
             } elsif ($proto eq 'udp') {
                 $top_udp_ports{$port} = $count;
             }
-            $port_ctr{$proto}++;
-            if ($status_print == $STATUS_PRINT) {
-                if ($port_ctr{$proto} >= $config{'STATUS_PORTS_THRESHOLD'}) {
-                    $port_stop{$proto} = '';
-                }
-                next if defined $port_stop{$proto};
-                if ($proto eq 'udp' and not $printed_udp_newline) {
-                    print "\n";
-                    $printed_udp_newline = 1;
-                }
-                if ($config{'STATUS_PORTS_THRESHOLD'} > 0) {
-                    last if $ctr >= $config{'STATUS_PORTS_THRESHOLD'};
-                }
-                print "      $_ packets\n";
-            }
-            $ctr++;
         }
     }
     close F;
-    print "\n" if $status_print == $STATUS_PRINT;
     return;
 }
 
-sub import_top_attackers() {
-    my ($status_print, $prev_source_hr) = @_;
-    return unless -e $config{'TOP_ATTACKERS_FILE'};
+sub print_top_scanned_ports() {
 
-    if ($status_print == $STATUS_PRINT) {
-        if ($config{'STATUS_IP_THRESHOLD'} > 0) {
-            print "[+] Top $config{'STATUS_IP_THRESHOLD'} attackers:\n";
-        } else {
-            print "[+] Top attackers:\n";
-        }
+    my @lines = ();
+
+    if ($config{'STATUS_PORTS_THRESHOLD'} > 0) {
+        push @lines, "[+] Top $config{'STATUS_PORTS_THRESHOLD'} scanned ports:\n";
+    } else {
+        push @lines, "[+] Top scanned ports:\n";
     }
 
-    my $ctr = 0;
+    if (%top_tcp_ports) {
+        my $ctr = 0;
+        for my $dp (sort {$top_tcp_ports{$b} <=> $top_tcp_ports{$a}}
+                keys %top_tcp_ports) {
+            my $str = sprintf "      tcp %-5d $top_tcp_ports{$dp} packets\n", $dp;
+            push @lines, $str;
+            $ctr++;
+            if ($config{'STATUS_PORTS_THRESHOLD'} > 0) {
+                last if $ctr >= $config{'STATUS_PORTS_THRESHOLD'};
+            }
+        }
+        push @lines, "\n";
+    }
+
+    if (%top_udp_ports) {
+        my $ctr = 0;
+        push @lines, "\n";
+        for my $dp (sort {$top_udp_ports{$b} <=> $top_udp_ports{$a}}
+                keys %top_udp_ports) {
+            my $str = sprintf "      udp %-5d $top_udp_ports{$dp} packets\n", $dp;
+            push @lines, $str;
+            $ctr++;
+            if ($config{'STATUS_PORTS_THRESHOLD'} > 0) {
+                last if $ctr >= $config{'STATUS_PORTS_THRESHOLD'};
+            }
+        }
+        push @lines, "\n";
+    }
+
+    return \@lines;
+}
+
+sub import_top_attackers() {
+    my $prev_sources_hr = shift;
+    return unless -e $config{'TOP_ATTACKERS_FILE'};
+
     open F, "< $config{'TOP_ATTACKERS_FILE'}" or die "[*] Could not open ",
         "$config{'TOP_ATTACKERS_FILE'}: $!";
     while (<F>) {
@@ -7649,19 +7580,11 @@ sub import_top_attackers() {
             my $uniq_sigs = $4;
             my $sig_matches = $5;
             my $is_local = $6;
-            if ($status_print == $STATUS_PRINT) {
-                if ($status_min_dl) {
-                    next unless $dl >= $status_min_dl;
-                } else {
-                    next unless $dl >= 1;
-                }
-            }
-            if ($status_print == $NO_STATUS) {
-                ### do not add any IP from the top_attackers file
-                ### that does not have a /var/log/psad/<ip>
-                ### directory
-                next unless defined $prev_source_hr->{$ip};
-            }
+
+            ### do not add any IP from the top_attackers file
+            ### that does not have a /var/log/psad/<ip>
+            ### directory
+            next unless defined $prev_sources_hr->{$ip};
             if (defined $scan_dl{$ip}) {
                 $scan_dl{$ip} = $dl
                     if $scan_dl{$ip} < $dl;
@@ -7671,23 +7594,59 @@ sub import_top_attackers() {
             $local_src{$ip} = '' if $is_local;
             $top_packet_counts{$ip} = $tot_pkts;
             $top_sig_counts{$ip}    = $sig_matches;
-            $ctr++;
-            if ($status_print == $STATUS_PRINT) {
-                my $str = sprintf "      %-15s  DL: $dl, Packets: $tot_pkts, " .
-                    "Sig count: $sig_matches", $ip;
-                if ($is_local) {
-                    $str .= " (local IP!)";
-                }
-                if ($config{'STATUS_IP_THRESHOLD'} > 0) {
-                    last if $ctr >= $config{'STATUS_IP_THRESHOLD'};
-                }
-                print $str, "\n";
-            }
         }
     }
     close F;
-    print "\n" if $status_print == $STATUS_PRINT;
     return;
+}
+
+sub print_top_attackers() {
+    my @lines = ();
+    if ($config{'STATUS_IP_THRESHOLD'} > 0) {
+        push @lines, "[+] Top $config{'STATUS_IP_THRESHOLD'} attackers:\n";
+    } else {
+        push @lines, "[+] Top attackers:\n";
+    }
+    my $ctr = 0;
+    my %pre_sort_dl = ();
+    for my $src (sort {$scan_dl{$b} cmp $scan_dl{$a}} keys %scan_dl) {
+        if ($status_min_dl) {
+            next unless $scan_dl{$src} >= $status_min_dl;
+        } else {
+            next unless $scan_dl{$src} >= $config{'MIN_DANGER_LEVEL'};
+        }
+        $pre_sort_dl{$scan_dl{$src}}{$src} = '';
+    }
+
+    for my $dl qw/5 4 3 2 1/ {
+        next unless defined $pre_sort_dl{$dl};
+
+        for my $src (sort keys %{$pre_sort_dl{$dl}}) {
+            next unless defined $top_packet_counts{$src}
+                    or defined $top_sig_counts{$src};
+            my $str = sprintf "      %-15s DL: %d", $src, $scan_dl{$src};
+            if (defined $top_packet_counts{$src}) {
+                $str .= ", Packets: $top_packet_counts{$src}";
+            } else {
+                $str .= ', Packets: 0';
+            }
+            if (defined $top_sig_counts{$src}) {
+                $str .= ", Sig count: $top_sig_counts{$src}";
+            } else {
+                $str .= ', Sig count: 0';
+            }
+            if (defined $local_src{$src}) {
+                $str .= ', (local IP)';
+            }
+            $ctr++;
+            if ($config{'STATUS_IP_THRESHOLD'} > 0) {
+                last if $ctr >= $config{'STATUS_IP_THRESHOLD'};
+            }
+            push @lines, $str, "\n";
+        }
+    }
+    push @lines, "\n";
+    return \@lines;
 }
 
 sub remove_old_scans() {
@@ -7954,7 +7913,7 @@ sub setup() {
             }
         }
 
-        ### create the Netfilter data file if it doesn't exist
+        ### create the iptables data file if it doesn't exist
         ### (this is better than dying because it isn't there).
         &truncate_file($fw_data_file) if $truncate_or_create;
 
@@ -8660,6 +8619,7 @@ sub required_vars() {
         STATUS_PORTS_THRESHOLD STATUS_SIGS_THRESHOLD STATUS_IP_THRESHOLD
         ANALYSIS_OUTPUT_FILE TOP_IP_LOG_THRESHOLD PSAD_LIBS_DIR
         PSAD_PID_FILE PSAD_CMDLINE_FILE PSAD_ERR_DIR MIN_DANGER_LEVEL
+        IGNORE_KERNEL_TIMESTAMP
     );
     &defined_vars(\@required_vars);
     return;
@@ -8676,12 +8636,12 @@ psad; the Port Scan Attack Detector
 Usage: psad [options]
 
 Options:
-    -A,  --Analyze-msgs           - Analyze Netfilter logfile and exit.
+    -A,  --Analyze-msgs           - Analyze iptables logfile and exit.
     -e,  --email-analysis         - Send emails for scans detected in
                                     offline analysis mode.
     -w,  --whois-analysis         - Enable whois lookups when running
                                     in offline analysis mode.
-    -m,  --messages-file <file>   - Specify the path to the Netfilter
+    -m,  --messages-file <file>   - Specify the path to the iptables
                                     logfile (use in conjunction with
                                     --Analyze-msgs).
     -i,  --interface <intf>       - Restrict detection to IN interface
@@ -8737,7 +8697,7 @@ Options:
                                     data structures on STDOUT).
     -H,  --HUP                    - Send all psad daemons a HUP signal
                                     to have them re-import configs.
-    --CSV                         - Parse Netfilter log messages and
+    --CSV                         - Parse iptables log messages and
                                     dump fields to stdout in csv format.
     --CSV-fields <fields>         - Restrict --CSV output to a list of
                                     specfic fields.
@@ -8745,14 +8705,14 @@ Options:
                                     output.
     --CSV-max-lines <num>         - Specify the maximum number of CSV
                                     output lines to print.
-    --CSV-start-line <line>       - Starting line within Netfilter log
+    --CSV-start-line <line>       - Starting line within iptables log
                                     file.
-    --CSV-end-line <line>         - Ending line within Netfilter log
+    --CSV-end-line <line>         - Ending line within iptables log
                                     file.
-    --CSV-regex <regex>           - Require Netfilter log messages to
+    --CSV-regex <regex>           - Require iptables log messages to
                                     match an additional regex in --CSV
                                     mode.
-    --CSV-neg-regex <regex>       - Require Netfilter log messages to
+    --CSV-neg-regex <regex>       - Require iptables log messages to
                                     not match an additional regex in
                                     --CSV mode.
     --signatures <sigs file>      - Manually specify the path to the
@@ -8781,7 +8741,7 @@ Options:
 
     --no-snort-sids               - Disable examination for snort sids
                                     (such as those generated by fwsnort)
-                                    in Netfilter log messages.
+                                    in iptables log messages.
     --no-signatures               - Disable psad signature processing
                                     (independent of snort sid matching).
     --no-icmp-types               - Disable icmp type/code validation.
@@ -8795,7 +8755,7 @@ Options:
                                     scanning IP addresses.
     --no-kmsgsd                   - Disable startup of kmsgsd (useful
                                     for debugging with an existing file
-                                    of Netfilter log messages).
+                                    of iptables log messages).
     --no-netstat                  - Disable local port lookups for scan
                                     signatures.
     -h   --help                   - Display usage on STDOUT and exit.

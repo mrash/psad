@@ -3107,7 +3107,8 @@ sub import_snort_rules() {
 
     print STDERR Dumper %fwsnort_sigs if $debug and $verbose;
     &sys_log('psad', "imported original Snort rules in " .
-        "$config{'SNORT_RULES_DIR'}/ for reference info");
+        "$config{'SNORT_RULES_DIR'}/ for reference info")
+        unless $analyze_mode;
     return;
 }
 
@@ -3129,7 +3130,8 @@ sub import_snort_class_priorities() {
         }
     }
     close F;
-    &sys_log('psad', 'imported Snort classification.config');
+    &sys_log('psad', 'imported Snort classification.config')
+        unless $analyze_mode;
     return;
 }
 
@@ -3546,7 +3548,8 @@ sub import_signatures() {
             Dumper(\%sig_search), Dumper(\%sigs);
     }
     &sys_log('psad', "imported $sig_ctr psad Snort signatures " .
-        "from $config{'SIGS_FILE'}");
+        "from $config{'SIGS_FILE'}")
+        unless $analyze_mode;
     return;
 }
 
@@ -3600,7 +3603,8 @@ sub import_icmp_types() {
         }
     }
     print STDERR Dumper %valid_icmp_types if $debug and $verbose;
-    &sys_log('psad', 'imported valid icmp types and codes');
+    &sys_log('psad', 'imported valid icmp types and codes')
+        unless $analyze_mode;
     return;
 }
 
@@ -3841,8 +3845,8 @@ sub import_p0f_sigs() {
     }
 
     print STDERR Dumper %p0f_sigs if $debug and $verbose;
-    &sys_log('psad',
-        'imported p0f-based passive OS fingerprinting signatures');
+    &sys_log('psad', 'imported p0f-based passive OS fingerprinting signatures')
+        unless $analyze_mode;
     return;
 }
 
@@ -3924,8 +3928,8 @@ sub import_posf_sigs() {
         }
     }
     print STDERR Dumper %posf_sigs if $debug and $verbose;
-    &sys_log('psad',
-        'imported TOS-based passive OS fingerprinting signatures');
+    &sys_log('psad', 'imported TOS-based passive OS fingerprinting signatures')
+        unless $analyze_mode;
     return;
 }
 

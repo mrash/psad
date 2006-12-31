@@ -2550,6 +2550,8 @@ sub psad_init() {
     ### turn off buffering
     $| = 1;
 
+    $no_syslog_alerts = 1 if $analyze_mode or $status_mode;
+
     ### import psad.conf
     &import_config($config_file);
 
@@ -3107,8 +3109,7 @@ sub import_snort_rules() {
 
     print STDERR Dumper %fwsnort_sigs if $debug and $verbose;
     &sys_log('psad', "imported original Snort rules in " .
-        "$config{'SNORT_RULES_DIR'}/ for reference info")
-        unless $analyze_mode;
+        "$config{'SNORT_RULES_DIR'}/ for reference info");
     return;
 }
 
@@ -3130,8 +3131,7 @@ sub import_snort_class_priorities() {
         }
     }
     close F;
-    &sys_log('psad', 'imported Snort classification.config')
-        unless $analyze_mode;
+    &sys_log('psad', 'imported Snort classification.config');
     return;
 }
 
@@ -3548,8 +3548,7 @@ sub import_signatures() {
             Dumper(\%sig_search), Dumper(\%sigs);
     }
     &sys_log('psad', "imported $sig_ctr psad Snort signatures " .
-        "from $config{'SIGS_FILE'}")
-        unless $analyze_mode;
+        "from $config{'SIGS_FILE'}");
     return;
 }
 
@@ -3603,8 +3602,7 @@ sub import_icmp_types() {
         }
     }
     print STDERR Dumper %valid_icmp_types if $debug and $verbose;
-    &sys_log('psad', 'imported valid icmp types and codes')
-        unless $analyze_mode;
+    &sys_log('psad', 'imported valid icmp types and codes');
     return;
 }
 
@@ -3845,8 +3843,7 @@ sub import_p0f_sigs() {
     }
 
     print STDERR Dumper %p0f_sigs if $debug and $verbose;
-    &sys_log('psad', 'imported p0f-based passive OS fingerprinting signatures')
-        unless $analyze_mode;
+    &sys_log('psad', 'imported p0f-based passive OS fingerprinting signatures');
     return;
 }
 
@@ -3928,8 +3925,8 @@ sub import_posf_sigs() {
         }
     }
     print STDERR Dumper %posf_sigs if $debug and $verbose;
-    &sys_log('psad', 'imported TOS-based passive OS fingerprinting signatures')
-        unless $analyze_mode;
+    &sys_log('psad',
+        'imported TOS-based passive OS fingerprinting signatures');
     return;
 }
 
@@ -4352,6 +4349,7 @@ sub scan_logr() {
                 }
                 next DST;
             }
+            $scan{$src}{$dst}{'email_ctr'}++ unless $no_email_alerts;
             print STDERR "[+] scan_logr(): dst IP: $dst\n" if $debug;
 
             ### make $src directory here in /var/log/psad
@@ -4732,7 +4730,6 @@ sub scan_logr() {
 #                        "$config{'EMAIL_ADDRESSES'}\n");
                     &send_mail($subject, $email_file,
                         $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
-                    $scan{$src}{$dst}{'email_ctr'}++;
 
                     ### print the number of email alerts we have sent
                     open E, "> $ecount_file" or die "[*] Could not open ",
@@ -6766,7 +6763,7 @@ sub print_scan_status() {
 
             ### source IP line
             my $src_str = "\nSRC:  $src, DL: $dl, Dsts: $total_dsts" .
-                ", Pkts: $tot_pkts, Unique sigs: $uniq_sigs,";
+                ", Pkts: $tot_pkts, Unique sigs: $uniq_sigs";
 
             unless ($analyze_mode) {
                 my $tot_alerts = 0;
@@ -7147,7 +7144,7 @@ sub import_ip_dirs() {
                 chomp $num_emails;
                 $scan{$src}{$dst}{'email_ctr'} = $num_emails;
                 $scan{$src}{$dst}{'alerted'}   = 1;
-            } else { 
+            } else {
                 $scan{$src}{$dst}{'email_ctr'} = 0;
                 $scan{$src}{$dst}{'alerted'}   = 0;
             }

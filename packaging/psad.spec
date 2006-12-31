@@ -247,8 +247,15 @@ fi
 %_libdir/%name
 
 %changelog
-* Tue Dec 26 2006 Michael Rash <mbr@cipherdyne.org>
+* Sun Dec 31 2006 Michael Rash <mbr@cipherdyne.org>
 - psad-2.0.3 release
+- Removed Psad.pm perl module and kmsgsd.pl and psadwatchd.pl scripts.  This
+  is a major change that allows psad to be more flexible and completely derive
+  its config from the psad.conf file and from the command line.  In the
+  previous scheme, psad imported its config with a function within Psad.pm,
+  and this required that psad imported the Psad perl module before reading its
+  config.  A consequence is that the PSAD_LIBS_DIR var could not be specified
+  usefully within the config file.
 
 * Sat Dec 23 2006 Michael Rash <mbr@cipherdyne.org>
 - psad-2.0.2 release

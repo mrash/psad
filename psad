@@ -6754,6 +6754,17 @@ sub print_scan_status() {
             for my $dst (keys %{$scan{$src}}) {
                 $tot_pkts += $scan{$src}{$dst}{'absnum'};
             }
+            for my $proto qw/tcp udp icmp ip/ {
+                for my $dst (keys %{$scan{$src}}) {
+                    next unless defined $scan{$src}{$dst}{$proto}
+                        and defined $scan{$src}{$dst}{$proto}{'sid'};
+                    for my $sid (keys %{$scan{$src}{$dst}{$proto}{'sid'}}) {
+                        $uniq_sigs++;
+                    }
+                }
+            }
+
+            ### source IP line
             my $src_str = "\nSRC:  $src, DL: $dl, Dsts: $total_dsts" .
                 ", Pkts: $tot_pkts, Unique sigs: $uniq_sigs,";
 

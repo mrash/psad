@@ -18,7 +18,7 @@
 #
 # Credits: (see the CREDITS file bundled with the psad sources.)
 #
-# Version: 2.0.2
+# Version: 2.0.3
 #
 # Copyright (C) 1999-2006 Michael Rash (mbr@cipherdyne.org)
 #
@@ -141,7 +141,7 @@ use strict;
 ### ========================== main =================================
 
 ### set the current psad version and file revision numbers
-my $version = '2.0.2';
+my $version = '2.0.3';
 my $revision_svn = '$Revision$';
 my $rev_num = '1';
 ($rev_num) = $revision_svn =~ m|\$Rev.*:\s+(\S+)|;
@@ -2849,7 +2849,7 @@ sub validate_home_net() {
                     $found = $found_one_net = 1;
                 }
             }
-            unless ($found or $analyze_mode) {
+            unless ($found) {
                 ### note that this might be ok if psad is running on a syslog
                 ### server, but the most likely explanation is that there was a
                 ### typo in the HOME_NET variable defintion.
@@ -4576,7 +4576,8 @@ sub scan_logr() {
                     );
                 }
                 $syslog_flags =~ s/\s*$//;
-                $syslog_range .= " tcp=[$tcp_newrange] $syslog_flags";
+                $syslog_range = "tcp: [$tcp_newrange]";
+                $syslog_range .= " flags: $syslog_flags" if $syslog_flags;
             }
             if ($udp_f) {
                 printf $fh "%${log_len}s%s\n", 'Scanned udp ports: ',
@@ -4587,7 +4588,7 @@ sub scan_logr() {
                         $fh
                     );
                 }
-
+                $syslog_range = "udp: [$udp_newrange]";
             }
             if ($icmp_f) {
                 printf $fh "%${log_len}s%s\n", 'icmp packets: ',
@@ -4695,13 +4696,18 @@ sub scan_logr() {
             }
             ### print out any matched signatures to the email
             ### alert file and also to the signature log
-            &scan_logr_signatures($src, $dst, $fh, $log_sigs);
+            my $sid_str = &scan_logr_signatures($src, $dst, $fh, $log_sigs);
 
             ### write a scan message to syslog
-            &sys_log('psad', "scan detected: $src -> $dst" .
-                "$syslog_range tcp=$tcp_newpkts udp=$udp_newpkts " .
-                "icmp=$icmp_newpkts dangerlevel: $curr_dl")
-                unless $analyze_mode;
+            my $syslog_str = "scan detected: $src -> $dst";
+            $syslog_str .= " $syslog_range" if $syslog_range;
+            $syslog_str .= " $sid_str" if $sid_str;
+            $syslog_str .= " tcp pkts: $tcp_newpkts" if $tcp_newpkts;
+            $syslog_str .= " udp pkts: $udp_newpkts" if $udp_newpkts;
+            $syslog_str .= " icmp pkts: $icmp_newpkts" if $icmp_newpkts;
+            $syslog_str .= " DL: $curr_dl";
+
+            &sys_log('psad', $syslog_str);
 
             unless ($no_whois) {
                 print $fh "\n[+] Whois Information:\n";
@@ -4725,9 +4731,6 @@ sub scan_logr() {
                             "DL$curr_dl src: " .
                             "$src_subj dst: $dst_subj";
                     }
-                    ### commented out for now
-#                    &sys_log('psad', "sending email alert to: " .
-#                        "$config{'EMAIL_ADDRESSES'}\n");
                     &send_mail($subject, $email_file,
                         $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
 
@@ -4762,6 +4765,7 @@ sub scan_logr_signatures() {
 
     my @del_sigs = ();
     my @log_sigs = ();
+    my $sys_log_sid_str = '';
 
     for my $proto qw(tcp udp icmp ip) {
         next unless defined $scan{$src}{$dst}{$proto};
@@ -4771,12 +4775,20 @@ sub scan_logr_signatures() {
                 or defined $href->{'invalid_type'}
                 or defined $href->{'invalid_code'});
 
-
         print $email_fh "\n\n[+] $proto scan signatures:\n\n";
         print STDERR "[+] scan_logr_signatures(): src: $src dst: $dst ",
             "proto: $proto\n" if $debug;
 
+        my $sid_ctr = 0;
         for my $sid (keys %{$href->{'sid'}}) {
+            $sid_ctr++;
+            if ($sid_ctr <= $config{'SIG_SID_SYSLOG_THRESHOLD'}) {
+                if ($sigs{'sid'}{'is_psad_id'}) {
+                    $sys_log_sid_str .= "psad_id: $sid ";
+                } else {
+                    $sys_log_sid_str .= "sid: $sid ";
+                }
+            }
             for my $chain (keys %{$href->{'sid'}->{$sid}}) {
 
                 my $sig_hr = '';
@@ -4806,6 +4818,11 @@ sub scan_logr_signatures() {
                 push @log_sigs, "$href->{'sid'}->{$sid}->{$chain}->{'time'} " .
                     qq|$sid $pkts "$sig_hr->{'msg'}" $chain $proto $dp "$flags" | .
                     "$is_fwsnort $sig_hr->{'is_psad_id'}";
+
+                if ($config{'ENABLE_SIG_MSG_SYSLOG'} eq 'Y'
+                        and $sid_ctr <= $config{'SIG_MSG_SYSLOG_THRESHOLD'}) {
+                    &sys_log('psad', "sig match: \"$sig_hr->{'msg'}\"");
+                }
 
                 print $email_fh qq|   "$sig_hr->{'msg'}"\n|;
 
@@ -4922,7 +4939,8 @@ sub scan_logr_signatures() {
         }
     }
     close LS;
-    return;
+    $sys_log_sid_str =~ s|\s*$||;
+    return $sys_log_sid_str;
 }
 
 sub print_chains_and_prefixes() {
@@ -7641,7 +7659,7 @@ sub handle_cmdline() {
     ### be absolutely sure to disable auto-response for various
     ### offline modes
     $config{'ENABLE_AUTO_IDS'} = 'N'
-        if $analyze_mode or $syslog_server or $benchmark;
+        if $analyze_mode or $syslog_server or $benchmark or $status_mode;
 
     ### The -I switch was given
     $config{'CHECK_INTERVAL'} = $chk_interval if $chk_interval;
@@ -8441,7 +8459,8 @@ sub required_vars() {
         STATUS_PORTS_THRESHOLD STATUS_SIGS_THRESHOLD STATUS_IP_THRESHOLD
         ANALYSIS_OUTPUT_FILE TOP_IP_LOG_THRESHOLD PSAD_LIBS_DIR
         PSAD_PID_FILE PSAD_CMDLINE_FILE PSAD_ERR_DIR MIN_DANGER_LEVEL
-        IGNORE_KERNEL_TIMESTAMP
+        IGNORE_KERNEL_TIMESTAMP ENABLE_SIG_MSG_SYSLOG
+        SIG_MSG_SYSLOG_THRESHOLD SIG_SID_SYSLOG_THRESHOLD
     );
     &defined_vars(\@required_vars);
     return;

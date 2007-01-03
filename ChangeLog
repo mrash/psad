@@ -1,19 +1,28 @@
+psad-2.0.4 (01//2007):
+    - Added Snort rule matches to syslog alerts.  Multiple matches can be
+      controlled with new configuration variables in psad.conf:
+      ENABLE_SIG_MSG_SYSLOG, SIG_MSG_SYSLOG_THRESHOLD, and
+      SIG_SID_SYSLOG_THRESHOLD.
+    - Bugfix to include scanned UDP port ranges in syslog alerts.
+
 psad-2.0.3 (12//2006):
-    - Removed Psad.pm perl module and kmsgsd.pl and psadwatchd.pl scripts.  This is
-      a major change that allows psad to be more flexible and completely derive its
-      config from the psad.conf file and from the command line.  In the previous
-      scheme, psad imported its config with a function within Psad.pm, and this
-      required that psad imported the Psad perl module before reading its config. A
-      consequence was that the PSAD_LIBS_DIR var could not be specified usefully
-      within the config file.
+    - Removed Psad.pm perl module and kmsgsd.pl and psadwatchd.pl scripts.
+      This is a major change that allows psad to be more flexible and
+      completely derive its config from the psad.conf file and from the
+      command line.  In the previous scheme, psad imported its config with a
+      function within Psad.pm, and this required that psad imported the Psad
+      perl module before reading its config. A consequence was that the
+      PSAD_LIBS_DIR var could not be specified usefully within the config
+      file.
     - Added the ability to recursively resolve embedded variables from *.conf
       files (with a limit of 20 resolution attempts).
     - Added IGNORE_KERNEL_TIMESTAMP so that Linux distros that add a timestamp
       to all kernel messages (Ubuntu for example) can be ignored.
     - Consolidated code to import data out of /var/log/psad/<ip> directories
-      with code to display status and analysis output (-S and -A).  Essentially
-      the %scan hash is built by the filesystem data import routine and the
-      remainder of the code references this single data structure.
+      with code to display status and analysis output (-S and -A).
+      Essentially the %scan hash is built by the filesystem data import
+      routine and the remainder of the code references this single data
+      structure.
 
 psad-2.0.2 (12/23/2006):
     - Added the ability to download the latest signatures from cipherdyne.org

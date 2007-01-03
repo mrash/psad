@@ -320,9 +320,14 @@ sub install() {
         &logr("[+] Compiling Marco d'Itri's whois client\n");
         system "$cmds{'make'} -C whois";
         if (-e 'whois/whois') {
+            ### if an old whois process is still around ("text file
+            ### busy" error), then it is ok to not be able to copy
+            ### the new whois binary into place; the old one should
+            ### work fine.
             &logr("[+] Copying whois binary to $cmds{'whois'}\n");
-            copy "whois/whois", $cmds{'whois'} or die "[*] Could not copy ",
-                "whois/whois -> $cmds{'whois'}: $!";
+            copy 'whois/whois', $cmds{'whois'};
+            die "[*] Could not copy whois/whois -> $cmds{'whois'}: $!"
+                unless -e $cmds{'whois'};
         } else {
             die "[*] Could not compile whois";
         }

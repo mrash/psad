@@ -1306,13 +1306,18 @@ sub parse_NF_pkt_str() {
     ### PHYSOUT=eth1 SRC=63.147.183.21 DST=11.11.79.100 LEN=48 TOS=0x00
     ### PREC=0x00 TTL=113 ID=19664 DF PROTO=TCP SPT=4918 DPT=135 WINDOW=64240
     ### RES=0x00 SYN URGP=0
-    if ($pkt_str =~ /\sIN=(\S+).*\sOUT=\s/) {
+    ### Note the lack of whitespace requirement before the IN= interface
+    ### because the logging prefix might not have contained it.
+    if ($pkt_str =~ /IN=(\S+)\s+PHYSIN=.*?\sOUT=\s/
+            or $pkt_str =~ /IN=(\S+).*?\sOUT=\s/) {
         $pkt_hr->{'intf'}  = $1;
         $pkt_hr->{'chain'} = 'INPUT';
-    } elsif ($pkt_str =~ /\sIN=(\S+).*\sOUT=\S/) {
+    } elsif ($pkt_str =~ /IN=(\S+)\s+PHYSIN=.*?\sOUT=\S/
+            or $pkt_str =~ /IN=(\S+).*?\sOUT=\S/) {
         $pkt_hr->{'intf'}  = $1;
         $pkt_hr->{'chain'} = 'FORWARD';
-    } elsif ($pkt_str =~ /\sIN=\s+.*\sOUT=(\S+)/) {
+    } elsif ($pkt_str =~ /IN=\s+PHYSIN=.*?\sOUT=(\S+)/
+            or $pkt_str =~ /IN=\s+.*?\sOUT=(\S+)/) {
         $pkt_hr->{'intf'}  = $1;
         $pkt_hr->{'chain'} = 'OUTPUT';
     }
@@ -4765,7 +4770,8 @@ sub scan_logr_signatures() {
 
     my @del_sigs = ();
     my @log_sigs = ();
-    my $sys_log_sid_str = '';
+    my $sys_log_sid_str = 'sids: ';
+    my $found_sid = 0;
 
     for my $proto qw(tcp udp icmp ip) {
         next unless defined $scan{$src}{$dst}{$proto};
@@ -4783,11 +4789,8 @@ sub scan_logr_signatures() {
         for my $sid (keys %{$href->{'sid'}}) {
             $sid_ctr++;
             if ($sid_ctr <= $config{'SIG_SID_SYSLOG_THRESHOLD'}) {
-                if ($sigs{'sid'}{'is_psad_id'}) {
-                    $sys_log_sid_str .= "psad_id: $sid ";
-                } else {
-                    $sys_log_sid_str .= "sid: $sid ";
-                }
+                $sys_log_sid_str .= "$sid,";
+                $found_sid = 1;
             }
             for my $chain (keys %{$href->{'sid'}->{$sid}}) {
 
@@ -4821,7 +4824,8 @@ sub scan_logr_signatures() {
 
                 if ($config{'ENABLE_SIG_MSG_SYSLOG'} eq 'Y'
                         and $sid_ctr <= $config{'SIG_MSG_SYSLOG_THRESHOLD'}) {
-                    &sys_log('psad', "sig match: \"$sig_hr->{'msg'}\"");
+                    &sys_log('psad', "signature match: \"$sig_hr->{'msg'}\" " .
+                        "(sid: $sid)");
                 }
 
                 print $email_fh qq|   "$sig_hr->{'msg'}"\n|;
@@ -4939,7 +4943,11 @@ sub scan_logr_signatures() {
         }
     }
     close LS;
-    $sys_log_sid_str =~ s|\s*$||;
+    if ($found_sid) {
+        $sys_log_sid_str =~ s|,\s*$||;
+    } else {
+        $sys_log_sid_str = '';
+    }
     return $sys_log_sid_str;
 }
 

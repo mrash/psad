@@ -4,6 +4,9 @@ psad-2.0.4 (01//2007):
       ENABLE_SIG_MSG_SYSLOG, SIG_MSG_SYSLOG_THRESHOLD, and
       SIG_SID_SYSLOG_THRESHOLD.
     - Bugfix to include scanned UDP port ranges in syslog alerts.
+    - Bugfix to allow logging prefixes to omit trailing spaces.  This is a bug
+      in the iptables logging format to allow this in the first place, but
+      before this gets fixed psad needs to compensate.
 
 psad-2.0.3 (12/31/2006):
     - Removed Psad.pm perl module and kmsgsd.pl and psadwatchd.pl scripts.

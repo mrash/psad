@@ -4701,12 +4701,11 @@ sub scan_logr() {
             }
             ### print out any matched signatures to the email
             ### alert file and also to the signature log
-            my $sid_str = &scan_logr_signatures($src, $dst, $fh, $log_sigs);
+            &scan_logr_signatures($src, $dst, $fh, $log_sigs);
 
             ### write a scan message to syslog
             my $syslog_str = "scan detected: $src -> $dst";
             $syslog_str .= " $syslog_range" if $syslog_range;
-            $syslog_str .= " $sid_str" if $sid_str;
             $syslog_str .= " tcp pkts: $tcp_newpkts" if $tcp_newpkts;
             $syslog_str .= " udp pkts: $udp_newpkts" if $udp_newpkts;
             $syslog_str .= " icmp pkts: $icmp_newpkts" if $icmp_newpkts;
@@ -4770,7 +4769,6 @@ sub scan_logr_signatures() {
 
     my @del_sigs = ();
     my @log_sigs = ();
-    my $sys_log_sid_str = 'sids: ';
     my $found_sid = 0;
 
     for my $proto qw(tcp udp icmp ip) {
@@ -4789,7 +4787,6 @@ sub scan_logr_signatures() {
         for my $sid (keys %{$href->{'sid'}}) {
             $sid_ctr++;
             if ($sid_ctr <= $config{'SIG_SID_SYSLOG_THRESHOLD'}) {
-                $sys_log_sid_str .= "$sid,";
                 $found_sid = 1;
             }
             for my $chain (keys %{$href->{'sid'}->{$sid}}) {
@@ -4824,8 +4821,13 @@ sub scan_logr_signatures() {
 
                 if ($config{'ENABLE_SIG_MSG_SYSLOG'} eq 'Y'
                         and $sid_ctr <= $config{'SIG_MSG_SYSLOG_THRESHOLD'}) {
-                    &sys_log('psad', "signature match: \"$sig_hr->{'msg'}\" " .
-                        "(sid: $sid)");
+                    if ($proto eq 'tcp' or $proto eq 'udp') {
+                        &sys_log('psad', "src: $src signature match: " .
+                            "\"$sig_hr->{'msg'}\" (sid: $sid) $proto port: $dp");
+                    } else {
+                        &sys_log('psad', "src: $src signature match: " .
+                            "\"$sig_hr->{'msg'}\" (sid: $sid) $proto");
+                    }
                 }
 
                 print $email_fh qq|   "$sig_hr->{'msg'}"\n|;
@@ -4943,12 +4945,7 @@ sub scan_logr_signatures() {
         }
     }
     close LS;
-    if ($found_sid) {
-        $sys_log_sid_str =~ s|,\s*$||;
-    } else {
-        $sys_log_sid_str = '';
-    }
-    return $sys_log_sid_str;
+    return;
 }
 
 sub print_chains_and_prefixes() {

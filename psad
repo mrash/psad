@@ -1876,7 +1876,7 @@ sub match_snort_udp_keywords() {
     if ($debug) {
         print STDERR "[+] packet matched udp keywords for sid: ",
             "$sig_hr->{'sid'} (psad_id: $sig_hr->{'psad_id'})\n",
-            "    $sig_hr->{'msg'}\n";
+            qq|    "$sig_hr->{'msg'}"\n|;
     }
 
     return &get_largest_sid_dl($sig_hr->{'sid'}, $sig_hr->{'dl'});
@@ -1902,7 +1902,7 @@ sub match_snort_icmp_keywords() {
     if ($debug) {
         print STDERR "[+] packet matched icmp keywords for sid: ",
             "$sig_hr->{'sid'} (psad_id: $sig_hr->{'psad_id'})\n",
-            "    $sig_hr->{'msg'}\n";
+            qq|    "$sig_hr->{'msg'}"\n|;
     }
 
     return &get_largest_sid_dl($sig_hr->{'sid'}, $sig_hr->{'dl'});
@@ -1935,7 +1935,7 @@ sub match_snort_ip_keywords() {
         if ($debug) {
             print STDERR "[+] packet matched ip keywords for sid: ",
                 "$sig_hr->{'sid'} (psad_id: $sig_hr->{'psad_id'})\n",
-                "    $sig_hr->{'msg'}\n";
+                qq|    "$sig_hr->{'msg'}"\n|;
         }
 
         $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'ip'}{'sid'}
@@ -2238,6 +2238,7 @@ sub parse_ip_options() {
         print STDERR 'IP options length not a multiple of two.' if $debug;
         return '';
     }
+    print STDERR "[+] parse_ip_options(): matched " if $debug;
 
     push @hex_nums, $1 while $ip_opts_str =~ m|(.{2})|g;
 
@@ -2246,11 +2247,6 @@ sub parse_ip_options() {
 
         for my $rfc_opt_val (keys %ip_options) {
             next unless $val == $rfc_opt_val;
-            if ($debug) {
-                print STDERR "[+] parse_ip_options(): matched ",
-                    "$ip_options{$rfc_opt_val}{'sig_keyword'} ",
-                    "option (0x$hex_nums[$i]).\n"
-            }
             if ($ip_options{$rfc_opt_val}{'len'} ne '-1') {
                 $i += $ip_options{$rfc_opt_val}{'len'}
                     unless $ip_options{$rfc_opt_val}{'len'} == 1;
@@ -2267,9 +2263,16 @@ sub parse_ip_options() {
                 }
                 $i += $pkt_opt_len;
             }
+            if ($debug) {
+                printf STDERR ("$ip_options{$rfc_opt_val}{'sig_keyword'} " .
+                    "(0x%x) ", $val) unless defined $ip_opts{$ip_options
+                    {$rfc_opt_val}{'sig_keyword'}};
+            }
             $ip_opts{$ip_options{$rfc_opt_val}{'sig_keyword'}} = '';
         }
     }
+    print STDERR "\n" if $debug;
+
     return \%ip_opts;
 }
 

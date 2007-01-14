@@ -1850,6 +1850,7 @@ sub match_snort_tcp_keywords() {
                 print STDERR "[-] SID: $sig_hr->{'sid'} ",
                     "$pkt_hr->{'flags'} != $sig_hr->{'flags'}\n";
             }
+            return 0;
         }
     }
 

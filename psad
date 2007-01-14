@@ -2246,6 +2246,11 @@ sub parse_ip_options() {
 
         for my $rfc_opt_val (keys %ip_options) {
             next unless $val == $rfc_opt_val;
+            if ($debug) {
+                print STDERR "[+] parse_ip_options(): matched ",
+                    "$ip_options{$rfc_opt_val}{'sig_keyword'} ",
+                    "option (0x$hex_nums[$i]).\n"
+            }
             if ($ip_options{$rfc_opt_val}{'len'} ne '-1') {
                 $i += $ip_options{$rfc_opt_val}{'len'}
                     unless $ip_options{$rfc_opt_val}{'len'} == 1;
@@ -2262,10 +2267,6 @@ sub parse_ip_options() {
                 }
                 $i += $pkt_opt_len;
             }
-            print STDERR "[+] parse_ip_options(): matched ",
-                "$ip_options{$rfc_opt_val}{'sig_keyword'} option.\n"
-                if $debug;
-
             $ip_opts{$ip_options{$rfc_opt_val}{'sig_keyword'}} = '';
         }
     }

@@ -166,7 +166,8 @@ my $fw_data_file = '';
 my $alert_conf_file = '/etc/psad/alert.conf';
 
 ### disable debugging by default
-my $debug = 0;
+my $debug     = 0;
+my $debug_sid = 0;  ### debug a specific signature
 
 my $flush_fw = 0;
 
@@ -562,6 +563,7 @@ Getopt::Long::Configure('no_ignore_case');
     'CSV-stdin'         => \$csv_stdin,       # Acquire iptables log data from
                                               #   stdin.
     'debug'             => \$debug,           # Run in debug mode.
+    'debug-sid=i'       => \$debug_sid,       # Debug a specific signature.
     'Dump-conf'         => \$dump_conf,       # Dump config and exit.
     'Interval=i'        => \$chk_interval,    # Set $chk_interval from the
                                               #   command line.
@@ -1463,6 +1465,11 @@ sub parse_NF_pkt_str() {
             return $PKT_ERROR;
         }
 
+        if ($pkt_str =~ /\sSEQ=(\d+)\s+ACK=(\d+)/) {
+            $pkt_hr->{'tcp_seq'} = $1;
+            $pkt_hr->{'tcp_ack'} = $2;
+        }
+
         ### see if we need to ignore this packet based on the
         ### IGNORE_PORTS config keyword
         return $PKT_IGNORE if &check_ignore_port($pkt_hr->{'dp'},
@@ -1727,6 +1734,11 @@ sub match_snort_keywords() {
 
         $dl = $dl_tmp if $dl_tmp > $dl;
 
+        if ($debug and $debug_sid == $sid) {
+            print STDERR "[+] SID: $sid, passed match_snort_ip_keywords() ",
+                "tests.\n";
+        }
+
         if ($sig_hr->{'proto'} eq 'tcp') {
 
             $dl_tmp = &match_snort_tcp_keywords($pkt_hr, $sig_hr);
@@ -1828,8 +1840,17 @@ sub match_snort_keywords() {
 sub match_snort_tcp_keywords() {
     my ($pkt_hr, $sig_hr) = @_;
 
+    if ($debug and $debug_sid == $sig_hr->{'sid'}) {
+        print STDERR "[+] SID: $sig_hr->{'sid'} match_snort_tcp_keywords()\n";
+    }
+
     if (defined $sig_hr->{'flags'}) {
-        return 0 unless $pkt_hr->{'flags'} eq $sig_hr->{'flags'};
+        unless ($pkt_hr->{'flags'} eq $sig_hr->{'flags'}) {
+            if ($debug and $debug_sid == $sig_hr->{'sid'}) {
+                print STDERR "[-] SID: $sig_hr->{'sid'} ",
+                    "$pkt_hr->{'flags'} != $sig_hr->{'flags'}\n";
+            }
+        }
     }
 
     my $header_len = $IP_HEADER_LEN + $TCP_HEADER_LEN;
@@ -1969,12 +1990,40 @@ sub check_sig_int_range() {
     return 1 unless defined $sig_hr->{"${keyword}_s"};
 
     if ($sig_hr->{"${keyword}_neg"}) {
-        return 0 if ($pkt_val <= $sig_hr->{"${keyword}_e"}
-            and $pkt_val >= $sig_hr->{"${keyword}_s"});
+        if ($pkt_val <= $sig_hr->{"${keyword}_e"}
+                and $pkt_val >= $sig_hr->{"${keyword}_s"}) {
+            if ($debug) {
+                if ($verbose or $debug_sid == $sig_hr->{'sid'}) {
+                    print STDERR "[-] SID: $sig_hr->{'sid'} failed ",
+                        "$keyword test, $pkt_val <= ",
+                        qq|$sig_hr->{"${keyword}_e"} and $pkt_val |,
+                        qq|>= $sig_hr->{"${keyword}_s"}\n|;
+                }
+            }
+            return 0;
+        }
     } else {
         ### normal match
-        return 0 if $pkt_val < $sig_hr->{"${keyword}_s"};
-        return 0 if $pkt_val > $sig_hr->{"${keyword}_e"};
+        if ($pkt_val < $sig_hr->{"${keyword}_s"}) {
+            if ($debug) {
+                if ($verbose or $debug_sid == $sig_hr->{'sid'}) {
+                    print STDERR "[-] SID: $sig_hr->{'sid'} failed ",
+                        "$keyword test, $pkt_val < ",
+                        qq|$sig_hr->{"${keyword}_s"} (range start)\n|;
+                }
+            }
+            return 0;
+        }
+        if ($pkt_val > $sig_hr->{"${keyword}_e"}) {
+            if ($debug) {
+                if ($verbose or $debug_sid == $sig_hr->{'sid'}) {
+                    print STDERR "[-] SID: $sig_hr->{'sid'} failed ",
+                        "$keyword test, $pkt_val > ",
+                        qq|$sig_hr->{"${keyword}_e"} (range end)\n|;
+                }
+            }
+            return 0;
+        }
     }
     return 1;
 }
@@ -8520,7 +8569,8 @@ Options:
     --fw-include-ips              - Include all IPs/nets in iptables
                                     dump (--fw-dump) output.
     -snort-rdir <rule dir>        - Path to snort rules directory.
-    -d,  --debug                  - Run psad in debugging mode.
+    --debug,                      - Run psad in debugging mode.
+    --debug-sid <sid>             - Debug a specific Snort rule.
     -D,  --Dump-conf              - Dump psad configuration on STDOUT
                                     and exit.
     -l,  --log-server             - psad is being run on a syslog

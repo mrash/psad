@@ -4,6 +4,13 @@ psad-2.0.4 (01//2007):
       ENABLE_SIG_MSG_SYSLOG, SIG_MSG_SYSLOG_THRESHOLD, and
       SIG_SID_SYSLOG_THRESHOLD.
     - Bugfix to include scanned UDP port ranges in syslog alerts.
+    - Bugfix to parse SEQ and ACK iptables log message fields (requires
+      --log-tcp-sequence on the iptables command line).  This allows the ipEye
+      signature to work.
+    - Added --debug-sid to allow a specific Snort rule to be debugged while
+      psad runs it through its detection engine.  A consequence of this is
+      that the -d command line argument must be spelled out, i.e. "psad
+      --debug".
     - Bugfix to allow logging prefixes to omit trailing spaces.  This is a bug
       in the iptables logging format to allow this in the first place, but
       before this gets fixed psad needs to compensate.

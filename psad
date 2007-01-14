@@ -1317,7 +1317,7 @@ sub parse_NF_pkt_str() {
         $pkt_hr->{'intf'}  = $1;
         $pkt_hr->{'chain'} = 'FORWARD';
     } elsif ($pkt_str =~ /IN=\s+PHYSIN=.*?\sOUT=(\S+)/
-            or $pkt_str =~ /IN=\s+.*?\sOUT=(\S+)/) {
+            or $pkt_str =~ /IN=\s+OUT=(\S+)/) {
         $pkt_hr->{'intf'}  = $1;
         $pkt_hr->{'chain'} = 'OUTPUT';
     }

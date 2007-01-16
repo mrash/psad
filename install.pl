@@ -614,12 +614,19 @@ sub install() {
                 if (&query_init_script_restart_syslog()) {
 
                     my $restarted = 0;
-                    if (-e "$INIT_DIR/sysklogd") {
-                        system "$INIT_DIR/sysklogd restart";
-                        $restarted = 1;
-                    } elsif (-e "$INIT_DIR/syslog") {
-                        system "$INIT_DIR/syslogd restart";
-                        $restarted = 1;
+                    if ($syslog_str eq 'syslog-ng') {
+                        if (-e "$INIT_DIR/syslog-ng") {
+                            system "$INIT_DIR/syslog-ng restart";
+                            $restarted = 1;
+                        }
+                    } else {
+                        if (-e "$INIT_DIR/sysklogd") {
+                            system "$INIT_DIR/sysklogd restart";
+                            $restarted = 1;
+                        } elsif (-e "$INIT_DIR/syslog") {
+                            system "$INIT_DIR/syslog restart";
+                            $restarted = 1;
+                        }
                     }
                     ### test syslog config again now that we
                     ### have restarted syslog via the init script

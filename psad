@@ -6826,6 +6826,7 @@ sub print_scan_status() {
             my $tot_pkts   = 0;
             my $uniq_sigs  = 0;
             for my $dst (keys %{$scan{$src}}) {
+                next unless defined $scan{$src}{$dst}{'absnum'};
                 $tot_pkts += $scan{$src}{$dst}{'absnum'};
             }
             for my $proto qw/tcp udp icmp ip/ {
@@ -7242,6 +7243,9 @@ sub import_ip_dirs() {
                                 or $chain eq 'forward'
                                 or $chain eq 'output';
                         $proto = 'icmp';
+                        $scan{$src}{$dst}{'chain'}{$chain}{$intf}{$proto}
+                            += $pkts;
+                        $scan{$src}{$dst}{'absnum'} += $pkts;
                     } elsif ($line =~ /^(\w+)_(\w+)_(tcp|udp):
                             \s+(\d+)\s+\[(\S+)\]/x) {
                         $chain = $1;
@@ -7259,10 +7263,10 @@ sub import_ip_dirs() {
                             $scan{$src}{$dst}{$proto}{'abs_sp'} = $1;
                             $scan{$src}{$dst}{$proto}{'abs_ep'} = $1;
                         }
+                        $scan{$src}{$dst}{'chain'}{$chain}{$intf}{$proto}
+                            += $pkts;
+                        $scan{$src}{$dst}{'absnum'} += $pkts;
                     }
-                    $scan{$src}{$dst}{'chain'}{$chain}{$intf}{$proto}
-                        += $pkts;
-                    $scan{$src}{$dst}{'absnum'} += $pkts;
                 }
             }
             if (-e "${src}/${dst}_start_time") {

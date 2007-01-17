@@ -348,3 +348,7 @@ Richard B\351neyt
 Philip Lawrence
     - Contributed patch to fix module path import bug.  This resulted in the
       psad-2.0.1 release.
+
+Stefano Harding
+    - Reported bug that caused psad to not acquire iptables data on systems
+      running syslog-ng when there is no "source" definition for /proc/kmsg.

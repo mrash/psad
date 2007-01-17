@@ -7923,7 +7923,7 @@ sub setup() {
             unless ($found) {
                 open SYSLOGNG, ">> $config{'ETC_SYSLOGNG_CONF'}" or
                     die "[*] Unable to open $config{'ETC_SYSLOGNG_CONF'}: $!";
-                my $src = 'src';
+                my $src = '';
                 ### see if a different source name is defined for /proc/kmsg
                 for my $line (@lines) {
                     ### source kernsrc { file("/proc/kmsg"); };
@@ -7931,8 +7931,13 @@ sub setup() {
                         $src = $1;
                     }
                 }
-                print SYSLOGNG "\n",
-                    'destination psadpipe { pipe(',
+                print SYSLOGNG "\n";
+                unless ($src) {
+                    print SYSLOGNG qq|source src { unix-stream("/dev/log"); |,
+                        qq|internal(); pipe("/proc/kmsg"); };\n|;
+                    $src = 'src';
+                }
+                print SYSLOGNG 'destination psadpipe { pipe(',
                     "\"$config{'PSAD_FIFO_FILE'}\"); };\n",
                     "filter f_kerninfo { facility(kern); };\n",
 #                    "filter f_kerninfo { facility(kern) ",

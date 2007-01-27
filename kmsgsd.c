@@ -405,7 +405,7 @@ static void parse_fw_search_file(void)
                 fw_msg_search[num_fw_search_strings]
                     = (char *) malloc(strlen(tmp_fw_search_buf));
                 strlcpy(fw_msg_search[num_fw_search_strings],
-                    tmp_fw_search_buf, MAX_GEN_LEN);
+                    tmp_fw_search_buf, strlen(tmp_fw_search_buf));
                 num_fw_search_strings++;
             }
             if (find_char_var("FW_SEARCH_ALL", tmp_fw_search_buf, index)) {

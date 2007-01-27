@@ -334,11 +334,11 @@ static void exec_binary(const char *binary, const char *cmdlinefile)
     pid_t child_pid;
     int arg_num=0, non_ws, i;
 
-    prog_argv[arg_num] = (char *) malloc(strlen(binary));
+    prog_argv[arg_num] = (char *) malloc(strlen(binary)+1);
     if (prog_argv[arg_num] == NULL) {
         exit(EXIT_FAILURE);
     }
-    strlcpy(prog_argv[arg_num], binary, strlen(binary));
+    strlcpy(prog_argv[arg_num], binary, strlen(binary)+1);
     arg_num++;
 
     if (cmdlinefile != NULL) {
@@ -383,9 +383,13 @@ static void exec_binary(const char *binary, const char *cmdlinefile)
             while (*index == ' ' || *index == '\t') index++;
         }
     }
+
     if (arg_num >= MAX_ARG_LEN)
         exit(EXIT_FAILURE);
-
+    prog_argv[arg_num] = (char *) malloc(1);
+    if (prog_argv[arg_num] == NULL) {
+        exit(EXIT_FAILURE);
+    }
     prog_argv[arg_num] = NULL;
 
     if ((child_pid = fork()) < 0)
@@ -393,7 +397,7 @@ static void exec_binary(const char *binary, const char *cmdlinefile)
         exit(EXIT_FAILURE);
     else if (child_pid > 0) {
         wait(NULL);
-        for (i=0; i < arg_num; i++) {
+        for (i=0; i<=arg_num; i++) {
             free(prog_argv[i]);
         }
     } else {

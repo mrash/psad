@@ -403,9 +403,9 @@ static void parse_fw_search_file(void)
 
             if (find_char_var("FW_MSG_SEARCH", tmp_fw_search_buf, index)) {
                 fw_msg_search[num_fw_search_strings]
-                    = (char *) malloc(strlen(tmp_fw_search_buf));
+                    = (char *) malloc(strlen(tmp_fw_search_buf)+1);
                 strlcpy(fw_msg_search[num_fw_search_strings],
-                    tmp_fw_search_buf, strlen(tmp_fw_search_buf));
+                    tmp_fw_search_buf, strlen(tmp_fw_search_buf)+1);
                 num_fw_search_strings++;
             }
             if (find_char_var("FW_SEARCH_ALL", tmp_fw_search_buf, index)) {
@@ -418,8 +418,8 @@ static void parse_fw_search_file(void)
         /* there are no FW_MSG_SEARCH vars in fw_search.conf; default
          * to "DROP".  Psad will generate a syslog warning.  */
         fw_msg_search[num_fw_search_strings]
-            = (char *) malloc(strlen("DROP"));
-        strlcpy(fw_msg_search[0], "DROP", MAX_GEN_LEN);
+            = (char *) malloc(strlen("DROP")+1);
+        strlcpy(fw_msg_search[0], "DROP", strlen("DROP")+1);
         num_fw_search_strings++;
     }
     fclose(fw_search_ptr);

@@ -1,4 +1,4 @@
-psad-2.0.4 (01//2007):
+psad-2.0.4 (01/27/2007):
     - Added Snort rule matches to syslog alerts.  Multiple matches can be
       controlled with new configuration variables in psad.conf:
       ENABLE_SIG_MSG_SYSLOG, SIG_MSG_SYSLOG_THRESHOLD, and
@@ -17,6 +17,8 @@ psad-2.0.4 (01//2007):
     - Bugfix for syslog-ng init script path in install.pl.
     - Bugfix to include a "source" definition for /proc/kmsg if not already
       defined for syslog-ng daemons.
+    - Minor memory handling bugfixes discovered by valgrind the excellent
+      Valgrind project: http://www.valgrind.org
 
 psad-2.0.3 (12/31/2006):
     - Removed Psad.pm perl module and kmsgsd.pl and psadwatchd.pl scripts.

@@ -352,3 +352,7 @@ Philip Lawrence
 Stefano Harding
     - Reported bug that caused psad to not acquire iptables data on systems
       running syslog-ng when there is no "source" definition for /proc/kmsg.
+
+Aki Tuomi
+    - Reported bug where iptables might report '0' instead of 'all' for the
+      protocol under the -nL output.

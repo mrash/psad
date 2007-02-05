@@ -273,10 +273,17 @@ sub ipt_chk_chain() {
             $log_protos =~ s|/$||;
             $no_log_protos =~ s|/$||;
 
-            print FWCHECK
+            if ($log_protos) {
+                print FWCHECK
 "[-] Your firewall config on $config{'HOSTNAME'} includes logging rules for\n",
 "    $log_protos but not for $no_log_protos in the $chain chain.\n\n";
-            return 0;
+                return 0;
+            } else {
+                print FWCHECK
+"[-] Could not determine whether iptables is configured with a default logging\n",
+"    rule on $config{'HOSTNAME'}.\n\n";
+                return 0;
+            }
         }
     } else {
         ### we are looking for specific log prefixes.

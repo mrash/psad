@@ -1,3 +1,7 @@
+psad-2.0.5 (02//2007):
+    - Bugfix to account for iptables -nL output where the protocol may be
+      reported as "0" instead of "all".
+
 psad-2.0.4 (01/27/2007):
     - Added Snort rule matches to syslog alerts.  Multiple matches can be
       controlled with new configuration variables in psad.conf:

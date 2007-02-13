@@ -66,8 +66,9 @@ int has_sub_var(char *var_name, char *value, char *sub_var,
     char *pre_str, char *post_str);
 void expand_sub_var_value(char *value, const char *sub_var,
     const char *pre_str, const char *post_str);
-int find_char_var(char *, char *, char *);
+int find_char_var(const char *, char *, char *);
 int check_import_config(time_t *config_mtime, char *config_file);
+void *safe_malloc(const unsigned int len);
 
 /* From OpenBSD */
 size_t strlcpy(char *, const char *, size_t);

@@ -109,7 +109,7 @@ void write_pid(const char *pid_file, const pid_t pid)
     return;
 }
 
-int find_char_var(char *search_str, char *charvar, char *line)
+int find_char_var(const char *search_str, char *charvar, char *line)
 {
     char *index_tmp;
     int char_ctr = 0, i;
@@ -164,6 +164,17 @@ int find_char_var(char *search_str, char *charvar, char *line)
     strncpy(charvar, index_tmp, char_ctr);
     charvar[char_ctr] = '\0';  /* replace the ';' with the NULL character */
     return 1;
+}
+
+void *safe_malloc(const unsigned int len)
+{
+    void *buf = NULL;
+    buf = malloc(len);
+    if (buf == NULL) {
+        fprintf(stderr, "[*] Could not malloc() %d bytes\n", len);
+        exit(EXIT_FAILURE);
+    }
+    return buf;
 }
 
 int has_sub_var(char *var_name, char *value, char *sub_var,

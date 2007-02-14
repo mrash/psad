@@ -49,7 +49,6 @@ char mail_addrs[MAX_EMAIL_LEN];
 char shCmd[MAX_GEN_LEN];
 char mailCmd[MAX_GEN_LEN];
 char config_file[MAX_PATH_LEN];
-char alert_config_file[MAX_PATH_LEN];
 char alerting_methods[MAX_GEN_LEN];
 char psadCmd[MAX_PATH_LEN];
 char psad_pid_file[MAX_PATH_LEN];

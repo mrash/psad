@@ -150,20 +150,8 @@ my $rev_num = '1';
 ### --config switch)
 my $config_file  = '/etc/psad/psad.conf';
 
-### default fw_search file where FW_MSG_SEARCH strings
-### are set.  Both psad and kmsgsd reference this single
-### file now instead of having FW_MSG_SEARCH appear in
-### psad.conf and kmsgsd.conf.
-my $fw_search_file = '/etc/psad/fw_search.conf';
-
 ### this will be set to either FW_DATA_FILE or ULOG_DATA_FILE
 my $fw_data_file = '';
-
-### default config file for ALERTING_METHODS keyword, which
-### is referenced by both psad and psadwatchd.  This keyword
-### allows email alerting or syslog alerting (or both) to be
-### disabled.
-my $alert_conf_file = '/etc/psad/alert.conf';
 
 ### disable debugging by default
 my $debug     = 0;
@@ -400,8 +388,6 @@ my $no_whois      = 0;
 my $no_netstat    = 0;
 my $no_fwcheck    = 0;
 my $no_kmsgsd     = 0;
-
-### these vars are controled by the alert.conf file
 my $no_email_alerts  = 0;
 my $no_syslog_alerts = 0;
 
@@ -537,7 +523,6 @@ Getopt::Long::Configure('no_ignore_case');
                                               #   rules.
     'auto-dl=s'         => \$auto_dl_file,    # Path to psad auto IPs file for
                                               #   auto-setting IP danger level.
-    'alert-conf=s'      => \$alert_conf_file, # Path to psad alert.conf file.
     'Analyze-msgs'      => \$analyze_mode,    # Analysis mode for old iptables
                                               #   messages in the psad fwdata file
                                               #   (or messages file; see
@@ -570,7 +555,6 @@ Getopt::Long::Configure('no_ignore_case');
     'interface=s'       => \$cmdl_interface,  # Specify the IN interface manually
                                               #   and ignore packets on all others.
     'config=s'          => \$config_file,     # Specify path to configuration file.
-    'fw-search=s'       => \$fw_search_file,  # Specify path to fw_search.conf.
     'fw-analyze'        => \$fw_analyze,      # Analyze the firewall ruleset and
                                               #   exit.
     'fw-file=s'         => \$fw_file,         # Analyze ruleset contained within
@@ -2614,11 +2598,8 @@ sub psad_init() {
     ### import psad.conf
     &import_config($config_file);
 
-    ### import alerting config (psadwatchd also references this file)
-    &import_config($alert_conf_file);
-
     ### import FW_MSG_SEARCH strings
-    &import_fw_search();
+    &import_fw_search($config_file);
 
     ### expand any embedded vars within config values
     &expand_vars();
@@ -2961,11 +2942,12 @@ sub import_ip_options() {
 }
 
 sub import_fw_search() {
+    my $config_file = shift;
 
     @fw_search = ();
 
-    open F, "< $fw_search_file" or die "[*] Could not open fw search ",
-        "string file $fw_search_file: $!";
+    open F, "< $config_file" or die "[*] Could not open fw search ",
+        "string file $config_file: $!";
     my @lines = <F>;
     close F;
     my $found_fw_search = 0;
@@ -2984,7 +2966,7 @@ sub import_fw_search() {
     }
     unless (defined $config{'FW_SEARCH_ALL'}) {
         &sys_log('psad', 'defaulting missing ' .
-            "FW_SEARCH_ALL variable in $fw_search_file to Y.");
+            "FW_SEARCH_ALL variable in $config_file to Y.");
         $config{'FW_SEARCH_ALL'} = 'Y';
     }
 
@@ -2996,7 +2978,7 @@ sub import_fw_search() {
 
     if ($config{'FW_SEARCH_ALL'} eq 'N' and not $found_fw_search) {
         &sys_log('psad', 'defaulting missing ' .
-            "FW_MSG_SEARCH variable in $fw_search_file to DROP.");
+            "FW_MSG_SEARCH variable in $config_file to DROP.");
         push @fw_search, 'DROP';
     }
     return;
@@ -6653,10 +6635,9 @@ sub fw_analyze_mode() {
 
     my $exit_status = 0;
     if ($run_fw_check) {
-        my $opts = "-c $config_file --fw-search $fw_search_file";
+        my $opts = "-c $config_file ";
         $opts .= " --fw-analyze" if $fw_analyze;
         $opts .= " --fw-file $fw_file" if $fw_file;
-        $opts .= " -a $alert_conf_file";
         $opts .= " -L $psad_lib_dir" if $psad_lib_dir;
         $opts .= " --no-fw-search-all" if $config{'FW_SEARCH_ALL'} eq 'N';
         $exit_status = (system "$cmds{'fwcheck_psad'} $opts") >> 8;
@@ -8559,8 +8540,6 @@ Options:
     --sig-update                  - Download the latest set of psad
                                     signatures from:
                                     http://www.cipherdyne.org/
-    --fw-search <file>            - Use <file> instead of the normal
-                                    fw-search file: $fw_search_file.
     --fw-analyze                  - Analyze the local iptables ruleset
                                     and exit.
     --fw-list-auto                - List the contents of any iptables
@@ -8635,8 +8614,6 @@ Options:
     --auto-dl <dl file>           - Import auto-danger level file for
                                     automatic IP danger level
                                     increases/decreses.
-    --alert-conf <file>           - Manually specify path to alert.conf
-                                    file.
     --analysis-write-data         - Write data to filesystem from -A mode
                                     (the disk IO involved in this step
                                     can take a long time).

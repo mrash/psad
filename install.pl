@@ -124,12 +124,6 @@ my @cmd_search_paths = qw(
 ### IP regex
 my $ip_re = qr|(?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2}|;
 
-### used to preserve old FW_MSG_SEARCH vars from previous
-### psad installation.  This is only needed when upgrading
-### to a newer version of psad that uses the fw_search.conf
-### file from a previous version that doesn't.
-my @old_fw_msg_search;
-
 ### get the hostname of the system
 my $HOSTNAME = hostname();
 
@@ -448,44 +442,27 @@ sub install() {
 
     ### the order of the config files is important (legacy FW_MSG_SEARCH
     ### vars in psad.conf).
-    for my $local_file qw(psad.conf psadwatchd.conf
-            kmsgsd.conf fw_search.conf alert.conf) {
-        my $prod_file = "$config{'PSAD_CONF_DIR'}/$local_file";
-        if (-e $prod_file) {
-            &archive($prod_file) unless $noarchive;
-            if ($preserve_rv) {
-                &preserve_config($local_file, $prod_file);
-            } else {
-                &logr("[+] Copying $local_file -> $prod_file\n");
-                copy $local_file, $prod_file or die "[*] Could not ",
-                    "copy $local_file -> $prod_file: $!";
-            }
-            if ($local_file eq 'fw_search.conf' and @old_fw_msg_search) {
-                &logr("[-] Warning: psad.conf contains FW_MSG_SEARCH vars, " .
-                    "but fw_search.conf also exists!\n");
-            }
+    my $prod_file = "$config{'PSAD_CONF_DIR'}/psad.conf";
+    if (-e $prod_file) {
+        &archive($prod_file) unless $noarchive;
+        if ($preserve_rv) {
+            &preserve_config('psad.conf', $prod_file);
         } else {
-            &logr("[+] Copying $local_file -> $prod_file\n");
-            copy $local_file, $prod_file or die "[*] Could not copy ",
-                "$local_file -> $prod_file: $!";
-
-            ### Deal with legacy FW_MSG_SEARCH in psad.conf.  Note that
-            ### this will only preserve old search strings if 1) they already
-            ### existed within psad.conf and 2) the file fw_search.conf does
-            ### not already exist in /etc/psad/.
-            if ($local_file eq 'fw_search.conf' and @old_fw_msg_search) {
-                &preserve_old_fw_msg_search();
-            }
+            &logr("[+] Copying psad.conf -> $prod_file\n");
+            copy 'psad.conf', $prod_file or die "[*] Could not ",
+                "copy psad.conf -> $prod_file: $!";
         }
-
-        if ($force_path_update or not $preserve_rv) {
-            &update_command_paths($prod_file)
-                if ($local_file eq 'psad.conf'
-                    or $local_file eq 'psadwatchd.conf');
-        }
-
-        &perms_ownership($prod_file, 0600);
+    } else {
+        &logr("[+] Copying psad.conf -> $prod_file\n");
+        copy 'psad.conf', $prod_file or die "[*] Could not copy ",
+            "psad.conf -> $prod_file: $!";
     }
+
+    if ($force_path_update or not $preserve_rv) {
+        &update_command_paths($prod_file);
+    }
+
+    &perms_ownership($prod_file, 0600);
 
     ### install auto_dl, signatures, icmp_types, posf, and pf.os files
     for my $filename qw(signatures icmp_types
@@ -508,10 +485,8 @@ sub install() {
         ### get email address(es)
         my $email_str = &query_email();
         if ($email_str) {
-            for my $local_file qw(psad.conf psadwatchd.conf) {
-                &put_string('EMAIL_ADDRESSES', $email_str,
-                    "$config{'PSAD_CONF_DIR'}/$local_file");
-            }
+            &put_string('EMAIL_ADDRESSES', $email_str,
+                "$config{'PSAD_CONF_DIR'}/psad.conf");
         }
 
         ### Give the admin the opportunity to set the strings that are
@@ -521,32 +496,31 @@ sub install() {
         ### "DROP".
         my $fw_search_aref = &get_fw_search_strings();
         if ($fw_search_aref) {
-            open F, "< $config{'PSAD_CONF_DIR'}/fw_search.conf"
+            open F, "< $config{'PSAD_CONF_DIR'}/psad.conf"
                 or die "[*] Could not open ",
-                    "$config{'PSAD_CONF_DIR'}/fw_search.conf: $!";
+                    "$config{'PSAD_CONF_DIR'}/psad.conf: $!";
             my @lines = <F>;
             close F;
-            open T, "> $config{'PSAD_CONF_DIR'}/fw_search.conf.tmp"
+            open T, "> $config{'PSAD_CONF_DIR'}/psad.conf.tmp"
                 or die "[*] Could not open ",
-                    "$config{'PSAD_CONF_DIR'}/fw_search.conf.tmp: $!";
+                    "$config{'PSAD_CONF_DIR'}/psad.conf.tmp: $!";
             for my $line (@lines) {
-                if ($line =~ /^\s*FW_MSG_SEARCH/) {
-                    last;
+                if ($line =~ /^\s*FW_MSG_SEARCH\s/) {
+                    for my $fw_str (@$fw_search_aref) {
+                        &logr(qq{[+] Setting FW_MSG_SEARCH to "$fw_str" } .
+                            "in $config{'PSAD_CONF_DIR'}/psad.conf\n");
+                        printf T "%-28s%s;\n", 'FW_MSG_SEARCH', $fw_str;
+                    }
                 } else {
-                    print T $line;
+                    print T $line unless $line =~ /^\s*FW_MSG_SEARCH\s/;
                 }
             }
-            for my $fw_str (@$fw_search_aref) {
-                &logr(qq{[+] Setting FW_MSG_SEARCH to "$fw_str" } .
-                    "in $config{'PSAD_CONF_DIR'}/fw_search.conf\n");
-                printf T "%-28s%s;\n", 'FW_MSG_SEARCH', $fw_str;
-            }
             close T;
-            move "$config{'PSAD_CONF_DIR'}/fw_search.conf.tmp",
-                "$config{'PSAD_CONF_DIR'}/fw_search.conf"
+            move "$config{'PSAD_CONF_DIR'}/psad.conf.tmp",
+                "$config{'PSAD_CONF_DIR'}/psad.conf"
                 or die "[*] Could not move ",
-                "$config{'PSAD_CONF_DIR'}/fw_search.conf.tmp -> ",
-                "$config{'PSAD_CONF_DIR'}/fw_search.conf: $!";
+                "$config{'PSAD_CONF_DIR'}/psad.conf.tmp -> ",
+                "$config{'PSAD_CONF_DIR'}/psad.conf: $!";
         }
         ### Give the admin the opportunity to set the HOME_NET variable.
         &set_home_net("$config{'PSAD_CONF_DIR'}/psad.conf");
@@ -559,12 +533,9 @@ sub install() {
         }
 
         ### Set the hostname
-        for my $file ("$config{'PSAD_CONF_DIR'}/psad.conf",
-                "$config{'PSAD_CONF_DIR'}/kmsgsd.conf",
-                "$config{'PSAD_CONF_DIR'}/psadwatchd.conf") {
-            &logr("[+] Setting hostname to \"$HOSTNAME\" in $file\n");
-            &set_hostname($file);
-        }
+        my $file = "$config{'PSAD_CONF_DIR'}/psad.conf";
+        &logr("[+] Setting hostname to \"$HOSTNAME\" in $file\n");
+        &set_hostname($file);
     }
 
     &put_string('SYSLOG_DAEMON', $syslog_str,
@@ -721,21 +692,30 @@ sub import_config() {
 
 sub expand_vars() {
 
-    for my $hr (\%config, \%cmds) {
-        for my $var (keys %$hr) {
-            my $val = $hr->{$var};
-            die "[*] Multiple variable expansion not supported yet ",
-                "(var $var)." if $val =~ m|\$.+\$|;
-            if ($val =~ m|\$(\w+)|) {
-                my $sub_var = $1;
-                die "[*] sub-ver $sub_var not allowed within same ",
-                    "variable $var" if $sub_var eq $var;
-                if (defined $config{$sub_var}) {
-                    $val =~ s|\$$sub_var|$config{$sub_var}|;
-                    $hr->{$var} = $val;
-                } else {
-                    die "[*] sub-var \"$sub_var\" not defined in ",
-                        "config for var: $var."
+    my $has_sub_var = 1;
+    my $resolve_ctr = 0;
+
+    while ($has_sub_var) {
+        $resolve_ctr++;
+        $has_sub_var = 0;
+        if ($resolve_ctr >= 20) {
+            die "[*] Exceeded maximum variable resolution counter.";
+        }
+        for my $hr (\%config, \%cmds) {
+            for my $var (keys %$hr) {
+                my $val = $hr->{$var};
+                if ($val =~ m|\$(\w+)|) {
+                    my $sub_var = $1;
+                    die "[*] sub-ver $sub_var not allowed within same ",
+                        "variable $var" if $sub_var eq $var;
+                    if (defined $config{$sub_var}) {
+                        $val =~ s|\$$sub_var|$config{$sub_var}|;
+                        $hr->{$var} = $val;
+                    } else {
+                        die "[*] sub-var \"$sub_var\" not defined in ",
+                            "config for var: $var."
+                    }
+                    $has_sub_var = 1;
                 }
             }
         }
@@ -1340,42 +1320,6 @@ sub query_preserve_sigs_autodl() {
             "in $file ([y]/n)?  ", $ACCEPT_YES_DEFAULT);
 }
 
-sub preserve_old_fw_msg_search() {
-    open F, "< $config{'PSAD_CONF_DIR'}/fw_search.conf"
-        or die "[*] Could not open ",
-            "$config{'PSAD_CONF_DIR'}/fw_search.conf: $!";
-    my @orig_lines = <F>;
-    close F;
-
-    &logr("[+] Preserving old FW_MSG_SEARCH values: " .
-        "$config{'PSAD_CONF_DIR'}/fw_search.conf\n");
-
-    open CONF, "> $config{'PSAD_CONF_DIR'}/fw_search.conf.new" or
-        die "[*] Could not open ",
-            "$config{'PSAD_CONF_DIR'}/fw_search.conf.new: $!";
-
-    my $found_search_var = 0;
-    my $printed_old_strs = 0;
-    for my $line (@orig_lines) {
-        if ($line =~ /^\s*FW_MSG_SEARCH/) {
-            $found_search_var = 1;
-        } else {
-            print CONF $line;
-        }
-        if ($found_search_var and not $printed_old_strs) {
-            print CONF for @old_fw_msg_search;
-            $printed_old_strs = 1;
-        }
-    }
-    close CONF;
-    move "$config{'PSAD_CONF_DIR'}/fw_search.conf.new",
-        "$config{'PSAD_CONF_DIR'}/fw_search.conf"
-        or die "[*] Could not move ",
-        "$config{'PSAD_CONF_DIR'}/fw_search.conf.new -> ",
-        "$config{'PSAD_CONF_DIR'}/fw_search.conf: $!";
-    return;
-}
-
 sub preserve_config() {
     my ($local_file, $prod_file) = @_;
     open C, "< $local_file" or die "[*] Could not open $local_file: $!";
@@ -1385,17 +1329,6 @@ sub preserve_config() {
     open CO, "< $prod_file" or die "[*] Could not open $prod_file: $!";
     my @orig_lines = <CO>;
     close CO;
-
-    ### deal with legacy FW_MSG_SEARCH lines in psad.conf
-    if ($local_file eq 'psad.conf') {
-        for my $line (@orig_lines) {
-            next unless $line =~ /\S/;
-            next if $line =~ /^\s*#/;
-            if ($line =~ /^\s*FW_MSG_SEARCH\s/) {
-                push @old_fw_msg_search, $line;
-            }
-        }
-    }
 
     &logr("[+] Preserving existing config: $prod_file\n");
     ### write to a tmp file and then move so any running psad daemon will
@@ -1696,7 +1629,7 @@ sub get_fw_search_strings() {
 
         ### we are only searching for specific iptables log prefixes
         &put_string('FW_SEARCH_ALL', 'N',
-            "$config{'PSAD_CONF_DIR'}/fw_search.conf");
+            "$config{'PSAD_CONF_DIR'}/psad.conf");
 
     my $str =
 "\n    psad checks the firewall configuration on the underlying machine\n" .
@@ -1730,7 +1663,7 @@ sub get_fw_search_strings() {
             }
         }
         &logr("\n    All firewall search strings used by psad are located " .
-            "in the file:\n    $config{'PSAD_CONF_DIR'}/fw_search.conf\n");
+            "in the psad config file:\n    $config{'PSAD_CONF_DIR'}/psad.conf\n");
     }
     return \@fw_search_strings;
 }

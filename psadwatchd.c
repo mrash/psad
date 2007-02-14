@@ -36,9 +36,7 @@
 #include "psad.h"
 
 /* defines */
-#define PSADWATCHD_CONF "/etc/psad/psadwatchd.conf"
-#define PSAD_CONF "/etc/psad/psad.conf" /* only used for DATA_INPUT_METHOD */
-#define ALERT_CONF "/etc/psad/alert.conf"
+#define CONFIG_FILE "/etc/psad/psad.conf" /* only used for DATA_INPUT_METHOD */
 
 /* globals */
 short int psad_syscalls_ctr     = 0;
@@ -68,7 +66,6 @@ static volatile sig_atomic_t received_sighup = 0;
 
 /* prototypes */
 static void parse_config(void);
-static void parse_alert_config(void);
 static void expand_config_vars(void);
 static void find_sub_var_value(
     char *value,
@@ -83,7 +80,6 @@ static void check_process(
     const char *binary_path,
     unsigned int max_retries
 );
-static void check_data_input_mode(void);
 static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries);
 static void reset_syscall_ctr(const char *pid_name);
 static void give_up(const char *pid_name);
@@ -102,20 +98,15 @@ int main(int argc, char *argv[]) {
     sleep(1);
 #endif
 
-    strlcpy(config_file, PSADWATCHD_CONF, MAX_PATH_LEN);
-    strlcpy(alert_config_file, ALERT_CONF, MAX_PATH_LEN);
+    strlcpy(config_file, CONFIG_FILE, MAX_PATH_LEN);
 
-    while((cmdlopt = getopt(argc, argv, "c:a:")) != -1) {
+    while((cmdlopt = getopt(argc, argv, "c:")) != -1) {
         switch(cmdlopt) {
             case 'c':
                 strlcpy(config_file, optarg, MAX_PATH_LEN);
                 break;
-            case 'a':
-                strlcpy(alert_config_file, optarg, MAX_PATH_LEN);
-                break;
             default:
-                printf("[+] Usage: psadwatchd [-c <config file>] ");
-                printf("[-a <alert config file>]\n");
+                printf("[+] Usage: psadwatchd [-c <config file>]\n");
                 exit(EXIT_FAILURE);
         }
     }
@@ -126,7 +117,6 @@ int main(int argc, char *argv[]) {
 
     /* parse the config files */
     parse_config();
-    parse_alert_config();
 
 #ifdef DEBUG
     dump_config();
@@ -173,7 +163,6 @@ int main(int argc, char *argv[]) {
             /* reparse the config file since we received a
              * HUP signal */
             parse_config();
-            parse_alert_config();
 
             slogr("psad(psadwatchd)",
                     "received HUP signal, re-imported psadwatchd.conf");
@@ -335,6 +324,7 @@ static void exec_binary(const char *binary, const char *cmdlinefile)
     int arg_num=0, non_ws, i;
 
     prog_argv[arg_num] = (char *) safe_malloc(strlen(binary)+1);
+
     strlcpy(prog_argv[arg_num], binary, strlen(binary)+1);
     arg_num++;
 
@@ -378,9 +368,9 @@ static void exec_binary(const char *binary, const char *cmdlinefile)
             while (*index == ' ' || *index == '\t') index++;
         }
     }
+
     if (arg_num >= MAX_ARG_LEN)
         exit(EXIT_FAILURE);
-
     prog_argv[arg_num] = NULL;
 
     if ((child_pid = fork()) < 0)
@@ -405,10 +395,10 @@ static void parse_config(void)
     FILE *config_ptr;         /* FILE pointer to the config file */
     int linectr = 0;
     char config_buf[MAX_LINE_BUF];
+    char data_input_mode[MAX_GEN_LEN];
     char *index;
 
-    /* check to see if kmsgsd needs to be running */
-    check_data_input_mode();  /* note that this also gets EMAIL_ADDRESSES */
+    data_input_mode[0] = '\0';
 
     if ((config_ptr = fopen(config_file, "r")) == NULL) {
         perror("[*] Could not open config file");
@@ -433,12 +423,15 @@ static void parse_config(void)
             find_char_var("PSAD_RUN_DIR", psad_run_dir, index);
             find_char_var("PSAD_PID_FILE", psad_pid_file, index);
             find_char_var("PSAD_CMDLINE_FILE", psad_cmdline_file, index);
+            find_char_var("ALERTING_METHODS", alerting_methods, index);
             find_char_var("KMSGSD_PID_FILE", kmsgsd_pid_file, index);
             find_char_var("PSADWATCHD_PID_FILE", psadwatchd_pid_file, index);
             find_char_var("PSADWATCHD_CHECK_INTERVAL",
                 char_psadwatchd_check_interval, index);
             find_char_var("PSADWATCHD_MAX_RETRIES",
                 char_psadwatchd_max_retries, index);
+            find_char_var("SYSLOG_DAEMON", data_input_mode, index);
+            find_char_var("EMAIL_ADDRESSES", mail_addrs, index);
 
             /* commands */
             find_char_var("kmsgsdCmd", kmsgsdCmd, index);
@@ -448,6 +441,10 @@ static void parse_config(void)
         }
     }
     fclose(config_ptr);
+
+    /* see if we are using the ulogd mode */
+    if (strncmp(data_input_mode, "ulogd", MAX_GEN_LEN) == 0)
+        check_kmsgsd = 0;
 
     /* resolve any embedded variables */
     expand_config_vars();
@@ -615,81 +612,6 @@ static void find_sub_var_value(char *value, char *sub_var, char *pre_str,
     return;
 }
 
-static void check_data_input_mode(void)
-{
-    FILE *config_ptr;   /* FILE pointer to the config file */
-    char config_buf[MAX_LINE_BUF];
-    char data_input_mode[MAX_GEN_LEN];
-    char *index;
-
-    if ((config_ptr = fopen(PSAD_CONF, "r")) == NULL) {
-        fprintf(stderr, "[-] Could not open %s for reading.\n",
-            PSAD_CONF);
-        exit(EXIT_FAILURE);
-    }
-
-    data_input_mode[0] = '\0';
-
-    /* increment through each line of the config file */
-    while ((fgets(config_buf, MAX_LINE_BUF, config_ptr)) != NULL) {
-        /* set the index pointer to the beginning of the line */
-        index = config_buf;
-
-        /* advance the index pointer through any whitespace
-         * at the beginning of the line */
-        while (*index == ' ' || *index == '\t') index++;
-
-        /* skip comments and blank lines, etc. */
-        if ((*index != '#') && (*index != '\n') &&
-                (*index != ';') && (index != NULL)) {
-
-            find_char_var("SYSLOG_DAEMON", data_input_mode, index);
-            find_char_var("EMAIL_ADDRESSES", mail_addrs, index);
-        }
-    }
-    fclose(config_ptr);
-
-    /* see if we are using the ulogd mode */
-    if (strncmp(data_input_mode, "ulogd", MAX_GEN_LEN) == 0)
-        check_kmsgsd = 0;
-
-    return;
-}
-
-static void parse_alert_config(void)
-{
-    FILE *config_ptr;         /* FILE pointer to the config file */
-    int linectr = 0;
-    char config_buf[MAX_LINE_BUF];
-    char *index;
-
-    if ((config_ptr = fopen(alert_config_file, "r")) == NULL) {
-        perror("[*] Could not open config file");
-        exit(EXIT_FAILURE);
-    }
-
-    /* increment through each line of the config file */
-    while ((fgets(config_buf, MAX_LINE_BUF, config_ptr)) != NULL) {
-        linectr++;
-        index = config_buf;  /* set the index pointer to the
-                                beginning of the line */
-
-        /* advance the index pointer through any whitespace
-         * at the beginning of the line */
-        while (*index == ' ' || *index == '\t') index++;
-
-        /* skip comments and blank lines, etc. */
-        if ((*index != '#') && (*index != '\n') &&
-                (*index != ';') && (index != NULL)) {
-
-            find_char_var("ALERTING_METHODS", alerting_methods, index);
-        }
-    }
-    fclose(config_ptr);
-
-    return;
-}
-
 #ifdef DEBUG
 static void dump_config(void)
 {
@@ -700,6 +622,7 @@ static void dump_config(void)
     fprintf(stderr, "    PSAD_PID_FILE: %s\n", psad_pid_file);
     fprintf(stderr, "    PSAD_CMDLINE_FILE: %s\n", psad_cmdline_file);
     fprintf(stderr, "    KMSGSD_PID_FILE: %s\n", kmsgsd_pid_file);
+    fprintf(stderr, "    ALERTING_METHODS: %s\n", alerting_methods);
     fprintf(stderr, "    PSADWATCHD_PID_FILE: %s\n", psadwatchd_pid_file);
     fprintf(stderr, "    PSADWATCHD_CHECK_INTERVAL: %u\n",
         psadwatchd_check_interval);

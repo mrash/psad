@@ -37,8 +37,7 @@
 #include <getopt.h>
 
 /* defines */
-#define KMSGSD_CONF "/etc/psad/kmsgsd.conf"
-#define FW_SEARCH_FILE "/etc/psad/fw_search.conf"
+#define CONFIG_FILE "/etc/psad/psad.conf"
 
 /* globals */
 static volatile sig_atomic_t received_sighup = 0;
@@ -50,13 +49,15 @@ char fwdata_file[MAX_PATH_LEN];
 char config_file[MAX_PATH_LEN];
 char fw_search_file[MAX_PATH_LEN];
 char snort_sid_str[MAX_PATH_LEN];
+char psad_dir[MAX_PATH_LEN];
+char psad_fifo_dir[MAX_PATH_LEN];
+char psad_run_dir[MAX_PATH_LEN];
 char kmsgsd_pid_file[MAX_PATH_LEN];
 int num_fw_search_strings = 0;
 int fw_search_all_flag = 1;  /* default to parse all iptables messages */
 
 /* prototypes */
 static void parse_config(void);
-static void parse_fw_search_file(void);
 static int match_fw_msg(char *fw_mgs);
 static void find_sub_var_value(
     char *value,
@@ -86,22 +87,17 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "STDOUT _and_ to fwdata.\n\n");
 #endif
 
-    /* establish default paths to config and fw_search file (may be
+    /* establish default paths to config file (may be
      * overriden with command line args below */
-    strlcpy(config_file, KMSGSD_CONF, MAX_PATH_LEN);
-    strlcpy(fw_search_file, FW_SEARCH_FILE, MAX_PATH_LEN);
+    strlcpy(config_file, CONFIG_FILE, MAX_PATH_LEN);
 
-    while((cmdlopt = getopt(argc, argv, "c:k:")) != -1) {
+    while((cmdlopt = getopt(argc, argv, "c:")) != -1) {
         switch(cmdlopt) {
             case 'c':
                 strlcpy(config_file, optarg, MAX_PATH_LEN);
                 break;
-            case 'k':
-                strlcpy(fw_search_file, optarg, MAX_PATH_LEN);
-                break;
             default:
-                printf("[+] Usage:  kmsgsd [-c <config file>] ");
-                printf("[-k <fw_search file>]\n");
+                printf("[+] Usage:  kmsgsd [-c <config file>]\n");
                 exit(EXIT_FAILURE);
         }
     }
@@ -109,11 +105,8 @@ int main(int argc, char *argv[]) {
 #ifdef DEBUG
     fprintf(stderr, "[+] parsing config_file: %s\n", config_file);
 #endif
-    /* parse config file (kmsgsd.conf) */
+    /* parse config file (psad.conf) */
     parse_config();
-
-    /* parse fw_search.conf file */
-    parse_fw_search_file();
 
 #ifdef DEBUG
     dump_config();
@@ -175,9 +168,6 @@ int main(int argc, char *argv[]) {
             /* re-parse the config file after receiving HUP signal */
             parse_config();
 
-            /* re-parse the fw_search.conf file */
-            parse_fw_search_file();
-
             /* close file descriptors and re-open them after
              * re-reading config file */
             close(fifo_fd);
@@ -197,7 +187,7 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_FAILURE);  /* could not open fwdata file */
             }
             slogr("psad(kmsgsd)",
-                    "received HUP signal, re-imported kmsgsd.conf");
+                    "received HUP signal, re-imported psad.conf");
         }
 
         /* see if we matched a firewall message and write it to the
@@ -258,9 +248,16 @@ static int match_fw_msg(char *fw_msg)
 static void parse_config(void)
 {
     FILE *config_ptr;   /* FILE pointer to the config file */
-    int linectr = 0;
+    int linectr = 0, i;
     char config_buf[MAX_LINE_BUF];
-    char *index;
+    char tmp_fw_search_buf[MAX_GEN_LEN], *index;
+
+    for (i=0; i < num_fw_search_strings; i++)
+        if (fw_msg_search[i] != NULL)
+            free(fw_msg_search[i]);
+
+    num_fw_search_strings = 0;
+    fw_msg_search[num_fw_search_strings] = NULL;
 
     if ((config_ptr = fopen(config_file, "r")) == NULL) {
         fprintf(stderr, "[*] Could not open %s for reading.\n",
@@ -282,13 +279,36 @@ static void parse_config(void)
         if ((*index != '#') && (*index != '\n') &&
                 (*index != ';') && (index != NULL)) {
 
+            find_char_var("PSAD_DIR", psad_dir, index);
+            find_char_var("PSAD_FIFO_DIR", psad_fifo_dir, index);
+            find_char_var("PSAD_RUN_DIR", psad_run_dir, index);
             find_char_var("SNORT_SID_STR", snort_sid_str, index);
-            find_char_var("PSAD_FIFO", psadfifo_file, index);
+            find_char_var("PSAD_FIFO_FILE", psadfifo_file, index);
             find_char_var("FW_DATA_FILE", fwdata_file, index);
             find_char_var("KMSGSD_PID_FILE", kmsgsd_pid_file, index);
+            if (find_char_var("FW_MSG_SEARCH", tmp_fw_search_buf, index)) {
+                fw_msg_search[num_fw_search_strings]
+                    = (char *) safe_malloc(strlen(tmp_fw_search_buf)+1);
+                strlcpy(fw_msg_search[num_fw_search_strings],
+                    tmp_fw_search_buf, strlen(tmp_fw_search_buf)+1);
+                num_fw_search_strings++;
+            }
+            if (find_char_var("FW_SEARCH_ALL", tmp_fw_search_buf, index)) {
+                if (tmp_fw_search_buf[0] == 'N')
+                    fw_search_all_flag = 0;
+            }
         }
     }
     fclose(config_ptr);
+
+    if (! fw_search_all_flag && num_fw_search_strings == 0) {
+        /* there are no FW_MSG_SEARCH vars in fw_search.conf; default
+         * to "DROP".  Psad will generate a syslog warning.  */
+        fw_msg_search[num_fw_search_strings]
+            = (char *) safe_malloc(strlen("DROP")+1);
+        strlcpy(fw_msg_search[0], "DROP", strlen("DROP")+1);
+        num_fw_search_strings++;
+    }
 
     /* resolve any embedded variables */
     expand_config_vars();
@@ -323,7 +343,7 @@ static void expand_config_vars(void)
             found_sub_var = 1;
         }
 
-        if (has_sub_var("PSAD_FIFO", psadfifo_file, sub_var,
+        if (has_sub_var("PSAD_FIFO_FILE", psadfifo_file, sub_var,
                 pre_str, post_str)) {
             find_sub_var_value(psadfifo_file, sub_var, pre_str, post_str);
             found_sub_var = 1;
@@ -342,13 +362,22 @@ static void find_sub_var_value(char *value, char *sub_var, char *pre_str,
     char *post_str)
 {
     int found_var = 0;
-    if (strncmp(sub_var, "SNORT_SID_STR", MAX_GEN_LEN) == 0) {
+    if (strncmp(sub_var, "PSAD_DIR", MAX_GEN_LEN) == 0) {
+        strlcpy(sub_var, psad_dir, MAX_GEN_LEN);
+        found_var = 1;
+    } else if (strncmp(sub_var, "PSAD_FIFO_DIR", MAX_GEN_LEN) == 0) {
+        strlcpy(sub_var, psad_fifo_dir, MAX_GEN_LEN);
+        found_var = 1;
+    } else if (strncmp(sub_var, "PSAD_RUN_DIR", MAX_GEN_LEN) == 0) {
+        strlcpy(sub_var, psad_run_dir, MAX_GEN_LEN);
+        found_var = 1;
+    } else if (strncmp(sub_var, "SNORT_SID_STR", MAX_GEN_LEN) == 0) {
         strlcpy(sub_var, snort_sid_str, MAX_GEN_LEN);
         found_var = 1;
     } else if (strncmp(sub_var, "FW_DATA_FILE", MAX_GEN_LEN) == 0) {
         strlcpy(sub_var, fwdata_file, MAX_GEN_LEN);
         found_var = 1;
-    } else if (strncmp(sub_var, "PSAD_FIFO", MAX_GEN_LEN) == 0) {
+    } else if (strncmp(sub_var, "PSAD_FIFO_FILE", MAX_GEN_LEN) == 0) {
         strlcpy(sub_var, psadfifo_file, MAX_GEN_LEN);
         found_var = 1;
     } else if (strncmp(sub_var, "KMSGSD_PID_FILE", MAX_GEN_LEN) == 0) {
@@ -356,12 +385,12 @@ static void find_sub_var_value(char *value, char *sub_var, char *pre_str,
         found_var = 1;
     }
 
-    if (found_var)
+    if (found_var) {
 
         /* substitute the variable value */
         expand_sub_var_value(value, sub_var, pre_str, post_str);
 
-    else {
+    } else {
         fprintf(stderr, "[*] Could not resolve sub-var: %s to a value.\n",
             sub_var);
         exit(EXIT_FAILURE);
@@ -369,68 +398,12 @@ static void find_sub_var_value(char *value, char *sub_var, char *pre_str,
     return;
 }
 
-static void parse_fw_search_file(void)
-{
-    FILE *fw_search_ptr;
-    char fw_search_buf[MAX_LINE_BUF], tmp_fw_search_buf[MAX_GEN_LEN], *index;
-    int linectr = 0, i;
-
-    for (i=0; i < num_fw_search_strings; i++)
-        free(fw_msg_search[i]);
-
-    num_fw_search_strings = 0;
-    fw_msg_search[num_fw_search_strings] = NULL;
-
-    if ((fw_search_ptr = fopen(fw_search_file, "r")) == NULL) {
-        fprintf(stderr, "[*] Could not open %s for reading.\n",
-            fw_search_file);
-        exit(EXIT_FAILURE);
-    }
-
-    /* increment through each line of the config file */
-    while ((fgets(fw_search_buf, MAX_LINE_BUF, fw_search_ptr)) != NULL) {
-        linectr++;
-        /* set the index pointer to the beginning of the line */
-        index = fw_search_buf;
-
-        /* advance the index pointer through any whitespace
-         * at the beginning of the line */
-        while (*index == ' ' || *index == '\t') index++;
-
-        /* skip comments and blank lines, etc. */
-        if ((*index != '#') && (*index != '\n') &&
-                (*index != ';') && (index != NULL)) {
-
-            if (find_char_var("FW_MSG_SEARCH", tmp_fw_search_buf, index)) {
-                fw_msg_search[num_fw_search_strings]
-                    = (char *) safe_malloc(strlen(tmp_fw_search_buf)+1);
-                strlcpy(fw_msg_search[num_fw_search_strings],
-                    tmp_fw_search_buf, strlen(tmp_fw_search_buf)+1);
-                num_fw_search_strings++;
-            }
-            if (find_char_var("FW_SEARCH_ALL", tmp_fw_search_buf, index)) {
-                if (tmp_fw_search_buf[0] == 'N')
-                    fw_search_all_flag = 0;
-            }
-        }
-    }
-    if (! fw_search_all_flag && num_fw_search_strings == 0) {
-        /* there are no FW_MSG_SEARCH vars in fw_search.conf; default
-         * to "DROP".  Psad will generate a syslog warning.  */
-        fw_msg_search[num_fw_search_strings]
-            = (char *) safe_malloc(strlen("DROP")+1);
-        strlcpy(fw_msg_search[0], "DROP", strlen("DROP")+1);
-        num_fw_search_strings++;
-    }
-    fclose(fw_search_ptr);
-    return;
-}
-
 #ifdef DEBUG
 static void dump_config(void)
 {
     fprintf(stderr, "[+] dump_config()\n");
-    fprintf(stderr, "    PSAD_FIFO: %s\n", psadfifo_file);
+    fprintf(stderr, "    PSAD_DIR: %s\n", psad_dir);
+    fprintf(stderr, "    PSAD_FIFO_FILE: %s\n", psadfifo_file);
     fprintf(stderr, "    FW_DATA_FILE: %s\n", fwdata_file);
     fprintf(stderr, "    SNORT_SID_STR: %s\n", snort_sid_str);
     fprintf(stderr, "    KMSGSD_PID_FILE: %s\n", kmsgsd_pid_file);

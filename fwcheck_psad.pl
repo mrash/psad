@@ -38,18 +38,6 @@ use strict;
 ### default psad config file.
 my $config_file  = '/etc/psad/psad.conf';
 
-### default fw_search file where FW_MSG_SEARCH strings
-### are set.  Both psad and kmsgsd reference this single
-### file now instead of having FW_MSG_SEARCH appear in
-### psad.conf and kmsgsd.conf.
-my $fw_search_file = '/etc/psad/fw_search.conf';
-
-### default config file for ALERTING_METHODS keyword, which
-### is referenced by both psad and psadwatchd.  This keyword
-### allows email alerting or syslog alerting (or both) to be
-### disabled.
-my $alert_conf_file = '/etc/psad/alert.conf';
-
 ### config hash
 my %config = ();
 
@@ -68,8 +56,6 @@ my $psad_lib_dir = '';
 
 &usage(1) unless (GetOptions(
     'config=s'    => \$config_file, # Specify path to configuration file.
-    'alert-conf=s'=> \$alert_conf_file, # Path to psad alert.conf file.
-    'fw-search=s' => \$fw_search_file,  # Specify path to fw_search.conf.
     'fw-file=s'   => \$fw_file,     # Analyze ruleset contained within
                                     # $fw_file instead of a running
                                     # policy.
@@ -97,11 +83,8 @@ if ($fw_file) {
 ### import psad.conf
 &import_config($config_file);
 
-### import alerting config (psadwatchd also references this file
-&import_config($alert_conf_file);
-
 ### import FW_MSG_SEARCH strings
-&import_fw_search();
+&import_fw_search($config_file);
 
 ### expand any embedded vars within config values
 &expand_vars();
@@ -117,11 +100,11 @@ open FWCHECK, "> $config{'FW_CHECK_FILE'}" or die "[*] Could not ",
     "open $config{'FW_CHECK_FILE'}: $!";
 
 unless ($fw_search_all) {
-    print FWCHECK "[+] Available search strings in $fw_search_file:\n\n";
+    print FWCHECK "[+] Available search strings in $config_file:\n\n";
     print FWCHECK "        $_\n" for @fw_search;
     print FWCHECK
 "\n[+] Additional search strings can be added be specifying more\n",
-    "    FW_MSG_SEARCH lines in $fw_search_file\n\n";
+    "    FW_MSG_SEARCH lines in $config_file\n\n";
 }
 
 ### check the iptables policy
@@ -413,8 +396,10 @@ sub get_psad_mod_paths() {
 }
 
 sub import_fw_search() {
-    open F, "< $fw_search_file" or die "[*] Could not open fw search ",
-        "string file $fw_search_file: $!";
+    my $config_file = shift;
+
+    open F, "< $config_file" or die "[*] Could not open fw search ",
+        "string file $config_file: $!";
     my @lines = <F>;
     close F;
     for my $line (@lines) {
@@ -546,8 +531,6 @@ sub usage() {
 Options:
     --config <config_file>            - Specify path to configuration
                                         file.
-    --alert-conf <alert_conf_file>    - Path to psad alert.conf file.
-    --fw-search  <fw_search_file>     - Specify path to fw_search.conf.
     --fw-file    <fw_file>            - Analyze ruleset contained within
                                         fw_file instead of a running
                                         policy.

@@ -148,7 +148,7 @@ sub chain_rules() {
             'd_port'   => '',
             'dport'    => '',
             'extended' => '',
-            'raw'      => ''  ### only used if regex doesn't match
+            'raw'      => $line
         );
 
         if ($ipt_verbose) {
@@ -181,8 +181,6 @@ sub chain_rules() {
                     $rule{'s_port'} = $rule{'sport'} = $s_port;
                     $rule{'d_port'} = $rule{'dport'} = $d_port;
                 }
-            } else {
-                $rule{'raw'} = $line;
             }
         } else {
             ### ACCEPT tcp  -- 164.109.8.0/24  0.0.0.0/0  tcp dpt:22 flags:0x16/0x02
@@ -218,8 +216,6 @@ sub chain_rules() {
                     $rule{'s_port'} = $rule{'sport'} = $s_port;
                     $rule{'d_port'} = $rule{'dport'} = $d_port;
                 }
-            } else {
-                $rule{'raw'} = $line;
             }
         }
         push @chain, \%rule;

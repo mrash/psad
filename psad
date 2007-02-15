@@ -2537,7 +2537,6 @@ sub import_psad_perl_modules() {
         print STDERR "$_\n" for @INC;
     }
 
-    require IPTables::Parse;
     require IPTables::ChainMgr;
     require Net::IPv4Addr;
     require Date::Calc;

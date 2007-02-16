@@ -8464,7 +8464,8 @@ sub send_mail() {
 sub print_sys_msg() {
     my ($msg, $file) = @_;
     open F, ">> $file" or die "[*] Could not open $file: $!";
-    print F scalar localtime(), " pid: $$ $msg";
+    print F scalar localtime(), " psad v$version (file ",
+        "rev: $rev_num) pid: $$ $msg";
     close F;
     return;
 }

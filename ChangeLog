@@ -10,7 +10,9 @@ psad-2.0.5 (02//2007):
       memory.
     - Bugfix to ensure that the psad_ip_len signature matching keyword is
       checked withing match_snort_ip_keywords() so that it applies to all
-      protocol packets.
+      protocol packets.  This fixes a bug that would cause the "PSAD-CUSTOM
+      Nachi worm reconnaisannce" signature to fire on normal ICMP packet log
+      messages.
     - Added version and file revision numbers to die and warn messages that
       are written to /var/log/psad/errs/.  This helps when trying to track
       these messages down to a specific file revisions when psad is being

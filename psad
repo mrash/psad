@@ -1698,7 +1698,7 @@ sub match_snort_keywords() {
 
         my $sig_hr = $sigs{$sid};
 
-        ### iptables logging messages always include TTL and IP_ID
+        ### iptables logging messages always include TTL and IP ID
         ### values (at least for ipv4, see
         ### linux/net/ipv4/netfilter/ipt_LOG.c)
         my $dl_tmp = 0;
@@ -1850,9 +1850,6 @@ sub match_snort_tcp_keywords() {
     return 0 unless &check_sig_int_range(
             ($pkt_hr->{'ip_len'}-$header_len), 'psad_dsize', $sig_hr);
 
-    return 0 unless &check_sig_int_range(
-            $pkt_hr->{'ip_len'}, 'psad_ip_len', $sig_hr);
-
     return 0 unless &check_sig_int_range($pkt_hr->{'win'}, 'window', $sig_hr);
     return 0 unless &check_sig_int_range($pkt_hr->{'tcp_seq'}, 'seq', $sig_hr);
     return 0 unless &check_sig_int_range($pkt_hr->{'tcp_ack'}, 'ack', $sig_hr);
@@ -1922,6 +1919,9 @@ sub match_snort_ip_keywords() {
 
     return 0, $NO_SIG_MATCH
         unless &check_sig_int_range($pkt_hr->{'ip_id'}, 'id', $sig_hr);
+
+    return 0 unless &check_sig_int_range(
+            $pkt_hr->{'ip_len'}, 'psad_ip_len', $sig_hr);
 
     ### to handle the ip_proto keyword parse_NF_pkt_str() would have to be
     ### modified to handle packets besides TCP, UDP, and ICMP.

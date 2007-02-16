@@ -8,6 +8,9 @@ psad-2.0.5 (02//2007):
     - Added a function safe_malloc() for kmsgsd.c and psadwatchd.c to ensure
       that a single API is used to perform a NULL check on heap-allocated
       memory.
+    - Bugfix to ensure that the psad_ip_len signature matching keyword is
+      checked withing match_snort_ip_keywords() so that it applies to all
+      protocol packets.
 
 psad-2.0.4 (01/27/2007):
     - Added Snort rule matches to syslog alerts.  Multiple matches can be

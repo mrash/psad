@@ -1920,8 +1920,9 @@ sub match_snort_ip_keywords() {
     return 0, $NO_SIG_MATCH
         unless &check_sig_int_range($pkt_hr->{'ip_id'}, 'id', $sig_hr);
 
-    return 0 unless &check_sig_int_range(
-            $pkt_hr->{'ip_len'}, 'psad_ip_len', $sig_hr);
+    return 0, $NO_SIG_MATCH
+        unless &check_sig_int_range($pkt_hr->{'ip_len'},
+                'psad_ip_len', $sig_hr);
 
     ### to handle the ip_proto keyword parse_NF_pkt_str() would have to be
     ### modified to handle packets besides TCP, UDP, and ICMP.
@@ -8521,7 +8522,7 @@ sub usage() {
 
 psad; the Port Scan Attack Detector
 [+] Version: $version (file revision: $rev_num)
-[+] By Michael Rash (mbr\@cipherdyne.org, http://www.cipherdyne.org)
+[+] By Michael Rash (mbr\@cipherdyne.org, http://www.cipherdyne.org/)
 
 Usage: psad [options]
 

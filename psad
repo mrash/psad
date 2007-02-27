@@ -2612,7 +2612,14 @@ sub psad_init() {
     );
 
     ### dump configuration to STDOUT
-    exit &dump_conf() if $dump_conf;
+    if ($dump_conf or $dump_ipt_policy) {
+        my $rv = 0;
+        my $rv_tmp = 0;
+        $rv = &dump_conf() if $dump_conf;
+        $rv_tmp = &dump_ipt_policy() if $dump_ipt_policy;
+        $rv += $rv_tmp if $rv_tmp != 0;
+        exit $rv;
+    }
 
     ### make sure all necessary configuration variables
     ### are defined
@@ -8160,12 +8167,11 @@ sub dump_conf() {
         printf $fh "%-30s %s\n", "[+] $var", $cmds{$var};
     }
 
-    &dump_ipt_policy() if $dump_ipt_policy;
-
     return 0;
 }
 
 sub dump_ipt_policy() {
+    my $rv = 0;
     my $fh = *STDOUT;
     $fh = *STDERR if $debug;
     print $fh "\n[+] iptables policy dump:\n";
@@ -8190,8 +8196,9 @@ sub dump_ipt_policy() {
         }
     } else {
         print $fh "[*] Could not find iptables command.\n";
+        $rv = 1;
     }
-    return;
+    return $rv;
 }
 
 sub sys_log_mline() {

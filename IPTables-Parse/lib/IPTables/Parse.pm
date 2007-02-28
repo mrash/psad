@@ -371,6 +371,16 @@ sub default_log() {
         };
     }
 
+    ### determine the output style (e.g. "-nL -v" or just plain "-nL"; if the
+    ### policy data came from a file then -v might not have been used)
+    my $ipt_verbose = 0;
+    for my $line (@ipt_lines) {
+        if ($line =~ /^\s*pkts\s+bytes\s+target/) {
+            $ipt_verbose = 1;
+            last;
+        }
+    }
+
     return '[-] Could not get iptables output!', 0
         unless @ipt_lines;
 
@@ -389,18 +399,28 @@ sub default_log() {
         $log_chain = '' unless $line =~ /\S/;
         next unless $log_chain;
 
-        if ($line =~ m|^\s*U?LOG\s+(\w+)\s+\-\-\s+.*$any_ip_re
-                \s+$any_ip_re\s+.*U?LOG|x) {
+        my $proto = '';
+        my $found = 0;
+        if ($ipt_verbose) {
+            if ($line =~ m|^\s*\d+\s+\d+\s*U?LOG\s+(\w+)\s+\-\-\s+
+                    \S+\s+\S+\s+$any_ip_re
+                    \s+$any_ip_re\s+.*U?LOG|x) {
+                $proto = $1;
+                $found = 1;
+            }
+        } else {
+            if ($line =~ m|^\s*U?LOG\s+(\w+)\s+\-\-\s+$any_ip_re
+                    \s+$any_ip_re\s+.*U?LOG|x) {
+                $proto = $1;
+                $found = 1;
+            }
+        }
 
-            my $proto = $1;
+        if ($found) {
             $proto = 'all' if $proto eq '0';
-
             ### the above regex allows the limit target to be used
             $log_chains{$log_chain}{$proto} = '';  ### protocol
-
-            if ($log_chain eq $chain) {
-                $log_rules{$proto} = '';
-            }
+            $log_rules{$proto} = '' if $log_chain eq $chain;
         }
     }
 

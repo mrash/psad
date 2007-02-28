@@ -21,6 +21,9 @@ psad-2.0.5 (02//2007):
       output.
     - Minor update to allow --fw-dump to be used on the command line without
       also having to use the -D argument.
+    - Updated the default_log() function in the IPTables::Parse module to
+      handle iptables policies that were dumped with -v, such as when
+      --Dump-conf is used.
 
 psad-2.0.4 (01/27/2007):
     - Added Snort rule matches to syslog alerts.  Multiple matches can be

@@ -13,10 +13,14 @@ psad-2.0.5 (02//2007):
       protocol packets.  This fixes a bug that would cause the "PSAD-CUSTOM
       Nachi worm reconnaisannce" signature to fire on normal ICMP packet log
       messages.
-    - Added version and file revision numbers to die and warn messages that
-      are written to /var/log/psad/errs/.  This helps when trying to track
-      these messages down to a specific file revisions when psad is being
-      upgraded on the local system.
+    - Added version and Subversion file revision numbers to die and warn
+      messages that are written to /var/log/psad/errs/.  This helps when
+      trying to track these messages down to a specific file revisions when
+      psad is being upgraded on the local system.
+    - Added version and Subversion file revision numbers to --Dump-conf
+      output.
+    - Minor update to allow --fw-dump to be used on the command line without
+      also having to use the -D argument.
 
 psad-2.0.4 (01/27/2007):
     - Added Snort rule matches to syslog alerts.  Multiple matches can be

@@ -84,7 +84,13 @@ sub chain_rules() {
     my $chain  = shift || croak '[*] Specify a chain, e.g. "OUTPUT"';
     my $file   = shift || '';
     my $iptables  = $self->{'_iptables'};
+
+    my $found_chain  = 0;
     my @ipt_lines;
+
+    ### array of hash refs
+    my @chain = ();
+    my @global_accept_state = ();
 
     if ($file) {
         ### read the iptables rules out of $file instead of executing
@@ -100,11 +106,6 @@ sub chain_rules() {
             close IPT;
         };
     }
-
-    my $found_chain = 0;
-
-    ### array of hash refs
-    my @chain = ();
 
     ### determine the output style (e.g. "-nL -v" or just plain "-nL"; if the
     ### policy data came from a file then -v might not have been used)
@@ -148,6 +149,7 @@ sub chain_rules() {
             'd_port'   => '',
             'dport'    => '',
             'extended' => '',
+            'state'    => '',
             'raw'      => $line
         );
 
@@ -167,19 +169,51 @@ sub chain_rules() {
                 $rule{'src'}      = $7;
                 $rule{'dst'}      = $8;
                 $rule{'extended'} = $9;
-                if ($rule{'extended'}
-                        and ($rule{'protocol'} eq 'tcp'
-                        or $rule{'protocol'} eq 'udp')) {
-                    my $s_port  = '0:0';  ### any to any
-                    my $d_port  = '0:0';
-                    if ($rule{'extended'} =~ /dpts?:(\S+)/) {
-                        $d_port = $1;
+                if ($rule{'extended'}) {
+                    if ($rule{'protocol'} eq 'tcp'
+                            or $rule{'protocol'} eq 'udp') {
+                        my $s_port  = '0:0';  ### any to any
+                        my $d_port  = '0:0';
+                        if ($rule{'extended'} =~ /dpts?:(\S+)/) {
+                            $d_port = $1;
+                        }
+                        if ($rule{'extended'} =~ /spts?:(\S+)/) {
+                            $s_port = $1;
+                        }
+                        $rule{'s_port'} = $rule{'sport'} = $s_port;
+                        $rule{'d_port'} = $rule{'dport'} = $d_port;
+
+                        for my $state_hr (@global_accept_state) {
+                            next unless $state_hr->{'src'} eq '0.0.0.0/0';
+                            next unless $state_hr->{'dst'} eq '0.0.0.0/0';
+                            next unless $state_hr->{'proto'} eq 'all' or
+                                $state_hr->{'proto'} = $rule{'proto'};
+                            next unless $state_hr->{'intf_in'} eq '*' or
+                                $state_hr->{'intf_in'} eq $rule{'intf_in'};
+                            next unless $state_hr->{'intf_out'} eq '*' or
+                                $state_hr->{'intf_out'} eq $rule{'intf_out'};
+                            ### if we make it here, then the state rule
+                            ### applies to this rule
+                            $rule{'state'} = $state_hr->{'state'};
+                        }
                     }
-                    if ($rule{'extended'} =~ /spts?:(\S+)/) {
-                        $s_port = $1;
+                    if ($rule{'target'} eq 'ACCEPT'
+                            and $rule{'extended'} =~ m|^state\s+(\S+)|) {
+                        my $state_str = $1;
+                        if ($state_str =~ /ESTABLISHED/
+                                or $state_str =~ /RELATED/) {
+
+                            push @global_accept_state, {
+                                'state'    => $state_str,
+                                'src'      => $rule{'src'},
+                                'dst'      => $rule{'dst'},
+                                'intf_in'  => $rule{'intf_in'},
+                                'intf_out' => $rule{'intf_out'},
+                                'proto'    => $rule{'protocol'}
+                            };
+                            my %state_hash = ();
+                        }
                     }
-                    $rule{'s_port'} = $rule{'sport'} = $s_port;
-                    $rule{'d_port'} = $rule{'dport'} = $d_port;
                 }
             }
         } else {

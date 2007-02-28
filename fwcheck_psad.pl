@@ -156,8 +156,6 @@ sub fw_check() {
         }
         if ($fw_analyze) {
             print "[-] Errors found in firewall config.\n";
-            print "[-] Results in ",
-                "$config{'FW_CHECK_FILE'}\n";
             print "    emailed to ",
                 "$config{'EMAIL_ADDRESSES'}\n";
         }
@@ -167,12 +165,13 @@ sub fw_check() {
 "    packets in both the INPUT and FORWARD chains.  Firewall config success!\n";
 
         if ($fw_analyze) {
-            print "[+] Firewall config looks good.\n";
-            print "[+] Completed check of firewall ruleset.\n";
+            print "[+] Firewall config looks good.\n",
+                "[+] Completed check of firewall ruleset.\n";
         }
     }
     if ($fw_analyze) {
-        print "[+] Exiting.\n";
+        print "[+] Results in $config{'FW_CHECK_FILE'}\n",
+            "[+] Exiting.\n";
     }
     return $forward_chain_rv && $input_chain_rv;
 }

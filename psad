@@ -8149,7 +8149,8 @@ sub dump_conf() {
         print $fh $_ for @perl_info;
         print $fh "\n";
     }
-    print $fh "[+] Dumping psad config from: $config_file\n";
+    print $fh "\n[+] psad v$version (file revision: $rev_num)\n\n";
+    print $fh "[+] Dumping psad config from: $config_file\n\n";
     for my $var (sort keys %config) {
         my $str = $config{$var};
         ### sanitize sensitive information
@@ -8160,7 +8161,7 @@ sub dump_conf() {
         $str = '(removed)' if $var eq 'HOSTNAME';
         $str = '(removed)' if $var eq 'EXTERNAL_NET';
         $str = '(removed)' if $var =~ m|SERVERS|;
-        printf $fh "%-30s %s\n", "[+] $var", $str;
+        printf $fh "%-30s %s\n", "    $var", $str;
     }
     print $fh "\n[+] Command paths:\n\n";
     for my $var (sort keys %cmds) {

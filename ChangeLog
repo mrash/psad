@@ -2,7 +2,8 @@ psad-2.0.5 (02//2007):
     - Consolidated all configuration variables into the /etc/psad/psad.conf
       file. The kmsgsd.conf, psadwatchd.conf, alert.conf, and fw_search.conf
       files were all removed since the daemons just reference the psad.conf
-      now.
+      now.  Updated install.pl to archive and remove these files if they
+      exist from a previous psad installation.
     - Bugfix to account for iptables -nL output where the protocol may be
       reported as "0" instead of "all".
     - Added a function safe_malloc() for kmsgsd.c and psadwatchd.c to ensure

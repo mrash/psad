@@ -478,6 +478,16 @@ sub install() {
             "copy $filename -> $file: $!";
         &perms_ownership($file, 0600);
     }
+
+    ### archive and remove legacy config files
+    for my $filename qw(kmsgsd.conf psadwatchd.conf alert.conf
+            fw_search.conf) {
+        my $path = "$config{'PSAD_CONF_DIR'}/$filename";
+        if (-e $path) {
+            &archive($path);
+            unlink $path;
+        }
+    }
     &logr("\n");
 
     unless ($preserve_rv) {  ### we want to preserve the existing config

@@ -247,6 +247,8 @@ fi
 %_libdir/%name
 
 %changelog
+* Thu Mar 01 2007 Michael Rash <mbr@cipherdyne.org>
+- psad-2.0.5 release
 - Removed all config files except for psad.conf since the psad daemons now all
   reference the same config file (psad.conf).
 

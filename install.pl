@@ -470,13 +470,19 @@ sub install() {
         my $file = $config{$file_vars{$filename}};
         if (-e $file) {
             &archive($file) unless $noarchive;
-### FIXME, need a real config preservation routine for these files.
-#            unless (&query_preserve_sigs_autodl($file)) {
+            ### FIXME, need a real config preservation routine for these files.
+            unless (&query_preserve_sigs_autodl($file)) {
+                &logr("[+] Copying $filename -> $file\n");
+                copy $filename, $file or die "[*] Could not ",
+                    "copy $filename -> $file: $!";
+                &perms_ownership($file, 0600);
+            }
+        } else {
+            &logr("[+] Copying $filename -> $file\n");
+            copy $filename, $file or die "[*] Could not ",
+                "copy $filename -> $file: $!";
+            &perms_ownership($file, 0600);
         }
-        &logr("[+] Copying $filename -> $file\n");
-        copy $filename, $file or die "[*] Could not ",
-            "copy $filename -> $file: $!";
-        &perms_ownership($file, 0600);
     }
 
     ### archive and remove legacy config files
@@ -999,18 +1005,18 @@ sub set_home_net() {
     ### first see if the admin will accept the default 'any' value
     return if &query_use_home_net_default();
 
-    my $str =
-"\n    Ok, would you like psad to automatically get the local subnets by\n" .
-"    parsing ifconfig output?  (This is probably best for most situations).\n";
-    &logr($str);
-    if (&query_yes_no('    ([y]/n)?  ', $ACCEPT_YES_DEFAULT)) {
-        return;
-    }
-
+### FIXME future
+#    my $str =
+#"\n    Ok, would you like psad to automatically get the local subnets by\n" .
+#"    parsing ifconfig output?  (This is probably best for most situations).\n";
+#    &logr($str);
+#    if (&query_yes_no('    ([y]/n)?  ', $ACCEPT_YES_DEFAULT)) {
+#        return;
+#    }
     ### if we make it here, then the admin wants to completely enumerate the
     ### HOME_NET var, so we have to disable ENABLE_INTF_LOCAL_NETS
-    &put_string('ENABLE_INTF_LOCAL_NETS', 'N',
-        "$config{'PSAD_CONF_DIR'}/psad.conf");
+#    &put_string('ENABLE_INTF_LOCAL_NETS', 'N',
+#        "$config{'PSAD_CONF_DIR'}/psad.conf");
 
     ### get all interfaces; even those that are down since they may
     ### brought up any time.
@@ -1063,7 +1069,7 @@ sub set_home_net() {
     for my $intf (keys %connected_subnets) {
         &logr("      $intf -> $connected_subnets{$intf}\n");
     }
-    $str =
+    my $str =
 "\n    Specify which subnets are part of your internal network.  Note that\n" .
 "    you can correct anything you enter here by editing the \"HOME_NET\"\n" .
 "    variable in: $file.\n\n" .
@@ -1326,7 +1332,7 @@ sub query_init_script_restart_syslog() {
 
 sub query_preserve_sigs_autodl() {
     my $file = shift;
-    return &query_yes_no("[+] Merge any user modfications " .
+    return &query_yes_no("[+] Preserve any user modfications " .
             "in $file ([y]/n)?  ", $ACCEPT_YES_DEFAULT);
 }
 

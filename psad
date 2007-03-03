@@ -18,7 +18,7 @@
 #
 # Credits: (see the CREDITS file bundled with the psad sources.)
 #
-# Version: 2.0.5-pre3
+# Version: 2.0.5
 #
 # Copyright (C) 1999-2006 Michael Rash (mbr@cipherdyne.org)
 #
@@ -141,7 +141,7 @@ use strict;
 ### ========================== main =================================
 
 ### set the current psad version and file revision numbers
-my $version = '2.0.5-pre3';
+my $version = '2.0.5';
 my $revision_svn = '$Revision$';
 my $rev_num = '1';
 ($rev_num) = $revision_svn =~ m|\$Rev.*:\s+(\S+)|;
@@ -2953,7 +2953,7 @@ sub import_fw_search() {
 
     @fw_search = ();
 
-    open F, "< $config_file" or die "[*] Could not open fw search ",
+    open F, "< $config_file" or die "[*] Could not open config ",
         "string file $config_file: $!";
     my @lines = <F>;
     close F;
@@ -8517,7 +8517,7 @@ sub required_vars() {
         STATUS_PORTS_THRESHOLD STATUS_SIGS_THRESHOLD STATUS_IP_THRESHOLD
         ANALYSIS_OUTPUT_FILE TOP_IP_LOG_THRESHOLD PSAD_LIBS_DIR
         PSAD_PID_FILE PSAD_CMDLINE_FILE PSAD_ERR_DIR MIN_DANGER_LEVEL
-        IGNORE_KERNEL_TIMESTAMP ENABLE_SIG_MSG_SYSLOG FW_MSG_SEARCH
+        IGNORE_KERNEL_TIMESTAMP ENABLE_SIG_MSG_SYSLOG
         SIG_MSG_SYSLOG_THRESHOLD SIG_SID_SYSLOG_THRESHOLD
         PSADWATCHD_CHECK_INTERVAL PSADWATCHD_MAX_RETRIES
     );

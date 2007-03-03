@@ -4610,9 +4610,9 @@ sub scan_logr() {
             print $fh "\n\n";
 
             if ($tcp_f) {
-                printf $fh "%${log_len}s%s\n", 'Scanned tcp ports: ',
+                printf $fh "%${log_len}s%s\n", 'Scanned TCP ports: ',
                     "[$tcp_newrange: $tcp_newpkts packets]";
-                my $prefix = 'tcp flags: ';
+                my $prefix = 'TCP flags: ';
                 for my $flags (keys %{$curr_scan_hr->{$src}->
                         {$dst}->{'tcp'}->{'flags'}}) {
                     my $nmap_opts;
@@ -4642,21 +4642,19 @@ sub scan_logr() {
                 }
                 if (defined $curr_scan_hr->{$src}->{$dst}->{'tcp'}->{'chain'}) {
                     &print_chains_and_prefixes(
-                        $curr_scan_hr->{$src}->{$dst}->{'tcp'}->{'chain'}, $fh
-                    );
+                        $curr_scan_hr->{$src}->{$dst}->{'tcp'}->{'chain'}, $fh);
                 }
                 $syslog_flags =~ s/\s*$//;
                 $syslog_range = "tcp: [$tcp_newrange]";
                 $syslog_range .= " flags: $syslog_flags" if $syslog_flags;
             }
             if ($udp_f) {
-                printf $fh "%${log_len}s%s\n", 'Scanned udp ports: ',
+                printf $fh "%${log_len}s%s\n", 'Scanned UDP ports: ',
                     "[$udp_newrange: $udp_newpkts packets, Nmap: -sU]";
                 if (defined $curr_scan_hr->{$src}->{$dst}->{'udp'}->{'chain'}) {
                     &print_chains_and_prefixes(
                         $curr_scan_hr->{$src}->{$dst}->{'udp'}->{'chain'},
-                        $fh
-                    );
+                        $fh);
                 }
                 $syslog_range = "udp: [$udp_newrange]";
             }
@@ -4666,8 +4664,7 @@ sub scan_logr() {
                 if (defined $curr_scan_hr->{$src}->{$dst}->{'icmp'}->{'chain'}) {
                     &print_chains_and_prefixes(
                         $curr_scan_hr->{$src}->{$dst}->{'icmp'}->{'chain'},
-                        $fh
-                    );
+                        $fh);
                 }
             }
             printf $fh "\n%${log_len}s%s\n", 'Source: ', $src;
@@ -4715,6 +4712,19 @@ sub scan_logr() {
             }
             print $fh "\n";
 
+            ### print the overall stats since the scan began
+            printf $fh "%${log_len}s%s\n", 'Overall scan start: ',
+                $abs_s_time;
+            printf $fh "%${log_len}s%s\n", 'Total email alerts: ',
+                $scan{$src}{$dst}{'email_ctr'};
+            if ($tcp_absrange) {
+                printf $fh "%${log_len}s%s\n", 'Complete TCP range: ',
+                    "[$tcp_absrange]";
+            }
+            if ($udp_absrange) {
+                printf $fh "%${log_len}s%s\n", 'Complete UDP range: ',
+                    "[$udp_absrange]";
+            }
             if (defined $curr_scan_hr->{$src}->{$dst}->{'syslog_host'}) {
                 my $syslog_hosts = '';
                 $syslog_hosts .= "$_, " for keys
@@ -4728,27 +4738,10 @@ sub scan_logr() {
                         $syslog_hosts;
                 }
             }
-            print $fh "\n";
-            unless ($analyze_mode) {
-                printf $fh "%${log_len}s%s\n", 'Current interval: ',
-                    "$s_time (start)";
-                printf $fh "%${log_len}s%s\n\n", '', "$time (end)";
-            }
-            ### print the overall stats since the scan began
-            printf $fh "%${log_len}s%s\n", 'Overall scan start: ',
-                $abs_s_time;
-            printf $fh "%${log_len}s%s\n", 'Total email alerts: ',
-                $scan{$src}{$dst}{'email_ctr'};
-            if ($tcp_absrange) {
-                printf $fh "%${log_len}s%s\n", 'Complete tcp range: ',
-                    "[$tcp_absrange]";
-            }
-            if ($udp_absrange) {
-                printf $fh "%${log_len}s%s\n", 'Complete udp range: ',
-                    "[$udp_absrange]";
-            }
-            printf $fh "\n   %-9s%-13s%-7s%-7s%-7s\n", 'chain:', 'interface:',
-                'tcp:', 'udp:', 'icmp:';
+            printf $fh "\n";
+
+            printf $fh "%${log_len}s%-9s%-13s%-7s%-7s%-7s\n", 'Global stats: ',
+                 'chain:', 'interface:', 'TCP:', 'UDP:', 'ICMP:';
             for my $chain (keys %{$scan{$src}{$dst}{'chain'}}) {
                 for my $intf (keys %{$scan{$src}{$dst}{'chain'}{$chain}}) {
                     my $tot_tcp  = 0;
@@ -4760,7 +4753,7 @@ sub scan_logr() {
                         if defined $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'udp'};
                     $tot_icmp = $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'icmp'}
                         if defined $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'icmp'};
-                    printf $fh "   %-9s%-13s%-7s%-7s%-7s\n", $chain,
+                    printf $fh "%${log_len}s%-9s%-13s%-7s%-7s%-7s\n", '', $chain,
                         $intf, $tot_tcp, $tot_udp, $tot_icmp;
                 }
             }
@@ -4844,7 +4837,7 @@ sub scan_logr_signatures() {
                 or defined $href->{'invalid_type'}
                 or defined $href->{'invalid_code'});
 
-        print $email_fh "\n\n[+] $proto scan signatures:\n\n";
+        print $email_fh "\n\n[+] " . uc($proto) . " scan signatures:\n\n";
         print STDERR "[+] scan_logr_signatures(): src: $src dst: $dst ",
             "proto: $proto\n" if $debug;
 
@@ -4856,8 +4849,9 @@ sub scan_logr_signatures() {
             }
             for my $chain (keys %{$href->{'sid'}->{$sid}}) {
 
-                my $sig_hr = '';
-                my $is_fwsnort = $href->{'sid'}->{$sid}
+                my $sig_hr      = '';
+                my $email_chain = $chain;
+                my $is_fwsnort  = $href->{'sid'}->{$sid}
                     ->{$chain}->{'is_fwsnort'};
 
                 if ($is_fwsnort) {
@@ -4901,16 +4895,20 @@ sub scan_logr_signatures() {
 
                             if ($chain eq 'INPUT') {
                                 $sig_log_str .= ' chain: FWSNORT_INPUT';
+                                $email_chain = 'FWSNORT_INPUT';
                             } elsif ($chain eq 'FORWARD') {
                                 $sig_log_str .= ' chain: FWSNORT_FORWARD';
+                                $email_chain = 'FWSNORT_FORWARD';
                             } elsif ($chain eq 'OUTPUT') {
                                 $sig_log_str .= ' chain: FWSNORT_OUTPUT';
+                                $email_chain = 'FWSNORT_OUTPUT';
                             }
 
                             if ($href->{'sid'}->{$sid}
                                     ->{$chain}->{'fwsnort_estab'}) {
 
                                 $sig_log_str .= '_ESTAB';
+                                $email_chain .= '_ESTAB';
                             }
                         }
 
@@ -4969,7 +4967,7 @@ sub scan_logr_signatures() {
                     $sid_str .= ')';
                 }
                 print $email_fh "$sid_str\n",
-                    "       chain:     $chain\n",
+                    "       chain:     $email_chain\n",
                     "       packets:   $pkts\n";
 
                 if ($sig_hr->{'classtype'}) {
@@ -5055,8 +5053,29 @@ sub print_chains_and_prefixes() {
                 printf $fh "%${log_len}s%s\n", 'iptables chain: ',
                     "$chain, $count packets";
             } else {
+                my $print_chain  = $chain;
+                my $fwsnort_rnum = 0;
+                if ($prefix =~ /$config{'SNORT_SID_STR'}/) {
+                    if ($prefix =~ /\[(\d+)\]/) {
+                        $fwsnort_rnum = $1;
+                    }
+                    if ($chain eq 'INPUT') {
+                        $print_chain = 'FWSNORT_INPUT';
+                    } elsif ($chain eq 'FORWARD') {
+                        $print_chain = 'FWSNORT_FORWARD';
+                    } elsif ($chain eq 'OUTPUT') {
+                        $print_chain = 'FWSNORT_OUTPUT';
+                    }
+                    if ($prefix =~ /ESTAB/) {
+                        $print_chain .= '_ESTAB';
+                    }
+                }
                 printf $fh "%${log_len}s%s\n", 'iptables chain: ',
-                    qq/$chain (prefix "$prefix"), $count packets/;
+                    qq/$print_chain (prefix "$prefix"), $count packets/;
+                if ($fwsnort_rnum) {
+                    printf $fh "%${log_len}s%s\n", 'fwsnort rule: ',
+                        $fwsnort_rnum;
+                }
             }
         }
     }
@@ -6933,11 +6952,11 @@ sub print_scan_status() {
                                         {$intf}{$proto};
                                 if ($start_port == $end_port) {
                                     push @lines, "        Scanned ports: " .
-                                        "$proto $start_port, Pkts: $ctr, " .
+                                        uc($proto) . " $start_port, Pkts: $ctr, " .
                                         "Chain: $chain, Intf: $intf\n";
                                 } else {
                                     push @lines, "        Scanned ports: " .
-                                        "$proto $start_port-$end_port, Pkts: " .
+                                        uc($proto) . " $start_port-$end_port, Pkts: " .
                                         "$ctr, Chain: $chain, Intf: $intf\n";
                                 }
                             }
@@ -6967,7 +6986,8 @@ sub print_scan_status() {
                                 {'sid'}{$sid}{$chain}{'pkts'};
 
                             my $sig_str = qq|        Signature match: "$msg"\n| .
-                                "            $proto, Chain: $chain, Count: $matches";
+                                "            " . uc($proto) .
+                                ", Chain: $chain, Count: $matches";
 
                             if ($proto eq 'tcp' or $proto eq 'udp') {
                                 my $dp = $scan{$src}{$dst}{$proto}

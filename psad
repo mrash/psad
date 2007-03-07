@@ -2846,7 +2846,7 @@ sub get_connected_subnets() {
     my $intf_name    = '';
     my $home_net_str = '';
     for my $line (@ifconfig_out) {
-        if ($line =~ /^(\w+)\s+Link/) {
+        if ($line =~ /^(\S+)\s+Link/) {
             $intf_name = $1;
             next;
         }
@@ -8214,6 +8214,7 @@ sub dump_conf() {
     ### uname output
     my @uname_out = @{&run_command($cmds{'uname'}, '-a')};
     if (@uname_out) {
+        print "[+] uname output:\n";
         print $fh $_ for @uname_out;
         print $fh "\n";
     }
@@ -8221,9 +8222,31 @@ sub dump_conf() {
     ### perl version (we assume perl is in the path)
     my @perl_info = @{&run_command('perl', '-V')};
     if (@perl_info) {
+        print "[+] perl info:\n";
         print $fh $_ for @perl_info;
         print $fh "\n";
     }
+
+    my @ps_out = @{&run_command($cmds{'ps'}, 'auxww')};
+    if (@ps_out) {
+        print $fh "[+] syslog processes:\n";
+        for (@ps_out) {
+            print $fh $_ if m|syslog|i;
+        }
+        print $fh "\n";
+    }
+
+    my @ifconfig_out = @{&run_command($cmds{'ifconfig'}, '-a')};
+    if (@ifconfig_out) {
+        print $fh "[+] ifconfig output:\n";
+        for (@ifconfig_out) {
+            s/$ip_re/x.x.x.x/g;
+            s/inet6\s+addr:\s+\S+/inet6 addr: (removed)/;
+            print $fh $_;
+        }
+        print $fh "\n";
+    }
+
     print $fh "\n[+] psad v$version (file revision: $rev_num)\n\n";
     print $fh "[+] Dumping psad config from: $config_file\n\n";
     for my $var (sort keys %config) {

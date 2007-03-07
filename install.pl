@@ -1034,7 +1034,7 @@ sub set_home_net() {
             $intf_name = '';
             next;
         }
-        if ($line =~ /^(\w+)\s+Link/) {
+        if ($line =~ /^(\S+)\s+Link/) {
             $intf_name = $1;
             next;
         }

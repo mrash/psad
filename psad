@@ -564,6 +564,7 @@ Getopt::Long::Configure('no_ignore_case');
                                               #   policy.
     'fw-list-auto'      => \$fw_list_auto,    # Display iptables chains used by
                                               #   psad in auto blocking code.
+    'List'              => \$fw_list_auto,    # Synonym for --fw-list-auto
     'fw-block-ip=s'     => \$fw_block_ip,     # Add an IP/net to the psad auto-
                                               #   blocking chains.  Then psad can
                                               #   manage timeouts, etc.
@@ -600,7 +601,7 @@ Getopt::Long::Configure('no_ignore_case');
                                               # USR1 signal (useful for debugging).
     'HUP'               => \$hup,             # Send psad processes a HUP signal
                                               #   to re-import config.
-    'Lib-dir=s'         => \$psad_lib_dir,    # Specify path to psad lib directory.
+    'lib-dir=s'         => \$psad_lib_dir,    # Specify path to psad lib directory.
     'no-snort-sids'     => \$no_snort_sids,   # Disable search for snort SID's
                                               #   in iptables messages.
     'no-whois'          => \$no_whois,        # Do not issue whois lookups against
@@ -8652,6 +8653,7 @@ Options:
                                     and exit.
     --fw-list-auto                - List the contents of any iptables
                                     chains use for auto-blocking rules.
+    --List                        - Synonym for --fw-list-auto.
     --fw-block-ip  <ip>           - Add an IP/network to the auto-
                                     blocking chains.
     --fw-rm-block-ip  <ip>        - Remove an IP/network from the auto-

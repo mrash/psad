@@ -941,7 +941,8 @@ MAIN: for (;;) {
     ### Print the number of new packets we saw in FW_DATA_FILE if we are
     ### running in debug mode
     if ($debug) {
-        print STDERR "[+] MAIN: number of new packets: $#fw_packets\n";
+        print STDERR "[+] MAIN: number of new packets: " .
+            ($#fw_packets+1) . "\n";
     }
 
     if ($die_msg) {

@@ -4,7 +4,9 @@ psad-2.0.6 (03//2007):
       version 0.9.0 and greater) and chain information.
     - Bugfix to allow interfaces that have IP aliases.
     - Added uname, ifconfig, and syslog process information to --Dump-conf
-      output (this can help diagnose various runtime information).
+      output (this can help diagnose various runtime issues).
+    - Changed the --Lib-dir command line argument to --lib-dir, and added
+      --List (similar to iptables) to list the psad auto-blocking chain rules.
 
 psad-2.0.5 (03/01/2007):
     - Consolidated all configuration variables into the /etc/psad/psad.conf

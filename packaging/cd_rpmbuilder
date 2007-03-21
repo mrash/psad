@@ -25,7 +25,7 @@
 #
 #############################################################################
 #
-# $Id: cd_rpmbuilder 431 2006-12-22 06:40:33Z mbr $
+# $Id: cd_rpmbuilder 634 2007-03-07 01:29:09Z mbr $
 #
 
 use File::Find;
@@ -191,7 +191,9 @@ sub md5_check() {
 }
 
 sub build_rpm() {
-    print "[+] Building RPM, this may take a little while...\n\n";
+    print
+"[+] Building RPM, this may take a little while (try -v if you want\n",
+"    to see all of the steps)...\n\n";
     my $cmd = "$rpmbuildCmd -ba $project-$build_version.spec";
     unless ($verbose) {
         $cmd .= ' > /dev/null 2>&1';

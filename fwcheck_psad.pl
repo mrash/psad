@@ -262,8 +262,8 @@ sub ipt_chk_chain() {
                 return 0;
             } else {
                 print FWCHECK
-"[-] Could not determine whether iptables is configured with a default logging\n",
-"    rule on $config{'HOSTNAME'}.\n\n";
+"[-] Could not determine whether iptables $chain chain is configured with a\n",
+"    default logging rule on $config{'HOSTNAME'}.\n\n";
                 return 0;
             }
         }

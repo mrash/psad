@@ -9,6 +9,9 @@ psad-2.0.6 (03//2007):
       output (this can help diagnose various runtime issues).
     - Changed the --Lib-dir command line argument to --lib-dir, and added
       --List (similar to iptables) to list the psad auto-blocking chain rules.
+    - Added psad.SlackBuild script contributed by pyllyukko for building psad
+      on Slackware systems.  It uses the Cipherdyne cd_rpmbuilder script to
+      first build and RPM, and then uses it to build a Slackware package.
 
 psad-2.0.5 (03/01/2007):
     - Consolidated all configuration variables into the /etc/psad/psad.conf

@@ -1,5 +1,5 @@
 %define name psad
-%define version 2.0.5
+%define version 2.0.6
 %define release 1
 %define psadlibdir %_libdir/%name
 %define psadlogdir /var/log/psad
@@ -247,6 +247,9 @@ fi
 %_libdir/%name
 
 %changelog
+* Fri Mar 22 2007 Michael Rash <mbr@cipherdyne.org>
+- psad-2.0.6 release
+
 * Thu Mar 01 2007 Michael Rash <mbr@cipherdyne.org>
 - psad-2.0.5 release
 - Removed all config files except for psad.conf since the psad daemons now all

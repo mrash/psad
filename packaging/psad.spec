@@ -247,7 +247,7 @@ fi
 %_libdir/%name
 
 %changelog
-* Fri Mar 22 2007 Michael Rash <mbr@cipherdyne.org>
+* Fri Mar 24 2007 Michael Rash <mbr@cipherdyne.org>
 - psad-2.0.6 release
 
 * Thu Mar 01 2007 Michael Rash <mbr@cipherdyne.org>

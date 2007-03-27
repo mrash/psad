@@ -13,7 +13,7 @@
 #
 # Credits: (see the CREDITS file bundled with the psad sources.)
 #
-# Copyright (C) 1999-2006 Michael Rash (mbr@cipherdyne.org)
+# Copyright (C) 1999-2007 Michael Rash (mbr@cipherdyne.org)
 #
 # License (GNU Public License):
 #

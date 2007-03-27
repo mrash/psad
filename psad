@@ -20,7 +20,7 @@
 #
 # Version: 2.0.6
 #
-# Copyright (C) 1999-2006 Michael Rash (mbr@cipherdyne.org)
+# Copyright (C) 1999-2007 Michael Rash (mbr@cipherdyne.org)
 #
 # License (GNU Public License):
 #
@@ -572,6 +572,7 @@ Getopt::Long::Configure('no_ignore_case');
     'fw-del-chains'     => \$fw_del_chains,   # Delete psad chains in addition to
                                               #   flushing them (requires --F as
                                               #   well).
+    'X'                 => \$fw_del_chains    # Synonym for --fw-del-chains.
     'fw-dump'           => \$dump_ipt_policy, # Dump the iptables policy
                                               #   (requires -D as well).
     'fw-include-ips'    => \$fw_include_ips,  # Include all IPs/nets in iptables
@@ -8654,7 +8655,8 @@ Options:
                                     and exit.
     --fw-list-auto                - List the contents of any iptables
                                     chains use for auto-blocking rules.
-    --List                        - Synonym for --fw-list-auto.
+    --List                        - Synonym for --fw-list-auto (emulates
+                                    iptables command line).
     --fw-block-ip  <ip>           - Add an IP/network to the auto-
                                     blocking chains.
     --fw-rm-block-ip  <ip>        - Remove an IP/network from the auto-
@@ -8664,6 +8666,8 @@ Options:
                                     instead of a running policy.
     --fw-del-chains               - Delete iptables chains used by
                                     psad for auto-blocking rules.
+    -X                            - Synonym for --fw-del-chains (emulates
+                                    iptables command line).
     --fw-dump                     - Dump a sanitized version of the local
                                     iptables policy.
     --fw-include-ips              - Include all IPs/nets in iptables
@@ -8676,7 +8680,8 @@ Options:
     -l,  --log-server             - psad is being run on a syslog
                                     logging server.
     -F,  --Flush                  - Remove any auto-generated firewall
-                                    block rules.
+                                    block rules (emulates iptables command
+                                    line).
     -K,  --Kill                   - Kill all running psad processes.
     -R,  --Restart                - Restart all running psad processes.
     -S,  --Status                 - Displays the status of any

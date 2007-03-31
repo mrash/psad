@@ -572,7 +572,7 @@ Getopt::Long::Configure('no_ignore_case');
     'fw-del-chains'     => \$fw_del_chains,   # Delete psad chains in addition to
                                               #   flushing them (requires --F as
                                               #   well).
-    'X'                 => \$fw_del_chains    # Synonym for --fw-del-chains.
+    'X'                 => \$fw_del_chains,   # Synonym for --fw-del-chains.
     'fw-dump'           => \$dump_ipt_policy, # Dump the iptables policy
                                               #   (requires -D as well).
     'fw-include-ips'    => \$fw_include_ips,  # Include all IPs/nets in iptables
@@ -1229,7 +1229,8 @@ sub check_scan() {
 
     ### write bogus packets to the error log.
     if ($benchmark) {
-        print scalar localtime(), " [+] Err packets: $#err_pkts.\n";
+        print scalar localtime(), ' [+] Err packets: ' .
+            ($#err_pkts+1) . ".\n";
     } else {
         &collect_errors(\@err_pkts) unless $no_ipt_errors;
     }

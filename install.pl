@@ -1410,7 +1410,7 @@ sub append_fifo_syslog() {
                 print SYSLOG $line;
             }
         }
-        print SYSLOG '### Send kern.info messages to psadfifo for ',
+        print SYSLOG "\n### Send kern.info messages to psadfifo for ",
             "analysis by kmsgsd\n";
         ### reinstate kernel logging to our named pipe
         print SYSLOG "kern.info\t\t|$config{'PSAD_FIFO_FILE'}\n";

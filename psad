@@ -4,6 +4,8 @@
 #
 # File: psad (/usr/sbin/psad)
 #
+# URL: http://www.cipherdyne.org/psad
+#
 # Purpose: psad makes use of iptables logs to detect port scans,
 #          probes for backdoors and DDoS tools, and other suspect traffic
 #          (many signatures were adapted from the snort intrusion
@@ -2447,6 +2449,9 @@ sub add_fwsnort_sid() {
 
         return &get_largest_sid_dl($sid, 2);
 
+    } else {
+        print "[-] Found sid: $sid in packet, but no ",
+            "corresponding fwsnort rule.\n" if $debug;
     }
     return 0;
 }
@@ -7952,7 +7957,7 @@ sub setup() {
                     }
                 }
                 ### reinstate kernel logging to our named pipe
-                print SYSLOG '### Send kern.info messages to psadfifo for ',
+                print SYSLOG "\n### Send kern.info messages to psadfifo for ",
                     "analysis by kmsgsd\n";
                 print SYSLOG "kern.info\t\t|$config{'PSAD_FIFO_FILE'}\n";
                 close SYSLOG;

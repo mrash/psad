@@ -1059,8 +1059,7 @@ sub check_scan() {
         ### file.  The return value is the auto-assigned danger level (or
         ### -1 if there is no auto-assigned danger level.
         unless ($no_auto_dl) {
-            my $rv = &assign_auto_danger_level($pkt{'src'}, $pkt{'proto'},
-                        $pkt{'dp'});
+            my $rv = &assign_auto_danger_level(\%pkt);
 
             print STDERR "[+] assign_auto_danger_level() returned: $rv\n"
                 if $debug;
@@ -1725,15 +1724,15 @@ sub match_snort_keywords() {
 
         my ($rv, $sig_match_rv) = &match_snort_ip_keywords($pkt_hr, $sig_hr);
 
-        if (not $rv and $sig_match_rv == $NO_SIG_MATCH) {
-            ### there were network-layer keywords that did not match
-            next SIG;
-        } elsif ($rv and $sig_match_rv == $NO_SIG_MATCH) {
-            ### there were no network-layer keywords so continue on
-            $dl_tmp = 0;
-        } elsif ($rv and $sig_match_rv == $SIG_MATCH) {
-            ### there were network-layer keywords, and they matched
+        if ($sig_match_rv == $SIG_MATCH) {
             $dl_tmp = $rv;
+            if ($rv == 0) {
+                next SIG;  ### ignore signature
+            }
+        } elsif ($sig_match_rv == $NO_SIG_MATCH) {
+            ### there were network-layer keywords that did not match
+            next SIG unless $rv;
+            ### else there were no network-layer keywords so continue on
         }
 
         $dl = $dl_tmp if $dl_tmp > $dl;
@@ -1745,9 +1744,13 @@ sub match_snort_keywords() {
 
         if ($sig_hr->{'proto'} eq 'tcp') {
 
-            $dl_tmp = &match_snort_tcp_keywords($pkt_hr, $sig_hr);
-            if ($dl_tmp) {
-                $dl = $dl_tmp if $dl_tmp > $dl;
+            ($rv, $sig_match_rv) = &match_snort_tcp_keywords($pkt_hr, $sig_hr);
+
+            if ($sig_match_rv == $SIG_MATCH) {
+
+                next SIG if $rv == 0;
+
+                $dl = $rv if $rv > $dl;
 
                 $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'tcp'}
                     {'sid'}{$sid}{$pkt_hr->{'chain'}}{'dp'}
@@ -1772,9 +1775,13 @@ sub match_snort_keywords() {
             }
         } elsif ($sig_hr->{'proto'} eq 'udp') {
 
-            $dl_tmp = &match_snort_udp_keywords($pkt_hr, $sig_hr);
-            if ($dl_tmp) {
-                $dl = $dl_tmp if $dl_tmp > $dl;
+            ($rv, $sig_match_rv) = &match_snort_udp_keywords($pkt_hr, $sig_hr);
+
+            if ($sig_match_rv == $SIG_MATCH) {
+
+                next SIG if $rv == 0;
+
+                $dl = $rv if $rv > $dl;
 
                 $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'udp'}
                     {'sid'}{$sid}{$pkt_hr->{'chain'}}{'dp'}
@@ -1800,6 +1807,7 @@ sub match_snort_keywords() {
             ### message text and danger levels.
             my $type_code_rv = &check_icmp_type($pkt_hr->{'itype'},
                     $pkt_hr->{'icode'});
+
             if ($type_code_rv == $BAD_ICMP_TYPE) {  ### bad type
 
                 $dl = 2 if $dl < 2;
@@ -1818,9 +1826,13 @@ sub match_snort_keywords() {
             }
             $dl = $dl_tmp if $dl_tmp > $dl;
 
-            $dl_tmp = &match_snort_icmp_keywords($pkt_hr, $sig_hr);
-            if ($dl_tmp) {
-                $dl = $dl_tmp if $dl_tmp > $dl;
+            ($rv, $sig_match_rv) = &match_snort_icmp_keywords($pkt_hr, $sig_hr);
+
+            if ($sig_match_rv == $SIG_MATCH) {
+
+                next SIG if $rv == 0;
+
+                $dl = $rv if $rv > $dl;
 
                 $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'icmp'}{'sid'}
                     {$sid}{$pkt_hr->{'chain'}}{'pkts'}++;
@@ -1854,7 +1866,7 @@ sub match_snort_tcp_keywords() {
                 print STDERR "[-] SID: $sig_hr->{'sid'} ",
                     "$pkt_hr->{'flags'} != $sig_hr->{'flags'}\n";
             }
-            return 0;
+            return 0, $NO_SIG_MATCH;
         }
     }
 
@@ -1864,15 +1876,18 @@ sub match_snort_tcp_keywords() {
         ### extend the header length to compensate for TCP options
         $header_len += $TCP_MAX_OPTS_LEN;
     }
-    return 0 unless &check_sig_int_range(
+    return 0, $NO_SIG_MATCH unless &check_sig_int_range(
             ($pkt_hr->{'ip_len'}-$header_len), 'dsize', $sig_hr);
 
-    return 0 unless &check_sig_int_range(
+    return 0, $NO_SIG_MATCH unless &check_sig_int_range(
             ($pkt_hr->{'ip_len'}-$header_len), 'psad_dsize', $sig_hr);
 
-    return 0 unless &check_sig_int_range($pkt_hr->{'win'}, 'window', $sig_hr);
-    return 0 unless &check_sig_int_range($pkt_hr->{'tcp_seq'}, 'seq', $sig_hr);
-    return 0 unless &check_sig_int_range($pkt_hr->{'tcp_ack'}, 'ack', $sig_hr);
+    return 0, $NO_SIG_MATCH
+        unless &check_sig_int_range($pkt_hr->{'win'}, 'window', $sig_hr);
+    return 0, $NO_SIG_MATCH
+        unless &check_sig_int_range($pkt_hr->{'tcp_seq'}, 'seq', $sig_hr);
+    return 0, $NO_SIG_MATCH
+        unless &check_sig_int_range($pkt_hr->{'tcp_ack'}, 'ack', $sig_hr);
 
     ### matched the signature
     if ($debug) {
@@ -1881,17 +1896,17 @@ sub match_snort_tcp_keywords() {
             qq|    "$sig_hr->{'msg'}"\n|;
     }
 
-    return &get_largest_sid_dl($sig_hr->{'sid'}, $sig_hr->{'dl'});
+    return &assign_sid_dl($sig_hr), $SIG_MATCH;
 }
 
 sub match_snort_udp_keywords() {
     my ($pkt_hr, $sig_hr) = @_;
 
-    return 0 unless &check_sig_int_range(
+    return 0, $NO_SIG_MATCH unless &check_sig_int_range(
             ($pkt_hr->{'udp_len'}-$UDP_HEADER_LEN),
             'dsize', $sig_hr);
 
-    return 0 unless &check_sig_int_range(
+    return 0, $NO_SIG_MATCH unless &check_sig_int_range(
             ($pkt_hr->{'udp_len'}-$UDP_HEADER_LEN),
             'psad_dsize', $sig_hr);
 
@@ -1902,24 +1917,28 @@ sub match_snort_udp_keywords() {
             qq|    "$sig_hr->{'msg'}"\n|;
     }
 
-    return &get_largest_sid_dl($sig_hr->{'sid'}, $sig_hr->{'dl'});
+    return &assign_sid_dl($sig_hr->{'sid'}), $SIG_MATCH;
 }
 
 sub match_snort_icmp_keywords() {
     my ($pkt_hr, $sig_hr) = @_;
 
-    return 0 unless &check_sig_int_range(
+    return 0, $NO_SIG_MATCH unless &check_sig_int_range(
             ($pkt_hr->{'ip_len'}-$IP_HEADER_LEN-$ICMP_HEADER_LEN),
             'dsize', $sig_hr);
 
-    return 0 unless &check_sig_int_range(
+    return 0, $NO_SIG_MATCH unless &check_sig_int_range(
             ($pkt_hr->{'ip_len'}-$IP_HEADER_LEN-$ICMP_HEADER_LEN),
             'psad_dsize', $sig_hr);
 
-    return 0 unless &check_sig_int_range($pkt_hr->{'itype'}, 'itype', $sig_hr);
-    return 0 unless &check_sig_int_range($pkt_hr->{'icode'}, 'icode', $sig_hr);
-    return 0 unless &check_sig_int_range($pkt_hr->{'icmp_seq'}, 'icmp_seq', $sig_hr);
-    return 0 unless &check_sig_int_range($pkt_hr->{'icmp_id'}, 'icmp_id', $sig_hr);
+    return 0, $NO_SIG_MATCH
+        unless &check_sig_int_range($pkt_hr->{'itype'}, 'itype', $sig_hr);
+    return 0, $NO_SIG_MATCH
+        unless &check_sig_int_range($pkt_hr->{'icode'}, 'icode', $sig_hr);
+    return 0, $NO_SIG_MATCH
+        unless &check_sig_int_range($pkt_hr->{'icmp_seq'}, 'icmp_seq', $sig_hr);
+    return 0, $NO_SIG_MATCH
+        unless &check_sig_int_range($pkt_hr->{'icmp_id'}, 'icmp_id', $sig_hr);
 
     ### matched the signature
     if ($debug) {
@@ -1928,7 +1947,7 @@ sub match_snort_icmp_keywords() {
             qq|    "$sig_hr->{'msg'}"\n|;
     }
 
-    return &get_largest_sid_dl($sig_hr->{'sid'}, $sig_hr->{'dl'});
+    return &assign_sid_dl($sig_hr->{'sid'}), $SIG_MATCH;
 }
 
 sub match_snort_ip_keywords() {
@@ -1978,10 +1997,7 @@ sub match_snort_ip_keywords() {
         $top_sigs{$sig_hr->{'sid'}}++;
         $top_sig_counts{$pkt_hr->{'src'}}++;
 
-        my $dl_tmp = &get_largest_sid_dl($sig_hr->{'sid'},
-                $sig_hr->{'dl'});
-
-        return $dl_tmp, $SIG_MATCH;
+        return &assign_sid_dl($sig_hr->{'sid'}), $SIG_MATCH;
     }
     return 1, $NO_SIG_MATCH;
 }
@@ -2388,20 +2404,20 @@ sub ttl_range() {
     return $min_ttl, $max_ttl;
 }
 
-sub get_largest_sid_dl() {
-    my ($sid, $sig_dl) = @_;
+sub assign_sid_dl() {
+    my $sig_hr = shift;
 
-    my $dl = $sig_dl;
+    my $dl = $sig_hr->{'dl'};  ### default sid danger level
 
-    ### see if /etc/psad/snort_rule_dl gives a higher DL
-    if (defined $snort_rule_dl{$sid}) {
-        if ($snort_rule_dl{$sid} > $dl) {
-            print STDERR "[+] get_largest_sid_dl(): snort_rule_dl ",
-                "assigning SID $sid a danger level of ",
-                "$snort_rule_dl{$sid}\n" if $debug;
-            $dl = $snort_rule_dl{$sid};
-        }
+    ### see if /etc/psad/snort_rule_dl assigns a DL (may be
+    ### zero).
+    if (defined $snort_rule_dl{$sig_hr->{'sid'}}) {
+        $dl = $snort_rule_dl{$sig_hr->{'sid'}};
     }
+
+    print STDERR "[+] assign_sid_dl(): snort_rule_dl ",
+        "assigning SID $sig_hr->{'sid'} a danger level of ",
+        "$dl\n" if $debug;
 
     return $dl;
 }
@@ -2447,7 +2463,7 @@ sub add_fwsnort_sid() {
             }
         }
 
-        return &get_largest_sid_dl($sid, 2);
+        return &assign_sid_dl($sid);
 
     } else {
         print "[-] Found sid: $sid in packet, but no ",
@@ -3247,6 +3263,9 @@ sub import_snort_reference_config() {
 }
 
 sub import_snort_rule_dl() {
+
+    %snort_rule_dl = ();
+
     ### parse the snort_rule_dl file
     return unless -e $config{'SNORT_RULE_DL_FILE'};
     open F, "< $config{'SNORT_RULE_DL_FILE'}" or die $!;
@@ -3256,7 +3275,7 @@ sub import_snort_rule_dl() {
             ### <sid>  <dl>
             my $sid = $1;
             my $dl  = $2;
-            unless ($dl > 0 and $dl < 6) {
+            unless ($dl >= 0 and $dl < 6) {
                 next;
             }
             $snort_rule_dl{$sid} = $dl;
@@ -4114,7 +4133,7 @@ sub assign_danger_level() {
 }
 
 sub assign_auto_danger_level() {
-    my ($src, $scan_proto, $scan_port) = @_;
+    my $pkt_hr = shift;
 
     ### see if the source should automatically be assigned a
     ### danger level
@@ -4122,36 +4141,36 @@ sub assign_auto_danger_level() {
         my $dl   = $auto_dl{$net}{'dl'};
         my $mask = $auto_dl{$net}{'mask'};  ### may be a /32 (single IP)
 
-        ### check to see if $src is contained within an auto_dl network
-        next NET unless ipv4_in_network("$net/$mask", $src);
+        ### check to see if $pkt_hr->{'src'} is contained within an auto_dl network
+        next NET unless ipv4_in_network("$net/$mask", $pkt_hr->{'src'});
 
-        ### $src is part of an ignored network
+        ### $pkt_hr->{'src'} is part of an ignored network
         return 0 if $dl == 0;
 
-        if ($scan_dl{$src} < $dl) {
+        if ($scan_dl{$pkt_hr->{'src'}} < $dl) {
             if (not defined $auto_dl{$net}{'proto'}) {
                 ### all protocols are applicable
-                $scan_dl{$src} = $dl;
+                $scan_dl{$pkt_hr->{'src'}} = $dl;
                 &sys_log('psad', 'auto-assigned danger level: ' .
-                    "$dl for IP: $src");
+                    "$dl for IP: $pkt_hr->{'src'}");
                 return $dl;
             } else {
                 for my $proto (keys %{$auto_dl{$net}{'proto'}}) {
-                    next unless $scan_proto eq $proto;
+                    next unless $pkt_hr->{'proto'} eq $proto;
                     if (defined $auto_dl{$net}{'proto'}{$proto}{'port'}
                             or defined $auto_dl{$net}{'proto'}{$proto}{'range'}) {
                         if (&match_port(\%{$auto_dl{$net}{'proto'}{$proto}},
-                                $scan_port)) {
-                            $scan_dl{$src} = $dl;
+                                $pkt_hr->{'dp'})) {
+                            $scan_dl{$pkt_hr->{'src'}} = $dl;
                             &sys_log('psad', 'auto-assigned danger ' .
-                                "level: $dl for IP: $src");
+                                "level: $dl for IP: $pkt_hr->{'src'}");
                             return $dl;
                         }
                     } elsif (defined $auto_dl{$net}{'proto'}{$proto}{'all'}) {
                         ### we only require to match the protocol
-                         $scan_dl{$src} = $dl;
+                         $scan_dl{$pkt_hr->{'src'}} = $dl;
                          &sys_log('psad', 'auto-assigned danger ' .
-                             "level: $dl for IP: $src");
+                             "level: $dl for IP: $pkt_hr->{'src'}");
                          return $dl;
                     }
                 }

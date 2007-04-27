@@ -8242,7 +8242,7 @@ sub dump_conf() {
     ### uname output
     my @uname_out = @{&run_command($cmds{'uname'}, '-a')};
     if (@uname_out) {
-        print "[+] uname output:\n";
+        print $fh "[+] uname output:\n";
         print $fh $_ for @uname_out;
         print $fh "\n";
     }
@@ -8250,7 +8250,7 @@ sub dump_conf() {
     ### perl version (we assume perl is in the path)
     my @perl_info = @{&run_command('perl', '-V')};
     if (@perl_info) {
-        print "[+] perl info:\n";
+        print $fh "[+] perl info:\n";
         print $fh $_ for @perl_info;
         print $fh "\n";
     }

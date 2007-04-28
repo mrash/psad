@@ -4,6 +4,9 @@ psad-2.0.7 (04//2007):
       reconfig caused the daemon to not start.
     - Bugfix to allow specific signatures to be ignored by setting SID values
       of zero in /etc/psad/snort_rule_dl.
+    - Added -X command line argument to allow the user to delete any psad
+      chains (in auto-response mode).  This is a synonym for the iptables -X
+      command line argument.
 
 psad-2.0.6 (03/24/2007):
     - Better integration with fwsnort; psad signature match syslog messages

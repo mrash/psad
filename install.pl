@@ -1214,6 +1214,7 @@ sub append_fifo_syslog_ng() {
 
     my $found_fifo = 0;
     for my $line (@slines) {
+        next if $line =~ m/^\s*#/;
         $found_fifo = 1 if ($line =~ /psadfifo/);
     }
 
@@ -1226,27 +1227,17 @@ sub append_fifo_syslog_ng() {
         }
         &archive($syslog_conf);
 
-        my $src = '';
-        ### see if a different source name is defined for /proc/kmsg
-        for my $line (@slines) {
-            ### source kernsrc { file("/proc/kmsg"); };
-            if ($line =~ m|^\s*source\s+(\w+)\s+.*file\(\"/proc/kmsg\"\);|) {
-                $src = $1;
-            }
-        }
         open SYSLOGNG, ">> $syslog_conf" or
             die "[*] Unable to open $syslog_conf: $!\n";
-        print SYSLOGNG "\n";
-        unless ($src) {
-            print SYSLOGNG qq|source src { unix-stream("/dev/log"); |,
-                qq|internal(); pipe("/proc/kmsg"); };\n|;
-            $src = 'src';
-        }
-        print SYSLOGNG 'destination psadpipe { ',
+        print SYSLOGNG "\n",
+            qq|source psadsrc { unix-stream("/dev/log"); |,
+            qq|internal(); pipe("/proc/kmsg"); };\n|,
+            'destination psadpipe { ',
             "pipe(\"$config{'PSAD_FIFO_FILE'}\"); };\n",
-#            "filter f_kerninfo { facility(kern) and level(info); };\n",
-            "filter f_kerninfo { facility(kern); };\n",
-            "log { source($src); filter(f_kerninfo); destination(psadpipe); };\n";
+            qq|filter f_psad { facility(kern) and match("IN=") |,
+            qq|and match("OUT="); };\n|,
+            'log { source(psadsrc); filter(f_psad); ',
+            "destination(psadpipe); };\n";
         close SYSLOGNG;
     }
     return;

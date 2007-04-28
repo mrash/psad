@@ -1,4 +1,7 @@
 psad-2.0.7 (04//2007):
+    - Bugfix to define a custom 'source' definition for syslog-ng daemons -
+      this fixes a problem on SuSE systems where the existing syslog-ng
+      reconfig caused the daemon to not start.
     - Bugfix to allow specific signatures to be ignored by setting SID values
       of zero in /etc/psad/snort_rule_dl.
 

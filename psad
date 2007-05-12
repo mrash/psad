@@ -8257,6 +8257,15 @@ sub dump_conf() {
         print $fh "\n";
     }
 
+    my @ps_psad_out = @{&run_command($cmds{'ps'}, 'auxww')};
+    if (@ps_psad_out) {
+        print $fh "[+] psad processes:\n";
+        for (@ps_psad_out) {
+            print $fh $_ if m|psad|i;
+        }
+        print $fh "\n";
+    }
+
     my @ifconfig_out = @{&run_command($cmds{'ifconfig'}, '-a')};
     if (@ifconfig_out) {
         print $fh "[+] ifconfig output:\n";

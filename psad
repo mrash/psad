@@ -20,7 +20,7 @@
 #
 # Credits: (see the CREDITS file bundled with the psad sources.)
 #
-# Version: 2.0.7-pre1
+# Version: 2.0.7
 #
 # Copyright (C) 1999-2007 Michael Rash (mbr@cipherdyne.org)
 #
@@ -143,7 +143,7 @@ use strict;
 ### ========================== main =================================
 
 ### set the current psad version and file revision numbers
-my $version = '2.0.7-pre1';
+my $version = '2.0.7';
 my $revision_svn = '$Revision$';
 my $rev_num = '1';
 ($rev_num) = $revision_svn =~ m|\$Rev.*:\s+(\S+)|;
@@ -362,7 +362,7 @@ my $chk_interval     = 0;
 my $log_len          = 23;  ### used in scan_logr()
 my $fw_analyze       = 0;
 my $fw_file          = '';
-my $psad_lib_dir     = '';
+my $lib_dir          = '';
 my $rm_data_ctr      = 0;
 my $analysis_emails  = 0;
 my $analysis_whois   = 0;
@@ -604,7 +604,7 @@ Getopt::Long::Configure('no_ignore_case');
                                               # USR1 signal (useful for debugging).
     'HUP'               => \$hup,             # Send psad processes a HUP signal
                                               #   to re-import config.
-    'lib-dir=s'         => \$psad_lib_dir,    # Specify path to psad lib directory.
+    'lib-dir=s'         => \$lib_dir,         # Specify path to psad lib directory.
     'no-snort-sids'     => \$no_snort_sids,   # Disable search for snort SID's
                                               #   in iptables messages.
     'no-whois'          => \$no_whois,        # Do not issue whois lookups against
@@ -2571,9 +2571,9 @@ sub check_icmp_type() {
     return 0;
 }
 
-sub import_psad_perl_modules() {
+sub import_perl_modules() {
 
-    my $mod_paths_ar = &get_psad_mod_paths();
+    my $mod_paths_ar = &get_mod_paths();
 
     if ($#$mod_paths_ar > -1) {  ### /usr/lib/psad/ exists
         push @$mod_paths_ar, @INC;
@@ -2581,7 +2581,7 @@ sub import_psad_perl_modules() {
     }
 
     if ($debug) {
-        print STDERR "[+] import_psad_perl_modules(): The \@INC array:\n";
+        print STDERR "[+] import_perl_modules(): The \@INC array:\n";
         print STDERR "$_\n" for @INC;
     }
 
@@ -2597,11 +2597,11 @@ sub import_psad_perl_modules() {
     return;
 }
 
-sub get_psad_mod_paths() {
+sub get_mod_paths() {
 
     my @paths = ();
 
-    $config{'PSAD_LIBS_DIR'} = $psad_lib_dir if $psad_lib_dir;
+    $config{'PSAD_LIBS_DIR'} = $lib_dir if $lib_dir;
 
     unless (-d $config{'PSAD_LIBS_DIR'}) {
         my $dir_tmp = $config{'PSAD_LIBS_DIR'};
@@ -6747,7 +6747,7 @@ sub fw_analyze_mode() {
         my $opts = "-c $config_file ";
         $opts .= " --fw-analyze" if $fw_analyze;
         $opts .= " --fw-file $fw_file" if $fw_file;
-        $opts .= " -L $psad_lib_dir" if $psad_lib_dir;
+        $opts .= " -L $lib_dir" if $lib_dir;
         $opts .= " --no-fw-search-all" if $config{'FW_SEARCH_ALL'} eq 'N';
         $exit_status = (system "$cmds{'fwcheck_psad'} $opts") >> 8;
     }
@@ -8646,8 +8646,10 @@ sub usage() {
     print <<_HELP_;
 
 psad; the Port Scan Attack Detector
+
 [+] Version: $version (file revision: $rev_num)
-[+] By Michael Rash (mbr\@cipherdyne.org, http://www.cipherdyne.org/)
+    By Michael Rash (mbr\@cipherdyne.org)
+    URL: http://www.cipherdyne.org/psad/
 
 Usage: psad [options]
 

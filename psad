@@ -8233,7 +8233,10 @@ sub dump_conf() {
     my @uname_out = @{&run_command($cmds{'uname'}, '-a')};
     if (@uname_out) {
         print $fh "[+] uname output:\n";
-        print $fh $_ for @uname_out;
+        for (@uname_out) {
+            s/Linux\s+(\S+)\s/Linux (removed) /;
+            print $fh $_;
+        }
         print $fh "\n";
     }
 

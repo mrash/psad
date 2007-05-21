@@ -8230,54 +8230,61 @@ sub dump_conf() {
     $fh = *STDERR if $debug;
 
     ### uname output
+    print $fh "[+] uname output:\n";
     my @uname_out = @{&run_command($cmds{'uname'}, '-a')};
     if (@uname_out) {
-        print $fh "[+] uname output:\n";
         for (@uname_out) {
             s/Linux\s+(\S+)\s/Linux (removed) /;
             print $fh $_;
         }
-        print $fh "\n";
     }
+    print $fh "\n";
 
     ### perl version (we assume perl is in the path)
+    print $fh "[+] perl info:\n";
     my @perl_info = @{&run_command('perl', '-V')};
     if (@perl_info) {
-        print $fh "[+] perl info:\n";
         print $fh $_ for @perl_info;
-        print $fh "\n";
     }
+    print $fh "\n";
 
+    print $fh "[+] syslog processes:\n";
     my @ps_out = @{&run_command($cmds{'ps'}, 'auxww')};
     if (@ps_out) {
-        print $fh "[+] syslog processes:\n";
         for (@ps_out) {
             print $fh $_ if m|syslog|i;
         }
-        print $fh "\n";
     }
+    print $fh "\n";
 
+    print $fh "[+] psad processes:\n";
     my @ps_psad_out = @{&run_command($cmds{'ps'}, 'auxww')};
     if (@ps_psad_out) {
-        print $fh "[+] psad processes:\n";
         for (@ps_psad_out) {
             print $fh $_ if m|psad|i;
         }
-        print $fh "\n";
     }
+    print $fh "\n";
 
+    print $fh "[+] ifconfig output:\n";
     my @ifconfig_out = @{&run_command($cmds{'ifconfig'}, '-a')};
     if (@ifconfig_out) {
-        print $fh "[+] ifconfig output:\n";
         for (@ifconfig_out) {
             s/$ip_re/x.x.x.x/g;
             s/inet6\s+addr:\s+\S+/inet6 addr: (removed)/;
             print $fh $_;
         }
-        print $fh "\n";
     }
+    print $fh "\n";
 
     print $fh "\n[+] psad v$version (file revision: $rev_num)\n\n";
+    my $install_log = '/var/log/psad/install.log';
+    if (-e $install_log) {
+        print $fh "[+] $install_log exists.\n\n";
+    } else {
+        print $fh "[+] $install_log does NOT exist.\n\n";
+    }
+
     print $fh "[+] Dumping psad config from: $config_file\n\n";
     for my $var (sort keys %config) {
         my $str = $config{$var};

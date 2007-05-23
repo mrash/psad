@@ -4,7 +4,7 @@
 *  File: psadwatchd.c
 *
 *  Purpose: psadwatchd checks on an interval of every five seconds to make
-*           sure that both kmsgsd and psad are running on the box.  If
+*           sure that both kmsgsd and psad are running on the box. If
 *           either daemon has died, psadwatchd will restart it and notify
 *           each email address in @email_addresses that the daemon has been
 *           restarted.
@@ -19,12 +19,12 @@
 *
 *     This program is distributed in the hope that it will be useful,
 *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-*     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 *     GNU General Public License for more details.
 *
 *     You should have received a copy of the GNU General Public License
 *     along with this program; if not, write to the Free Software
-*     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
+*     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 *     USA
 *
 *****************************************************************************
@@ -122,9 +122,8 @@ int main(int argc, char *argv[]) {
 #endif
 
     /* see if we are suppose to disable all email alerts */
-    if (strncmp("noemail", alerting_methods, MAX_GEN_LEN) == 0) {
+    if (strncmp("noemail", alerting_methods, MAX_GEN_LEN) == 0)
         no_email = 1;
-    }
 
     /* first make sure there isn't another psadwatchd already running */
     check_unique_pid(psadwatchd_pid_file, "psadwatchd");
@@ -264,7 +263,7 @@ static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries)
         psad_syscalls_ctr++;
 #ifdef DEBUG
         fprintf(stderr,
-            "[-] %s not running.  Trying to restart (%d tries so far).\n",
+            "[-] %s not running. Trying to restart (%d tries so far).\n",
             pid_name, psad_syscalls_ctr);
 #endif
         if (psad_syscalls_ctr >= max_retries)
@@ -273,7 +272,7 @@ static void incr_syscall_ctr(const char *pid_name, unsigned int max_retries)
         kmsgsd_syscalls_ctr++;
 #ifdef DEBUG
         fprintf(stderr,
-            "[-] %s not running.  Trying to restart (%d tries so far).\n",
+            "[-] %s not running. Trying to restart (%d tries so far).\n",
             pid_name, kmsgsd_syscalls_ctr);
 #endif
         if (kmsgsd_syscalls_ctr >= max_retries)
@@ -296,13 +295,13 @@ static void give_up(const char *pid_name)
 {
     char mail_str[MAX_MSG_LEN] = "";
 #ifdef DEBUG
-    fprintf(stderr, "[*] Could not restart %s process.  Exiting.\n", pid_name);
+    fprintf(stderr, "[*] Could not restart %s process. Exiting.\n", pid_name);
 #endif
     strlcat(mail_str, " -s \"[*] psadwatchd: Could not restart ", MAX_MSG_LEN);
     strlcat(mail_str, pid_name, MAX_MSG_LEN);
     strlcat(mail_str, " on ", MAX_MSG_LEN);
     strlcat(mail_str, hostname, MAX_MSG_LEN);
-    strlcat(mail_str, ".  Exiting.\" ", MAX_MSG_LEN);
+    strlcat(mail_str, ". Exiting.\" ", MAX_MSG_LEN);
     strlcat(mail_str, mail_addrs, MAX_MSG_LEN);
     strlcat(mail_str, mail_redr, MAX_MSG_LEN);
 
@@ -537,7 +536,7 @@ static void expand_config_vars(void)
             found_sub_var = 1;
         }
 
-        if (has_sub_var("ksmgsdCmd", kmsgsdCmd, sub_var,
+        if (has_sub_var("kmsgsdCmd", kmsgsdCmd, sub_var,
                 pre_str, post_str)) {
             find_sub_var_value(kmsgsdCmd, sub_var, pre_str, post_str);
             found_sub_var = 1;

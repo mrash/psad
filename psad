@@ -2692,7 +2692,7 @@ sub psad_init() {
     &check_commands({'wget' => ''});
 
     ### import psad perl modules
-    &import_psad_perl_modules();
+    &import_perl_modules();
 
     ### download latest signatures from
     ### http://www.cipherdyne.org/psad/signatures

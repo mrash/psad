@@ -1220,7 +1220,7 @@ sub append_fifo_syslog_ng() {
 
     unless ($found_fifo) {
         &logr("[+] Modifying $syslog_conf to write kern.info " .
-            "messages to\n    $config{'PSAD_FIFO_FILE'}");
+            "messages to\n    $config{'PSAD_FIFO_FILE'}\n");
         unless (-e "$syslog_conf.orig") {
             copy $syslog_conf, "$syslog_conf.orig" or die "[*] Could not ",
                 "copy $syslog_conf -> $syslog_conf.orig: $!";

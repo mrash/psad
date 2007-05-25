@@ -1804,7 +1804,7 @@ sub archive() {
                 "move ${base}${j}.gz -> ${base}${i}.gz: $!";
         }
     }
-    &logr("[+] Archiving $file -> ${base}1\n");
+    &logr("[+] Archiving $file -> $config{'CONF_ARCHIVE_DIR'}/${base}1.gz\n");
     unlink "${base}1.gz" if -e "${base}1.gz";
     ### move $file into the archive directory
     copy $file, "${base}1" or die "[*] Could not copy ",

@@ -1232,10 +1232,10 @@ sub append_fifo_syslog_ng() {
         print SYSLOGNG "\n",
             qq|source psadsrc { unix-stream("/dev/log"); |,
             qq|internal(); pipe("/proc/kmsg"); };\n|,
-            'destination psadpipe { ',
-            "pipe(\"$config{'PSAD_FIFO_FILE'}\"); };\n",
             qq|filter f_psad { facility(kern) and match("IN=") |,
             qq|and match("OUT="); };\n|,
+            'destination psadpipe { ',
+            "pipe(\"$config{'PSAD_FIFO_FILE'}\"); };\n",
             'log { source(psadsrc); filter(f_psad); ',
             "destination(psadpipe); };\n";
         close SYSLOGNG;

@@ -1896,7 +1896,7 @@ sub match_snort_tcp_keywords() {
             qq|    "$sig_hr->{'msg'}"\n|;
     }
 
-    return &assign_sid_dl($sig_hr), $SIG_MATCH;
+    return &assign_sid_dl($sig_hr->{'sid'}, $sig_hr->{'dl'}), $SIG_MATCH;
 }
 
 sub match_snort_udp_keywords() {
@@ -1917,7 +1917,7 @@ sub match_snort_udp_keywords() {
             qq|    "$sig_hr->{'msg'}"\n|;
     }
 
-    return &assign_sid_dl($sig_hr->{'sid'}), $SIG_MATCH;
+    return &assign_sid_dl($sig_hr->{'sid'}, $sig_hr->{'dl'}), $SIG_MATCH;
 }
 
 sub match_snort_icmp_keywords() {
@@ -1947,7 +1947,7 @@ sub match_snort_icmp_keywords() {
             qq|    "$sig_hr->{'msg'}"\n|;
     }
 
-    return &assign_sid_dl($sig_hr->{'sid'}), $SIG_MATCH;
+    return &assign_sid_dl($sig_hr->{'sid'}, $sig_hr->{'dl'}), $SIG_MATCH;
 }
 
 sub match_snort_ip_keywords() {
@@ -1997,7 +1997,7 @@ sub match_snort_ip_keywords() {
         $top_sigs{$sig_hr->{'sid'}}++;
         $top_sig_counts{$pkt_hr->{'src'}}++;
 
-        return &assign_sid_dl($sig_hr->{'sid'}), $SIG_MATCH;
+        return &assign_sid_dl($sig_hr->{'sid'}, $sig_hr->{'dl'}), $SIG_MATCH;
     }
     return 1, $NO_SIG_MATCH;
 }
@@ -2405,18 +2405,16 @@ sub ttl_range() {
 }
 
 sub assign_sid_dl() {
-    my $sig_hr = shift;
-
-    my $dl = $sig_hr->{'dl'};  ### default sid danger level
+    my ($sid, $dl) = @_;
 
     ### see if /etc/psad/snort_rule_dl assigns a DL (may be
     ### zero).
-    if (defined $snort_rule_dl{$sig_hr->{'sid'}}) {
-        $dl = $snort_rule_dl{$sig_hr->{'sid'}};
+    if (defined $snort_rule_dl{$sid}) {
+        $dl = $snort_rule_dl{$sid};
     }
 
     print STDERR "[+] assign_sid_dl(): snort_rule_dl ",
-        "assigning SID $sig_hr->{'sid'} a danger level of ",
+        "assigning SID $sid a danger level of ",
         "$dl\n" if $debug;
 
     return $dl;
@@ -2463,7 +2461,7 @@ sub add_fwsnort_sid() {
             }
         }
 
-        return &assign_sid_dl($sid);
+        return &assign_sid_dl($sid, 2);
 
     } else {
         print "[-] Found sid: $sid in packet, but no ",

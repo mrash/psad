@@ -199,6 +199,8 @@ Jeffrey Sofferin
     - Found bug for not preserving user modifications in auto_dl file.
     - Found bug on SuSE systems running syslog-ng where the syslog-ng.conf
       reconfig added by psad caused the daemon to not start.
+    - Found initialization bug that caused signature danger levels to not
+      be properly assigned by the /etc/psad/snort_rule_dl file.
 
 Kenneth Grande
     - Suggested protocol-specific thresholds for email alerts.

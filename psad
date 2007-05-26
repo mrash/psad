@@ -1070,6 +1070,37 @@ sub check_scan() {
             }
         }
 
+        unless ($no_snort_sids) {
+            if ($pkt{'fwsnort_sid'}) {
+
+                ### found a fwsnort sid in the packet log message
+                my ($dl, $is_sig_match) = &add_fwsnort_sid(\%pkt);
+
+                if ($dl) {
+                    $curr_sids_dl{$pkt{'src'}} = $dl;
+                } else {
+                    ### a signature matched but is supposed
+                    ### to be ignored
+                    next PKT if $is_sig_match == $SIG_MATCH;
+                }
+
+            } else {
+                ### attempt to match any tcp/udp/icmp signatures in the
+                ### main signatures hash
+                unless ($no_signatures) {
+
+                    my ($dl, $is_sig_match) = &match_sigs(\%pkt);
+
+                    if ($dl) {
+                        $curr_sigs_dl{$pkt{'src'}} = $dl;
+                    } else {
+                        ### a signature matched but is supposed
+                        ### to be ignored
+                        next PKT if $is_sig_match == $SIG_MATCH;
+                    }
+                }
+            }
+        }
         ### note that we send this packet data off to DShield regardless
         ### of whether psad decides that it is associated with a scan so
         ### that DShield can make its own determination
@@ -1203,26 +1234,6 @@ sub check_scan() {
                         and $scan{$pkt{'src'}}{$pkt{'dst'}}{'absnum'} < 100) {
                     &posf($pkt{'src'}, $pkt{'ip_len'}, $pkt{'tos'},
                             $pkt{'ttl'}, $pkt{'ip_id'}, $pkt{'win'})
-                }
-            }
-        }
-
-        unless ($no_snort_sids) {
-            if ($pkt{'fwsnort_sid'}) {
-
-                ### found a fwsnort sid in the packet log message
-                my $dl = &add_fwsnort_sid(\%pkt);
-
-                $curr_sids_dl{$pkt{'src'}} = $dl if $dl;
-
-            } else {
-                ### attempt to match any tcp/udp/icmp signatures in the
-                ### main signatures hash
-                unless ($no_signatures) {
-
-                    my $dl = &match_sigs(\%pkt);
-
-                    $curr_sigs_dl{$pkt{'src'}} = $dl if $dl;
                 }
             }
         }
@@ -1604,13 +1615,14 @@ sub match_sigs() {
     my $pkt_hr = shift;
 
     my $dl = 0;
+    my $is_sig_match = $NO_SIG_MATCH;
 
     print STDERR "[+] match_sigs()\n" if $debug and $verbose;
 
     ### always run the IP protocol sigs
     for my $proto ($pkt_hr->{'proto'}, 'ip') {
 
-        return 0 unless defined $sig_search{$proto};
+        return 0, $NO_SIG_MATCH unless defined $sig_search{$proto};
 
         SRC: for my $src (keys %{$sig_search{$proto}}) {
             print STDERR "[+] SRC: sig_ip: $src, pkt src: $pkt_hr->{'src'}\n"
@@ -1677,12 +1689,16 @@ sub match_sigs() {
                                         ### signatures that match the sip/dip
                                         ### and sp/dp, so match any Snort
                                         ### keywords
-                                        my $dl_tmp = &match_snort_keywords($pkt_hr,
-                                                $dp_hr->{$dp_s}->{$dp_e});
+                                        my ($dl_tmp, $sig_match_tmp) = &match_snort_keywords(
+                                                $pkt_hr, $dp_hr->{$dp_s}->{$dp_e});
 
+                                        print STDERR "    match_snort_keywords() ",
+                                            " return DL: $dl_tmp\n" if $debug;
                                         ### return maximal danger level from all
                                         ### signature matches
                                         $dl = $dl_tmp if $dl_tmp > $dl;
+                                        $is_sig_match = $SIG_MATCH
+                                            if $sig_match_tmp == $SIG_MATCH;
                                     }
                                 }
                             }
@@ -1691,16 +1707,19 @@ sub match_sigs() {
                 } else {
                     ### now we have the set of applicable icmp
                     ### signatures that match the sip/dip
-                    my $dl_tmp = &match_snort_keywords($pkt_hr,
-                            $sig_search{$proto}{$src}{$dst});
+                    my ($dl_tmp, $sig_match_tmp) = &match_snort_keywords(
+                            $pkt_hr, $sig_search{$proto}{$src}{$dst});
 
+                    print STDERR "    match_snort_keywords() ",
+                        " return DL: $dl_tmp\n" if $debug;
                     ### return maximal danger level from all signature matches
                     $dl = $dl_tmp if $dl_tmp > $dl;
+                    $is_sig_match = $SIG_MATCH if $sig_match_tmp == $SIG_MATCH;
                 }
             }
         }
     }
-    return $dl;
+    return $dl, $is_sig_match;
 }
 
 sub match_snort_keywords() {
@@ -1709,6 +1728,7 @@ sub match_snort_keywords() {
     print STDERR "[+] match_snort_keywords()\n" if $debug;
 
     my $dl = 0;
+    my $matched_sig = $NO_SIG_MATCH;
 
     ### see if all Snort keywords match the packet
     SIG: for my $sid (keys %$sigs_ids_hr) {
@@ -1725,6 +1745,7 @@ sub match_snort_keywords() {
         my ($rv, $sig_match_rv) = &match_snort_ip_keywords($pkt_hr, $sig_hr);
 
         if ($sig_match_rv == $SIG_MATCH) {
+            $matched_sig = $SIG_MATCH;
             $dl_tmp = $rv;
             if ($rv == 0) {
                 next SIG;  ### ignore signature
@@ -1748,6 +1769,7 @@ sub match_snort_keywords() {
 
             if ($sig_match_rv == $SIG_MATCH) {
 
+                $matched_sig = $SIG_MATCH;
                 next SIG if $rv == 0;
 
                 $dl = $rv if $rv > $dl;
@@ -1779,6 +1801,7 @@ sub match_snort_keywords() {
 
             if ($sig_match_rv == $SIG_MATCH) {
 
+                $matched_sig = $SIG_MATCH;
                 next SIG if $rv == 0;
 
                 $dl = $rv if $rv > $dl;
@@ -1830,6 +1853,7 @@ sub match_snort_keywords() {
 
             if ($sig_match_rv == $SIG_MATCH) {
 
+                $matched_sig = $SIG_MATCH;
                 next SIG if $rv == 0;
 
                 $dl = $rv if $rv > $dl;
@@ -1850,7 +1874,7 @@ sub match_snort_keywords() {
         }
 
     }
-    return $dl;
+    return $dl, $matched_sig;
 }
 
 sub match_snort_tcp_keywords() {
@@ -2427,6 +2451,15 @@ sub add_fwsnort_sid() {
 
     if (defined $fwsnort_sigs{$sid}) {
 
+        ### see if we need to ignore this signature match
+        my $dl = &assign_sid_dl($sid, 2);
+
+        unless ($dl) {
+            print "[+] add_fwsnort_sid(): ignoring fwsnort signature ",
+                "match for SID: $sid (DL=0)\n" if $debug;
+            return 0, $SIG_MATCH;
+        }
+
         $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{$pkt_hr->{'proto'}}
             {'sid'}{$sid}{$pkt_hr->{'chain'}}{'pkts'}++;
 
@@ -2461,13 +2494,13 @@ sub add_fwsnort_sid() {
             }
         }
 
-        return &assign_sid_dl($sid, 2);
+        return $dl, $SIG_MATCH;
 
     } else {
         print "[-] Found sid: $sid in packet, but no ",
             "corresponding fwsnort rule.\n" if $debug;
     }
-    return 0;
+    return 0, $NO_SIG_MATCH;
 }
 
 sub dshield_email_log() {

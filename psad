@@ -8704,128 +8704,124 @@ psad; the Port Scan Attack Detector
 Usage: psad [options]
 
 Options:
+
     -A,  --Analyze-msgs           - Analyze iptables logfile and exit.
     -e,  --email-analysis         - Send emails for scans detected in
                                     offline analysis mode.
-    -w,  --whois-analysis         - Enable whois lookups when running
-                                    in offline analysis mode.
-    -m,  --messages-file <file>   - Specify the path to the iptables
-                                    logfile (use in conjunction with
+    -w,  --whois-analysis         - Enable whois lookups when running in
+                                    offline analysis mode.
+    -m,  --messages-file <file>   - Specify the path to the iptables logfile
+                                    (use in conjunction with
                                     --Analyze-msgs).
-    -i,  --interface <intf>       - Restrict detection to IN interface
-                                    (for INPUT and FORWARD chains) or
-                                    OUT interface (for OUPUT chain).
+    -i,  --interface <intf>       - Restrict detection to IN interface (for
+                                    INPUT and FORWARD chains) or OUT
+                                    interface (for OUPUT chain).
     --sig-update                  - Download the latest set of psad
                                     signatures from:
                                     http://www.cipherdyne.org/
-    --fw-analyze                  - Analyze the local iptables ruleset
-                                    and exit.
-    --fw-list-auto                - List the contents of any iptables
-                                    chains use for auto-blocking rules.
+    --fw-analyze                  - Analyze the local iptables ruleset and
+                                    exit.
+    --fw-list-auto                - List the contents of any iptables chains
+                                    use for auto-blocking rules.
     --List                        - Synonym for --fw-list-auto (emulates
                                     iptables command line).
-    --fw-block-ip  <ip>           - Add an IP/network to the auto-
-                                    blocking chains.
+    --fw-block-ip  <ip>           - Add an IP/network to the auto-blocking
+                                    chains.
     --fw-rm-block-ip  <ip>        - Remove an IP/network from the auto-
                                     blocking chains.
-    --fw-file <rules file>        - Analyze the iptables ruleset
-                                    contained within <rules file>
-                                    instead of a running policy.
-    --fw-del-chains               - Delete iptables chains used by
-                                    psad for auto-blocking rules.
+    --fw-file <rules file>        - Analyze the iptables ruleset contained
+                                    within <rules file> instead of a running
+                                    policy.
+    --fw-del-chains               - Delete iptables chains used by psad for
+                                    auto-blocking rules.
     -X                            - Synonym for --fw-del-chains (emulates
                                     iptables command line).
     --fw-dump                     - Dump a sanitized version of the local
                                     iptables policy.
-    --fw-include-ips              - Include all IPs/nets in iptables
-                                    dump (--fw-dump) output.
+    --fw-include-ips              - Include all IPs/nets in iptables dump
+                                    (--fw-dump) output.
     -snort-rdir <rule dir>        - Path to snort rules directory.
     --debug,                      - Run psad in debugging mode.
     --debug-sid <sid>             - Debug a specific Snort rule.
-    -D,  --Dump-conf              - Dump psad configuration on STDOUT
-                                    and exit.
-    -l,  --log-server             - psad is being run on a syslog
-                                    logging server.
+    -D,  --Dump-conf              - Dump psad configuration on STDOUT and
+                                    exit.
+    -l,  --log-server             - psad is being run on a syslog logging
+                                    server.
     -F,  --Flush                  - Remove any auto-generated firewall
                                     block rules (emulates iptables command
                                     line).
     -K,  --Kill                   - Kill all running psad processes.
     -R,  --Restart                - Restart all running psad processes.
-    -S,  --Status                 - Displays the status of any
-                                    currently running psad processes.
-    --restrict-ip <IP address>    - Only process packets that have this
-                                    IP as the src or dst.
+    -S,  --Status                 - Displays the status of any currently
+                                    running psad processes.
+    --restrict-ip <IP address>    - Only process packets that have this IP
+                                    as the src or dst.
     --status-ip <IP address>      - View status for a specific IP.
     --status-dl <dl>              - Display status information for only
                                     those scans that have reach at least
                                     <dl> (from 1 to 5).
-    --status-summary              - Only display summary status output
-                                    in --Status and --Analyze modes.
-    -B,  --Benchmark              - run psad in benchmark mode.
+    --status-summary              - Only display summary status output in
+                                    --Status and --Analyze modes.
+    -B,  --Benchmark              - Run psad in benchmark mode.
     --packets <number>            - Specify number of packets to use in
                                     benchmark test (default is 10,000).
     -U,  --USR1                   - Send a running psad process a USR1
                                     signal (generates a dump of psad
                                     data structures on STDOUT).
-    -H,  --HUP                    - Send all psad daemons a HUP signal
-                                    to have them re-import configs.
-    --CSV                         - Parse iptables log messages and
-                                    dump fields to stdout in csv format.
+    -H,  --HUP                    - Send all psad daemons a HUP signal to
+                                    have them re-import configs.
+    --CSV                         - Parse iptables log messages and dump
+                                    fields to stdout in csv format.
     --CSV-fields <fields>         - Restrict --CSV output to a list of
                                     specfic fields.
-    --CSV-unique-lines            - Only print unique lines in CSV
-                                    output.
-    --CSV-max-lines <num>         - Specify the maximum number of CSV
-                                    output lines to print.
-    --CSV-start-line <line>       - Starting line within iptables log
-                                    file.
-    --CSV-end-line <line>         - Ending line within iptables log
-                                    file.
-    --CSV-regex <regex>           - Require iptables log messages to
-                                    match an additional regex in --CSV
-                                    mode.
+    --CSV-unique-lines            - Only print unique lines in CSV output.
+    --CSV-max-lines <num>         - Specify the maximum number of CSV output
+                                    lines to print.
+    --CSV-start-line <line>       - Starting line within iptables log file.
+    --CSV-end-line <line>         - Ending line within iptables log file.
+    --CSV-regex <regex>           - Require iptables log messages to match
+                                    an additional regex in --CSV mode.
     --CSV-neg-regex <regex>       - Require iptables log messages to
-                                    not match an additional regex in
-                                    --CSV mode.
-    --signatures <sigs file>      - Manually specify the path to the
-                                    psad signatures file.
-    --snort-type                  - Restrict psad to look for specific
-                                    snort sids such as those in
-                                    ddos.rules or backdoor.rules.
-    --passive-os-sigs <sigs file> - Manually specify the path to the
-                                    passive os fingerprinting sigs.
+                                    not match an additional regex in --CSV
+                                    mode.
+    --signatures <sigs file>      - Manually specify the path to the psad
+                                    signatures file.
+    --snort-type                  - Restrict psad to look for specific Snort
+                                    sids such as those in ddos.rules or
+                                    backdoor.rules.
+    --passive-os-sigs <sigs file> - Manually specify the path to the passive
+                                    os fingerprinting sigs.
     --auto-dl <dl file>           - Import auto-danger level file for
-                                    automatic IP danger level
-                                    increases/decreses.
+                                    automatic IP danger level increases or
+                                    decreses.
     --analysis-write-data         - Write data to filesystem from -A mode
-                                    (the disk IO involved in this step
-                                    can take a long time).
-    -c,  --config <config file>   - Use <config file> instead of the
-                                    normal config file located at
+                                    (the disk IO involved in this step can
+                                    take a long time).
+    -c,  --config <config file>   - Use <config file> instead of the normal
+                                    config file located at
                                     $config_file.
-    -I,  --Interval <seconds>     - Configure the check interval from
-                                    the command line to override the 5
-                                    second default.
+    -I,  --Interval <seconds>     - Configure the check interval from the
+                                    command line to override the 5 second
+                                    default.
     -v,  --verbose                - Run in verbose mode.
     -V,  --Version                - Print the psad version and exit.
 
     --no-snort-sids               - Disable examination for snort sids
-                                    (such as those generated by fwsnort)
-                                    in iptables log messages.
+                                    (such as those generated by fwsnort) in
+                                    iptables log messages.
     --no-signatures               - Disable psad signature processing
                                     (independent of snort sid matching).
     --no-icmp-types               - Disable icmp type/code validation.
     --no-auto-dl                  - Disable auto danger level assignment.
     --no-daemon                   - Do not run as a daemon.
-    --no-ipt-errors               - Do not write errors to the error
-                                    log.
+    --no-ipt-errors               - Do not write errors to the error log.
     --no-whois                    - Disable whois lookups.
     --no-fwcheck                  - Disable firewall rules verification.
-    --no-rdns                     - Disable name resolution against
-                                    scanning IP addresses.
-    --no-kmsgsd                   - Disable startup of kmsgsd (useful
-                                    for debugging with an existing file
-                                    of iptables log messages).
+    --no-rdns                     - Disable name resolution against scanning
+                                    IP addresses.
+    --no-kmsgsd                   - Disable startup of kmsgsd (useful for
+                                    debugging with an existing file of
+                                    iptables log messages).
     --no-netstat                  - Disable local port lookups for scan
                                     signatures.
     -h   --help                   - Display usage on STDOUT and exit.

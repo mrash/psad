@@ -25,7 +25,7 @@
 #
 #############################################################################
 #
-# $Id: cd_rpmbuilder 634 2007-03-07 01:29:09Z mbr $
+# $Id: cd_rpmbuilder 687 2007-05-27 02:03:38Z mbr $
 #
 
 use File::Find;
@@ -89,7 +89,7 @@ if ($project) {
 }
 
 die "[*] $wgetCmd is not a valid path to wget, update the config section."
-    unless -x $rpmbuildCmd;
+    unless -x $wgetCmd;
 die "[*] $rpmbuildCmd is not a valid path to rpmbuild, update the config " .
     "section." unless -x $rpmbuildCmd;
 

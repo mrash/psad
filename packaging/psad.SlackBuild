@@ -1,19 +1,24 @@
 #!/bin/bash
 ################################################################################
-# psad.SlackBuild -- pyllyukko@maimed.org -- 26.1.2007                         #
+# psad.SlackBuild -- v1.2 -- pyllyukko <at> maimed <dot> org -- 26.1.2007 ->   #
+#                                                                              #
+# NOTES:                                                                       #
+#   - you might wan't to change %_sysconfdir in                                #
+#     /usr/lib/rpm/`uname -m`-linux/macros                                     #
+#                                                                              #
 ################################################################################
 declare -r  RPM_BUILDER="http://www.cipherdyne.org/scripts/cd_rpmbuilder.tar.gz"
 declare -r  RPM_ROOT_DIR="/usr/src/rpm"
 declare -r  ARCH="i386"
 declare -ri BUILD=1
 PSAD_VERSION=`wget --no-verbose --output-document=- http://www.cipherdyne.org/psad/psad-latest` || {
-  echo "error!" 1>&2
+  echo "error at line $[${LINENO}-1]!" 1>&2
   exit 1
 }
 ################################################################################
 wget --no-verbose --output-document=- "${RPM_BUILDER}" | tar xz --to-stdout | perl -- - -p psad -r "${RPM_ROOT_DIR}"
 [ $[ ${PIPESTATUS[0]} | ${PIPESTATUS[1]} | ${PIPESTATUS[2]} ] -ne 0 ] && {
-  echo "error!" 1>&2
+  echo "error at line $[${LINENO}-2]!" 1>&2
   exit 1
 }
 [ ! -f "${RPM_ROOT_DIR}/RPMS/${ARCH}/psad-${PSAD_VERSION}-${BUILD}.${ARCH}.rpm" ] && {

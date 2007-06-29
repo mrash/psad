@@ -773,7 +773,7 @@ MAIN: for (;;) {
 
     if ($hup_flag) {
 
-        &sys_log('psad', 'received HUP signal, ' .
+        &sys_log('received HUP signal, ' .
             're-importing psad.conf');
 
         print STDERR "[+] Received HUP signal, re-importing config...\n"
@@ -816,7 +816,7 @@ MAIN: for (;;) {
     if ($usr1_flag) {
         $usr1_flag = 0;  ### clear the USR1 flag
 
-        &sys_log('psad', 'received USR1 signal, printing scan ' .
+        &sys_log('received USR1 signal, printing scan ' .
             "hashes to $config{'PSAD_DIR'}/scan_hash.$$");
 
         ### dump scan hash to filesystem
@@ -1689,8 +1689,9 @@ sub match_sigs() {
                                         ### signatures that match the sip/dip
                                         ### and sp/dp, so match any Snort
                                         ### keywords
-                                        my ($dl_tmp, $sig_match_tmp) = &match_snort_keywords(
-                                                $pkt_hr, $dp_hr->{$dp_s}->{$dp_e});
+                                        my ($dl_tmp, $sig_match_tmp) =
+                                                &match_snort_keywords($pkt_hr,
+                                                    $dp_hr->{$dp_s}->{$dp_e});
 
                                         print STDERR "    match_snort_keywords() ",
                                             " return DL: $dl_tmp\n" if $debug;
@@ -2395,7 +2396,8 @@ sub posf() {
             if (defined $posf{$src}{'win'}{$posf_sigs{$os}{'win'}}
 #                    and defined $posf{$src}{'tos'}{$posf_sigs{$os}{'tos'}}
                     and defined $posf{$src}{'len'}{$posf_sigs{$os}{'len'}}
-                    and ($min_ttl > ($posf_sigs{$os}{'ttl'}-$max_hops))  ### ttl's only decrease
+                    ### ttl's only decrease
+                    and ($min_ttl > ($posf_sigs{$os}{'ttl'}-$max_hops))
                     and ($max_ttl <= $posf_sigs{$os}{'ttl'})
                     and $id_str eq $posf_sigs{$os}{'id'}) {
                 $posf{$src}{'guess'} = $os;
@@ -2574,7 +2576,7 @@ sub dshield_email_log() {
             close DSSAVE;
         }
 
-        &sys_log('psad', "sent $#dshield_data lines of log data to " .
+        &sys_log("sent $#dshield_data lines of log data to " .
             $config{'DSHIELD_ALERT_EMAIL'});
 
         ### store the current time
@@ -2851,7 +2853,7 @@ sub validate_config() {
     if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
             and $config{'IPTABLES_BLOCK_METHOD'} eq 'N'
             and $config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'N') {
-        &sys_log('psad', 'config warning, ENABLE_AUTO_IDS=Y, but ' .
+        &sys_log('config warning, ENABLE_AUTO_IDS=Y, but ' .
             'both IPTABLES_BLOCK_METHOD and TCPWRAPPERS_BLOCK_METHOD are ' .
             'set to N.');
     }
@@ -2943,7 +2945,7 @@ sub validate_home_net() {
     } else {
 
         if ($config{'HOME_NET'} =~ /CHANGEME/) {
-            &sys_log('psad', 'config warning: the HOME_NET ' .
+            &sys_log('config warning: the HOME_NET ' .
                 'variable has not been set, defaulting to "any"');
 
             $config{'HOME_NET'} = 'any';
@@ -2978,7 +2980,7 @@ sub validate_home_net() {
                 ### note that this might be ok if psad is running on a syslog
                 ### server, but the most likely explanation is that there was a
                 ### typo in the HOME_NET variable defintion.
-                &sys_log('psad', 'config warning: HOME_NET definition ' .
+                &sys_log('config warning: HOME_NET definition ' .
                     qq|in psad.conf contains "$home_net" which does not appear | .
                     "to be directly connected to the local system.");
             }
@@ -3050,19 +3052,19 @@ sub import_fw_search() {
         }
     }
     unless (defined $config{'FW_SEARCH_ALL'}) {
-        &sys_log('psad', 'defaulting missing ' .
+        &sys_log('defaulting missing ' .
             "FW_SEARCH_ALL variable in $config_file to Y.");
         $config{'FW_SEARCH_ALL'} = 'Y';
     }
 
     unless ($config{'FW_SEARCH_ALL'} eq 'Y' or
             $config{'FW_SEARCH_ALL'} eq 'N') {
-        &sys_log('psad', 'setting FW_SEARCH_ALL to Y.');
+        &sys_log('setting FW_SEARCH_ALL to Y.');
         $config{'FW_SEARCH_ALL'} = 'Y';
     }
 
     if ($config{'FW_SEARCH_ALL'} eq 'N' and not $found_fw_search) {
-        &sys_log('psad', 'defaulting missing ' .
+        &sys_log('defaulting missing ' .
             "FW_MSG_SEARCH variable in $config_file to DROP.");
         push @fw_search, 'DROP';
     }
@@ -3124,7 +3126,7 @@ sub parse_ignore_protocols() {
     my @protos = split /\s*,\s*/, $config{'IGNORE_PROTOCOLS'};
     for my $proto (@protos) {
         if ($proto =~ /\W/) {
-            &sys_log('psad', 'invalid protocol in IGNORE_PROTOCOLS var');
+            &sys_log('invalid protocol in IGNORE_PROTOCOLS var');
         } else {
             if ($proto =~ /^\d+$/) {
                 ### IP protocol number
@@ -3147,7 +3149,7 @@ sub parse_ignore_interfaces() {
     my @interfaces = split /\s*,\s*/, $config{'IGNORE_INTERFACES'};
     for my $intf (@interfaces) {
         if ($intf =~ /\W/) {
-            &sys_log('psad', 'invalid interface in IGNORE_INTERFACES var');
+            &sys_log('invalid interface in IGNORE_INTERFACES var');
         } else {
             $ignore_interfaces{$intf} = '';
         }
@@ -3234,7 +3236,7 @@ sub import_snort_rules() {
     &import_snort_rule_dl();
 
     print STDERR Dumper %fwsnort_sigs if $debug and $verbose;
-    &sys_log('psad', "imported original Snort rules in " .
+    &sys_log("imported original Snort rules in " .
         "$config{'SNORT_RULES_DIR'}/ for reference info");
     return;
 }
@@ -3257,7 +3259,7 @@ sub import_snort_class_priorities() {
         }
     }
     close F;
-    &sys_log('psad', 'imported Snort classification.config');
+    &sys_log('imported Snort classification.config');
     return;
 }
 
@@ -3426,7 +3428,7 @@ sub import_signatures() {
             if ($config{'ENABLE_SNORT_SIG_STRICT'} eq 'Y') {
                 die $msg;
             } else {
-                &sys_log('psad', $msg);
+                &sys_log($msg);
                 next SIG;
             }
         }
@@ -3676,7 +3678,7 @@ sub import_signatures() {
         print STDERR "[+] Main signatures hash:\n",
             Dumper(\%sig_search), Dumper(\%sigs);
     }
-    &sys_log('psad', "imported $sig_ctr psad Snort signatures " .
+    &sys_log("imported $sig_ctr psad Snort signatures " .
         "from $config{'SIGS_FILE'}");
     return;
 }
@@ -3691,7 +3693,7 @@ sub check_supported_options() {
             if ($config{'ENABLE_SNORT_SIG_STRICT'} eq 'Y') {
                 die $msg;
             } else {
-                &sys_log('psad', $msg);
+                &sys_log($msg);
                 return 0;
             }
         }
@@ -3731,7 +3733,7 @@ sub import_icmp_types() {
         }
     }
     print STDERR Dumper %valid_icmp_types if $debug and $verbose;
-    &sys_log('psad', 'imported valid icmp types and codes');
+    &sys_log('imported valid icmp types and codes');
     return;
 }
 
@@ -3875,14 +3877,14 @@ sub import_auto_dl() {
             $dl          = $2;
             $opt_criteria = $3;
             my $iaddr = inet_aton($hostname) or
-                &sys_log('psad', "could not resolve auto_dl $hostname " .
+                &sys_log("could not resolve auto_dl $hostname " .
                     "to an IP at line $i");
             $ip = inet_ntoa($iaddr) or
-                &sys_log('psad', "could not resolve auto_dl $hostname " .
+                &sys_log("could not resolve auto_dl $hostname " .
                     "to an IP at line $i");
             $mask = '32';  ### single IP
         } else {
-            &sys_log('psad', "improperly formatted auto_dl line $i");
+            &sys_log("improperly formatted auto_dl line $i");
             next LINE;
         }
 
@@ -3928,7 +3930,7 @@ sub import_auto_dl() {
         ### don't write syslog message if we are running in --fw-block-ip
         ### mode
         unless ($fw_block_ip) {
-            &sys_log('psad', "imported auto_dl, got $ip_ctr " .
+            &sys_log("imported auto_dl, got $ip_ctr " .
                 "IP addresses and $net_ctr networks");
         }
     }
@@ -3972,7 +3974,7 @@ sub import_p0f_sigs() {
     }
 
     print STDERR Dumper %p0f_sigs if $debug and $verbose;
-    &sys_log('psad', 'imported p0f-based passive OS fingerprinting signatures');
+    &sys_log('imported p0f-based passive OS fingerprinting signatures');
     return;
 }
 
@@ -4009,53 +4011,52 @@ sub import_posf_sigs() {
     ### make sure each of the os signatures has all fields defined
     OS: for my $os (keys %posf_sigs) {
         unless (defined $posf_sigs{$os}{'numpkts'}) {
-            &sys_log('psad', "$posf_file: missing " .
+            &sys_log("$posf_file: missing " .
                 "NUMPKTS for os: $os");
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'tos'}) {
-            &sys_log('psad', "$posf_file: missing " .
+            &sys_log("$posf_file: missing " .
                 "TOS for os: $os");
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'len'}) {
-            &sys_log('psad', "$posf_file: missing " .
+            &sys_log("$posf_file: missing " .
                 "LEN for os: $os");
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'ttl'}) {
-            &sys_log('psad', "$posf_file: missing " .
+            &sys_log("$posf_file: missing " .
                 "TTL for os: $os");
             delete $posf_sigs{$os};
             next OS;
         }
         unless (defined $posf_sigs{$os}{'id'}) {
-            &sys_log('psad', "$posf_file: missing " .
+            &sys_log("$posf_file: missing " .
                 "ID for os: $os");
             delete $posf_sigs{$os};
             next OS;
         } else {
             unless ($posf_sigs{$os}{'id'} eq 'SMALLINCR'
                     || $posf_sigs{$os}{'id'} eq 'RANDOM') {
-                &sys_log('psad', "$posf_file: ID must " .
+                &sys_log("$posf_file: ID must " .
                     "be either SMALLINCR or RANDOM for os: $os");
                 delete $posf_sigs{$os};
                 next OS;
             }
         }
         unless (defined $posf_sigs{$os}{'win'}) {
-            &sys_log('psad', "$posf_file: missing " .
+            &sys_log("$posf_file: missing " .
                 "WINDOW for os: $os");
             delete $posf_sigs{$os};
             next OS;
         }
     }
     print STDERR Dumper %posf_sigs if $debug and $verbose;
-    &sys_log('psad',
-        'imported TOS-based passive OS fingerprinting signatures');
+    &sys_log('imported TOS-based passive OS fingerprinting signatures');
     return;
 }
 
@@ -4182,7 +4183,7 @@ sub assign_auto_danger_level() {
             if (not defined $auto_dl{$net}{'proto'}) {
                 ### all protocols are applicable
                 $scan_dl{$pkt_hr->{'src'}} = $dl;
-                &sys_log('psad', 'auto-assigned danger level: ' .
+                &sys_log('auto-assigned danger level: ' .
                     "$dl for IP: $pkt_hr->{'src'}");
                 return $dl;
             } else {
@@ -4193,14 +4194,14 @@ sub assign_auto_danger_level() {
                         if (&match_port(\%{$auto_dl{$net}{'proto'}{$proto}},
                                 $pkt_hr->{'dp'})) {
                             $scan_dl{$pkt_hr->{'src'}} = $dl;
-                            &sys_log('psad', 'auto-assigned danger ' .
+                            &sys_log('auto-assigned danger ' .
                                 "level: $dl for IP: $pkt_hr->{'src'}");
                             return $dl;
                         }
                     } elsif (defined $auto_dl{$net}{'proto'}{$proto}{'all'}) {
                         ### we only require to match the protocol
                          $scan_dl{$pkt_hr->{'src'}} = $dl;
-                         &sys_log('psad', 'auto-assigned danger ' .
+                         &sys_log('auto-assigned danger ' .
                              "level: $dl for IP: $pkt_hr->{'src'}");
                          return $dl;
                     }
@@ -4369,7 +4370,8 @@ sub log_top_scans() {
     open A, "> $config{'TOP_ATTACKERS_FILE'}" or
         die "[*] Could not open $config{'TOP_ATTACKERS_FILE'}: $!";
     $ctr = 0;
-    print A "#\n# Format: <IP> <DL> <total_packets> <uniq_sigs> <sig_matches> <is_local>\n#\n\n";
+    print A "#\n# Format: <IP> <DL> <total_packets> ",
+        "<uniq_sigs> <sig_matches> <is_local>\n#\n\n";
     for my $src (sort {$scan_dl{$b} cmp $scan_dl{$a}} keys %scan_dl) {
         next unless $scan_dl{$src} >= $config{'MIN_DANGER_LEVEL'};
         next unless defined $top_packet_counts{$src}
@@ -4828,7 +4830,7 @@ sub scan_logr() {
             $syslog_str .= " icmp pkts: $icmp_newpkts" if $icmp_newpkts;
             $syslog_str .= " DL: $curr_dl";
 
-            &sys_log('psad', $syslog_str);
+            &sys_log($syslog_str);
 
             unless ($no_whois) {
                 print $fh "\n[+] Whois Information:\n";
@@ -4982,7 +4984,7 @@ sub scan_logr_signatures() {
                     }
 
                     ### write the signature match to syslog
-                    &sys_log('psad', $sig_log_str);
+                    &sys_log($sig_log_str);
                 }
 
                 print $email_fh qq|   "$sig_hr->{'msg'}"\n|;
@@ -5228,7 +5230,7 @@ sub renew_auto_blocked_ips() {
                         $auto_blocked_ips{$ip} = $orig_block_time
                             unless defined $auto_blocked_ips{$ip};
                     } else {
-                        &sys_log('psad', "renewing tcpwrappers auto-block " .
+                        &sys_log("renewing tcpwrappers auto-block " .
                             "against $ip $timeout_str");
                         &tcpwr_block($ip);
                         if ($config{'ENABLE_RENEW_BLOCK_EMAILS'} eq 'Y') {
@@ -5252,7 +5254,7 @@ sub renew_auto_blocked_ips() {
                             $auto_blocked_ips{$ip} = $orig_block_time
                                 unless defined $auto_blocked_ips{$ip};
                         } else {
-                            &sys_log('psad', "renewing tcpwrappers auto-block " .
+                            &sys_log("renewing tcpwrappers auto-block " .
                                 "against $ip $timeout_str");
                             &tcpwr_block($ip);
                             if ($config{'ENABLE_RENEW_BLOCK_EMAILS'} eq 'Y') {
@@ -5317,7 +5319,7 @@ sub flush_auto_blocked_ips() {
     my $ipt = new IPTables::ChainMgr(%ipt_opts)
         or die '[*] Could not acquire IPTables::ChainMgr object.';
 
-    &sys_log('psad', 'flushing existing psad iptables ' .
+    &sys_log('flushing existing psad iptables ' .
         'auto-response chains');
 
     if (@ipt_config) {
@@ -5334,20 +5336,19 @@ sub flush_auto_blocked_ips() {
                     ($rv, $out_aref, $err_aref) = $ipt->delete_chain($table,
                         $from_chain, $to_chain);
                     if ($rv) {
-                        &sys_log('psad',
-                            "deleted $table table $to_chain chain");
+                        &sys_log("deleted $table table $to_chain chain");
                     } else {
-                        &sys_log('psad',
-                            "could not delete $table table $to_chain chain");
+                        &sys_log("could not delete $table " .
+                            "table $to_chain chain");
                         &sys_log_mline($err_aref);
                     }
                 } else {
                     ($rv, $out_aref, $err_aref)
                         = $ipt->flush_chain($table, $to_chain);
                     if ($rv) {
-                        &sys_log('psad', "flushed: $to_chain");
+                        &sys_log("flushed: $to_chain");
                     } else {
-                        &sys_log('psad', "could not flush: $to_chain");
+                        &sys_log("could not flush: $to_chain");
                         &sys_log_mline($err_aref);
                     }
                 }
@@ -5366,8 +5367,7 @@ sub flush_auto_blocked_ips() {
 
     if (-e $config{'AUTO_BLOCK_TCPWR_FILE'}) {
         my $found_blocked = 0;
-        &sys_log('psad',
-            "removing tcpwrapper auto-generated block rules.");
+        &sys_log("removing tcpwrapper auto-generated block rules.");
         open B, "< $config{'AUTO_BLOCK_TCPWR_FILE'}" or
             die "[*] Could not open $config{'AUTO_BLOCK_TCPWR_FILE'}: $!";
         my @lines = <B>;
@@ -5384,7 +5384,7 @@ sub flush_auto_blocked_ips() {
         ### the cache file.
         &truncate_file($config{'AUTO_BLOCK_TCPWR_FILE'});
         unless ($found_blocked) {
-            &sys_log('psad', "currently there are no auto-generated " .
+            &sys_log("currently there are no auto-generated " .
                 "tcpwrapper blocking rules in effect.");
         }
     }
@@ -5411,7 +5411,7 @@ sub check_auto_response_sock() {
     ### and we can recover by reopening it.
     return if -e $config{'AUTO_IPT_SOCK'};
 
-    &sys_log('psad', "domain socket $config{'AUTO_IPT_SOCK'} does not " .
+    &sys_log("domain socket $config{'AUTO_IPT_SOCK'} does not " .
         "exist (a separate process must have deleted it), recreating it.");
 
     close $ipt_sock;
@@ -5486,7 +5486,7 @@ sub ipt_block() {
 
             unless ($rv) {
                 my $msg = "could not create $table $to_chain chain";
-                &sys_log('psad', $msg);
+                &sys_log($msg);
                 &sys_log_mline($err_aref);
                 print STDERR "[-] ipt_block(): $msg\n" if $debug;
                 next;
@@ -5498,7 +5498,7 @@ sub ipt_block() {
 
             unless ($rv) {
                 my $msg = "could not add jump rule to $to_chain chain";
-                &sys_log('psad', $msg);
+                &sys_log($msg);
                 &sys_log_mline($err_aref);
                 print STDERR "[-] ipt_block(): $msg\n" if $debug;
                 next;
@@ -5528,7 +5528,7 @@ sub ipt_block() {
                 $block_success = 1;
             } else {
                 my $msg = "could not add block rule for $src -> $dst";
-                &sys_log('psad', $msg);
+                &sys_log($msg);
                 &sys_log_mline($err_aref);
                 print STDERR "[-] ipt_block(): $msg\n" if $debug;
             }
@@ -5553,7 +5553,7 @@ sub ipt_block() {
                     $block_success = 1;
                 } else {
                     my $msg = "could not add block rule for $src2 -> $dst2";
-                    &sys_log('psad', $msg);
+                    &sys_log($msg);
                     &sys_log_mline($err_aref);
                     print STDERR "[-] ipt_block(): $msg\n" if $debug;
                 }
@@ -5561,7 +5561,7 @@ sub ipt_block() {
         }
     }
     if ($already_blocked) {
-        &sys_log('psad', "block rule for IP: $ip already exists");
+        &sys_log("block rule for IP: $ip already exists");
         print STDERR "[-] Block rule for IP: $ip already exists\n"
             if $debug;
     } elsif ($block_success) {
@@ -5593,7 +5593,7 @@ sub ipt_block() {
                     $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
             }
         }
-        &sys_log('psad', $mail_msg);
+        &sys_log($mail_msg);
 
         ### write the ip out to the auto blocked file
         &diskwrite_blocked_ip($ip,
@@ -5602,7 +5602,7 @@ sub ipt_block() {
         print STDERR "[+] ipt_block(): added block for $ip\n"
             if $debug;
     } else {
-        &sys_log('psad', "could not add iptables " .
+        &sys_log("could not add iptables " .
             "block rule for: $ip");
         print STDERR "[-] Could not add iptables block rule for: $ip\n"
             if $debug;
@@ -5650,7 +5650,7 @@ sub ipt_rm_block() {
             $rm_block = 1;
         } else {
             my $msg = "could not delete rule for $src -> $dst";
-            &sys_log('psad', $msg);
+            &sys_log($msg);
             &sys_log_mline($err_aref);
             print STDERR "[-] ipt_rm_block(): $msg\n" if $debug;
         }
@@ -5665,7 +5665,7 @@ sub ipt_rm_block() {
                 $rm_block = 1;
             } else {
                 my $msg = "could not delete rule for $src -> $dst";
-                &sys_log('psad', $msg);
+                &sys_log($msg);
                 &sys_log_mline($err_aref);
                 print STDERR "[-] ipt_rm_block(): $msg\n" if $debug;
             }
@@ -5684,7 +5684,7 @@ sub ipt_rm_block() {
         unless ($flush_fw) {
             ### don't send timeout email if we are manually flushing
             ### the auto-block rules from the command line with --Flush.
-            &sys_log('psad', "removed iptables auto-block against " .
+            &sys_log("removed iptables auto-block against " .
                 $ip);
             if ($config{'ENABLE_AUTO_IDS_EMAILS'} eq 'Y') {
                 &send_mail("$config{'MAIL_STATUS_PREFIX'} removed " .
@@ -5698,7 +5698,7 @@ sub ipt_rm_block() {
         return 1;
     }
 
-    &sys_log('psad', 'warning: could not remove iptables ' .
+    &sys_log('warning: could not remove iptables ' .
         "block rule for $ip");
     print STDERR "[-] Could not remove iptables block rule for $ip\n"
         if $debug;
@@ -5999,7 +5999,7 @@ sub auto_psad_response() {
                 &ipt_block($src, '');
             }
             if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
-                &sys_log('psad', 'initiating tcpwrappers auto-block ' .
+                &sys_log('initiating tcpwrappers auto-block ' .
                     "against $src $timeout_str");
                 if ($config{'ENABLE_AUTO_IDS_EMAILS'} eq 'Y') {
                     &send_mail("$config{'MAIL_STATUS_PREFIX'} " .
@@ -6113,7 +6113,7 @@ sub build_ipt_config() {
                 my $msg = "the IPT_AUTO_CHAIN$ctr variable in psad.conf " .
                     "needs to be updated to set the jump rule position and " .
                     "the auto rule position; defaulting both to 1.";
-                    &sys_log('psad', $msg);
+                    &sys_log($msg);
                     print STDERR "[-] build_ipt_config(): $msg\n"
                         if $debug;
             } else {
@@ -6133,7 +6133,7 @@ sub build_ipt_config() {
                         $hsh{'direction'} eq 'both') {
                 my $msg = "invalid direction $hsh{'direction'} " .
                     "in IPT_AUTO_CHAIN$ctr keyword";
-                &sys_log('psad', $msg);
+                &sys_log($msg);
                 print STDERR "[-] build_ipt_config(): $msg\n"
                     if $debug;
                 next VAR;
@@ -6141,7 +6141,7 @@ sub build_ipt_config() {
             if ($hsh{'from_chain'} eq $hsh{'to_chain'}) {
                 my $msg = "cannot have identical from_chain and to_chain " .
                     "in IPT_AUTO_CHAIN$ctr keyword";
-                &sys_log('psad', $msg);
+                &sys_log($msg);
                 print STDERR "[-] build_ipt_config(): $msg\n"
                     if $debug;
                 next VAR;
@@ -6154,13 +6154,13 @@ sub build_ipt_config() {
             } else {
                 my $msg = "invalid IPT_AUTO_CHAIN$ctr keyword, " .
                     "$hsh{'from_chain'} chain does not exist.";
-                &sys_log('psad', $msg);
+                &sys_log($msg);
                 print STDERR "[-] build_ipt_config(): $msg\n"
                     if $debug;
             }
         } else {
             my $msg = "invalid IPT_AUTO_CHAIN$ctr variable: $value";
-            &sys_log('psad', $msg);
+            &sys_log($msg);
             print STDERR "[-] build_ipt_config(): $msg\n" if $debug;
         }
         $ctr++;
@@ -6365,7 +6365,7 @@ sub REAPER {
 sub stop_psad() {
     my $rv = 0;
 
-    &sys_log('psad', 'shutting down psad daemons');
+    &sys_log('shutting down psad daemons');
     ### must kill psadwatchd first since if not, it might try to restart
     ### any of the other two daemons.
     for my $pidname qw(psadwatchd kmsgsd psad) {
@@ -7191,7 +7191,7 @@ sub import_old_scans() {
 
     &import_filesystem_scan_data();
 
-    &sys_log('psad', 'imported ' . (keys %scan_dl) . ' scanning IP ' .
+    &sys_log('imported ' . (keys %scan_dl) . ' scanning IP ' .
             'addresses from previous psad instance');
     return;
 }
@@ -8011,7 +8011,7 @@ sub setup() {
                     "analysis by kmsgsd\n";
                 print SYSLOG "kern.info\t\t|$config{'PSAD_FIFO_FILE'}\n";
                 close SYSLOG;
-                &sys_log('psad', 'reconfiguring syslogd to write ' .
+                &sys_log('reconfiguring syslogd to write ' .
                     "kern.info messages to $config{'PSAD_FIFO_FILE'}");
                 system "$cmds{'killall'} -HUP syslogd";
             }
@@ -8057,7 +8057,7 @@ sub setup() {
                     "destination(psadpipe); };\n";
                 close SYSLOGNG;
 
-                &sys_log('psad', 'reconfiguring syslog-ng to write ' .
+                &sys_log('reconfiguring syslog-ng to write ' .
                     "kern.info messages to $config{'PSAD_FIFO_FILE'}");
                 system "$cmds{'killall'} -HUP syslog-ng";
             }
@@ -8098,7 +8098,7 @@ sub setup() {
                     '  command  = ',
                     "\"/usr/sbin/psadpipe.sh\"\n";
                 close METALOG;
-                &sys_log('psad', 'reconfiguring metalog to write ' .
+                &sys_log('reconfiguring metalog to write ' .
                         "kern-facility messages to /usr/sbin/psadpipe.sh");
 
                 open PIPESCRIPT, '> /usr/sbin/psadpipe.sh' or
@@ -8107,7 +8107,7 @@ sub setup() {
                     "echo \"\$3\" >> $config{'PSAD_FIFO_FILE'}\n";
                 close PIPESCRIPT;
                 chmod 0700, '/usr/sbin/psadpipe.sh';
-                &sys_log('psad', 'generated /usr/sbin/psadpipe.sh ' .
+                &sys_log('generated /usr/sbin/psadpipe.sh ' .
                         "which writes to $config{'PSAD_FIFO_FILE'}");
 
                 ### Metalog seems to simply die on SIGHUP and SIGALRM, and I
@@ -8136,8 +8136,7 @@ sub restart_kmsgsd() {
 
     return unless $pid;
 
-    &sys_log('psad', 'restarting kmsgsd since TRUNCATE_FWDATA is ' .
-        'enabled');
+    &sys_log('restarting kmsgsd since TRUNCATE_FWDATA is enabled');
     kill 9, $pid unless kill 15, $pid;
     system $cmds{'kmsgsd'};
 
@@ -8191,19 +8190,18 @@ sub disk_space_exceeded() {
         ### need to remove data
         $rv = 1;
         $rm_data_ctr++;
-        &sys_log('psad', "disk partition associated with " .
+        &sys_log("disk partition associated with " .
             "$config{'PSAD_DIR'} exceeded " .
             "$config{'DISK_MAX_PERCENTAGE'} prct utilization.");
         &send_mail("$config{'MAIL_ERROR_PREFIX'} Exceeded max disk " .
             "utilization for $config{'PSAD_DIR'} on $config{'HOSTNAME'}",
             '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
-        &sys_log('psad', "removing data in $config{'PSAD_DIR'}");
+        &sys_log("removing data in $config{'PSAD_DIR'}");
         if (-d $config{'SCAN_DATA_ARCHIVE_DIR'}) {
             ### remove the entire archive directory (we have run out of
             ### disk so keeping old scan directories around is the least
             ### of our worries).
-            &sys_log('psad',
-                "removing $config{'SCAN_DATA_ARCHIVE_DIR'} directory");
+            &sys_log("removing $config{'SCAN_DATA_ARCHIVE_DIR'} directory");
             rmtree $config{'SCAN_DATA_ARCHIVE_DIR'};
             mkdir $config{'SCAN_DATA_ARCHIVE_DIR'}, 0500;
         }
@@ -8227,7 +8225,7 @@ sub disk_space_exceeded() {
             }
         }
         if ($rm_data_ctr > $config{'DISK_MAX_RM_RETRIES'}) {
-            &sys_log('psad', "could not sufficiently reduce disk " .
+            &sys_log("could not sufficiently reduce disk " .
                 "utilization in $config{'PSAD_DIR'} partition.  " .
                 "Stopping psad!");
             &send_mail("$config{'MAIL_ERROR_PREFIX'} Could not " .
@@ -8371,17 +8369,54 @@ sub dump_ipt_policy() {
 sub sys_log_mline() {
     my $aref = shift;
     for (my $i=0; $i<5 && $i<=$#$aref; $i++) {
-        &sys_log('psad', $aref->[$i]);
+        &sys_log($aref->[$i]);
     }
     return;
 }
 
 ### write a message to syslog
 sub sys_log() {
-    my ($ident, $msg) = @_;
+    my $msg = shift;
     return if $no_syslog_alerts;
-    openlog($ident, &LOG_DAEMON(), &LOG_LOCAL7());
-    syslog(&LOG_INFO(), $msg);
+
+    ### this is an ugly hack to avoid the 'can't use string as subroutine'
+    ### error because of 'use strict'
+    if ($config{'SYSLOG_FACILITY'} =~ /LOG_LOCAL7/i) {
+        openlog($config{'SYSLOG_IDENTITY'}, &LOG_DAEMON(), &LOG_LOCAL7());
+    } elsif ($config{'SYSLOG_FACILITY'} =~ /LOG_LOCAL6/i) {
+        openlog($config{'SYSLOG_IDENTITY'}, &LOG_DAEMON(), &LOG_LOCAL6());
+    } elsif ($config{'SYSLOG_FACILITY'} =~ /LOG_LOCAL5/i) {
+        openlog($config{'SYSLOG_IDENTITY'}, &LOG_DAEMON(), &LOG_LOCAL5());
+    } elsif ($config{'SYSLOG_FACILITY'} =~ /LOG_LOCAL4/i) {
+        openlog($config{'SYSLOG_IDENTITY'}, &LOG_DAEMON(), &LOG_LOCAL4());
+    } elsif ($config{'SYSLOG_FACILITY'} =~ /LOG_LOCAL3/i) {
+        openlog($config{'SYSLOG_IDENTITY'}, &LOG_DAEMON(), &LOG_LOCAL3());
+    } elsif ($config{'SYSLOG_FACILITY'} =~ /LOG_LOCAL2/i) {
+        openlog($config{'SYSLOG_IDENTITY'}, &LOG_DAEMON(), &LOG_LOCAL2());
+    } elsif ($config{'SYSLOG_FACILITY'} =~ /LOG_LOCAL1/i) {
+        openlog($config{'SYSLOG_IDENTITY'}, &LOG_DAEMON(), &LOG_LOCAL1());
+    } elsif ($config{'SYSLOG_FACILITY'} =~ /LOG_LOCAL0/i) {
+        openlog($config{'SYSLOG_IDENTITY'}, &LOG_DAEMON(), &LOG_LOCAL0());
+    }
+
+    if ($config{'SYSLOG_PRIORITY'} =~ /LOG_INFO/i) {
+        syslog(&LOG_INFO(), $msg);
+    } elsif ($config{'SYSLOG_PRIORITY'} =~ /LOG_DEBUG/i) {
+        syslog(&LOG_DEBUG(), $msg);
+    } elsif ($config{'SYSLOG_PRIORITY'} =~ /LOG_NOTICE/i) {
+        syslog(&LOG_NOTICE(), $msg);
+    } elsif ($config{'SYSLOG_PRIORITY'} =~ /LOG_WARNING/i) {
+        syslog(&LOG_WARNING(), $msg);
+    } elsif ($config{'SYSLOG_PRIORITY'} =~ /LOG_ERR/i) {
+        syslog(&LOG_ERR(), $msg);
+    } elsif ($config{'SYSLOG_PRIORITY'} =~ /LOG_CRIT/i) {
+        syslog(&LOG_CRIT(), $msg);
+    } elsif ($config{'SYSLOG_PRIORITY'} =~ /LOG_ALERT/i) {
+        syslog(&LOG_ALERT(), $msg);
+    } elsif ($config{'SYSLOG_PRIORITY'} =~ /LOG_EMERG/i) {
+        syslog(&LOG_EMERG(), $msg);
+    }
+
     closelog();
     return;
 }
@@ -8685,7 +8720,8 @@ sub required_vars() {
         PSAD_PID_FILE PSAD_CMDLINE_FILE PSAD_ERR_DIR MIN_DANGER_LEVEL
         IGNORE_KERNEL_TIMESTAMP ENABLE_SIG_MSG_SYSLOG
         SIG_MSG_SYSLOG_THRESHOLD SIG_SID_SYSLOG_THRESHOLD
-        PSADWATCHD_CHECK_INTERVAL PSADWATCHD_MAX_RETRIES
+        PSADWATCHD_CHECK_INTERVAL PSADWATCHD_MAX_RETRIES SYSLOG_IDENTITY
+        SYSLOG_FACILITY SYSLOG_PRIORITY
     );
     &defined_vars(\@required_vars);
     return;

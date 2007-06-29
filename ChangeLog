@@ -1,3 +1,8 @@
+psad-2.0.8 (07//2007):
+    - Added the ability to configure the syslog facility and priority via the
+      psad.conf file (see the SYSLOG_FACILITY and SYSLOG_PRIORITY variables).
+    - Updated psad.spec file to respect the %_initrddir RPM macro.
+
 psad-2.0.7 (05/28/2007):
     - Bugfix to define a custom 'source' definition for syslog-ng daemons -
       this fixes a problem on SuSE systems where the existing syslog-ng

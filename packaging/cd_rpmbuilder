@@ -25,7 +25,7 @@
 #
 #############################################################################
 #
-# $Id: cd_rpmbuilder 687 2007-05-27 02:03:38Z mbr $
+# $Id: cd_rpmbuilder 698 2007-06-06 05:26:21Z mbr $
 #
 
 use File::Find;
@@ -187,6 +187,7 @@ sub md5_check() {
             "exiting.";
     }
     print "[+] Valid md5 sum check for $file\n";
+    unlink "$file.md5";
     return;
 }
 

@@ -2872,7 +2872,7 @@ sub validate_config() {
         unless ($fw_block_ip =~ m|^\s*$ip_re\s*$|
                 or $fw_block_ip =~ m|^\s*$ip_re/\d+\s*$|
                 or $fw_block_ip =~ m|^\s*$ip_re/$ip_re\s*$|) {
-            die '[-] The --fw-block-ip argument accepts ' .
+            die '[*] The --fw-block-ip argument accepts ' .
                 'an IP address or network.';
         }
     }
@@ -2881,9 +2881,31 @@ sub validate_config() {
         unless ($fw_rm_block_ip =~ m|^\s*$ip_re\s*$|
                 or $fw_rm_block_ip =~ m|^\s*$ip_re/\d+\s*$|
                 or $fw_rm_block_ip =~ m|^\s*$ip_re/$ip_re\s*$|) {
-            die '[-] The --fw-rm-block-ip argument accepts ' .
+            die '[*] The --fw-rm-block-ip argument accepts ' .
                 'an IP address or network.';
         }
+    }
+
+    unless ($config{'SYSLOG_FACILITY'} =~ /LOG_LOCAL7/i
+            or $config{'SYSLOG_FACILITY'} =~ /LOG_LOCAL6/i
+            or $config{'SYSLOG_FACILITY'} =~ /LOG_LOCAL5/i
+            or $config{'SYSLOG_FACILITY'} =~ /LOG_LOCAL4/i
+            or $config{'SYSLOG_FACILITY'} =~ /LOG_LOCAL3/i
+            or $config{'SYSLOG_FACILITY'} =~ /LOG_LOCAL2/i
+            or $config{'SYSLOG_FACILITY'} =~ /LOG_LOCAL1/i
+            or $config{'SYSLOG_FACILITY'} =~ /LOG_LOCAL0/i) {
+        die "[*] Unrecognized SYSLOG_FACILITY, see psad.conf";
+    }
+
+    unless ($config{'SYSLOG_PRIORITY'} =~ /LOG_INFO/i
+            or $config{'SYSLOG_PRIORITY'} =~ /LOG_DEBUG/i
+            or $config{'SYSLOG_PRIORITY'} =~ /LOG_NOTICE/i
+            or $config{'SYSLOG_PRIORITY'} =~ /LOG_WARNING/i
+            or $config{'SYSLOG_PRIORITY'} =~ /LOG_ERR/i
+            or $config{'SYSLOG_PRIORITY'} =~ /LOG_CRIT/i
+            or $config{'SYSLOG_PRIORITY'} =~ /LOG_ALERT/i
+            or $config{'SYSLOG_PRIORITY'} =~ /LOG_EMERG/i) {
+        die "[*] Unrecognized SYSLOG_PRIORITY, see psad.conf";
     }
 
     return;

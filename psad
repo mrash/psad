@@ -336,6 +336,7 @@ my $fw_list_auto     = 0;
 my $fw_block_ip      = '';
 my $fw_rm_block_ip   = '';
 my $fw_del_chains    = 0;
+my $gnuplot_mode     = 0;
 my $csv_mode         = 0;
 my $csv_stdin        = 0;
 my $csv_fields       = '';
@@ -489,6 +490,36 @@ my %pkt_NF_init = (
     'timestamp'     => ''
 );
 
+my %gnuplot_non_digit_packet_fields = (
+
+    ### data link layer
+    'src_mac' => '',
+    'dst_mac' => '',
+    'intf'    => '',
+
+    ### network layer
+    'src'    => '',
+    'dst'    => '',
+    'proto'  => '',
+    'tos'    => '',
+    'ip_opts'  => '',
+    'frag_bit' => '',
+
+    ### transport layer
+    'flags' => '',
+    'tcp_opts' => '',
+
+    ### extra fields for psad internals (DShield reporting, fwsnort
+    ### sid matching, iptables logging prefixes and chains, etc.)
+    'fwsnort_sid'   => '',
+    'fwsnort_rnum'  => '',
+    'chain'         => '',
+    'log_prefix'    => '',
+    'dshield_str'   => '',
+    'syslog_host'   => '',
+);
+my %gnuplot_non_digit_map = ();
+
 ### packet parsing return values
 my $PKT_ERROR   = 0;
 my $PKT_SUCCESS = 1;
@@ -540,6 +571,7 @@ Getopt::Long::Configure('no_ignore_case');
     'messages-file=s'   => \$messages_file,   # Specify the path to file containing
                                               #   old iptables messages (fwdata by
                                               #   default).
+    'gnuplot'           => \$gnuplot_mode,    # gnuplot mode.
     'CSV'               => \$csv_mode,        # CSV mode.
     'CSV-fields=s'      => \$csv_fields,      # Specify list of CSV fields.
     'CSV-unique-lines'  => \$csv_print_uniq,  # Only print unique lines in CSV output.
@@ -6521,7 +6553,7 @@ sub analysis_mode() {
 
 sub csv_mode() {
 
-    ### see what we should be searching for
+    ### see what we should be parsing out of the iptables logs
     my ($tokens_ar, $match_criteria_ar) = &csv_tokens();
 
     $csv_regex = qr/$csv_regex/ if $csv_regex;
@@ -6620,13 +6652,18 @@ sub csv_mode() {
                         next MSG;
                     }
                 }
-                push @matched_fields, $pkt{$tok};
+            }
+
+            if ($gnuplot_mode) {
+                push @matched_fields, &gnuplot_value($tok, $pkt{$tok});
             } else {
                 push @matched_fields, $pkt{$tok};
             }
         }
         next MSG unless @matched_fields;
         my $str = '';
+
+        ### here is where the output string is assembled
         if ($csv_fields) {
             $str .= "$_, " for @matched_fields;
         } else {
@@ -6634,10 +6671,13 @@ sub csv_mode() {
         }
         $str =~ s/,\s*$//;
         $str =~ s/\s*$//;
+
         $ctr++;
         if ($csv_print_uniq) {
             $csv_uniq_lines{$str} = '';
         } else {
+            ### The CSV data is printed here unless
+            ### we are running with --CSV-unique-lines
             print $str, "\n";
         }
         if ($csv_line_limit > 0) {
@@ -6649,6 +6689,49 @@ sub csv_mode() {
         print "$_\n" for keys %csv_uniq_lines;
     }
     return 0;
+}
+
+sub gnuplot_value() {
+    my ($tok, $packet_val) = @_;
+
+    my $rv = $packet_val;
+
+    if ($tok eq 'timestamp') {
+
+        ### reformat timestamp (e.g. "Feb  1 00:00:27"
+        ### becomes 02/02/04:03:00:17)
+        if ($packet_val =~ /^\s*(\w+)\s+(\d+)\s+(\S+)/) {
+            my $mon  = $1;
+            my $day  = $2;
+            my $time = $3;
+            $rv = sprintf "02/%.2d/07:$time", $day;
+        }
+
+    } else {
+
+        ### see if this field is non-digit data, and map
+        ### to a digit if so
+        if (defined $gnuplot_non_digit_packet_fields{$tok}) {
+
+            ### map the value to a digit
+            unless (defined $gnuplot_non_digit_map{$tok}
+                    and defined $gnuplot_non_digit_map{$tok}{'data'}
+                    and defined $gnuplot_non_digit_map{$tok}
+                    {'data'}{$packet_val}) {
+
+                unless (defined $gnuplot_non_digit_map{$tok}{'ctr'}) {
+                    $gnuplot_non_digit_map{$tok}{'ctr'} = 0;
+                }
+
+                $gnuplot_non_digit_map{$tok}{'ctr'}++;
+
+                $gnuplot_non_digit_map{$tok}{'data'}{$packet_val}
+                    = $gnuplot_non_digit_map{$tok}{'ctr'};
+            }
+            $rv = $gnuplot_non_digit_map{$tok}{'data'}{$packet_val};
+        }
+    }
+    return $rv;
 }
 
 sub csv_tokens() {

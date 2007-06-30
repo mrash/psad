@@ -337,6 +337,8 @@ my $fw_block_ip      = '';
 my $fw_rm_block_ip   = '';
 my $fw_del_chains    = 0;
 my $gnuplot_mode     = 0;
+my @gnuplot_data     = ();
+my $plot_separator   = ', ';  ### default to CSV format for plot data
 my $csv_mode         = 0;
 my $csv_stdin        = 0;
 my $csv_fields       = '';
@@ -491,34 +493,38 @@ my %pkt_NF_init = (
 );
 
 my %gnuplot_non_digit_packet_fields = (
+    ### 'hashentry' - maps the field to an integer based on whether
+    ###               it has been seen before
+    ### 'intf2int'  - converts interface number to an integer (e.g. eth0 -> 0)
+    ### 'ip2int'    - converts IP address to integer representation
 
     ### data link layer
-    'src_mac' => '',
-    'dst_mac' => '',
-    'intf'    => '',
+    'src_mac' => 'hashentry',
+    'dst_mac' => 'hashentry',
+    'intf'    => 'intf2int',
 
     ### network layer
-    'src'    => '',
-    'dst'    => '',
-    'proto'  => '',
-    'tos'    => '',
-    'ip_opts'  => '',
-    'frag_bit' => '',
+    'src'      => 'ip2int',
+    'dst'      => 'ip2int',
+    'proto'    => 'proto2int',
+    'tos'      => 'hashentry',
+    'ip_opts'  => 'hashentry',
+    'frag_bit' => 'hashentry',
 
     ### transport layer
-    'flags' => '',
-    'tcp_opts' => '',
+    'flags'    => 'hashentry',
+    'tcp_opts' => 'hashentry',
 
     ### extra fields for psad internals (DShield reporting, fwsnort
     ### sid matching, iptables logging prefixes and chains, etc.)
-    'fwsnort_sid'   => '',
-    'fwsnort_rnum'  => '',
-    'chain'         => '',
-    'log_prefix'    => '',
-    'dshield_str'   => '',
-    'syslog_host'   => '',
+    'chain'         => 'hashentry',
+    'log_prefix'    => 'hashentry',
+    'dshield_str'   => 'hashentry',
+    'syslog_host'   => 'hashentry',
 );
 my %gnuplot_non_digit_map = ();
+my %ip2int_cache   = ();
+my %gnuplot_ip2int = ();
 
 ### packet parsing return values
 my $PKT_ERROR   = 0;
@@ -583,6 +589,8 @@ Getopt::Long::Configure('no_ignore_case');
                                               #   match.
     'CSV-stdin'         => \$csv_stdin,       # Acquire iptables log data from
                                               #   stdin.
+    'plot-separator'    => \$plot_separator,  # Specify separator character for plot
+                                              #   data (both gnuplot and CSV data).
     'debug'             => \$debug,           # Run in debug mode.
     'debug-sid=i'       => \$debug_sid,       # Debug a specific signature.
     'Dump-conf'         => \$dump_conf,       # Dump config and exit.
@@ -6611,90 +6619,169 @@ sub csv_mode() {
         }
         $pkt{'log_prefix'} =~ s/\W//g;
         $pkt{'log_prefix'} =~ s/\s//g;
+
         my @matched_fields = ();
+        my $gnuplot_comment_str = '';
         for (my $i=0; $i <= $#$tokens_ar; $i++) {
             my $tok = $tokens_ar->[$i];
             if ($match_criteria_ar) {
                 my $match_hr = $match_criteria_ar->[$i];
                 if (defined $match_hr->{'num'}) {
-                    unless ($pkt{$tok} =~ m|^\d+$|
-                            and $pkt{$tok} == $match_hr->{'num'}) {
-                        next MSG;
+                    next MSG unless $pkt{$tok} =~ m|^\d+$|;
+                    if ($match_hr->{'negate'}) {
+                        next MSG if $pkt{$tok} == $match_hr->{'num'};
+                    } else {
+                        next MSG unless $pkt{$tok} == $match_hr->{'num'};
                     }
                 } elsif (defined $match_hr->{'gt'}) {
-                    unless ($pkt{$tok} =~ m|^\d+$|
-                            and $pkt{$tok} > $match_hr->{'gt'}) {
-                        next MSG;
+                    next MSG unless $pkt{$tok} =~ m|^\d+$|;
+                    if ($match_hr->{'negate'}) {
+                        next MSG unless $pkt{$tok} <= $match_hr->{'gt'};
+                    } else {
+                        next MSG unless $pkt{$tok} > $match_hr->{'gt'};
                     }
                 } elsif (defined $match_hr->{'lt'}) {
-                    unless ($pkt{$tok} =~ m|^\d+$|
-                            and $pkt{$tok} < $match_hr->{'lt'}) {
-                        next MSG;
+                    next MSG unless $pkt{$tok} =~ m|^\d+$|;
+                    if ($match_hr->{'negate'}) {
+                        next MSG unless $pkt{$tok} >= $match_hr->{'lt'};
+                    } else {
+                        next MSG unless $pkt{$tok} < $match_hr->{'lt'};
                     }
                 } elsif (defined $match_hr->{'str'}) {
-                    unless ($pkt{$tok} eq $match_hr->{'str'}) {
-                        next MSG;
+                    if ($match_hr->{'negate'}) {
+                        next MSG if $pkt{$tok} eq $match_hr->{'str'};
+                    } else {
+                        next MSG unless $pkt{$tok} eq $match_hr->{'str'};
                     }
                 } elsif (defined $match_hr->{'re'}) {
-                    unless ($pkt{$tok} =~ m|$match_hr->{'re'}m|) {
-                        next MSG;
+                    if ($match_hr->{'negate'}) {
+                        next MSG if $pkt{$tok} =~ m|$match_hr->{'re'}m|;
+                    } else {
+                        next MSG unless $pkt{$tok} =~ m|$match_hr->{'re'}m|;
                     }
                 } elsif (defined $match_hr->{'net'}) {
                     if ($pkt{$tok} =~ m|$ip_re|) {
-                        unless (ipv4_in_network($match_hr->{'net'}, $pkt{$tok})) {
-                            next MSG;
+                        if ($match_hr->{'negate'}) {
+                            next MSG if ipv4_in_network($match_hr->{'net'},
+                                    $pkt{$tok});
+                        } else {
+                            next MSG unless ipv4_in_network($match_hr->{'net'},
+                                    $pkt{$tok});
                         }
                     } else {
                         next MSG;
                     }
                 } elsif (defined $match_hr->{'ip'}) {
-                    unless ($pkt{$tok} eq $match_hr->{'ip'}) {
-                        next MSG;
+                    if ($match_hr->{'negate'}) {
+                        next MSG if $pkt{$tok} eq $match_hr->{'ip'};
+                    } else {
+                        next MSG unless $pkt{$tok} eq $match_hr->{'ip'};
                     }
                 }
             }
 
-            if ($gnuplot_mode) {
-                push @matched_fields, &gnuplot_value($tok, $pkt{$tok});
-            } else {
-                push @matched_fields, $pkt{$tok};
-            }
+            push @matched_fields, $pkt{$tok};
+
         }
         next MSG unless @matched_fields;
-        my $str = '';
-
-        ### here is where the output string is assembled
-        if ($csv_fields) {
-            $str .= "$_, " for @matched_fields;
-        } else {
-            $str .= "$_ " for @matched_fields;
-        }
-        $str =~ s/,\s*$//;
-        $str =~ s/\s*$//;
-
         $ctr++;
-        if ($csv_print_uniq) {
-            $csv_uniq_lines{$str} = '';
-        } else {
-            ### The CSV data is printed here unless
-            ### we are running with --CSV-unique-lines
-            print $str, "\n";
-        }
         if ($csv_line_limit > 0) {
             last if $ctr >= $csv_line_limit;
         }
+
+        if ($gnuplot_mode) {
+            ### cache the data since IP addresses have to mapped to
+            ### integers across the entire data set
+            push @gnuplot_data, \@matched_fields;
+        } else {
+
+            my $str = '';
+        
+            ### here is where the output string is assembled
+            $str .= $_ . $plot_separator for @matched_fields;
+            $str =~ s/$plot_separator$//;
+
+            if ($csv_print_uniq) {
+                $csv_uniq_lines{$str} = '';
+            } else {
+                ### The CSV data is printed here unless
+                ### we are running with --CSV-unique-lines
+                ### or we are running in --gnuplot mode
+                print $str, "\n";
+            }
+        }
     }
     close MSGS;
-    if ($csv_print_uniq) {
+
+    if ($gnuplot_mode) {
+
+        ### print out the gnuplot data after appropriate
+        ### integer conversions
+        &write_gnuplot_data($tokens_ar);
+
+    } elsif ($csv_print_uniq) {
         print "$_\n" for keys %csv_uniq_lines;
     }
     return 0;
+}
+
+sub write_gnuplot_data() {
+    my $tokens_ar = shift;
+
+    ### first resolve any IP addresses to minimal integers
+    ### (this mapping preserves IP address subnet relationships
+    ### in that IP's on the same subnet will appear close together
+    ### in the plot).
+    for my $aref (@gnuplot_data) {
+        for (my $i=0; $i <= $#$tokens_ar; $i++) {
+            my $tok = $tokens_ar->[$i];
+            if ($tok eq 'src' or $tok eq 'dst') {
+
+                ### add the IP into the ip2int cache
+                &ip2int($aref->[$i]);
+            }
+        }
+    }
+
+    ### now that all IP addresses have been mapped into the cache
+    ### we map each IP to a mimimal integer
+    my $ctr = 1;
+    for my $ip (sort {$ip2int_cache{$a} <=> $ip2int_cache{$b}} keys %ip2int_cache) {
+        unless (defined $gnuplot_ip2int{$ip}) {
+            $gnuplot_ip2int{$ip} = $ctr;
+            $ctr++;
+        }
+    }
+
+    for my $aref (@gnuplot_data) {
+
+        my @matched_fields = ();
+        my $gnuplot_comment_str = '';
+        for (my $i=0; $i <= $#$tokens_ar; $i++) {
+            my $tok = $tokens_ar->[$i];
+            my $val = $aref->[$i];
+
+            my ($rv, $gnuplot_comment) = &gnuplot_value($tok, $val);
+            push @matched_fields, $rv;
+            $gnuplot_comment_str .= "$rv=$gnuplot_comment "
+                if $gnuplot_comment;
+        }
+        next unless @matched_fields;
+
+        my $str = '';
+        $str .= $_ . $plot_separator for @matched_fields;
+        $str =~ s/$plot_separator$//;
+        $str .= "  ### $gnuplot_comment_str" if $gnuplot_comment_str;
+        print $str, "\n";
+    }
+    return;
 }
 
 sub gnuplot_value() {
     my ($tok, $packet_val) = @_;
 
     my $rv = $packet_val;
+    my $gnuplot_comment_str = '';
 
     if ($tok eq 'timestamp') {
 
@@ -6713,23 +6800,84 @@ sub gnuplot_value() {
         ### to a digit if so
         if (defined $gnuplot_non_digit_packet_fields{$tok}) {
 
-            ### map the value to a digit
-            unless (defined $gnuplot_non_digit_map{$tok}
-                    and defined $gnuplot_non_digit_map{$tok}{'data'}
-                    and defined $gnuplot_non_digit_map{$tok}
-                    {'data'}{$packet_val}) {
+            ### it is a non-digit value from the packet, so append a comment
+            ### to the gnuplot data file that contains that original value.
+            ### This allows the user to map integers back to their original
+            ### value (say IP integers back to the dotted-quad notation).
+            $gnuplot_comment_str = $packet_val;
 
-                unless (defined $gnuplot_non_digit_map{$tok}{'ctr'}) {
-                    $gnuplot_non_digit_map{$tok}{'ctr'} = 0;
+            if ($gnuplot_non_digit_packet_fields{$tok} eq 'ip2int') {
+
+                ### get the minimal IP integer from the %gnuplot_ip2int cache
+                $rv = $gnuplot_ip2int{$packet_val};
+
+            } elsif ($gnuplot_non_digit_packet_fields{$tok} eq 'proto2int') {
+
+                ### convert protocol to integer
+                $rv = &proto2int($packet_val);
+
+            } elsif ($gnuplot_non_digit_packet_fields{$tok} eq 'intf2int') {
+
+                ### convert interface to integer
+                $rv = &intf2int($packet_val);
+
+            } elsif ($gnuplot_non_digit_packet_fields{$tok} eq 'hashentry') {
+
+                ### map the value to a digit
+                unless (defined $gnuplot_non_digit_map{$tok}
+                        and defined $gnuplot_non_digit_map{$tok}{'data'}
+                        and defined $gnuplot_non_digit_map{$tok}
+                        {'data'}{$packet_val}) {
+
+                    unless (defined $gnuplot_non_digit_map{$tok}{'ctr'}) {
+                       $gnuplot_non_digit_map{$tok}{'ctr'} = 0;
+                    }
+
+                    $gnuplot_non_digit_map{$tok}{'ctr'}++;
+
+                    $gnuplot_non_digit_map{$tok}{'data'}{$packet_val}
+                        = $gnuplot_non_digit_map{$tok}{'ctr'};
                 }
-
-                $gnuplot_non_digit_map{$tok}{'ctr'}++;
-
-                $gnuplot_non_digit_map{$tok}{'data'}{$packet_val}
-                    = $gnuplot_non_digit_map{$tok}{'ctr'};
+                $rv = $gnuplot_non_digit_map{$tok}{'data'}{$packet_val};
             }
-            $rv = $gnuplot_non_digit_map{$tok}{'data'}{$packet_val};
         }
+    }
+    return $rv, $gnuplot_comment_str;
+}
+
+sub ip2int() {
+    my $ip = shift;
+    my $ip_int = 0;
+    unless (defined $ip2int_cache{$ip}) {
+        # my @octets = split /\./, $ip;
+        for (split /\./, $ip) {
+            $ip_int = $ip_int*256 + $_;
+        }
+        $ip2int_cache{$ip} = $ip_int;
+    }
+    return;
+}
+
+sub proto2int() {
+    my $proto = shift;
+    my $rv = -1;
+    if ($proto =~ /^\d+$/) {
+        $rv = $proto;
+    } elsif ($proto =~ /tcp/i) {
+        $rv = 6;
+    } elsif ($proto =~ /udp/i) {
+        $rv = 17;
+    } elsif ($proto =~ /icmp/i) {
+        $rv = 1;
+    }
+    return $rv;
+}
+
+sub intf2int() {
+    my $intf = shift;
+    my $rv = -1;
+    if ($intf =~ /(\d+)$/) {
+        $rv = $1;
     }
     return $rv;
 }
@@ -6744,9 +6892,14 @@ sub csv_tokens() {
         for my $tok_str (@tok_tmp) {
             my $token  = $tok_str;
             my $search = '';
+            my $negate = 0;
             if ($tok_str =~ m|(\w+):(\S+)|) {
                 $token  = $1;
                 $search = $2;
+            }
+            if ($search =~ /^not/) {
+                $negate = 1;
+                $search =~ s/^not//;
             }
             $token = 'src' if $token eq 'SRC';
             $token = 'dst' if $token eq 'DST';
@@ -6773,7 +6926,7 @@ sub csv_tokens() {
             push @tokens, $token;
 
             if ($search) {
-                my %search_hsh = ();
+                my %search_hsh = ('negate' => $negate);
                 if ($search =~ m|^\d+$|) {
                     $search_hsh{'num'} = $search;
                 } elsif ($search =~ m|^>(\d+)$|) {
@@ -6817,6 +6970,7 @@ sub csv_tokens() {
             log_prefix
         );
     }
+
     return \@tokens, \@match_criteria;
 }
 
@@ -8911,6 +9065,8 @@ Options:
                                     data structures on STDOUT).
     -H,  --HUP                    - Send all psad daemons a HUP signal to
                                     have them re-import configs.
+    -g,  --gnuplot                - Produce output suitable for plotting
+                                    with gnuplot.
     --CSV                         - Parse iptables log messages and dump
                                     fields to stdout in csv format.
     --CSV-fields <fields>         - Restrict --CSV output to a list of
@@ -8925,6 +9081,10 @@ Options:
     --CSV-neg-regex <regex>       - Require iptables log messages to
                                     not match an additional regex in --CSV
                                     mode.
+    --plot-separator <str>        - Specify a separator string between plot
+                                    fields (in --gnuplot or --CSV plot
+                                    modes (the default is a comma for CSV
+                                    formatted output).
     --signatures <sigs file>      - Manually specify the path to the psad
                                     signatures file.
     --snort-type                  - Restrict psad to look for specific Snort

@@ -1,4 +1,19 @@
 psad-2.0.8 (07//2007):
+    - Added --gnuplot mode so that psad can output data that is suitable for
+      plotting with gnuplot. All output produced in this mode is integer data
+      with the exception of date stamps that are derived from iptables syslog
+      messages.
+    - Added the ability to negate match conditions on fields specified with
+      the --CSV-fields argument by prepending the string "not" (which plays
+      more nicely with shells like bash than a character like "!"). For
+      example, to graph all packet data in --gnuplot or --CSV modes that
+      originates from the 11.11.0.0/16 subnet and is not destined for port
+      80, the following argument does the trick:
+
+            --CSV-fields "src:11.11.0.0/255.255.0.0 dp:not80"
+
+    - Added --plot-separator to allow the format of plot data (either in
+      --gnuplot or --CSV modes) to be influenced by the user.
     - Added the ability to configure the syslog facility and priority via the
       psad.conf file (see the SYSLOG_FACILITY and SYSLOG_PRIORITY variables).
     - Updated psad.spec file to respect the %_initrddir RPM macro.

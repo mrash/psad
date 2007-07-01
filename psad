@@ -324,6 +324,9 @@ my $snort_rules_dir  = '';
 my $srules_type      = '';
 my $cmdline_file     = '';
 my $analyze_mode     = 0;
+my $analysis_fields  = '';
+my $analysis_tokens_ar = [];
+my $analysis_match_criteria_ar = [];
 my $syslog_server    = 0;
 my $kill             = 0;
 my $restart          = 0;
@@ -574,6 +577,9 @@ Getopt::Long::Configure('no_ignore_case');
     'analysis-write-data' => \$analyze_write_data, # Write data to filesystem from
                                                    # -A mode (this can take a long
                                                    # time.
+    'analysis-fields=s' => \$analysis_fields, # Place a criteria on various fields
+                                              #   that are parsed from an iptables
+                                              #   logfile.
     'whois-analysis'    => \$analysis_whois,  # Issue whois lookups in analysis
                                               #   mode.
     'email-analysis'    => \$analysis_emails, # Send analysis mode emails.
@@ -1057,6 +1063,13 @@ sub check_scan() {
             next PKT;
         } elsif ($pkt_parse_rv == $PKT_IGNORE) {
             next PKT;
+        }
+
+        if ($analyze_mode and $analysis_fields) {
+            my ($matched_fields_ar, $gnuplot_comment_str)
+                = &ipt_match_criteria(\%pkt, $analysis_tokens_ar,
+                        $analysis_match_criteria_ar);
+            next PKT unless $#$matched_fields_ar > -1;
         }
 
         if ($pkt{'proto'} eq 'tcp') {
@@ -6494,6 +6507,9 @@ sub restart() {
 
 sub analysis_mode() {
 
+    ($analysis_tokens_ar, $analysis_match_criteria_ar) = &analysis_fields()
+        if $analysis_fields;
+
     &make_psad_dirs();
 
     unless (-d $config{'PSAD_DIR'}) {
@@ -6562,6 +6578,73 @@ sub analysis_mode() {
     return 0;
 }
 
+sub ipt_match_criteria() {
+    my ($pkt_hr, $tokens_ar, $match_criteria_ar) = @_;
+
+    my @matched_fields = ();
+    my $gnuplot_comment_str = '';
+    TOK: for (my $i=0; $i <= $#$tokens_ar; $i++) {
+        my $tok = $tokens_ar->[$i];
+        if ($match_criteria_ar) {
+            my $match_hr = $match_criteria_ar->[$i];
+            if (defined $match_hr->{'num'}) {
+                next TOK unless $pkt_hr->{$tok} =~ m|^\d+$|;
+                if ($match_hr->{'negate'}) {
+                    next TOK if $pkt_hr->{$tok} == $match_hr->{'num'};
+                } else {
+                    next TOK unless $pkt_hr->{$tok} == $match_hr->{'num'};
+                }
+            } elsif (defined $match_hr->{'gt'}) {
+                next TOK unless $pkt_hr->{$tok} =~ m|^\d+$|;
+                if ($match_hr->{'negate'}) {
+                    next TOK unless $pkt_hr->{$tok} <= $match_hr->{'gt'};
+                } else {
+                    next TOK unless $pkt_hr->{$tok} > $match_hr->{'gt'};
+                }
+            } elsif (defined $match_hr->{'lt'}) {
+                next TOK unless $pkt_hr->{$tok} =~ m|^\d+$|;
+                if ($match_hr->{'negate'}) {
+                    next TOK unless $pkt_hr->{$tok} >= $match_hr->{'lt'};
+                } else {
+                    next TOK unless $pkt_hr->{$tok} < $match_hr->{'lt'};
+                }
+            } elsif (defined $match_hr->{'str'}) {
+                if ($match_hr->{'negate'}) {
+                    next TOK if $pkt_hr->{$tok} eq $match_hr->{'str'};
+                } else {
+                    next TOK unless $pkt_hr->{$tok} eq $match_hr->{'str'};
+                }
+            } elsif (defined $match_hr->{'re'}) {
+                if ($match_hr->{'negate'}) {
+                    next TOK if $pkt_hr->{$tok} =~ m|$match_hr->{'re'}m|;
+                } else {
+                    next TOK unless $pkt_hr->{$tok} =~ m|$match_hr->{'re'}m|;
+                }
+            } elsif (defined $match_hr->{'net'}) {
+                if ($pkt_hr->{$tok} =~ m|$ip_re|) {
+                    if ($match_hr->{'negate'}) {
+                        next TOK if ipv4_in_network($match_hr->{'net'},
+                                $pkt_hr->{$tok});
+                    } else {
+                        next TOK unless ipv4_in_network($match_hr->{'net'},
+                                $pkt_hr->{$tok});
+                    }
+                } else {
+                    next TOK;
+                }
+            } elsif (defined $match_hr->{'ip'}) {
+                if ($match_hr->{'negate'}) {
+                    next TOK if $pkt_hr->{$tok} eq $match_hr->{'ip'};
+                } else {
+                    next TOK unless $pkt_hr->{$tok} eq $match_hr->{'ip'};
+                }
+            }
+        }
+        push @matched_fields, $pkt_hr->{$tok};
+    }
+    return \@matched_fields, $gnuplot_comment_str;
+}
+
 sub csv_mode() {
 
     ### see what we should be parsing out of the iptables logs
@@ -6623,70 +6706,10 @@ sub csv_mode() {
         $pkt{'log_prefix'} =~ s/\W//g;
         $pkt{'log_prefix'} =~ s/\s//g;
 
-        my @matched_fields = ();
-        my $gnuplot_comment_str = '';
-        for (my $i=0; $i <= $#$tokens_ar; $i++) {
-            my $tok = $tokens_ar->[$i];
-            if ($match_criteria_ar) {
-                my $match_hr = $match_criteria_ar->[$i];
-                if (defined $match_hr->{'num'}) {
-                    next MSG unless $pkt{$tok} =~ m|^\d+$|;
-                    if ($match_hr->{'negate'}) {
-                        next MSG if $pkt{$tok} == $match_hr->{'num'};
-                    } else {
-                        next MSG unless $pkt{$tok} == $match_hr->{'num'};
-                    }
-                } elsif (defined $match_hr->{'gt'}) {
-                    next MSG unless $pkt{$tok} =~ m|^\d+$|;
-                    if ($match_hr->{'negate'}) {
-                        next MSG unless $pkt{$tok} <= $match_hr->{'gt'};
-                    } else {
-                        next MSG unless $pkt{$tok} > $match_hr->{'gt'};
-                    }
-                } elsif (defined $match_hr->{'lt'}) {
-                    next MSG unless $pkt{$tok} =~ m|^\d+$|;
-                    if ($match_hr->{'negate'}) {
-                        next MSG unless $pkt{$tok} >= $match_hr->{'lt'};
-                    } else {
-                        next MSG unless $pkt{$tok} < $match_hr->{'lt'};
-                    }
-                } elsif (defined $match_hr->{'str'}) {
-                    if ($match_hr->{'negate'}) {
-                        next MSG if $pkt{$tok} eq $match_hr->{'str'};
-                    } else {
-                        next MSG unless $pkt{$tok} eq $match_hr->{'str'};
-                    }
-                } elsif (defined $match_hr->{'re'}) {
-                    if ($match_hr->{'negate'}) {
-                        next MSG if $pkt{$tok} =~ m|$match_hr->{'re'}m|;
-                    } else {
-                        next MSG unless $pkt{$tok} =~ m|$match_hr->{'re'}m|;
-                    }
-                } elsif (defined $match_hr->{'net'}) {
-                    if ($pkt{$tok} =~ m|$ip_re|) {
-                        if ($match_hr->{'negate'}) {
-                            next MSG if ipv4_in_network($match_hr->{'net'},
-                                    $pkt{$tok});
-                        } else {
-                            next MSG unless ipv4_in_network($match_hr->{'net'},
-                                    $pkt{$tok});
-                        }
-                    } else {
-                        next MSG;
-                    }
-                } elsif (defined $match_hr->{'ip'}) {
-                    if ($match_hr->{'negate'}) {
-                        next MSG if $pkt{$tok} eq $match_hr->{'ip'};
-                    } else {
-                        next MSG unless $pkt{$tok} eq $match_hr->{'ip'};
-                    }
-                }
-            }
+        my ($matched_fields_ar, $gnuplot_comment_str)
+                = &ipt_match_criteria(\%pkt, $tokens_ar, $match_criteria_ar);
+        next MSG unless $#$matched_fields_ar > -1;
 
-            push @matched_fields, $pkt{$tok};
-
-        }
-        next MSG unless @matched_fields;
         $ctr++;
         if ($csv_line_limit > 0) {
             last if $ctr >= $csv_line_limit;
@@ -6695,13 +6718,13 @@ sub csv_mode() {
         if ($gnuplot_mode) {
             ### cache the data since IP addresses have to mapped to
             ### integers across the entire data set
-            push @gnuplot_data, \@matched_fields;
+            push @gnuplot_data, $matched_fields_ar;
         } else {
 
             my $str = '';
         
             ### here is where the output string is assembled
-            $str .= $_ . $plot_separator for @matched_fields;
+            $str .= $_ . $plot_separator for @$matched_fields_ar;
             $str =~ s/$plot_separator$//;
 
             if ($csv_print_uniq) {
@@ -6957,6 +6980,11 @@ sub intf2int() {
     return $rv;
 }
 
+sub analysis_fields() {
+    $csv_fields = $analysis_fields;
+    return &csv_tokens();
+}
+
 sub csv_tokens() {
 
     my @tokens = ();
@@ -6971,6 +6999,10 @@ sub csv_tokens() {
             if ($tok_str =~ m|(\w+):(\S+)|) {
                 $token  = $1;
                 $search = $2;
+            } else {
+                if ($analysis_fields) {
+                    die "[*] $tok_str requires a search criteria in -A mode.";
+                }
             }
             if ($search =~ /^not/) {
                 $negate = 1;

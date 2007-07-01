@@ -17,6 +17,13 @@ psad-2.0.8 (07//2007):
       count, a relative count vs. another field, and a unique count. This is
       useful to plot graphs of source IP vs. the number unique ports for
       example.
+    - Added --analysis-fields so the iptables log messages that are parsed in
+      -A mode can be restricted to those that meet certain criteria. For
+      example, to restrict the analyze mode to process packets with a source
+      address of 192.168.10.1, use this command:
+
+            psad -A --analysis-fields "src:192.168.10.1"
+
     - Added --plot-separator to allow the format of plot data (either in
       --gnuplot or --CSV modes) to be influenced by the user.
     - Added the ability to configure the syslog facility and priority via the

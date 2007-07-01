@@ -342,7 +342,9 @@ my $fw_del_chains    = 0;
 my $gnuplot_mode     = 0;
 my $gnuplot_relative_count_mode = 0;  ### enabled by appending ",count" to a --CSV-field entry
 my $gnuplot_abs_count_mode = 0;  ### enabled by appending ",abscount" to a --CSV-field entry
+my $gnuplot_uniq_count_mode = 0;  ### enabled by appending ",uniqcount" to a --CSV-field entry
 my $gnuplot_count_element = -1;
+my %gnuplot_cache_uniq = ();
 my @gnuplot_data     = ();
 my $plot_separator   = ', ';  ### default to CSV format for plot data
 my $csv_mode         = 0;
@@ -6801,7 +6803,9 @@ sub write_gnuplot_data() {
         }
         next unless @matched_fields;
 
-        if ($gnuplot_relative_count_mode or $gnuplot_abs_count_mode) {
+        if ($gnuplot_relative_count_mode
+                    or $gnuplot_abs_count_mode
+                    or $gnuplot_uniq_count_mode) {
             push @matched_fields, $gnuplot_comment_str;
             push @gnuplot_count_data, \@matched_fields;
         } else {
@@ -6813,7 +6817,9 @@ sub write_gnuplot_data() {
         }
     }
 
-    if ($gnuplot_relative_count_mode or $gnuplot_abs_count_mode) {
+    if ($gnuplot_relative_count_mode
+                or $gnuplot_abs_count_mode
+                or $gnuplot_uniq_count_mode) {
 
         my %render_count_data = ();
 
@@ -6821,6 +6827,15 @@ sub write_gnuplot_data() {
             if ($gnuplot_count_element == 1) {
                 if ($gnuplot_relative_count_mode) {
                     $render_count_data{$aref->[0]}{'count'}{$aref->[1]}++;
+                } elsif ($gnuplot_uniq_count_mode) {
+                    unless (defined $gnuplot_cache_uniq{$aref->[0]}) {
+                        $render_count_data{$aref->[0]}{'count'}++;
+                        $gnuplot_cache_uniq{$aref->[0]}{$aref->[1]} = '';
+                    }
+                    unless (defined $gnuplot_cache_uniq{$aref->[0]}{$aref->[1]}) {
+                        $render_count_data{$aref->[0]}{'count'}++;
+                        $gnuplot_cache_uniq{$aref->[0]}{$aref->[1]} = '';
+                    } 
                 } else {
                     $render_count_data{$aref->[0]}{'count'}++;
                 }
@@ -7013,15 +7028,29 @@ sub csv_tokens() {
                 $search =~ s/,abscount$//;
                 $search =~ s/^abscount//;
                 die "[*] Counts against multiple fields are not supported."
-                    if $gnuplot_relative_count_mode or $gnuplot_abs_count_mode;
+                    if $gnuplot_relative_count_mode
+                            or $gnuplot_abs_count_mode
+                            or $gnuplot_uniq_count_mode;
                 $gnuplot_abs_count_mode = 1;
+                $gnuplot_count_element = $#tokens + 1;
+            }
+            if ($search =~ /,uniqcount$/ or $search =~ /^uniqcount/) {
+                $search =~ s/,uniqcount$//;
+                $search =~ s/^uniqcount//;
+                die "[*] Counts against multiple fields are not supported."
+                    if $gnuplot_relative_count_mode
+                            or $gnuplot_abs_count_mode
+                            or $gnuplot_uniq_count_mode;
+                $gnuplot_uniq_count_mode = 1;
                 $gnuplot_count_element = $#tokens + 1;
             }
             if ($search =~ /,count$/ or $search =~ /^count/) {
                 $search =~ s/,count$//;
                 $search =~ s/^count//;
                 die "[*] Counts against multiple fields are not supported."
-                    if $gnuplot_relative_count_mode or $gnuplot_abs_count_mode;
+                    if $gnuplot_relative_count_mode
+                            or $gnuplot_abs_count_mode
+                            or $gnuplot_uniq_count_mode;
                 $gnuplot_relative_count_mode = 1;
                 $gnuplot_count_element = $#tokens + 1;
             }

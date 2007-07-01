@@ -12,6 +12,11 @@ psad-2.0.8 (07//2007):
 
             --CSV-fields "src:11.11.0.0/255.255.0.0 dp:not80"
 
+    - In --gnuplot mode, added the ability to generate the count for a CSV
+      field instead of the field itself. Supported modes are an absolute
+      count, a relative count vs. another field, and a unique count. This is
+      useful to plot graphs of source IP vs. the number unique ports for
+      example.
     - Added --plot-separator to allow the format of plot data (either in
       --gnuplot or --CSV modes) to be influenced by the user.
     - Added the ability to configure the syslog facility and priority via the

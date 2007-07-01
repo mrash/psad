@@ -337,6 +337,9 @@ my $fw_block_ip      = '';
 my $fw_rm_block_ip   = '';
 my $fw_del_chains    = 0;
 my $gnuplot_mode     = 0;
+my $gnuplot_relative_count_mode = 0;  ### enabled by appending ",count" to a --CSV-field entry
+my $gnuplot_abs_count_mode = 0;  ### enabled by appending ",abscount" to a --CSV-field entry
+my $gnuplot_count_element = -1;
 my @gnuplot_data     = ();
 my $plot_separator   = ', ';  ### default to CSV format for plot data
 my $csv_mode         = 0;
@@ -6745,14 +6748,20 @@ sub write_gnuplot_data() {
 
     ### now that all IP addresses have been mapped into the cache
     ### we map each IP to a mimimal integer
-    my $ctr = 1;
+    my $ip_ctr = 1;
     for my $ip (sort {$ip2int_cache{$a} <=> $ip2int_cache{$b}} keys %ip2int_cache) {
         unless (defined $gnuplot_ip2int{$ip}) {
-            $gnuplot_ip2int{$ip} = $ctr;
-            $ctr++;
+            $gnuplot_ip2int{$ip} = $ip_ctr;
+            $ip_ctr++;
         }
     }
 
+    ### check to see if we are generating data counts instead of
+    ### values (for example number of packets to ports instead
+    ### of just the port values themselves)
+    my @gnuplot_count_data = ();
+
+    ### write gnuplot data out to stdout
     for my $aref (@gnuplot_data) {
 
         my @matched_fields = ();
@@ -6768,12 +6777,78 @@ sub write_gnuplot_data() {
         }
         next unless @matched_fields;
 
-        my $str = '';
-        $str .= $_ . $plot_separator for @matched_fields;
-        $str =~ s/$plot_separator$//;
-        $str .= "  ### $gnuplot_comment_str" if $gnuplot_comment_str;
-        print $str, "\n";
+        if ($gnuplot_relative_count_mode or $gnuplot_abs_count_mode) {
+            push @matched_fields, $gnuplot_comment_str;
+            push @gnuplot_count_data, \@matched_fields;
+        } else {
+            my $str = '';
+            $str .= $_ . $plot_separator for @matched_fields;
+            $str =~ s/$plot_separator$//;
+            $str .= "  ### $gnuplot_comment_str" if $gnuplot_comment_str;
+            print $str, "\n";
+        }
     }
+
+    if ($gnuplot_relative_count_mode or $gnuplot_abs_count_mode) {
+
+        my %render_count_data = ();
+
+        for my $aref (@gnuplot_count_data) {
+            if ($gnuplot_count_element == 1) {
+                if ($gnuplot_relative_count_mode) {
+                    $render_count_data{$aref->[0]}{'count'}{$aref->[1]}++;
+                } else {
+                    $render_count_data{$aref->[0]}{'count'}++;
+                }
+                if ($#$aref == 2) {  ### gnuplot comment
+                    $render_count_data{$aref->[0]}{'comment'} = $aref->[2];
+                }
+            } elsif ($gnuplot_count_element == 0) {
+                $render_count_data{$aref->[0]}{'count'}++;
+                if ($#$aref == 1) {  ### gnuplot comment
+                    $render_count_data{$aref->[0]}{'comment'} = $aref->[1];
+                }
+            }
+        }
+
+        ### print out the counted data
+        if ($gnuplot_count_element == 1 and $gnuplot_relative_count_mode) {
+            for my $tok0 (sort {$a <=> $b} keys %render_count_data) {
+                for my $tok1 (keys %{$render_count_data{$tok0}{'count'}}) {
+                    my $count = $render_count_data{$tok0}{'count'}{$tok1};
+                    if (defined $render_count_data{$tok0}{'comment'}) {
+                        print $tok0 . $plot_separator . $tok1 .
+                            $plot_separator .  $count . $plot_separator .
+                            $render_count_data{$tok0}{'comment'}, "\n";
+                    } else {
+                        print $tok0 . $plot_separator . $tok1 .
+                            $plot_separator . $count, "\n";
+                    }
+                }
+            }
+        } else {
+            for my $tok0 (sort {$a <=> $b} keys %render_count_data) {
+                my $count = $render_count_data{$tok0}{'count'};
+                if ($gnuplot_count_element == 1) {
+                    if (defined $render_count_data{$tok0}{'comment'}) {
+                        print $tok0 . $plot_separator . $count .
+                            $plot_separator .
+                            $render_count_data{$tok0}{'comment'}, "\n";
+                    } else {
+                        print $tok0 . $plot_separator . $count, "\n";
+                    }
+                } else {
+                    if (defined $render_count_data{$tok0}{'comment'}) {
+                        print $count . $plot_separator .
+                            $render_count_data{$tok0}{'comment'}, "\n";
+                    } else {
+                        print $count, "\n";
+                    }
+                }
+            }
+        }
+    }
+
     return;
 }
 
@@ -6901,20 +6976,36 @@ sub csv_tokens() {
                 $negate = 1;
                 $search =~ s/^not//;
             }
-            $token = 'src' if $token eq 'SRC';
-            $token = 'dst' if $token eq 'DST';
-            $token = 'sp'  if $token eq 'SPT';
-            $token = 'dp'  if $token eq 'DPT';
+            if ($search =~ /,abscount$/ or $search =~ /^abscount/) {
+                $search =~ s/,abscount$//;
+                $search =~ s/^abscount//;
+                die "[*] Counts against multiple fields are not supported."
+                    if $gnuplot_relative_count_mode or $gnuplot_abs_count_mode;
+                $gnuplot_abs_count_mode = 1;
+                $gnuplot_count_element = $#tokens + 1;
+            }
+            if ($search =~ /,count$/ or $search =~ /^count/) {
+                $search =~ s/,count$//;
+                $search =~ s/^count//;
+                die "[*] Counts against multiple fields are not supported."
+                    if $gnuplot_relative_count_mode or $gnuplot_abs_count_mode;
+                $gnuplot_relative_count_mode = 1;
+                $gnuplot_count_element = $#tokens + 1;
+            }
+            $token = 'src'   if $token eq 'SRC';
+            $token = 'dst'   if $token eq 'DST';
+            $token = 'sp'    if $token eq 'SPT';
+            $token = 'dp'    if $token eq 'DPT';
             $token = 'proto' if $token eq 'PROTO';
-            $token = 'tos' if $token eq 'TOS';
-            $token = 'win' if $token eq 'WIN';
+            $token = 'tos'   if $token eq 'TOS';
+            $token = 'win'   if $token eq 'WIN';
             $token = 'itype' if $token eq 'TYPE';
             $token = 'icode' if $token eq 'CODE';
             $token = 'ttl'   if $token eq 'TTL';
             $token = 'ip_id' if $token eq 'ID';
             $token = 'icmp_seq' if $token eq 'SEQ';
-            $token = 'ip_len' if $token eq 'LEN';
-            $token = 'intf' if $token eq 'IN' or $token eq 'OUT';
+            $token = 'ip_len'   if $token eq 'LEN';
+            $token = 'intf'     if $token eq 'IN' or $token eq 'OUT';
             unless (defined $pkt_NF_init{$token}) {
                 print "[*] $token is not a valid packet field; valid ",
                     "fields are:\n";

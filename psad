@@ -6583,60 +6583,60 @@ sub ipt_match_criteria() {
 
     my @matched_fields = ();
     my $gnuplot_comment_str = '';
-    TOK: for (my $i=0; $i <= $#$tokens_ar; $i++) {
+    for (my $i=0; $i <= $#$tokens_ar; $i++) {
         my $tok = $tokens_ar->[$i];
         if ($match_criteria_ar) {
             my $match_hr = $match_criteria_ar->[$i];
             if (defined $match_hr->{'num'}) {
-                next TOK unless $pkt_hr->{$tok} =~ m|^\d+$|;
+                return [], '' unless $pkt_hr->{$tok} =~ m|^\d+$|;
                 if ($match_hr->{'negate'}) {
-                    next TOK if $pkt_hr->{$tok} == $match_hr->{'num'};
+                    return [], '' if $pkt_hr->{$tok} == $match_hr->{'num'};
                 } else {
-                    next TOK unless $pkt_hr->{$tok} == $match_hr->{'num'};
+                    return [], '' unless $pkt_hr->{$tok} == $match_hr->{'num'};
                 }
             } elsif (defined $match_hr->{'gt'}) {
-                next TOK unless $pkt_hr->{$tok} =~ m|^\d+$|;
+                return [], '' unless $pkt_hr->{$tok} =~ m|^\d+$|;
                 if ($match_hr->{'negate'}) {
-                    next TOK unless $pkt_hr->{$tok} <= $match_hr->{'gt'};
+                    return [], '' unless $pkt_hr->{$tok} <= $match_hr->{'gt'};
                 } else {
-                    next TOK unless $pkt_hr->{$tok} > $match_hr->{'gt'};
+                    return [], '' unless $pkt_hr->{$tok} > $match_hr->{'gt'};
                 }
             } elsif (defined $match_hr->{'lt'}) {
-                next TOK unless $pkt_hr->{$tok} =~ m|^\d+$|;
+                return [], '' unless $pkt_hr->{$tok} =~ m|^\d+$|;
                 if ($match_hr->{'negate'}) {
-                    next TOK unless $pkt_hr->{$tok} >= $match_hr->{'lt'};
+                    return [], '' unless $pkt_hr->{$tok} >= $match_hr->{'lt'};
                 } else {
-                    next TOK unless $pkt_hr->{$tok} < $match_hr->{'lt'};
+                    return [], '' unless $pkt_hr->{$tok} < $match_hr->{'lt'};
                 }
             } elsif (defined $match_hr->{'str'}) {
                 if ($match_hr->{'negate'}) {
-                    next TOK if $pkt_hr->{$tok} eq $match_hr->{'str'};
+                    return [], '' if $pkt_hr->{$tok} eq $match_hr->{'str'};
                 } else {
-                    next TOK unless $pkt_hr->{$tok} eq $match_hr->{'str'};
+                    return [], '' unless $pkt_hr->{$tok} eq $match_hr->{'str'};
                 }
             } elsif (defined $match_hr->{'re'}) {
                 if ($match_hr->{'negate'}) {
-                    next TOK if $pkt_hr->{$tok} =~ m|$match_hr->{'re'}m|;
+                    return [], '' if $pkt_hr->{$tok} =~ m|$match_hr->{'re'}m|;
                 } else {
-                    next TOK unless $pkt_hr->{$tok} =~ m|$match_hr->{'re'}m|;
+                    return [], '' unless $pkt_hr->{$tok} =~ m|$match_hr->{'re'}m|;
                 }
             } elsif (defined $match_hr->{'net'}) {
                 if ($pkt_hr->{$tok} =~ m|$ip_re|) {
                     if ($match_hr->{'negate'}) {
-                        next TOK if ipv4_in_network($match_hr->{'net'},
+                        return [], '' if ipv4_in_network($match_hr->{'net'},
                                 $pkt_hr->{$tok});
                     } else {
-                        next TOK unless ipv4_in_network($match_hr->{'net'},
+                        return [], '' unless ipv4_in_network($match_hr->{'net'},
                                 $pkt_hr->{$tok});
                     }
                 } else {
-                    next TOK;
+                    return [], '';
                 }
             } elsif (defined $match_hr->{'ip'}) {
                 if ($match_hr->{'negate'}) {
-                    next TOK if $pkt_hr->{$tok} eq $match_hr->{'ip'};
+                    return [], '' if $pkt_hr->{$tok} eq $match_hr->{'ip'};
                 } else {
-                    next TOK unless $pkt_hr->{$tok} eq $match_hr->{'ip'};
+                    return [], '' unless $pkt_hr->{$tok} eq $match_hr->{'ip'};
                 }
             }
         }
@@ -6708,6 +6708,7 @@ sub csv_mode() {
 
         my ($matched_fields_ar, $gnuplot_comment_str)
                 = &ipt_match_criteria(\%pkt, $tokens_ar, $match_criteria_ar);
+
         next MSG unless $#$matched_fields_ar > -1;
 
         $ctr++;

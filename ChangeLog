@@ -16,7 +16,8 @@ psad-2.0.8 (07//2007):
       field instead of the field itself. Supported modes are an absolute
       count, a relative count vs. another field, and a unique count. This is
       useful to plot graphs of source IP vs. the number unique ports for
-      example.
+      example.  Also added the ability to summarize iptables log fields over
+      various time scales (minutes, hours, and days).
     - Added --analysis-fields so the iptables log messages that are parsed in
       -A mode can be restricted to those that meet certain criteria. For
       example, to restrict the analyze mode to process packets with a source

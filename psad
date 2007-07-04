@@ -340,9 +340,9 @@ my $fw_block_ip      = '';
 my $fw_rm_block_ip   = '';
 my $fw_del_chains    = 0;
 my $gnuplot_mode     = 0;
-my $gnuplot_relative_count_mode = 0;  ### enabled by appending ",count" to a --CSV-field entry
-my $gnuplot_abs_count_mode = 0;  ### enabled by appending ",abscount" to a --CSV-field entry
-my $gnuplot_uniq_count_mode = 0;  ### enabled by appending ",uniqcount" to a --CSV-field entry
+my $gnuplot_year     = 0;
+my $gnuplot_prev_mon = 0;
+my $gnuplot_count_type = '';
 my $gnuplot_count_element = -1;
 my %gnuplot_cache_uniq = ();
 my @gnuplot_data     = ();
@@ -356,6 +356,7 @@ my $csv_start_line   = 0;
 my $csv_end_line     = 0;
 my $csv_regex        = '';
 my $csv_neg_regex    = '';
+my $csv_have_timestamp = 0;
 my $dump_ipt_policy  = 0;
 my $fw_include_ips   = 0;
 my $benchmark        = 0;
@@ -2682,7 +2683,8 @@ sub import_perl_modules() {
     require Unix::Syslog;
 
     Net::IPv4Addr->import(qw(ipv4_network ipv4_in_network ipv4_broadcast));
-    Date::Calc->import(qw(Timezone This_Year Decode_Month));
+    Date::Calc->import(qw(Timezone This_Year Decode_Month
+            Today Date_to_Time Mktime Localtime));
     Unix::Syslog->import(qw(:subs :macros));
 
     return;
@@ -6757,7 +6759,10 @@ sub csv_mode() {
 sub write_gnuplot_data() {
     my $tokens_ar = shift;
 
-    ### first resolve any IP addresses to minimal integers
+    ### see how many years we need to go back
+    &gnuplot_set_start_year($tokens_ar);
+
+    ### resolve any IP addresses to minimal integers
     ### (this mapping preserves IP address subnet relationships
     ### in that IP's on the same subnet will appear close together
     ### in the plot).
@@ -6803,9 +6808,7 @@ sub write_gnuplot_data() {
         }
         next unless @matched_fields;
 
-        if ($gnuplot_relative_count_mode
-                    or $gnuplot_abs_count_mode
-                    or $gnuplot_uniq_count_mode) {
+        if ($gnuplot_count_type) {
             push @matched_fields, $gnuplot_comment_str;
             push @gnuplot_count_data, \@matched_fields;
         } else {
@@ -6817,30 +6820,47 @@ sub write_gnuplot_data() {
         }
     }
 
-    if ($gnuplot_relative_count_mode
-                or $gnuplot_abs_count_mode
-                or $gnuplot_uniq_count_mode) {
+    if ($gnuplot_count_type) {
 
         my %render_count_data = ();
+        my $start_time = '';
+        my $end_time = '';
 
+        if ($gnuplot_count_type eq 'countday'
+                or $gnuplot_count_type eq 'counthour'
+                or $gnuplot_count_type eq 'countmin') {
+            $start_time = $gnuplot_count_data[0]->[0];
+            $end_time = $gnuplot_count_data[$#gnuplot_count_data]->[0];
+        }
         for my $aref (@gnuplot_count_data) {
             if ($gnuplot_count_element == 1) {
-                if ($gnuplot_relative_count_mode) {
-                    $render_count_data{$aref->[0]}{'count'}{$aref->[1]}++;
-                } elsif ($gnuplot_uniq_count_mode) {
+                my $x_axis = $aref->[0];
+                my $y_axis = $aref->[1];
+                if ($gnuplot_count_type eq 'countday') {
+                    $x_axis =~ s/\d{2}:\d{2}:\d{2}$/00:00:00/;
+                } elsif ($gnuplot_count_type eq 'counthour') {
+                    $x_axis =~ s/\d{2}:\d{2}$/00:00/;
+                } elsif ($gnuplot_count_type eq 'countmin') {
+                    $x_axis =~ s/\d{2}$/00/;
+                }
+                if ($gnuplot_count_type eq 'count') {
+                    $render_count_data{$x_axis}{'count'}{$y_axis}++;
+                } elsif ($gnuplot_count_type eq 'uniqcount') {
                     unless (defined $gnuplot_cache_uniq{$aref->[0]}) {
-                        $render_count_data{$aref->[0]}{'count'}++;
-                        $gnuplot_cache_uniq{$aref->[0]}{$aref->[1]} = '';
+                        $render_count_data{$x_axis}{'count'}++;
+                        $gnuplot_cache_uniq{$x_axis}{$y_axis} = '';
                     }
-                    unless (defined $gnuplot_cache_uniq{$aref->[0]}{$aref->[1]}) {
-                        $render_count_data{$aref->[0]}{'count'}++;
-                        $gnuplot_cache_uniq{$aref->[0]}{$aref->[1]} = '';
+                    unless (defined $gnuplot_cache_uniq{$x_axis}{$y_axis}) {
+                        $render_count_data{$x_axis}{'count'}++;
+                        $gnuplot_cache_uniq{$x_axis}{$y_axis} = '';
                     } 
                 } else {
-                    $render_count_data{$aref->[0]}{'count'}++;
+                    $render_count_data{$x_axis}{'count'}++;
                 }
-                if ($#$aref == 2) {  ### gnuplot comment
-                    $render_count_data{$aref->[0]}{'comment'} = $aref->[2];
+                if ($#$aref == 2 and $gnuplot_count_type ne 'countday'
+                        and $gnuplot_count_type ne 'counthour'
+                        and $gnuplot_count_type ne 'countmin') {
+                    $render_count_data{$x_axis}{'comment'} = $aref->[2];
                 }
             } elsif ($gnuplot_count_element == 0) {
                 $render_count_data{$aref->[0]}{'count'}++;
@@ -6851,43 +6871,145 @@ sub write_gnuplot_data() {
         }
 
         ### print out the counted data
-        if ($gnuplot_count_element == 1 and $gnuplot_relative_count_mode) {
-            for my $tok0 (sort {$a <=> $b} keys %render_count_data) {
-                for my $tok1 (keys %{$render_count_data{$tok0}{'count'}}) {
-                    my $count = $render_count_data{$tok0}{'count'}{$tok1};
-                    if (defined $render_count_data{$tok0}{'comment'}) {
-                        print $tok0 . $plot_separator . $tok1 .
+        if ($gnuplot_count_element == 1 and $gnuplot_count_type eq 'count') {
+            for my $x_axis (sort {$a cmp $b} keys %render_count_data) {
+                for my $y_axis (keys %{$render_count_data{$x_axis}{'count'}}) {
+                    my $count = $render_count_data{$x_axis}{'count'}{$y_axis};
+                    if (defined $render_count_data{$x_axis}{'comment'}) {
+                        print $x_axis . $plot_separator . $y_axis .
                             $plot_separator .  $count . $plot_separator .
-                            $render_count_data{$tok0}{'comment'}, "\n";
+                            $render_count_data{$x_axis}{'comment'}, "\n";
                     } else {
-                        print $tok0 . $plot_separator . $tok1 .
+                        print $x_axis . $plot_separator . $y_axis .
                             $plot_separator . $count, "\n";
                     }
                 }
             }
         } else {
-            for my $tok0 (sort {$a <=> $b} keys %render_count_data) {
-                my $count = $render_count_data{$tok0}{'count'};
-                if ($gnuplot_count_element == 1) {
-                    if (defined $render_count_data{$tok0}{'comment'}) {
-                        print $tok0 . $plot_separator . $count .
-                            $plot_separator .
-                            $render_count_data{$tok0}{'comment'}, "\n";
+
+            if ($gnuplot_count_type eq 'countday'
+                    or $gnuplot_count_type eq 'counthour'
+                    or $gnuplot_count_type eq 'countmin') {
+
+                my $scale_factor = 60;  ### default to countmin
+                $start_time =~ s/\d{2}$/00/;
+                $end_time =~ s/\d{2}$/00/;
+                if ($gnuplot_count_type eq 'counthour') {
+                    $scale_factor = 60 * 60;
+                    $start_time =~ s/\d{2}:\d{2}$/00:00/;
+                    $end_time =~ s/\d{2}:\d{2}$/00:00/;
+                } elsif ($gnuplot_count_type eq 'countday') {
+                    $scale_factor = 60 * 60 * 24;
+                    $start_time =~ s/\d{2}:\d{2}:\d{2}$/00:00:00/;
+                    $end_time =~ s/\d{2}:\d{2}:\d{2}$/00:00:00/;
+                }
+               
+                ### print a point for each time interval
+                my $time_sec_num = &convert_time_to_sec($start_time);
+                my $end_sec_num  = &convert_time_to_sec($end_time);
+                while ($time_sec_num <= $end_sec_num) {
+                    $time_sec_num += $scale_factor;
+                    my $time_str = &convert_sec_to_str($time_sec_num);
+                    if (defined $render_count_data{$time_str}) {
+                        print $time_str . $plot_separator .
+                            $render_count_data{$time_str}{'count'}, "\n";
                     } else {
-                        print $tok0 . $plot_separator . $count, "\n";
+                        print $time_str . $plot_separator . '0', "\n";
                     }
-                } else {
-                    if (defined $render_count_data{$tok0}{'comment'}) {
-                        print $count . $plot_separator .
-                            $render_count_data{$tok0}{'comment'}, "\n";
+                }
+            } else {
+                for my $x_axis (sort {$a cmp $b} keys %render_count_data) {
+                    my $count = $render_count_data{$x_axis}{'count'};
+                    if ($gnuplot_count_element == 1) {
+                        if (defined $render_count_data{$x_axis}{'comment'}) {
+                            print $x_axis . $plot_separator . $count .
+                                $plot_separator .
+                                $render_count_data{$x_axis}{'comment'}, "\n";
+                        } else {
+                            print $x_axis . $plot_separator . $count, "\n";
+                        }
                     } else {
-                        print $count, "\n";
+                        if (defined $render_count_data{$x_axis}{'comment'}) {
+                            print $count . $plot_separator .
+                                $render_count_data{$x_axis}{'comment'}, "\n";
+                        } else {
+                            print $count, "\n";
+                        }
                     }
                 }
             }
         }
     }
+    return;
+}
 
+sub convert_time_to_sec() {
+    my $time_str = shift;
+    my $rv = 0;
+    ### 02/09/2007:03:27:02
+    if ($time_str =~ m|(\d+)/(\d+)/(\d+):(\d+):(\d+):(\d+)|) {
+        my $mon  = $1;
+        my $day  = $2;
+        my $year = $3;
+        my $hour = $4;
+        my $min  = $5;
+        my $sec  = $6;
+        $rv = Mktime($year, $mon, $day, $hour, $min, $sec);
+    }
+    return $rv;
+}
+
+sub convert_sec_to_str() {
+    my $time = shift;
+    my $str = '';
+    my @arr = Localtime($time);
+    return sprintf "%.2d/%.2d/$arr[0]:%.2d:%.2d:%.2d",
+        $arr[1], $arr[2], $arr[3], $arr[4], $arr[5];
+}
+
+sub gnuplot_set_start_year() {
+    my $tokens_ar = shift;
+
+    return unless $csv_have_timestamp;
+
+    my $timestamp_field = -1;
+    for (my $i=0; $i <= $#$tokens_ar; $i++) {
+        if ($tokens_ar->[$i] eq 'timestamp') {
+            $timestamp_field = $i;
+            last;
+        }
+    }
+    ### calculate the starting year by looking at the most recent
+    ### event and working backwards
+    die unless $timestamp_field > -1;
+
+    my ($today_year, $today_mon, $today_day) = Today();
+    $gnuplot_year = $today_year;
+    my $prev_month = 0;
+    for (my $i=$#gnuplot_data; $i >= 0; $i--) {
+        if ($gnuplot_data[$i]->[$timestamp_field] =~ /^\s*(\w+)\s+(\d+)\s+(\S+)/) {
+            my $mon  = Decode_Month($1);
+            my $day  = $2;
+            my $time = $3;
+            if ($gnuplot_year) {
+                if ($prev_month < $mon) {
+                    ### i.e., switched from Jan to Dec as we go backwards
+                    ### in the log (but there could be a hole like Jan to
+                    ### Oct as well, the key is that the new mon is less
+                    ### than the previous one)
+                    $gnuplot_year--;
+                } 
+                $prev_month = $mon;
+            } else {
+                $prev_month = $mon;
+                if ($today_mon < $mon) {
+                    $gnuplot_year = $today_year - 1;
+                } else {
+                    $gnuplot_year = $today_year;
+                }
+            }
+        }
+    }
     return;
 }
 
@@ -6902,10 +7024,23 @@ sub gnuplot_value() {
         ### reformat timestamp (e.g. "Feb  1 00:00:27"
         ### becomes 02/02/04:03:00:17)
         if ($packet_val =~ /^\s*(\w+)\s+(\d+)\s+(\S+)/) {
-            my $mon  = $1;
+            my $mon  = Decode_Month($1);
             my $day  = $2;
             my $time = $3;
-            $rv = sprintf "02/%.2d/07:$time", $day;
+            my $hour = 0;
+            my $min  = 0;
+            my $sec  = 0;
+            if ($time =~ /(\d{2}):(\d{2}):(\d{2})/) {
+                $hour = $1;
+                $min  = $2;
+                $sec  = $3;
+            }
+            $gnuplot_prev_mon = $mon unless $gnuplot_prev_mon;
+            if ($mon < $gnuplot_prev_mon) {
+                $gnuplot_year++;
+            }
+            $gnuplot_prev_mon = $mon;
+            $rv = sprintf "%.2d/%.2d/$gnuplot_year:$time", $mon, $day;
         }
 
     } else {
@@ -7020,40 +7155,32 @@ sub csv_tokens() {
                     die "[*] $tok_str requires a search criteria in -A mode.";
                 }
             }
+            if ($token eq 'timestamp') {
+                $csv_have_timestamp = 1;
+            }
             if ($search =~ /^not/) {
                 $negate = 1;
                 $search =~ s/^not//;
             }
-            if ($search =~ /,abscount$/ or $search =~ /^abscount/) {
-                $search =~ s/,abscount$//;
-                $search =~ s/^abscount//;
-                die "[*] Counts against multiple fields are not supported."
-                    if $gnuplot_relative_count_mode
-                            or $gnuplot_abs_count_mode
-                            or $gnuplot_uniq_count_mode;
-                $gnuplot_abs_count_mode = 1;
-                $gnuplot_count_element = $#tokens + 1;
+            for my $count_type qw/abscount uniqcount
+                    countday counthour countmin count/ {
+
+                if ($search =~ /,$count_type$/ or $search =~ /^$count_type/) {
+                    $search =~ s/,$count_type$//;
+                    $search =~ s/^$count_type//;
+                    die "[*] Counts against multiple fields are not supported."
+                        if $gnuplot_count_type;
+                    $gnuplot_count_type = $count_type;
+                    $gnuplot_count_element = $#tokens + 1;
+
+                    die "[*] The first search field must be 'timestamp' ",
+                        "for time-based counts" if $#tokens == -1;
+                    die "[*] The first search field must be 'timestamp' ",
+                        "for time-based counts"
+                        unless $tokens[0] eq 'timestamp';
+                }
             }
-            if ($search =~ /,uniqcount$/ or $search =~ /^uniqcount/) {
-                $search =~ s/,uniqcount$//;
-                $search =~ s/^uniqcount//;
-                die "[*] Counts against multiple fields are not supported."
-                    if $gnuplot_relative_count_mode
-                            or $gnuplot_abs_count_mode
-                            or $gnuplot_uniq_count_mode;
-                $gnuplot_uniq_count_mode = 1;
-                $gnuplot_count_element = $#tokens + 1;
-            }
-            if ($search =~ /,count$/ or $search =~ /^count/) {
-                $search =~ s/,count$//;
-                $search =~ s/^count//;
-                die "[*] Counts against multiple fields are not supported."
-                    if $gnuplot_relative_count_mode
-                            or $gnuplot_abs_count_mode
-                            or $gnuplot_uniq_count_mode;
-                $gnuplot_relative_count_mode = 1;
-                $gnuplot_count_element = $#tokens + 1;
-            }
+
             $token = 'src'   if $token eq 'SRC';
             $token = 'dst'   if $token eq 'DST';
             $token = 'sp'    if $token eq 'SPT';

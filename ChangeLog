@@ -10,14 +10,15 @@ psad-2.0.8 (07//2007):
       originates from the 11.11.0.0/16 subnet and is not destined for port
       80, the following argument does the trick:
 
-            --CSV-fields "src:11.11.0.0/255.255.0.0 dp:not80"
+            --CSV-fields "src:11.11.0.0/16 dp:not80"
 
     - In --gnuplot mode, added the ability to generate the count for a CSV
       field instead of the field itself. Supported modes are an absolute
-      count, a relative count vs. another field, and a unique count. This is
-      useful to plot graphs of source IP vs. the number unique ports for
-      example.  Also added the ability to summarize iptables log fields over
-      various time scales (minutes, hours, and days).
+      count (<field>:count) , and a unique count (<field>:uniqcount). This
+      is useful to plot graphs of source IP vs. the number unique ports for
+      example.  Also added the ability to count iptables log fields over
+      various time scales (minutes, hours, and days) with the following
+      switches: <field>:countday, <field>:counthour, <field>:countmin.
     - Added --analysis-fields so the iptables log messages that are parsed in
       -A mode can be restricted to those that meet certain criteria. For
       example, to restrict the analyze mode to process packets with a source

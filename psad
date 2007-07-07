@@ -7001,7 +7001,7 @@ sub render_count_data() {
         my $z_axis = '';
 
         if ($time_interval_incr) {
-            $x_axis = &gnuplot_time_to_interval($x_axis, $start_time,
+            ($x_axis, $start_time) = &gnuplot_time_to_interval($x_axis, $start_time,
                 $end_time, $time_interval_incr);
         }
 
@@ -7164,7 +7164,7 @@ sub gnuplot_time_to_interval() {
         $mapped_time = $start_time;
     }
 
-    return $mapped_time;
+    return ($mapped_time, $start_time);
 }
 
 sub gnuplot_print_count_3d_data() {

@@ -6816,7 +6816,8 @@ sub gnuplot_write_plot_file() {
     print GP "$_\n", for @{&gnuplot_header()};
     unless ($gnuplot_title) {
         $gnuplot_title = "psad iptables log visualization: $csv_fields";
-        $gnuplot_title .= " $csv_regex" if $csv_regex;
+        $gnuplot_title .= ', regex: ' . qr/$csv_regex/ if $csv_regex;
+        $gnuplot_title .= ', neg-regex: ' . qr/$csv_neg_regex/ if $csv_neg_regex;
     }
     print GP "reset\n", qq|set title "$gnuplot_title"\n|;
     unless ($gnuplot_interactive) {

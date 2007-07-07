@@ -6965,7 +6965,10 @@ sub render_count_data() {
 
     if ($gnuplot_count_type eq 'countday'
             or $gnuplot_count_type eq 'counthour'
-            or $gnuplot_count_type eq 'countmin') {
+            or $gnuplot_count_type eq 'countmin'
+            or $gnuplot_count_type eq 'countdayuniq'
+            or $gnuplot_count_type eq 'counthouruniq'
+            or $gnuplot_count_type eq 'countminuniq') {
 
         $start_time = $count_data_ar->[0]->[0];
         $end_time   = $count_data_ar->[$#$count_data_ar]->[0];
@@ -6979,7 +6982,17 @@ sub render_count_data() {
         } elsif ($gnuplot_count_type eq 'countmin') {
             $time_interval_incr = 60;
             $gnuplot_count_type = 'count';
+        } elsif ($gnuplot_count_type eq 'countdayuniq') {
+            $time_interval_incr = 60 * 60 * 24;
+            $gnuplot_count_type = 'countuniq';
+        } elsif ($gnuplot_count_type eq 'counthouruniq') {
+            $time_interval_incr = 60 * 60;
+            $gnuplot_count_type = 'countuniq';
+        } elsif ($gnuplot_count_type eq 'countminuniq') {
+            $time_interval_incr = 60;
+            $gnuplot_count_type = 'countuniq';
         }
+
     }
 
     for my $aref (@$count_data_ar) {

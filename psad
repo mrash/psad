@@ -6829,6 +6829,12 @@ sub gnuplot_write_plot_file() {
             qq|set timefmt x "%s"\n|,
             qq|set format x "%m/%d"\n|,
             qq|set xlabel "time"\n|;
+        if ($gnuplot_xrange) {
+            die "[*] range argument must be formatted as <start>:<end>"
+                unless $gnuplot_xrange =~ /^\S+:\S+$/;
+            $gnuplot_xrange =~ s/:/":"/;
+            print GP qq|set xrange ["$gnuplot_xrange"]\n|;
+        }
     } else {
         if ($gnuplot_xaxis) {
             print GP qq|set xlabel "$gnuplot_xaxis"\n|; 
@@ -6836,7 +6842,9 @@ sub gnuplot_write_plot_file() {
             print GP qq|set xlabel "$tokens[0]"\n|; 
         }
         if ($gnuplot_xrange) {
-            print GP "set xrange [$gnuplot_xrange]\n";
+            die "[*] range argument must be formatted as <start>:<end>, ",
+                "e.g. 1:10" unless $gnuplot_xrange =~ /^\d+:\d+$/;
+            print GP qq|set xrange [$gnuplot_xrange]\n|;
         }
     }
     if ($gnuplot_yaxis) {
@@ -6845,7 +6853,9 @@ sub gnuplot_write_plot_file() {
         print GP qq|set ylabel "$tokens[1]"\n|; 
     }
     if ($gnuplot_yrange) {
-        print GP "set yrange [$gnuplot_yrange]\n";
+        die "[*] range argument must be formatted as <start>:<end>, e.g. 1:10"
+            unless $gnuplot_yrange =~ /^\d+:\d+$/;
+        print GP qq|set yrange [$gnuplot_yrange]\n|;
     }
     if ($#$tokens_ar == 2 or $gnuplot_3d) {
         ### include zaxis
@@ -6859,7 +6869,9 @@ sub gnuplot_write_plot_file() {
             }
         }
         if ($gnuplot_zrange) {
-            print GP "set zrange [$gnuplot_zrange]\n";
+            die "[*] range argument must be formatted as <start>:<end>, ",
+                "e.g. 1:10" unless $gnuplot_zrange =~ /^\d+:\d+$/;
+            print GP qq|set zrange [$gnuplot_zrange]\n|;
         }
         unless ($gnuplot_graph_style) {
             $gnuplot_graph_style = 'points';

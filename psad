@@ -6712,6 +6712,7 @@ sub gnuplot_write_plot_file() {
     print GP "$_\n", for @{&gnuplot_header()};
     unless ($gnuplot_title) {
         $gnuplot_title = "psad iptables log visualization: $csv_fields";
+        $gnuplot_title =~ s/_//g;  ### some fonts used by Gnuplot don't like "-" chars
     }
     print GP "reset\n", qq|set title "$gnuplot_title"\n|;
     unless ($gnuplot_interactive) {
@@ -6739,8 +6740,8 @@ sub gnuplot_write_plot_file() {
         if ($gnuplot_xaxis) {
             print GP qq|set xlabel "$gnuplot_xaxis"\n|; 
         } else {
+            $tokens[0] =~ s/_//g;
             print GP qq|set xlabel "$tokens[0]"\n|; 
-            $gnuplot_xrange =~ s/_//g;
         }
         if ($gnuplot_xrange) {
             die "[*] range argument must be formatted as <start>:<end>, ",
@@ -6751,8 +6752,8 @@ sub gnuplot_write_plot_file() {
     if ($gnuplot_yaxis) {
         print GP qq|set ylabel "$gnuplot_yaxis"\n|; 
     } else {
+        $tokens[1] =~ s/_//g;
         print GP qq|set ylabel "$tokens[1]"\n|; 
-        $gnuplot_yrange =~ s/_//g;
     }
     if ($gnuplot_yrange) {
         die "[*] range argument must be formatted as <start>:<end>, e.g. 1:10"
@@ -6767,8 +6768,8 @@ sub gnuplot_write_plot_file() {
             if ($gnuplot_count_type) {
                 print GP qq|set zlabel "$gnuplot_count_type"\n|;
             } else {
+                $tokens[2] =~ s/_//g;
                 print GP qq|set zlabel "$tokens[2]"\n|;
-                $gnuplot_zrange =~ s/_//g;
             }
         }
         if ($gnuplot_zrange) {

@@ -6656,11 +6656,16 @@ sub csv_mode() {
 
     if ($gnuplot_mode) {
 
-        if ($store_file and not -e $store_file) {
-            ### store the @gnuplot_data array to disk for fast
-            ### retrieval next time
-            print "[+] Storing Gnuplot data to: $store_file\n";
-            store(\@gnuplot_data, $store_file);
+        if ($store_file) {
+            if (-e $store_file) {
+                print "[+] Retrieved Gnuplot array from: $store_file\n";
+            } else {
+                ### store the @gnuplot_data array to disk for fast
+                ### retrieval next time
+                print "[+] Storing Gnuplot data to: $store_file\n";
+                store(\@gnuplot_data, $store_file);
+                chmod 0644, $store_file;
+            }
         } else {
             print "[+] Parsed $line_ctr iptables log messages.\n";
         }

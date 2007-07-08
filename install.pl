@@ -91,6 +91,10 @@ my %required_perl_modules = (
         'force-install' => 0,
         'mod-dir' => 'Bit-Vector'
     },
+    'Storable', => {
+        'force-install' => 0,
+        'mod-dir' => 'Storable'
+    },
     'Date::Calc', => {
         'force-install' => 0,
         'mod-dir' => 'Date-Calc'

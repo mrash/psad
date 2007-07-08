@@ -19,6 +19,17 @@ psad-2.0.8 (07//2007):
       example.  Also added the ability to count iptables log fields over
       various time scales (minutes, hours, and days) with the following
       switches: <field>:countday, <field>:counthour, <field>:countmin.
+    - In --gnuplot mode, added the ability to specify the view coordinates
+      for 3D graph viewing with --gnuplot-view.
+    - Added the Storable-2.16 module along with the --use-store-file argument
+      so that in --gnuplot mode the Gnuplot data can be stored on disk and
+      retrieve quickly.  This eliminates a large performance bottleneck when
+      Gnuplot configuration directives are tweaked while the same graph is
+      generated multiple times.
+    - Added --gnuplot-grayscale to generate graphs without the default red
+      color for graph points.
+    - Bugfix for regular expressions not being imported correctly from within
+      the --CSV-fields argument.
     - Added --analysis-fields so the iptables log messages that are parsed in
       -A mode can be restricted to those that meet certain criteria. For
       example, to restrict the analyze mode to process packets with a source

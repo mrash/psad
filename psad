@@ -343,6 +343,8 @@ my $gnuplot_mode     = 0;
 my $gnuplot_year     = 0;
 my $gnuplot_prev_mon = 0;
 my $gnuplot_title    = '';
+my $gnuplot_legend_title = '';
+my $gnuplot_grayscale = 0;
 my $gnuplot_xaxis    = '';
 my $gnuplot_xrange   = '';
 my $gnuplot_yaxis    = '';
@@ -350,6 +352,7 @@ my $gnuplot_yrange   = '';
 my $gnuplot_zaxis    = '';
 my $gnuplot_zrange   = '';
 my $gnuplot_3d       = 0;
+my $gnuplot_view     = '';
 my $gnuplot_sort_style = 'value';
 my $gnuplot_graph_style = '';
 my $gnuplot_count_type  = '';
@@ -359,6 +362,8 @@ my @gnuplot_data     = ();
 my $gnuplot_data_file = 'psad_iptables.dat';
 my $gnuplot_plot_file = 'psad_iptables.gnu';
 my $gnuplot_png_file  = 'psad_iptables.png';
+my $gnuplot_file_prefix = '';
+my $store_file       = '';
 my $gnuplot_interactive = 0;
 my $plot_separator   = ', ';  ### default to CSV format for plot data
 my $csv_mode         = 0;
@@ -572,154 +577,8 @@ my $IP_HEADER_LEN    = 20;  ### excludes options
 ### save a copy of the command line arguments
 my @args_cp = @ARGV;
 
-### make Getopts case sensitive
-Getopt::Long::Configure('no_ignore_case');
-
-&usage(1) unless (GetOptions(
-    'signatures=s'      => \$sigs_file,       # Path to psad signatures file.
-    'sig-update'        => \$download_sigs,   # Download the latest signatures from
-                                              # http://www.cipherdyne.org/psad/signatures
-    'passive-os-sigs=s' => \$posf_file,       # Path to passive os fingerprinting
-                                              #   signatures.
-    'snort-type=s'      => \$srules_type,     # Only process snort rules of
-                                              #   this type (e.g. "ddos" or
-                                              #   "backdoor").
-    'snort-rdir=s'      => \$snort_rules_dir, # Specify a directory for snort
-                                              #   rules.
-    'auto-dl=s'         => \$auto_dl_file,    # Path to psad auto IPs file for
-                                              #   auto-setting IP danger level.
-    'Analyze-msgs'      => \$analyze_mode,    # Analysis mode for old iptables
-                                              #   messages in the psad fwdata file
-                                              #   (or messages file; see
-                                              #   --messages).
-    'analysis-write-data' => \$analyze_write_data, # Write data to filesystem from
-                                                   # -A mode (this can take a long
-                                                   # time.
-    'analysis-fields=s' => \$analysis_fields, # Place a criteria on various fields
-                                              #   that are parsed from an iptables
-                                              #   logfile.
-    'whois-analysis'    => \$analysis_whois,  # Issue whois lookups in analysis
-                                              #   mode.
-    'email-analysis'    => \$analysis_emails, # Send analysis mode emails.
-    'messages-file=s'   => \$messages_file,   # Specify the path to file containing
-                                              #   old iptables messages (fwdata by
-                                              #   default).
-    'gnuplot'           => \$gnuplot_mode,    # gnuplot mode.
-    'gnuplot-dat-file=s'  => \$gnuplot_data_file, # gnuplot .dat file.
-    'gnuplot-plot-file=s' => \$gnuplot_plot_file, # gnuplot .gnu file.
-    'gnuplot-png-file=s'  => \$gnuplot_png_file, # gnuplot .gnu file.
-    'gnuplot-interactive' => \$gnuplot_interactive, # launch gnuplot.
-    'gnuplot-title=s'   => \$gnuplot_title,   # Set gnuplot title.
-    'gnuplot-xaxis=s'   => \$gnuplot_xaxis,
-    'gnuplot-xrange=s'  => \$gnuplot_xrange,
-    'gnuplot-yaxis=s'   => \$gnuplot_yaxis,
-    'gnuplot-yrange=s'  => \$gnuplot_yrange,
-    'gnuplot-zaxis=s'   => \$gnuplot_zaxis,
-    'gnuplot-zrange=s'  => \$gnuplot_zrange,
-    'gnuplot-graph-style=s' => \$gnuplot_graph_style,
-    'gnuplot-sort-style=s' => \$gnuplot_sort_style,
-    'gnuplot-3d'        => \$gnuplot_3d,
-    'CSV'               => \$csv_mode,        # CSV mode.
-    'CSV-fields=s'      => \$csv_fields,      # Specify list of CSV fields.
-    'CSV-unique-lines'  => \$csv_print_uniq,  # Only print unique lines in CSV output.
-    'CSV-max-lines=i'   => \$csv_line_limit,  # Limit the number of CSV output lines.
-    'CSV-start-line=i'  => \$csv_start_line,  # Starting line in CSV file.
-    'CSV-end-line=i'    => \$csv_end_line,    # Ending line in CSV file.
-    'CSV-regex=s'       => \$csv_regex,       # Require additional regex match.
-    'CSV-neg-regex=s'   => \$csv_neg_regex,   # Require additional negative regex
-                                              #   match.
-    'CSV-stdin'         => \$csv_stdin,       # Acquire iptables log data from
-                                              #   stdin.
-    'plot-separator'    => \$plot_separator,  # Specify separator character for plot
-                                              #   data (both gnuplot and CSV data).
-    'debug'             => \$debug,           # Run in debug mode.
-    'debug-sid=i'       => \$debug_sid,       # Debug a specific signature.
-    'Dump-conf'         => \$dump_conf,       # Dump config and exit.
-    'Interval=i'        => \$chk_interval,    # Set $chk_interval from the
-                                              #   command line.
-    'interface=s'       => \$cmdl_interface,  # Specify the IN interface manually
-                                              #   and ignore packets on all others.
-    'config=s'          => \$config_file,     # Specify path to configuration file.
-    'fw-analyze'        => \$fw_analyze,      # Analyze the firewall ruleset and
-                                              #   exit.
-    'fw-file=s'         => \$fw_file,         # Analyze ruleset contained within
-                                              #   $fw_file instead of a running
-                                              #   policy.
-    'fw-list-auto'      => \$fw_list_auto,    # Display iptables chains used by
-                                              #   psad in auto blocking code.
-    'List'              => \$fw_list_auto,    # Synonym for --fw-list-auto
-    'fw-block-ip=s'     => \$fw_block_ip,     # Add an IP/net to the psad auto-
-                                              #   blocking chains.  Then psad can
-                                              #   manage timeouts, etc.
-    'fw-rm-block-ip=s'  => \$fw_rm_block_ip,  # Delete any block rule against an IP
-    'fw-del-chains'     => \$fw_del_chains,   # Delete psad chains in addition to
-                                              #   flushing them (requires --F as
-                                              #   well).
-    'X'                 => \$fw_del_chains,   # Synonym for --fw-del-chains.
-    'fw-dump'           => \$dump_ipt_policy, # Dump the iptables policy
-                                              #   (requires -D as well).
-    'fw-include-ips'    => \$fw_include_ips,  # Include all IPs/nets in iptables
-                                              # dump (--fw-dump) output.
-    'log-server'        => \$syslog_server,   # We are running psad on a syslog
-                                              #   logging server.
-    'Kill'              => \$kill,            # Kill all running psad processes.
-                                              #   (psadwatchd, psad, kmsgsd)
-    'Restart'           => \$restart,         # Restart psad with all options of
-                                              #   the currently running psad
-                                              #   process.
-    'Flush'             => \$flush_fw,        # Flush any rules that psad previously
-                                              #   added via the auto blocking code.
-    'Status'            => \$status_mode,     # Display status of any currently
-                                              #   running psad processes.
-    'status-ip=s'       => \$status_ip,       # Display status for a specific IP.
-    'status-dl=i'       => \$status_min_dl,   # Display status for scans that have
-                                              #   reached at least this danger
-                                              #   level.
-    'status-summary'    => \$status_summary,  # Only display status summary info.
-    'restrict-ip=s'     => \$restrict_ip,     # Only process packets that have
-                                              #   either this IP as the src or dst.
-    'Benchmark'         => \$benchmark,       # Run in benchmark mode.
-    'packets=i'         => \$b_packets,       # Specify number of packets to use
-                                              #   in benchmark test.
-    'USR1'              => \$usr1,            # Send an existing psad process a
-                                              # USR1 signal (useful for debugging).
-    'HUP'               => \$hup,             # Send psad processes a HUP signal
-                                              #   to re-import config.
-    'lib-dir=s'         => \$lib_dir,         # Specify path to psad lib directory.
-    'no-snort-sids'     => \$no_snort_sids,   # Disable search for snort SID's
-                                              #   in iptables messages.
-    'no-whois'          => \$no_whois,        # Do not issue whois lookups against
-    'no-passiveos'      => \$no_posf,         # Do not attempt to passively
-    'no-passive-os'     => \$no_posf,         # Do not attempt to passively
-                                              #   fingerprint the remote OS.
-    'no-signatures'     => \$no_signatures,   # Disable signature processing.
-    'no-icmp-types'     => \$no_icmp_types,   # Disable icmp type/code validation.
-    'no-auto-dl'        => \$no_auto_dl,      # Disable auto danger level
-                                              #   assignment.
-    'no-daemon'         => \$no_daemon,       # Do not run as a daemon.
-    'no-fwcheck'        => \$no_fwcheck,      # Do not check firewall rules.
-    'no-rdns'           => \$no_rdns,         # Do not issue dns lookups against
-                                              #   scanning IP address.
-    'no-netstat'        => \$no_netstat,      # Do not check to see if the
-                                              #   firewall is listening on
-                                              #   localport that has been scanned.
-    'no-ipt-errors'     => \$no_ipt_errors,   # Do not write malformed packet.
-                                              #   messages to error log.
-    'no-kmsgsd'         => \$no_kmsgsd,       # Do not start kmsgsd (used for
-                                              #   debugging).
-    'verbose'           => \$verbose,         # Verbose output (for both alerts
-                                              #   and debug info).
-    'Version'           => \$print_ver,       # Print the psad version and exit.
-    'help'              => \$help,            # Display help.
-));
-&usage(0) if $help;
-
-### Print the version number and exit if -V given on the command line.
-if ($print_ver) {
-    print "[+] psad v$version (file revision: $rev_num)\n",
-        "      by Michael Rash <mbr\@cipherdyne.org>\n";
-    exit 0;
-}
+### handle command line args
+&handle_cmd_line();
 
 ### Everthing after this point must be executed as root (psad
 ### only needs root if run in auto-blocking mode; should take
@@ -2710,11 +2569,13 @@ sub import_perl_modules() {
     require Net::IPv4Addr;
     require Date::Calc;
     require Unix::Syslog;
+    require Storable if $store_file;
 
     Net::IPv4Addr->import(qw(ipv4_network ipv4_in_network ipv4_broadcast));
     Date::Calc->import(qw(Timezone This_Year Decode_Month
             Today Date_to_Time Mktime Localtime));
     Unix::Syslog->import(qw(:subs :macros));
+    Storable->import(qw(retrieve  store)) if $store_file;
 
     return;
 }
@@ -6649,9 +6510,9 @@ sub ipt_match_criteria() {
                 }
             } elsif (defined $match_hr->{'re'}) {
                 if ($match_hr->{'negate'}) {
-                    return [], '' if $pkt_hr->{$tok} =~ m|$match_hr->{'re'}m|;
+                    return [], '' if $pkt_hr->{$tok} =~ m|$match_hr->{'re'}|;
                 } else {
-                    return [], '' unless $pkt_hr->{$tok} =~ m|$match_hr->{'re'}m|;
+                    return [], '' unless $pkt_hr->{$tok} =~ m|$match_hr->{'re'}|;
                 }
             } elsif (defined $match_hr->{'net'}) {
                 if ($pkt_hr->{$tok} =~ m|$ip_re|) {
@@ -6679,6 +6540,12 @@ sub ipt_match_criteria() {
 }
 
 sub csv_mode() {
+
+    if ($gnuplot_file_prefix) {
+        $gnuplot_data_file = "$gnuplot_file_prefix.dat";
+        $gnuplot_plot_file = "$gnuplot_file_prefix.gnu";
+        $gnuplot_png_file  = "$gnuplot_file_prefix.png";
+    }
 
     print "[+] Entering Gnuplot mode...\n" if $gnuplot_mode;
 
@@ -6710,79 +6577,93 @@ sub csv_mode() {
     my $ctr = 0;
     my $line_ctr = 0;
 
-    MSG: while (<$fh>) {
-        my $pkt_str = $_;
-        $line_ctr++;
-        if ($csv_start_line) {
-            next MSG unless $line_ctr >= $csv_start_line;
-        }
-        if ($csv_end_line) {
-            last MSG if $line_ctr == $csv_end_line;
-        }
-        next MSG unless $pkt_str =~ /IN.*OUT/;
-        my %pkt = %pkt_NF_init;
-        if ($config{'FW_SEARCH_ALL'} eq 'Y') {
-            my $rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
-            next MSG if $rv == $PKT_ERROR or $rv == $PKT_IGNORE;
-        } else {
-            if ($pkt_str =~ /$config{'SNORT_SID_STR'}/) {
+    if ($gnuplot_mode and $store_file and -e $store_file) {
+
+        @gnuplot_data = @{retrieve($store_file)};
+
+    } else {
+
+        MSG: while (<$fh>) {
+            my $pkt_str = $_;
+            $line_ctr++;
+            if ($csv_start_line) {
+                next MSG unless $line_ctr >= $csv_start_line;
+            }
+            if ($csv_end_line) {
+                last MSG if $line_ctr == $csv_end_line;
+            }
+            next MSG unless $pkt_str =~ /IN.*OUT/;
+            my %pkt = %pkt_NF_init;
+            if ($config{'FW_SEARCH_ALL'} eq 'Y') {
                 my $rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
                 next MSG if $rv == $PKT_ERROR or $rv == $PKT_IGNORE;
             } else {
-                for my $fw_search_str (@fw_search) {
-                    if ($pkt_str =~ /$fw_search_str/) {
-                        my $rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
-                        next MSG if $rv == $PKT_ERROR or $rv == $PKT_IGNORE;
+                if ($pkt_str =~ /$config{'SNORT_SID_STR'}/) {
+                    my $rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
+                    next MSG if $rv == $PKT_ERROR or $rv == $PKT_IGNORE;
+                } else {
+                    for my $fw_search_str (@fw_search) {
+                        if ($pkt_str =~ /$fw_search_str/) {
+                            my $rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
+                            next MSG if $rv == $PKT_ERROR or $rv == $PKT_IGNORE;
+                        }
                     }
                 }
             }
-        }
-        if ($csv_regex) {
-            next MSG unless $pkt{'raw'} =~ m|$csv_regex|;
-        }
-        if ($csv_neg_regex) {
-            next MSG unless $pkt{'raw'} !~ m|$csv_neg_regex|;
-        }
-        $pkt{'log_prefix'} =~ s/\W//g;
-        $pkt{'log_prefix'} =~ s/\s//g;
+            if ($csv_regex) {
+                next MSG unless $pkt{'raw'} =~ m|$csv_regex|;
+            }
+            if ($csv_neg_regex) {
+                next MSG unless $pkt{'raw'} !~ m|$csv_neg_regex|;
+            }
+            $pkt{'log_prefix'} =~ s/\W//g;
+            $pkt{'log_prefix'} =~ s/\s//g;
 
-        my ($matched_fields_ar, $gnuplot_comment_str)
-                = &ipt_match_criteria(\%pkt, $tokens_ar, $match_criteria_ar);
+            my ($matched_fields_ar, $gnuplot_comment_str)
+                    = &ipt_match_criteria(\%pkt, $tokens_ar, $match_criteria_ar);
 
-        next MSG unless $#$matched_fields_ar > -1;
+            next MSG unless $#$matched_fields_ar > -1;
 
-        $ctr++;
-        if ($csv_line_limit > 0) {
-            last if $ctr >= $csv_line_limit;
-        }
+            $ctr++;
+            if ($csv_line_limit > 0) {
+                last if $ctr >= $csv_line_limit;
+            }
 
-        if ($gnuplot_mode) {
-            ### cache the data since IP addresses have to mapped to
-            ### integers across the entire data set
-            push @gnuplot_data, $matched_fields_ar;
-        } else {
-
-            my $str = '';
-        
-            ### here is where the output string is assembled
-            $str .= $_ . $plot_separator for @$matched_fields_ar;
-            $str =~ s/$plot_separator$//;
-
-            if ($csv_print_uniq) {
-                $csv_uniq_lines{$str} = '';
+            if ($gnuplot_mode) {
+                ### cache the data since IP addresses have to mapped to
+                ### integers across the entire data set
+                push @gnuplot_data, $matched_fields_ar;
             } else {
-                ### The CSV data is printed here unless
-                ### we are running with --CSV-unique-lines
-                ### or we are running in --gnuplot mode
-                print $str, "\n";
+
+                my $str = '';
+
+                ### here is where the output string is assembled
+                $str .= $_ . $plot_separator for @$matched_fields_ar;
+                $str =~ s/$plot_separator$//;
+
+                if ($csv_print_uniq) {
+                    $csv_uniq_lines{$str} = '';
+                } else {
+                    ### The CSV data is printed here unless
+                    ### we are running with --CSV-unique-lines
+                    ### or we are running in --gnuplot mode
+                    print $str, "\n";
+                }
             }
         }
+        close MSGS;
     }
-    close MSGS;
 
     if ($gnuplot_mode) {
 
-        print "[+] Parsed $line_ctr iptables log messages.\n";
+        if ($store_file and not -e $store_file) {
+            ### store the @gnuplot_data array to disk for fast
+            ### retrieval next time
+            print "[+] Storing Gnuplot data to: $store_file\n";
+            store(\@gnuplot_data, $store_file);
+        } else {
+            print "[+] Parsed $line_ctr iptables log messages.\n";
+        }
         ### print out the gnuplot data after appropriate
         ### integer conversions
         &gnuplot_write_data($tokens_ar);
@@ -6809,6 +6690,16 @@ sub gnuplot_header() {
 sub gnuplot_write_plot_file() {
     my $tokens_ar = shift;
 
+    unless ($gnuplot_legend_title) {
+        $gnuplot_legend_title = '(';
+        for my $tok (@$tokens_ar) {
+            $gnuplot_legend_title .= "$tok,";
+        } 
+        $gnuplot_legend_title =~ s/,$//;
+        $gnuplot_legend_title .= ')';
+        $gnuplot_legend_title  =~ s/_//g;
+    }
+
     my @tokens = split /\s+/, $csv_fields;
     print "[+] Writing gnuplot directive file: $gnuplot_plot_file\n";
     open GP, "> $gnuplot_plot_file" or die "[*] Could not open ",
@@ -6816,13 +6707,17 @@ sub gnuplot_write_plot_file() {
     print GP "$_\n", for @{&gnuplot_header()};
     unless ($gnuplot_title) {
         $gnuplot_title = "psad iptables log visualization: $csv_fields";
-        $gnuplot_title .= ', regex: ' . qr/$csv_regex/ if $csv_regex;
-        $gnuplot_title .= ', neg-regex: ' . qr/$csv_neg_regex/ if $csv_neg_regex;
     }
     print GP "reset\n", qq|set title "$gnuplot_title"\n|;
     unless ($gnuplot_interactive) {
-        print GP "set terminal png transparent nocrop enhanced\n",
-            qq|set output "$gnuplot_png_file"\n|;
+        if ($gnuplot_grayscale) {
+            print GP "set terminal png transparent xffffff x000000 x606060 ",
+                "x606060 x606060 x606060 x606060 x606060 nocrop enhanced\n",
+                qq|set output "$gnuplot_png_file"\n|;
+        } else {
+            print GP "set terminal png transparent nocrop enhanced\n",
+                qq|set output "$gnuplot_png_file"\n|;
+        }
     }
     if ($tokens_ar->[0] eq 'timestamp') {
         print GP "set xdata time\n",
@@ -6840,6 +6735,7 @@ sub gnuplot_write_plot_file() {
             print GP qq|set xlabel "$gnuplot_xaxis"\n|; 
         } else {
             print GP qq|set xlabel "$tokens[0]"\n|; 
+            $gnuplot_xrange =~ s/_//g;
         }
         if ($gnuplot_xrange) {
             die "[*] range argument must be formatted as <start>:<end>, ",
@@ -6851,6 +6747,7 @@ sub gnuplot_write_plot_file() {
         print GP qq|set ylabel "$gnuplot_yaxis"\n|; 
     } else {
         print GP qq|set ylabel "$tokens[1]"\n|; 
+        $gnuplot_yrange =~ s/_//g;
     }
     if ($gnuplot_yrange) {
         die "[*] range argument must be formatted as <start>:<end>, e.g. 1:10"
@@ -6860,12 +6757,13 @@ sub gnuplot_write_plot_file() {
     if ($#$tokens_ar == 2 or $gnuplot_3d) {
         ### include zaxis
         if ($gnuplot_zaxis) {
-            print GP qq|set zlabel "$gnuplot_zaxis"\n|; 
+            print GP qq|set zlabel "$gnuplot_zaxis"\n|;
         } else {
             if ($gnuplot_count_type) {
-                print GP qq|set zlabel "$gnuplot_count_type"\n|; 
+                print GP qq|set zlabel "$gnuplot_count_type"\n|;
             } else {
-                print GP qq|set zlabel "$tokens[2]"\n|; 
+                print GP qq|set zlabel "$tokens[2]"\n|;
+                $gnuplot_zrange =~ s/_//g;
             }
         }
         if ($gnuplot_zrange) {
@@ -6876,14 +6774,19 @@ sub gnuplot_write_plot_file() {
         unless ($gnuplot_graph_style) {
             $gnuplot_graph_style = 'points';
         }
-        print GP qq|splot '$gnuplot_data_file' using | .
-            "1:2:3 with $gnuplot_graph_style\n";
+        if ($gnuplot_view) {
+            die "[*] View must be a coordinate pair such as 60,30"
+                unless $gnuplot_view =~ /^\d+,\d+/;
+            print GP qq|set view $gnuplot_view\n|;
+        }
+        print GP qq|splot '$gnuplot_data_file' using 1:2:3 with | .
+            "$gnuplot_graph_style title '$gnuplot_legend_title'\n";
     } else {
         unless ($gnuplot_graph_style) {
             $gnuplot_graph_style = 'linespoints';
         }
-        print GP qq|plot '$gnuplot_data_file' using | .
-            "1:2 with $gnuplot_graph_style\n";
+        print GP qq|plot '$gnuplot_data_file' using 1:2 with | .
+            "$gnuplot_graph_style title '$gnuplot_legend_title'\n";
     }
     close GP;
     chmod 0644, $gnuplot_plot_file;
@@ -6914,7 +6817,8 @@ sub gnuplot_write_data() {
     ### now that all IP addresses have been mapped into the cache
     ### we map each IP to a mimimal integer
     my $ip_ctr = 1;
-    for my $ip (sort {$ip2int_cache{$a} <=> $ip2int_cache{$b}} keys %ip2int_cache) {
+    for my $ip (sort {$ip2int_cache{$a} <=> $ip2int_cache{$b}}
+                keys %ip2int_cache) {
         unless (defined $gnuplot_ip2int{$ip}) {
             $gnuplot_ip2int{$ip} = $ip_ctr;
             $ip_ctr++;
@@ -7074,7 +6978,7 @@ sub render_count_data() {
                     unless (defined $gnuplot_cache_uniq{$x_axis}{$y_axis}) {
                         $render_count_data{$x_axis}++;
                         $gnuplot_cache_uniq{$x_axis}{$y_axis} = '';
-                    } 
+                    }
                 }
 
             } elsif ($gnuplot_count_element == 2) {
@@ -7091,7 +6995,7 @@ sub render_count_data() {
                 unless (defined $gnuplot_cache_uniq{$x_axis}{$y_axis}) {
                     $render_count_data{$x_axis}{$y_axis}++;
                     $gnuplot_cache_uniq{$x_axis}{$y_axis}{$z_axis} = '';
-                } 
+                }
                 unless (defined $gnuplot_cache_uniq{$x_axis}{$y_axis}{$z_axis}) {
                     $render_count_data{$x_axis}{$y_axis}++;
                     $gnuplot_cache_uniq{$x_axis}{$y_axis}{$z_axis} = '';
@@ -7275,7 +7179,7 @@ sub gnuplot_set_start_year() {
                     ### Oct as well, the key is that the new mon is less
                     ### than the previous one)
                     $gnuplot_year--;
-                } 
+                }
                 $prev_month = $mon;
             } else {
                 $prev_month = $mon;
@@ -7511,7 +7415,7 @@ sub csv_tokens() {
                         unless $1 >= 0;
                 } elsif ($search =~ m|^/(.*?)/$|) {
                     $search_hsh{'re'} = qr|$1|;
-                } elsif ($search =~ m|^\"(.*?)\"$|) {
+                } elsif ($search =~ m|^'(.*?)'$|) {
                     $search_hsh{'str'} = $1;
                 } elsif ($search =~ m|^$ip_re/$ip_re$|) {
                     $search_hsh{'net'} = $search;
@@ -9508,6 +9412,163 @@ sub print_sys_msg() {
     print F scalar localtime(), " psad v$version (file ",
         "rev: $rev_num) pid: $$ $msg";
     close F;
+    return;
+}
+
+sub handle_cmd_line() {
+    ### make Getopts case sensitive
+    Getopt::Long::Configure('no_ignore_case');
+
+    &usage(1) unless (GetOptions(
+        'signatures=s'      => \$sigs_file,       # Path to psad signatures file.
+        'sig-update'        => \$download_sigs,   # Download the latest signatures from
+                                                  # http://www.cipherdyne.org/psad/signatures
+        'passive-os-sigs=s' => \$posf_file,       # Path to passive os fingerprinting
+                                                  #   signatures.
+        'snort-type=s'      => \$srules_type,     # Only process snort rules of
+                                                  #   this type (e.g. "ddos" or
+                                                  #   "backdoor").
+        'snort-rdir=s'      => \$snort_rules_dir, # Specify a directory for snort
+                                                  #   rules.
+        'auto-dl=s'         => \$auto_dl_file,    # Path to psad auto IPs file for
+                                                  #   auto-setting IP danger level.
+        'use-store-file=s'  => \$store_file,      # Path to parsed data written to by Storable
+        'Analyze-msgs'      => \$analyze_mode,    # Analysis mode for old iptables
+                                                  #   messages in the psad fwdata file
+                                                  #   (or messages file; see
+                                                  #   --messages).
+        'analysis-write-data' => \$analyze_write_data, # Write data to filesystem from
+                                                       # -A mode (this can take a long
+                                                       # time).
+        'analysis-fields=s' => \$analysis_fields, # Place a criteria on various fields
+                                                  #   that are parsed from an iptables
+                                                  #   logfile.
+        'whois-analysis'    => \$analysis_whois,  # Issue whois lookups in analysis
+                                                  #   mode.
+        'email-analysis'    => \$analysis_emails, # Send analysis mode emails.
+        'messages-file=s'   => \$messages_file,   # Specify the path to file containing
+                                                  #   old iptables messages (fwdata by
+                                                  #   default).
+        'gnuplot'           => \$gnuplot_mode,    # gnuplot mode.
+        'gnuplot-dat-file=s'  => \$gnuplot_data_file, # gnuplot .dat file.
+        'gnuplot-plot-file=s' => \$gnuplot_plot_file, # gnuplot .gnu file.
+        'gnuplot-png-file=s'  => \$gnuplot_png_file, # gnuplot .gnu file.
+        'gnuplot-interactive' => \$gnuplot_interactive, # launch gnuplot.
+        'gnuplot-title=s'   => \$gnuplot_title,   # Set gnuplot title.
+        'gnuplot-legend-titls=s' => \$gnuplot_legend_title,   # Set gnuplot legend title.
+        'gnuplot-xaxis=s'   => \$gnuplot_xaxis,
+        'gnuplot-xrange=s'  => \$gnuplot_xrange,
+        'gnuplot-yaxis=s'   => \$gnuplot_yaxis,
+        'gnuplot-yrange=s'  => \$gnuplot_yrange,
+        'gnuplot-zaxis=s'   => \$gnuplot_zaxis,
+        'gnuplot-zrange=s'  => \$gnuplot_zrange,
+        'gnuplot-graph-style=s' => \$gnuplot_graph_style,
+        'gnuplot-sort-style=s' => \$gnuplot_sort_style,
+        'gnuplot-3d'        => \$gnuplot_3d,
+        'gnuplot-view=s'    => \$gnuplot_view,
+        'gnuplot-grayscale' => \$gnuplot_grayscale,
+        'gnuplot-file-prefix=s' => \$gnuplot_file_prefix,
+        'CSV'               => \$csv_mode,        # CSV mode.
+        'CSV-fields=s'      => \$csv_fields,      # Specify list of CSV fields.
+        'CSV-unique-lines'  => \$csv_print_uniq,  # Only print unique lines in CSV output.
+        'CSV-max-lines=i'   => \$csv_line_limit,  # Limit the number of CSV output lines.
+        'CSV-start-line=i'  => \$csv_start_line,  # Starting line in CSV file.
+        'CSV-end-line=i'    => \$csv_end_line,    # Ending line in CSV file.
+        'CSV-regex=s'       => \$csv_regex,       # Require additional regex match.
+        'CSV-neg-regex=s'   => \$csv_neg_regex,   # Require additional negative regex
+                                                  #   match.
+            'CSV-stdin'         => \$csv_stdin,       # Acquire iptables log data from
+                                                  #   stdin.
+        'plot-separator'    => \$plot_separator,  # Specify separator character for plot
+                                                  #   data (both gnuplot and CSV data).
+        'debug'             => \$debug,           # Run in debug mode.
+        'debug-sid=i'       => \$debug_sid,       # Debug a specific signature.
+        'Dump-conf'         => \$dump_conf,       # Dump config and exit.
+        'Interval=i'        => \$chk_interval,    # Set $chk_interval from the
+                                                  #   command line.
+        'interface=s'       => \$cmdl_interface,  # Specify the IN interface manually
+                                                  #   and ignore packets on all others.
+        'config=s'          => \$config_file,     # Specify path to configuration file.
+        'fw-analyze'        => \$fw_analyze,      # Analyze the firewall ruleset and
+                                                  #   exit.
+        'fw-file=s'         => \$fw_file,         # Analyze ruleset contained within
+                                                  #   $fw_file instead of a running
+                                                  #   policy.
+        'fw-list-auto'      => \$fw_list_auto,    # Display iptables chains used by
+                                                  #   psad in auto blocking code.
+        'List'              => \$fw_list_auto,    # Synonym for --fw-list-auto
+        'fw-block-ip=s'     => \$fw_block_ip,     # Add an IP/net to the psad auto-
+                                                  #   blocking chains.  Then psad can
+                                                  #   manage timeouts, etc.
+        'fw-rm-block-ip=s'  => \$fw_rm_block_ip,  # Delete any block rule against an IP
+        'fw-del-chains'     => \$fw_del_chains,   # Delete psad chains in addition to
+                                                  #   flushing them (requires --F as
+                                                  #   well).
+        'X'                 => \$fw_del_chains,   # Synonym for --fw-del-chains.
+        'fw-dump'           => \$dump_ipt_policy, # Dump the iptables policy
+                                                  #   (requires -D as well).
+        'fw-include-ips'    => \$fw_include_ips,  # Include all IPs/nets in iptables
+                                                  # dump (--fw-dump) output.
+        'log-server'        => \$syslog_server,   # We are running psad on a syslog
+                                                  #   logging server.
+        'Kill'              => \$kill,            # Kill all running psad processes.
+                                                  #   (psadwatchd, psad, kmsgsd)
+        'Restart'           => \$restart,         # Restart psad with all options of
+                                                  #   the currently running psad
+                                                  #   process.
+        'Flush'             => \$flush_fw,        # Flush any rules that psad previously
+                                                  #   added via the auto blocking code.
+        'Status'            => \$status_mode,     # Display status of any currently
+                                                  #   running psad processes.
+        'status-ip=s'       => \$status_ip,       # Display status for a specific IP.
+        'status-dl=i'       => \$status_min_dl,   # Display status for scans that have
+                                                  #   reached at least this danger
+                                                  #   level.
+        'status-summary'    => \$status_summary,  # Only display status summary info.
+        'restrict-ip=s'     => \$restrict_ip,     # Only process packets that have
+                                                  #   either this IP as the src or dst.
+        'Benchmark'         => \$benchmark,       # Run in benchmark mode.
+        'packets=i'         => \$b_packets,       # Specify number of packets to use
+                                                  #   in benchmark test.
+        'USR1'              => \$usr1,            # Send an existing psad process a
+                                                  # USR1 signal (useful for debugging).
+        'HUP'               => \$hup,             # Send psad processes a HUP signal
+                                                  #   to re-import config.
+        'lib-dir=s'         => \$lib_dir,         # Specify path to psad lib directory.
+        'no-snort-sids'     => \$no_snort_sids,   # Disable search for snort SID's
+                                                  #   in iptables messages.
+        'no-whois'          => \$no_whois,        # Do not issue whois lookups against
+        'no-passiveos'      => \$no_posf,         # Do not attempt to passively
+        'no-passive-os'     => \$no_posf,         # Do not attempt to passively
+                                                  #   fingerprint the remote OS.
+        'no-signatures'     => \$no_signatures,   # Disable signature processing.
+        'no-icmp-types'     => \$no_icmp_types,   # Disable icmp type/code validation.
+        'no-auto-dl'        => \$no_auto_dl,      # Disable auto danger level
+                                                  #   assignment.
+        'no-daemon'         => \$no_daemon,       # Do not run as a daemon.
+        'no-fwcheck'        => \$no_fwcheck,      # Do not check firewall rules.
+        'no-rdns'           => \$no_rdns,         # Do not issue dns lookups against
+                                                  #   scanning IP address.
+        'no-netstat'        => \$no_netstat,      # Do not check to see if the
+                                                  #   firewall is listening on
+                                                  #   localport that has been scanned.
+        'no-ipt-errors'     => \$no_ipt_errors,   # Do not write malformed packet.
+                                                  #   messages to error log.
+        'no-kmsgsd'         => \$no_kmsgsd,       # Do not start kmsgsd (used for
+                                                  #   debugging).
+        'verbose'           => \$verbose,         # Verbose output (for both alerts
+                                                  #   and debug info).
+        'Version'           => \$print_ver,       # Print the psad version and exit.
+        'help'              => \$help,            # Display help.
+    ));
+    &usage(0) if $help;
+    
+    ### Print the version number and exit if -V given on the command line.
+    if ($print_ver) {
+        print "[+] psad v$version (file revision: $rev_num)\n",
+        "      by Michael Rash <mbr\@cipherdyne.org>\n";
+        exit 0;
+    }
     return;
 }
 

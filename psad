@@ -345,24 +345,25 @@ my $gnuplot_prev_mon = 0;
 my $gnuplot_title    = '';
 my $gnuplot_legend_title = '';
 my $gnuplot_grayscale = 0;
-my $gnuplot_xaxis    = '';
-my $gnuplot_xrange   = '';
-my $gnuplot_yaxis    = '';
-my $gnuplot_yrange   = '';
-my $gnuplot_zaxis    = '';
-my $gnuplot_zrange   = '';
-my $gnuplot_3d       = 0;
-my $gnuplot_view     = '';
+my $gnuplot_x_label = '';
+my $gnuplot_x_range = '';
+my $gnuplot_y_label = '';
+my $gnuplot_y_range = '';
+my $gnuplot_z_label = '';
+my $gnuplot_z_range = '';
+my $gnuplot_3d   = 0;
+my $gnuplot_view = '';
 my $gnuplot_sort_style = 'value';
 my $gnuplot_graph_style = '';
 my $gnuplot_count_type  = '';
 my $gnuplot_count_element = -1;
 my %gnuplot_cache_uniq = ();
-my @gnuplot_data     = ();
+my @gnuplot_data = ();
 my $gnuplot_data_file = 'psad_iptables.dat';
 my $gnuplot_plot_file = 'psad_iptables.gnu';
 my $gnuplot_png_file  = 'psad_iptables.png';
 my $gnuplot_file_prefix = '';
+my $gnuplot_template_file = '';
 my $store_file       = '';
 my $gnuplot_interactive = 0;
 my $plot_separator   = ', ';  ### default to CSV format for plot data
@@ -6706,95 +6707,101 @@ sub gnuplot_write_plot_file() {
     }
 
     my @tokens = split /\s+/, $csv_fields;
-    print "[+] Writing gnuplot directive file: $gnuplot_plot_file\n";
-    open GP, "> $gnuplot_plot_file" or die "[*] Could not open ",
-        "$gnuplot_plot_file: $!";
-    print GP "$_\n", for @{&gnuplot_header()};
-    unless ($gnuplot_title) {
-        $gnuplot_title = "psad iptables log visualization: $csv_fields";
-        $gnuplot_title =~ s/_//g;  ### some fonts used by Gnuplot don't like "-" chars
-    }
-    print GP "reset\n", qq|set title "$gnuplot_title"\n|;
-    unless ($gnuplot_interactive) {
-        if ($gnuplot_grayscale) {
-            print GP "set terminal png transparent xffffff x000000 x606060 ",
-                "x606060 x606060 x606060 x606060 x606060 nocrop enhanced\n",
-                qq|set output "$gnuplot_png_file"\n|;
-        } else {
-            print GP "set terminal png transparent nocrop enhanced\n",
-                qq|set output "$gnuplot_png_file"\n|;
-        }
-    }
-    if ($tokens_ar->[0] eq 'timestamp') {
-        print GP "set xdata time\n",
-            qq|set timefmt x "%s"\n|,
-            qq|set format x "%m/%d"\n|,
-            qq|set xlabel "time"\n|;
-        if ($gnuplot_xrange) {
-            die "[*] range argument must be formatted as <start>:<end>"
-                unless $gnuplot_xrange =~ /^\S+:\S+$/;
-            $gnuplot_xrange =~ s/:/":"/;
-            print GP qq|set xrange ["$gnuplot_xrange"]\n|;
-        }
+    if ($gnuplot_template_file) {
+        print "[+] Using Gnuplot template file: $gnuplot_template_file\n";
+        copy $gnuplot_template_file, $gnuplot_plot_file or die "[*] ",
+            "Could not copy $gnuplot_template_file -> $gnuplot_plot_file: $!";
     } else {
-        if ($gnuplot_xaxis) {
-            print GP qq|set xlabel "$gnuplot_xaxis"\n|; 
-        } else {
-            $tokens[0] =~ s/_//g;
-            print GP qq|set xlabel "$tokens[0]"\n|; 
+        print "[+] Writing gnuplot directive file: $gnuplot_plot_file\n";
+        open GP, "> $gnuplot_plot_file" or die "[*] Could not open ",
+            "$gnuplot_plot_file: $!";
+        print GP "$_\n", for @{&gnuplot_header()};
+        unless ($gnuplot_title) {
+            $gnuplot_title = "psad iptables log visualization: $csv_fields";
+            $gnuplot_title =~ s/_//g;  ### some fonts used by Gnuplot don't like "-" chars
         }
-        if ($gnuplot_xrange) {
-            die "[*] range argument must be formatted as <start>:<end>, ",
-                "e.g. 1:10" unless $gnuplot_xrange =~ /^\d+:\d+$/;
-            print GP qq|set xrange [$gnuplot_xrange]\n|;
-        }
-    }
-    if ($gnuplot_yaxis) {
-        print GP qq|set ylabel "$gnuplot_yaxis"\n|; 
-    } else {
-        $tokens[1] =~ s/_//g;
-        print GP qq|set ylabel "$tokens[1]"\n|; 
-    }
-    if ($gnuplot_yrange) {
-        die "[*] range argument must be formatted as <start>:<end>, e.g. 1:10"
-            unless $gnuplot_yrange =~ /^\d+:\d+$/;
-        print GP qq|set yrange [$gnuplot_yrange]\n|;
-    }
-    if ($#$tokens_ar == 2 or $gnuplot_3d) {
-        ### include zaxis
-        if ($gnuplot_zaxis) {
-            print GP qq|set zlabel "$gnuplot_zaxis"\n|;
-        } else {
-            if ($gnuplot_count_type) {
-                print GP qq|set zlabel "$gnuplot_count_type"\n|;
+        print GP "reset\n", qq|set title "$gnuplot_title"\n|;
+        unless ($gnuplot_interactive) {
+            if ($gnuplot_grayscale) {
+                print GP "set terminal png transparent xffffff x000000 x606060 ",
+                    "x606060 x606060 x606060 x606060 x606060 nocrop enhanced\n",
+                    qq|set output "$gnuplot_png_file"\n|;
             } else {
-                $tokens[2] =~ s/_//g;
-                print GP qq|set zlabel "$tokens[2]"\n|;
+                print GP "set terminal png transparent nocrop enhanced\n",
+                    qq|set output "$gnuplot_png_file"\n|;
             }
         }
-        if ($gnuplot_zrange) {
-            die "[*] range argument must be formatted as <start>:<end>, ",
-                "e.g. 1:10" unless $gnuplot_zrange =~ /^\d+:\d+$/;
-            print GP qq|set zrange [$gnuplot_zrange]\n|;
+        if ($tokens_ar->[0] eq 'timestamp') {
+            print GP "set xdata time\n",
+                qq|set timefmt x "%s"\n|,
+                qq|set format x "%m/%d"\n|,
+                qq|set xlabel "time"\n|;
+            if ($gnuplot_x_range) {
+                die "[*] range argument must be formatted as <start>:<end>"
+                    unless $gnuplot_x_range =~ /^\S+:\S+$/;
+                $gnuplot_x_range =~ s/:/":"/;
+                print GP qq|set xrange ["$gnuplot_x_range"]\n|;
+            }
+        } else {
+            if ($gnuplot_x_label) {
+                print GP qq|set xlabel "$gnuplot_x_label"\n|; 
+            } else {
+                $tokens[0] =~ s/_//g;
+                print GP qq|set xlabel "$tokens[0]"\n|; 
+            }
+            if ($gnuplot_x_range) {
+                die "[*] range argument must be formatted as <start>:<end>, ",
+                    "e.g. 1:10" unless $gnuplot_x_range =~ /^\d+:\d+$/;
+                print GP qq|set xrange [$gnuplot_x_range]\n|;
+            }
         }
-        unless ($gnuplot_graph_style) {
-            $gnuplot_graph_style = 'points';
+        if ($gnuplot_y_label) {
+            print GP qq|set ylabel "$gnuplot_y_label"\n|; 
+        } else {
+            $tokens[1] =~ s/_//g;
+            print GP qq|set ylabel "$tokens[1]"\n|; 
         }
-        if ($gnuplot_view) {
-            die "[*] View must be a coordinate pair such as 60,30"
-                unless $gnuplot_view =~ /^\d+,\d+/;
-            print GP qq|set view $gnuplot_view\n|;
+        if ($gnuplot_y_range) {
+                die "[*] range argument must be formatted as <start>:<end>, e.g. 1:10"
+                unless $gnuplot_y_range =~ /^\d+:\d+$/;
+            print GP qq|set yrange [$gnuplot_y_range]\n|;
         }
-        print GP qq|splot '$gnuplot_data_file' using 1:2:3 with | .
-            "$gnuplot_graph_style title '$gnuplot_legend_title'\n";
-    } else {
-        unless ($gnuplot_graph_style) {
-            $gnuplot_graph_style = 'linespoints';
+        if ($#$tokens_ar == 2 or $gnuplot_3d) {
+            ### include zaxis
+            if ($gnuplot_z_label) {
+                print GP qq|set zlabel "$gnuplot_z_label"\n|;
+            } else {
+                if ($gnuplot_count_type) {
+                    print GP qq|set zlabel "$gnuplot_count_type"\n|;
+                } else {
+                    $tokens[2] =~ s/_//g;
+                    print GP qq|set zlabel "$tokens[2]"\n|;
+                }
+            }
+            if ($gnuplot_z_range) {
+                die "[*] range argument must be formatted as <start>:<end>, ",
+                    "e.g. 1:10" unless $gnuplot_z_range =~ /^\d+:\d+$/;
+                print GP qq|set zrange [$gnuplot_z_range]\n|;
+            }
+            unless ($gnuplot_graph_style) {
+                $gnuplot_graph_style = 'points';
+            }
+            if ($gnuplot_view) {
+                die "[*] View must be a coordinate pair such as 60,30"
+                    unless $gnuplot_view =~ /^\d+,\d+/;
+                print GP qq|set view $gnuplot_view\n|;
+            }
+            print GP qq|splot '$gnuplot_data_file' using 1:2:3 with | .
+                "$gnuplot_graph_style title '$gnuplot_legend_title'\n";
+        } else {
+            unless ($gnuplot_graph_style) {
+                $gnuplot_graph_style = 'linespoints';
+            }
+            print GP qq|plot '$gnuplot_data_file' using 1:2 with | .
+                "$gnuplot_graph_style title '$gnuplot_legend_title'\n";
         }
-        print GP qq|plot '$gnuplot_data_file' using 1:2 with | .
-            "$gnuplot_graph_style title '$gnuplot_legend_title'\n";
+        close GP;
     }
-    close GP;
     chmod 0644, $gnuplot_plot_file;
     return;
 }
@@ -9455,25 +9462,30 @@ sub handle_cmd_line() {
         'messages-file=s'   => \$messages_file,   # Specify the path to file containing
                                                   #   old iptables messages (fwdata by
                                                   #   default).
-        'gnuplot'           => \$gnuplot_mode,    # gnuplot mode.
-        'gnuplot-dat-file=s'  => \$gnuplot_data_file, # gnuplot .dat file.
-        'gnuplot-plot-file=s' => \$gnuplot_plot_file, # gnuplot .gnu file.
-        'gnuplot-png-file=s'  => \$gnuplot_png_file, # gnuplot .gnu file.
-        'gnuplot-interactive' => \$gnuplot_interactive, # launch gnuplot.
-        'gnuplot-title=s'   => \$gnuplot_title,   # Set gnuplot title.
+
+        ### gnuplot options
+        'gnuplot'                => \$gnuplot_mode,    # gnuplot mode.
+        'gnuplot-dat-file=s'     => \$gnuplot_data_file, # gnuplot .dat file.
+        'gnuplot-plot-file=s'    => \$gnuplot_plot_file, # gnuplot .gnu file.
+        'gnuplot-png-file=s'     => \$gnuplot_png_file, # gnuplot .gnu file.
+        'gnuplot-interactive'    => \$gnuplot_interactive, # launch gnuplot.
+        'gnuplot-title=s'        => \$gnuplot_title,   # Set gnuplot title.
         'gnuplot-legend-titls=s' => \$gnuplot_legend_title,   # Set gnuplot legend title.
-        'gnuplot-xaxis=s'   => \$gnuplot_xaxis,
-        'gnuplot-xrange=s'  => \$gnuplot_xrange,
-        'gnuplot-yaxis=s'   => \$gnuplot_yaxis,
-        'gnuplot-yrange=s'  => \$gnuplot_yrange,
-        'gnuplot-zaxis=s'   => \$gnuplot_zaxis,
-        'gnuplot-zrange=s'  => \$gnuplot_zrange,
-        'gnuplot-graph-style=s' => \$gnuplot_graph_style,
-        'gnuplot-sort-style=s' => \$gnuplot_sort_style,
-        'gnuplot-3d'        => \$gnuplot_3d,
-        'gnuplot-view=s'    => \$gnuplot_view,
-        'gnuplot-grayscale' => \$gnuplot_grayscale,
-        'gnuplot-file-prefix=s' => \$gnuplot_file_prefix,
+        'gnuplot-x-label=s'      => \$gnuplot_x_label,
+        'gnuplot-x-range=s'      => \$gnuplot_x_range,
+        'gnuplot-y-label=s'      => \$gnuplot_y_label,
+        'gnuplot-y-range=s'      => \$gnuplot_y_range,
+        'gnuplot-z-label=s'      => \$gnuplot_z_label,
+        'gnuplot-z-range=s'      => \$gnuplot_z_range,
+        'gnuplot-graph-style=s'  => \$gnuplot_graph_style,
+        'gnuplot-sort-style=s'   => \$gnuplot_sort_style,
+        'gnuplot-3d'             => \$gnuplot_3d,
+        'gnuplot-3D'             => \$gnuplot_3d,
+        'gnuplot-view=s'         => \$gnuplot_view,
+        'gnuplot-grayscale'      => \$gnuplot_grayscale,
+        'gnuplot-file-prefix=s'  => \$gnuplot_file_prefix,
+        'gnuplot-template=s'     => \$gnuplot_template_file,
+
         'CSV'               => \$csv_mode,        # CSV mode.
         'CSV-fields=s'      => \$csv_fields,      # Specify list of CSV fields.
         'CSV-unique-lines'  => \$csv_print_uniq,  # Only print unique lines in CSV output.
@@ -9483,7 +9495,7 @@ sub handle_cmd_line() {
         'CSV-regex=s'       => \$csv_regex,       # Require additional regex match.
         'CSV-neg-regex=s'   => \$csv_neg_regex,   # Require additional negative regex
                                                   #   match.
-            'CSV-stdin'         => \$csv_stdin,       # Acquire iptables log data from
+         'CSV-stdin'        => \$csv_stdin,       # Acquire iptables log data from
                                                   #   stdin.
         'plot-separator'    => \$plot_separator,  # Specify separator character for plot
                                                   #   data (both gnuplot and CSV data).
@@ -9704,8 +9716,37 @@ Options:
                                     data structures on STDOUT).
     -H,  --HUP                    - Send all psad daemons a HUP signal to
                                     have them re-import configs.
-    -g,  --gnuplot                - Produce output suitable for plotting
-                                    with gnuplot.
+
+    --gnuplot                     - Parse iptables log data and produce a
+                                    file suitable for plotting with Gnuplot.
+    --gnuplot-graph-style         - Set the Gnuplot graph style (e.g.
+                                    "dots", "lines", "linespoints", etc.).
+    --gnuplot-file-prefix         - Use a prefix for the .gnu, .dat, and
+                                    .png files that are generated in Gnuplot
+                                    mode.
+    --gnuplot-interactive         - Do not add the terminal directive to the
+                                    Gnuplot .gnu file, so when Gnuplot loads
+                                    the file it will graph the data in an
+                                    interactive window.
+    --gnuplot-title               - Set the Gnuplot graph title.
+    --gnuplot-legend-title        - Set the Gnuplot legend title.
+    --gnuplot-x-label             - Set the x-axis label.
+    --gnuplot-x-range             - Set the x-axis range.
+    --gnuplot-y-label             - Set the y-axis label.
+    --gnuplot-y-range             - Set the y-axis range.
+    --gnuplot-z-label             - Set the z-axis label.
+    --gnuplot-z-range             - Set the z-axis range.
+    --gnuplot-sort-style          - Set the psad sorting style to either
+                                    "time" or "value" (defaults to "value").
+    --gnuplot-3D                  - Create three-dimensional Gnuplot graph.
+    --gnuplot-view                - Set the viewing angle.
+    --gnuplot-grayscale           - Only use grayscale colors.
+    --gnuplot-template <file>     - Use a template file for all Gnuplot
+                                    directives.
+    --gnuplot-dat-file            - Specify path to .dat output file.
+    --gnuplot-plot-file           - Specify path to .gnu output file.
+    --gnuplot-png-file            - Specify path to .png output file.
+
     --CSV                         - Parse iptables log messages and dump
                                     fields to stdout in csv format.
     --CSV-fields <fields>         - Restrict --CSV output to a list of
@@ -9724,6 +9765,7 @@ Options:
                                     fields (in --gnuplot or --CSV plot
                                     modes (the default is a comma for CSV
                                     formatted output).
+
     --signatures <sigs file>      - Manually specify the path to the psad
                                     signatures file.
     --snort-type                  - Restrict psad to look for specific Snort

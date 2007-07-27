@@ -26,6 +26,9 @@ psad-2.0.8 (07//2007):
       retrieve quickly.  This eliminates a large performance bottleneck when
       Gnuplot configuration directives are tweaked while the same graph is
       generated multiple times.
+    - Added --gnuplot-template so that a template file can be used for all
+      Gnuplot directives (usually psad creates the .gnu file based on the
+      --gnuplot command line arguments).
     - Added --gnuplot-grayscale to generate graphs without the default red
       color for graph points.
     - Bugfix for regular expressions not being imported correctly from within

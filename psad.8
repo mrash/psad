@@ -362,6 +362,65 @@ do not want
 .B psad
 to process the entire thing.
 .TP
+.BR \-\^\-gnuplot
+Enter into Gnuplot mode whereby
+.B psad
+parses an iptables logfile and creates .gnu and .dat files that are suitable
+for graphing with Gnuplot.  The various
+.I --CSV
+command line arguments apply to plotting iptables log with Gnuplot.
+.TP
+.BR \-\^\-gnuplot-template\ \<file>
+Use a template file for all Gnuplot graphing directives (this is usually
+a .gnu file by convention).  Normally
+.B psad builds all of the graphing directives based on various --gnuplot
+command line arguments, but the --gnuplot-template switch allows you to
+override this behavior.
+.TP
+.BR \-\^\-gnuplot-file-prefix\ \<file>
+Specify a prefix for the .gnu, .dat, and .png files that are generated in
+.I --gnuplot
+mode.  So, when visualizing attacks captured in an iptables logfile (let's
+say you are interested in port scans), you could use this option to have
+.B psad
+create the two files portscan.dat, portscan.gnu, and Gnuplot will create
+an additional file portscan.png when the portscan.gnu file is loaded.
+.TP
+.BR \-\^\-gnuplot-x-label\ \<label>
+Set the label associated with the x-axis.
+.TP
+.BR \-\^\-gnuplot-x-range\ \<range>
+Set the x-axis range.
+.TP
+.BR \-\^\-gnuplot-y-label\ \<label>
+Set the label associated with the y-axis.
+.TP
+.BR \-\^\-gnuplot-y-range\ \<range>
+Set the y-axis range.
+.TP
+.BR \-\^\-gnuplot-z-label\ \<label>
+Set the label associated with the z-axis (only if
+.I --gnuplot-3D
+is used).
+.TP
+.BR \-\^\-gnuplot-z-range\ \<range>
+Set the z-axis range. (only if
+.I --gnuplot-3D
+is used).
+.TP
+.BR \-\^\-gnuplot-3D
+Generate a Gnuplot
+.B splot
+graph.  This produces a three-dimensional graph.
+.TP
+.BR \-\^\-gnuplot-view
+Set the viewing angle when graphing data in
+.I --gnuplot-3D
+mode.
+.TP
+.BR \-\^\-gnuplot-title\ \<title>
+Set the graph title for the Gnuplot graph.
+.TP
 .BR \-I "\fR,\fP " \-\^\-Interval\ \<seconds>
 Specify the interval (in seconds) that psad should use to
 check whether or not packets have been logged by the
@@ -740,6 +799,11 @@ file if the -m option is not specified):
 .PP
 .B # psad -A -m <iptables logfile>
 .PP
+Run psad in forensics mode, but limit its operations to a specific IP
+address "10.1.1.1":
+.PP
+.B # psad -A -m <iptables logfile> --analysis-fields "src:10.1.1.1"
+.PP
 Generate graphs of scan data using AfterGlow:
 .PP
 .B # psad --CSV --CSV-fields "src dst dp" --CSV-max 1000 -m <iptables logfile> | perl afterglow.pl -c color.properties | neato -Tgif -o netfilter_graph.gif
@@ -807,6 +871,7 @@ represents the pid of the psad process.
 .BR snort (8),
 .BR nmap (1).
 .BR p0f (1)
+.BR gnuplot (1)
 .SH AUTHOR
 Michael Rash <mbr@cipherdyne.org>
 .SH BUGS

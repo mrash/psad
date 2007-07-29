@@ -9657,8 +9657,7 @@ Options:
     -w,  --whois-analysis         - Enable whois lookups when running in
                                     offline analysis mode.
     -m,  --messages-file <file>   - Specify the path to the iptables logfile
-                                    (use in conjunction with
-                                    --Analyze-msgs).
+                                    (for --Analyze-msgs mode).
     -i,  --interface <intf>       - Restrict detection to IN interface (for
                                     INPUT and FORWARD chains) or OUT
                                     interface (for OUPUT chain).
@@ -9668,7 +9667,7 @@ Options:
     --fw-analyze                  - Analyze the local iptables ruleset and
                                     exit.
     --fw-list-auto                - List the contents of any iptables chains
-                                    use for auto-blocking rules.
+                                    (for auto-blocking rules).
     --List                        - Synonym for --fw-list-auto (emulates
                                     iptables command line).
     --fw-block-ip  <ip>           - Add an IP/network to the auto-blocking

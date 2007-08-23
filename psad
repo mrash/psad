@@ -6744,10 +6744,10 @@ sub gnuplot_write_plot_file() {
             }
         } else {
             if ($gnuplot_x_label) {
-                print GP qq|set xlabel "$gnuplot_x_label"\n|; 
+                print GP qq|set xlabel "$gnuplot_x_label"\n|;
             } else {
                 $tokens[0] =~ s/_//g;
-                print GP qq|set xlabel "$tokens[0]"\n|; 
+                print GP qq|set xlabel "$tokens[0]"\n|;
             }
             if ($gnuplot_x_range) {
                 die "[*] range argument must be formatted as <start>:<end>, ",
@@ -6756,10 +6756,10 @@ sub gnuplot_write_plot_file() {
             }
         }
         if ($gnuplot_y_label) {
-            print GP qq|set ylabel "$gnuplot_y_label"\n|; 
+            print GP qq|set ylabel "$gnuplot_y_label"\n|;
         } else {
             $tokens[1] =~ s/_//g;
-            print GP qq|set ylabel "$tokens[1]"\n|; 
+            print GP qq|set ylabel "$tokens[1]"\n|;
         }
         if ($gnuplot_y_range) {
                 die "[*] range argument must be formatted as <start>:<end>, e.g. 1:10"

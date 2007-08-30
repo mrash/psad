@@ -2,14 +2,22 @@
 This README applies to the patch files contained within the "patches"
 directory in the psad (http://www.cipherdyne.org/psad) sources.
 
-The patches in this directory are organized by kernel version, so
-"linux-2.4.27_conntrack.patch" applies to the linux-2.4.27 kernel.
-The "_conntrack" portion of the filename describes the Netfilter module
-to which the patch applies.  As of psad-1.4.2, all of the patches in
-this directory apply to the conntrack module.  Specifically, each patch
-extends the close wait timeout for TCP connections from 60 seconds to
-2 minutes.  If you are seeing Netfilter logging messages for TCP ACK
-packets associated with legitimate TCP connections (i.e. packets are
-not being correctly identified as such by the conntrack module), you
-may want to apply the appropriate conntrack patch. See the BUGS section
-of the psad man page for more information.
+The patches in this directory are organized by kernel version or iptables
+version, so "linux-2.4.27_conntrack.patch" applies to the linux-2.4.27
+kernel, and "iptables-1.3.8_LOG_prefix_space.patch" applies to iptables-1.3.8.
+
+The "iptables-1.3.8_LOG_prefix_space.patch" adds a trailing space to any
+iptables log prefix that does not already include a space. This means that an
+iptables log prefix cannot break the separator tokens (specifically the IN=
+token) in an iptables log message.  More information about this can be found
+here:
+
+http://www.cipherdyne.org/
+
+Many of the patches in this directory apply to the conntrack module.
+Specifically, each patch extends the close wait timeout for TCP connections
+from 60 seconds to 2 minutes.  If you are seeing iptables log messages for TCP
+ACK packets associated with legitimate TCP connections (i.e. packets are not
+being correctly identified as such by the conntrack module), you may want to
+apply the appropriate conntrack patch. See the BUGS section of the psad man
+page for more information.

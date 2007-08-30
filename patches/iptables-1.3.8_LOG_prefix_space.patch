@@ -1,0 +1,49 @@
+--- extensions/libipt_LOG.c.orig	2007-01-23 07:50:00.000000000 -0500
++++ extensions/libipt_LOG.c	2007-08-28 23:32:05.000000000 -0400
+@@ -114,6 +114,7 @@
+       struct ipt_entry_target **target)
+ {
+ 	struct ipt_log_info *loginfo = (struct ipt_log_info *)(*target)->data;
++	int add_prefix_space = 0, prefix_len = 0, space_adjust = 1;
+ 
+ 	switch (c) {
+ 	case '!':
+@@ -138,20 +139,34 @@
+ 			exit_error(PARAMETER_PROBLEM,
+ 				   "Unexpected `!' after --log-prefix");
+ 
+-		if (strlen(optarg) > sizeof(loginfo->prefix) - 1)
++		prefix_len = strlen(optarg);
++
++		if (optarg[prefix_len-1] != ' ') {
++			/* add a space to the end of the prefix */
++			add_prefix_space = 1;
++			space_adjust = 0;
++		}
++
++		if (prefix_len > sizeof(loginfo->prefix) - 1)
+ 			exit_error(PARAMETER_PROBLEM,
+ 				   "Maximum prefix length %u for --log-prefix",
+-				   (unsigned int)sizeof(loginfo->prefix) - 1);
++				   (unsigned int)sizeof(loginfo->prefix) - space_adjust);
+ 
+-		if (strlen(optarg) == 0)
++		if (prefix_len == 0)
+ 			exit_error(PARAMETER_PROBLEM,
+ 				   "No prefix specified for --log-prefix");
+ 
+-		if (strlen(optarg) != strlen(strtok(optarg, "\n")))
++		if (prefix_len != strlen(strtok(optarg, "\n")))
+ 			exit_error(PARAMETER_PROBLEM,
+ 				   "Newlines not allowed in --log-prefix");
+ 
+ 		strcpy(loginfo->prefix, optarg);
++
++		if (add_prefix_space) {
++			prefix_len++;
++			loginfo->prefix[prefix_len-1] = ' ';
++		}
++
+ 		*flags |= IPT_LOG_OPT_PREFIX;
+ 		break;
+ 

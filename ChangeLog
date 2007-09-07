@@ -1,4 +1,12 @@
-psad-2.0.8 (07//2007):
+psad-2.0.9 (09//2007):
+    - Bugfix to ensure that parsing TCP options does not descend into an
+      infinite loop in some some circumstances with obscure or maliciously
+      constructed options.  Also added syslog reporting for broken options
+      lengths of zero or one byte (the minimum option length is two bytes to
+      accomodate the TLV encoding).
+    - Bugfix to enforce the usage of --CSV-fields in --gnuplot mode.
+
+psad-2.0.8 (07/27/2007):
     - Added --gnuplot mode so that psad can output data that is suitable for
       plotting with gnuplot. All output produced in this mode is integer data
       with the exception of date stamps that are derived from iptables syslog

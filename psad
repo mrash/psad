@@ -579,7 +579,7 @@ my $IP_HEADER_LEN    = 20;  ### excludes options
 my @args_cp = @ARGV;
 
 ### handle command line args
-&handle_cmd_line();
+&getopt_wrapper();
 
 ### Everthing after this point must be executed as root (psad
 ### only needs root if run in auto-blocking mode; should take
@@ -2076,7 +2076,7 @@ sub p0f() {
     print STDERR "[+] p0f(): $src len: $len, frag_bit: $frag_bit, " ,
         "ttl: $ttl, win: $win\n" if $debug;
 
-    my ($options_aref) = &parse_tcp_options($tcp_options);
+    my ($options_aref) = &parse_tcp_options($src, $tcp_options);
 
     return unless $options_aref;
 
@@ -2203,7 +2203,7 @@ sub p0f() {
 }
 
 sub parse_tcp_options() {
-    my $tcp_options = shift;
+    my ($src, $tcp_options) = @_;
     my @opts = ();
     my @hex_nums = ();
     my $debug_str = '';
@@ -2219,7 +2219,15 @@ sub parse_tcp_options() {
         my $str = $chars[$i] . $chars[$i+1];
         push @hex_nums, $str;
     }
+
+    my $max_parse_attempts = $#chars;
+    my $parse_ctr = 0;
+
     OPT: for (my $opt_kind=0; $opt_kind <= $#hex_nums;) {
+
+        $parse_ctr++;
+        return [] if $parse_ctr > $max_parse_attempts;
+
         last OPT unless defined $hex_nums[$opt_kind+1];
 
         my $is_nop = 0;
@@ -2261,6 +2269,16 @@ sub parse_tcp_options() {
         if ($is_nop) {
             $opt_kind += 1;
         } else {
+            if ($len == 0 or $len == 1) {
+                ### this should never happen; it indicates a broken TCP stack
+                ### or maliciously constructed options since the len field is
+                ### large enough to accomodate the TLV encoding
+                my $msg = "broken $len-byte len field within TCP options " .
+                    "string: $tcp_options from source IP: $src";
+                print STDERR "    $msg\n" if $debug;
+                &sys_log($msg);
+                return [];
+            }
             ### get to the next option-kind field
             $opt_kind += $len;
         }
@@ -2857,6 +2875,16 @@ sub validate_config() {
             or $config{'SYSLOG_PRIORITY'} =~ /LOG_ALERT/i
             or $config{'SYSLOG_PRIORITY'} =~ /LOG_EMERG/i) {
         die "[*] Unrecognized SYSLOG_PRIORITY, see psad.conf";
+    }
+
+    if ($analyze_mode or $gnuplot_mode or $csv_mode) {
+        die "[*] iptables log file must point to a file (use -m)"
+            if -d $messages_file;
+    }
+
+    if ($gnuplot_mode and not $csv_mode) {
+        die "[*] Must specify which iptables fields to plot with the ",
+            "--CSV-fields argument."
     }
 
     return;
@@ -9428,7 +9456,7 @@ sub print_sys_msg() {
     return;
 }
 
-sub handle_cmd_line() {
+sub getopt_wrapper() {
     ### make Getopts case sensitive
     Getopt::Long::Configure('no_ignore_case');
 
@@ -9580,7 +9608,7 @@ sub handle_cmd_line() {
         'help'              => \$help,            # Display help.
     ));
     &usage(0) if $help;
-    
+
     ### Print the version number and exit if -V given on the command line.
     if ($print_ver) {
         print "[+] psad v$version (file revision: $rev_num)\n",

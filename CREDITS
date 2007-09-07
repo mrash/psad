@@ -367,3 +367,9 @@ pyllyukko
       systems.
     - Suggested that the psad.spec file respect the %_initrddir RPM macro.
     - Suggested configurable syslog facility and priority settings.
+    - Contributed a suspicious iptables log message that contained a broken
+      set of TCP options.  This exposed a bug where psad would consume all
+      available memory on the system and would have to be killed.  The result
+      is an additional check to ensure that the length fields parsed from TCP
+      options are greater than one byte; otherwise, the TLV encoding doesn't
+      work out properly.

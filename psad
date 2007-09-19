@@ -2882,7 +2882,7 @@ sub validate_config() {
             if -d $messages_file;
     }
 
-    if ($gnuplot_mode and not $csv_mode) {
+    if ($gnuplot_mode and not $csv_fields) {
         die "[*] Must specify which iptables fields to plot with the ",
             "--CSV-fields argument."
     }
@@ -9500,11 +9500,17 @@ sub getopt_wrapper() {
         'gnuplot-title=s'        => \$gnuplot_title,   # Set gnuplot title.
         'gnuplot-legend-titls=s' => \$gnuplot_legend_title,   # Set gnuplot legend title.
         'gnuplot-x-label=s'      => \$gnuplot_x_label,
+        'gnuplot-xlabel=s'       => \$gnuplot_x_label,
         'gnuplot-x-range=s'      => \$gnuplot_x_range,
+        'gnuplot-xrange=s'       => \$gnuplot_x_range,
         'gnuplot-y-label=s'      => \$gnuplot_y_label,
+        'gnuplot-ylabel=s'       => \$gnuplot_y_label,
         'gnuplot-y-range=s'      => \$gnuplot_y_range,
+        'gnuplot-yrange=s'       => \$gnuplot_y_range,
         'gnuplot-z-label=s'      => \$gnuplot_z_label,
+        'gnuplot-zlabel=s'       => \$gnuplot_z_label,
         'gnuplot-z-range=s'      => \$gnuplot_z_range,
+        'gnuplot-zrange=s'       => \$gnuplot_z_range,
         'gnuplot-graph-style=s'  => \$gnuplot_graph_style,
         'gnuplot-sort-style=s'   => \$gnuplot_sort_style,
         'gnuplot-3d'             => \$gnuplot_3d,

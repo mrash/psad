@@ -327,6 +327,7 @@ my $analyze_mode     = 0;
 my $analysis_fields  = '';
 my $analysis_tokens_ar = [];
 my $analysis_match_criteria_ar = [];
+my $get_next_rule_id = 0;
 my $syslog_server    = 0;
 my $kill             = 0;
 my $restart          = 0;
@@ -3344,6 +3345,7 @@ sub import_signatures() {
 
     my $line_num = 0;
     my $sig_ctr  = 0;
+    my $next_available_sid = 1;
 
     SIG: while (<SIGS>) {
 
@@ -3420,9 +3422,13 @@ sub import_signatures() {
             if (defined $psad_ids{$psad_id}) {
                 die "[*] import_signatures(): Duplicate psad_id: $psad_id ",
                     qq|on line: $line_num|;
+            } elsif (defined $sids{$psad_id}) {
+                die "[*] import_signatures(): Duplicate psad_id: $psad_id ",
+                    qq|to sid on line: $line_num|;
             }
             $psad_ids{$psad_id} = '';
             $sig{'psad_id'} = $psad_id;
+            $next_available_sid = $psad_id if $psad_id > $next_available_sid;
         } else {
             my $msg = "[*] import_signatures(): could not find signature" .
                 qq| "psad_id" on line: $line_num|;
@@ -3440,10 +3446,14 @@ sub import_signatures() {
             if (defined $sids{$sid}) {
                 die "[*] import_signatures(): Duplicate sid: $sid ",
                     qq|on line: $line_num|;
+            } elsif (defined $psad_ids{$sid}) {
+                die "[*] import_signatures(): Duplicate sid: $sid ",
+                    qq|to psad_id on line: $line_num|;
             }
             $sids{$sid} = '';
             $sig{'sid'} = $sid;
             $sig{'is_psad_id'} = 0;
+            $next_available_sid = $sid if $sid > $next_available_sid;
         } else {
             ### the signature was derived from several Snort rules
             $sig{'sid'} = $sig{'psad_id'};
@@ -3602,6 +3612,7 @@ sub import_signatures() {
             }
 
         } elsif ($sig{'proto'} eq 'udp') {
+            ### no specific UDP header tests
         } elsif ($sig{'proto'} eq 'icmp') {
 
             ### ICMP keywords
@@ -3675,6 +3686,11 @@ sub import_signatures() {
         $sig_ctr++;
     }
     close SIGS;
+    if ($get_next_rule_id) {
+        $next_available_sid++;
+        print "[+] Next available rule ID: $next_available_sid\n";
+        exit 0;
+    }
     if ($debug and $verbose) {
         print STDERR "[+] Main signatures hash:\n",
             Dumper(\%sig_search), Dumper(\%sigs);
@@ -9490,15 +9506,16 @@ sub getopt_wrapper() {
         'messages-file=s'   => \$messages_file,   # Specify the path to file containing
                                                   #   old iptables messages (fwdata by
                                                   #   default).
+        'get-next-rule-id'  => \$get_next_rule_id, # Show the next available signature ID.
 
         ### gnuplot options
-        'gnuplot'                => \$gnuplot_mode,    # gnuplot mode.
-        'gnuplot-dat-file=s'     => \$gnuplot_data_file, # gnuplot .dat file.
-        'gnuplot-plot-file=s'    => \$gnuplot_plot_file, # gnuplot .gnu file.
-        'gnuplot-png-file=s'     => \$gnuplot_png_file, # gnuplot .gnu file.
-        'gnuplot-interactive'    => \$gnuplot_interactive, # launch gnuplot.
-        'gnuplot-title=s'        => \$gnuplot_title,   # Set gnuplot title.
-        'gnuplot-legend-titls=s' => \$gnuplot_legend_title,   # Set gnuplot legend title.
+        'gnuplot'                => \$gnuplot_mode,         # gnuplot mode.
+        'gnuplot-dat-file=s'     => \$gnuplot_data_file,    # gnuplot .dat file.
+        'gnuplot-plot-file=s'    => \$gnuplot_plot_file,    # gnuplot .gnu file.
+        'gnuplot-png-file=s'     => \$gnuplot_png_file,     # gnuplot .gnu file.
+        'gnuplot-interactive'    => \$gnuplot_interactive,  # launch gnuplot.
+        'gnuplot-title=s'        => \$gnuplot_title,        # Set gnuplot title.
+        'gnuplot-legend-titls=s' => \$gnuplot_legend_title, # Set gnuplot legend title.
         'gnuplot-x-label=s'      => \$gnuplot_x_label,
         'gnuplot-xlabel=s'       => \$gnuplot_x_label,
         'gnuplot-x-range=s'      => \$gnuplot_x_range,
@@ -9749,6 +9766,8 @@ Options:
                                     data structures on STDOUT).
     -H,  --HUP                    - Send all psad daemons a HUP signal to
                                     have them re-import configs.
+    --get-next-rule-id            - Display the next available rule ID and
+                                    exit.
 
     --gnuplot                     - Parse iptables log data and produce a
                                     file suitable for plotting with Gnuplot.

@@ -8697,7 +8697,7 @@ sub setup() {
 
     &make_psad_dirs();
 
-    unless (-e $config{'PSAD_FIFO_FILE'}) {
+    unless (-e $config{'PSAD_FIFO_FILE'} and -p $config{'PSAD_FIFO_FILE'}) {
         system "$cmds{'mknod'} -m 600 $config{'PSAD_FIFO_FILE'} p";
     }
     ### make sure the new whois path exists

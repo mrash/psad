@@ -9478,7 +9478,7 @@ sub getopt_wrapper() {
     ### make Getopts case sensitive
     Getopt::Long::Configure('no_ignore_case');
 
-    &usage(1) unless (GetOptions(
+    die "[*] See 'psad -h' for usage information" unless (GetOptions(
         'signatures=s'      => \$sigs_file,       # Path to psad signatures file.
         'sig-update'        => \$download_sigs,   # Download the latest signatures from
                                                   # http://www.cipherdyne.org/psad/signatures

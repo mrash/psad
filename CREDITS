@@ -373,3 +373,7 @@ pyllyukko
       is an additional check to ensure that the length fields parsed from TCP
       options are greater than one byte; otherwise, the TLV encoding doesn't
       work out properly.
+
+Christian Lyra
+    - Found off-by-one error in number of email alerts that are reported under
+      --Status output.

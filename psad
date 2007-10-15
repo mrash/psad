@@ -7761,7 +7761,9 @@ sub print_scan_status() {
             unless ($analyze_mode) {
                 my $tot_alerts = 0;
                 for my $dst (keys %{$scan{$src}}) {
-                    $tot_alerts += $scan{$src}{$dst}{'email_ctr'};
+                    if ($scan{$src}{$dst}{'email_ctr'} > 1) {
+                        $tot_alerts += $scan{$src}{$dst}{'email_ctr'} - 1;
+                    }
                 }
                 $src_str .= ", Email alerts: $tot_alerts";
             }

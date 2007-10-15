@@ -4486,7 +4486,7 @@ sub scan_logr() {
             my $curr_dl = $scan_dl{$src};
 
             unless (defined $scan{$src}{$dst}{'email_ctr'}) {
-                $scan{$src}{$dst}{'email_ctr'} = 0;
+                $scan{$src}{$dst}{'email_ctr'} = 1;
             } elsif ($config{'EMAIL_LIMIT'} > 0
                     and $scan{$src}{$dst}{'email_ctr'}
                     > $config{'EMAIL_LIMIT'}) {
@@ -4495,6 +4495,8 @@ sub scan_logr() {
                         or $config{'EMAIL_LIMIT_STATUS_MSG'} eq 'N') {
                     &email_limit_reached($src, $dst);
                 }
+                &sys_log("email limit reached for src: $src " .
+                    "against dst: $dst");
                 next DST;
             }
             $scan{$src}{$dst}{'email_ctr'}++ unless $no_email_alerts;

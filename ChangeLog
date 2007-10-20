@@ -1,4 +1,8 @@
 psad-2.0.9 (09//2007):
+    - Changed EMAIL_LIMIT model to apply to scanning source addresses only
+      instead of also factoring in the destination address. The original
+      src/dst email limit behavior can be restored by setting a new variable
+      "ENABLE_EMAIL_LIMIT_PER_DST" to "Y".
     - Bugfix to ensure that parsing TCP options does not descend into an
       infinite loop in some some circumstances with obscure or maliciously
       constructed options.  Also added syslog reporting for broken options
@@ -7,6 +11,8 @@ psad-2.0.9 (09//2007):
     - Bugfix to enforce the usage of --CSV-fields in --gnuplot mode.
     - Implemented --get-next-rule-id so that it is easy to assign a new rule
       ID to a new signature in the /etc/psad/signatures file.
+    - Updated to just call die() if GetOpt fails; this allows erroneous usage
+      of the command line to display informative error messages more clearly.
 
 psad-2.0.8 (07/27/2007):
     - Added --gnuplot mode so that psad can output data that is suitable for

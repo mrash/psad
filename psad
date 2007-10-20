@@ -187,6 +187,9 @@ my %scan = ();
 ### cache scan danger levels
 my %scan_dl = ();
 
+### cache scan email counters
+my %scan_email_ctrs = ();
+
 ### cache executions of external script (only used if
 ### ENABLE_EXT_SCRIPT_EXEC is set to 'Y');
 my %scan_ext_exec = ();
@@ -2802,6 +2805,8 @@ sub psad_init() {
 
 sub validate_config() {
 
+    &check_enable_vars_value();
+
     &is_digit_range('PORT_RANGE_SCAN_THRESHOLD', 0, 65535);
     &is_digit_range('TOP_SCANS_CTR_THRESHOLD', 0, 500);
     &is_digit_range('DSHIELD_ALERT_INTERVAL', 1, 24);
@@ -2888,6 +2893,18 @@ sub validate_config() {
             "--CSV-fields argument."
     }
 
+    return;
+}
+
+sub check_enable_vars_value() {
+    for my $var (keys %config) {
+        next unless $var =~ /^ENABLE_/;
+        ### make sure that all of the "ENABLE_" vars have a value of
+        ### 'Y' or 'N'
+        unless ($config{$var} eq 'Y' or $config{$var} eq 'N') {
+            die "[*] $var variable must be 'Y' or 'N'";
+        }
+    }
     return;
 }
 
@@ -4453,6 +4470,25 @@ sub scan_logr() {
             next SRC;
         }
 
+        if ($config{'ENABLE_EMAIL_LIMIT_PER_DST'} eq 'N') {
+            unless (defined $scan_email_ctrs{$src}{'email_ctr'}) {
+                $scan_email_ctrs{$src}{'email_ctr'} = 0;
+            } elsif ($config{'EMAIL_LIMIT'} > 0
+                    and $scan_email_ctrs{$src}{'email_ctr'}
+                    >= $config{'EMAIL_LIMIT'}) {
+                ### ignore EMAIL_LIMIT if it is zero
+                unless (defined $scan_email_ctrs{$src}{'stop_email'}
+                        or $config{'EMAIL_LIMIT_STATUS_MSG'} eq 'N') {
+                    &email_limit_reached($src, '');
+                }
+                &sys_log("email limit reached for src: $src");
+                next SRC;
+            }
+            unless ($no_email_alerts) {
+                $scan_email_ctrs{$src}{'email_ctr'}++;
+            }
+        }
+
         DST: for my $dst (keys %{$curr_scan_hr->{$src}}) {
 
             ### see if we have already sent an alert for $src
@@ -4485,21 +4521,25 @@ sub scan_logr() {
             ### of packets used in the scan so far
             my $curr_dl = $scan_dl{$src};
 
-            unless (defined $scan{$src}{$dst}{'email_ctr'}) {
-                $scan{$src}{$dst}{'email_ctr'} = 1;
-            } elsif ($config{'EMAIL_LIMIT'} > 0
-                    and $scan{$src}{$dst}{'email_ctr'}
-                    > $config{'EMAIL_LIMIT'}) {
-                ### ignore EMAIL_LIMIT if it is zero
-                unless (defined $scan{$src}{$dst}{'stop_email'}
-                        or $config{'EMAIL_LIMIT_STATUS_MSG'} eq 'N') {
-                    &email_limit_reached($src, $dst);
+            if ($config{'ENABLE_EMAIL_LIMIT_PER_DST'} eq 'Y') {
+                unless (defined $scan_email_ctrs{$src}{$dst}{'email_ctr'}) {
+                    $scan_email_ctrs{$src}{$dst}{'email_ctr'} = 0;
+                } elsif ($config{'EMAIL_LIMIT'} > 0
+                        and $scan_email_ctrs{$src}{$dst}{'email_ctr'}
+                        >= $config{'EMAIL_LIMIT'}) {
+                    ### ignore EMAIL_LIMIT if it is zero
+                    unless (defined $scan_email_ctrs{$src}{$dst}{'stop_email'}
+                            or $config{'EMAIL_LIMIT_STATUS_MSG'} eq 'N') {
+                        &email_limit_reached($src, $dst);
+                    }
+                    &sys_log("email limit reached for src: $src " .
+                        "against dst: $dst");
+                    next DST;
                 }
-                &sys_log("email limit reached for src: $src " .
-                    "against dst: $dst");
-                next DST;
+                unless ($no_email_alerts) {
+                    $scan_email_ctrs{$src}{$dst}{'email_ctr'}++;
+                }
             }
-            $scan{$src}{$dst}{'email_ctr'}++ unless $no_email_alerts;
             print STDERR "[+] scan_logr(): dst IP: $dst\n" if $debug;
 
             ### make $src directory here in /var/log/psad
@@ -4515,7 +4555,11 @@ sub scan_logr() {
             my $log_sigs     = "${src_dir}/${dst}_signatures";
             my $s_time_file  = "${src_dir}/${dst}_start_time";
             my $pkt_ctr_file = "${src_dir}/${dst}_packet_ctr";
-            my $ecount_file  = "${src_dir}/${dst}_email_ctr";
+            my $ecount_file  = "${src_dir}/email_ctr";
+
+            if ($config{'ENABLE_EMAIL_LIMIT_PER_DST'} eq 'Y') {
+                $ecount_file = "${src_dir}/${dst}_email_ctr";
+            }
 
             ### print the current danger level to the danger_level file.
             open DL, "> $dl_file" or die "[*] Could not open $dl_file: $!";
@@ -4795,8 +4839,15 @@ sub scan_logr() {
             ### print the overall stats since the scan began
             printf $fh "%${log_len}s%s\n", 'Overall scan start: ',
                 $abs_s_time;
-            printf $fh "%${log_len}s%s\n", 'Total email alerts: ',
-                $scan{$src}{$dst}{'email_ctr'};
+
+            if ($config{'ENABLE_EMAIL_LIMIT_PER_DST'} eq 'Y') {
+                printf $fh "%${log_len}s%s\n", 'Total email alerts: ',
+                    $scan_email_ctrs{$src}{$dst}{'email_ctr'};
+            } else {
+                printf $fh "%${log_len}s%s\n", 'Total email alerts: ',
+                    $scan_email_ctrs{$src}{'email_ctr'};
+            }
+
             if ($tcp_absrange) {
                 printf $fh "%${log_len}s%s\n", 'Complete TCP range: ',
                     "[$tcp_absrange]";
@@ -4879,7 +4930,12 @@ sub scan_logr() {
                     ### print the number of email alerts we have sent
                     open E, "> $ecount_file" or die "[*] Could not open ",
                         "$ecount_file: $!";
-                    print E $scan{$src}{$dst}{'email_ctr'}, "\n";
+
+                    if ($config{'ENABLE_EMAIL_LIMIT_PER_DST'} eq 'Y') {
+                        print E $scan_email_ctrs{$src}{$dst}{'email_ctr'}, "\n";
+                    } else {
+                        print E $scan_email_ctrs{$src}{'email_ctr'}, "\n";
+                    }
                     close E;
 
                     if ($config{'ENABLE_EXT_SCRIPT_EXEC'} eq 'Y') {
@@ -6272,9 +6328,15 @@ sub diskwrite_rm_blocked_ip() {
 sub email_limit_reached() {
     my ($src, $dst) = @_;
     my $subject = "$config{'MAIL_STATUS_PREFIX'} reached email message " .
-        "limit for $src on $config{'HOSTNAME'} ($dst)";
+        "limit for $src on $config{'HOSTNAME'}";
+    $subject .= " ($dst)" if $dst;
     &send_mail($subject, '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
-    $scan{$src}{$dst}{'stop_email'} = 1;
+
+    if ($dst) {
+        $scan_email_ctrs{$src}{$dst}{'stop_email'} = 1;
+    } else {
+        $scan_email_ctrs{$src}{'stop_email'} = 1;
+    }
     return;
 }
 
@@ -7760,10 +7822,12 @@ sub print_scan_status() {
 
             unless ($analyze_mode) {
                 my $tot_alerts = 0;
-                for my $dst (keys %{$scan{$src}}) {
-                    if ($scan{$src}{$dst}{'email_ctr'} > 1) {
-                        $tot_alerts += $scan{$src}{$dst}{'email_ctr'} - 1;
+                if ($config{'ENABLE_EMAIL_LIMIT_PER_DST'} eq 'Y') {
+                    for my $dst (keys %{$scan{$src}}) {
+                        $tot_alerts += $scan_email_ctrs{$src}{$dst}{'email_ctr'};
                     }
+                } else {
+                    $tot_alerts += $scan_email_ctrs{$src}{'email_ctr'};
                 }
                 $src_str .= ", Email alerts: $tot_alerts";
             }
@@ -8129,8 +8193,8 @@ sub import_ip_dirs() {
             my $email_ctr_file = '';
             if (-e "${src}/${dst}_email_ctr") {
                 $email_ctr_file = "${src}/${dst}_email_ctr";
-            } elsif (-e "${src}/email_count") {
-                $email_ctr_file = "${src}/email_count";
+            } elsif (-e "${src}/email_ctr") {
+                $email_ctr_file = "${src}/email_ctr";
             }
             if ($email_ctr_file) {
                 open E, "< $email_ctr_file" or die "[*] Could not open ",
@@ -8138,10 +8202,18 @@ sub import_ip_dirs() {
                 $num_emails = <E>;
                 close E;
                 chomp $num_emails;
-                $scan{$src}{$dst}{'email_ctr'} = $num_emails;
+                if ($config{'ENABLE_EMAIL_LIMIT_PER_DST'} eq 'Y') {
+                    $scan_email_ctrs{$src}{$dst}{'email_ctr'} = $num_emails;
+                } else {
+                    $scan_email_ctrs{$src}{'email_ctr'} = $num_emails;
+                }
                 $scan{$src}{$dst}{'alerted'}   = 1;
             } else {
-                $scan{$src}{$dst}{'email_ctr'} = 0;
+                if ($config{'ENABLE_EMAIL_LIMIT_PER_DST'} eq 'Y') {
+                    $scan_email_ctrs{$src}{$dst}{'email_ctr'} = 0;
+                } else {
+                    $scan_email_ctrs{$src}{'email_ctr'} = 0;
+                }
                 $scan{$src}{$dst}{'alerted'}   = 0;
             }
             if (-e "${src}/${dst}_packet_ctr") {
@@ -9686,7 +9758,7 @@ sub required_vars() {
         IGNORE_KERNEL_TIMESTAMP ENABLE_SIG_MSG_SYSLOG
         SIG_MSG_SYSLOG_THRESHOLD SIG_SID_SYSLOG_THRESHOLD
         PSADWATCHD_CHECK_INTERVAL PSADWATCHD_MAX_RETRIES SYSLOG_IDENTITY
-        SYSLOG_FACILITY SYSLOG_PRIORITY
+        SYSLOG_FACILITY SYSLOG_PRIORITY ENABLE_EMAIL_LIMIT_PER_DST
     );
     &defined_vars(\@required_vars);
     return;

@@ -3,6 +3,11 @@ psad-2.1 (10/19/2007):
       instead of also factoring in the destination address. The original
       src/dst email limit behavior can be restored by setting a new variable
       "ENABLE_EMAIL_LIMIT_PER_DST" to "Y".
+    - Added the patches/iptables-1.3.8_LOG_prefix_space.patch file which can
+      be applied to the iptables-1.3.8 code to enforce a trailing space
+      character before any log prefix when a LOG rule is added. This ensures
+      that the user cannot break the iptables syslog format just by forgetting
+      to include a space at the end of a logging prefix.
     - Bugfix to ensure that parsing TCP options does not descend into an
       infinite loop in some some circumstances with obscure or maliciously
       constructed options.  Also added syslog reporting for broken options

@@ -183,6 +183,7 @@ static void check_process(
     pid_t pid;
     unsigned short int restart = 0;
     char mail_str[MAX_MSG_LEN] = "";
+    char syslog_str[MAX_MSG_LEN] = "";
     char pid_line[MAX_PID_SIZE];
 
     if ((pidfile_ptr = fopen(pid_file, "r")) == NULL) {
@@ -236,6 +237,11 @@ static void check_process(
 #ifdef DEBUG
         fprintf(stderr, "sending mail:  %s\n", mail_str);
 #endif
+
+        snprintf(syslog_str, MAX_MSG_LEN,
+            "restarting %s on %s", pid_name, hostname);
+        slogr("psad(psadwatchd)", syslog_str);
+
         if (! no_email) {
             /* send the email */
             send_alert_email(shCmd, mailCmd, mail_str);

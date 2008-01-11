@@ -381,3 +381,8 @@ Christian Lyra
 James Neff
     - Provided solution for getting psad to run in Fedora 8 systems by
       pointing psad at the /etc/rsyslog.conf file.
+
+Franck Joncourt
+    - Performed analysis of locale settings for fwknop installer and suggested
+      using the LC_ALL environmental variable instead of the LANG variable
+      (which is superseded by LC_* vars).

@@ -11,7 +11,7 @@
 #
 # Credits:  (see the CREDITS file)
 #
-# Copyright (C) 1999-2007 Michael Rash (mbr@cipherdyne.org)
+# Copyright (C) 1999-2008 Michael Rash (mbr@cipherdyne.org)
 #
 # License (GNU Public License):
 #
@@ -151,6 +151,8 @@ my $force_mod_re = '';
 my $exclude_mod_re = '';
 my $no_rm_old_lib_dir = 0;
 my $syslog_conf = '';
+my $locale = 'C';  ### default LC_ALL env variable
+my $no_locale = 0;
 
 ### make Getopts case sensitive
 Getopt::Long::Configure('no_ignore_case');
@@ -167,9 +169,14 @@ Getopt::Long::Configure('no_ignore_case');
     'syslog-conf=s'     => \$syslog_conf, ### specify path to syslog config file.
     'no-syslog-test'    => \$skip_syslog_test,
     'uninstall'         => \$uninstall,   ### Uninstall psad.
+    'LC_ALL=s'          => \$locale,
+    'no-LC_ALL'         => \$no_locale,
     'help'              => \$help         ### Display help.
 ));
 &usage(0) if $help;
+
+### set LC_ALL env variable
+$ENV{'LC_ALL'} = $locale unless $no_locale;
 
 ### import paths from default psad.conf
 &import_config();
@@ -2076,6 +2083,9 @@ Usage: install.pl [options]
                                    directory before installing psad.
     --no-syslog-test             - Skip syslog reconfiguration test.
     --no-preserve                - Disable preservation of old configs.
+    -L, --LANG <locale>          - Specify LANG env variable (actually the
+                                   LC_ALL variable).
+    -n, --no-LANG                - Do not export the LANG env variable.
     -h  --help                   - Prints this help message.
 
 _HELP_

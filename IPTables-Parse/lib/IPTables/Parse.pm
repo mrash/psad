@@ -167,12 +167,20 @@ sub chain_rules() {
                 $rule{'packets'}  = $1;
                 $rule{'bytes'}    = $2;
                 $rule{'target'}   = $3;
+
+                my $proto = $4;
+                $proto = 'all' if $proto eq '0';
                 $rule{'protocol'} = $rule{'proto'} = $4;
                 $rule{'intf_in'}  = $5;
                 $rule{'intf_out'} = $6;
                 $rule{'src'}      = $7;
                 $rule{'dst'}      = $8;
                 $rule{'extended'} = $9;
+
+                if ($proto eq 'all') {
+                    $rule{'s_port'} = $rule{'sport'} = '0:0';
+                    $rule{'d_port'} = $rule{'dport'} = '0:0';
+                }
                 if ($rule{'extended'}) {
                     if ($rule{'protocol'} eq 'tcp'
                             or $rule{'protocol'} eq 'udp') {
@@ -245,6 +253,12 @@ sub chain_rules() {
                 $rule{'src'}      = $3;
                 $rule{'dst'}      = $4;
                 $rule{'extended'} = $5;
+
+                if ($proto eq 'all') {
+                    $rule{'s_port'} = $rule{'sport'} = '0:0';
+                    $rule{'d_port'} = $rule{'dport'} = '0:0';
+                }
+
                 if ($rule{'extended'}
                         and ($rule{'protocol'} eq 'tcp'
                         or $rule{'protocol'} eq 'udp')) {

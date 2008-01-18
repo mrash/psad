@@ -7,7 +7,7 @@
 #
 # Author: Michael Rash (mbr@cipherdyne.org)
 #
-# Version: 0.4
+# Version: 0.5
 #
 ##################################################################
 #
@@ -22,7 +22,7 @@ use strict;
 use warnings;
 use vars qw($VERSION);
 
-$VERSION = '0.4';
+$VERSION = '0.5';
 
 sub new() {
     my $class = shift;
@@ -44,7 +44,7 @@ sub chain_policy() {
     my $chain  = shift || croak '[*] Specify a chain, e.g. "OUTPUT"';
     my $file   = shift || '';
     my $iptables  = $self->{'_iptables'};
-    my @ipt_lines;
+    my @ipt_lines = ();
 
     if ($file) {
         ### read the iptables rules out of $file instead of executing
@@ -86,7 +86,8 @@ sub chain_rules() {
     my $iptables  = $self->{'_iptables'};
 
     my $found_chain  = 0;
-    my @ipt_lines;
+    my @ipt_lines = ();
+    my $ip_re = qr|(?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2}|;
 
     ### array of hash refs
     my @chain = ();
@@ -148,6 +149,8 @@ sub chain_rules() {
             'dst'      => '',
             'd_port'   => '',
             'dport'    => '',
+            'to_ip'    => '',
+            'to_port'  => '',
             'extended' => '',
             'state'    => '',
             'raw'      => $line
@@ -158,6 +161,7 @@ sub chain_rules() {
             ### 0     0 ACCEPT  tcp  --  eth1 * 192.168.10.15 0.0.0.0/0  tcp dpt:22
             ### 33 2348 ACCEPT  tcp  --  eth1 * 192.168.10.2  0.0.0.0/0  tcp dpt:22
             ### 0     0 ACCEPT  tcp  --  eth1 * 192.168.10.2  0.0.0.0/0  tcp dpt:80
+            ### 0     0 DNAT    tcp  --  *    * 123.123.123.123 0.0.0.0/0 tcp dpt:55000 to:192.168.12.12:80
             if ($line =~ m|^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+\-\-\s+
                                 (\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*(.*)|x) {
                 $rule{'packets'}  = $1;
@@ -182,6 +186,10 @@ sub chain_rules() {
                         }
                         $rule{'s_port'} = $rule{'sport'} = $s_port;
                         $rule{'d_port'} = $rule{'dport'} = $d_port;
+                        if ($rule{'extended'} =~ /\sto:($ip_re):(\d+)/) {
+                            $rule{'to_ip'}   = $1;
+                            $rule{'to_port'} = $2;
+                        }
 
                         for my $state_hr (@global_accept_state) {
                             next unless $state_hr->{'src'} eq '0.0.0.0/0';
@@ -227,6 +235,7 @@ sub chain_rules() {
 
             ### LOG  all  --  0.0.0.0/0  0.0.0.0/0  LOG flags 0 level 4 prefix `DROP '
             ### LOG  all  --  127.0.0.2  0.0.0.0/0  LOG flags 0 level 4
+            ### ### DNAT tcp  --  123.123.123.123  0.0.0.0/0  tcp dpt:55000 to:192.168.12.12:80
 
             if ($line =~ m|^\s*(\S+)\s+(\S+)\s+\-\-\s+(\S+)\s+(\S+)\s*(.*)|) {
                 $rule{'target'}   = $1;
@@ -249,6 +258,10 @@ sub chain_rules() {
                     }
                     $rule{'s_port'} = $rule{'sport'} = $s_port;
                     $rule{'d_port'} = $rule{'dport'} = $d_port;
+                    if ($rule{'extended'} =~ /\sto:($ip_re):(\d+)/) {
+                        $rule{'to_ip'}   = $1;
+                        $rule{'to_port'} = $2;
+                    }
                 }
             }
         }
@@ -263,7 +276,7 @@ sub default_drop() {
     my $chain = shift || croak "[*] Specify a chain, e.g. \"OUTPUT\"";
     my $file  = shift || '';
     my $iptables  = $self->{'_iptables'};
-    my @ipt_lines;
+    my @ipt_lines = ();
 
     if ($file) {
         ### read the iptables rules out of $file instead of executing
@@ -347,8 +360,8 @@ sub default_log() {
     my $file  = shift || '';
     my $iptables  = $self->{'_iptables'};
 
-    my $any_ip_re = '(?:0\.){3}0/0';
-    my @ipt_lines;
+    my $any_ip_re  = '(?:0\.){3}0/0';
+    my @ipt_lines  = ();
     my %log_chains = ();
     my %log_rules  = ();
 

@@ -41,21 +41,20 @@ use Getopt::Long;
 use strict;
 
 #============== config ===============
-my $INIT_DIR     = '/etc/init.d';
 my $USRSBIN_DIR  = '/usr/sbin';  ### consistent with FHS (Filesystem
                                  ### Hierarchy Standard)
 my $USRBIN_DIR   = '/usr/bin';   ### consistent with FHS
-my $RUNLEVEL;    ### This should only be set if install.pl
-                 ### cannot determine the correct runlevel
 
 my $psad_conf_file  = 'psad.conf';
 
 ### system binaries ###
 my $chkconfigCmd = '/sbin/chkconfig';
 my $rcupdateCmd  = '/sbin/rc-update';  ### Gentoo
+my $updatercdCmd = '/usr/sbin/update-rc.d';  ### Ubuntu
 my $makeCmd      = '/usr/bin/make';
 my $perlCmd      = '/usr/bin/perl';
 my $wgetCmd      = '/usr/bin/wget';
+my $runlevelCmd  = '/sbin/runlevel';
 #============ end config ============
 
 my %file_vars = (
@@ -153,6 +152,9 @@ my $no_rm_old_lib_dir = 0;
 my $syslog_conf = '';
 my $locale = 'C';  ### default LC_ALL env variable
 my $no_locale = 0;
+my $init_dir = '/etc/init.d';
+my $init_name = 'psad';
+my $runlevel = -1;
 
 ### make Getopts case sensitive
 Getopt::Long::Configure('no_ignore_case');
@@ -169,6 +171,9 @@ Getopt::Long::Configure('no_ignore_case');
     'syslog-conf=s'     => \$syslog_conf, ### specify path to syslog config file.
     'no-syslog-test'    => \$skip_syslog_test,
     'uninstall'         => \$uninstall,   ### Uninstall psad.
+    'init-dir=s'        => \$init_dir,
+    'init-name=s'       => \$init_name,
+    'runlevel=i'        => \$runlevel,
     'LC_ALL=s'          => \$locale,
     'no-LC_ALL'         => \$no_locale,
     'help'              => \$help         ### Display help.
@@ -186,8 +191,9 @@ my @LOGR_FILES   = (*STDOUT, $config{'INSTALL_LOG_FILE'});
 $force_mod_re = qr|$force_mod_re| if $force_mod_re;
 $exclude_mod_re = qr|$exclude_mod_re| if $exclude_mod_re;
 
-$cmds{'make'} = $makeCmd;
-$cmds{'perl'} = $perlCmd;
+$cmds{'make'}     = $makeCmd;
+$cmds{'perl'}     = $perlCmd;
+$cmds{'runlevel'} = $runlevelCmd;
 
 if (-e $config{'INSTALL_LOG_FILE'}) {
     open INSTALL, "> $config{'INSTALL_LOG_FILE'}" or
@@ -203,19 +209,20 @@ if ($distro eq 'redhat' or $distro eq 'fedora') {
 } elsif ($distro eq 'gentoo') {
     ### add rc-update if we are running on a gentoo distro
     $cmds{'rc-update'} = $rcupdateCmd;
+} elsif ($distro eq 'ubuntu') {
+    ### add update-rc.d if we are running on an ubuntu distro
+    $cmds{'update-rc.d'} = $updatercdCmd;
 }
 
-my $init_dir = '';
-
-if (-d $INIT_DIR) {
-    $init_dir = $INIT_DIR;
-} elsif (-d '/etc/rc.d/init.d') {
-    $init_dir = '/etc/rc.d/init.d';
-} elsif (-d '/etc/rc.d') {  ### for Slackware
-    $init_dir = '/etc/rc.d';
-} else {
-    die "[*] Cannot find the init script directory, edit ",
-        "the \$INIT_DIR variable.\n";
+unless (-d $init_dir) {
+    if (-d '/etc/rc.d/init.d') {
+        $init_dir = '/etc/rc.d/init.d';
+    } elsif (-d '/etc/rc.d') {  ### for Slackware
+        $init_dir = '/etc/rc.d';
+    } else {
+        die "[*] Cannot find the init script directory, use ",
+            "--init-dir <path>\n";
+    }
 }
 
 ### need to make sure this exists before attempting to
@@ -443,7 +450,7 @@ sub install() {
         mkdir $config{'PSAD_CONF_DIR'},0500;
     }
 
-    ### get syslog daemon (e.g. syslog, syslog-ng, or metalog)
+    ### get syslog daemon (e.g. syslog, rsyslog syslog-ng, or metalog)
     my $syslog_str = &query_syslog();
 
     my $preserve_rv = 0;
@@ -578,6 +585,15 @@ sub install() {
                     $restarted_syslog = 1;
                 }
             }
+        } elsif ($syslog_str eq 'rsyslogd') {
+            if (-e $syslog_conf) {
+                &append_fifo_syslog($syslog_conf);
+                if (((system "$cmds{'killall'} -HUP rsyslogd 2> /dev/null")>>8) == 0) {
+                    &logr("[+] HUP signal sent to rsyslogd.\n");
+                    $restarted_syslog = 1;
+                }
+            }
+
         } elsif ($syslog_str eq 'syslog-ng') {
             if (-e $syslog_conf) {
                 &append_fifo_syslog_ng($syslog_conf);
@@ -613,16 +629,21 @@ sub install() {
 
                     my $restarted = 0;
                     if ($syslog_str eq 'syslog-ng') {
-                        if (-e "$INIT_DIR/syslog-ng") {
-                            system "$INIT_DIR/syslog-ng restart";
+                        if (-e "$init_dir/syslog-ng") {
+                            system "$init_dir/syslog-ng restart";
+                            $restarted = 1;
+                        }
+                    } elsif ($syslog_str eq 'rsyslogd') {
+                        if (-e "$init_dir/sysklogd") {
+                            system "$init_dir/sysklogd restart";
+                            $restarted = 1;
+                        } elsif (-e "$init_dir/syslog") {
+                            system "$init_dir/syslog restart";
                             $restarted = 1;
                         }
                     } else {
-                        if (-e "$INIT_DIR/sysklogd") {
-                            system "$INIT_DIR/sysklogd restart";
-                            $restarted = 1;
-                        } elsif (-e "$INIT_DIR/syslog") {
-                            system "$INIT_DIR/syslog restart";
+                        if (-e "$init_dir/rsyslog") {
+                            system "$init_dir/rsyslog restart";
                             $restarted = 1;
                         }
                     }
@@ -666,10 +687,10 @@ sub install() {
     }
 
     if ($init_dir) {
-        &logr("[+] Copying $init_file -> ${init_dir}/psad\n");
-        copy $init_file, "${init_dir}/psad" or die "[*] Could not copy ",
-            "$init_file -> ${init_dir}/psad: $!";
-        &perms_ownership("${init_dir}/psad", 0744);
+        &logr("[+] Copying $init_file -> ${init_dir}/$init_name\n");
+        copy $init_file, "${init_dir}/$init_name" or die "[*] Could not copy ",
+            "$init_file -> ${init_dir}/$init_name: $!";
+        &perms_ownership("${init_dir}/$init_name", 0744);
         &enable_psad_at_boot($distro);
     }
 
@@ -846,44 +867,11 @@ sub uninstall() {
             rmtree $dir;
         }
     }
-    my $running_syslogd = 0;
-    my $running_syslog_ng = 0;
-    print "[+] Restoring /etc/syslog.conf.orig -> /etc/syslog.conf\n";
-    if (-e '/etc/syslog.conf.orig') {
-        move '/etc/syslog.conf.orig', '/etc/syslog.conf' or die "[*] Could not ",
-            "move /etc/syslog.conf.orig -> /etc/syslog.conf: $!";
-        $running_syslogd = 1;
-    } elsif (-e '/etc/syslog.conf') {
-        print "[+] /etc/syslog.conf.orig does not exist. ",
-            " Editing /etc/syslog.conf directly.\n";
-        open ESYS, '< /etc/syslog.conf' or
-            die "[*] Unable to open /etc/syslog.conf: $!\n";
-        my @sys = <ESYS>;
-        close ESYS;
-        open CSYS, '> /etc/syslog.conf' or die "[*] Could not open ",
-            "/etc/syslog.conf: $!";
-        for my $line (@sys) {
-            chomp $line;
-            ### don't print the psadfifo line
-            print CSYS "$line\n" if ($line !~ /psadfifo/);
-        }
-        close CSYS;
-        $running_syslogd = 1;
-    } elsif (-e '/etc/syslog-ng/syslog-ng.conf.orig') {
-        move '/etc/syslog-ng/syslog-ng.conf.orig', '/etc/syslog-ng/syslog-ng.conf'
-            or die "[*] Could not move /etc/syslog.conf.orig ",
-                "-> /etc/syslog.conf: $!";
-        $running_syslog_ng = 1;
-    }
-    if ($running_syslogd) {
-        print "[+] Restarting syslog.\n";
-        system "$cmds{'killall'} -HUP syslogd";
-    } elsif ($running_syslog_ng) {
-        print "[+] Restarting syslog.\n";
-        system "$cmds{'killall'} -HUP syslog-ng";
-    }
-    print "\n";
-    print "[+] psad has been uninstalled!\n";
+    print "[+] You will need to remove psad-specific config lines ",
+        "from your syslog config.\n",
+        "    Your original syslog config at psad install time is preserved here:\n",
+        "    $config{'CONF_ARCHIVE_DIR'}\n";
+    print "\n[+] psad has been uninstalled!\n";
     return;
 }
 
@@ -974,7 +962,7 @@ sub install_perl_module() {
             print "[+] Module $mod_name is already installed in the ",
                 "system perl tree, skipping.\n";
         } else {
-            ### install the module in the /usr/lib/fwknop directory because
+            ### install the module in the /usr/lib/psad directory because
             ### it is not already installed.
             $install_module = 1;
         }
@@ -1617,6 +1605,7 @@ sub get_distro() {
             chomp $line;
             return 'redhat' if $line =~ /red\s*hat/i;
             return 'fedora' if $line =~ /fedora/i;
+            return 'ubuntu' if $line =~ /ubuntu/i;
         }
     }
     return 'NA';
@@ -1745,12 +1734,12 @@ sub query_email() {
 }
 
 sub query_syslog() {
-    &logr("\n[+] psad supports the syslogd, syslog-ng, ulogd, and\n" .
+    &logr("\n[+] psad supports the syslogd, rsyslogd, syslog-ng, ulogd, and\n" .
         "    metalog logging daemons.  Which system logger is running?\n\n");
     my $ans = '';
-    while ($ans ne 'syslogd' and $ans ne 'syslog-ng' and $ans ne 'ulogd'
-            and $ans ne 'metalog') {
-        &logr("    syslogd / syslog-ng / ulogd / metalog? [syslogd] ");
+    while ($ans ne 'syslogd' and $ans ne 'rsyslogd' and
+            $ans ne 'syslog-ng' and $ans ne 'ulogd' and $ans ne 'metalog') {
+        &logr("    syslogd / rsyslogd / syslog-ng / ulogd / metalog? [syslogd] ");
         $ans = <STDIN>;
         if ($ans eq "\n") {  ### allow default to take over
             $ans = 'syslogd';
@@ -1760,6 +1749,9 @@ sub query_syslog() {
         if ($ans eq 'syslogd') {
             ### allow command line --syslog-conf arg to take over
             $syslog_conf = '/etc/syslog.conf' unless $syslog_conf;
+        } elsif ($ans eq 'rsyslogd') {
+            ### allow command line --syslog-conf arg to take over
+            $syslog_conf = '/etc/rsyslog.conf' unless $syslog_conf;
         } elsif ($ans eq 'syslog-ng') {
             ### allow command line --syslog-conf arg to take over
             $syslog_conf = '/etc/syslog-ng/syslog-ng.conf' unless $syslog_conf;
@@ -1768,8 +1760,12 @@ sub query_syslog() {
             $syslog_conf = '/etc/metalog/metalog.conf' unless $syslog_conf;
         }
         if ($ans ne 'ulogd' and $syslog_conf and not -e $syslog_conf) {
+            if (-e '/etc/rsyslog.conf') {
+                warn "[-] It looks like /etc/rsyslog.conf exists, ",
+                    "did you mean rsyslog?\n";
+            }
             die
-"[-] The config file $syslog_conf does not exist. Re-run install.pl\n",
+"[*] The config file $syslog_conf does not exist. Re-run install.pl\n",
 "    with the --syslog-conf argument to specify the path to the syslog\n",
 "    daemon config file.\n";
         }
@@ -1777,6 +1773,7 @@ sub query_syslog() {
     die "[-] Invalid syslog daemon \"$ans\"\n"
         unless ($ans and
             ($ans eq 'syslogd'
+            or $ans eq 'rsyslogd'
             or $ans eq 'syslog-ng'
             or $ans eq 'ulogd'
             or $ans eq 'metalog'));
@@ -1832,45 +1829,26 @@ sub enable_psad_at_boot() {
     if (&query_yes_no("[+] Enable psad at boot time ([y]/n)?  ",
                 $ACCEPT_YES_DEFAULT)) {
         if ($distro eq 'redhat' or $distro eq 'fedora') {
-            system "$cmds{'chkconfig'} --add psad";
+            system "$cmds{'chkconfig'} --add $init_name";
         } elsif ($distro eq 'gentoo') {
-            system "$cmds{'rc-update'} add psad default";
-        } else {  ### it is a non-redhat distro, try to
-                  ### get the runlevel from /etc/inittab
-            if ($RUNLEVEL) {
-                ### the link already exists, so don't re-create it
-                unless (-e "/etc/rc.d/rc${RUNLEVEL}.d/S99psad") {
-                    symlink '/etc/rc.d/init.d/psad',
-                        "/etc/rc.d/rc${RUNLEVEL}.d/S99psad";
-                }
-            } elsif (-e '/etc/inittab') {
-                open I, '< /etc/inittab' or die "[*] Could not open ",
-                    "/etc/inittab: $!";
-                my @ilines = <I>;
-                close I;
-                for my $line (@ilines) {
-                    chomp $line;
-                    if ($line =~ /^id\:(\d)\:initdefault/) {
-                        $RUNLEVEL = $1;
-                        last;
+            system "$cmds{'rc-update'} add $init_name default";
+        } elsif ($distro eq 'ubuntu') {
+            system "$cmds{'update-rc.d'} $init_name defaults";
+        } else {
+
+            ### get the current run level
+            &get_runlevel();
+
+            if ($runlevel) {
+                if (-d '/etc/rc.d' and -d "/etc/rc.d/rc${runlevel}.d") {
+                    unless (-e "/etc/rc.d/rc${runlevel}.d/S99$init_name") {
+                        symlink "$init_dir/$init_name",
+                            "/etc/rc.d/rc${runlevel}.d/S99$init_name";
                     }
+                } else {
+                    print "[-] The /etc/rc.d/rc${runlevel}.d directory does ",
+                        "exist, not sure how to enable psad at boot time.";
                 }
-                unless ($RUNLEVEL) {
-                    &logr("[-] Could not determine the runlevel.  Set " .
-                        "the runlevel\nmanually in the config section of " .
-                        "install.pl\n");
-                    return;
-                }
-                ### the link already exists, so don't re-create it
-                unless (-e "/etc/rc.d/rc${RUNLEVEL}.d/S99psad") {
-                    symlink '/etc/rc.d/init.d/psad',
-                        "/etc/rc.d/rc${RUNLEVEL}.d/S99psad";
-                }
-            } else {
-                &logr("[-] /etc/inittab does not exist!  Set the " .
-                    "runlevel\nmanually in the config section of " .
-                    "install.pl.\n");
-                return;
             }
         }
     }
@@ -1891,6 +1869,14 @@ sub check_commands() {
                 }
             }
             unless ($found) {
+                if ($cmd eq 'runlevel') {
+                    if ($runlevel > 0) {
+                        next CMD;
+                    } else {
+                        die "[*] Could not find the $cmd command, ",
+                            "use --runlevel <N>";
+                    }
+                }
                 die "\n[*] Could not find $cmd anywhere!!!  ",
                     "Please edit the config section to include the path to ",
                     "$cmd.\n";
@@ -2039,6 +2025,25 @@ sub update_command_paths() {
     return;
 }
 
+sub get_runlevel() {
+    die "[*] The runlevel cannot be greater than 6"
+        if $runlevel > 6;
+
+    return if $runlevel > 0;
+
+    open RUN, "$cmds{'runlevel'} |" or die "[*] Could not execute the runlevel ",
+        "command, use --runlevel <N>";
+    while (<RUN>) {
+        if (/^\s*\S+\s+(\d+)/) {
+            $runlevel = $1;
+            last;
+        }
+    }
+    close RUN;
+    return;
+}
+
+
 ### logging subroutine that handles multiple filehandles
 sub logr() {
     my $msg = shift;
@@ -2079,6 +2084,11 @@ Usage: install.pl [options]
     -c, --config <file>          - Specify alternate path to psad.conf from
                                    which default installation paths are
                                    derived.
+    --init-dir <path>            - Specify path to the init directory (the
+                                   default is $init_dir).
+    --init-name <name>           - Specify the name for the psad init
+                                   script (the default is $init_name).
+    -r, --runlevel <N>           - Specify the current system runlevel.
     --no-rm-lib-dir              - Do not remove the /usr/lib/psad/
                                    directory before installing psad.
     --no-syslog-test             - Skip syslog reconfiguration test.

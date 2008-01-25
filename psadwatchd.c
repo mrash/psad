@@ -400,6 +400,7 @@ static void parse_config(void)
     int linectr = 0;
     char config_buf[MAX_LINE_BUF];
     char data_input_mode[MAX_GEN_LEN];
+    char enable_syslog_file[MAX_GEN_LEN];
     char *index;
 
     data_input_mode[0] = '\0';
@@ -435,6 +436,7 @@ static void parse_config(void)
             find_char_var("PSADWATCHD_MAX_RETRIES",
                 char_psadwatchd_max_retries, index);
             find_char_var("SYSLOG_DAEMON", data_input_mode, index);
+            find_char_var("ENABLE_SYSLOG_FILE", enable_syslog_file, index);
             find_char_var("EMAIL_ADDRESSES", mail_addrs, index);
 
             /* commands */
@@ -448,6 +450,11 @@ static void parse_config(void)
 
     /* see if we are using the ulogd mode */
     if (strncmp(data_input_mode, "ulogd", MAX_GEN_LEN) == 0)
+        check_kmsgsd = 0;
+
+    /* see if ENABLE_SYSLOG_FILE is enabled, so psad is just parsing
+     * a file written to by syslog directly */
+    if (strncmp(enable_syslog_file, "Y", 1) == 0)
         check_kmsgsd = 0;
 
     /* resolve any embedded variables */

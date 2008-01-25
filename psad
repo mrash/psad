@@ -152,7 +152,8 @@ my $rev_num = '1';
 ### --config switch)
 my $config_file  = '/etc/psad/psad.conf';
 
-### this will be set to either FW_DATA_FILE or ULOG_DATA_FILE
+### this will be set to either FW_DATA_FILE, ULOG_DATA_FILE
+### or IPT_SYSLOG_FILE
 my $fw_data_file = '';
 
 ### disable debugging by default
@@ -631,16 +632,19 @@ unless ($no_daemon or $debug) {
     unless $debug;
 
 ### psad _requires_ that kmsgsd is running to receive any data (unless
-### SYSLOG_DAEMON is set to ulogd), so let's start it here for good
+### SYSLOG_DAEMON is set to ulogd or psad is configured to acquire data
+### from a normal file via IPT_SYSLOG_FILE), so let's start it here for good
 ### measure (as of 0.9.2 it makes use of the pid files and unique_pid(),
 ### so we don't have to worry about starting a duplicate copy).  While
 ### we're at it, start psadwatchd as well.  Note that this is the best
 ### place to start the other daemons since we just wrote the psad pid
 ### to PID_FILE above.
-system $cmds{'kmsgsd'}
-    unless $no_kmsgsd
-    or $config{'SYSLOG_DAEMON'} =~ /ulog/i
-    or $kmsgsd_started;
+unless ($config{'ENABLE_SYSLOG_FILE'} eq 'Y') {
+    system $cmds{'kmsgsd'}
+        unless $no_kmsgsd
+        or $config{'SYSLOG_DAEMON'} =~ /ulog/i
+        or $kmsgsd_started;
+}
 
 system $cmds{'psadwatchd'}
     unless $debug or $no_daemon;
@@ -695,6 +699,11 @@ if ($config{'IMPORT_OLD_SCANS'} eq 'Y') {
 ### whether DShield alerting is enabled since if it isn't we will
 ### just zero out the counters).
 &write_dshield_stats();
+
+my $fw_data_file_size  = -s $fw_data_file;
+my $fw_data_file_inode = (stat($fw_data_file))[1];
+
+my $fw_data_file_check_ctr = 0;
 
 ### Get an open filehandle for the main firewall data file FW_DATA_FILE.
 ### All firewall drop/reject log messages are written to FW_DATA_FILE
@@ -792,6 +801,32 @@ MAIN: for (;;) {
         }
     }
 
+    if ($fw_data_file_check_ctr == 10) {
+        if (-e $fw_data_file) {
+            my $size_tmp  = -s $fw_data_file;
+            my $inode_tmp = (stat($fw_data_file))[1];
+            if ($inode_tmp != $fw_data_file_inode
+                    or $size_tmp < $fw_data_file_size) {
+
+                close FWDATA;
+
+                &sys_log('[+]', "iptables syslog file $fw_data_file " .
+                    "shrank or was rotated, so re-opening");
+
+                ### re-open the fwdata file
+                open FWDATA, $fw_data_file or die
+                    "[*] Could not open $fw_data_file: $!";
+
+                $skip_first_loop = 1;
+
+                ### set file size and inode
+                $fw_data_file_size  = $size_tmp;
+                $fw_data_file_inode = $inode_tmp;
+            }
+        }
+        $fw_data_file_check_ctr = 0;
+    }
+
     if (@fw_packets) {
 
         if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
@@ -870,7 +905,7 @@ MAIN: for (;;) {
             and (time() - $last_disk_check) > $config{'DISK_CHECK_INTERVAL'}) {
         ### See how we are doing on disk space, and remove data
         ### if necessary.
-        if (&disk_space_exceeded()) {
+        if (&disk_space_exceeded() and $config{'ENABLE_SYSLOG_FILE'} ne 'Y') {
             close FWDATA;
 
             ### truncate fwdata file
@@ -904,6 +939,8 @@ MAIN: for (;;) {
     }
 
     $check_interval_ctr++;
+
+    $fw_data_file_check_ctr++;
 
     ### clearerr() on the FWDATA filehandle to be ready for new packets
     FWDATA->clearerr();
@@ -2685,9 +2722,12 @@ sub psad_init() {
     &validate_config();
 
     ### setup the appropriate iptables data file depending on whether
-    ### SYSLOG_DAEMON is set to ulogd
+    ### SYSLOG_DAEMON is set to ulogd, or if ENABLE_SYSLOG_FILE is set
+    ### to 'Y'
     if ($config{'SYSLOG_DAEMON'} =~ /ulog/i) {
         $fw_data_file = $config{'ULOG_DATA_FILE'};
+    } elsif ($config{'ENABLE_SYSLOG_FILE'} eq 'Y') {
+        $fw_data_file = $config{'IPT_SYSLOG_FILE'};
     } else {
         $fw_data_file = $config{'FW_DATA_FILE'};
     }
@@ -2859,6 +2899,12 @@ sub validate_config() {
             die '[*] The --fw-rm-block-ip argument accepts ' .
                 'an IP address or network.';
         }
+    }
+
+    if ($config{'ENABLE_SYSLOG_FILE'} eq 'Y') {
+        die "[*] Cannot set IPT_SYSLOG_FILE and FW_DATA_FILE to point ",
+            "at the same file." if $config{'IPT_SYSLOG_FILE'}
+            eq $config{'FW_DATA_FILE'};
     }
 
     unless ($config{'SYSLOG_FACILITY'} =~ /LOG_LOCAL7/i
@@ -8688,7 +8734,7 @@ sub archive_data() {
     ### first see how big the archive file is and zero out if
     ### it is larger than about 10,000 lines
     if (-e $fwarchive && (-s $fwarchive) > 2367766) {  ### about 10,000 lines
-        &truncate_file($fwarchive);
+        &truncate_file($fwarchive) unless $config{'ENABLE_SYSLOG_FILE'} eq 'Y';
     }
     unless (-e $fwdata) {
         return;
@@ -8797,7 +8843,8 @@ sub setup() {
     unless ($hup_flag) {
         my $truncate_or_create = 0;
         my $restart_kmsgsd     = 0;
-        if ($config{'TRUNCATE_FWDATA'} eq 'Y') {
+        if ($config{'TRUNCATE_FWDATA'} eq 'Y'
+                and $config{'ENABLE_SYSLOG_FILE'} ne 'Y') {
             $truncate_or_create = 1;
             $restart_kmsgsd     = 1;
         } else {
@@ -8829,33 +8876,41 @@ sub setup() {
             &truncate_file($config{'TOP_ATTACKERS_FILE'});
         }
 
-        ### make sure the permissions on these files is 0600
-        for my $file ($fw_data_file,
-                $config{'FW_ERROR_LOG'}) {
-            chmod 0600, $file;
+        if ($config{'ENABLE_SYSLOG_FILE'} ne 'Y') {
+            chmod 0600, $fw_data_file;
         }
+        chmod 0600, $config{'FW_ERROR_LOG'};
     }
 
     ### we assume that ulogd is properly configured (FIXME?)
     return if $config{'SYSLOG_DAEMON'} =~ /ulog/i;
+    return if $config{'ENABLE_SYSLOG_FILE'} eq 'Y';
 
     die '[*] No system logger config file could be found.'
         unless (-e $config{'ETC_SYSLOG_CONF'}
+                or -e $config{'ETC_RSYSLOG_CONF'}
                 or -e $config{'ETC_SYSLOGNG_CONF'}
                 or -e $config{'ETC_METALOG_CONF'});
 
     ### attempt to correct syslog config file if it is not configured
     ### correctly.
+    my $syslog_conf = '';
     if ($config{'SYSLOG_DAEMON'} eq 'syslogd') {
-        if (-e $config{'ETC_SYSLOG_CONF'}) {
-            unless (-e "$config{'ETC_SYSLOG_CONF'}.orig") {
-                copy $config{'ETC_SYSLOG_CONF'},
-                    "$config{'ETC_SYSLOG_CONF'}.orig" or die "[*] Could not ",
-                    "copy $config{'ETC_SYSLOG_CONF'} -> ",
-                    "$config{'ETC_SYSLOG_CONF'}.orig";
+        $syslog_conf = $config{'ETC_SYSLOG_CONF'};
+    } elsif ($config{'SYSLOG_DAEMON'} eq 'rsyslogd') {
+        $syslog_conf = $config{'ETC_RSYSLOG_CONF'};
+    }
+
+    if ($syslog_conf) {
+        if (-e $syslog_conf) {
+            unless (-e "$syslog_conf.orig") {
+                copy $syslog_conf,
+                    "$syslog_conf.orig" or die "[*] Could not ",
+                    "copy $syslog_conf -> ",
+                    "$syslog_conf.orig";
             }
-            open RS, "< $config{'ETC_SYSLOG_CONF'}" or
-                die "[*] Unable to open $config{'ETC_SYSLOG_CONF'}: $!";
+            open RS, "< $syslog_conf" or
+                die "[*] Unable to open $syslog_conf: $!";
             my @lines = <RS>;
             close RS;
             my $found = 0;
@@ -8866,8 +8921,8 @@ sub setup() {
                 }
             }
             unless ($found) {
-                open SYSLOG, "> $config{'ETC_SYSLOG_CONF'}" or
-                    die "[*] Unable to open $config{'ETC_SYSLOG_CONF'}: $!";
+                open SYSLOG, "> $syslog_conf" or
+                    die "[*] Unable to open $syslog_conf: $!";
                 ### this loop removes any old location for psadfifo
                 for my $line (@lines) {
                     unless ($line =~ /psadfifo/i) {
@@ -8889,8 +8944,7 @@ sub setup() {
                 "exist, check SYSLOG_DAEMON setting on $config{'HOSTNAME'}",
                 '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         }
-    }
-    if ($config{'SYSLOG_DAEMON'} eq 'syslog-ng') {
+    } elsif ($config{'SYSLOG_DAEMON'} eq 'syslog-ng') {
         if (-e $config{'ETC_SYSLOGNG_CONF'}) {
             unless (-e "$config{'ETC_SYSLOGNG_CONF'}.orig") {
                 copy $config{'ETC_SYSLOGNG_CONF'},
@@ -8935,9 +8989,8 @@ sub setup() {
                 "exist, check SYSLOG_DAEMON setting on $config{'HOSTNAME'}",
                 '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         }
-    }
-    ### Metalog support added by Dennis Freise <cat@final-frontier.ath.cx>
-    if ($config{'SYSLOG_DAEMON'} eq 'metalog') {
+    } elsif ($config{'SYSLOG_DAEMON'} eq 'metalog') {
+         ### Metalog support added by Dennis Freise <cat@final-frontier.ath.cx>
         if (-e $config{'ETC_METALOG_CONF'}) {
             unless (-e "$config{'ETC_METALOG_CONF'}.orig") {
                 copy $config{'ETC_METALOG_CONF'},
@@ -9759,6 +9812,8 @@ sub required_vars() {
         SIG_MSG_SYSLOG_THRESHOLD SIG_SID_SYSLOG_THRESHOLD
         PSADWATCHD_CHECK_INTERVAL PSADWATCHD_MAX_RETRIES SYSLOG_IDENTITY
         SYSLOG_FACILITY SYSLOG_PRIORITY ENABLE_EMAIL_LIMIT_PER_DST
+        ENABLE_SYSLOG_FILE IPT_SYSLOG_FILE IPT_WRITE_FWDATA
+        ETC_RSYSLOG_CONF
     );
     &defined_vars(\@required_vars);
     return;
@@ -9768,7 +9823,7 @@ sub usage() {
     my $exitcode = shift;
     print <<_HELP_;
 
-psad; the Port Scan Attack Detector
+psad: the Port Scan Attack Detector
 
 [+] Version: $version (file revision: $rev_num)
     By Michael Rash (mbr\@cipherdyne.org)

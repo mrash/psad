@@ -1,5 +1,33 @@
 psad-2.1.1 (//2008):
+    - Added a new feature whereby psad can acquire iptables log data just by
+      parsing an existing file (/var/log/messages by default) that is written
+      to by syslog.  By default, psad acquires iptables log data from the
+      /var/log/psad/fwdata file which is written to by kmsgsd, but on some
+      systems, having syslog communicate log data to kmsgsd can be problematic
+      since syslog configs and external factors such as Apparmor and SELinux
+      can play a role here.  This new feature is controled by two new
+      configuration variables "ENABLE_SYSLOG_FILE" (to enable/disable the
+      feature) and "IPT_SYSLOG_FILE" to specifiy the path to the file to
+      parse.
+    - Better installation support for various Linux distributions including
+      Fedora 8 and Ubuntu.  The current runlevel is now acquired via the
+      "runlevel" command instead of attempting to read /etc/inittab (which
+      does not even exist on Ubuntu 7.10), and there are new command line
+      arguments --init-dir, --init-name, and --runlevel to allow the init
+      directory, init script name, and the runlevel to be manually specified
+      on the install.pl command line.
+    - Updated psad to automatically handle situations where the either the
+      /var/log/psad/fwdata file or the /var/log/messages file (whichever
+      syslog is writing iptables log messages to) gets rotated.  The
+      filehandle is closed and reopened if the file shrinks or if the inode
+      changes.  This strategy is borrowed from how the fwknop project deals
+      with the filesystem packet capture file.
     - Minor bugfix to generate syslog message when restarting a psad process.
+    - Updated install.pl to set the LC_ALL environmental variable to "C"
+      This should address some issues with installing psad on non-English
+      locale systems.
+    - Updated install.pl to be compatible with the rsyslog daemon, which is
+      commonly installed on Fedora 8 systems.
 
 psad-2.1 (10/19/2007):
     - Changed EMAIL_LIMIT model to apply to scanning source addresses only

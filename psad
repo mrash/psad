@@ -8411,7 +8411,7 @@ sub print_top_sigs() {
             push @lines,  qq|      "$fwsnort_sigs{$sid}{'msg'}" | .
                 qq|($fwsnort_sigs{$sid}{'proto'}),  | .
                 qq|Count: $top_sigs{$sid},  Unique sources: | .
-                qq|$num_sources,  Sid: $sid|;
+                qq|$num_sources,  Sid: $sid\n|;
             $found   = 1;
             $printed = 1;
         }

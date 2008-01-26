@@ -120,13 +120,21 @@ mkdir -p $RPM_BUILD_ROOT%_initrddir
 
 ### the 700 permissions mode is fixed in the
 ### %post phase
-install -m 700 {psad,kmsgsd,psadwatchd} $RPM_BUILD_ROOT%_sbindir/
+install -m 700 psad $RPM_BUILD_ROOT%_sbindir/
+install -m 700 kmsgsd $RPM_BUILD_ROOT%_sbindir/
+install -m 700 psadwatchd $RPM_BUILD_ROOT%_sbindir/
 install -m 500 fwcheck_psad.pl $RPM_BUILD_ROOT%_sbindir/fwcheck_psad
 install -m 755 whois/whois $RPM_BUILD_ROOT/usr/bin/whois_psad
 install -m 755 nf2csv $RPM_BUILD_ROOT/usr/bin/nf2csv
 install -m 755 init-scripts/psad-init.redhat $RPM_BUILD_ROOT%_initrddir/psad
 install -m 644 psad.conf $RPM_BUILD_ROOT%_sysconfdir/%name/
-install -m 644 {signatures,icmp_types,ip_options,auto_dl,snort_rule_dl,posf,pf.os} $RPM_BUILD_ROOT%_sysconfdir/%name/
+install -m 644 signatures $RPM_BUILD_ROOT%_sysconfdir/%name/
+install -m 644 icmp_types $RPM_BUILD_ROOT%_sysconfdir/%name/
+install -m 644 ip_options $RPM_BUILD_ROOT%_sysconfdir/%name/
+install -m 644 auto_dl $RPM_BUILD_ROOT%_sysconfdir/%name/
+install -m 644 snort_rule_dl $RPM_BUILD_ROOT%_sysconfdir/%name/
+install -m 644 pf.os $RPM_BUILD_ROOT%_sysconfdir/%name/
+install -m 644 posf $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 *.8 $RPM_BUILD_ROOT%{_mandir}/man8/
 install -m 644 nf2csv.1 $RPM_BUILD_ROOT%{_mandir}/man1/
 

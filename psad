@@ -196,7 +196,7 @@ my %scan_email_ctrs = ();
 my %scan_ext_exec = ();
 
 ### cache p0f-based passive os fingerprinting information
-my %p0f;
+my %p0f = ();
 
 ### cache p0f-based passive os fingerprinting signature information
 my %p0f_sigs = ();
@@ -2117,9 +2117,14 @@ sub p0f() {
     print STDERR "[+] p0f(): $src len: $len, frag_bit: $frag_bit, " ,
         "ttl: $ttl, win: $win\n" if $debug;
 
-    my ($options_aref) = &parse_tcp_options($src, $tcp_options);
+    my $options_aref = &parse_tcp_options($src, $tcp_options);
 
-    return unless $options_aref;
+    unless ($options_aref) {
+        print STDERR "[-] Could not fingerprint remote OS.\n" if $debug;
+        return;
+    }
+
+    my $matched_os = 0;
 
     ### try to match SYN packet length
     LEN: for my $sig_len (keys %p0f_sigs) {
@@ -2174,7 +2179,6 @@ sub p0f() {
                     }
 
                     next WIN unless $matched_win_size;
-
                     TCPOPTS: for my $sig_opts (keys %{$p0f_sigs{$sig_len}
                             {$test_frag_bit}{$sig_ttl}{$sig_win_size}}) {
                         my @sig_opts = split /\,/, $sig_opts;
@@ -2233,12 +2237,16 @@ sub p0f() {
                                 {$test_frag_bit}{$sig_ttl}{$sig_win_size}
                                 {$sig_opts}{$os};
                             print STDERR "[+] os: $os, $sig\n" if $debug;
+                            $matched_os = 1;
                             $p0f{$src}{$os} = '';
                         }
                     }
                 }
             }
         }
+    }
+    if ($debug and not $matched_os) {
+        print STDERR "    Could not match $src against any p0f signature.\n";
     }
     return;
 }
@@ -2251,7 +2259,7 @@ sub parse_tcp_options() {
 
     if (length($tcp_options) % 2 != 0) {  ### make sure length is a multiple of two
         print STDERR 'tcp options length not a multiple of two.' if $debug;
-        return '';
+        return [];
     }
     ### $tcp_options is a hex string like "020405B401010402" from the iptables
     ### log message
@@ -2267,7 +2275,11 @@ sub parse_tcp_options() {
     OPT: for (my $opt_kind=0; $opt_kind <= $#hex_nums;) {
 
         $parse_ctr++;
-        return [] if $parse_ctr > $max_parse_attempts;
+        if ($parse_ctr > $max_parse_attempts) {
+            print STDERR "    p0f() parse_ctr $parse_ctr > ",
+                "max_parse_attempts $max_parse_attempts\n" if $debug;
+            return [];
+        }
 
         last OPT unless defined $hex_nums[$opt_kind+1];
 
@@ -9675,7 +9687,7 @@ sub getopt_wrapper() {
         'CSV-regex=s'       => \$csv_regex,       # Require additional regex match.
         'CSV-neg-regex=s'   => \$csv_neg_regex,   # Require additional negative regex
                                                   #   match.
-         'CSV-stdin'        => \$csv_stdin,       # Acquire iptables log data from
+        'CSV-stdin'         => \$csv_stdin,       # Acquire iptables log data from
                                                   #   stdin.
         'plot-separator'    => \$plot_separator,  # Specify separator character for plot
                                                   #   data (both gnuplot and CSV data).

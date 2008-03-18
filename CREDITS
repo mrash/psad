@@ -390,3 +390,6 @@ Franck Joncourt
 Erik Heidt
     - Submitted patch to fix fwsnort sid reporting w.r.t. ending newline
       chars.
+    - Reported iptables log prefix bug where timestamps that include spaces
+      where not being excluded even when IGNORE_KERNEL_TIMESTAMP is set to
+      "Y".

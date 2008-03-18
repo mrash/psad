@@ -1282,7 +1282,7 @@ sub parse_NF_pkt_str() {
     ### "kernel:" string is preceded by .*).
     if ($pkt_str =~ /.*kernel:\s+(.*?)\s*IN=/) {
         $pkt_hr->{'log_prefix'} = $1;
-        $pkt_hr->{'log_prefix'} =~ s|\[\d+\.\d+\]\s*||
+        $pkt_hr->{'log_prefix'} =~ s|\[\s*\d+\.\d+\s*\]\s*||
             if ($config{'IGNORE_KERNEL_TIMESTAMP'} eq 'Y');
         if ($pkt_hr->{'log_prefix'} =~ /\S/) {
             if ($config{'IGNORE_LOG_PREFIXES'} ne 'NONE') {

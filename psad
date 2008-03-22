@@ -3939,7 +3939,7 @@ sub import_auto_dl() {
         "$config{'AUTO_DL_FILE'}: $!";
     my @lines = <A>;
     close A;
-    my $i = 1;
+    my $i = 0;
     LINE: for my $line (@lines) {
         $i++;
         next LINE unless $line =~ /\S/;
@@ -3971,12 +3971,12 @@ sub import_auto_dl() {
             my $iaddr = 0;
             $iaddr = inet_aton($hostname);
             unless ($iaddr) {
-                &sys_log("could not resolve auto_dl $hostname " .
+                &sys_log(qq|could not resolve auto_dl "$hostname" | .
                     "to an IP at line $i");
                 next LINE;
             }
             $ip = inet_ntoa($iaddr) or
-                &sys_log("could not resolve auto_dl $hostname " .
+                &sys_log(qq|could not resolve auto_dl "$hostname" | .
                     "to an IP at line $i");
             $mask = '32';  ### single IP
         } else {

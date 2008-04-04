@@ -1,6 +1,7 @@
-psad-2.1.2 (03//2008):
+psad-2.1.2 (04/03/2008):
     - Bugfix to not include kernel timestamps in iptables log prefixes that
-      contain spaces like "[   65.026008] DROP".
+      contain spaces like "[   65.026008] DROP" (bug reported by Erik Heidt).
+    - Bugfix to skip non-resolved IP addresses (bug reported by Albert Whale)
     - Better p0f output in --debug mode to display when a passive OS
       fingerprint cannot be calculated based on iptables log messages that
       include tcp options (i.e., with --log-tcp-options when building a LOG

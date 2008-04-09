@@ -1,3 +1,128 @@
+whois (4.7.26) unstable; urgency=medium
+
+  * Added support for passing command line options in the environment
+    variables WHOIS_OPTIONS and MKPASSWD_OPTIONS. (Closes: #324858)
+  * Updated the French translation. (Closes: #474307)
+
+ -- Marco d'Itri <md@linux.it>  Sat, 05 Apr 2008 04:53:26 +0200
+
+whois (4.7.25) unstable; urgency=low
+
+  * mkpasswd: added support for the SHA-256 and SHA-512 methods from
+    glibc 2.7.
+  * mkpasswd: added support for FreeBSD-style Blowfish and NT-Hash methods.
+  * mkpasswd: added support for variable-rounds methods (OpenBSD-style
+    Blowfish and SHA-256/SHA-512).
+  * mkpasswd: renamed -H/--hash to -m/--method.
+  * mkpasswd: finished support for libxcrypt (not enabled by default).
+  * Added NONE entries for the rest of .uk SLD. (Closes: #471963)
+  * Added the .bd, .gh, .lc, .sc, .ma, .me, .om and .rs TLD servers.
+  * Updated the .aero, .bb and .bz TLD servers. (Closes: #448683)
+  * Added another RIPE ERX ASN block. (Closes: #452328)
+  * Added a new ASN allocation.
+  * Added Basque and Czech translations.
+
+ -- Marco d'Itri <md@linux.it>  Sun, 23 Mar 2008 19:18:34 +0100
+
+whois (4.7.24) unstable; urgency=medium
+
+  * Added new ASN allocations.
+  * Added new IPv4 allocations.
+  * Added the .asia, .kp and .mq TLD servers. (Closes: #445747)
+
+ -- Marco d'Itri <md@linux.it>  Tue, 30 Oct 2007 11:06:25 +0100
+
+whois (4.7.23) unstable; urgency=medium
+
+  * Fixed myinet_aton to not reject CIDR networks.
+  * Added support for ASN32.
+  * Added the za.net and za.org pseudo-TLD servers.
+
+ -- Marco d'Itri <md@linux.it>  Thu, 13 Sep 2007 03:28:21 +0200
+
+whois (4.7.22) unstable; urgency=medium
+
+  * Added new IPv4 allocations.
+  * Added new ASN allocations.
+  * Updated the Polish translation.
+  * Updated the .jobs, .ai and .tn TLD and za.net servers.
+  * Added the za.net server. (Closes: #423549)
+  * Stop misparsing <as-set>:<hierarchical-name> as an IPv6 address.
+  * Stop mangling IDN queries with in-query flags. (Closes: #422895)
+
+ -- Marco d'Itri <md@linux.it>  Sat, 28 Jul 2007 23:53:00 +0200
+
+whois (4.7.21) unstable; urgency=medium
+
+  * Improved myinet_aton to not parse addresses with trailing junk
+  * Added APNIC and RIPE allocations.
+  * Updated the name of the Verio whois server. (Closes: #410449)
+  * Removed references to whois.nic.mil, which apparently is gone.
+  * Removed whois.nic.it from ripe_servers, because it does not even
+    pretend to be one anymore.
+
+ -- Marco d'Itri <md@linux.it>  Mon, 02 Apr 2007 04:23:45 +0200
+
+whois (4.7.20) unstable; urgency=medium
+
+  * Added more krnic allocations.
+  * Added support for -sixxs NIC handles.
+  * Added again 26[12]0:0000::/23 which had been mistakenly removed.
+
+ -- Marco d'Itri <md@linux.it>  Fri, 24 Nov 2006 09:34:01 +0100
+
+whois (4.7.19) unstable; urgency=medium
+
+  * Added new IPv4 and IPv6 allocations.
+
+ -- Marco d'Itri <md@linux.it>  Sun, 22 Oct 2006 09:32:45 +0200
+
+whois (4.7.18) unstable; urgency=medium
+
+  * whois.radb.net does not understand the RIPE protocol anymore.
+  * Added support for IPv6 Teredo addresses, contributed by Rémi
+    Denis-Courmont. (Closes: #384373)
+  * Updated the .mobi and .gs TLD servers. (Closes: #389880, 391447)
+  * Added the .gd TLD server.
+
+ -- Marco d'Itri <md@linux.it>  Fri,  6 Oct 2006 18:47:53 +0200
+
+whois (4.7.17) unstable; urgency=medium
+
+  * 4.7.16 did not ask whois.denic.de for the complete data. Fixed.
+
+ -- Marco d'Itri <md@linux.it>  Tue, 19 Sep 2006 11:24:46 +0200
+
+whois (4.7.16) unstable; urgency=medium
+
+  * Added new IPv4 and IPv6 allocations.
+  * Strip the CIDR prefix length from queries to whois.arin.net.
+  * whois.denic.de does not understand the RIPE protocol anymore.
+
+ -- Marco d'Itri <md@linux.it>  Fri, 15 Sep 2006 00:07:49 +0200
+
+whois (4.7.15) unstable; urgency=high
+
+  * Fixed the parsing of hostname+port, which was broken by 4.7.14.
+  * Added the .gp, .ni and .tn TLD servers.
+  * Updated the .bh, .bn, .ec, .gy, .im, .kw, .mu, .ph, .pr, .py, .ve and .vu
+    TLD servers.
+
+ -- Marco d'Itri <md@linux.it>  Wed, 19 Jul 2006 21:01:32 +0200
+
+whois (4.7.14) unstable; urgency=medium
+
+  * Added the .coop, .mobi TLD and e164.arpa servers.
+  * Added new ASN allocations. (Closes: #377953)
+  * Added support for resolution of IDN server hostnames using AI_IDN.
+  * Fixed the parsing of IPv6 server addresses on the command line.
+  * Use the official "nicname" service name instead of "whois".
+  * Added whois.pot to the source package.
+  * Fixed a typo in the german translation. (Closes: #363550)
+  * Do not FTBFS on binNMUs. (Closes: #360741)
+
+ -- Marco d'Itri <md@linux.it>  Sat, 15 Jul 2006 19:22:42 +0200
+
 whois (4.7.13) unstable; urgency=medium
 
   * Added the .cat, .jobs, and .travel TLD servers.

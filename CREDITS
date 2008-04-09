@@ -394,3 +394,8 @@ Erik Heidt
     - Reported iptables log prefix bug where timestamps that include spaces
       where not being excluded even when IGNORE_KERNEL_TIMESTAMP is set to
       "Y".
+
+Andrew Kaplan
+    - Reported the inability of an older version of the bundled whois client
+      to query the whois information associated with certain IP addresses.
+      Updating to whois-4.7.26 solved the problem.

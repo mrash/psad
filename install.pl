@@ -154,6 +154,7 @@ my $locale = 'C';  ### default LC_ALL env variable
 my $no_locale = 0;
 my $init_dir = '/etc/init.d';
 my $init_name = 'psad';
+my $install_syslog_fifo = 0;
 my $runlevel = -1;
 
 ### make Getopts case sensitive
@@ -173,6 +174,7 @@ Getopt::Long::Configure('no_ignore_case');
     'uninstall'         => \$uninstall,   ### Uninstall psad.
     'init-dir=s'        => \$init_dir,
     'init-name=s'       => \$init_name,
+    'install-syslog-fifo' => \$install_syslog_fifo,
     'runlevel=i'        => \$runlevel,
     'LC_ALL=s'          => \$locale,
     'no-LC_ALL'         => \$no_locale,
@@ -450,8 +452,17 @@ sub install() {
         mkdir $config{'PSAD_CONF_DIR'},0500;
     }
 
-    ### get syslog daemon (e.g. syslog, rsyslog syslog-ng, or metalog)
-    my $syslog_str = &query_syslog();
+    my $syslog_str = '';
+
+    if ($install_syslog_fifo) {
+        ### get syslog daemon (e.g. syslog, rsyslog syslog-ng, or metalog)
+        $syslog_str = &query_syslog();
+    } else {
+        print
+"[+] psad by default parses iptables log messages from the /var/log/messages\n",
+"    file, but you can alter this with the IPT_SYSLOG_FILE variable in the\n",
+"    /etc/psad/psad.conf file.\n";
+    }
 
     my $preserve_rv = 0;
     if (-e "$config{'PSAD_CONF_DIR'}/psad.conf") {
@@ -572,96 +583,98 @@ sub install() {
         &set_hostname($file);
     }
 
-    &put_string('SYSLOG_DAEMON', $syslog_str,
-        "$config{'PSAD_CONF_DIR'}/psad.conf");
+    if ($install_syslog_fifo) {
+        &put_string('SYSLOG_DAEMON', $syslog_str,
+            "$config{'PSAD_CONF_DIR'}/psad.conf");
 
-    if ($syslog_str ne 'ulogd') {
-        my $restarted_syslog = 0;
-        if ($syslog_str eq 'syslogd') {
-            if (-e $syslog_conf) {
-                &append_fifo_syslog($syslog_conf);
-                if (((system "$cmds{'killall'} -HUP syslogd 2> /dev/null")>>8) == 0) {
-                    &logr("[+] HUP signal sent to syslogd.\n");
-                    $restarted_syslog = 1;
-                }
-            }
-        } elsif ($syslog_str eq 'rsyslogd') {
-            if (-e $syslog_conf) {
-                &append_fifo_syslog($syslog_conf);
-                if (((system "$cmds{'killall'} -HUP rsyslogd 2> /dev/null")>>8) == 0) {
-                    &logr("[+] HUP signal sent to rsyslogd.\n");
-                    $restarted_syslog = 1;
-                }
-            }
-
-        } elsif ($syslog_str eq 'syslog-ng') {
-            if (-e $syslog_conf) {
-                &append_fifo_syslog_ng($syslog_conf);
-                if (((system "$cmds{'killall'} -HUP syslog-ng 2> /dev/null")>>8) == 0) {
-                    &logr("[+] HUP signal sent to syslog-ng.\n");
-                    $restarted_syslog = 1;
-                }
-            }
-        } elsif ($syslog_str eq 'metalog') {
-            if (-e $syslog_conf) {
-                &config_metalog($syslog_conf);
-                &logr("[-] Metalog support is shaky in psad.  " .
-                    "Use at your own risk.\n");
-                ### don't send warning about not restarting metalog daemon
-                $restarted_syslog = 1;
-            }
-        }
-
-        unless ($restarted_syslog) {
-            &logr("[-] Could not restart any syslog daemons.\n");
-        }
-    }
-
-    if (-x $cmds{'iptables'} and not $skip_syslog_test) {
-        &logr("[+] Found iptables. Testing syslog configuration:\n");
-        ### make sure we actually see packets being logged by
-        ### the firewall.
         if ($syslog_str ne 'ulogd') {
-            if (&test_syslog_config($syslog_str)) {
-                &logr("[+] Successful $syslog_str reconfiguration.\n\n");
-            } else {
-                if (&query_init_script_restart_syslog()) {
+            my $restarted_syslog = 0;
+            if ($syslog_str eq 'syslogd') {
+                if (-e $syslog_conf) {
+                    &append_fifo_syslog($syslog_conf);
+                    if (((system "$cmds{'killall'} -HUP syslogd 2> /dev/null")>>8) == 0) {
+                        &logr("[+] HUP signal sent to syslogd.\n");
+                        $restarted_syslog = 1;
+                    }
+                }
+            } elsif ($syslog_str eq 'rsyslogd') {
+                if (-e $syslog_conf) {
+                    &append_fifo_syslog($syslog_conf);
+                    if (((system "$cmds{'killall'} -HUP rsyslogd 2> /dev/null")>>8) == 0) {
+                        &logr("[+] HUP signal sent to rsyslogd.\n");
+                        $restarted_syslog = 1;
+                    }
+                }
 
-                    my $restarted = 0;
-                    if ($syslog_str eq 'syslog-ng') {
-                        if (-e "$init_dir/syslog-ng") {
-                            system "$init_dir/syslog-ng restart";
-                            $restarted = 1;
+            } elsif ($syslog_str eq 'syslog-ng') {
+                if (-e $syslog_conf) {
+                    &append_fifo_syslog_ng($syslog_conf);
+                    if (((system "$cmds{'killall'} -HUP syslog-ng 2> /dev/null")>>8) == 0) {
+                        &logr("[+] HUP signal sent to syslog-ng.\n");
+                        $restarted_syslog = 1;
+                    }
+                }
+            } elsif ($syslog_str eq 'metalog') {
+                if (-e $syslog_conf) {
+                    &config_metalog($syslog_conf);
+                    &logr("[-] Metalog support is shaky in psad.  " .
+                        "Use at your own risk.\n");
+                    ### don't send warning about not restarting metalog daemon
+                    $restarted_syslog = 1;
+                }
+            }
+
+            unless ($restarted_syslog) {
+                &logr("[-] Could not restart any syslog daemons.\n");
+            }
+        }
+
+        if (-x $cmds{'iptables'} and not $skip_syslog_test) {
+            &logr("[+] Found iptables. Testing syslog configuration:\n");
+            ### make sure we actually see packets being logged by
+            ### the firewall.
+            if ($syslog_str ne 'ulogd') {
+                if (&test_syslog_config($syslog_str)) {
+                    &logr("[+] Successful $syslog_str reconfiguration.\n\n");
+                } else {
+                    if (&query_init_script_restart_syslog()) {
+
+                        my $restarted = 0;
+                        if ($syslog_str eq 'syslog-ng') {
+                            if (-e "$init_dir/syslog-ng") {
+                                system "$init_dir/syslog-ng restart";
+                                $restarted = 1;
+                            }
+                        } elsif ($syslog_str eq 'rsyslogd') {
+                            if (-e "$init_dir/sysklogd") {
+                                system "$init_dir/sysklogd restart";
+                                $restarted = 1;
+                            } elsif (-e "$init_dir/syslog") {
+                                system "$init_dir/syslog restart";
+                                $restarted = 1;
+                            }
+                        } else {
+                            if (-e "$init_dir/rsyslog") {
+                                system "$init_dir/rsyslog restart";
+                                $restarted = 1;
+                            }
                         }
-                    } elsif ($syslog_str eq 'rsyslogd') {
-                        if (-e "$init_dir/sysklogd") {
-                            system "$init_dir/sysklogd restart";
-                            $restarted = 1;
-                        } elsif (-e "$init_dir/syslog") {
-                            system "$init_dir/syslog restart";
-                            $restarted = 1;
+                        ### test syslog config again now that we
+                        ### have restarted syslog via the init script
+                        ### instead of relying on a HUP signal to
+                        ### syslog
+                        if ($restarted) {
+                            if (&test_syslog_config($syslog_str)) {
+                                &logr("[+] Successful $syslog_str reconfiguration.\n\n");
+                            } else {
+                                &logr("[-] Unsuccessful $syslog_str reconfiguration.\n");
+                                &logr("    Consult the psad man page for the basic " .
+                                    "$syslog_str requirement to get psad to work.\n\n");
+                            }
                         }
                     } else {
-                        if (-e "$init_dir/rsyslog") {
-                            system "$init_dir/rsyslog restart";
-                            $restarted = 1;
-                        }
+                        &logr("[-] Ok, hoping that psad can get packet data anyway.\n");
                     }
-                    ### test syslog config again now that we
-                    ### have restarted syslog via the init script
-                    ### instead of relying on a HUP signal to
-                    ### syslog
-                    if ($restarted) {
-                        if (&test_syslog_config($syslog_str)) {
-                            &logr("[+] Successful $syslog_str reconfiguration.\n\n");
-                        } else {
-                            &logr("[-] Unsuccessful $syslog_str reconfiguration.\n");
-                            &logr("    Consult the psad man page for the basic " .
-                                "$syslog_str requirement to get psad to work.\n\n");
-                        }
-                    }
-                } else {
-                    &logr("[-] Ok, hoping that psad can get packet data anyway.\n");
                 }
             }
         }
@@ -2088,6 +2101,10 @@ Usage: install.pl [options]
                                    default is $init_dir).
     --init-name <name>           - Specify the name for the psad init
                                    script (the default is $init_name).
+    --install-syslog-fifo        - Add the installation of the psadfifo
+                                   (this is not usually necessary since
+                                   the default is to enable
+                                   ENABLE_SYSLOG_FILE).
     -r, --runlevel <N>           - Specify the current system runlevel.
     --no-rm-lib-dir              - Do not remove the /usr/lib/psad/
                                    directory before installing psad.

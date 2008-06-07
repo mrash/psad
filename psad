@@ -631,7 +631,7 @@ unless ($no_daemon or $debug) {
 &write_cmd_line(\@args_cp, $cmdline_file)
     unless $debug;
 
-### psad _requires_ that kmsgsd is running to receive any data (unless
+### psad requires that kmsgsd is running to receive any data (unless
 ### SYSLOG_DAEMON is set to ulogd or psad is configured to acquire data
 ### from a normal file via IPT_SYSLOG_FILE), so let's start it here for good
 ### measure (as of 0.9.2 it makes use of the pid files and unique_pid(),
@@ -639,11 +639,21 @@ unless ($no_daemon or $debug) {
 ### we're at it, start psadwatchd as well.  Note that this is the best
 ### place to start the other daemons since we just wrote the psad pid
 ### to PID_FILE above.
-unless ($config{'ENABLE_SYSLOG_FILE'} eq 'Y') {
-    system $cmds{'kmsgsd'}
-        unless $no_kmsgsd
+unless ($config{'ENABLE_SYSLOG_FILE'} eq 'Y'
+        or $no_kmsgsd
         or $config{'SYSLOG_DAEMON'} =~ /ulog/i
-        or $kmsgsd_started;
+        or $kmsgsd_started) {
+    system $cmds{'kmsgsd'};
+    $kmsgsd_started = 1;
+}
+
+unless ($kmsgsd_started) {
+    my $pid = &is_running($pidfiles{'kmsgsd'});
+
+    if ($pid) {
+        kill 9, $pid unless kill 15, $pid;
+    }
+    unlink $pidfiles{'kmsgsd'} if -e $pidfiles{'kmsgsd'};
 }
 
 system $cmds{'psadwatchd'}
@@ -1423,7 +1433,7 @@ sub parse_NF_pkt_str() {
                 and $config{'IGNORE_CONNTRACK_BUG_PKTS'} eq 'Y' &&
                 ($pkt_hr->{'flags'} =~ /ACK/ || $pkt_hr->{'flags'} =~ /RST/)) {
 
-            ###                 $dp > 1024 && ($pkt_hr->{'flags'} =~ /ACK/ ||
+            ### $dp > 1024 && ($pkt_hr->{'flags'} =~ /ACK/ ||
 
             ### FIXME: ignore TCP packets that have the ACK or RST
             ### bits set (unless we matched a snort sid) since
@@ -6527,7 +6537,8 @@ sub stop_psad() {
             } else {
                 my $print = 1;
                 if ($pidname eq 'kmsgsd'
-                        and $config{'SYSLOG_DAEMON'} =~ /ulog/i) {
+                        and ($config{'SYSLOG_DAEMON'} =~ /ulog/i
+                        or $config{'ENABLE_SYSLOG_FILE'} eq 'Y')) {
                     $print = 0;
                 }
                 print "[-] psad: $pidname is not running on ",
@@ -6537,7 +6548,8 @@ sub stop_psad() {
         } else {
             my $print = 1;
             if ($pidname eq 'kmsgsd'
-                    and $config{'SYSLOG_DAEMON'} =~ /ulog/i) {
+                    and ($config{'SYSLOG_DAEMON'} =~ /ulog/i
+                    or $config{'ENABLE_SYSLOG_FILE'} eq 'Y')) {
                 $print = 0;
             }
             print "[-] psad: pid file $pidfile does not exist for ",
@@ -7731,7 +7743,8 @@ sub status() {
             } else {
                 my $print = 1;
                 if ($pidname eq 'kmsgsd'
-                        and $config{'SYSLOG_DAEMON'} =~ /ulog/i) {
+                        and ($config{'SYSLOG_DAEMON'} =~ /ulog/i
+                        or $config{'ENABLE_SYSLOG_FILE'} eq 'Y')) {
                     $print = 0;
                 }
                 print "[-] psad: $pidname is not running on ",
@@ -7740,7 +7753,8 @@ sub status() {
         } else {
             my $print = 1;
             if ($pidname eq 'kmsgsd'
-                    and $config{'SYSLOG_DAEMON'} =~ /ulog/i) {
+                    and ($config{'SYSLOG_DAEMON'} =~ /ulog/i
+                    or $config{'ENABLE_SYSLOG_FILE'} eq 'Y')) {
                 $print = 0;
             }
             print "[-] psad: pid file $pidfile does not exist for ",
@@ -8677,7 +8691,8 @@ sub hup() {
         } else {
             my $print = 1;
             if ($pidname eq 'kmsgsd'
-                    and $config{'SYSLOG_DAEMON'} =~ /ulog/i) {
+                    and ($config{'SYSLOG_DAEMON'} =~ /ulog/i
+                    or $config{'ENABLE_SYSLOG_FILE'} eq 'Y')) {
                 $print = 0;
             }
             print "[-] $pidname daemon not running.\n" if $print;
@@ -9066,6 +9081,7 @@ sub setup() {
 
 sub restart_kmsgsd() {
 
+    return if $config{'ENABLE_SYSLOG_FILE'} eq 'Y';
     return if $no_kmsgsd or $config{'SYSLOG_DAEMON'} =~ /ulog/i;
     return unless -e $pidfiles{'kmsgsd'};
 

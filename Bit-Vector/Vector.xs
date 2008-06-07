@@ -2,7 +2,7 @@
 
 /*****************************************************************************/
 /*                                                                           */
-/*    Copyright (c) 1995 - 2002 by Steffen Beyer.                            */
+/*    Copyright (c) 1995 - 2004 by Steffen Beyer.                            */
 /*    All rights reserved.                                                   */
 /*                                                                           */
 /*    This package is free software; you can redistribute it                 */
@@ -2912,6 +2912,42 @@ CODE:
     if ( BIT_VECTOR_OBJECT(reference,handle,address) )
     {
         RETVAL = Set_Norm(address);
+    }
+    else BIT_VECTOR_OBJECT_ERROR;
+}
+OUTPUT:
+RETVAL
+
+
+N_int
+Set_Norm2(reference)
+BitVector_Object	reference
+CODE:
+{
+    BitVector_Handle  handle;
+    BitVector_Address address;
+
+    if ( BIT_VECTOR_OBJECT(reference,handle,address) )
+    {
+        RETVAL = Set_Norm2(address);
+    }
+    else BIT_VECTOR_OBJECT_ERROR;
+}
+OUTPUT:
+RETVAL
+
+
+N_int
+Set_Norm3(reference)
+BitVector_Object	reference
+CODE:
+{
+    BitVector_Handle  handle;
+    BitVector_Address address;
+
+    if ( BIT_VECTOR_OBJECT(reference,handle,address) )
+    {
+        RETVAL = Set_Norm3(address);
     }
     else BIT_VECTOR_OBJECT_ERROR;
 }

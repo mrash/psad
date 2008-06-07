@@ -9,6 +9,10 @@ Bit::Vector - Efficient bit vector, set of integers and "big int" math library
 
 See L<Bit::Vector::Overload(3)>.
 
+=head2 MORE STRING IMPORT/EXPORT
+
+See L<Bit::Vector::String(3)>.
+
 =head2 CLASS METHODS
 
   Version
@@ -342,6 +346,8 @@ See L<Bit::Vector::Overload(3)>.
 
   Norm
       $norm = $set->Norm();
+      $norm = $set->Norm2();
+      $norm = $set->Norm3();
 
   Min
       $min = $set->Min();
@@ -503,6 +509,10 @@ error will occur.
 
 See L<Bit::Vector::Overload(3)>.
 
+=head2 MORE STRING IMPORT/EXPORT
+
+See L<Bit::Vector::String(3)>.
+
 =head2 CLASS METHODS
 
 =over 2
@@ -589,14 +599,14 @@ This method is an alternative constructor which allows you to create
 a new bit vector object (with "C<$bits>" bits) and to initialize it
 all in one go.
 
-The method is more efficient than performing these two steps separately
-first because in this method, the memory area occupied by the new bit
-vector is not initialized to zeros (which is pointless in this case),
-and second because it saves you from the associated overhead of one
-additional method invocation.
+The method internally first calls the bit vector constructor method
+"C<new()>" and then passes the given string to the method "C<from_Hex()>".
 
-The method first calls the bit vector constructor method "C<new()>"
-internally, and then passes the given string to the method "C<from_Hex()>".
+However, this method is more efficient than performing these two steps
+separately: First because in this method, the memory area occupied by
+the new bit vector is not initialized to zeros (which is pointless in
+this case), and second because it saves you from the associated overhead
+of one additional method invocation.
 
 An exception will be raised if the necessary memory cannot be allocated
 (see the description of the method "C<new()>" immediately above for
@@ -616,14 +626,14 @@ This method is an alternative constructor which allows you to create
 a new bit vector object (with "C<$bits>" bits) and to initialize it
 all in one go.
 
-The method is more efficient than performing these two steps separately
-first because in this method, the memory area occupied by the new bit
-vector is not initialized to zeros (which is pointless in this case),
-and second because it saves you from the associated overhead of one
-additional method invocation.
+The method internally first calls the bit vector constructor method
+"C<new()>" and then passes the given string to the method "C<from_Bin()>".
 
-The method first calls the bit vector constructor method "C<new()>"
-internally, and then passes the given string to the method "C<from_Bin()>".
+However, this method is more efficient than performing these two steps
+separately: First because in this method, the memory area occupied by
+the new bit vector is not initialized to zeros (which is pointless in
+this case), and second because it saves you from the associated overhead
+of one additional method invocation.
 
 An exception will be raised if the necessary memory cannot be allocated
 (see the description of the method "C<new()>" above for possible causes)
@@ -642,14 +652,15 @@ This method is an alternative constructor which allows you to create
 a new bit vector object (with "C<$bits>" bits) and to initialize it
 all in one go.
 
-The method is more efficient than performing these two steps separately
-first because in this method, the memory area occupied by the new bit
-vector is not initialized to zeros (which is pointless in this case),
+The method internally first calls the bit vector constructor method
+"C<new()>" and then passes the given string to the method "C<from_Dec()>".
+
+However, this method is more efficient than performing these two steps
+separately: First because in this method, "C<new()>" does not initialize
+the memory area occupied by the new bit vector with zeros (which is
+pointless in this case, because "C<from_Dec()>" will do it anyway),
 and second because it saves you from the associated overhead of one
 additional method invocation.
-
-The method first calls the bit vector constructor method "C<new()>"
-internally, and then passes the given string to the method "C<from_Dec()>".
 
 An exception will be raised if the necessary memory cannot be allocated
 (see the description of the method "C<new()>" above for possible causes)
@@ -668,14 +679,15 @@ This method is an alternative constructor which allows you to create
 a new bit vector object (with "C<$bits>" bits) and to initialize it
 all in one go.
 
-The method is more efficient than performing these two steps separately
-first because in this method, the memory area occupied by the new bit
-vector is not initialized to zeros (which is pointless in this case),
+The method internally first calls the bit vector constructor method
+"C<new()>" and then passes the given string to the method "C<from_Enum()>".
+
+However, this method is more efficient than performing these two steps
+separately: First because in this method, "C<new()>" does not initialize
+the memory area occupied by the new bit vector with zeros (which is
+pointless in this case, because "C<from_Enum()>" will do it anyway),
 and second because it saves you from the associated overhead of one
 additional method invocation.
-
-The method first calls the bit vector constructor method "C<new()>"
-internally, and then passes the given string to the method "C<from_Enum()>".
 
 An exception will be raised if the necessary memory cannot be allocated
 (see the description of the method "C<new()>" above for possible causes)
@@ -2901,6 +2913,64 @@ Returns the norm (number of bits which are set) of the given vector.
 This is equivalent to the number of elements contained in the given
 set.
 
+Uses a byte lookup table for calculating the number of set bits
+per byte, and thus needs a time for evaluation (and a number of
+loops) linearly proportional to the length of the given bit vector
+(in bytes).
+
+This should be the fastest algorithm on average.
+
+=item *
+
+C<$norm = $set-E<gt>Norm2();>
+
+Returns the norm (number of bits which are set) of the given vector.
+
+This is equivalent to the number of elements contained in the given
+set.
+
+This does the same as the method "C<Norm()>" above, only with a
+different algorithm:
+
+This method counts the number of set and cleared bits at the same
+time and will stop when either of them has been exhausted, thus
+needing at most half as many loops per machine word as the total
+number of bits in a machine word - in fact it will need a number
+of loops equal to the minimum of the number of set bits and the
+number of cleared bits.
+
+This might be a faster algorithm than of the method "C<Norm()>"
+above on some systems, depending on the system's architecture
+and the compiler and optimisation used, for bit vectors with
+sparse set bits and for bit vectors with sparse cleared bits
+(i.e., predominantly set bits).
+
+=item *
+
+C<$norm = $set-E<gt>Norm3();>
+
+Returns the norm (number of bits which are set) of the given vector.
+
+This is equivalent to the number of elements contained in the given
+set.
+
+This does the same as the two methods "C<Norm()>" and "C<Norm2()>"
+above, however with a different algorithm.
+
+In fact this is the implementation of the method "C<Norm()>" used
+in previous versions of this module.
+
+The method needs a number of loops per machine word equal to the
+number of set bits in that machine word.
+
+Only for bit vectors with sparse set bits will this method be
+fast; it will depend on a system's architecture and compiler
+whether the method will be faster than any of the two methods
+above in such cases.
+
+On average however, this is probably the slowest method of the
+three.
+
 =item *
 
 C<$min = $set-E<gt>Min();>
@@ -3053,18 +3123,19 @@ See L<Math::MatrixBool(3)> for details.
 
 =head1 SEE ALSO
 
-Bit::Vector::Overload(3), Set::IntRange(3),
-Math::MatrixBool(3), Math::MatrixReal(3),
-DFA::Kleene(3), Math::Kleene(3),
-Graph::Kruskal(3).
+Bit::Vector::Overload(3),
+Bit::Vector::String(3).
 
-perl(1), perlsub(1), perlmod(1), perlref(1),
-perlobj(1), perlbot(1), perltoot(1), perlxs(1),
-perlxstut(1), perlguts(1), overload(3).
+Set::IntRange(3),
+Math::MatrixBool(3),
+Math::MatrixReal(3),
+DFA::Kleene(3),
+Math::Kleene(3),
+Graph::Kruskal(3).
 
 =head1 VERSION
 
-This man page documents "Bit::Vector" version 6.3.
+This man page documents "Bit::Vector" version 6.4.
 
 =head1 AUTHOR
 
@@ -3074,7 +3145,7 @@ This man page documents "Bit::Vector" version 6.3.
 
 =head1 COPYRIGHT
 
-Copyright (c) 1995 - 2002 by Steffen Beyer. All rights reserved.
+Copyright (c) 1995 - 2004 by Steffen Beyer. All rights reserved.
 
 =head1 LICENSE
 

@@ -1,7 +1,7 @@
 
 /*****************************************************************************/
 /*                                                                           */
-/*    Copyright (c) 2002 by Steffen Beyer.                                   */
+/*    Copyright (c) 2002 - 2004 by Steffen Beyer.                            */
 /*    All rights reserved.                                                   */
 /*                                                                           */
 /*    This program is free software; you can redistribute it                 */

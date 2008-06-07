@@ -1,9 +1,9 @@
                     =====================================
-                      Package "Bit::Vector" Version 6.3
+                      Package "Bit::Vector" Version 6.4
                     =====================================
 
 
-                 Copyright (c) 1995 - 2002 by Steffen Beyer.
+                 Copyright (c) 1995 - 2004 by Steffen Beyer.
                              All rights reserved.
 
 
@@ -168,5 +168,29 @@ version 6.2.
 Many thanks to Mike Swieton <swietonm@student.gvsu.edu> (and many other
 people in the past) for sending in a patch so that ToolBox.h will compile
 with C++ compilers.
+
+Many thanks to Runip Gopisetty <Runip.Gopisetty@Procket.com> for sending
+a patch for adding functions for generic string import and export functions.
+However, I decided to realize these in Perl instead (at least for the time
+being); you can find them in the new module "Bit::Vector::String". This way
+even octal representation and enumerations are supported.
+
+Many heartfelt thanks go to Jamie Blustein <jamie@cs.dal.ca> /
+<jamie@csd.uwo.ca> / <jamie@ACM.org> for sending me the article
+"Performance Investigation of Bit-Counting Algorithms with a
+Speedup to Lookup Table", by Eyas El-Qawasmeh, Department of
+Computer Science and Information Systems, Jordan University of
+Science and Technology, cited from the Journal of Research and
+Practice in Information Technology, Vol. 32, No. 3/4, August/
+November 2000, thus prompting my reconsideration of the
+implementation of the "Norm()" method in this module.
+
+See also his web pages, especially the pages about bit vectors,
+at:
+    http://www.cs.dal.ca/~jamie/
+    http://www.csd.uwo.ca/~jamie/
+    http://www.csd.uwo.ca/%7ejamie/.Refs/code.html
+    http://www.csd.uwo.ca/%7ejamie/publications.html#BitVectors
+    http://www.csd.uwo.ca/~jamie/BitVectors/
 
 

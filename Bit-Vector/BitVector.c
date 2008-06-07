@@ -222,6 +222,8 @@ void    Set_Complement       (wordptr X, wordptr Y);            /* X = ~Y    */
 boolean Set_subset           (wordptr X, wordptr Y);            /* X in Y ?  */
 
 N_int   Set_Norm             (wordptr addr);                    /* = | X |   */
+N_int   Set_Norm2            (wordptr addr);                    /* = | X |   */
+N_int   Set_Norm3            (wordptr addr);                    /* = | X |   */
 Z_long  Set_Min              (wordptr addr);                    /* = min(X)  */
 Z_long  Set_Max              (wordptr addr);                    /* = max(X)  */
 
@@ -264,6 +266,42 @@ void    Matrix_Transpose     (wordptr X, N_int rowsX, N_int colsX,
 #define  ERRCODE_EXPO  "exponent must be positive"
 #define  ERRCODE_ZERO  "division by zero error"
 #define  ERRCODE_OOPS  "unexpected internal error - please contact author"
+
+const N_int BitVector_BYTENORM[256] =
+{
+    0x00, 0x01, 0x01, 0x02,  0x01, 0x02, 0x02, 0x03,
+    0x01, 0x02, 0x02, 0x03,  0x02, 0x03, 0x03, 0x04, /* 0x00 */
+    0x01, 0x02, 0x02, 0x03,  0x02, 0x03, 0x03, 0x04,
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05, /* 0x10 */
+    0x01, 0x02, 0x02, 0x03,  0x02, 0x03, 0x03, 0x04,
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05, /* 0x20 */
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05,
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06, /* 0x30 */
+    0x01, 0x02, 0x02, 0x03,  0x02, 0x03, 0x03, 0x04,
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05, /* 0x40 */
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05,
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06, /* 0x50 */
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05,
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06, /* 0x60 */
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06,
+    0x04, 0x05, 0x05, 0x06,  0x05, 0x06, 0x06, 0x07, /* 0x70 */
+    0x01, 0x02, 0x02, 0x03,  0x02, 0x03, 0x03, 0x04,
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05, /* 0x80 */
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05,
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06, /* 0x90 */
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05,
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06, /* 0xA0 */
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06,
+    0x04, 0x05, 0x05, 0x06,  0x05, 0x06, 0x06, 0x07, /* 0xB0 */
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05,
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06, /* 0xC0 */
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06,
+    0x04, 0x05, 0x05, 0x06,  0x05, 0x06, 0x06, 0x07, /* 0xD0 */
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06,
+    0x04, 0x05, 0x05, 0x06,  0x05, 0x06, 0x06, 0x07, /* 0xE0 */
+    0x04, 0x05, 0x05, 0x06,  0x05, 0x06, 0x06, 0x07,
+    0x05, 0x06, 0x06, 0x07,  0x06, 0x07, 0x07, 0x08  /* 0xF0 */
+};
 
 /*****************************************************************************/
 /*  MODULE IMPLEMENTATION:                                                   */
@@ -572,7 +610,7 @@ N_word BitVector_Mask(N_int bits)           /* bit vector mask (unused bits) */
 
 charptr BitVector_Version(void)
 {
-    return((charptr)"6.3");
+    return((charptr)"6.4");
 }
 
 N_int BitVector_Word_Bits(void)
@@ -779,18 +817,19 @@ void BitVector_Copy(wordptr X, wordptr Y)                           /* X = Y */
         if (sizeY > 0)
         {
             lastY = Y + sizeY - 1;
-            *lastY &= maskY;
+            if ( (*lastY AND (maskY AND NOT (maskY >> 1))) == 0 ) *lastY &= maskY;
+            else
+            {
+                fill = (N_word) ~0L;
+                *lastY |= NOT maskY;
+            }
             while ((sizeX > 0) and (sizeY > 0))
             {
                 *X++ = *Y++;
                 sizeX--;
                 sizeY--;
             }
-            if ( (*lastY AND (maskY AND NOT (maskY >> 1))) != 0 )
-            {
-                fill = (N_word) ~0L;
-                *(X-1) |= NOT maskY;
-            }
+            *lastY &= maskY;
         }
         while (sizeX-- > 0) *X++ = fill;
         *lastX &= maskX;
@@ -3471,6 +3510,45 @@ boolean Set_subset(wordptr X, wordptr Y)                    /* X subset Y ?  */
 
 N_int Set_Norm(wordptr addr)                                /* = | X |       */
 {
+    byteptr byte;
+    N_word  bytes;
+    N_int   n;
+
+    byte = (byteptr) addr;
+    bytes = size_(addr) << FACTOR;
+    n = 0;
+    while (bytes-- > 0)
+    {
+        n += BitVector_BYTENORM[*byte++];
+    }
+    return(n);
+}
+
+N_int Set_Norm2(wordptr addr)                               /* = | X |       */
+{
+    N_word  size = size_(addr);
+    N_word  w0,w1;
+    N_int   n,k;
+
+    n = 0;
+    while (size-- > 0)
+    {
+        k = 0;
+        w1 = NOT (w0 = *addr++);
+        while (w0 and w1)
+        {
+            w0 &= w0 - 1;
+            w1 &= w1 - 1;
+            k++;
+        }
+        if (w0 == 0) n += k;
+        else         n += BITS - k;
+    }
+    return(n);
+}
+
+N_int Set_Norm3(wordptr addr)                               /* = | X |       */
+{
     N_word  size  = size_(addr);
     N_int   count = 0;
     N_word  c;
@@ -3737,11 +3815,12 @@ void Matrix_Transpose(wordptr X, N_int rowsX, N_int colsX,
 }
 
 /*****************************************************************************/
-/*  VERSION:  6.3                                                            */
+/*  VERSION:  6.4                                                            */
 /*****************************************************************************/
 /*  VERSION HISTORY:                                                         */
 /*****************************************************************************/
 /*                                                                           */
+/*    Version 6.4  03.10.04  Added C++ comp. directives. Improved "Norm()".  */
 /*    Version 6.3  28.09.02  Added "Create_List()" and "GCD2()".             */
 /*    Version 6.2  15.09.02  Overhauled error handling. Fixed "GCD()".       */
 /*    Version 6.1  08.10.01  Make VMS linker happy: _lsb,_msb => _lsb_,_msb_ */
@@ -3779,7 +3858,7 @@ void Matrix_Transpose(wordptr X, N_int rowsX, N_int colsX,
 /*  COPYRIGHT:                                                               */
 /*****************************************************************************/
 /*                                                                           */
-/*    Copyright (c) 1995 - 2002 by Steffen Beyer.                            */
+/*    Copyright (c) 1995 - 2004 by Steffen Beyer.                            */
 /*    All rights reserved.                                                   */
 /*                                                                           */
 /*****************************************************************************/

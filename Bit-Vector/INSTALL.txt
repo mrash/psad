@@ -1,9 +1,9 @@
                     =====================================
-                      Package "Bit::Vector" Version 6.3
+                      Package "Bit::Vector" Version 6.4
                     =====================================
 
 
-                 Copyright (c) 1995 - 2002 by Steffen Beyer.
+                 Copyright (c) 1995 - 2004 by Steffen Beyer.
                              All rights reserved.
 
 
@@ -22,18 +22,52 @@ Prerequisites:
 
 Perl version 5.000 or higher, and an ANSI C compiler. (!)
                                      ^^^^^^
-If you compile under Windows, note that you will need
-exactly the same compiler your Perl itself was compiled
-with! (This is also true for Unix, but rarely a problem.)
+Module "Carp::Clan" version 5.0 or higher.
+
+Note that in order to compile Perl modules which contain
+C (and/or XS) code (such as this one), you always HAVE
+to use the very same compiler your Perl itself was compiled
+with.
+
+Many vendors nowadays ship their operating system already
+comprising a precompiled version of Perl. Many times the
+compilers used to compile this version of Perl are not
+available to or not usually used by the users of these
+operating systems.
+
+In such cases building this module (or any other Perl
+module containing C and/or XS code) will not work. You
+will either have to get the compiler which was used to
+compile Perl itself (see for example the section "Compiler:"
+in the output of the command "perl -V"), or to build
+your own Perl with the compiler of your choice (which
+also allows you to take advantage of the various compile-
+time switches Perl offers).
+
+Note that Sun Solaris and Red Hat Linux frequently were
+reported to suffer from this kind of problem.
 
 Moreover, you usually cannot build any modules under
-Windows 95/98, the Win 95/98 command shell doesn't
-grok the "&&" operator. You will need the Windows NT
-command shell ("cmd.exe") or the "4DOS" shell.
+Windows 95/98 since the Win 95/98 command shell doesn't
+support the "&&" operator. You will need the Windows NT
+command shell ("cmd.exe") or the "4DOS" shell to be
+installed on your Windows 95/98 system first. Note that
+Windows NT and Windows 2000 are not affected and just
+work fine. I don't know about Windows XP, however.
 
 Note that ActiveState provides precompiled binaries of
 this module for their Win32 port of Perl ("ActivePerl")
-on their web site at http://www.activestate.com/.
+on their web site, which you should be able to install
+simply by typing "ppm install Bit-Vector" in your MS-DOS
+command shell (but note the "-" instead of "::" in the
+package name!). This also works under Windows 95/98 (!).
+
+If your firewall prevents "ppm" from downloading
+this package, you can also download it manually from
+http://www.activestate.com/ppmpackages/5.005/zips/ or
+http://www.activestate.com/ppmpackages/5.6/zips/.
+Follow the installation instructions included in
+the "zip" archive.
 
 
 Preliminary steps for use with Perl prior to version 5.002:
@@ -43,7 +77,7 @@ Edit the file "Makefile.PL" and change the line
 
     'VERSION_FROM'      => 'Vector.pm',
 to
-    'VERSION'           => '6.3',
+    'VERSION'           => '6.4',
 
 Then edit the file "Vector.pm" and change the line
 
@@ -53,7 +87,7 @@ to
 
 Also edit the file "t/00____version.t" and change the line
 
-    use Bit::Vector 6.3;
+    use Bit::Vector 6.4;
 
 to
 
@@ -97,7 +131,7 @@ Detailed installation guide:
 ----------------------------
 
  1) Change directory to the directory that has been created by unpacking this
-    package ("cd Bit-Vector-6.3").
+    package ("cd Bit-Vector-6.4").
 
  2) Type "perl Makefile.PL" (or whatever the name and path of your Perl 5
     binary is).
@@ -182,9 +216,10 @@ Detailed installation guide:
     t/17________gcd.....ok
     t/28__chunklist.....ok
     t/30_overloaded.....ok
+    t/40__auxiliary.....ok
     All tests successful.
-    Files=20,  Tests=67417, 22 wallclock secs
-    (13.72 cusr +  0.57 csys = 14.29 CPU)
+    Files=21,  Tests=68151, 29 wallclock secs
+    (19.75 cusr +  0.73 csys = 20.48 CPU)
 
     (Note that the exact number of tests will depend on the number of bits
      of a machine word/an unsigned long on your system!)

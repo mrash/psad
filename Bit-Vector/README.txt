@@ -1,5 +1,5 @@
                     =====================================
-                      Package "Bit::Vector" Version 6.3
+                      Package "Bit::Vector" Version 6.4
                     =====================================
 
 
@@ -30,20 +30,15 @@ overloaded operators for maximum ease of use.
 The C library can nevertheless be used stand-alone, without Perl.
 
 
-What's new in version 6.3:
+What's new in version 6.4:
 --------------------------
 
- +  Added "Create_List()" and "GCD2()" in "BitVector.c".
- +  "new()" now can optionally return a list of bit vectors.
- +  "GCD()" now can optionally return the two integer factors
-    "x" and "y" for the linear combination of its input values
-    "a" and "b" so that gcd(a,b) = x * a + y * b.
- +  Changed the test files "t/01________new.t" and "t/09_parameters.t"
-    as well as the documentation accordingly.
- +  Added a new test file "t/17________gcd.t".
- +  Further simplified the error handlers in "Vector.xs", making the
-    resulting object library file substantially smaller (about 20%!)
-    and thus faster to load.
+ +  Added compiler directives for C++.
+ +  Improved the method "Norm()".
+ +  Removed "Carp::Clan" from the distribution (available separately).
+ +  Added "Bit::Vector::String" for generic string import/export functions.
+ +  Added a new test file "t/40__auxiliary.t" for "Bit::Vector::String".
+ +  Fixed a bug in method "Copy()" concerning sign (MSB) extension.
 
 
 Legal issues:
@@ -51,7 +46,7 @@ Legal issues:
 
 This package with all its parts is
 
-Copyright (c) 1995 - 2002 by Steffen Beyer.
+Copyright (c) 1995 - 2004 by Steffen Beyer.
 All rights reserved.
 
 This package is free software; you can use, modify and redistribute
@@ -71,21 +66,45 @@ Prerequisites:
 
 Perl version 5.000 or higher, and an ANSI C compiler. (!)
                                      ^^^^^^
-If you compile under Windows, note that you will need
-exactly the same compiler your Perl itself was compiled
-with! (This is also true for Unix, but rarely a problem.)
+Module "Carp::Clan" version 5.0 or higher.
+
+Note that in order to compile Perl modules which contain
+C (and/or XS) code (such as this one), you always HAVE
+to use the very same compiler your Perl itself was compiled
+with.
+
+Many vendors nowadays ship their operating system already
+comprising a precompiled version of Perl. Many times the
+compilers used to compile this version of Perl are not
+available to or not usually used by the users of these
+operating systems.
+
+In such cases building this module (or any other Perl
+module containing C and/or XS code) will not work. You
+will either have to get the compiler which was used to
+compile Perl itself (see for example the section "Compiler:"
+in the output of the command "perl -V"), or to build
+your own Perl with the compiler of your choice (which
+also allows you to take advantage of the various compile-
+time switches Perl offers).
+
+Note that Sun Solaris and Red Hat Linux frequently were
+reported to suffer from this kind of problem.
 
 Moreover, you usually cannot build any modules under
-Windows 95/98, the Win 95/98 command shell doesn't
-grok the "&&" operator. You will need the Windows NT
-command shell ("cmd.exe") or the "4DOS" shell.
+Windows 95/98 since the Win 95/98 command shell doesn't
+support the "&&" operator. You will need the Windows NT
+command shell ("cmd.exe") or the "4DOS" shell to be
+installed on your Windows 95/98 system first. Note that
+Windows NT and Windows 2000 are not affected and just
+work fine. I don't know about Windows XP, however.
 
 Note that ActiveState provides precompiled binaries of
 this module for their Win32 port of Perl ("ActivePerl")
 on their web site, which you should be able to install
 simply by typing "ppm install Bit-Vector" in your MS-DOS
 command shell (but note the "-" instead of "::" in the
-package name!). This also works under Windows 95/98.
+package name!). This also works under Windows 95/98 (!).
 
 If your firewall prevents "ppm" from downloading
 this package, you can also download it manually from
@@ -98,7 +117,7 @@ the "zip" archive.
 Note to CPAN Testers:
 ---------------------
 
-After completion, version 6.3 of this module has already
+After completion, version 6.4 of this module has already
 been tested successfully with the following configurations:
 
   Perl 5.005_03  -  FreeBSD 4.1.1-RELEASE (with "dlopen() relative paths" patch)
@@ -108,11 +127,8 @@ been tested successfully with the following configurations:
   Perl 5.7.1     -  FreeBSD 4.1.1-RELEASE
   Perl 5.7.2     -  FreeBSD 4.1.1-RELEASE
   Perl 5.8.0     -  FreeBSD 4.1.1-RELEASE
-  Perl 5.005_03  -  FreeBSD 4.6-STABLE
-  Perl 5.6.1     -  FreeBSD 4.6-STABLE
-  Perl 5.005_03  -  Windows NT 4.0 & MS VC++ 6.0 (native Perl build)
-  Perl 5.8.0     -  Windows NT 4.0 & MS VC++ 6.0 (native Perl build)
-  Perl 5.6.1     -  Windows NT 4.0 & ActivePerl 5.6.1.633 (multi-thread)
+  Perl 5.8.4     -  FreeBSD 4.10-BETA
+  Perl 5.8.0     -  Windows 2000 & MS VC++ 6.0 (native Perl build)
 
 
 Installation:
@@ -151,14 +167,14 @@ Available man pages:
 
     Bit::Vector(3)
     Bit::Vector::Overload(3)
-    Carp::Clan(3)
+    Bit::Vector::String(3)
 
 If Perl is not available on your system, you can also read the ".pod"
 files
 
     ./Vector.pod
     ./lib/Bit/Vector/Overload.pod
-    ./lib/Carp/Clan.pod
+    ./lib/Bit/Vector/String.pod
 
 directly.
 
@@ -166,18 +182,18 @@ directly.
 What does it do:
 ----------------
 
-This module implements bit vectors of arbitrary size and provides efficient
+This package implements bit vectors of arbitrary size and provides efficient
 methods for handling them.
 
 This goes far beyond the built-in capabilities of Perl for handling bit
 vectors (compare with the method list below!).
 
-Moreover, the C core of this module can be used "stand-alone" in other
+Moreover, the C core of this package can be used "stand-alone" in other
 C applications; Perl is not necessarily required.
 
-The module is intended to serve as a base class for other applications
-or application classes, such as implementing sets or performing big
-integer arithmetic.
+The main module of this package is intended to serve as a base class for
+other applications or application classes, such as implementing sets or
+performing big integer arithmetic.
 
 All methods are implemented in C internally for maximum performance.
 
@@ -188,7 +204,10 @@ Note that there is (of course) a little speed penalty to pay for
 overloaded operators. If speed is crucial, use the "Bit::Vector"
 module alone!
 
-This module is useful for a large range of different tasks:
+Another module, "Bit::Vector::String", offers additional methods
+for generic string export and import (also Perl only).
+
+This package is useful for a large range of different tasks:
 
   -  For example for implementing sets and performing set operations
      (like union, difference, intersection, complement, check for subset
@@ -197,7 +216,7 @@ This module is useful for a large range of different tasks:
   -  as a basis for many efficient algorithms, for instance the
      "Sieve of Erathostenes" (for calculating prime numbers),
 
-     (The complexities of the methods in this module are usually either
+     (The complexities of the methods in this package are usually either
       O(1) or O(n/b), where "b" is the number of bits in a machine word
       on your system.)
 
@@ -236,10 +255,10 @@ You can also import and export the contents of a bit vector in binary,
 hexadecimal and decimal representation as well as ".newsrc" style
 enumerations.
 
-Note that this module is specifically designed for efficiency, which is
+Note that this package is specifically designed for efficiency, which is
 also the reason why its methods are implemented in C.
 
-To further increase execution speed, the module doesn't use bytes as its
+To further increase execution speed, the package doesn't use bytes as its
 basic storage unit, but rather uses machine words, assuming that a machine
 word is the most efficiently handled size of all scalar types on all
 machines (that's what the ANSI C standard proposes and assumes anyway).
@@ -249,7 +268,7 @@ in a machine word on your system and then adjusts its internal configuration
 constants accordingly.
 
 The greater the size of this basic storage unit, the better the complexity
-(= execution speed) of the methods in this module, but also the greater the
+(= execution speed) of the methods in this package, but also the greater the
 average waste of unused bits in the last word.
 
 The range of available methods is exceptionally large for this kind of library;

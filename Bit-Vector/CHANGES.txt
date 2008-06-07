@@ -1,14 +1,23 @@
                     =====================================
-                      Package "Bit::Vector" Version 6.3
+                      Package "Bit::Vector" Version 6.4
                     =====================================
 
 
-                 Copyright (c) 1995 - 2002 by Steffen Beyer.
+                 Copyright (c) 1995 - 2004 by Steffen Beyer.
                              All rights reserved.
 
 
 Version history:
 ----------------
+
+Version 6.4   03.10.2004
+
+ +  Added compiler directives for C++.
+ +  Improved the method "Norm()".
+ +  Removed "Carp::Clan" from the distribution (available separately).
+ +  Added "Bit::Vector::String" for generic string import/export functions.
+ +  Added a new test file "t/40__auxiliary.t" for "Bit::Vector::String".
+ +  Fixed a bug in method "Copy()" concerning sign (MSB) extension.
 
 Version 6.3   28.09.2002
 

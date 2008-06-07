@@ -1,5 +1,9 @@
 #ifndef MODULE_BIT_VECTOR
 #define MODULE_BIT_VECTOR
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 /*****************************************************************************/
 /*  MODULE NAME:  BitVector.h                           MODULE TYPE:  (adt)  */
 /*****************************************************************************/
@@ -222,6 +226,8 @@ void    Set_Complement       (wordptr X, wordptr Y);            /* X = ~Y    */
 boolean Set_subset           (wordptr X, wordptr Y);            /* X in Y ?  */
 
 N_int   Set_Norm             (wordptr addr);                    /* = | X |   */
+N_int   Set_Norm2            (wordptr addr);                    /* = | X |   */
+N_int   Set_Norm3            (wordptr addr);                    /* = | X |   */
 Z_long  Set_Min              (wordptr addr);                    /* = min(X)  */
 Z_long  Set_Max              (wordptr addr);                    /* = max(X)  */
 
@@ -265,16 +271,55 @@ void    Matrix_Transpose     (wordptr X, N_int rowsX, N_int colsX,
 #define  ERRCODE_ZERO  "division by zero error"
 #define  ERRCODE_OOPS  "unexpected internal error - please contact author"
 
+extern const N_int BitVector_BYTENORM[256];
+/*
+{
+    0x00, 0x01, 0x01, 0x02,  0x01, 0x02, 0x02, 0x03,
+    0x01, 0x02, 0x02, 0x03,  0x02, 0x03, 0x03, 0x04,
+    0x01, 0x02, 0x02, 0x03,  0x02, 0x03, 0x03, 0x04,
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05,
+    0x01, 0x02, 0x02, 0x03,  0x02, 0x03, 0x03, 0x04,
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05,
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05,
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06,
+    0x01, 0x02, 0x02, 0x03,  0x02, 0x03, 0x03, 0x04,
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05,
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05,
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06,
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05,
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06,
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06,
+    0x04, 0x05, 0x05, 0x06,  0x05, 0x06, 0x06, 0x07,
+    0x01, 0x02, 0x02, 0x03,  0x02, 0x03, 0x03, 0x04,
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05,
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05,
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06,
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05,
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06,
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06,
+    0x04, 0x05, 0x05, 0x06,  0x05, 0x06, 0x06, 0x07,
+    0x02, 0x03, 0x03, 0x04,  0x03, 0x04, 0x04, 0x05,
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06,
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06,
+    0x04, 0x05, 0x05, 0x06,  0x05, 0x06, 0x06, 0x07,
+    0x03, 0x04, 0x04, 0x05,  0x04, 0x05, 0x05, 0x06,
+    0x04, 0x05, 0x05, 0x06,  0x05, 0x06, 0x06, 0x07,
+    0x04, 0x05, 0x05, 0x06,  0x05, 0x06, 0x06, 0x07,
+    0x05, 0x06, 0x06, 0x07,  0x06, 0x07, 0x07, 0x08
+};
+*/
+
 /*****************************************************************************/
 /*  MODULE IMPLEMENTATION:                                                   */
 /*****************************************************************************/
 
 /*****************************************************************************/
-/*  VERSION:  6.3                                                            */
+/*  VERSION:  6.4                                                            */
 /*****************************************************************************/
 /*  VERSION HISTORY:                                                         */
 /*****************************************************************************/
 /*                                                                           */
+/*    Version 6.4  03.10.04  Added C++ comp. directives. Improved "Norm()".  */
 /*    Version 6.3  28.09.02  Added "Create_List()" and "GCD2()".             */
 /*    Version 6.2  15.09.02  Overhauled error handling. Fixed "GCD()".       */
 /*    Version 6.1  08.10.01  Make VMS linker happy: _lsb,_msb => _lsb_,_msb_ */
@@ -312,7 +357,7 @@ void    Matrix_Transpose     (wordptr X, N_int rowsX, N_int colsX,
 /*  COPYRIGHT:                                                               */
 /*****************************************************************************/
 /*                                                                           */
-/*    Copyright (c) 1995 - 2002 by Steffen Beyer.                            */
+/*    Copyright (c) 1995 - 2004 by Steffen Beyer.                            */
 /*    All rights reserved.                                                   */
 /*                                                                           */
 /*****************************************************************************/
@@ -337,4 +382,7 @@ void    Matrix_Transpose     (wordptr X, N_int rowsX, N_int colsX,
 /*    or download a copy from ftp://ftp.gnu.org/pub/gnu/COPYING.LIB-2.0      */
 /*                                                                           */
 /*****************************************************************************/
+#ifdef __cplusplus
+}
+#endif
 #endif

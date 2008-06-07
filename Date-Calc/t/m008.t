@@ -1,5 +1,6 @@
 #!perl -w
 
+BEGIN { eval { require bytes; }; }
 use strict;
 no strict "vars";
 
@@ -18,9 +19,42 @@ require Date::Calendar::Year;
 #   ($date,$rest,$sign) = $year->_move_forward_(INDEX,OFFSET,SIGN);
 # ======================================================================
 
-print "1..72\n";
+print "1..124\n";
 
 $n = 1;
+
+$year = Date::Calendar::Year->new(1995,{});
+$full = $year->vec_full();
+$yday = 0;
+
+foreach $bit (1,0,0,0,0,0,1,1,0,0,0,0,0,1,1,0)
+{
+    if ($full->bit_test($yday++) == $bit)
+    {print "ok $n\n";} else {print "not ok $n\n";}
+    $n++;
+}
+
+$year = Date::Calendar::Year->new(1996,{});
+$full = $year->vec_full();
+$yday = 0;
+
+foreach $bit (0,0,0,0,0,1,1,0,0,0,0,0,1,1,0)
+{
+    if ($full->bit_test($yday++) == $bit)
+    {print "ok $n\n";} else {print "not ok $n\n";}
+    $n++;
+}
+
+$year = Date::Calendar::Year->new(1999,{});
+$full = $year->vec_full();
+$yday = 0;
+
+foreach $bit (0,1,1,0,0,0,0,0,1,1,0)
+{
+    if ($full->bit_test($yday++) == $bit)
+    {print "ok $n\n";} else {print "not ok $n\n";}
+    $n++;
+}
 
 $year = Date::Calendar::Year->new(2000,{});
 $days = $year->val_days();
@@ -29,6 +63,14 @@ $last = $days - 1;
 #$work = $year->vec_work();
 $full = $year->vec_full();
 $half = $year->vec_half();
+
+$yday = 0;
+foreach $bit (1,1,0,0,0,0,0,1,1,0)
+{
+    if ($full->bit_test($yday++) == $bit)
+    {print "ok $n\n";} else {print "not ok $n\n";}
+    $n++;
+}
 
 $full->Fill();
 $full->Bit_Off($last);

@@ -1,5 +1,9 @@
 #ifndef MODULE_TOOLBOX
 #define MODULE_TOOLBOX
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 /*****************************************************************************/
 /*  MODULE NAME:  ToolBox.h                             MODULE TYPE:  (dat)  */
 /*****************************************************************************/
@@ -79,10 +83,14 @@ typedef  Z_longword         *Z_longwordptr;
 #undef  TRUE
 #define TRUE        (0==0)
 
-#ifdef MACOS_TRADITIONAL
-    #define boolean Boolean
+#ifdef __cplusplus
+    typedef bool boolean;
 #else
-    typedef enum { false = FALSE, true = TRUE } boolean;
+    #ifdef MACOS_TRADITIONAL
+        #define boolean Boolean
+    #else
+        typedef enum { false = FALSE, true = TRUE } boolean;
+    #endif
 #endif
 
 #define and         &&      /* logical (boolean) operators: lower case */
@@ -108,11 +116,12 @@ typedef  Z_longword         *Z_longwordptr;
 /*****************************************************************************/
 
 /*****************************************************************************/
-/*  VERSION:  5.4                                                            */
+/*  VERSION:  5.5                                                            */
 /*****************************************************************************/
 /*  VERSION HISTORY:                                                         */
 /*****************************************************************************/
 /*                                                                           */
+/*    Version 5.5   03.10.04  Added compiler directives for C++.             */
 /*    Version 5.4   08.09.02  Added conditional changes for MacOS/MacPerl.   */
 /*    Version 5.3   12.05.98  Completed history.                             */
 /*    Version 5.0   01.03.98  "Definitions.h" -> "ToolBox.h".                */
@@ -137,7 +146,7 @@ typedef  Z_longword         *Z_longwordptr;
 /*  COPYRIGHT:                                                               */
 /*****************************************************************************/
 /*                                                                           */
-/*    Copyright (c) 1995 - 2002 by Steffen Beyer.                            */
+/*    Copyright (c) 1995 - 2004 by Steffen Beyer.                            */
 /*    All rights reserved.                                                   */
 /*                                                                           */
 /*****************************************************************************/
@@ -161,4 +170,7 @@ typedef  Z_longword         *Z_longwordptr;
 /*    or download a copy from ftp://ftp.gnu.org/pub/gnu/COPYING.LIB-2.0      */
 /*                                                                           */
 /*****************************************************************************/
+#ifdef __cplusplus
+}
+#endif
 #endif

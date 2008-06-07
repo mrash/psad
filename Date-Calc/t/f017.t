@@ -1,5 +1,6 @@
 #!perl -w
 
+BEGIN { eval { require bytes; }; }
 use strict;
 no strict "vars";
 

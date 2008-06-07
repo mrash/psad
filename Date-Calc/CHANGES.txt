@@ -1,14 +1,31 @@
                      ====================================
-                       Package "Date::Calc" Version 5.3
+                       Package "Date::Calc" Version 5.4
                      ====================================
 
 
-                  Copyright (c) 1995 - 2002 by Steffen Beyer.
+                  Copyright (c) 1995 - 2004 by Steffen Beyer.
                              All rights reserved.
 
 
 Version history:
 ----------------
+
+Version 5.4   03.10.2004
+
+ +  Added compiler directives for C++.
+ +  Removed "Carp::Clan" from the distribution (available separately).
+ +  Fixed bug in initialization of "Date::Calendar::Year" objects.
+ +  Added method "tags()" to "Date::Calendar" and "Date::Calendar::Year".
+ +  Fixed the formula for "Labor Day" in the U.S. to "1/Mon/Sep".
+ +  Added a new recipe to the "Date::Calc" documentation.
+ +  Added Romanian to the list of languages supported by "Date::Calc".
+ +  Changed the example script "calendar.cgi" to highlight the name
+    which led to a given date being a holiday.
+ +  Fixed the Polish entries in "Date::Calc".
+ +  Added a few commemorative days to the Norwegian calendar profile.
+ +  Added "use bytes" to all Perl files to avoid problems on systems
+    not using the standard locale "C".
+ +  Fixed test 5 of t/m005.t to (hopefully) work under other locales.
 
 Version 5.3   29.09.2002
 

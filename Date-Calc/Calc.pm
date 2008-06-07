@@ -1,7 +1,7 @@
 
 ###############################################################################
 ##                                                                           ##
-##    Copyright (c) 1995 - 2002 by Steffen Beyer.                            ##
+##    Copyright (c) 1995 - 2004 by Steffen Beyer.                            ##
 ##    All rights reserved.                                                   ##
 ##                                                                           ##
 ##    This package is free software; you can redistribute it                 ##
@@ -11,6 +11,7 @@
 
 package Date::Calc;
 
+BEGIN { eval { require bytes; }; }
 use strict;
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 
@@ -98,7 +99,7 @@ require DynaLoader;
 ##                                              ##
 ##################################################
 
-$VERSION = '5.3';
+$VERSION = '5.4';
 
 bootstrap Date::Calc $VERSION;
 

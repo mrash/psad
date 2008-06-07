@@ -51,6 +51,8 @@ with years lying within the range [1583..2299].
   @dates        = $calendar->search(PATTERN);
   $dates        = $calendar->search(PATTERN);
 
+  $hashref      = $calendar->tags(YEAR,MONTH,DAY|DATE);
+
   $days         = $calendar->delta_workdays(YEAR1,MONTH1,DAY1|DATE1
                                            ,YEAR2,MONTH2,DAY2|DATE2
                                            ,FLAG1,FLAG2);
@@ -295,6 +297,24 @@ is returned, instead of the resulting list itself (as in list context).
 
 =item *
 
+C<$hashref = $calendar-E<gt>tags(YEAR,MONTH,DAY|DATE);>
+
+This method returns a hash reference for the given calendar and
+date. The hash it refers to is a copy of the calendar profile's
+internal hash which contains the names for the given date as keys
+and 0, 1, 2, or 3 as their corresponding values meaning the following:
+
+    0    =>    commemorative day
+    1    =>    "half" holiday
+    2    =>    "full" holiday
+    3    =>    both a "half" and a "full" holiday
+
+The value "3" should only occur if a date has been redefined by the
+underlying profile using the same key (i.e., the same name) but with
+a different type of holiday.
+
+=item *
+
 C<$days = $calendar-E<gt>delta_workdays(YEAR1,MONTH1,DAY1, YEAR2,MONTH2,DAY2, FLAG1,FLAG2);>
 
 C<$days = $calendar-E<gt>delta_workdays(DATE1,DATE2,FLAG1,FLAG2);>
@@ -513,9 +533,18 @@ details.
 Date::Calendar::Year(3), Date::Calendar::Profiles(3),
 Date::Calc::Object(3), Date::Calc(3), Bit::Vector(3).
 
+=head1 KNOWN BUGS
+
+The method "add_delta_workdays()" is known to produce results
+which are sometimes off by one working day when a negative
+offset is used. As a workaround, try to add one working day
+first and then subtract one working day more than initially
+intended. See also the file "examples/bug.pl" for how to do
+this.
+
 =head1 VERSION
 
-This man page documents "Date::Calendar" version 5.3.
+This man page documents "Date::Calendar" version 5.4.
 
 =head1 AUTHOR
 
@@ -525,7 +554,7 @@ This man page documents "Date::Calendar" version 5.3.
 
 =head1 COPYRIGHT
 
-Copyright (c) 2000 - 2002 by Steffen Beyer. All rights reserved.
+Copyright (c) 2000 - 2004 by Steffen Beyer. All rights reserved.
 
 =head1 LICENSE
 

@@ -1,7 +1,7 @@
 
 ###############################################################################
 ##                                                                           ##
-##    Copyright (c) 2000 - 2002 by Steffen Beyer.                            ##
+##    Copyright (c) 2000 - 2004 by Steffen Beyer.                            ##
 ##    All rights reserved.                                                   ##
 ##                                                                           ##
 ##    This package is free software; you can redistribute it                 ##
@@ -11,6 +11,7 @@
 
 package Date::Calendar;
 
+BEGIN { eval { require bytes; }; }
 use strict;
 use vars qw( @ISA @EXPORT @EXPORT_OK $VERSION );
 
@@ -22,7 +23,7 @@ require Exporter;
 
 @EXPORT_OK = qw();
 
-$VERSION = '5.3';
+$VERSION = '5.4';
 
 use Carp::Clan qw(^Date::);
 use Date::Calc::Object qw(:ALL);
@@ -154,6 +155,20 @@ sub search
         push( @result, $self->year($year)->search($pattern) );
     }
     return wantarray ? (@result) : scalar(@result);
+}
+
+sub tags
+{
+    my($self) = shift;
+    my(%result) = ();
+    my(@date);
+
+    if (@_)
+    {
+        @date = shift_date(\@_);
+        return $self->year($date[0])->tags(@date);
+    }
+    else { return \%result; }
 }
 
 sub delta_workdays

@@ -1,7 +1,7 @@
 
 ###############################################################################
 ##                                                                           ##
-##    Copyright (c) 2000 - 2002 by Steffen Beyer.                            ##
+##    Copyright (c) 2000 - 2004 by Steffen Beyer.                            ##
 ##    All rights reserved.                                                   ##
 ##                                                                           ##
 ##    This package is free software; you can redistribute it                 ##
@@ -11,6 +11,7 @@
 
 package Date::Calendar::Profiles;
 
+BEGIN { eval { require bytes; }; }
 use strict;
 use vars qw( @ISA @EXPORT @EXPORT_OK $VERSION $Profiles );
 
@@ -34,7 +35,7 @@ require Exporter;
     &Advent
 );
 
-$VERSION = '5.3';
+$VERSION = '5.4';
 
 use Date::Calc qw(:all);
 use Carp::Clan qw(^Date::);
@@ -389,6 +390,8 @@ sub DE_Totensonntag
 # Larry Rosler <lr@hpl.hp.com>
 # Anthony Argyriou <anthony@alphageo.com>
 # Philip Newton <pne@writeme.com>
+# Joe Rice <riceja@water-melon.net>
+# Sridhar Gopal <sridhar.gopal@bankofamerica.com>
 
 $Profiles->{'US'} = # United States of America
 {
@@ -403,7 +406,7 @@ $Profiles->{'US'} = # United States of America
     "President's Day"               => "3/Mon/Feb",
     "Memorial Day"                  => "5/Mon/May",
     "Independence Day"              => \&US_Independence,
-    "Labor Day"                     => \&US_Labor,
+    "Labor Day"                     => "1/Mon/Sep",
     "Columbus Day"                  => "2/Mon/Oct",
     "Halloween"                     => "#Oct/31",
     "All Saints Day"                => "#Nov/1",
@@ -1311,6 +1314,10 @@ $Profiles->{'DK'} = # Denmark
 # Wim Verhaegen <wim.verhaegen@esat.kuleuven.ac.be>
 # Cas Tuyn <cas.tuyn@asml.nl>
 # Remco B. Brink <remco@solbors.no>
+# Can Bican <can@ripe.net>
+# Ziya Suzen <ziya@ripe.net>
+# Henk Uijterwaal <henk@ripe.net>
+# Eric Veldhuyzen <ericv@xs4all.net>
 
 $Profiles->{'NL'} = # Nederland
 {
@@ -1357,19 +1364,49 @@ sub NL_Koninginnedag
     if (Day_of_Week(@date) == 7) { @date = Add_Delta_Days(@date,-1); }
     return(@date);
 }
+
+# Bevrijdingsdag:
+#
+# 1945     : Liberation from German occupation in World War II
+# 1946,1947: Official holiday
+# 1948,1949: Afternoon off for government personnel, some local celebrations
+# 1950-1957: No official celebrations
+# 1958-1981: Commemorative, holiday for government personnel, schools etc.
+# 1982-1990: Official holiday for everybody
+# 1990-... : Official holiday every 5th year for everybody
+#
+# See also
+# http://www.herdenkenenvieren.nl/utility/print.jsp?detail=2197&contentid=2197&siteid=hev&nofooter=true
+
+# As far as I know, 'bevrijdingsdag' is an official national celebration
+# day for everybody, but this does NOT mean that you do not have to go to
+# work. This depends on your employer. In general, for everybody it is
+# just a normal work day, except for people working for the government.
+#
+# See also
+# http://home.szw.nl/faq/dsp_faq.cfm?view=3Ddetail&link_id=3D41264
+# http://www.abvakabo.net/faq/index.php?page=3Dindex_v2&id=3D333&c=3D91
+
 sub NL_Bevrijdingsdag
 {
     my($year,$label) = @_;
 
     if ($year >= 1945)
     {
-        if (($year <= 1980) or
-            ($year >= 1990) or
-            (($year >= 1980) and (($year % 5) == 0)))
+        if (                     ($year <= 1947)  or
+            (($year >= 1982) and ($year <= 1990)) or
+            (($year >  1990) and (($year % 5) == 0)))
         {
-            return($year,5,5); # true holiday
+            return($year,5,5);     # true holiday
         }
-        return($year,5,5,'#'); # only commemorative
+        elsif (($year == 1948) or ($year == 1949))
+        {
+            return($year,5,5,':'); # half day off
+        }
+        else
+        {
+            return($year,5,5,'#'); # only commemorative
+        }
     }
     return(); # didn't exist before 1945
 }
@@ -1377,12 +1414,14 @@ sub NL_Bevrijdingsdag
 # Thanks to:
 # Erland Sommarskog <sommar@algonet.se>
 # Magnus Bodin <magnus@bodin.org>
+# Olle E. Johansson <oej@edvina.net>
 
 $Profiles->{'SV'} = # Sverige
 {
     "Nyårsdagen"                => "01.01.",
     "Trettondedagsafton"        => "#05.01.", # 12 days after Dec 24th
     "Trettondedag jul"          => "06.01.",  # 13 days after Dec 24th
+    "Tjugondedag Knut"          => "#13.01.", # 20 days after Dec 24th according to Olle E. Johansson
     "Kyndelsmässodagen"         => "#02.02",
     "Marie bebådelsedag"        => "#25.03",
     "Skärtorsdag"               => "#-3",
@@ -1392,7 +1431,7 @@ $Profiles->{'SV'} = # Sverige
     "Annandag påsk"             => "+1",
     "Valborgsmässoafton"        => "#30.04.",
     "Första maj"                => "01.05.",
-    "Syttende maj"              => "#17.05.",
+    "Syttende maj"              => "#17.05.", # not a swedish but a norwegian holiday according to Olle E. Johansson
     "Mors dag"                  => "5/Sun/May", # Last Sun in May
     "Fars dag"                  => "2/Sun/Nov", # 2nd  Sun in Nov
     "Sveriges nationaldag"      => "#06.06.",
@@ -1437,21 +1476,25 @@ sub SV_Alla_Helgons_Dag # Saturday that falls on Oct 31st to Nov 6th
 # Gisle Aas <gisle@aas.no>
 # Remco B. Brink <remco@solbors.no>
 # Lars Ole <ma-karl2@online.no>
+# Vetle Roeim <vetler@opera.com>
 
 $Profiles->{'NO'} = # Norway
 {
-    "Nyttårsdag"            => "01/01",
-    "Skjærtorsdag"          => "-3",
-    "Langfredag"            => "-2",
-    "Påskedag"              => "+0",
-    "2. Påskedag"           => "+1",
-    "1. mai"                => "05/01",
-    "Grunnlovsdag"          => "05/17",
-    "Kristi himmelfartsdag" => "+39",
-    "Pinsedag"              => "+49",
-    "2. Pinsedag"           => "+50",
-    "Juledag"               => "12/25",
-    "2. Juledag"            => "12/26",
+    "Nyttårsdag"              => "01/01",
+    "Onsdag før Skjærtorsdag" => "#-4", # sometimes half a day off
+    "Skjærtorsdag"            => "-3",
+    "Langfredag"              => "-2",
+    "Påskedag"                => "+0",
+    "2. Påskedag"             => "+1",
+    "1. mai"                  => "05/01",
+    "Grunnlovsdag"            => "05/17",
+    "Kristi himmelfartsdag"   => "+39",
+    "Pinsedag"                => "+49",
+    "2. Pinsedag"             => "+50",
+    "Julaften"                => "#12/24", # sometimes half a day off
+    "Juledag"                 => "12/25",
+    "2. Juledag"              => "12/26",
+    "Nyttårsaften"            => "#31.12" # sometimes half a day off
 };
 
 ## Thanks to:
@@ -1542,8 +1585,25 @@ sub GB_Boxing
 # Brian Graham <brian.graham@nec.com.au>
 # Pat Waters <pat.waters@dir.qld.gov.au>
 # Stephen Riehm <Stephen.Riehm@gmx.net>
-# http://www.holidayfestival.com/Australia.html
-# http://www.earthcalendar.net/countries/2001/australia.html
+#     http://www.holidayfestival.com/Australia.html
+#     http://www.earthcalendar.net/countries/2001/australia.html
+# Sven Geisler <sgeisler@aeccom.com>
+# Canberra (ACT):
+#     http://www.workcover.act.gov.au/labourreg/publicholidays.html
+# New South Wales (NSW):
+#     http://www.dir.nsw.gov.au/holidays/index.html
+# Northern Territory (NT):
+#     http://www.nt.gov.au/ocpe/documents/public-holidays/
+# Queensland (QLD):
+#     http://www.wageline.qld.gov.au/publicholidays/list_pubhols.html
+# South Australia (SA):
+#     http://www.sacentral.sa.gov.au/information/pubhols.htm
+# Tasmania (TAS):
+#     http://www.workcover.tas.gov.au/WSTPublish/node/wststatutory.htm
+# Victoria (VIC):
+#     http://www.info.vic.gov.au/resources/publichols.htm
+# Western Australia (WA):
+#     http://www.doplar.wa.gov.au/wages/pub_hol1.htm
 
 $Profiles->{'AU'} = # Australia
 {

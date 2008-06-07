@@ -522,9 +522,18 @@ for a short description of that little script.
 Date::Calendar(3), Date::Calendar::Year(3),
 Date::Calc::Object(3), Date::Calc(3).
 
+=head1 KNOWN BUGS
+
+The australian calendar profiles are known to contain wrong dates.
+This is due to the fact that Australia decrees its holidays individually
+for each year, difficulting the calculation of the holidays by way of
+a formula. An effort to compare (and to correct) the current implementation
+with official documents (web pages) by the Australian authorities is under
+way. This hasn't been finished yet because it is very time-consuming.
+
 =head1 VERSION
 
-This man page documents "Date::Calendar::Profiles" version 5.3.
+This man page documents "Date::Calendar::Profiles" version 5.4.
 
 =head1 AUTHOR
 
@@ -534,7 +543,7 @@ This man page documents "Date::Calendar::Profiles" version 5.3.
 
 =head1 COPYRIGHT
 
-Copyright (c) 2000 - 2002 by Steffen Beyer. All rights reserved.
+Copyright (c) 2000 - 2004 by Steffen Beyer. All rights reserved.
 
 =head1 LICENSE
 

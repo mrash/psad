@@ -1,9 +1,9 @@
                      ====================================
-                       Package "Date::Calc" Version 5.3
+                       Package "Date::Calc" Version 5.4
                      ====================================
 
 
-                  Copyright (c) 1995 - 2002 by Steffen Beyer.
+                  Copyright (c) 1995 - 2004 by Steffen Beyer.
                              All rights reserved.
 
 
@@ -364,6 +364,67 @@ causes an incorrect result when adding a negative number of workdays.
 
 The bug hasn't been fixed yet, but there is a workaround which seems
 to remedy the problem: First add one workday to the date in question,
-and then subtract one workday more than you initially intended.
+and then subtract one workday more than initially.
+
+Many thanks to Mike Swieton <swietonm@student.gvsu.edu> (and many other
+people in the past) for sending in a patch so that ToolBox.h will compile
+with C++ compilers.
+
+Thanks to Joe Rice <riceja@water-melon.net> and Sridhar Gopal
+<sridhar.gopal@bankofamerica.com> for pointing out that the formula
+for Labor Day in the U.S. apparently was wrong; it returned
+September 8th in 2003 but Labor Day in that year actually was on
+September 1st. It should obviously be "1/Mon/Sep" instead.
+
+Many thanks to M.S. Tawfik <mstawfik@optonline.net> for finding a
+bug in the "init()" method of Date::Calendar::Year when the year
+starts with a Sunday (such as in 1995) and for sending a patch!
+
+Thanks to George Cooke <quatto@hotmail.com> for raising the question
+of how to "normalize" the results of the "Delta_YMD()" function to
+show only positive values, the answer to which has been included as
+a "recipe" in the documentation of Date::Calc.
+
+Thanks to Joachim Ansorg <joachim@ansorgs.de> for sending me the
+necessary information to add Romanian to the list of languages
+supported by Date::Calc.
+
+Many thanks to Peter Prymmer <PPrymmer@factset.com> for suggesting
+a work-around for the problems that can arise when a locale other
+than "C" is used!
+
+Thanks to Olle E. Johansson <oej@edvina.net> for sending corrections
+for the Swedish calendar profile.
+
+Thanks to Harold van Oostrom <perl@lanceerplaats.nl> for sending in a
+fix for the Polish language in Date::Calc. Also many thanks for his patch
+to make Date::Calc ready for UTF-8, which unfortunately I haven't had
+the time yet to evaluate.
+
+Many thanks also to Sven Geisler <sgeisler@aeccom.com> for sending me
+corrections for the profile and official references for ALL federal
+states of Australia.
+
+Many thanks to Tony Mountifield <tony@mountifield.org> for sending
+in a patch to enable Date::Calc to handle negative values of time_t,
+for dates before the Epoch. I decided not to include it at this time
+first because the system functions such as localtime, gmtime and
+mktime are considered legacy functions due to their rather restricted
+range (Date::Calc's own functions operate on a much broader range),
+and second because it cost so much effort to make these functions
+work in Date::Calc under Unix and Windows as well as under MacOS
+(Classic), that the risk of breaking things is just too high, not
+to mention the time and effort needed to get it right again, which
+I can't spend at the moment, unfortunately. So please use Date::Calc's
+own functions instead, which cover the intended range of dates anyway.
+
+Thanks a lot to Can Bican <can@ripe.net>, Ziya Suzen <ziya@ripe.net>,
+Henk Uijterwaal <henk@ripe.net> and the Amsterdam Perl Mongers for
+providing me with more detailed information concerning the
+"Bevrijdingsdag" (5th of May) in the Netherlands.
+
+Many thanks to Vetle Roeim <vetler@opera.com> for sending some more
+commemorative days (some companies give half a day off) for the
+Norwegian profile.
 
 

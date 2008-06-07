@@ -2,7 +2,7 @@
 
 rem ###########################################################################
 rem ##                                                                       ##
-rem ##    Copyright (c) 1998 - 2002 by Steffen Beyer.                        ##
+rem ##    Copyright (c) 1998 - 2004 by Steffen Beyer.                        ##
 rem ##    All rights reserved.                                               ##
 rem ##                                                                       ##
 rem ##    This program is free software; you can redistribute it             ##

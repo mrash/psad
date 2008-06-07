@@ -1,5 +1,6 @@
 #!perl -w
 
+BEGIN { eval { require bytes; }; }
 use strict;
 no strict "vars";
 
@@ -20,9 +21,9 @@ $n = 1;
 Date::Calc->date_format(1);
 Date::Calc->language(2);
 
-$date = Date::Calc->new(2001,8,1);
+$date = Date::Calc->new(2001,8,5);
 
-if ("$date" eq '01-aoû-2001')
+if ("$date" eq '05-aoû-2001')
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
@@ -33,7 +34,7 @@ $n++;
 $date->date_format(3);
 $date->language("Port");
 
-if ("$date" eq 'Quarta-feira, dia 1 de agosto de 2001')
+if ("$date" eq 'Domingo, dia 5 de agosto de 2001')
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
@@ -46,7 +47,7 @@ Date::Calc->language(11);
 
 {
     local($date->[0][2]) = undef;
-    if ("$date" eq '4ª 1-ago-2001')
+    if ("$date" eq 'Dom 5-ago-2001')
     {print "ok $n\n";} else {print "not ok $n\n";}
     $n++;
     if (Language_to_Text(Language()) eq 'suomi')
@@ -54,13 +55,13 @@ Date::Calc->language(11);
     $n++;
 }
 
-if ("$date" eq 'Quarta-feira, dia 1 de agosto de 2001')
+if ("$date" eq 'Domingo, dia 5 de agosto de 2001')
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
 {
     local($date->[0][3]) = undef;
-    if ("$date" eq 'keskiviikko, 1. elokuuta 2001')
+    if ("$date" eq 'sunnuntai, 5. elokuuta 2001')
     {print "ok $n\n";} else {print "not ok $n\n";}
     $n++;
     if (Language_to_Text(Language()) eq 'suomi')
@@ -68,7 +69,7 @@ $n++;
     $n++;
 }
 
-if ("$date" eq 'Quarta-feira, dia 1 de agosto de 2001')
+if ("$date" eq 'Domingo, dia 5 de agosto de 2001')
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
@@ -93,7 +94,7 @@ $text = '<STILL UNTOUCHED>';
 
 $format = sub { Date_to_Text_Long($_[0]->date()); };
 
-if ($date->string($format, 9) eq 'onsdag, 1 augusti 2001')
+if ($date->string($format, 9) eq 'söndag, 5 augusti 2001')
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
@@ -105,7 +106,7 @@ if ($lang eq '<NO LANGUAGE>')
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
-if ($date->string($format, 6) eq 'Woensdag, 1 augustus 2001')
+if ($date->string($format, 6) eq 'Zondag, 5 augustus 2001')
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
@@ -123,7 +124,7 @@ if ($lang eq 'Nederlands')
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
-if ($date->string($format, 9) eq '2001~8~1~0~0~0')
+if ($date->string($format, 9) eq '2001~8~5~0~0~0')
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
@@ -169,7 +170,7 @@ if ($text eq '<STILL UNTOUCHED>')
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
-if ("$date" eq 'Quarta-feira, dia 1 de agosto de 2001')
+if ("$date" eq 'Domingo, dia 5 de agosto de 2001')
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 

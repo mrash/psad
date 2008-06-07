@@ -1,7 +1,7 @@
 
 ###############################################################################
 ##                                                                           ##
-##    Copyright (c) 2000 - 2002 by Steffen Beyer.                            ##
+##    Copyright (c) 2000 - 2004 by Steffen Beyer.                            ##
 ##    All rights reserved.                                                   ##
 ##                                                                           ##
 ##    This package is free software; you can redistribute it                 ##
@@ -21,6 +21,7 @@
 
 package Date::Calc::Object;
 
+BEGIN { eval { require bytes; }; }
 use strict;
 use vars qw(@ISA @AUXILIARY @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 
@@ -37,7 +38,7 @@ BEGIN # Re-export imports from Date::Calc:
     %EXPORT_TAGS = (all => [@Date::Calc::EXPORT_OK],
                     aux => [@AUXILIARY],
                     ALL => [@EXPORT_OK]);
-    $VERSION     = '5.3';
+    $VERSION     = '5.4';
     Date::Calc->import(@Date::Calc::EXPORT,@Date::Calc::EXPORT_OK);
 }
 

@@ -1,5 +1,5 @@
                      ====================================
-                       Package "Date::Calc" Version 5.3
+                       Package "Date::Calc" Version 5.4
                      ====================================
 
 
@@ -35,10 +35,23 @@ interface) with overloaded operators, and a set of modules for calculations
 which take local holidays into account (both additions in Perl only, however).
 
 
-What's new in version 5.3:
+What's new in version 5.4:
 --------------------------
 
- +  Simplified the error message handlers in "Calc.xs".
+ +  Added compiler directives for C++.
+ +  Removed "Carp::Clan" from the distribution (available separately).
+ +  Fixed bug in initialization of "Date::Calendar::Year" objects.
+ +  Added method "tags()" to "Date::Calendar" and "Date::Calendar::Year".
+ +  Fixed the formula for "Labor Day" in the U.S. to "1/Mon/Sep".
+ +  Added a new recipe to the "Date::Calc" documentation.
+ +  Added Romanian to the list of languages supported by "Date::Calc".
+ +  Changed the example script "calendar.cgi" to highlight the name
+    which led to a given date being a holiday.
+ +  Fixed the Polish entries in "Date::Calc".
+ +  Added a few commemorative days to the Norwegian calendar profile.
+ +  Added "use bytes" to all Perl files to avoid problems on systems
+    not using the standard locale "C".
+ +  Fixed test 5 of t/m005.t to (hopefully) work under other locales.
 
 
 New features in version 5.0:
@@ -80,7 +93,7 @@ Legal issues:
 
 This package with all its parts is
 
-Copyright (c) 1995 - 2002 by Steffen Beyer.
+Copyright (c) 1995 - 2004 by Steffen Beyer.
 All rights reserved.
 
 This package is free software; you can use, modify and redistribute
@@ -100,42 +113,64 @@ Prerequisites:
 
 Perl version 5.000 or higher, and an ANSI C compiler. (!)
                                      ^^^^^^
+Module "Carp::Clan" version 5.0 or higher.
+
 If you plan to use the modules "Date::Calendar" or
 "Date::Calendar::Year" from this package, you will
-also need the module "Bit::Vector" version 5.7 or
+also need the module "Bit::Vector" version 6.4 or
 newer (which also needs an ANSI C compiler!).
 
 Otherwise you may safely ignore the warning message
-"Warning: prerequisite Bit::Vector 5.7 not found at ..."
+"Warning: prerequisite Bit::Vector 6.4 not found at ..."
 when running "perl Makefile.PL".
 
-You can install "Bit::Vector" at any time later if you
-change your mind.
+Anyway, you can always install "Bit::Vector" later
+at any time if you change your mind.
 
-If you compile under Windows, note that you will need
-exactly the same compiler your Perl itself was compiled
-with! (This is also true for Unix, but rarely a problem.)
+Note that in order to compile Perl modules which contain
+C (and/or XS) code (such as this one), you always HAVE
+to use the very same compiler your Perl itself was compiled
+with.
+
+Many vendors nowadays ship their operating system already
+comprising a precompiled version of Perl. Many times the
+compilers used to compile this version of Perl are not
+available to or not usually used by the users of these
+operating systems.
+
+In such cases building this module (or any other Perl
+module containing C and/or XS code) will not work. You
+will either have to get the compiler which was used to
+compile Perl itself (see for example the section "Compiler:"
+in the output of the command "perl -V"), or to build
+your own Perl with the compiler of your choice (which
+also allows you to take advantage of the various compile-
+time switches Perl offers).
+
+Note that Sun Solaris and Red Hat Linux frequently were
+reported to suffer from this kind of problem.
 
 Moreover, you usually cannot build any modules under
-Windows 95/98, the Win 95/98 command shell doesn't
-grok the "&&" operator. You will need the Windows NT
-command shell ("cmd.exe") or the "4DOS" shell.
+Windows 95/98 since the Win 95/98 command shell doesn't
+support the "&&" operator. You will need the Windows NT
+command shell ("cmd.exe") or the "4DOS" shell to be
+installed on your Windows 95/98 system first. Note that
+Windows NT and Windows 2000 are not affected and just
+work fine. I don't know about Windows XP, however.
 
 Note that ActiveState provides precompiled binaries of
-both modules (Date::Calc and Bit::Vector) for their
-Win32 port of Perl ("ActivePerl") on their web site,
-which you should be able to install simply by typing
-"ppm install Bit-Vector" and "ppm install Date-Calc"
-in your MS-DOS command shell (but note the "-" instead
-of "::" in the package name!). This also works under
-Windows 95/98.
+this module for their Win32 port of Perl ("ActivePerl")
+on their web site, which you should be able to install
+simply by typing "ppm install Date-Calc" in your MS-DOS
+command shell (but note the "-" instead of "::" in the
+package name!). This also works under Windows 95/98 (!).
 
-If your firewall prevents "ppm" from downloading these
-packages, you can also download them manually from
+If your firewall prevents "ppm" from downloading
+this package, you can also download it manually from
 http://www.activestate.com/ppmpackages/5.005/zips/ or
 http://www.activestate.com/ppmpackages/5.6/zips/.
 Follow the installation instructions included in
-the "zip" archives.
+the "zip" archive.
 
 Note also that a "plain Perl" version of "Date::Calc" called
 "Date::Pcalc" exists (written by J. David Eisenberg); you
@@ -147,7 +182,7 @@ http://catcode.com/date/pcalc.html.
 Note to CPAN Testers:
 ---------------------
 
-After completion, version 5.3 of this module has already
+After completion, version 5.4 of this module has already
 been tested successfully with the following configurations:
 
   Perl 5.005_03  -  FreeBSD 4.1.1-RELEASE (with "dlopen() relative paths" patch)
@@ -157,11 +192,8 @@ been tested successfully with the following configurations:
   Perl 5.7.1     -  FreeBSD 4.1.1-RELEASE
   Perl 5.7.2     -  FreeBSD 4.1.1-RELEASE
   Perl 5.8.0     -  FreeBSD 4.1.1-RELEASE
-  Perl 5.005_03  -  FreeBSD 4.6-STABLE
-  Perl 5.6.1     -  FreeBSD 4.6-STABLE
-  Perl 5.005_03  -  Windows NT 4.0 & MS VC++ 6.0 (native Perl build)
-  Perl 5.8.0     -  Windows NT 4.0 & MS VC++ 6.0 (native Perl build)
-  Perl 5.6.1     -  Windows NT 4.0 & ActivePerl 5.6.1.633 (multi-thread)
+  Perl 5.8.4     -  FreeBSD 4.10-BETA
+  Perl 5.8.0     -  Windows 2000 & MS VC++ 6.0 (native Perl build)
 
 Note: You can safely ignore the failing tests in module Bit::Vector 6.0
 (Bit::Vector::Overload, to be precise) in file "t/30_overloaded.t" under

@@ -403,9 +403,9 @@ const Z_int DateCalc_Days_in_Month_[2][13] =
     { 0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
 };
 
-#define DateCalc_LANGUAGES 13
+#define DateCalc_LANGUAGES 14
 
-Z_int  DateCalc_Language = 1; /* Default = 1 (English) */
+Z_int DateCalc_Language = 1; /* Default = 1 (English) */
 
 const N_char DateCalc_Month_to_Text_[DateCalc_LANGUAGES+1][13][32] =
 {
@@ -463,10 +463,16 @@ const N_char DateCalc_Month_to_Text_[DateCalc_LANGUAGES+1][13][32] =
         "Július", "Augusztus", "Szeptember", "Október", "November", "December"
     },
     {
-        "???", "Styczen", "Luty", "Marzec", "Kwiecien", "Maj", "Czerwiec",
-        "Lipiec", "Sierpien", "Wrzesien", "Pazdziernik", "Listopad", "Grudzien"
+        "???", "stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
+        "lipca", "sierpnia", "wrzesnia", "pazdziernika", "listopada", "grudnia"
+     /* "???", "Styczen", "Luty", "Marzec", "Kwiecien", "Maj", "Czerwiec", */ /* non-flected? */
+     /* "Lipiec", "Sierpien", "Wrzesien", "Pazdziernik", "Listopad", "Grudzien" */
      /* "???", "Styczeñ", "Luty", "Marzec", "Kwiecieñ", "Maj", "Czerwiec", */ /* ISO-Latin-2 */
      /* "Lipiec", "Sierpieñ", "Wrzesieñ", "Pa¼dziernik", "Listopad", "Grudzieñ" */
+    },
+    {
+        "???", "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
+        "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"
     }
 };
 
@@ -525,10 +531,16 @@ const N_char DateCalc_Day_of_Week_to_Text_[DateCalc_LANGUAGES+1][8][32] =
         "csütörtök", "péntek", "szombat", "vasárnap"
     },
     {
-        "???", "Poniedzialek", "Wtorek", "Sroda",
-        "Czwartek", "Piatek", "Sobota", "Niedziela"
+        "???", "poniedzialek", "wtorek", "srodek",
+        "czwartek", "piatek", "sobota", "niedziele"
+     /* "???", "Poniedzialek", "Wtorek", "Sroda", */ /* non-flected? */
+     /* "Czwartek", "Piatek", "Sobota", "Niedziela" */
      /* "???", "Poniedzia³ek", "Wtorek", "¦roda", */ /* ISO-Latin-2 */
      /* "Czwartek", "Pi±tek", "Sobota", "Niedziela" */
+    },
+    {
+        "???", "Luni", "Marti", "Miercuri",
+        "Joi", "Vineri", "Sambata", "Duminica"
     }
 };
 
@@ -579,6 +591,9 @@ const N_char DateCalc_Day_of_Week_Abbreviation_[DateCalc_LANGUAGES+1][8][4] =
     {
         "???", "Pn", "Wt", "Sr", "Cz", "Pt", "So", "Ni"    /* 13 */
      /* "???", "Pn", "Wt", "¦r", "Cz", "Pt", "So", "Ni" */ /* 13 */ /* ISO-Latin-2 */
+    },
+    {
+        "", "", "", "", "", "", "", ""    /* 14 */
     }
 };
 
@@ -605,14 +620,15 @@ const N_char DateCalc_Date_Long_Format_[DateCalc_LANGUAGES+1][64] =
     "%s, %d. %s %d",                    /* 10  Dansk       */
     "%s, %d. %sta %d",                  /* 11  suomi       */
     "%d. %s %d., %s",                   /* 12  Magyar      */
-    "%s, %d %s %d"                      /* 13  Polski      */
+    "%s, %d %s %d",                     /* 13  polski      */
+    "%s %d %s %d"                       /* 14  Romaneste   */
 };
 
 const N_char DateCalc_Language_to_Text_[DateCalc_LANGUAGES+1][32] =
 {
     "???", "English", "Français", "Deutsch", "Español",
     "Português", "Nederlands", "Italiano", "Norsk", "Svenska",
-    "Dansk", "suomi", "Magyar", "Polski"
+    "Dansk", "suomi", "Magyar", "polski", "Romaneste"
 };
 
 /*****************************************************************************/
@@ -2219,40 +2235,41 @@ void DateCalc_Dispose(charptr string)
 
 charptr DateCalc_Version(void)
 {
-    return( (charptr) "5.3" );
+    return( (charptr) "5.4" );
 }
 
 /*****************************************************************************/
-/*  VERSION:  5.3                                                            */
+/*  VERSION:  5.4                                                            */
 /*****************************************************************************/
 /*  VERSION HISTORY:                                                         */
 /*****************************************************************************/
 /*                                                                           */
-/*    Version 5.3   29.09.02  No changes.                                    */
-/*    Version 5.2   18.09.02  No changes.                                    */
-/*    Version 5.1   08.09.02  Added conditional changes for MacOS/MacPerl.   */
-/*    Version 5.0   10.10.01  New YMD/HMS functions, replaced <ctype.h>, ... */
-/*    Version 4.3   08.01.00  decode_date_??: (yy < 70 ? 20yy : 19yy)        */
-/*    Version 4.2   07.09.98  No changes.                                    */
-/*    Version 4.1   08.06.98  Fixed bug in "add_delta_ymd()".                */
-/*    Version 4.0   12.05.98  Major rework. Added multi-language support.    */
-/*    Version 3.2   15.06.97  Added "week_of_year()".                        */
-/*    Version 3.1   12.06.97  No significant changes.                        */
-/*    Version 3.0   16.02.97  Changed conventions for unsuccessful returns.  */
-/*    Version 2.3   22.11.96  Fixed unbalanced "malloc" and "free".          */
-/*    Version 2.2   26.05.96  No significant changes.                        */
-/*    Version 2.1   26.05.96  Fixed HH MM SS parameter checks.               */
-/*    Version 2.0   25.05.96  Added time calculations. Major rework.         */
-/*    Version 1.6   20.04.96  Not published.                                 */
-/*    Version 1.5   14.03.96  No significant changes.                        */
-/*    Version 1.4   11.02.96  No significant changes.                        */
-/*    Version 1.3   10.12.95  Added "days_in_month()".                       */
-/*    Version 1.2b  27.11.95  No significant changes.                        */
-/*    Version 1.2a  21.11.95  Fix for type name clashes.                     */
-/*    Version 1.1   18.11.95  Fix for type name clashes.                     */
-/*    Version 1.01  16.11.95  Improved compliance w/ programming standards.  */
-/*    Version 1.0   14.11.95  First version under UNIX (with Perl module).   */
-/*    Version 0.9   01.11.93  First version of C library under MS-DOS.       */
+/*    Version 5.4  03.10.04  Added compiler directives for C++.              */
+/*    Version 5.3  29.09.02  No changes.                                     */
+/*    Version 5.2  18.09.02  No changes.                                     */
+/*    Version 5.1  08.09.02  Added conditional changes for MacOS/MacPerl.    */
+/*    Version 5.0  10.10.01  New YMD/HMS functions, replaced <ctype.h>, ...  */
+/*    Version 4.3  08.01.00  decode_date_??: (yy < 70 ? 20yy : 19yy)         */
+/*    Version 4.2  07.09.98  No changes.                                     */
+/*    Version 4.1  08.06.98  Fixed bug in "add_delta_ymd()".                 */
+/*    Version 4.0  12.05.98  Major rework. Added multi-language support.     */
+/*    Version 3.2  15.06.97  Added "week_of_year()".                         */
+/*    Version 3.1  12.06.97  No significant changes.                         */
+/*    Version 3.0  16.02.97  Changed conventions for unsuccessful returns.   */
+/*    Version 2.3  22.11.96  Fixed unbalanced "malloc" and "free".           */
+/*    Version 2.2  26.05.96  No significant changes.                         */
+/*    Version 2.1  26.05.96  Fixed HH MM SS parameter checks.                */
+/*    Version 2.0  25.05.96  Added time calculations. Major rework.          */
+/*    Version 1.6  20.04.96  Not published.                                  */
+/*    Version 1.5  14.03.96  No significant changes.                         */
+/*    Version 1.4  11.02.96  No significant changes.                         */
+/*    Version 1.3  10.12.95  Added "days_in_month()".                        */
+/*    Version 1.2b 27.11.95  No significant changes.                         */
+/*    Version 1.2a 21.11.95  Fix for type name clashes.                      */
+/*    Version 1.1  18.11.95  Fix for type name clashes.                      */
+/*    Version 1.01 16.11.95  Improved compliance w/ programming standards.   */
+/*    Version 1.0  14.11.95  First version under UNIX (with Perl module).    */
+/*    Version 0.9  01.11.93  First version of C library under MS-DOS.        */
 /*                                                                           */
 /*****************************************************************************/
 /*  AUTHOR:                                                                  */
@@ -2266,7 +2283,7 @@ charptr DateCalc_Version(void)
 /*  COPYRIGHT:                                                               */
 /*****************************************************************************/
 /*                                                                           */
-/*    Copyright (c) 1993 - 2002 by Steffen Beyer.                            */
+/*    Copyright (c) 1993 - 2004 by Steffen Beyer.                            */
 /*    All rights reserved.                                                   */
 /*                                                                           */
 /*****************************************************************************/

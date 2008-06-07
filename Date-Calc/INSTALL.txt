@@ -1,9 +1,9 @@
                      ====================================
-                       Package "Date::Calc" Version 5.3
+                       Package "Date::Calc" Version 5.4
                      ====================================
 
 
-                  Copyright (c) 1995 - 2002 by Steffen Beyer.
+                  Copyright (c) 1995 - 2004 by Steffen Beyer.
                              All rights reserved.
 
 
@@ -22,31 +22,64 @@ Prerequisites:
 
 Perl version 5.000 or higher, and an ANSI C compiler. (!)
                                      ^^^^^^
+Module "Carp::Clan" version 5.0 or higher.
+
 If you plan to use the modules "Date::Calendar" or
 "Date::Calendar::Year" from this package, you will
-also need the module "Bit::Vector" version 5.7 or
+also need the module "Bit::Vector" version 6.4 or
 newer (which also needs an ANSI C compiler!).
 
 Otherwise you may safely ignore the warning message
-"Warning: prerequisite Bit::Vector 5.7 not found at ..."
+"Warning: prerequisite Bit::Vector 6.4 not found at ..."
 when running "perl Makefile.PL".
 
-You can install "Bit::Vector" at any time later if you
-change your mind.
+Anyway, you can always install "Bit::Vector" later
+at any time if you change your mind.
 
-If you compile under Windows, note that you will need
-exactly the same compiler your Perl itself was compiled
-with! (This is also true for Unix, but rarely a problem.)
+Note that in order to compile Perl modules which contain
+C (and/or XS) code (such as this one), you always HAVE
+to use the very same compiler your Perl itself was compiled
+with.
+
+Many vendors nowadays ship their operating system already
+comprising a precompiled version of Perl. Many times the
+compilers used to compile this version of Perl are not
+available to or not usually used by the users of these
+operating systems.
+
+In such cases building this module (or any other Perl
+module containing C and/or XS code) will not work. You
+will either have to get the compiler which was used to
+compile Perl itself (see for example the section "Compiler:"
+in the output of the command "perl -V"), or to build
+your own Perl with the compiler of your choice (which
+also allows you to take advantage of the various compile-
+time switches Perl offers).
+
+Note that Sun Solaris and Red Hat Linux frequently were
+reported to suffer from this kind of problem.
 
 Moreover, you usually cannot build any modules under
-Windows 95/98, the Win 95/98 command shell doesn't
-grok the "&&" operator. You will need the Windows NT
-command shell ("cmd.exe") or the "4DOS" shell.
+Windows 95/98 since the Win 95/98 command shell doesn't
+support the "&&" operator. You will need the Windows NT
+command shell ("cmd.exe") or the "4DOS" shell to be
+installed on your Windows 95/98 system first. Note that
+Windows NT and Windows 2000 are not affected and just
+work fine. I don't know about Windows XP, however.
 
 Note that ActiveState provides precompiled binaries of
-both modules (Date::Calc and Bit::Vector) for their
-Win32 port of Perl ("ActivePerl") on their web site
-at http://www.activestate.com/.
+this module for their Win32 port of Perl ("ActivePerl")
+on their web site, which you should be able to install
+simply by typing "ppm install Date-Calc" in your MS-DOS
+command shell (but note the "-" instead of "::" in the
+package name!). This also works under Windows 95/98 (!).
+
+If your firewall prevents "ppm" from downloading
+this package, you can also download it manually from
+http://www.activestate.com/ppmpackages/5.005/zips/ or
+http://www.activestate.com/ppmpackages/5.6/zips/.
+Follow the installation instructions included in
+the "zip" archive.
 
 Note also that a "plain Perl" version of "Date::Calc" called
 "Date::Pcalc" exists (written by J. David Eisenberg); you
@@ -62,7 +95,7 @@ Edit the file "Makefile.PL" and change the line
 
     'VERSION_FROM'      => 'Calc.pm',
 to
-    'VERSION'           => '5.3',
+    'VERSION'           => '5.4',
 
 Then edit the file "Calc.pm" and change the line
 
@@ -72,7 +105,7 @@ to
 
 Also edit the file "t/f000.t" and change all lines of the kind
 
-    use Date::Calc 5.3;
+    use Date::Calc 5.4;
 
 into just
 
@@ -111,7 +144,7 @@ and do the following:
 
 1) Increment the number in the line
 
-    #define DateCalc_LANGUAGES 13
+    #define DateCalc_LANGUAGES 14
 
    as necessary.
 
@@ -191,7 +224,7 @@ and do the following:
 
 7) Now edit the file "DateCalc.h" and set the number in the line
 
-    #define DateCalc_LANGUAGES 13
+    #define DateCalc_LANGUAGES 14
 
    to the same value as in the file "DateCalc.c".
 
@@ -264,7 +297,7 @@ Detailed installation guide:
 ----------------------------
 
  1) Change directory to the directory that has been created by unpacking this
-    package ("cd Date-Calc-5.3").
+    package ("cd Date-Calc-5.4").
 
  2) Type "perl Makefile.PL" (or whatever the name and path of your Perl 5
     binary is).
@@ -380,8 +413,8 @@ Detailed installation guide:
     t/m010..............ok
     t/m011..............ok
     All tests successful.
-    Files=48,  Tests=2716, 28 wallclock secs
-    (26.12 cusr +  1.29 csys = 27.41 CPU)
+    Files=48,  Tests=2770, 30 wallclock secs
+    (26.29 cusr +  1.41 csys = 27.70 CPU)
 
  5) At last, type "make install" (or "dmake install", "nmake install").
 

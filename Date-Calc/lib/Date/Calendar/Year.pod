@@ -45,6 +45,9 @@ with years lying within the range [1583..2299].
   @dates    = $year->search(PATTERN);
   $dates    = $year->search(PATTERN);
 
+  $hashref  = $year->tags(YEAR,MONTH,DAY|DATE);
+  $hashref  = $year->tags(INDEX);
+
   $days     = $year->delta_workdays(YEAR,MONTH1,DAY1|DATE1
                                    ,YEAR,MONTH2,DAY2|DATE2
                                    ,FLAG1,FLAG2);
@@ -534,7 +537,8 @@ with it.
 
 Currently the contents of this bit vector are modified by the
 two methods "delta_workdays()" and "add_delta_workdays()", in
-ways which are hard to predict.
+ways which are hard to predict (depending on the calculations
+being performed).
 
 The size of this bit vector can be determined through either
 "C<$days = $vector-E<gt>Size();>" or
@@ -620,6 +624,30 @@ The result is guaranteed to be sorted chronologically.
 
 In scalar context, only the number of items in the resulting list
 is returned, instead of the resulting list itself (as in list context).
+
+=item *
+
+C<$hashref  = $year-E<gt>tags(YEAR,MONTH,DAY|DATE);>
+
+C<$hashref  = $year-E<gt>tags(INDEX);>
+
+This method returns a hash reference for the given calendar and date
+(or index). The hash it refers to is a copy of the calendar profile's
+internal hash which contains the names for the given date as keys and
+0, 1, 2, or 3 as their corresponding values meaning the following:
+
+    0    =>    commemorative day
+    1    =>    "half" holiday
+    2    =>    "full" holiday
+    3    =>    both a "half" and a "full" holiday
+
+The value "3" should only occur if a date has been redefined by the
+underlying profile using the same key (i.e., the same name) but with
+a different type of holiday.
+
+The index must be a number such as returned by the method "date2index()";
+it can be used here instead of a date or a date object in order to speed
+up processing (= no need to calculate it internally).
 
 =item *
 
@@ -788,9 +816,18 @@ See also L<Bit::Vector(3)> for more details.
 Bit::Vector(3), Date::Calendar(3), Date::Calendar::Profiles(3),
 Date::Calc::Object(3), Date::Calc(3).
 
+=head1 KNOWN BUGS
+
+The method "add_delta_workdays()" is known to produce results
+which are sometimes off by one working day when a negative
+offset is used. As a workaround, try to add one working day
+first and then subtract one working day more than initially
+intended. See also the file "examples/bug.pl" for how to do
+this.
+
 =head1 VERSION
 
-This man page documents "Date::Calendar::Year" version 5.3.
+This man page documents "Date::Calendar::Year" version 5.4.
 
 =head1 AUTHOR
 
@@ -800,7 +837,7 @@ This man page documents "Date::Calendar::Year" version 5.3.
 
 =head1 COPYRIGHT
 
-Copyright (c) 2000 - 2002 by Steffen Beyer. All rights reserved.
+Copyright (c) 2000 - 2004 by Steffen Beyer. All rights reserved.
 
 =head1 LICENSE
 

@@ -587,6 +587,17 @@ E.g., "C<Day_of_Year($year,1,1)>" returns "C<1>",
 "C<Day_of_Year($year,2,1)>" returns "C<32>", and
 "C<Day_of_Year($year,12,31)>" returns either "C<365>" or "C<366>".
 
+The day of year is sometimes also referred to as the Julian day (or date),
+although it has nothing to do with the Julian calendar, the calendar which
+was used before the Gregorian calendar.
+
+In order to convert the number returned by this function back into a
+date, use the function "C<Add_Delta_Days()>" (described further below),
+as follows:
+
+  $doy = Day_of_Year($year,$month,$day);
+  ($year,$month,$day) = Add_Delta_Days($year,1,1, $doy - 1);
+
 =item *
 
 C<$days = Date_to_Days($year,$month,$day);>
@@ -600,14 +611,19 @@ returns "C<365>", "C<Date_to_Days(2,1,1)>" returns "C<366>",
 
 This is sometimes also referred to (not quite correctly) as the Julian
 date (or day). This may cause confusion, because also the number of the
-day in a year (from 1 to 365 or 366) is frequently called the "Julian date".
+day in a year (from 1 to 365 or 366) is frequently called the "Julian day".
 
-In fact the calendar that was used B<BEFORE> the Gregorian calendar
-was the Julian calendar - named after famous Julius Caesar, who had
-instituted it in Roman times. The Julian calendar was less precise
-because it had too many leap years compared to the true mean length
-of a year, and because rulers often changed it arbitrarily, in order
-to lengthen their own reign, for instance.
+More confusing still, this has nothing to do with the Julian calendar,
+which was used B<BEFORE> the Gregorian calendar.
+
+The Julian calendar was named after famous Julius Caesar, who had
+instituted it in Roman times. The Julian calendar is less precise than
+the Gregorian calendar because it has too many leap years compared to
+the true mean length of a year (but the Gregorian calendar also still
+has one day too much every 5000 years). Anyway, the Julian calendar was
+better than what existed before, because rulers had often changed the
+calendar used until then in arbitrary ways, in order to lengthen their
+own reign, for instance.
 
 In order to convert the number returned by this function back into
 a date, use the function "C<Add_Delta_Days()>" (described further
@@ -1468,7 +1484,7 @@ This function takes a string as its argument, which should contain the
 name of one of the languages supported by this package (B<IN THIS VERY
 LANGUAGE ITSELF>), or any uniquely identifying abbreviation of the name
 of a language (i.e., the first few letters), and returns its corresponding
-internal number (1..13 in the original distribution) upon a successful match,
+internal number (1..14 in the original distribution) upon a successful match,
 or "C<0>" otherwise (therefore, the return value can also be used as the
 conditional expression in an "if" statement).
 
@@ -1493,7 +1509,8 @@ The original distribution supports the following thirteen languages:
             Dansk       (Danish)       ==>   10
             suomi       (Finnish)      ==>   11
             Magyar      (Hungarian)    ==>   12
-            Polski      (Polish)       ==>   13
+            polski      (Polish)       ==>   13
+            Romaneste   (Romanian)     ==>   14
 
 See the section "How to install additional languages" in the file
 "INSTALL.txt" in this distribution for how to add more languages
@@ -1860,6 +1877,7 @@ defined as follows:
  11  Finnish    :  "wwwwww, dd. mmmmmmta yyyy"
  12  Hungarian  :  "dd. Mmmmmm yyyy., wwwwww"
  13  Polish     :  "Wwwwww, dd Mmmmmm yyyy"
+ 14  Romanian   :  "Wwwwww dd Mmmmmm yyyy"
 
 (You can change these formats in the file "DateCalc.c" before
 building this module in order to suit your personal preferences.)
@@ -1985,7 +2003,8 @@ The original distribution supports the following thirteen languages:
            10   ==>   Dansk       (Danish)
            11   ==>   suomi       (Finnish)
            12   ==>   Magyar      (Hungarian)
-           13   ==>   Polski      (Polish)
+           13   ==>   polski      (Polish)
+           14   ==>   Romaneste   (Romanian)
 
 See the section "How to install additional languages" in the file
 "INSTALL.txt" in this distribution for how to add more languages
@@ -2026,7 +2045,8 @@ The original distribution contains the following thirteen languages:
            10   ==>   Dansk       (Danish)
            11   ==>   suomi       (Finnish)
            12   ==>   Magyar      (Hungarian)
-           13   ==>   Polski      (Polish)
+           13   ==>   polski      (Polish)
+           14   ==>   Romaneste   (Romanian)
 
 See the section "How to install additional languages" in the file
 "INSTALL.txt" in this distribution for how to add more languages
@@ -2083,7 +2103,7 @@ See the section "How to install additional languages" in the file
 to this package.
 
 In the original distribution of this package there are thirteen built-in
-languages, therefore the value returned by this function will be "C<13>"
+languages, therefore the value returned by this function will be "C<14>"
 if no other languages have been added to your particular installation.
 
 =item *
@@ -2811,6 +2831,125 @@ because it doesn't take legal holidays into account.
 
 See L<Date::Calendar(3)> for how to do that.
 
+=item 17)
+
+How can I "normalize" the output of the "Delta_YMDHMS()" (or "Delta_YMD()")
+function so that it contains only positive values?
+
+I.e., how can I show a difference in date (and time) in a more human-readable
+form, for example in order to show how much time until (or since) the expiration
+of something (e.g. an account, a domain, a credit card, etc.) is left (has passed)?
+
+a) Delta_YMDHMS():
+
+  #!perl
+  use strict;
+  use Date::Calc qw(Today_and_Now Delta_YMDHMS Add_Delta_YMDHMS Delta_DHMS Date_to_Text);
+
+  my $today = [Today_and_Now()];
+  my $target = [2005,1,1,0,0,0];
+
+  my $sign = "until";
+  my $delta = Normalize_Delta_YMDHMS($today,$target);
+  if ($delta->[0] < 0)
+  {
+      $sign = "since";
+      $delta = Normalize_Delta_YMDHMS($target,$today);
+  }
+  printf("Today is %s %02d:%02d:%02d\n", Date_to_Text(@{$today}[0..2]), @{$today}[3..5]);
+  printf
+  (
+      "%d year%s, %d month%s, %d day%s, %d hour%s, %d minute%s, %d second%s %s %s %02d:%02d:%02d\n",
+      $delta->[0], (($delta->[0]==1)?'':'s'),
+      $delta->[1], (($delta->[1]==1)?'':'s'),
+      $delta->[2], (($delta->[2]==1)?'':'s'),
+      $delta->[3], (($delta->[3]==1)?'':'s'),
+      $delta->[4], (($delta->[4]==1)?'':'s'),
+      $delta->[5], (($delta->[5]==1)?'':'s'),
+      $sign,
+      Date_to_Text(@{$target}[0..2]),
+      @{$target}[3..5]
+  );
+
+  sub Normalize_Delta_YMDHMS
+  {
+      my($date1,$date2) = @_;
+      my(@delta);
+
+      @delta = Delta_YMDHMS(@$date1,@$date2);
+      while ($delta[1] < 0 or
+             $delta[2] < 0 or
+             $delta[3] < 0 or
+             $delta[4] < 0 or
+             $delta[5] < 0)
+      {
+          if ($delta[1] < 0) { $delta[0]--; $delta[1] += 12; }
+          if ($delta[2] < 0)
+          {
+              $delta[1]--;
+              @delta[2..5] = (0,0,0,0);
+              @delta[2..5] = Delta_DHMS(Add_Delta_YMDHMS(@$date1,@delta),@$date2);
+          }
+          if ($delta[3] < 0) { $delta[2]--; $delta[3] += 24; }
+          if ($delta[4] < 0) { $delta[3]--; $delta[4] += 60; }
+          if ($delta[5] < 0) { $delta[4]--; $delta[5] += 60; }
+      }
+      return \@delta;
+  }
+
+b) Delta_YMD():
+
+  #!perl
+  use strict;
+  use Date::Calc qw(Today Delta_YMD Add_Delta_YM Delta_Days Date_to_Text);
+
+  my($sign,$delta);
+  my $today = [Today()];
+  my $target = [2005,1,1];
+
+  if (Delta_Days(@$today,@$target) < 0)
+  {
+      $sign = "since";
+      $delta = Normalize_Delta_YMD($target,$today);
+  }
+  else
+  {
+      $sign = "until";
+      $delta = Normalize_Delta_YMD($today,$target);
+  }
+  print "Today is ", Date_to_Text(@$today), "\n";
+  printf
+  (
+      "%d year%s, %d month%s, %d day%s %s %s\n",
+      $delta->[0], (($delta->[0]==1)?'':'s'),
+      $delta->[1], (($delta->[1]==1)?'':'s'),
+      $delta->[2], (($delta->[2]==1)?'':'s'),
+      $sign,
+      Date_to_Text(@$target)
+  );
+
+  sub Normalize_Delta_YMD
+  {
+      my($date1,$date2) = @_;
+      my(@delta);
+
+      @delta = Delta_YMD(@$date1,@$date2);
+      while ($delta[1] < 0 or $delta[2] < 0)
+      {
+          if ($delta[1] < 0) { $delta[0]--; $delta[1] += 12; }
+          if ($delta[2] < 0)
+          {
+              $delta[1]--;
+              $delta[2] = Delta_Days(Add_Delta_YM(@$date1,@delta[0,1]),@$date2);
+          }
+      }
+      return \@delta;
+  }
+
+Note that for normalizing just a time vector, you can use the built-in
+function "Normalize_DHMS()". However, this will yield either all positive
+B<OR> all negative values, B<NOT> all positive values as above.
+
 =back
 
 =head1 SEE ALSO
@@ -2833,7 +2972,7 @@ threads as well).
 
 =head1 VERSION
 
-This man page documents "Date::Calc" version 5.3.
+This man page documents "Date::Calc" version 5.4.
 
 =head1 AUTHOR
 
@@ -2843,7 +2982,7 @@ This man page documents "Date::Calc" version 5.3.
 
 =head1 COPYRIGHT
 
-Copyright (c) 1995 - 2002 by Steffen Beyer. All rights reserved.
+Copyright (c) 1995 - 2004 by Steffen Beyer. All rights reserved.
 
 =head1 LICENSE
 

@@ -1,7 +1,7 @@
 
 ###############################################################################
 ##                                                                           ##
-##    Copyright (c) 2000 - 2002 by Steffen Beyer.                            ##
+##    Copyright (c) 2000 - 2004 by Steffen Beyer.                            ##
 ##    All rights reserved.                                                   ##
 ##                                                                           ##
 ##    This package is free software; you can redistribute it                 ##
@@ -11,6 +11,7 @@
 
 package Date::Calendar::Year;
 
+BEGIN { eval { require bytes; }; }
 use strict;
 use vars qw( @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION );
 
@@ -24,7 +25,7 @@ require Exporter;
 
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-$VERSION = '5.3';
+$VERSION = '5.4';
 
 use Bit::Vector;
 use Carp::Clan qw(^Date::);
@@ -71,16 +72,17 @@ sub _check_callback_date_
 sub _set_date_
 {
     my($self,$name,$yy,$mm,$dd,$flag) = @_;
-    my($index);
+    my($type,$index);
 
+    $type = 0;
     $flag ||= '';
     $index = $self->date2index($yy,$mm,$dd);
     if ($flag ne '#')
     {
-        if ($flag eq ':') { ${$self}{'HALF'}->Bit_On( $index ); }
-        else              { ${$self}{'FULL'}->Bit_On( $index ); }
+        if ($flag eq ':') { ${$self}{'HALF'}->Bit_On( $index ); $type = 1; }
+        else              { ${$self}{'FULL'}->Bit_On( $index ); $type = 2; }
     }
-    $self->{'TAGS'}{$index}{$name} = 1;
+    $self->{'TAGS'}{$index}{$name} |= $type;
 }
 
 sub _set_fixed_date_
@@ -173,12 +175,10 @@ sub init
     ${$self}{'HALF'} = Bit::Vector->new($days);
     ${$self}{'FULL'} = Bit::Vector->new($days);
     ${$self}{'WORK'} = Bit::Vector->new($days);
-    $dow = Day_of_Week($year,1,1);
-    $dow = 7 - $dow if ($dow != 7);
-    $dow--;
+    $dow = 6 - Day_of_Week($year,1,1); # Mon 1 => 5, ... , Fri 5 => 1, Sat 6 => 0, Sun 7 => -1
     while ($dow < $days)
     {
-        ${$self}{'FULL'}->Bit_On( $dow );                     # Saturday
+        ${$self}{'FULL'}->Bit_On( $dow ) unless ($dow < 0);   # Saturday
         ${$self}{'FULL'}->Bit_On( $dow ) if (++$dow < $days); # Sunday
         $dow += 6;
     }
@@ -405,6 +405,30 @@ sub search
         }
     }
     return( map( $self->index2date($_), sort {$a<=>$b} @result ) );
+}
+
+sub tags
+{
+    my($self) = shift;
+    my(%result) = ();
+    my($index);
+    my(@date);
+
+    if (@_ == 1 and not ref($_[0]))
+    {
+        $index = shift;
+    }
+    else
+    {
+        @date = shift_date(\@_);
+        $index = $self->date2index(@date);
+    }
+    if (exists  $self->{'TAGS'}{$index} and
+        defined $self->{'TAGS'}{$index})
+    {
+        %result = %{$self->{'TAGS'}{$index}};
+    }
+    return \%result;
 }
 
 sub _interval_workdays_

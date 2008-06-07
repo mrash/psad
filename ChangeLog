@@ -1,5 +1,20 @@
-psad-2.1.3 (05//2008):
-    - Updated to version 4.7.26 of the whois client from Marco d'Itri.
+psad-2.1.3 (06/07/2008):
+    - Updated to enable IPT_SYSLOG_FILE by default.  This is a relatively
+      important change since it changes the method of acquiring iptables log
+      data from reading it out of named pipe from syslog to just parsing the
+      /var/log/messages file.  This implies that kmsgsd does not have to run,
+      and that it is much easier to ensure that psad actually receives
+      iptables log messages.  The most complex and error prone aspect of psad
+      in the past has been the reconfiguration of the various syslog daemons
+      out there (which have very different configuration syntax and features)
+      to write kern.info messages to the /var/lib/psad/psadfifo named pipe.
+    - Updated to version 4.7.26 of the whois client from Marco d'Itri.  This
+      allows whois records for some addresses (such as 116.125.35.98, which
+      which was scanning a system running psad but could not be identified
+      under the older whois client) to be properly queried.
+    - Updated to Bit::Vector 6.4 from 6.3.
+    - Updated to Date::Calc 5.4 from 5.3.
+    - Updated to Storable 2.18 from 2.16.
 
 psad-2.1.2 (04/03/2008):
     - Bugfix to not include kernel timestamps in iptables log prefixes that

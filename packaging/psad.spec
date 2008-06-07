@@ -1,5 +1,5 @@
 %define name psad
-%define version 2.1.2
+%define version 2.1.3
 %define release 1
 %define psadlibdir %_libdir/%name
 %define psadlogdir /var/log/psad

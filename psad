@@ -407,7 +407,6 @@ my $netstat_lkup_ctr = 0;
 my $kmsgsd_started   = 0;
 my $warn_msg         = '';
 my $die_msg          = '';
-my $messages_file    = '/var/log/messages';
 my $skip_first_loop  = 1;
 my $cmdl_interface   = '';
 my $analyze_write_data = 0;
@@ -718,6 +717,7 @@ my $fw_data_file_check_ctr = 0;
 ### Get an open filehandle for the main firewall data file FW_DATA_FILE.
 ### All firewall drop/reject log messages are written to FW_DATA_FILE
 ### by kmsgsd (or by ulogd directly).
+print STDERR "[+] Opening iptables data file: $fw_data_file\n" if $debug;
 open FWDATA, $fw_data_file or die '[*] Could not open ',
     "$fw_data_file: $!";
 
@@ -2746,12 +2746,14 @@ sub psad_init() {
     ### setup the appropriate iptables data file depending on whether
     ### SYSLOG_DAEMON is set to ulogd, or if ENABLE_SYSLOG_FILE is set
     ### to 'Y'
-    if ($config{'SYSLOG_DAEMON'} =~ /ulog/i) {
-        $fw_data_file = $config{'ULOG_DATA_FILE'};
-    } elsif ($config{'ENABLE_SYSLOG_FILE'} eq 'Y') {
-        $fw_data_file = $config{'IPT_SYSLOG_FILE'};
-    } else {
-        $fw_data_file = $config{'FW_DATA_FILE'};
+    unless ($fw_data_file) {
+        if ($config{'SYSLOG_DAEMON'} =~ /ulog/i) {
+            $fw_data_file = $config{'ULOG_DATA_FILE'};
+        } elsif ($config{'ENABLE_SYSLOG_FILE'} eq 'Y') {
+            $fw_data_file = $config{'IPT_SYSLOG_FILE'};
+        } else {
+            $fw_data_file = $config{'FW_DATA_FILE'};
+        }
     }
 
     ### check to make sure the commands specified in the config section
@@ -2952,8 +2954,8 @@ sub validate_config() {
     }
 
     if ($analyze_mode or $gnuplot_mode or $csv_mode) {
-        die "[*] iptables log file must point to a file (use -m)"
-            if -d $messages_file;
+        $fw_data_file = $config{'IPT_SYSLOG_FILE'}
+            unless $fw_data_file;
     }
 
     if ($gnuplot_mode and not $csv_fields) {
@@ -6621,9 +6623,9 @@ sub analysis_mode() {
     ### work more easily).
     $config{'PSAD_DIR'} = $config{'ANALYSIS_MODE_DIR'};
 
-    print "[+] Entering analysis mode.  Parsing $messages_file\n";
-    open MSGS, "< $messages_file" or die "[*] Could not open ",
-        "$messages_file: $!";
+    print "[+] Entering analysis mode.  Parsing $fw_data_file\n";
+    open MSGS, "< $fw_data_file" or die "[*] Could not open ",
+        "$fw_data_file: $!";
     my @lines = <MSGS>;
     close MSGS;
     my @ipt_msgs;
@@ -6751,10 +6753,10 @@ sub csv_mode() {
             if $gnuplot_mode;
         $fh = *STDIN;
     } else {
-        print "[+] Parsing iptables log messages from file: $messages_file\n"
+        print "[+] Parsing iptables log messages from file: $fw_data_file\n"
             if $gnuplot_mode;
-        open MSGS, "< $messages_file" or die "[*] Could not open ",
-            "$messages_file: $!";
+        open MSGS, "< $fw_data_file" or die "[*] Could not open ",
+            "$fw_data_file: $!";
         $fh = *MSGS;
     }
     my $ctr = 0;
@@ -9664,7 +9666,7 @@ sub getopt_wrapper() {
         'whois-analysis'    => \$analysis_whois,  # Issue whois lookups in analysis
                                                   #   mode.
         'email-analysis'    => \$analysis_emails, # Send analysis mode emails.
-        'messages-file=s'   => \$messages_file,   # Specify the path to file containing
+        'messages-file=s'   => \$fw_data_file,    # Specify the path to file containing
                                                   #   old iptables messages (fwdata by
                                                   #   default).
         'get-next-rule-id'  => \$get_next_rule_id, # Show the next available signature ID.

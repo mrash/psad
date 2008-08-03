@@ -1,4 +1,17 @@
-psad-2.1.4 (08//2008):
+psad-2.1.4 (08/03/2008):
+    - Restructured perl module paths to make it easy to introduce a "nodeps"
+      distribution of psad that does not contain any perl modules.  This
+      allows better integration with systems that already have all necessary
+      modules installed (including the IPTables::ChainMgr and IPTables::Parse
+      modules).  The main driver for this work is to make all cipherdyne.org
+      projects easily integrated with distributions based on Debian, and
+      Franck Joncourt has been instrumental in this process a reality.  All
+      perl modules are now placed within the "deps" directory, and the
+      install.pl script checks to see if this directory exists - a separate
+      psad-<ver>-nodeps tarball will be distributed without this directory.
+      The Debian package for psad can then reference the -nodeps tarball, and
+      a new "psad-nodeps.spec" file has been added to build an RPM from the
+      psad sources that does not install any perl modules.
     - Bugfix to honor the IPT_SYSLOG_FILE variable in --Analyze-msgs mode.
 
 psad-2.1.3 (06/07/2008):

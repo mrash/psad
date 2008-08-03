@@ -1,5 +1,5 @@
 %define name psad
-%define version 2.1.3
+%define version 2.1.4
 %define release 1
 %define psadlogdir /var/log/psad
 %define psadrundir /var/run/psad
@@ -166,6 +166,10 @@ fi
 %config(noreplace) %_sysconfdir/%name/snort_rules/*
 
 %changelog
+* Sun Aug 03 2008 Michael Rash <mbr@cipherdyne.org>
+- This spec file omits installing any perl modules that psad depends upon.
+- psad-2.1.4 release
+
 * Sat Jun 07 2008 Michael Rash <mbr@cipherdyne.org>
 - psad-2.1.3 release
 

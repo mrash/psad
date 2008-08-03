@@ -1,16 +1,11 @@
 %define name psad
 %define version 2.1.3
 %define release 1
-%define psadlibdir %_libdir/%name
 %define psadlogdir /var/log/psad
 %define psadrundir /var/run/psad
 %define psadvarlibdir /var/lib/psad
 
-### $Id$
-
-### get the first @INC directory that includes the string "linux".
-### This may be 'i386-linux', or 'i686-linux-thread-multi', etc.
-%define psadmoddir `perl -e '$path='i386-linux'; for (@INC) { if($_ =~ m|.*/(.*linux.*)|) {$path = $1; last; }} print $path'`
+### $Id: psad.spec 2186 2008-06-07 15:52:37Z mbr $
 
 Summary: psad analyzes iptables log messages for suspect traffic
 Name: %name
@@ -49,41 +44,12 @@ iptables string match module to detect application layer signatures.
 
 %setup -q
 
-for i in $(grep -r "use lib" . | cut -d: -f1); do
-	awk '/use lib/ { sub("/usr/lib/psad", "%_libdir/%name") } { print }' $i > $i.tmp
-	mv $i.tmp $i
-done
-
-cd deps
-cd IPTables-Parse && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
-cd ..
-cd IPTables-ChainMgr && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
-cd ..
-cd Bit-Vector && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
-cd ..
-cd Net-IPv4Addr && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
-cd ..
-cd Unix-Syslog && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
-cd ..
-cd Date-Calc && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
-cd ../..
-
 %build
 ### build psad binaries (kmsgsd and psadwatchd)
 make OPTS="$RPM_OPT_FLAGS"
 
 ### build the whois client
 make OPTS="$RPM_OPT_FLAGS" -C whois
-
-cd deps
-### build perl modules used by psad
-make OPTS="$RPM_OPT_FLAGS" -C IPTables-Parse
-make OPTS="$RPM_OPT_FLAGS" -C IPTables-ChainMgr
-make OPTS="$RPM_OPT_FLAGS" -C Bit-Vector
-make OPTS="$RPM_OPT_FLAGS" -C Net-IPv4Addr
-make OPTS="$RPM_OPT_FLAGS" -C Unix-Syslog
-make OPTS="$RPM_OPT_FLAGS" -C Date-Calc
-cd ..
 
 %install
 ### config directory
@@ -94,22 +60,6 @@ mkdir -p $RPM_BUILD_ROOT%psadlogdir
 mkdir -p $RPM_BUILD_ROOT%psadvarlibdir
 ### dir for pidfiles
 mkdir -p $RPM_BUILD_ROOT%psadrundir
-
-### psad module dirs
-mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Bit/Vector
-mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Bit
-mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Unix/Syslog
-mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Date/Calc
-mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Net/IPv4Addr
-mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/IPTables/Parse
-mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/IPTables/ChainMgr
-mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Unix
-mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Carp
-mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Date/Calc
-mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Date/Calendar
-mkdir -p $RPM_BUILD_ROOT%psadlibdir/auto/Net/IPv4Addr
-mkdir -p $RPM_BUILD_ROOT%psadlibdir/Net
-mkdir -p $RPM_BUILD_ROOT%psadlibdir/IPTables
 
 ### whois_psad binary
 mkdir -p $RPM_BUILD_ROOT%_bindir
@@ -140,35 +90,6 @@ install -m 644 pf.os $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 posf $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 *.8 $RPM_BUILD_ROOT%{_mandir}/man8/
 install -m 644 nf2csv.1 $RPM_BUILD_ROOT%{_mandir}/man1/
-
-### install perl modules used by psad
-cd deps
-install -m 555 Bit-Vector/blib/arch/auto/Bit/Vector/Vector.so $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Bit/Vector/Vector.so
-install -m 444 Bit-Vector/blib/arch/auto/Bit/Vector/Vector.bs $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Bit/Vector/Vector.bs
-install -m 444 Bit-Vector/blib/lib/Bit/Vector.pm $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Bit/Vector.pm
-install -m 555 Unix-Syslog/blib/arch/auto/Unix/Syslog/Syslog.so $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Unix/Syslog/Syslog.so
-install -m 444 Unix-Syslog/blib/arch/auto/Unix/Syslog/Syslog.bs $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Unix/Syslog/Syslog.bs
-install -m 444 Unix-Syslog/blib/lib/auto/Unix/Syslog/autosplit.ix $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Unix/Syslog/autosplit.ix
-install -m 444 Unix-Syslog/blib/lib/Unix/Syslog.pm $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Unix/Syslog.pm
-install -m 555 Date-Calc/blib/arch/auto/Date/Calc/Calc.so $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Date/Calc/Calc.so
-install -m 444 Date-Calc/blib/arch/auto/Date/Calc/Calc.bs $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Date/Calc/Calc.bs
-install -m 444 Date-Calc/blib/lib/Carp/Clan.pod $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Carp/Clan.pod
-install -m 444 Date-Calc/blib/lib/Carp/Clan.pm $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Carp/Clan.pm
-install -m 444 Date-Calc/blib/lib/Date/Calc.pm $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Date/Calc.pm
-install -m 444 Date-Calc/blib/lib/Date/Calc.pod $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Date/Calc.pod
-install -m 444 Date-Calc/blib/lib/Date/Calendar.pm $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Date/Calendar.pm
-install -m 444 Date-Calc/blib/lib/Date/Calendar.pod $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Date/Calendar.pod
-install -m 444 Date-Calc/blib/lib/Date/Calc/Object.pm $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Date/Calc/Object.pm
-install -m 444 Date-Calc/blib/lib/Date/Calc/Object.pod $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Date/Calc/Object.pod
-install -m 444 Date-Calc/blib/lib/Date/Calendar/Year.pm $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Date/Calendar/Year.pm
-install -m 444 Date-Calc/blib/lib/Date/Calendar/Profiles.pod $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Date/Calendar/Profiles.pod
-install -m 444 Date-Calc/blib/lib/Date/Calendar/Profiles.pm $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Date/Calendar/Profiles.pm
-install -m 444 Date-Calc/blib/lib/Date/Calendar/Year.pod $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Date/Calendar/Year.pod
-install -m 444 Net-IPv4Addr/blib/lib/auto/Net/IPv4Addr/autosplit.ix $RPM_BUILD_ROOT%psadlibdir/auto/Net/IPv4Addr/autosplit.ix
-install -m 444 Net-IPv4Addr/blib/lib/Net/IPv4Addr.pm $RPM_BUILD_ROOT%psadlibdir/Net/IPv4Addr.pm
-install -m 444 IPTables-Parse/blib/lib/IPTables/Parse.pm $RPM_BUILD_ROOT%psadlibdir/IPTables/Parse.pm
-install -m 444 IPTables-ChainMgr/blib/lib/IPTables/ChainMgr.pm $RPM_BUILD_ROOT%psadlibdir/IPTables/ChainMgr.pm
-cd ..
 
 ### install snort rules files
 cp -r snort_rules $RPM_BUILD_ROOT%_sysconfdir/%name
@@ -243,8 +164,6 @@ fi
 
 %dir %_sysconfdir/%name/snort_rules
 %config(noreplace) %_sysconfdir/%name/snort_rules/*
-
-%_libdir/%name
 
 %changelog
 * Sat Jun 07 2008 Michael Rash <mbr@cipherdyne.org>

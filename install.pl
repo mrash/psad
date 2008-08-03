@@ -152,6 +152,7 @@ my $no_rm_old_lib_dir = 0;
 my $syslog_conf = '';
 my $locale = 'C';  ### default LC_ALL env variable
 my $no_locale = 0;
+my $deps_dir = 'deps';
 my $init_dir = '/etc/init.d';
 my $init_name = 'psad';
 my $install_syslog_fifo = 0;
@@ -188,10 +189,14 @@ $ENV{'LC_ALL'} = $locale unless $no_locale;
 ### import paths from default psad.conf
 &import_config();
 
-my @LOGR_FILES   = (*STDOUT, $config{'INSTALL_LOG_FILE'});
+my @LOGR_FILES = (*STDOUT, $config{'INSTALL_LOG_FILE'});
 
 $force_mod_re = qr|$force_mod_re| if $force_mod_re;
 $exclude_mod_re = qr|$exclude_mod_re| if $exclude_mod_re;
+
+### see if the deps/ directory exists, and if not then we are installing
+### from the -nodeps sources so don't install any perl modules
+$skip_module_install = 1 unless -d $deps_dir;
 
 $cmds{'make'}     = $makeCmd;
 $cmds{'perl'}     = $perlCmd;
@@ -254,7 +259,7 @@ exit 0;
 sub install() {
 
     ### make sure install.pl is being called from the source directory
-    unless (-e 'psad' and -d 'IPTables-ChainMgr') {
+    unless (-e 'psad') {
         die "[*] install.pl can only be executed from the directory\n",
             "    that contains the psad sources!  Exiting.";
     }
@@ -275,15 +280,17 @@ sub install() {
     }
 
     ### change any existing psad module directory to allow anyone to import
-    my $dir_tmp = $config{'PSAD_LIBS_DIR'};
-    $dir_tmp =~ s|lib/|lib64/|;
-    for my $dir ($config{'PSAD_LIBS_DIR'}, $dir_tmp) {
-        if (-d $dir) {
-            chmod 0755, $dir;
-            unless ($no_rm_old_lib_dir) {
-                &logr("[+] Removing $dir/ directory from previous " .
-                    "psad installation.\n");
-                rmtree $dir;
+    unless ($skip_module_install) {
+        my $dir_tmp = $config{'PSAD_LIBS_DIR'};
+        $dir_tmp =~ s|lib/|lib64/|;
+        for my $dir ($config{'PSAD_LIBS_DIR'}, $dir_tmp) {
+            if (-d $dir) {
+                chmod 0755, $dir;
+                unless ($no_rm_old_lib_dir) {
+                    &logr("[+] Removing $dir/ directory from previous " .
+                        "psad installation.\n");
+                    rmtree $dir;
+                }
             }
         }
     }
@@ -395,7 +402,8 @@ sub install() {
     &logr("[+] Verifying compilation of fwcheck_psad.pl script:\n");
     unless (((system "$cmds{'perl'} -c fwcheck_psad.pl")>>8) == 0) {
         die "[*] fwcheck_psad.pl does not compile with \"perl -c\".  Download ",
-            "the latest sources from:\n\nhttp://www.cipherdyne.org/\n";
+            "the latest sources from:\n\nhttp://www.cipherdyne.org/\n"
+            unless $skip_module_install;
     }
 
     ### make sure the psad (perl) daemon compiles.  The other three
@@ -403,14 +411,16 @@ sub install() {
     &logr("[+] Verifying compilation of psad perl daemon:\n");
     unless (((system "$cmds{'perl'} -c psad")>>8) == 0) {
         die "[*] psad does not compile with \"perl -c\".  Download the",
-            " latest sources from:\n\nhttp://www.cipherdyne.org/\n";
+            " latest sources from:\n\nhttp://www.cipherdyne.org/\n"
+            unless $skip_module_install;
     }
 
     ### install nf2csv
     &logr("[+] Verifying compilation of nf2csv script:\n");
     unless (((system "$cmds{'perl'} -c nf2csv")>>8) == 0) {
         die "[*] nf2csv does not compile with \"perl -c\".  Download ",
-            "the latest sources from:\n\nhttp://www.cipherdyne.org/\n";
+            "the latest sources from:\n\nhttp://www.cipherdyne.org/\n"
+            unless $skip_module_install;
     }
 
     ### put the nf2csv script in place
@@ -935,6 +945,9 @@ sub stop_psad() {
 
 sub install_perl_module() {
     my $mod_name = shift;
+
+    chdir $src_dir or die "[*] Could not chdir $src_dir: $!";
+    chdir $deps_dir or die "[*] Could not chdir($deps_dir): $!";
 
     die '[*] Missing force-install key in required_perl_modules hash.'
         unless defined $required_perl_modules{$mod_name}{'force-install'};

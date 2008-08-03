@@ -2657,7 +2657,7 @@ sub import_perl_modules() {
     Date::Calc->import(qw(Timezone This_Year Decode_Month
             Today Date_to_Time Mktime Localtime));
     Unix::Syslog->import(qw(:subs :macros));
-    Storable->import(qw(retrieve  store)) if $store_file;
+    Storable->import(qw(retrieve store)) if $store_file;
 
     return;
 }

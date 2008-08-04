@@ -603,17 +603,6 @@ $< == 0 && $> == 0 or
 ### get the ip addresses that are local to this machine
 &get_local_ips();
 
-### disable whois lookups if for some reason the whois client that is
-### bundled with psad can't be found
-unless ($no_whois) {
-    unless (defined $cmds{'whois'}
-            and -x $cmds{'whois'}) {  ### we couldn't find whois_psad
-        warn '[-] Could not locate whois_psad binary.  ',
-            "Disabling whois lookups.\n";
-        $no_whois = 1;
-    }
-}
-
 ### daemonize psad unless running with --no-daemon or an
 ### analysis mode
 unless ($no_daemon or $debug) {
@@ -9520,6 +9509,18 @@ sub defined_vars() {
 ### check paths to commands and attempt to correct if any are wrong.
 sub check_commands() {
     my $exceptions_hr = shift;
+
+    if ($no_whois) {
+        $exceptions_hr->{'whois'} = '';
+    } else {
+        unless (defined $cmds{'whois'}
+                and -x $cmds{'whois'}) {
+            ### try setting to normal /usr/bin/whois path, and let
+            ### the code below work out the correct path if necessary
+            $cmds{'whois'} = '/usr/bin/whois';
+        }
+    }
+
     my @path = qw(
         /bin
         /sbin
@@ -9563,6 +9564,18 @@ sub check_commands() {
             }
         }
     }
+
+    unless ($no_whois) {
+        ### disable whois lookups if a suitable whois client could not
+        ### be found.
+        unless (defined $cmds{'whois'}
+                and -x $cmds{'whois'}) {  ### we couldn't find whois_psad
+            warn '[-] Could not locate whois binary, ',
+                "disabling whois lookups.\n";
+            $no_whois = 1;
+        }
+    }
+
     return;
 }
 

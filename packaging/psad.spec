@@ -73,7 +73,7 @@ cd ../..
 make OPTS="$RPM_OPT_FLAGS"
 
 ### build the whois client
-make OPTS="$RPM_OPT_FLAGS" -C whois
+make OPTS="$RPM_OPT_FLAGS" -C deps/whois
 
 cd deps
 ### build perl modules used by psad
@@ -127,7 +127,7 @@ install -m 700 psad $RPM_BUILD_ROOT%_sbindir/
 install -m 700 kmsgsd $RPM_BUILD_ROOT%_sbindir/
 install -m 700 psadwatchd $RPM_BUILD_ROOT%_sbindir/
 install -m 500 fwcheck_psad.pl $RPM_BUILD_ROOT%_sbindir/fwcheck_psad
-install -m 755 whois/whois $RPM_BUILD_ROOT/usr/bin/whois_psad
+install -m 755 deps/whois/whois $RPM_BUILD_ROOT/usr/bin/whois_psad
 install -m 755 nf2csv $RPM_BUILD_ROOT/usr/bin/nf2csv
 install -m 755 init-scripts/psad-init.redhat $RPM_BUILD_ROOT%_initrddir/psad
 install -m 644 psad.conf $RPM_BUILD_ROOT%_sysconfdir/%name/

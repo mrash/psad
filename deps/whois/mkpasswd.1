@@ -1,0 +1,55 @@
+.TH MKPASSWD 1 "21 March 2008" "Marco d'Itri" "Debian GNU/Linux"
+.SH NAME
+mkpasswd \- Overfeatured front end to crypt(3)
+.SH SYNOPSIS
+.B mkpasswd
+.BR PASSWORD
+.BR SALT
+.PP
+.SH DESCRIPTION
+.B mkpasswd
+encrypts the given password with the
+.BR crypt(3)
+libc function using the given salt.
+.SH OPTIONS
+.TP
+.B -S, --salt=STRING
+Use the \fISTRING\fP as salt. It must not contain prefixes such as \fI$1$\fP.
+.TP
+.B -R, --rounds=NUMBER
+Use \fINUMBER\fP rounds. This argument is ignored if the method choosen
+does not support variable rounds. For the OpenBSD Blowfish method this is
+the logarithm of the number of rounds.
+.TP
+.B -m, --method=TYPE
+Compute the password using the \fITYPE\fP method.
+If \fITYPE\fP is \fIhelp\fP then the available methods are printed.
+.TP
+.B -P, --password-fd=NUM
+Read the password from file descriptor \fINUM\fP instead of using
+\fIgetpass(3)\fP.
+If the file descriptor is not connected to a tty then no other message
+than the hashed password is printed on stdout.
+.TP
+.B -s, --stdin
+Like \fI--password-fd=0\fP.
+.SH "ENVIRONMENT"
+.IP "MKPASSWD_OPTIONS"
+A list of options which will be evalued before the ones specified on the
+command line.
+.SH BUGS
+If the \fI--stdin\fP option is used, passwords containing some control
+characters may not be read correctly.
+.TP
+This programs suffers of a bad case of featuritis.
+.SH "SEE ALSO"
+.IR passwd(1),
+.IR passwd(5),
+.IR crypt(3),
+.IR getpass(3)
+.SH AUTHOR
+.B mkpasswd
+and this man page were written by Marco d'Itri <\fImd@linux.it\fP>
+and are licensed under the terms of the GNU General Public License,
+version 2 or higher.
+

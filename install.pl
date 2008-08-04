@@ -337,17 +337,17 @@ sub install() {
         &logr("[+] Creating $USRSBIN_DIR\n");
         mkdir $USRSBIN_DIR,0755;
     }
-    if (-d 'whois') {
+    if (-d 'deps' and -d 'deps/whois') {
         &logr("[+] Compiling Marco d'Itri's whois client\n");
-        system "$cmds{'make'} -C whois";
-        if (-e 'whois/whois') {
+        system "$cmds{'make'} -C deps/whois";
+        if (-e 'deps/whois/whois') {
             ### if an old whois process is still around ("text file
             ### busy" error), then it is ok to not be able to copy
             ### the new whois binary into place; the old one should
             ### work fine.
             &logr("[+] Copying whois binary to $cmds{'whois'}\n");
-            copy 'whois/whois', $cmds{'whois'};
-            die "[*] Could not copy whois/whois -> $cmds{'whois'}: $!"
+            copy 'deps/whois/whois', $cmds{'whois'};
+            die "[*] Could not copy deps/whois/whois -> $cmds{'whois'}: $!"
                 unless -e $cmds{'whois'};
         } else {
             die "[*] Could not compile whois";

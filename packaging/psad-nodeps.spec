@@ -86,9 +86,6 @@ install -m 644 posf $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 *.8 $RPM_BUILD_ROOT%{_mandir}/man8/
 install -m 644 nf2csv.1 $RPM_BUILD_ROOT%{_mandir}/man1/
 
-### install snort rules files
-cp -r snort_rules $RPM_BUILD_ROOT%_sysconfdir/%name
-
 %clean
 [ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
 
@@ -156,9 +153,6 @@ fi
 %config(noreplace) %_sysconfdir/%name/posf
 %config(noreplace) %_sysconfdir/%name/pf.os
 %config(noreplace) %_sysconfdir/%name/icmp_types
-
-%dir %_sysconfdir/%name/snort_rules
-%config(noreplace) %_sysconfdir/%name/snort_rules/*
 
 %changelog
 * Sun Aug 03 2008 Michael Rash <mbr@cipherdyne.org>

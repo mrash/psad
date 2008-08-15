@@ -171,7 +171,7 @@ install -m 444 IPTables-ChainMgr/blib/lib/IPTables/ChainMgr.pm $RPM_BUILD_ROOT%p
 cd ..
 
 ### install snort rules files
-cp -r snort_rules $RPM_BUILD_ROOT%_sysconfdir/%name
+cp -r deps/snort_rules $RPM_BUILD_ROOT%_sysconfdir/%name
 
 %clean
 [ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT

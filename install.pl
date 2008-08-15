@@ -363,24 +363,29 @@ sub install() {
         }
     }
 
-    &logr("[+] Installing Snort-2.3.3 signatures in " .
-        "$config{'SNORT_RULES_DIR'}\n");
-    unless (-d $config{'SNORT_RULES_DIR'}) {
-        mkdir $config{'SNORT_RULES_DIR'}, 0500
-            or die "[*] Could not create $config{'SNORT_RULES_DIR'}: $!";
-    }
-    opendir D, 'snort_rules' or die "[*] Could not open ",
-        "the snort_rules directory: $!";
-    my @files = readdir D;
-    closedir D;
+    if (-d 'deps' and -d 'deps/snort_rules') {
 
-    for my $file (@files) {
-        next unless $file =~ /\.rules$/ or $file =~ /\.config$/;
-        &logr("[+] Installing snort_rules/${file}\n");
-        copy "snort_rules/${file}", "$config{'SNORT_RULES_DIR'}/${file}" or
-            die "[*] Could not copy snort_rules/${file} -> ",
-                "$config{'SNORT_RULES_DIR'}/${file}: $!";
-        &perms_ownership("$config{'SNORT_RULES_DIR'}/${file}", 0600);
+        &logr("[+] Installing Snort-2.3.3 signatures in " .
+            "$config{'SNORT_RULES_DIR'}\n");
+        unless (-d $config{'SNORT_RULES_DIR'}) {
+            mkdir $config{'SNORT_RULES_DIR'}, 0500
+                or die "[*] Could not create $config{'SNORT_RULES_DIR'}: $!";
+        }
+
+        opendir D, 'deps/snort_rules' or die "[*] Could not open ",
+            "the deps/snort_rules directory: $!";
+        my @files = readdir D;
+        closedir D;
+
+        for my $file (@files) {
+            next unless $file =~ /\.rules$/ or $file =~ /\.config$/;
+            &logr("[+] Installing deps/snort_rules/${file}\n");
+            copy "deps/snort_rules/${file}",
+                 "$config{'SNORT_RULES_DIR'}/${file}" or
+                die "[*] Could not copy deps/snort_rules/${file} -> ",
+                    "$config{'SNORT_RULES_DIR'}/${file}: $!";
+            &perms_ownership("$config{'SNORT_RULES_DIR'}/${file}", 0600);
+        }
     }
     print "\n\n";
 

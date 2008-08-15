@@ -1,0 +1,11 @@
+# (C) Copyright 2001-2004, Martin Roesch, Brian Caswell, et al.
+#    All rights reserved.
+# $Id$
+#--------------
+# POP2 RULES
+#--------------
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 109 (msg:"POP2 FOLD overflow attempt"; flow:established,to_server; content:"FOLD"; nocase; isdataat:256,relative; pcre:"/^FOLD\s[^\n]{256}/smi"; reference:bugtraq,283; reference:cve,1999-0920; reference:nessus,10130; classtype:attempted-admin; sid:1934; rev:10;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 109 (msg:"POP2 FOLD arbitrary file attempt"; flow:established,to_server; content:"FOLD"; nocase; pcre:"/^FOLD\s+\//smi"; classtype:misc-attack; sid:1935; rev:5;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 109 (msg:"POP2 x86 Linux overflow"; flow:established,to_server; content:"|EB|,[|89 D9 80 C1 06|9|D9 7C 07 80 01|"; reference:bugtraq,283; reference:cve,1999-0920; reference:nessus,10130; classtype:attempted-admin; sid:284; rev:8;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 109 (msg:"POP2 x86 Linux overflow"; flow:established,to_server; content:"|FF FF FF|/BIN/SH|00|"; reference:bugtraq,283; reference:cve,1999-0920; reference:nessus,10130; classtype:attempted-admin; sid:285; rev:8;)

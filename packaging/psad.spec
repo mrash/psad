@@ -49,11 +49,6 @@ iptables string match module to detect application layer signatures.
 
 %setup -q
 
-for i in $(grep -r "use lib" . | cut -d: -f1); do
-	awk '/use lib/ { sub("/usr/lib/psad", "%_libdir/%name") } { print }' $i > $i.tmp
-	mv $i.tmp $i
-done
-
 cd deps
 cd IPTables-Parse && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
 cd ..

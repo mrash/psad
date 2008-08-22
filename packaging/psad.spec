@@ -242,7 +242,7 @@ fi
 %_libdir/%name
 
 %changelog
-* Sun Aug 03 2008 Michael Rash <mbr@cipherdyne.org>
+* Thu Aug 21 2008 Michael Rash <mbr@cipherdyne.org>
 - Updated to use the deps/ directory for all perl module sources.
 - psad-2.1.4 release
 

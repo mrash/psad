@@ -155,7 +155,7 @@ fi
 %config(noreplace) %_sysconfdir/%name/icmp_types
 
 %changelog
-* Sun Aug 03 2008 Michael Rash <mbr@cipherdyne.org>
+* Sun Aug 21 2008 Michael Rash <mbr@cipherdyne.org>
 - This spec file omits installing any perl modules that psad depends upon.
 - psad-2.1.4 release
 

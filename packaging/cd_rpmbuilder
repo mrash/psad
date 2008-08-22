@@ -9,9 +9,9 @@
 #
 # Author: Michael Rash
 #
-# Copyright (C) 2006 Michael Rash (mbr@cipherdyne.org)
+# Copyright (C) 2006-2008 Michael Rash (mbr@cipherdyne.org)
 #
-# License (GNU Public License):
+# License (GNU Public License - GPLv2):
 #
 #    This program is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -25,7 +25,7 @@
 #
 #############################################################################
 #
-# $Id: cd_rpmbuilder 698 2007-06-06 05:26:21Z mbr $
+# $Id: cd_rpmbuilder 1864 2008-08-22 03:16:19Z mbr $
 #
 
 use File::Find;
@@ -47,6 +47,7 @@ my $version = '0.9';
 my $project = '';
 my $build_version = '';
 my $print_version = 0;
+my $nodeps = 0;
 my $verbose = 0;
 my $help = 0;
 
@@ -67,6 +68,7 @@ Getopt::Long::Configure('no_ignore_case');
     'project=s' => \$project,
     'build-version=s' => \$build_version,
     'rpm-build-dir=s' => \$rpm_root_dir,
+    'no-deps' => \$nodeps,
     'verbose' => \$verbose,
     'Version' => \$print_version,
     'help'    => \$help
@@ -100,18 +102,30 @@ unless ($build_version) {
     &get_latest_version();
 }
 
+my $spec_file = "$project-$build_version.spec";
+my $tar_file  = "$project-$build_version.tar.gz";
+
+if ($nodeps) {
+    $spec_file = "$project-nodeps-$build_version.spec";
+    $tar_file  = "$project-nodeps-$build_version.tar.gz";
+}
+
 ### remove old RPMS
 &find_rpms($RM);
 
 ### get the remote spec file
-&download_file("$project-$build_version.spec");
-&md5_check("$project-$build_version.spec");
+&download_file($spec_file);
+&md5_check($spec_file);
 
 ### get the remote source tarball and md5 sum file
-&download_file("$project-$build_version.tar.gz");
-&md5_check("$project-$build_version.tar.gz");
+&download_file($tar_file);
+&md5_check($tar_file);
 
-move "$project-$build_version.tar.gz", '../SOURCES' or die $!;
+if ($nodeps) {
+    move $tar_file, "../SOURCES/$project-$build_version.tar.gz" or die $!;
+} else {
+    move $tar_file, '../SOURCES' or die $!;
+}
 
 ### build the rpm
 &build_rpm();
@@ -195,7 +209,7 @@ sub build_rpm() {
     print
 "[+] Building RPM, this may take a little while (try -v if you want\n",
 "    to see all of the steps)...\n\n";
-    my $cmd = "$rpmbuildCmd -ba $project-$build_version.spec";
+    my $cmd = "$rpmbuildCmd -ba $spec_file";
     unless ($verbose) {
         $cmd .= ' > /dev/null 2>&1';
     }
@@ -230,7 +244,7 @@ cd_rpmbuilder; the CipherDyne RPM builder
 [+] Version: $version
 [+] By Michael Rash (mbr\@cipherdyne.org, http://www.cipherdyne.org)
 
-Usage: cd_rpmbuilder -p <project> [-b <version>] [-r <dir>] [-v] [-V] [-h]
+Usage: cd_rpmbuilder -p <project> [options]
 
 Options:
     -p, --project <name>       - This can be one of "psad", "fwknop",
@@ -238,6 +252,8 @@ Options:
     -b, --build-version <ver>  - Build a specific project version.
     -r, --rpm-build-dir <dir>  - Change the RPM build directory from the
                                  default of $rpm_root_dir.
+    -n, --no-deps              - Build the specified project without any
+                                 dependencies (such as perl modules).
     -v, --verbose              - Run in verbose mode.
     -V, --Version              - Print version and exit.
     -h, --help                 - Display usage information.

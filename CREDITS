@@ -405,3 +405,8 @@ Andrew Kaplan
 j.bakshi
     - Reported a bug where IPT_SYSLOG_FILE was not being honored in -A
       (analyze) mode.
+
+Steve B
+    - Submitted patch to fix a bug in the start() function in the Gentoo init
+      script which caused psad to not be started and the error "* ERROR: psad
+      failed to start" to be generated.

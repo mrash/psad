@@ -1,0 +1,49 @@
+.\"
+.TH FWCHECK_PSAD 8 "Aug, 2008" "Debian/GNU Linux"
+.SH NAME
+.B fwcheck_psad
+\- look for iptables rules that log and block unwanted packets.
+.SH SYNOPSIS
+.B fwcheck_psad [options]
+.SH DESCRIPTION
+.B fwcheck_psad
+parses the iptables ruleset on the underlying system to see if iptables has
+been configured to log and block unwanted packets by default. This program is 
+called by
+.B psad
+, but can also be executed manually from the command line.
+.SH OPTIONS
+.TP
+.BR " \-\^\-config
+Specify path to the psad configuration file. By default this is
+.B /etc/psad/psad.conf.
+.TP
+.BR " \-\^\-fw-file
+Allow the user to analyze a specific rulset from a file rather than the local
+policy.
+.TP
+.BR " \-\^\-fw-analyze
+Analyze the local iptables ruleset and exit.
+.TP
+.BR " \-\^\-no-fw-search-all
+Look for specific log prefix defined through the FW_MSG_SEARCH variable(s) in
+the configuration file.
+.TP
+.BR " \-\^\-Lib-dir
+Specify path to psad lib directory.
+.TP
+.BR " \-\^\-help
+Display the help message.
+.SH "SEE ALSO"
+.BR iptables (8),
+.BR psad (8)
+.SH AUTHOR
+Michael Rash <mbr@cipherdyne.org>
+.SH BUGS
+Send bug reports to mbr@cipherdyne.org.  Suggestions and/or comments are
+always welcome as well.
+.SH DISTRIBUTION
+.B psad
+is distributed under the GNU General Public License (GPL), and the latest
+version may be downloaded from:
+.B http://www.cipherdyne.org/

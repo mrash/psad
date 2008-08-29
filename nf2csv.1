@@ -107,7 +107,7 @@ between the src and dst fields):
 .B $ nfcsv -f "src dst dp" -r 11.11.11.67
 .PP
 Display likely instances of Window Messanger popup spam attempts (note the use of
-the --regex argument to require minimal lengths on the UDP length field and source
+the \-\-regex argument to require minimal lengths on the UDP length field and source
 port, but the output contains the destination port of 1026):
 .PP
 .B $ nfcsv -f "src dst dp" -r "SPT=\d{4}.*LEN=[4-9]\d{2}"

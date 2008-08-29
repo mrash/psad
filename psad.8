@@ -73,7 +73,7 @@ just as a normal running psad process would have for all logged scans.  By
 default the psad data file
 .B /var/log/psad/fwdata
 is parsed for old scans, but any file can be specified through the use
-of the --messages-file command line option.  For example it might be useful
+of the \-\-messages-file command line option.  For example it might be useful
 to point psad at your
 .B /var/log/messages
 file.
@@ -138,7 +138,7 @@ modes.
 .TP
 .BR \-m "\fR,\fP " \-\^\-messages-file\ \<file>
 This option is used to specify the file that will be parsed in analysis
-mode (see the --Analyze-msgs option).  The default path is the psad
+mode (see the \-\-Analyze-msgs option).  The default path is the psad
 data file
 .B /var/log/psad/fwdata.
 .TP
@@ -186,7 +186,7 @@ scan data to be lost in the process.
 .TP
 .BR \-B ", " \-\^\-Benchmark
 Run psad in benchmark mode.  By default benchmark mode will simulate
-a scan of 10,000 packets (see the --packets option) and then report
+a scan of 10,000 packets (see the \-\-packets option) and then report
 the elapsed time.  This is useful to see how fast psad can process
 packets on a specific machine.
 .TP
@@ -208,7 +208,7 @@ for almost all configuration parameters.
 .B psad
 can be made to
 override this path by specifying a different file on the command
-line with the --config option.
+line with the \-\-config option.
 .TP
 .BR \-\^\-signatures\ \<signatures-file>
 The iptables firewalling code included within the linux 2.4.x kernel
@@ -222,24 +222,24 @@ The signatures were
 originally included within the snort intrusion detection
 system.  New signatures can be included and modifications to existing
 signatures can be made to the signature file and psad will import
-the changes upon receiving a HUP signal (see the --HUP command line
+the changes upon receiving a HUP signal (see the \-\-HUP command line
 option) without having to restart the psad process.
 .B psad
 also detects
 many UDP and ICMP signatures that were originally included within snort.
 .TP
 .BR \-e ", " \-\^\-email-analysis
-Send alert emails when run in --Analyze-msgs mode.  Depending on the size of
-the iptables logfile, using the --email-analysis option could extend the runtime
+Send alert emails when run in \-\-Analyze-msgs mode.  Depending on the size of
+the iptables logfile, using the \-\-email-analysis option could extend the runtime
 of psad by quite a bit since normally both DNS and whois lookups will be issued
 against each scanning IP address.  As usual these lookups can be disabled with
-the --no-rdns and --no-whois options respectively.
+the \-\-no-rdns and \-\-no-whois options respectively.
 .TP
 .BR \-w ", " \-\^\-whois-analysis
 By default
 .B psad
-does not issue whois lookups when running in --Analyze-msgs mode.  The
---whois-analysis option will override this behavior (when run in analysis mode)
+does not issue whois lookups when running in \-\-Analyze-msgs mode.  The
+\-\-whois-analysis option will override this behavior (when run in analysis mode)
 and instruct psad to issue whois lookups against IP addresses from which scans
 or other suspect traffic has originated.
 .TP
@@ -280,7 +280,7 @@ for firewall search mode and search strings.
 .B psad
 can be made to
 override this path by specifying a different file on the command
-line with the --fw-search option.
+line with the \-\-fw-search option.
 .TP
 .BR \-\^\-fw-list-auto
 List all rules in iptables chains that are used by
@@ -295,7 +295,7 @@ discovered, and then exit.
 By default, if ENABLE_AUTO_IDS is set to "Y"
 .B psad
 will not delete the auto-generated iptables chains (see the IPT_AUTO_CHAIN
-keywords in psad.conf) if the --Flush option is given.  The --fw-del-chains
+keywords in psad.conf) if the \-\-Flush option is given.  The \-\-fw-del-chains
 option overrides this behavior and deletes the auto-blocking chains from a
 running iptables firewall.
 .TP
@@ -305,7 +305,7 @@ Instruct
 to dump the contents of the iptables policy that is running on the local
 system.  All IP addresses are removed from the resulting output, so it is
 safe to post to the psad list, or communicate to others.  This option is
-most often used with --Dump-conf.
+most often used with \-\-Dump-conf.
 .TP
 .BR \-\^\-fw-block-ip\ \<ip>
 Specify an IP address or network to add to the iptables controls that are
@@ -374,7 +374,7 @@ command line arguments apply to plotting iptables log with Gnuplot.
 Use a template file for all Gnuplot graphing directives (this is usually
 a .gnu file by convention).  Normally
 .B psad builds all of the graphing directives based on various --gnuplot
-command line arguments, but the --gnuplot-template switch allows you to
+command line arguments, but the \-\-gnuplot-template switch allows you to
 override this behavior.
 .TP
 .BR \-\^\-gnuplot-file-prefix\ \<file>
@@ -453,12 +453,12 @@ ring buffer used by klogd becomes full.
 psad
 will write these message to
 .B /var/log/psad/errs/fwerrorlog
-by default.  Passing the --no-ipt-errors option will make psad ignore
+by default.  Passing the \-\-no-ipt-errors option will make psad ignore
 all such erroneous firewall messages.
 .TP
 .BR \-\^\-no-whois
 By default psad will issue a whois query against any IP from which
-a scan has originated, but this can be disabled with the --no-whois
+a scan has originated, but this can be disabled with the \-\-no-whois
 command line argument.
 .TP
 .BR \-\^\-no-fwcheck
@@ -466,7 +466,7 @@ psad performs a rudimentary check of the firewall ruleset that
 exists on the machine on which psad is deployed to determine
 whether or not the firewall has a compatible configuration (i.e.
 iptables has been configured to log packets).  Passing the
---no-fwcheck or --log-server options will disable this check.
+\-\-no-fwcheck or \-\-log-server options will disable this check.
 .TP
 .BR \-\^\-no-auto-dl
 Disable auto danger level assignments.  This will instruct to not import
@@ -491,14 +491,14 @@ Disable ICMP type and code field validation.
 .BR \-\^\-no-passive-os
 By default psad will attempt to passively (i.e. without sending
 any packets) fingerprint the remote operating system from which
-a scan originates.  Passing the --no-passive-os option will
+a scan originates.  Passing the \-\-no-passive-os option will
 disable this feature.
 .TP
 .BR \-\^\-no-rdns
 .B psad
 normally attempts to find the name associated with a
 scanning IP address, but this feature can be disabled with
-the --no-rdns command line argument.
+the \-\-no-rdns command line argument.
 .TP
 .BR \-\^\-no-kmsgsd
 Disable startup of kmsgsd.  This option is most useful for debugging
@@ -510,7 +510,7 @@ file.
 .BR \-\^\-no-netstat
 By default for iptables firewalls psad will determine whether
 or not your machine is listening on a port for which a TCP
-signature has been matched.  Specifying --no-netstat
+signature has been matched.  Specifying \-\-no-netstat
 disables this feature.
 .TP
 .BR \-h ", " \-\^\-help
@@ -530,7 +530,7 @@ and
 .B kmsgsd
 employ to parse iptables messages.  Using configuration directive within
 this file, psad can be configured to parse all iptables messages or only
-those that match specific log prefix strings (see the --log-prefix option
+those that match specific log prefix strings (see the \-\-log-prefix option
 to iptables).
 .RE
 
@@ -552,7 +552,7 @@ will be generated if a non-matching ICMP packet is logged by iptables.
 
 .B /etc/psad/snort_rules/*.rules
 .RS
-Snort rules files that are consulted by default unless the --no-snort-sids
+Snort rules files that are consulted by default unless the \-\-no-snort-sids
 commmand line argument is given.
 .RE
 
@@ -622,7 +622,7 @@ uses to parse iptables messages.  By default FW_SEARCH_ALL is set to "Y"
 since normally most people want all iptables log messages to be parsed for
 scan activity.  However, if FW_SEARCH_ALL is set to "N", psad
 will only parse those iptables log messages that match certain search
-strings that appear in iptables logs with the --log-prefix option.  This is
+strings that appear in iptables logs with the \-\-log-prefix option.  This is
 useful for restricting psad to only operate on specific iptables chains or
 rules.  The strings that will be searched for are defined with the FW_MSG_SEARCH
 variable (see below).  The FW_SEARCH_ALL variable is defined in the file
@@ -634,7 +634,7 @@ Defines a set of search strings that
 .B psad
 uses to identify iptables messages that should be parsed for scan activity.
 These search strings should match the log prefix strings specified
-in the iptables ruleset with the --log-prefix option, and the default value
+in the iptables ruleset with the \-\-log-prefix option, and the default value
 for FW_MSG_SEARCH is "DROP".  Note that
 .B psad
 normally parses all iptables messages, and so the FW_MSG_SEARCH variable
@@ -795,7 +795,7 @@ Same as above, but this time we use the init script to start psad:
 Use psad as a forensics tool to analyze an old iptables logfile (psad defaults
 to analyzing the
 .B /var/log/messages
-file if the -m option is not specified):
+file if the \-m option is not specified):
 .PP
 .B # psad -A -m <iptables logfile>
 .PP
@@ -835,8 +835,8 @@ traffic that is not explicitly allowed through.  This is consistent with a
 secure network configuration since all traffic that has not been explicitly
 allowed should be blocked by the firewall ruleset.  By default, psad attempts
 to determine whether or not the firewall has been configured in this way.  This
-feature can be disabled with the --no-fwcheck or --log-server options.  The
---log-server option is useful if psad is running on a syslog logging server
+feature can be disabled with the \-\-no-fwcheck or \-\-log-server options.  The
+\-\-log-server option is useful if psad is running on a syslog logging server
 that is separate from the firewall.  For more information on compatible iptables
 rulesets, see the
 .B FW_EXAMPLE_RULES
@@ -852,9 +852,9 @@ the named pipe
 will do.  Remember also to restart \fBsyslog\fR after the changes to
 this file.
 .SH DIAGNOSTICS
-The --debug option can be used to display crucial information
+The \-\-debug option can be used to display crucial information
 about the psad data structures on STDOUT as a scan generates firewall
-log messages.  --debug disables daemon mode execution.
+log messages.  \-\-debug disables daemon mode execution.
 .PP
 Another more effective way to peer into the runtime execution of psad
 is to send (as root) a USR1 signal to the psad process which will
@@ -885,7 +885,7 @@ to view the online list of contributors.
 Send bug reports to mbr@cipherdyne.org.  Suggestions and/or comments are
 always welcome as well.
 .PP
--For iptables firewalls as of Linux kernel version 2.4.26, if the ip_conntrack
+For iptables firewalls as of Linux kernel version 2.4.26, if the ip_conntrack
 module is loaded (or compiled into the kernel) and the firewall has been
 configured to keep state of connections, occasionally packets that are supposed
 to be part of normal TCP traffic will not be correctly identified due to a bug

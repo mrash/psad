@@ -493,7 +493,13 @@ sub check_commands() {
         ### if "nomail" is set in REPORT_METHOD, and sendmail is only
         ### required if DShield alerting is enabled and a DShield user
         ### email is set.
-        next if $cmd =~ /mail/i;
+        if ($cmd eq 'mail') {
+            next CMD if $config{'ALERTING_METHODS'} =~ /no.?e?mail/i;
+        } elsif ($cmd eq 'sendmail') {
+            next CMD unless ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
+                and $config{'DSHIELD_ALERT_EMAIL'} ne 'NONE');
+        }
+
         next if $cmd eq 'wget';  ### only used in --sig-update mode
         unless (-x $cmds{$cmd}) {
             my $found = 0;

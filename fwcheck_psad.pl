@@ -389,7 +389,8 @@ sub get_psad_mod_paths() {
         ### get directories like "/usr/lib/psad/x86_64-linux"
         next unless -d "$config{'PSAD_LIBS_DIR'}/$dir";
         push @paths, "$config{'PSAD_LIBS_DIR'}/$dir"
-            if $dir =~ m|linux| or $dir =~ m|thread|;
+            if $dir =~ m|linux| or $dir =~ m|thread|
+                or (-d "$config{'PSAD_LIBS_DIR'}/$dir/auto");
     }
     return \@paths;
 }

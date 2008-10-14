@@ -603,6 +603,9 @@ $< == 0 && $> == 0 or
 ### get the ip addresses that are local to this machine
 &get_local_ips();
 
+### get the current services running on this machine
+&get_listening_ports() unless ($no_netstat);
+
 ### daemonize psad unless running with --no-daemon or an
 ### analysis mode
 unless ($no_daemon or $debug) {
@@ -5131,7 +5134,7 @@ sub scan_logr_signatures() {
                 if ($proto eq 'tcp' or $proto eq 'udp') {
                     if ($chain eq 'INPUT') {
                         if (defined $local_ports{$proto}
-                                and defined $local_ports{$dp}) {
+                                and defined $local_ports{$proto}{$dp}) {
                             print $email_fh "       dst port:  $dp (server ",
                                   "bound to local port!)\n";
                             print $email_fh "       flags:     $flags\n"

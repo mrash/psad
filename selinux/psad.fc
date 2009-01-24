@@ -1,0 +1,17 @@
+
+
+/etc/rc\.d/init\.d/psad 		--   		gen_context(system_u:object_r:psad_initrc_exec_t,s0)
+
+/etc/psad(/.*)?						gen_context(system_u:object_r:psad_etc_t,s0)
+
+/usr/sbin/psad				--		gen_context(system_u:object_r:psad_exec_t,s0)
+
+#/usr/sbin/psadwatchd			--		gen_context(system_u:object_r:psadwatchd_exec_t,s0)
+
+#/usr/sbin/kmsgsd			--		gen_context(system_u:object_r:kmsgsd_exec_t,s0)
+
+/var/run/psad(/.*)?					gen_context(system_u:object_r:psad_var_run_t,s0)
+
+/var/lib/psad(/.*)?					gen_context(system_u:object_r:psad_var_lib_t,s0)
+
+/var/log/psad(/.*)?  					gen_context(system_u:object_r:psad_var_log_t,s0)

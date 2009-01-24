@@ -49,7 +49,7 @@ and then reads all messages out of the pipe that are matched by a string
 designed to catch any packets that have been logged (and possibly dropped)
 by the firewall.  In this way psad is supplied with a pure data stream
 that exclusively contains packets that the firewall has deemed unfit to
-enter the network.  
+enter the network.
 .B psad
 consists of three daemons: psad, kmsgsd, and psadwatchd.
 .B psad
@@ -448,7 +448,7 @@ Occasionally iptables messages written by syslog to
 or to
 .B /var/log/messages
 do not conform to the normal firewall logging format if the kernel
-ring buffer used by klogd becomes full.  
+ring buffer used by klogd becomes full.
 .B
 psad
 will write these message to
@@ -847,7 +847,7 @@ also requires that syslog be configured to write all kern.info messages to
 the named pipe
 \fB/var/lib/psad/psadfifo\fR.  A simple
 .IP
-.B echo -e 'kern.info\\\\t|/var/lib/psad/psadfifo' >> /etc/syslog.conf
+.B echo -e 'kern.info   |/var/lib/psad/psadfifo' >> /etc/syslog.conf
 .PP
 will do.  Remember also to restart \fBsyslog\fR after the changes to
 this file.

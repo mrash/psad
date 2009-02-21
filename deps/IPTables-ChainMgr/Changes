@@ -1,6 +1,36 @@
 Revision history for Perl extension IPTables::ChainMgr.
 
-0.01  Tue Feb 22 01:18:14 2005
-	- original version; created by h2xs 1.23 with options
-		-A -X -b 5.6.0 -n IPTables::ChainMgr
+0.9 Sat Feb 11 23:11:45 2008
+    - Added Net::IPv4Addr prerequisite to Makefile.PL (patch submitted by
+      Dominik Gehl).
+    - Updated perldoc documentation to properly discuss the delete_chain()
+      API.  The material about the $jump_from_chain was missing (Darien
+      Kindlund reported this issue).
+    - Applied patch from Darien Kindlund to add the ability to specify the
+      source MAC address via the --mac-source <addr> command line argument to
+      iptables.
 
+0.8 Fri Oct 17 11:35:15 2008
+    - Added the ability to control the iptables execution model.  The default
+      is to use waitpid(), but other options are to use system() or popen().
+    - Added the ability to introduce a configurable time delay between each
+      iptables command.
+    - Added the ability to use a function reference for the SIGCHLD signal
+      handler.
+    - Added the ability to configure the number of seconds used as the alarm
+      timeout for iptables command execution in the waitpid() execution model.
+    - Passed IPTables::ChainMgr options for execution model, configurable alarm
+      timeouts, the SIGCHLD signal handler reference, and the configurable
+      number of seconds for additional sleeps between iptables commands to the
+      IPTables::Parse module.
+    - Bugfix for SIGALRM handling to be more consistent with an example from
+      the perlipc man page.
+    - Added append_ip_rule() so that new iptables rules can be appended to the
+      end of a chain instead of just inserted at a particular rule number.
+
+0.7 Sat May 17 10:49:15 2008
+    - Added perldoc documentation for 0.7 release.
+
+0.01  Tue Feb 22 01:18:14 2005
+    - original version; created by h2xs 1.23 with options
+        -A -X -b 5.6.0 -n IPTables::ChainMgr

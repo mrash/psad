@@ -1272,6 +1272,13 @@ sub check_scan() {
 sub parse_NF_pkt_str() {
     my ($pkt_hr, $pkt_str) = @_;
 
+    ### with ENABLE_SYSLOG_FILE enabled, psad sees all sorts of syslog
+    ### messages that aren't just from iptables (kmsgsd is not running
+    ### to filter them), so require a preliminary match
+    if ($config{'ENABLE_SYSLOG_FILE'} eq 'Y') {
+        return $PKT_IGNORE unless $pkt_str =~ /IN=.*OUT=/;
+    }
+
     print STDERR "\n", $pkt_str if $debug;
 
     $pkt_hr->{'raw'} = $pkt_str if $csv_mode or $gnuplot_mode;

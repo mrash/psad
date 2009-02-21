@@ -1,5 +1,5 @@
 %define name psad
-%define version 2.1.4
+%define version 2.1.5
 %define release 1
 %define psadlibdir %_libdir/%name
 %define psadlogdir /var/log/psad
@@ -242,6 +242,9 @@ fi
 %_libdir/%name
 
 %changelog
+* Fri Feb 20 2009 Michael Rash <mbr@cipherdyne.org>
+- psad-2.1.5 release
+
 * Thu Aug 21 2008 Michael Rash <mbr@cipherdyne.org>
 - Updated to use the deps/ directory for all perl module sources.
 - psad-2.1.4 release

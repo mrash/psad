@@ -1,5 +1,5 @@
 %define name psad
-%define version 2.1.4
+%define version 2.1.5
 %define release 1
 %define psadlogdir /var/log/psad
 %define psadrundir /var/run/psad
@@ -155,6 +155,9 @@ fi
 %config(noreplace) %_sysconfdir/%name/icmp_types
 
 %changelog
+* Fri Feb 20 2009 Michael Rash <mbr@cipherdyne.org>
+- psad-2.1.5 release
+
 * Sun Aug 21 2008 Michael Rash <mbr@cipherdyne.org>
 - This spec file omits installing any perl modules that psad depends upon.
 - psad-2.1.4 release

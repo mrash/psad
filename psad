@@ -9636,8 +9636,8 @@ sub write_cmd_line() {
 sub send_mail() {
     my ($subject, $body_file, $addr_str, $mailCmd) = @_;
     return if $no_email_alerts;
-    open MAIL, "| $mailCmd -s \"$subject\" $addr_str > /dev/null" or die
-        "[*] Could not send mail: $mailCmd -s \"$subject\" $addr_str: $!";
+    open MAIL, qq{| $mailCmd -s "$subject" $addr_str > /dev/null} or die
+        qq{[*] Could not send mail: $mailCmd -s "$subject" $addr_str: $!};
     if ($body_file) {
         open F, "< $body_file" or die "[*] Could not open mail file: ",
             "$body_file: $!";

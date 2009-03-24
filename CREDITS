@@ -394,6 +394,9 @@ Franck Joncourt
       fwcheck_psad.pl script.
     - Submitted patch to fix a bug where local server ports were not reported
       correctly under netstat parsing.
+    - Submitted patch to correct mail binary usage to redirect stderr.
+    - Submitted patch to close stdout, stderr, and stdin when running as a
+      daemon.
 
 Erik Heidt
     - Submitted patch to fix fwsnort sid reporting w.r.t. ending newline

@@ -611,6 +611,7 @@ $< == 0 && $> == 0 or
 unless ($no_daemon or $debug) {
     my $pid = fork();
     exit 0 if $pid;
+    close STDIN; close STDOUT; close STDERR;
     die "[*] $0: Couldn't fork: $!" unless defined $pid;
     POSIX::setsid() or die "[*] $0: Can't start a new session: $!";
 }
@@ -9636,7 +9637,7 @@ sub write_cmd_line() {
 sub send_mail() {
     my ($subject, $body_file, $addr_str, $mailCmd) = @_;
     return if $no_email_alerts;
-    open MAIL, qq{| $mailCmd -s "$subject" $addr_str > /dev/null} or die
+    open MAIL, qq{| $mailCmd -s "$subject" $addr_str > /dev/null 2>&1} or die
         qq{[*] Could not send mail: $mailCmd -s "$subject" $addr_str: $!};
     if ($body_file) {
         open F, "< $body_file" or die "[*] Could not open mail file: ",

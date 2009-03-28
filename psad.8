@@ -100,6 +100,11 @@ to download the latest set of modified Snort signatures from
 http://www.cipherdyne.org/psad/signatures so that psad can take advantage of
 signature updates before a new release is made.
 .TP
+.BR \-O "\fR,\fP " \-\^\-Override-config\ \<file>
+Override config variable values that are normally read from the
+/etc/psad/psad.conf file with values from the specified file.  Multiple
+override config files can be given as a comma separated list.
+.TP
 .BR \-D ", " \-\^\-Dump-conf
 Dump the current psad config to STDOUT and exit.  Various pieces of information
 such as the home network, alert email addresses, and DShield user id are removed

@@ -114,6 +114,11 @@ int find_char_var(const char *search_str, char *charvar, char *line)
     char *index_tmp;
     int char_ctr = 0, i;
 
+    /* There is no need to check for this  variable since this one
+     * is already setup */
+    if (*charvar != 0)
+        return 0;
+
     index_tmp = line;
 
     /* look for specific variables in the config
@@ -320,4 +325,25 @@ void send_alert_email(const char *shCmd, const char *mailCmd,
     else
         execle(shCmd, shCmd, "-c", mail_line, NULL, NULL);  /* don't use env */
     return;
+}
+
+void list_to_array(char *list_ptr, const char sep, char **array,
+        unsigned char max_arg)
+{
+    unsigned char  ix;
+
+    ix = 0;
+
+    while ( (list_ptr != NULL) && (ix < max_arg) ) {
+
+        array[ix] = list_ptr;
+
+        list_ptr = strchr(list_ptr, sep);
+        if (list_ptr != NULL)
+            *list_ptr++ = '\0';
+
+        ix++;
+    }
+
+    array[ix] = NULL;
 }

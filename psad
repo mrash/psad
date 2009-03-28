@@ -168,6 +168,7 @@ my @ipt_config = ();
 
 ### main configuration hash
 my %config = ();
+my $override_config_str = '';
 
 ### local subnets
 my @local_nets = ();
@@ -2707,6 +2708,9 @@ sub psad_init() {
     $| = 1;
 
     $no_syslog_alerts = 1 if $analyze_mode or $status_mode;
+
+    ### import any override config files first
+    &import_override_configs() if $override_config_str;
 
     ### import psad.conf
     &import_config($config_file);
@@ -9447,6 +9451,16 @@ sub archive_conf() {
     return;
 }
 
+sub import_override_configs() {
+    my @override_configs = split /,/, $override_config_str;
+    for my $file (@override_configs) {
+        die "[*] Override config file $file does not exist"
+            unless -e $file;
+        &import_config($file);
+    }
+    return;
+}
+
 sub import_config() {
     my $conf_file = shift;
 
@@ -9462,9 +9476,9 @@ sub import_config() {
             my $val     = $2;
             if ($val =~ m|/.+| && $varname =~ /^\s*(\S+)Cmd$/) {
                 ### found a command
-                $cmds{$1} = $val;
+                $cmds{$1} = $val unless defined $cmds{$1};
             } else {
-                $config{$varname} = $val;
+                $config{$varname} = $val unless defined $config{$varname};;
             }
         }
     }
@@ -9746,6 +9760,7 @@ sub getopt_wrapper() {
         'interface=s'       => \$cmdl_interface,  # Specify the IN interface manually
                                                   #   and ignore packets on all others.
         'config=s'          => \$config_file,     # Specify path to configuration file.
+        'Override-config=s' => \$override_config_str,
         'fw-analyze'        => \$fw_analyze,      # Analyze the firewall ruleset and
                                                   #   exit.
         'fw-file=s'         => \$fw_file,         # Analyze ruleset contained within
@@ -10024,6 +10039,9 @@ Options:
     -c,  --config <config file>   - Use <config file> instead of the normal
                                     config file located at
                                     $config_file.
+    -O, --Override-config <str>   - Allow config variables from the normal
+                                    $config_file to be superseded with values
+                                    from the specified file(s).
     -I,  --Interval <seconds>     - Configure the check interval from the
                                     command line to override the 5 second
                                     default.

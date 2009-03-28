@@ -38,6 +38,9 @@
 /* defines */
 #define CONFIG_FILE "/etc/psad/psad.conf" /* only used for DATA_INPUT_METHOD */
 
+/* Maximum number of overwrite files allowed on the command line */
+#define MAX_OVW_FILES   3
+
 /* globals */
 short int psad_syscalls_ctr     = 0;
 short int kmsgsd_syscalls_ctr   = 0;
@@ -59,12 +62,18 @@ char kmsgsd_pid_file[MAX_PATH_LEN];
 char psadwatchd_pid_file[MAX_PATH_LEN];
 char char_psadwatchd_check_interval[MAX_NUM_LEN];
 char char_psadwatchd_max_retries[MAX_NUM_LEN];
-unsigned int psadwatchd_check_interval = 5;  /* default to 5 seconds */
-unsigned int psadwatchd_max_retries = 10; /* default to 10 tries */
+unsigned int psadwatchd_check_interval;
+unsigned int psadwatchd_max_retries;
 static volatile sig_atomic_t received_sighup = 0;
+unsigned char dump_cfg;
 
 /* prototypes */
-static void parse_config(void);
+static void usage(void);
+static void clean_settings(void);
+static void parse_config(char *file);
+static void check_config(void);
+static void dump_config(void);
+
 static void expand_config_vars(void);
 static void find_sub_var_value(
     char *value,
@@ -84,42 +93,55 @@ static void reset_syscall_ctr(const char *pid_name);
 static void give_up(const char *pid_name);
 static void exec_binary(const char *binary_path, const char *cmdline_file);
 static void sighup_handler(int sig);
-#ifdef DEBUG
-static void dump_config(void);
-#endif
 
 /* main */
 int main(int argc, char *argv[]) {
-    int cmdlopt;
+
+    int    cmdlopt;
+    char **ovw_file_ptr;
+    char  *overwrite_files[MAX_OVW_FILES+1];
+    char   overwrite_cmd[MAX_PATH_LEN];
+    char   config_file[MAX_PATH_LEN];
 
 #ifdef DEBUG
     fprintf(stderr, "[+] Entering DEBUG mode\n");
     sleep(1);
 #endif
 
+    overwrite_files[0] = NULL;
     strlcpy(config_file, CONFIG_FILE, MAX_PATH_LEN);
+    dump_cfg = 0;
 
-    while((cmdlopt = getopt(argc, argv, "c:")) != -1) {
+    while((cmdlopt = getopt(argc, argv, "c:O:Dh")) != -1) {
         switch(cmdlopt) {
             case 'c':
                 strlcpy(config_file, optarg, MAX_PATH_LEN);
                 break;
+            case 'O':
+                strlcpy(overwrite_cmd, optarg, MAX_PATH_LEN);
+                list_to_array(overwrite_cmd, ',', overwrite_files, MAX_OVW_FILES);
+                break;
+            case 'D':
+                dump_cfg = 1;
+                break;
             default:
-                printf("[+] Usage: psadwatchd [-c <config file>]\n");
-                exit(EXIT_FAILURE);
+                usage();
         }
     }
 
-#ifdef DEBUG
-    fprintf(stderr, "[+] parsing config_file: %s\n", config_file);
-#endif
+    /* clean our settings */
+    clean_settings();
 
-    /* parse the config files */
-    parse_config();
+    /* Parse both the overwrite and configuration file */
+    for (ovw_file_ptr=overwrite_files; *ovw_file_ptr!=NULL; ovw_file_ptr++)
+        parse_config(*ovw_file_ptr);
+    parse_config(config_file);
 
-#ifdef DEBUG
-    dump_config();
-#endif
+    /* Check our settings */
+    check_config();
+
+    if (dump_cfg == 1)
+        dump_config();
 
     /* see if we are suppose to disable all email alerts */
     if (strncmp("noemail", alerting_methods, MAX_GEN_LEN) == 0)
@@ -155,12 +177,16 @@ int main(int argc, char *argv[]) {
         /* check for sighup */
         if (received_sighup) {
             received_sighup = 0;
-#ifdef DEBUG
-    fprintf(stderr, "[+] re-parsing config file: %s\n", config_file);
-#endif
-            /* reparse the config file since we received a
-             * HUP signal */
-            parse_config();
+
+            /* clean our settings */
+            clean_settings();
+
+            /* reparse the config file since we received a HUP signal */
+            for (ovw_file_ptr=overwrite_files; *ovw_file_ptr!=NULL; ovw_file_ptr++)
+                parse_config(*ovw_file_ptr);
+            parse_config(config_file);
+
+            check_config();
 
             slogr("psad(psadwatchd)",
                     "received HUP signal, re-imported psadwatchd.conf");
@@ -394,7 +420,7 @@ static void exec_binary(const char *binary, const char *cmdlinefile)
     return;
 }
 
-static void parse_config(void)
+static void parse_config(char * file)
 {
     FILE *config_ptr;         /* FILE pointer to the config file */
     int linectr = 0;
@@ -402,10 +428,15 @@ static void parse_config(void)
     char data_input_mode[MAX_GEN_LEN];
     char enable_syslog_file[MAX_GEN_LEN];
     char *index;
+    int tmp;
+
+#ifdef DEBUG
+    fprintf(stderr, "[+] Parsing file %s\n", file);
+#endif
 
     data_input_mode[0] = '\0';
 
-    if ((config_ptr = fopen(config_file, "r")) == NULL) {
+    if ((config_ptr = fopen(file, "r")) == NULL) {
         perror("[*] Could not open config file");
         exit(EXIT_FAILURE);
     }
@@ -457,11 +488,13 @@ static void parse_config(void)
     if (strncmp(enable_syslog_file, "Y", 1) == 0)
         check_kmsgsd = 0;
 
-    /* resolve any embedded variables */
-    expand_config_vars();
+    tmp = atoi(char_psadwatchd_check_interval);
+    if (tmp != 0)
+        psadwatchd_check_interval = tmp;
 
-    psadwatchd_check_interval = atoi(char_psadwatchd_check_interval);
-    psadwatchd_max_retries    = atoi(char_psadwatchd_max_retries);
+    tmp = atoi(char_psadwatchd_max_retries);
+    if (tmp != 0)
+        psadwatchd_max_retries = tmp;
 
     return;
 }
@@ -623,7 +656,94 @@ static void find_sub_var_value(char *value, char *sub_var, char *pre_str,
     return;
 }
 
+static void check_config(void)
+{
+    unsigned char err;
+
 #ifdef DEBUG
+    fprintf(stderr, "[+] Checking configuration...\n");
+#endif
+
+    err = 1;
+    if (psadwatchd_check_interval <= 0)
+        fprintf(stderr, "[*] PSADWATCHD_CHECK_INTERVAL must be > 0\n");
+
+    else if (psadwatchd_max_retries <= 0)
+        fprintf(stderr, "[*] PSADWATCHD_MAX_RETRIES must be > 0\n");
+
+    else if (mail_addrs[0] == '\0')
+        fprintf(stderr, "[*] Could not find EMAIL_ADDRESSES\n");
+
+    else if (hostname[0] == '\0')
+        fprintf(stderr, "[*] Could not find HOSTNAME\n");
+
+    else if (psad_run_dir[0] == '\0')
+        fprintf(stderr, "[*] Could not find PSAD_RUN_DIR\n");
+
+    else if (psad_pid_file[0] == '\0')
+        fprintf(stderr, "[*] Could not find PSAD_PID_DIR\n");
+
+    else if (psad_cmdline_file[0] == '\0')
+        fprintf(stderr, "[*] Could not find PSAD_CMDLINE_FILE\n");
+
+    else if (kmsgsd_pid_file[0] == '\0')
+        fprintf(stderr, "[*] Could not find KMSGD_PID_FILE\n");
+
+    else if (psadwatchd_pid_file[0] == '\0')
+        fprintf(stderr, "[*] Could not find PSADWATCHD_PID_FILE\n");
+
+    else if (mailCmd[0] == '\0')
+        fprintf(stderr, "[*] Could not find mailCmd\n");
+
+    else if (shCmd[0] == '\0')
+        fprintf(stderr, "[*] Could not find shCmd\n");
+
+    else if (kmsgsdCmd[0] == '\0')
+        fprintf(stderr, "[*] Could not find kmsgsdCmd\n");
+
+    else if (psadCmd[0] == '\0')
+        fprintf(stderr, "[*] Could not find psadCmd\n");
+
+    else if (alerting_methods[0] == '\0')
+        fprintf(stderr, "[*] Could not find ALERTING_METHODS\n");
+
+    else {
+
+        /* Resolve any embedded variables */
+        expand_config_vars();
+        err = 0;
+    }
+
+    if (err == 1)
+        exit(EXIT_FAILURE);
+}
+
+static void clean_settings (void)
+{
+
+#ifdef DEBUG
+    fprintf(stderr, "[+] Cleaning settings\n");
+#endif
+
+    /* Set the default values used by psadwatchd when trying to
+     * restart the psad and kmsgsd daemons (5s /10 times) */
+    psadwatchd_check_interval = 5;
+    psadwatchd_max_retries    = 10;
+
+    *mail_addrs             = '\0';
+    *hostname               = '\0';
+    *psad_run_dir           = '\0';
+    *psad_pid_file          = '\0';
+    *psad_cmdline_file      = '\0';
+    *kmsgsd_pid_file        = '\0';
+    *psadwatchd_pid_file    = '\0';
+    *mailCmd                = '\0';
+    *shCmd                  = '\0';
+    *kmsgsdCmd              = '\0';
+    *psadCmd                = '\0';
+    *alerting_methods       = '\0';
+}
+
 static void dump_config(void)
 {
     fprintf(stderr, "[+] dump_config()\n");
@@ -643,11 +763,37 @@ static void dump_config(void)
     fprintf(stderr, "    mailCmd: %s\n", mailCmd);
     fprintf(stderr, "    shCmd: %s\n", shCmd);
     fprintf(stderr, "    psadCmd: %s\n", psadCmd);
-    return;
+
+    exit(EXIT_SUCCESS);
 }
-#endif
 
 static void sighup_handler(int sig)
 {
     received_sighup = 1;
+}
+
+static void usage (void)
+{
+    fprintf(stderr, "psadwatchd - Psad watch daemon\n\n");
+
+    fprintf(stderr, "[+] Version: %s\n", PSAD_VERSION);
+    fprintf(stderr,
+"    By Michael Rash (mbr@cipherdyne.org)\n"
+"    URL: http://www.cipherdyne.org/fwknop/\n\n");
+
+    fprintf(stderr, "Usage: psadwatchd [options]\n\n");
+
+    fprintf(stderr,
+"Options:\n"
+"    -c <file>          - Specify path to config file instead of using the\n"
+"                         default $config_file.\n"
+"    -D                 - Dump  the  configuration values that psad\n"
+"                         derives from the /etc/psad/psad.conf (or other\n"
+"                         override files) on STDERR\n"
+"    -h                 - Display this usage message and exit\n"
+"    -O <file>          - Override config variable values that are normally\n"
+"                         read from the /etc/psad/psad.conf file with\n"
+"                         values from the specified file\n");
+
+    exit(EXIT_FAILURE);
 }

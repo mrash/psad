@@ -47,6 +47,7 @@
 #include <ctype.h>
 
 /* DEFINES ********************************************************************/
+#define PSAD_VERSION      "2.1.6-pre1"
 #define MAX_LINE_BUF 1024
 #define MAX_PID_SIZE 6
 #define MAX_PATH_LEN 100
@@ -69,6 +70,8 @@ void expand_sub_var_value(char *value, const char *sub_var,
 int find_char_var(const char *, char *, char *);
 int check_import_config(time_t *config_mtime, char *config_file);
 void *safe_malloc(const unsigned int len);
+void list_to_array(char *ptList, const char sep, char **array,
+    unsigned char max_arg);
 
 /* From OpenBSD */
 size_t strlcpy(char *, const char *, size_t);

@@ -116,7 +116,7 @@ int find_char_var(const char *search_str, char *charvar, char *line)
 
     /* There is no need to check for this  variable since this one
      * is already setup */
-    if (*charvar != 0)
+    if (*charvar != '\0')
         return 0;
 
     index_tmp = line;

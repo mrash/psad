@@ -16,6 +16,24 @@ the machine.
 uses the psad.conf configuration file which by default is
 located at /etc/psad/psad.conf, but a different path can be specified
 on the command line.
+.SH OPTIONS
+.TP
+.BR \-c\ \<config\-file>
+Specify path to config file instead of using the default configuration file
+/etc/psad/psad.conf.
+.TP
+.BR \-D
+Dump the configuration values that
+.B kmsgd
+derives from /etc/psad/psad.conf (or other override files) on STDERR.
+.TP
+.BR \-h
+Display usage information and exit.
+.TP
+.BR \-O\ \<config\-file>
+Override config variable values that are normally read from the
+/etc/psad/psad.conf file with values from the specified file.  Multiple
+override config files can be given as a comma separated list.
 .SH SEE ALSO
 .BR psad (8),
 .BR psadwatchd (8),

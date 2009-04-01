@@ -45,13 +45,12 @@
 short int psad_syscalls_ctr     = 0;
 short int kmsgsd_syscalls_ctr   = 0;
 unsigned short int no_email     = 0;
-unsigned short int check_kmsgsd = 1;
+unsigned short int check_kmsgsd;
 const char mail_redr[] = " < /dev/null > /dev/null 2>&1";
 char hostname[MAX_GEN_LEN];
 char mail_addrs[MAX_EMAIL_LEN];
 char shCmd[MAX_GEN_LEN];
 char mailCmd[MAX_GEN_LEN];
-char config_file[MAX_PATH_LEN];
 char alerting_methods[MAX_GEN_LEN];
 char psadCmd[MAX_PATH_LEN];
 char psad_pid_file[MAX_PATH_LEN];
@@ -60,6 +59,8 @@ char psad_run_dir[MAX_PATH_LEN];
 char kmsgsdCmd[MAX_PATH_LEN];
 char kmsgsd_pid_file[MAX_PATH_LEN];
 char psadwatchd_pid_file[MAX_PATH_LEN];
+char data_input_mode[MAX_GEN_LEN];
+char enable_syslog_file[MAX_GEN_LEN];
 char char_psadwatchd_check_interval[MAX_NUM_LEN];
 char char_psadwatchd_max_retries[MAX_NUM_LEN];
 unsigned int psadwatchd_check_interval;
@@ -73,6 +74,7 @@ static void clean_settings(void);
 static void parse_config(char *file);
 static void check_config(void);
 static void dump_config(void);
+static unsigned short int is_kmsgsd_required(void);
 
 static void expand_config_vars(void);
 static void find_sub_var_value(
@@ -176,6 +178,8 @@ int main(int argc, char *argv[]) {
 
         /* check for sighup */
         if (received_sighup) {
+
+            slogr("psad(psadwatchd)", "received HUP signal");
             received_sighup = 0;
 
             /* clean our settings */
@@ -187,9 +191,6 @@ int main(int argc, char *argv[]) {
             parse_config(config_file);
 
             check_config();
-
-            slogr("psad(psadwatchd)",
-                    "received HUP signal, re-imported psadwatchd.conf");
         }
     }
 
@@ -425,16 +426,12 @@ static void parse_config(char * file)
     FILE *config_ptr;         /* FILE pointer to the config file */
     int linectr = 0;
     char config_buf[MAX_LINE_BUF];
-    char data_input_mode[MAX_GEN_LEN];
-    char enable_syslog_file[MAX_GEN_LEN];
     char *index;
     int tmp;
 
 #ifdef DEBUG
     fprintf(stderr, "[+] Parsing file %s\n", file);
 #endif
-
-    data_input_mode[0] = '\0';
 
     if ((config_ptr = fopen(file, "r")) == NULL) {
         perror("[*] Could not open config file");
@@ -478,15 +475,6 @@ static void parse_config(char * file)
         }
     }
     fclose(config_ptr);
-
-    /* see if we are using the ulogd mode */
-    if (strncmp(data_input_mode, "ulogd", MAX_GEN_LEN) == 0)
-        check_kmsgsd = 0;
-
-    /* see if ENABLE_SYSLOG_FILE is enabled, so psad is just parsing
-     * a file written to by syslog directly */
-    if (strncmp(enable_syslog_file, "Y", 1) == 0)
-        check_kmsgsd = 0;
 
     tmp = atoi(char_psadwatchd_check_interval);
     if (tmp != 0)
@@ -711,6 +699,10 @@ static void check_config(void)
 
         /* Resolve any embedded variables */
         expand_config_vars();
+
+        /* Refresh the need to check kmsgsd */
+        check_kmsgsd = is_kmsgsd_required();
+
         err = 0;
     }
 
@@ -742,6 +734,9 @@ static void clean_settings (void)
     *kmsgsdCmd              = '\0';
     *psadCmd                = '\0';
     *alerting_methods       = '\0';
+    
+    *data_input_mode        = '\0';
+    *enable_syslog_file     = '\0';
 }
 
 static void dump_config(void)
@@ -772,6 +767,36 @@ static void sighup_handler(int sig)
     received_sighup = 1;
 }
 
+/*
+ * Check to see if kmsgsd should not be running:
+ *
+ *   - first check if we are using the ulog mode
+ *   - then, if ENABLE_SYSLOG_FILE is enabled so psad is just parsing
+ *     a file written to by syslog directly
+ *
+ * \return 0 if not required
+ *         1 otherwise
+ */
+static unsigned short int is_kmsgsd_required(void)
+{
+    unsigned short int required;
+
+    if (strncmp(data_input_mode, "ulogd", MAX_GEN_LEN) == 0)
+        required = 0;
+
+    else if (strncmp(enable_syslog_file, "Y", 1) == 0)
+        required = 0;
+
+    else
+        required = 1;
+
+    return required;
+}
+
+/*
+ * Usage message to be displayed when -h option is supplied or a bad option
+ * is passed to the daemon. This function ends the execution of the program.
+ */
 static void usage (void)
 {
     fprintf(stderr, "psadwatchd - Psad watch daemon\n\n");
@@ -779,7 +804,7 @@ static void usage (void)
     fprintf(stderr, "[+] Version: %s\n", PSAD_VERSION);
     fprintf(stderr,
 "    By Michael Rash (mbr@cipherdyne.org)\n"
-"    URL: http://www.cipherdyne.org/fwknop/\n\n");
+"    URL: http://www.cipherdyne.org/psad/\n\n");
 
     fprintf(stderr, "Usage: psadwatchd [options]\n\n");
 

@@ -39,6 +39,9 @@
 /* defines */
 #define CONFIG_FILE "/etc/psad/psad.conf"
 
+/* Maximum number of overwrite files allowed on the command line */
+#define MAX_OVW_FILES   3
+
 /* globals */
 static volatile sig_atomic_t received_sighup = 0;
 extern char *optarg; /* for getopt */
@@ -46,18 +49,22 @@ extern int   optind; /* for getopt */
 char *fw_msg_search[MAX_GEN_LEN];
 char psadfifo_file[MAX_PATH_LEN];
 char fwdata_file[MAX_PATH_LEN];
-char config_file[MAX_PATH_LEN];
 char fw_search_file[MAX_PATH_LEN];
 char snort_sid_str[MAX_PATH_LEN];
 char psad_dir[MAX_PATH_LEN];
 char psad_fifo_dir[MAX_PATH_LEN];
 char psad_run_dir[MAX_PATH_LEN];
 char kmsgsd_pid_file[MAX_PATH_LEN];
-int num_fw_search_strings = 0;
-int fw_search_all_flag = 1;  /* default to parse all iptables messages */
+int num_fw_search_strings;
+int fw_search_all_flag;
+unsigned char dump_cfg;
 
 /* prototypes */
-static void parse_config(void);
+static void usage(void);
+static void clean_settings(void);
+static void parse_config(char *file);
+static void check_config(void);
+static void dump_config(void);
 static int match_fw_msg(char *fw_mgs);
 static void find_sub_var_value(
     char *value,
@@ -65,20 +72,23 @@ static void find_sub_var_value(
     char *pre_str,
     char *post_str
 );
-#ifdef DEBUG
-static void dump_config(void);
-#endif
+
 static void expand_config_vars(void);
 static void sighup_handler(int sig);
 
 /* main */
 int main(int argc, char *argv[]) {
-    char buf[MAX_LINE_BUF];
-    int fifo_fd, fwdata_fd;  /* file descriptors */
-    int cmdlopt, numbytes;
+
+    char **ovw_file_ptr;
+    char  *overwrite_files[MAX_OVW_FILES+1];
+    char   overwrite_cmd[MAX_PATH_LEN];
+    char   config_file[MAX_PATH_LEN];
+    char   buf[MAX_LINE_BUF];
+    int    fifo_fd, fwdata_fd;  /* file descriptors */
+    int    cmdlopt, numbytes;
 #ifdef DEBUG
-    int matched_ipt_log_msg = 0;
-    int fwlinectr = 0;
+    int    matched_ipt_log_msg = 0;
+    int    fwlinectr = 0;
 #endif
 
 #ifdef DEBUG
@@ -87,30 +97,40 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "STDOUT _and_ to fwdata.\n\n");
 #endif
 
-    /* establish default paths to config file (may be
-     * overriden with command line args below */
+    overwrite_files[0] = NULL;
     strlcpy(config_file, CONFIG_FILE, MAX_PATH_LEN);
+    dump_cfg = 0;
 
-    while((cmdlopt = getopt(argc, argv, "c:")) != -1) {
+    while((cmdlopt = getopt(argc, argv, "c:O:Dh")) != -1) {
         switch(cmdlopt) {
             case 'c':
                 strlcpy(config_file, optarg, MAX_PATH_LEN);
                 break;
+            case 'O':
+                strlcpy(overwrite_cmd, optarg, MAX_PATH_LEN);
+                list_to_array(overwrite_cmd, ',', overwrite_files, MAX_OVW_FILES);
+                break;
+            case 'D':
+                dump_cfg = 1;
+                break;
             default:
-                printf("[+] Usage:  kmsgsd [-c <config file>]\n");
-                exit(EXIT_FAILURE);
+                usage();
         }
     }
 
-#ifdef DEBUG
-    fprintf(stderr, "[+] parsing config_file: %s\n", config_file);
-#endif
-    /* parse config file (psad.conf) */
-    parse_config();
+    /* clean our settings */
+    clean_settings();
 
-#ifdef DEBUG
-    dump_config();
-#endif
+    /* Parse both the overwrite and configuration file */
+    for (ovw_file_ptr=overwrite_files; *ovw_file_ptr!=NULL; ovw_file_ptr++)
+        parse_config(*ovw_file_ptr);
+    parse_config(config_file);
+
+    /* Check our settings */
+    check_config();
+
+    if (dump_cfg == 1)
+        dump_config();
 
     /* make sure there isn't another kmsgsd already running */
     check_unique_pid(kmsgsd_pid_file, "kmsgsd");
@@ -162,11 +182,19 @@ int main(int argc, char *argv[]) {
         buf[numbytes] = '\0';
 
         if (received_sighup) {
+
             /* clear the signal flag */
             received_sighup = 0;
 
-            /* re-parse the config file after receiving HUP signal */
-            parse_config();
+            /* clean our settings */
+            clean_settings();
+
+            /* reparse the config file since we received a HUP signal */
+            for (ovw_file_ptr=overwrite_files; *ovw_file_ptr!=NULL; ovw_file_ptr++)
+                parse_config(*ovw_file_ptr);
+            parse_config(config_file);
+
+            check_config();
 
             /* close file descriptors and re-open them after
              * re-reading config file */
@@ -186,8 +214,7 @@ int main(int argc, char *argv[]) {
                     fwdata_file);
                 exit(EXIT_FAILURE);  /* could not open fwdata file */
             }
-            slogr("psad(kmsgsd)",
-                    "received HUP signal, re-imported psad.conf");
+            slogr("psad(kmsgsd)", "received HUP signal");
         }
 
         /* see if we matched a firewall message and write it to the
@@ -245,7 +272,7 @@ static int match_fw_msg(char *fw_msg)
     return 0;
 }
 
-static void parse_config(void)
+static void parse_config(char * file)
 {
     FILE *config_ptr;   /* FILE pointer to the config file */
     int linectr = 0, i;
@@ -259,9 +286,12 @@ static void parse_config(void)
     num_fw_search_strings = 0;
     fw_msg_search[num_fw_search_strings] = NULL;
 
-    if ((config_ptr = fopen(config_file, "r")) == NULL) {
-        fprintf(stderr, "[*] Could not open %s for reading.\n",
-            config_file);
+#ifdef DEBUG
+    fprintf(stderr, "[+] Parsing file %s\n", file);
+#endif
+
+    if ((config_ptr = fopen(file, "r")) == NULL) {
+        perror("[*] Could not open config file");
         exit(EXIT_FAILURE);
     }
 
@@ -300,18 +330,6 @@ static void parse_config(void)
         }
     }
     fclose(config_ptr);
-
-    if (! fw_search_all_flag && num_fw_search_strings == 0) {
-        /* there are no FW_MSG_SEARCH vars in fw_search.conf; default
-         * to "DROP".  Psad will generate a syslog warning.  */
-        fw_msg_search[num_fw_search_strings]
-            = (char *) safe_malloc(strlen("DROP")+1);
-        strlcpy(fw_msg_search[0], "DROP", strlen("DROP")+1);
-        num_fw_search_strings++;
-    }
-
-    /* resolve any embedded variables */
-    expand_config_vars();
 
     return;
 }
@@ -398,7 +416,6 @@ static void find_sub_var_value(char *value, char *sub_var, char *pre_str,
     return;
 }
 
-#ifdef DEBUG
 static void dump_config(void)
 {
     fprintf(stderr, "[+] dump_config()\n");
@@ -407,11 +424,107 @@ static void dump_config(void)
     fprintf(stderr, "    FW_DATA_FILE: %s\n", fwdata_file);
     fprintf(stderr, "    SNORT_SID_STR: %s\n", snort_sid_str);
     fprintf(stderr, "    KMSGSD_PID_FILE: %s\n", kmsgsd_pid_file);
-    return;
+
+    exit(EXIT_SUCCESS);
 }
+
+static void check_config(void)
+{
+    unsigned char err;
+
+#ifdef DEBUG
+    fprintf(stderr, "[+] Checking configuration...\n");
 #endif
+
+    err = 1;
+    if (psad_dir[0] == '\0')
+        fprintf(stderr, "[*] Could not find PSAD_DIR\n");
+
+    else if (psadfifo_file[0] == '\0')
+        fprintf(stderr, "[*] Could not find PSAD_FIFO_FILE\n");
+
+    else if (fwdata_file[0] == '\0')
+        fprintf(stderr, "[*] Could not find FW_DATA_FILE\n");
+
+    else if (snort_sid_str[0] == '\0')
+        fprintf(stderr, "[*] Could not find SNORT_SID_STR\n");
+
+    else if (kmsgsd_pid_file[0] == '\0')
+        fprintf(stderr, "[*] Could not find KMSGSD_PID_FILE\n");
+
+    /* Resolve any embedded variables */
+    else {
+        expand_config_vars();
+
+        /* there are no FW_MSG_SEARCH vars in fw_search.conf; default
+         * to "DROP".  Psad will generate a syslog warning.  */
+        if (! fw_search_all_flag && num_fw_search_strings == 0) {
+            fw_msg_search[num_fw_search_strings]
+                = (char *) safe_malloc(strlen("DROP")+1);
+            strlcpy(fw_msg_search[0], "DROP", strlen("DROP")+1);
+            num_fw_search_strings++;
+        }
+
+        err = 0;
+    }
+
+    if (err == 1)
+        exit(EXIT_FAILURE);
+}
+
+static void clean_settings (void)
+{
+
+#ifdef DEBUG
+    fprintf(stderr, "[+] Cleaning settings\n");
+#endif
+
+    /* default to parse all iptables messages */
+    num_fw_search_strings = 0;
+    fw_search_all_flag    = 1;
+
+    *psad_dir        = '\0';
+    *psad_fifo_dir   = '\0';
+    *psad_run_dir    = '\0';
+    *psadfifo_file   = '\0';
+    *fwdata_file     = '\0';
+    *snort_sid_str   = '\0';
+    *kmsgsd_pid_file = '\0';
+}
+
 
 static void sighup_handler(int sig)
 {
     received_sighup = 1;
+}
+
+/*
+ * Usage message to be displayed when -h option is supplied or a bad option
+ * is passed to the daemon. This function ends the execution of the program.
+ */
+static void usage (void)
+{
+    fprintf(stderr,
+"kmsgsd - separates iptables messages from all other kernel messages\n\n");
+
+    fprintf(stderr, "[+] Version: %s\n", PSAD_VERSION);
+    fprintf(stderr,
+"    By Michael Rash (mbr@cipherdyne.org)\n"
+"    URL: http://www.cipherdyne.org/psad/\n\n");
+
+    fprintf(stderr, "Usage: kmsgsd [options]\n\n");
+
+    fprintf(stderr,
+"Options:\n"
+"    -c <file>          - Specify path to config file instead of using the\n"
+"                         default $config_file.\n"
+"    -D                 - Dump  the  configuration values that psad\n"
+"                         derives from the /etc/psad/psad.conf (or other\n"
+"                         override files) on STDERR\n"
+"    -h                 - Display this usage message and exit\n"
+"    -O <file>          - Override config variable values that are normally\n"
+"                         read from the /etc/psad/psad.conf file with\n"
+"                         values from the specified file\n");
+
+    exit(EXIT_FAILURE);
 }

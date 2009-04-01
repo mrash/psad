@@ -632,11 +632,17 @@ unless ($no_daemon or $debug) {
 ### we're at it, start psadwatchd as well.  Note that this is the best
 ### place to start the other daemons since we just wrote the psad pid
 ### to PID_FILE above.
+my $cmd;
 unless ($config{'ENABLE_SYSLOG_FILE'} eq 'Y'
         or $no_kmsgsd
         or $config{'SYSLOG_DAEMON'} =~ /ulog/i
         or $kmsgsd_started) {
-    system $cmds{'kmsgsd'};
+    $cmd  = $cmds{'kmsgsd'};
+    $cmd .= " -c $config_file";
+    $cmd .= " -O $override_config_str"
+        if $override_config_str;
+    open KMSGSD, "| $cmd" or die "[*] Could not execute $cmds{'kmsgsd'}";
+    close KMSGSD;
     $kmsgsd_started = 1;
 }
 
@@ -649,8 +655,15 @@ unless ($kmsgsd_started) {
     unlink $pidfiles{'kmsgsd'} if -e $pidfiles{'kmsgsd'};
 }
 
-system $cmds{'psadwatchd'}
-    unless $debug or $no_daemon;
+unless ($debug or $no_daemon) {
+    $cmd  = $cmds{'psadwatchd'};
+    $cmd .= " -c $config_file";
+    $cmd .= " -O $override_config_str"
+        if $override_config_str;
+    open PSADWATCHD, "| $cmd" or die "[*] Could not ",
+        "execute $cmds{'psadwatchd'}";
+    close PSADWATCHD;
+}
 
 if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
     ### always flush old rules (the subsequent renew_auto_blocked_ips()

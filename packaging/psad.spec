@@ -22,6 +22,7 @@ Url: http://www.cipherdyne.org/psad/
 Source: %name-%version.tar.gz
 BuildRoot: %_tmppath/%{name}-buildroot
 Requires: iptables
+BuildRequires: perl-ExtUtils-MakeMaker
 #Prereq: rpm-helper
 
 %description

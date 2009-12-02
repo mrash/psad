@@ -5250,7 +5250,7 @@ sub scan_logr_signatures() {
     if (@log_sigs) {
         open LS, ">> $log_sigs_file.tmp" or
             die "[*] Could not open $log_sigs_file: $!";
-        print LS "#\n# Format: <sig_time> <sid> <matches> \"<msg\" <chain> ",
+        print LS "#\n# Format: <sig_time> <sid> <matches> \"<msg>\" <chain> ",
             "<proto> <dst port> \"<flags>\" <is_fwsnort> <is_psad>\n#\n\n";
         for my $str (@log_sigs) {
             print LS $str, "\n";
@@ -8371,7 +8371,7 @@ sub import_ip_dirs() {
                 my @lines = <F>;
                 close F;
                 for my $line (@lines) {
-                    ### Format: <sig time> <sid> <matches> "<msg" <chain> \
+                    ### Format: <sig time> <sid> <matches> "<msg>" <chain> \
                     ### <proto> <dst port> <flags> <is_fwsnort> <is_psad>
                     ### 1165099853 249 1 "DDOS mstream client to handler" \
                     ### INPUT tcp 15104 SYN 0 0

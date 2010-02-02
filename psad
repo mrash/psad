@@ -6904,7 +6904,7 @@ sub gnuplot_write_plot_file() {
         $gnuplot_legend_title = '(';
         for my $tok (@$tokens_ar) {
             $gnuplot_legend_title .= "$tok,";
-        } 
+        }
         $gnuplot_legend_title =~ s/,$//;
         $gnuplot_legend_title .= ')';
         $gnuplot_legend_title  =~ s/_//g;
@@ -7181,7 +7181,7 @@ sub render_count_data() {
                     unless (defined $gnuplot_cache_uniq{$x_axis}{$y_axis}) {
                         $render_count_data{$x_axis}{$y_axis}++;
                         $gnuplot_cache_uniq{$x_axis}{$y_axis} = '';
-                    } 
+                    }
 
                 } else {
                     if ($#$aref == 2) {

@@ -1117,7 +1117,8 @@ sub check_scan() {
                 and not $analyze_mode
                 and $pkt{'dshield_str'}) {
             if ($pkt{'timestamp'} =~ /^\s*(\w+)\s+(\d+)\s+(\S+)/) {
-                my $month   = Decode_Month($1);
+                my $m_tmp = $1;  ### kludge for Decode_Month() call
+                my $month   = Decode_Month($m_tmp);
                 my $day     = sprintf("%.2d", $2);
                 my $time_24 = $3;
                 push @dshield_data, "$year-$month-$day $time_24 " .
@@ -7386,7 +7387,8 @@ sub gnuplot_set_start_year() {
     my $prev_month = 0;
     for (my $i=$#gnuplot_data; $i >= 0; $i--) {
         if ($gnuplot_data[$i]->[$timestamp_field] =~ /^\s*(\w+)\s+(\d+)\s+(\S+)/) {
-            my $mon  = Decode_Month($1);
+            my $m_tmp = $1;  ### kludge for Decode_Month() call
+            my $mon  = Decode_Month($m_tmp);
             my $day  = $2;
             my $time = $3;
             if ($gnuplot_year) {
@@ -7422,7 +7424,8 @@ sub gnuplot_value() {
         ### reformat timestamp (e.g. "Feb  1 00:00:27"
         ### becomes 02/02/04:03:00:17)
         if ($packet_val =~ /^\s*(\w+)\s+(\d+)\s+(\S+)/) {
-            my $mon  = Decode_Month($1);
+            my $m_tmp = $1;  ### kludge for Decode_Month() call
+            my $mon  = Decode_Month($m_tmp);
             my $day  = $2;
             my $time = $3;
             my $hour = 0;

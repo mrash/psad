@@ -1,4 +1,6 @@
 psad-2.1.6 (04//2009):
+    - Bug fix for Decode_Month() call in DShield processing code to ensure
+      proper month handling for iptables log message time stamps.
     - (Franck Joncourt) Added --Override-config feature so that alternate
       configuration files can be specified on the command line to override
       configuration variables in the standard /etc/psad/psad.conf file.

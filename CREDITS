@@ -427,3 +427,8 @@ Miroslav Grepl
     - Contributed policy files to make psad compatible with SELinux.  The
       files are located in a new "selinux" directory in the
       psad sources.
+
+Stephen Nims
+    - Reported 'Date::Calc::Decode_Month(): argument is not a string at
+      /usr/sbin/psad line 1103' bug.  This affected DShield processing and a
+      few other areas.

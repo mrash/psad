@@ -8996,7 +8996,7 @@ sub setup() {
             }
         } else {
             &send_mail("$config{'MAIL_ERROR_PREFIX'} " .
-                "$config{'ETC_SYSLOG_CONF'} does not " .
+                "$syslog_conf does not " .
                 "exist, check SYSLOG_DAEMON setting on $config{'HOSTNAME'}",
                 '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
         }

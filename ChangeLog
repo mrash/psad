@@ -1,6 +1,10 @@
 psad-2.1.6 (07/08/2010):
     - Bug fix for Decode_Month() calls used to handle date formats and ensure
-      proper month handling for iptables log message time stamps.
+      proper month handling for iptables log message time stamps.  This bug
+      caused psad to die in some cases, and the specific error on the console
+      in --debug mode was:
+        Date::Calc::Decode_Month(): argument is not a string at \
+        /usr/sbin/psad line 1103, <FWDATA> line 2.
     - (Franck Joncourt) Added --Override-config feature so that alternate
       configuration files can be specified on the command line to override
       configuration variables in the standard /etc/psad/psad.conf file.

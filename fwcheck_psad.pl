@@ -188,7 +188,7 @@ sub print_fw_help() {
 
 sub check_forwarding() {
     ### check to see if there are multiple interfaces on the
-    ### machine and return false if no since the machine will
+    ### machine and return false if not since the machine will
     ### not be able to forward packets anyway (e.g. desktop
     ### machines).  Also return false if forwarding is turned
     ### off (we have to trust the machine config is as the
@@ -206,18 +206,49 @@ sub check_forwarding() {
             "    The PROC_FORWARD_FILE in $config_file points to\n",
             "    $config{'PROC_FORWARD_FILE'}";
     }
-    open IFC, "$cmds{'ifconfig'} -a |" or die "[*] Could not ",
-        "execute: $cmds{'ifconfig'} -a: $!";
-    my @if_out = <IFC>;
-    close IFC;
-    my $num_intf = 0;
-    for my $line (@if_out) {
-        if ($line =~ /inet\s+/i && $line !~ /127\.0\.0\.1/) {
+    if ($config{'IFCFGTYPE'} =~ /iproute2/i) {
+        open IFC, "$cmds{'ip'} addr |" or die "[*] Could not ",
+            "execute: $cmds{'ip'} addr: $!";
+        my @if_out = <IFC>;
+        close IFC;
+        my $intf_name = '';
+        my $intf_inet_count = 0;
+        my $num_intf = 0;
+        for my $line (@if_out) {
+            if ($line =~ /^\d+:\s+(\S+): </) {
+                $intf_name = $1;
+                if ($intf_inet_count > 0) {
+                    $num_intf++;
+                }
+                $intf_inet_count = 0;
+                next;
+            }
+            next if $intf_name eq 'lo';
+            next if $intf_name =~ /dummy/i;
+            if ($line =~ /inet\s+/i) {
+                $intf_inet_count++;
+            }
+        }
+        if ($intf_inet_count > 0) {
             $num_intf++;
         }
-    }
-    if ($num_intf < 2) {
-        return 0;
+        if ($num_intf < 2) {
+            return 0;
+        }
+    } else {
+        open IFC, "$cmds{'ifconfig'} -a |" or die "[*] Could not ",
+            "execute: $cmds{'ifconfig'} -a: $!";
+        my @if_out = <IFC>;
+        close IFC;
+        my $num_intf = 0;
+        for my $line (@if_out) {
+            if ($line =~ /inet\s+/i && $line !~ /127\.0\.0\.1/) {
+                $num_intf++;
+            }
+        }
+        if ($num_intf < 2) {
+            return 0;
+        }
     }
     return 1;
 }

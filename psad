@@ -2670,7 +2670,7 @@ sub import_perl_modules() {
     require Unix::Syslog;
     require Storable if $store_file;
 
-    Net::IPv4Addr->import(qw(ipv4_network ipv4_in_network ipv4_broadcast));
+    Net::IPv4Addr->import(qw(ipv4_network ipv4_in_network ipv4_broadcast ipv4_cidr2msk));
     Date::Calc->import(qw(Timezone This_Year Decode_Month
             Today Date_to_Time Mktime Localtime));
     Unix::Syslog->import(qw(:subs :macros));
@@ -3008,24 +3008,45 @@ sub is_digit_range() {
 }
 
 sub get_connected_subnets() {
-    my @ifconfig_out = @{&run_command($cmds{'ifconfig'}, '-a')};
     my @connected_subnets = ();
     my @connected_subnets_cidr = ();
-    my $intf_name    = '';
-    my $home_net_str = '';
-    for my $line (@ifconfig_out) {
-        if ($line =~ /^(\S+)\s+Link/) {
-            $intf_name = $1;
-            next;
+    if ($config{'IFCFGTYPE'} =~ /iproute2/i) {
+        my @ip_out = @{&run_command($cmds{'ip'}, 'addr')};
+        my $intf_name    = '';
+        my $home_net_str = '';
+        for my $line (@ip_out) {
+            if ($line =~ /^\d+:\s+(\S+): </) {
+                $intf_name = $1;
+                next;
+            }
+            next if $intf_name eq 'lo';
+            next if $intf_name =~ /dummy/i;
+            if ($line =~ /^\s+inet.*?($ip_re)\/(\d+)/i) {
+                my $ip = $1;
+                my $msk = ipv4_cidr2msk($2);
+                my ($net_addr, $cidr_msk) = ipv4_network($ip, $msk);
+                push @connected_subnets, "$net_addr/$msk";
+                push @connected_subnets_cidr, "$net_addr/$cidr_msk";
+            }
         }
-        next if $intf_name eq 'lo';
-        next if $intf_name =~ /dummy/i;
-        if ($line =~ /^\s+inet.*?:($ip_re).*:($ip_re)/i) {
-            my $ip  = $1;
-            my $msk = $2;
-            my ($net_addr, $cidr_msk) = ipv4_network($ip, $msk);
-            push @connected_subnets, "$net_addr/$msk";
-            push @connected_subnets_cidr, "$net_addr/$cidr_msk";
+    } else {
+        my @ifconfig_out = @{&run_command($cmds{'ifconfig'}, '-a')};
+        my $intf_name    = '';
+        my $home_net_str = '';
+        for my $line (@ifconfig_out) {
+            if ($line =~ /^(\S+)\s+Link/) {
+                $intf_name = $1;
+                next;
+            }
+            next if $intf_name eq 'lo';
+            next if $intf_name =~ /dummy/i;
+            if ($line =~ /^\s+inet.*?:($ip_re).*:($ip_re)/i) {
+                my $ip  = $1;
+                my $msk = $2;
+                my ($net_addr, $cidr_msk) = ipv4_network($ip, $msk);
+                push @connected_subnets, "$net_addr/$msk";
+                push @connected_subnets_cidr, "$net_addr/$cidr_msk";
+            }
         }
     }
     return \@connected_subnets, \@connected_subnets_cidr;
@@ -6452,11 +6473,25 @@ sub print_scan() {  ### this should primarily be used for debugging
 
 sub get_local_ips() {
     print STDERR "[+] get_local_ips()\n" if $debug;
-    my @ips = @{&run_command($cmds{'ifconfig'}, '-a')};
-    return unless @ips;
-    for my $line (@ips) {
-        if ($line =~ /inet\s+.*?:($ip_re)\s/) {
-            $local_ips{$1} = '';
+    if ($config{'IFCFGTYPE'} =~ /iproute2/i) {
+        print STDERR "[+] : Using IFCFGTYPE iproute2\n" if $debug;
+        my @ips = @{&run_command($cmds{'ip'}, 'addr')};
+        return unless @ips;
+        for my $line (@ips) {
+            if ($line =~ /inet\s+($ip_re)\/\d+\s/) {
+                print STDERR "[+] : Adding $1 to local_ips\n" if $debug;
+                $local_ips{$1} = '';
+            }
+        }
+    } else {
+        print STDERR "[+] : Using IFCFGTYPE ifconfig\n" if $debug;
+        my @ips = @{&run_command($cmds{'ifconfig'}, '-a')};
+        return unless @ips;
+        for my $line (@ips) {
+            if ($line =~ /inet\s+.*?:($ip_re)\s/) {
+                print STDERR "[+] : Adding $1 to local_ips\n" if $debug;
+                $local_ips{$1} = '';
+            }
         }
     }
     return;
@@ -9273,13 +9308,25 @@ sub dump_conf() {
     }
     print $fh "\n";
 
-    print $fh "[+] ifconfig output:\n";
-    my @ifconfig_out = @{&run_command($cmds{'ifconfig'}, '-a')};
-    if (@ifconfig_out) {
-        for (@ifconfig_out) {
-            s/$ip_re/x.x.x.x/g;
-            s/inet6\s+addr:\s+\S+/inet6 addr: (removed)/;
-            print $fh $_;
+    if (defined $config{'IFCFGTYPE'} and $config{'IFCFGTYPE'} =~ /iproute2/i) {
+        print $fh "[+] ip addr output:\n";
+        my @ifconfig_out = @{&run_command($cmds{'ip'}, 'addr')};
+        if (@ifconfig_out) {
+            for (@ifconfig_out) {
+                s/$ip_re/x.x.x.x/g;
+                s/inet6\s+\S+/inet6 (removed)/;
+                print $fh $_;
+            }
+        }
+    } else {
+        print $fh "[+] ifconfig output:\n";
+        my @ifconfig_out = @{&run_command($cmds{'ifconfig'}, '-a')};
+        if (@ifconfig_out) {
+            for (@ifconfig_out) {
+                s/$ip_re/x.x.x.x/g;
+                s/inet6\s+addr:\s+\S+/inet6 addr: (removed)/;
+                print $fh $_;
+            }
         }
     }
     print $fh "\n";
@@ -9905,7 +9952,7 @@ sub required_vars() {
         PSADWATCHD_CHECK_INTERVAL PSADWATCHD_MAX_RETRIES SYSLOG_IDENTITY
         SYSLOG_FACILITY SYSLOG_PRIORITY ENABLE_EMAIL_LIMIT_PER_DST
         ENABLE_SYSLOG_FILE IPT_SYSLOG_FILE IPT_WRITE_FWDATA
-        ETC_RSYSLOG_CONF
+        ETC_RSYSLOG_CONF IFCFGTYPE
     );
     &defined_vars(\@required_vars);
     return;

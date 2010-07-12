@@ -432,3 +432,12 @@ Stephen Nims
     - Reported 'Date::Calc::Decode_Month(): argument is not a string at
       /usr/sbin/psad line 1103' bug.  This affected DShield processing and a
       few other areas.
+
+Dan A. Dickey
+    - Submitted a patch to allow psad to use the "ip" command from the iproute2
+      tools to acquire IP addresses from local interfaces.  Dan's description
+      is as follows: "...A main reason for doing this is in the case of multi-
+      homed hosts. ifconfig sets these up on an interface using aliases,
+      iproute2 does not.  So, for a multi-homed interface (eth0 with multiple
+      addresses), ifconfig -a only shows the first one configured and not the
+      rest.  ip addr shows all of the configured addresses...".

@@ -1,4 +1,4 @@
-psad-2.1.7 (07/11/2010):
+psad-2.1.7 (07/14/2010):
     - (Dan A. Dickey) Added the ability to use the "ip" command from the
       iproute2 tools to acquire IP addresses from local interfaces.  Dan's
       description is as follows: "...A main reason for doing this is in the
@@ -6,6 +6,14 @@ psad-2.1.7 (07/11/2010):
       aliases, iproute2 does not.  So, for a multi-homed interface (eth0 with
       multiple addresses), ifconfig -a only shows the first one configured and
       not the rest.  ip addr shows all of the configured addresses...".
+    - Added ENABLE_WHOIS_FORCE_ASCII to replace any non-ascii characters in
+      whois data (which is common with whois lookups against Chinese IP
+      addresses for example) with the string "NA".  This option is disabled by
+      default, but can be useful if errors like the following are seen upon
+      receiving an email alert from psad:
+
+        <<< 554 5.6.1 Eight bit data not allowed
+        554 5.0.0 Service unavailable
 
 psad-2.1.6 (07/09/2010):
     - Bug fix for Decode_Month() calls used to handle date formats and ensure

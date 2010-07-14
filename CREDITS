@@ -441,3 +441,13 @@ Dan A. Dickey
       iproute2 does not.  So, for a multi-homed interface (eth0 with multiple
       addresses), ifconfig -a only shows the first one configured and not the
       rest.  ip addr shows all of the configured addresses...".
+
+Graham Murray
+    - Reported a bug where 8-bit data included in some whois output causes mail
+      delivery problems with the following error:
+
+        <<< 554 5.6.1 Eight bit data not allowed
+        554 5.0.0 Service unavailable
+
+      The fix for this problem was the addition of the ENABLE_WHOIS_FORCE_ASCII
+      functionality.

@@ -6560,6 +6560,13 @@ sub get_whois_info() {
         die "[*] Could not open $whois_datafile: $!";
     @whois_data = <W>;
     close W;
+
+    if ($config{'ENABLE_WHOIS_FORCE_ASCII'} eq 'Y') {
+        for my $line (@whois_data) {
+            $line =~ s/[^\x20-\x7e]/NA/g;
+        }
+    }
+
     return \@whois_data;
 }
 
@@ -9952,7 +9959,7 @@ sub required_vars() {
         PSADWATCHD_CHECK_INTERVAL PSADWATCHD_MAX_RETRIES SYSLOG_IDENTITY
         SYSLOG_FACILITY SYSLOG_PRIORITY ENABLE_EMAIL_LIMIT_PER_DST
         ENABLE_SYSLOG_FILE IPT_SYSLOG_FILE IPT_WRITE_FWDATA
-        ETC_RSYSLOG_CONF IFCFGTYPE
+        ETC_RSYSLOG_CONF IFCFGTYPE ENABLE_WHOIS_FORCE_ASCII
     );
     &defined_vars(\@required_vars);
     return;

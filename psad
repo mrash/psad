@@ -116,8 +116,9 @@
 #   created:
 #
 #       danger_level       - Overall danger level aggregated for all scans.
-#       whois              - Whois information for <src>.
-#       p0f_guess          - Passive OS fingerprint guess.
+#       p0f_guess          - Passive OS fingerprint guess for <src>.
+#       <src/dst>_whois    - Whois information for <src> (or <dst> if src
+#                            is a local IP).
 #       <dst>_email_ctr    - Total email alerts sent for <src>.
 #       <dst>_email_alert  - The most recent email alert for <dst>.
 #       <dst>_packet_ctr   - Packet counters for <dst>.

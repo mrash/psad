@@ -3056,7 +3056,8 @@ sub validate_home_net() {
 
     @local_nets = ();
 
-    return if $config{'HOME_NET'} eq 'any';
+    return if $config{'HOME_NET'} eq 'any'
+        and $config{'ENABLE_INTF_LOCAL_NETS'} eq 'N';
 
     my ($connected_subnets_ar, $connected_subnets_cidr_ar)
         = &get_connected_subnets();
@@ -3123,12 +3124,18 @@ sub validate_home_net() {
 
 sub is_local() {
     my $ip = shift;
+
+    print STDERR "[+] is_local(): $ip..." if $debug;
+
     my $found = 0;
     for my $net (@local_nets) {
         if (ipv4_in_network($net, $ip)) {
             $found = 1;
             last;
         }
+    }
+    if ($debug) {
+        $found == 0 ? print STDERR "no\n" : print STDERR "yes\n";
     }
     return $found;
 }
@@ -4666,7 +4673,6 @@ sub scan_logr() {
             my $dl_file      = "${src_dir}/danger_level";
             my $posf_file    = "${src_dir}/os_guess";
             my $p0f_file     = "${src_dir}/p0f_guess";
-            my $whois_file   = "${src_dir}/whois";
             my $email_file   = "${src_dir}/${dst}_email_alert";
             my $log_sigs     = "${src_dir}/${dst}_signatures";
             my $s_time_file  = "${src_dir}/${dst}_start_time";
@@ -4798,8 +4804,24 @@ sub scan_logr() {
             }
 
             ### get whois info
+            my $whois_which_ip_str = 'source IP';
             unless ($no_whois) {
-                $whois_info_aref = &get_whois_info($src, $whois_file);
+                my $lookup_ip = $src;  ### default
+
+                ### we're most likely interested in the whois information for
+                ### a non local IP address
+                if ($config{'ENABLE_WHOIS_FORCE_SRC_IP'} eq 'N'
+                        and &is_local($src) and not &is_local($dst)) {
+                    $whois_which_ip_str = 'destination IP';
+                    $lookup_ip = $dst;
+                }
+
+                $whois_info_aref = &get_whois_info($lookup_ip,
+                                    "${src_dir}/${lookup_ip}_whois");
+
+                if ($debug and $verbose) {
+                    print STDERR for $whois_info_aref;
+                }
             }
             print STDERR "[+] scan_logr(): generating email.....\n"
                 if $debug;
@@ -5019,7 +5041,7 @@ sub scan_logr() {
             &sys_log($syslog_str);
 
             unless ($no_whois) {
-                print $fh "\n[+] Whois Information:\n";
+                print $fh "\n[+] Whois Information ($whois_which_ip_str):\n";
                 for my $line (@$whois_info_aref) {
                     print $fh $line;
                 }
@@ -6533,6 +6555,9 @@ sub get_dns_info() {
 
 sub get_whois_info() {
     my ($ip, $whois_datafile) = @_;
+
+    print STDERR "[+] get_whois_info() IP: $ip\n" if $debug;
+
     my @whois_data;
     if (defined $whois_cache{$ip}
             and $whois_cache{$ip} < $config{'WHOIS_LOOKUP_THRESHOLD'}
@@ -6563,6 +6588,7 @@ sub get_whois_info() {
 
     if ($config{'ENABLE_WHOIS_FORCE_ASCII'} eq 'Y') {
         for my $line (@whois_data) {
+            ### replace any non-ascii chars in whois output with 'NA'
             $line =~ s/[^\x20-\x7e]/NA/g;
         }
     }
@@ -9960,6 +9986,7 @@ sub required_vars() {
         SYSLOG_FACILITY SYSLOG_PRIORITY ENABLE_EMAIL_LIMIT_PER_DST
         ENABLE_SYSLOG_FILE IPT_SYSLOG_FILE IPT_WRITE_FWDATA
         ETC_RSYSLOG_CONF IFCFGTYPE ENABLE_WHOIS_FORCE_ASCII
+        ENABLE_WHOIS_FORCE_SRC_IP
     );
     &defined_vars(\@required_vars);
     return;

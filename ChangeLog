@@ -15,6 +15,15 @@ psad-2.1.7 (07/14/2010):
         <<< 554 5.6.1 Eight bit data not allowed
         554 5.0.0 Service unavailable
 
+    - Updated psad to issues whois lookups against IP addresses that are not
+      directly connected to the local system.  This is useful for example when
+      an internal system is scanning an external destination system, and the
+      scan is logged in the FORWARD chain.  Issuing whois lookups on the
+      internal system (frequently on RFC 1918 address space) is not usually
+      very useful, but issuing the whois lookup against the destination system
+      gives much more interesting data.  This feature can be disabled with the
+      new ENABLE_WHOIS_FORCE_SRC_IP variable.
+
 psad-2.1.6 (07/09/2010):
     - Bug fix for Decode_Month() calls used to handle date formats and ensure
       proper month handling for iptables log message time stamps.  This bug

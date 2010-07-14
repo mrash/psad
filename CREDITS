@@ -451,3 +451,11 @@ Graham Murray
 
       The fix for this problem was the addition of the ENABLE_WHOIS_FORCE_ASCII
       functionality.
+
+Dean Takemori
+    - Reported a condition where whois lookups were being calculated always on
+      the source IP of suspicious traffic even if the source IP's were on
+      internal directly connected networks (frequently on RFC 1918 address
+      space).  This report led to a change where whois lookups are now done
+      against non-local IP addresses by default (see the ENABLE_WHOIS_LOCAL
+      variable).

@@ -982,7 +982,7 @@ exit 0;
 ### keeps track of tcp flags for each scan, test for snort sid
 ### values in iptables packets (if fwsnort is being used).
 sub check_scan() {
-    my $fw_packets_aref = shift;
+    my $fw_packets_ar = shift;
 
     my %curr_scan = ();
     my %curr_sigs_dl = ();
@@ -992,12 +992,12 @@ sub check_scan() {
 
     my $pkt_ctr = 0;
 
-    my $print_scale_factor = &get_scale_factor($#$fw_packets_aref);
+    my $print_scale_factor = &get_scale_factor($#$fw_packets_ar);
 
     ### loop through all of the packet log messages we have just acquired
     ### from iptables
 
-    PKT: for my $pkt_str (@$fw_packets_aref) {
+    PKT: for my $pkt_str (@$fw_packets_ar) {
 
         ### main packet data structure
         my %pkt = %pkt_NF_init;
@@ -2145,9 +2145,9 @@ sub p0f() {
     print STDERR "[+] p0f(): $src len: $len, frag_bit: $frag_bit, " ,
         "ttl: $ttl, win: $win\n" if $debug;
 
-    my $options_aref = &parse_tcp_options($src, $tcp_options);
+    my $options_ar = &parse_tcp_options($src, $tcp_options);
 
-    unless ($options_aref) {
+    unless ($options_ar) {
         print STDERR "[-] Could not fingerprint remote OS.\n" if $debug;
         return;
     }
@@ -2193,7 +2193,7 @@ sub p0f() {
                         ### window size must be a multiple of maximum
                         ### seqment size
                         my $multiple = $1;
-                        for my $opt_hr (@$options_aref) {
+                        for my $opt_hr (@$options_ar) {
                             if (defined $opt_hr->{$tcp_p0f_opt_types{'M'}}) {
                                 my $mss_val = $opt_hr->{$tcp_p0f_opt_types{'M'}};
                                 if ($win == $mss_val * $multiple) {
@@ -2217,7 +2217,7 @@ sub p0f() {
                             if ($sig_opts[$i] =~ /^([NMWST])/) {
                                 my $sig_letter = $1;
 
-                                unless (defined $options_aref->[$i]->
+                                unless (defined $options_ar->[$i]->
                                         {$tcp_p0f_opt_types{$sig_letter}}) {
                                     next TCPOPTS;  ### could not match tcp option order
                                 }
@@ -2227,30 +2227,30 @@ sub p0f() {
                                 if ($sig_letter eq 'M') {
                                     if ($sig_opts[$i] =~ /M(\d+)/) {
                                         my $sig_mss_val = $1;
-                                        next TCPOPTS unless $options_aref->[$i]->
+                                        next TCPOPTS unless $options_ar->[$i]->
                                             {$tcp_p0f_opt_types{$sig_letter}}
                                                 == $sig_mss_val;
                                     } elsif ($sig_opts[$i] =~ /M\%(\d+)/) {
                                         my $sig_mss_mod_val = $1;
-                                        next TCPOPTS unless (($options_aref->[$i]->
+                                        next TCPOPTS unless (($options_ar->[$i]->
                                             {$tcp_p0f_opt_types{$sig_letter}}
                                                 % $sig_mss_mod_val) == 0);
                                     } ### else it is "M*" which always matches
                                 } elsif ($sig_letter eq 'W') {
                                     if ($sig_opts[$i] =~ /W(\d+)/) {
                                         my $sig_win_val = $1;
-                                        next TCPOPTS unless $options_aref->[$i]->
+                                        next TCPOPTS unless $options_ar->[$i]->
                                             {$tcp_p0f_opt_types{$sig_letter}}
                                                 == $sig_win_val;
                                     } elsif ($sig_opts[$i] =~ /W\%(\d+)/) {
                                         my $sig_win_mod_val = $1;
-                                        next TCPOPTS unless (($options_aref->[$i]->
+                                        next TCPOPTS unless (($options_ar->[$i]->
                                             {$tcp_p0f_opt_types{$sig_letter}}
                                                 % $sig_win_mod_val) == 0);
                                     } ### else it is "W*" which always matches
                                 } elsif ($sig_letter eq 'T') {
                                     if ($sig_opts[$i] =~ /T0/) {
-                                        next TCPOPTS unless $options_aref->[$i]->
+                                        next TCPOPTS unless $options_ar->[$i]->
                                             {$tcp_p0f_opt_types{$sig_letter}}
                                                 == 0;
                                     }  ### else it is just "T" which matches
@@ -4387,9 +4387,9 @@ sub net_overlap() {
 }
 
 sub check_scan_proto() {
-    my ($proto, $scan_href) = @_;
-    for my $dst (keys %$scan_href) {
-        return 1 if defined $scan_href->{$dst}->{$proto};
+    my ($proto, $scan_hr) = @_;
+    for my $dst (keys %$scan_hr) {
+        return 1 if defined $scan_hr->{$dst}->{$proto};
     }
     return 0;
 }
@@ -4450,10 +4450,10 @@ sub write_src_packet_counters() {
 }
 
 sub collect_errors() {
-    my $bad_packets_aref = shift;
+    my $bad_packets_ar = shift;
     open ERR, ">> $config{'FW_ERROR_LOG'}" or die '[*] Could not open ',
         "$config{'FW_ERROR_LOG'}: $!";
-    for my $line (@$bad_packets_aref) {
+    for my $line (@$bad_packets_ar) {
         print ERR $line;
     }
     close ERR;
@@ -4639,7 +4639,7 @@ sub scan_logr() {
             my $tcp_f  = 0;
             my $udp_f  = 0;
             my $icmp_f = 0;
-            my $whois_info_aref;
+            my $whois_info_ar;
 
             ### get the current danger level and the absolute number
             ### of packets used in the scan so far
@@ -4817,11 +4817,11 @@ sub scan_logr() {
                     $lookup_ip = $dst;
                 }
 
-                $whois_info_aref = &get_whois_info($lookup_ip,
+                $whois_info_ar = &get_whois_info($lookup_ip,
                                     "${src_dir}/${lookup_ip}_whois");
 
                 if ($debug and $verbose) {
-                    print STDERR for $whois_info_aref;
+                    print STDERR for $whois_info_ar;
                 }
             }
             print STDERR "[+] scan_logr(): generating email.....\n"
@@ -5043,7 +5043,7 @@ sub scan_logr() {
 
             unless ($no_whois) {
                 print $fh "\n[+] Whois Information ($whois_which_ip_str):\n";
-                for my $line (@$whois_info_aref) {
+                for my $line (@$whois_info_ar) {
                     print $fh $line;
                 }
             }
@@ -5542,28 +5542,28 @@ sub flush_auto_blocked_ips() {
             my $from_chain = $hr->{'from_chain'};
             my $to_chain   = $hr->{'to_chain'};
 
-            my ($rv, $out_aref, $err_aref)
+            my ($rv, $out_ar, $err_ar)
                 = $ipt->chain_exists($table, $to_chain);
 
             if ($rv) {
                 if ($fw_del_chains) {
-                    ($rv, $out_aref, $err_aref) = $ipt->delete_chain($table,
+                    ($rv, $out_ar, $err_ar) = $ipt->delete_chain($table,
                         $from_chain, $to_chain);
                     if ($rv) {
                         &sys_log("deleted $table table $to_chain chain");
                     } else {
                         &sys_log("could not delete $table " .
                             "table $to_chain chain");
-                        &sys_log_mline($err_aref);
+                        &sys_log_mline($err_ar);
                     }
                 } else {
-                    ($rv, $out_aref, $err_aref)
+                    ($rv, $out_ar, $err_ar)
                         = $ipt->flush_chain($table, $to_chain);
                     if ($rv) {
                         &sys_log("flushed: $to_chain");
                     } else {
                         &sys_log("could not flush: $to_chain");
-                        &sys_log_mline($err_aref);
+                        &sys_log_mline($err_ar);
                     }
                 }
             }
@@ -5695,25 +5695,25 @@ sub ipt_block() {
                 if $debug;
 
             ### make sure "to_chain" exists
-            my ($rv, $out_aref, $err_aref)
+            my ($rv, $out_ar, $err_ar)
                 = $ipt->create_chain($table, $to_chain);
 
             unless ($rv) {
                 my $msg = "could not create $table $to_chain chain";
                 &sys_log($msg);
-                &sys_log_mline($err_aref);
+                &sys_log_mline($err_ar);
                 print STDERR "[-] ipt_block(): $msg\n" if $debug;
                 next;
             }
 
             ### add jump rule to the "to_chain" from the "from_chain"
-            ($rv, $out_aref, $err_aref) = $ipt->add_jump_rule($table,
+            ($rv, $out_ar, $err_ar) = $ipt->add_jump_rule($table,
                 $from_chain, $jump_rule_position, $to_chain);
 
             unless ($rv) {
                 my $msg = "could not add jump rule to $to_chain chain";
                 &sys_log($msg);
-                &sys_log_mline($err_aref);
+                &sys_log_mline($err_ar);
                 print STDERR "[-] ipt_block(): $msg\n" if $debug;
                 next;
             }
@@ -5735,7 +5735,7 @@ sub ipt_block() {
                 "already exists.\n" if $debug;
             $already_blocked = 1;
         } else {
-            my ($rv, $out_aref, $err_aref) = $ipt->add_ip_rule($src, $dst,
+            my ($rv, $out_ar, $err_ar) = $ipt->add_ip_rule($src, $dst,
                 $auto_rule_position, $table, $to_chain, $target);
             if ($rv) {
                 print STDERR "[+] Test1 block success.\n" if $debug;
@@ -5743,7 +5743,7 @@ sub ipt_block() {
             } else {
                 my $msg = "could not add block rule for $src -> $dst";
                 &sys_log($msg);
-                &sys_log_mline($err_aref);
+                &sys_log_mline($err_ar);
                 print STDERR "[-] ipt_block(): $msg\n" if $debug;
             }
         }
@@ -5760,7 +5760,7 @@ sub ipt_block() {
                     "already exists.\n" if $debug;
                 $already_blocked = 1;
             } else {
-                my ($rv, $out_aref, $err_aref) = $ipt->add_ip_rule($src2, $dst2,
+                my ($rv, $out_ar, $err_ar) = $ipt->add_ip_rule($src2, $dst2,
                     $auto_rule_position, $table, $to_chain, $target);
                 if ($rv) {
                     print STDERR "[+] Test2 block success.\n" if $debug;
@@ -5768,7 +5768,7 @@ sub ipt_block() {
                 } else {
                     my $msg = "could not add block rule for $src2 -> $dst2";
                     &sys_log($msg);
-                    &sys_log_mline($err_aref);
+                    &sys_log_mline($err_ar);
                     print STDERR "[-] ipt_block(): $msg\n" if $debug;
                 }
             }
@@ -5858,14 +5858,14 @@ sub ipt_rm_block() {
             $dst = $ip;
         }
 
-        my ($rv, $out_aref, $err_aref) = $ipt->delete_ip_rule($src, $dst,
+        my ($rv, $out_ar, $err_ar) = $ipt->delete_ip_rule($src, $dst,
             $table, $to_chain, $target);
         if ($rv) {
             $rm_block = 1;
         } else {
             my $msg = "could not delete rule for $src -> $dst";
             &sys_log($msg);
-            &sys_log_mline($err_aref);
+            &sys_log_mline($err_ar);
             print STDERR "[-] ipt_rm_block(): $msg\n" if $debug;
         }
 
@@ -5873,14 +5873,14 @@ sub ipt_rm_block() {
             ### need to delete reverse rule for FORWARD chain
             my $src2 = $dst;
             my $dst2 = $src;
-            ($rv, $out_aref, $err_aref) = $ipt->delete_ip_rule($src2, $dst2,
+            ($rv, $out_ar, $err_ar) = $ipt->delete_ip_rule($src2, $dst2,
                 $table, $to_chain, $target);
             if ($rv) {
                 $rm_block = 1;
             } else {
                 my $msg = "could not delete rule for $src -> $dst";
                 &sys_log($msg);
-                &sys_log_mline($err_aref);
+                &sys_log_mline($err_ar);
                 print STDERR "[-] ipt_rm_block(): $msg\n" if $debug;
             }
         }
@@ -5942,15 +5942,15 @@ sub ipt_list_auto_chains() {
         my $table    = $hr->{'table'};
         my $to_chain = $hr->{'to_chain'};
 
-        my ($rv, $out_aref, $err_aref)
+        my ($rv, $out_ar, $err_ar)
             = $ipt->chain_exists($table, $to_chain);
 
         if ($rv) {
-            ($rv, $out_aref, $err_aref) =
+            ($rv, $out_ar, $err_ar) =
                 $ipt->run_ipt_cmd("$cmds{'iptables'} -t " .
                     "$table -n -L $to_chain -v");
-            if ($rv and $out_aref) {
-                print for @$out_aref;
+            if ($rv and $out_ar) {
+                print for @$out_ar;
             }
             print "\n";
         } else {
@@ -5961,10 +5961,10 @@ sub ipt_list_auto_chains() {
 }
 
 sub check_ipt_cmd() {
-    my $lines_aref = shift;
+    my $lines_ar = shift;
 
     my %uniq_cmds = ();
-    for my $line (@$lines_aref) {
+    for my $line (@$lines_ar) {
         chomp $line;
         next if defined $uniq_cmds{$line};
         $uniq_cmds{$line} = '';
@@ -6360,7 +6360,7 @@ sub build_ipt_config() {
                     if $debug;
                 next VAR;
             }
-            my ($rv, $out_aref, $err_aref)
+            my ($rv, $out_ar, $err_ar)
                 = $ipt->chain_exists($hsh{'table'}, $hsh{'from_chain'});
 
             if ($rv) {
@@ -9621,8 +9621,8 @@ sub expand_vars() {
 ### this subroutine is passed different variables by each script that
 ### correspond to only those variables needed be each script).
 sub defined_vars() {
-    my $varnames_aref = shift;
-    for my $var (@$varnames_aref) {
+    my $varnames_ar = shift;
+    for my $var (@$varnames_ar) {
         unless (defined $config{$var}) {  ### missing var
             die "[*] The config file \"$config_file\" does not " .
                   "contain the\nvariable: \"$var\".  Exiting!";
@@ -9736,9 +9736,9 @@ sub write_pid() {
 
 ### write command line to cmd file
 sub write_cmd_line() {
-    my ($args_aref, $cmdline_file) = @_;
+    my ($args_ar, $cmdline_file) = @_;
     open CMD, "> $cmdline_file";
-    print CMD "@$args_aref\n";
+    print CMD "@$args_ar\n";
     close CMD;
     chmod 0600, $cmdline_file;
     return;

@@ -554,8 +554,8 @@ sub install() {
         ### admin may have configured the firewall to use a logging prefix
         ### of "Audit" or something else other than the default string
         ### "DROP".
-        my $fw_search_aref = &get_fw_search_strings();
-        if ($fw_search_aref) {
+        my $fw_search_ar = &get_fw_search_strings();
+        if ($fw_search_ar) {
             open F, "< $config{'PSAD_CONF_DIR'}/psad.conf"
                 or die "[*] Could not open ",
                     "$config{'PSAD_CONF_DIR'}/psad.conf: $!";
@@ -566,7 +566,7 @@ sub install() {
                     "$config{'PSAD_CONF_DIR'}/psad.conf.tmp: $!";
             for my $line (@lines) {
                 if ($line =~ /^\s*FW_MSG_SEARCH\s/) {
-                    for my $fw_str (@$fw_search_aref) {
+                    for my $fw_str (@$fw_search_ar) {
                         &logr(qq{[+] Setting FW_MSG_SEARCH to "$fw_str" } .
                             "in $config{'PSAD_CONF_DIR'}/psad.conf\n");
                         printf T "%-28s%s;\n", 'FW_MSG_SEARCH', $fw_str;

@@ -28,14 +28,16 @@
 #ifdef HAVE_GETOPT_LONG
 #include <getopt.h>
 #endif
+#include <fcntl.h>
 #include <string.h>
 #include <time.h>
 #include <sys/types.h>
-/*#define HAVE_XCRYPT 0*/
 #ifdef HAVE_XCRYPT
 #include <xcrypt.h>
 #include <sys/stat.h>
-#include <fcntl.h>
+#endif
+#ifdef HAVE_GETTIMEOFDAY
+#include <sys/time.h>
 #endif
 
 /* Application-specific */
@@ -55,6 +57,9 @@ static const struct option longopts[] = {
     {"version",		no_argument,		NULL, 'V'},
     {NULL,		0,			NULL, 0  }
 };
+#else
+extern char *optarg;
+extern int optind;
 #endif
 
 static const char valid_salts[] = "abcdefghijklmnopqrstuvwxyz"
@@ -63,43 +68,49 @@ static const char valid_salts[] = "abcdefghijklmnopqrstuvwxyz"
 struct crypt_method {
     const char *method;		/* short name used by the command line option */
     const char *prefix;		/* salt prefix */
-    const unsigned int len;	/* salt lenght */
+    const unsigned int minlen;	/* minimum salt length */
+    const unsigned int maxlen;	/* maximum salt length */
     const unsigned int rounds;	/* supports a variable number of rounds */
     const char *desc;		/* long description for the methods list */
 };
 
 static const struct crypt_method methods[] = {
-    /* method		prefix	len rounds description */
-    { "des",		"",	2,  0,
+    /* method		prefix	minlen,	maxlen	rounds description */
+    { "des",		"",	2,	2,	0,
 	N_("standard 56 bit DES-based crypt(3)") },
-    { "md5",		"$1$",	8,  0, "MD5" },
+    { "md5",		"$1$",	8,	8,	0, "MD5" },
 #if defined FreeBSD
-    { "bf",		"$2$",  22, 0, "Blowfish (FreeBSD)" },
+    { "bf",		"$2$",  22,	22,	0, "Blowfish (FreeBSD)" },
 #endif
-#if defined OpenBSD || defined HAVE_XCRYPT
-    { "bf",		"$2a$", 22, 1, "Blowfish" },
+#if defined OpenBSD || (defined __SVR4 && defined __sun) || defined HAVE_XCRYPT
+    { "bf",		"$2a$", 22,	22,	1, "Blowfish" },
 #endif
 #if defined FreeBSD
-    { "nt",		"$3$",   0, 0, "NT-Hash" },
+    { "nt",		"$3$",  0,	0,	0, "NT-Hash" },
 #endif
 #if defined HAVE_SHA_CRYPT
     /* http://people.redhat.com/drepper/SHA-crypt.txt */
-    { "sha-256",	"$5$",	16, 1, "SHA-256" },
-    { "sha-512",	"$6$",	16, 1, "SHA-512" },
+    { "sha-256",	"$5$",	8,	16,	1, "SHA-256" },
+    { "sha-512",	"$6$",	8,	16,	1, "SHA-512" },
 #endif
     /* http://www.crypticide.com/dropsafe/article/1389 */
-/* proper support is hard since solaris >= 9 supports pluggable methods
+    /*
+     * Actually the maximum salt length is arbitrary, but Solaris by default
+     * always uses 8 characters:
+     * http://cvs.opensolaris.org/source/xref/onnv/onnv-gate/ \
+     *   usr/src/lib/crypt_modules/sunmd5/sunmd5.c#crypt_gensalt_impl
+     */
 #if defined __SVR4 && defined __sun
-    { "sunmd5",		"$md5$", ?, 1, "SunMD5" },
-*/
-#if defined HAVE_XCRYPT
-    { "sha",		"{SHA}", 0, 0, "SHA-1" },
+    { "sunmd5",		"$md5$", 8,	8,	1, "SunMD5" },
 #endif
-    { NULL,		NULL,	 0, 0, NULL }
+#if defined HAVE_XCRYPT
+    { "sha",		"{SHA}", 0,	0,	0, "SHA-1" },
+#endif
+    { NULL,		NULL,	0,	0,	0, NULL }
 };
 
 void generate_salt(char *const buf, const unsigned int len);
-void *gather_entropy(const int len);
+void *get_random_bytes(const int len);
 void display_help(void);
 void display_version(void);
 void display_methods(void);
@@ -108,7 +119,8 @@ int main(int argc, char *argv[])
 {
     int ch, i;
     int password_fd = -1;
-    unsigned int salt_len = 0;
+    unsigned int salt_minlen = 0;
+    unsigned int salt_maxlen = 0;
     unsigned int rounds_support = 0;
     const char *salt_prefix = NULL;
     const char *salt_arg = NULL;
@@ -126,8 +138,12 @@ int main(int argc, char *argv[])
     /* prepend options from environment */
     argv = merge_args(getenv("MKPASSWD_OPTIONS"), argv, &argc);
 
-    while ((ch = GETOPT_LONGISH(argc, argv, "hH:m:P:R:sSV", longopts, 0)) > 0) {
+    while ((ch = GETOPT_LONGISH(argc, argv, "hH:m:5P:R:sS:V", longopts, 0))
+	    > 0) {
 	switch (ch) {
+	case '5':
+	    optarg = (char *) "md5";
+	    /* fall through */
 	case 'm':
 	case 'H':
 	    if (!optarg || strcaseeq("help", optarg)) {
@@ -137,7 +153,8 @@ int main(int argc, char *argv[])
 	    for (i = 0; methods[i].method != NULL; i++)
 		if (strcaseeq(methods[i].method, optarg)) {
 		    salt_prefix = methods[i].prefix;
-		    salt_len = methods[i].len;
+		    salt_minlen = methods[i].minlen;
+		    salt_maxlen = methods[i].maxlen;
 		    rounds_support = methods[i].rounds;
 		    break;
 		}
@@ -200,7 +217,8 @@ int main(int argc, char *argv[])
 
     /* default: DES password */
     if (!salt_prefix) {
-	salt_len = methods[0].len;
+	salt_minlen = methods[0].minlen;
+	salt_maxlen = methods[0].maxlen;
 	salt_prefix = methods[0].prefix;
     }
 
@@ -216,11 +234,19 @@ int main(int argc, char *argv[])
 
     if (salt_arg) {
 	unsigned int c = strlen(salt_arg);
-	/* XXX: should support methods which support variable-length salts */
-	if (c != salt_len) {
-	    fprintf(stderr,
-		    _("Wrong salt length: %d byte(s) when %d expected.\n"),
-		    c, salt_len);
+	if (c < salt_minlen || c > salt_maxlen) {
+	    if (salt_minlen == salt_maxlen)
+		fprintf(stderr, ngettext(
+			"Wrong salt length: %d byte when %d expected.\n",
+			"Wrong salt length: %d bytes when %d expected.\n", c),
+			c, salt_maxlen);
+	    else
+		fprintf(stderr, ngettext(
+			"Wrong salt length: %d byte when %d <= n <= %d"
+			" expected.\n",
+			"Wrong salt length: %d bytes when %d <= n <= %d"
+			" expected.\n", c),
+			c, salt_minlen, salt_maxlen);
 	    exit(1);
 	}
 	while (c-- > 0) {
@@ -239,7 +265,7 @@ int main(int argc, char *argv[])
 	strcat(salt, salt_arg);
     } else {
 #ifdef HAVE_XCRYPT
-	void *entropy = gather_entropy(64);
+	void *entropy = get_random_bytes(64);
 
 	salt = crypt_gensalt(salt_prefix, rounds, entropy, 64);
 	if (!salt) {
@@ -248,6 +274,13 @@ int main(int argc, char *argv[])
 	}
 	free(entropy);
 #else
+	unsigned int salt_len = salt_maxlen;
+
+	if (salt_minlen != salt_maxlen) { /* salt length can vary */
+	    srand(time(NULL) + getpid());
+	    salt_len = rand() % (salt_maxlen - salt_minlen + 1) + salt_minlen;
+	}
+
 	salt = NOFAIL(malloc(strlen(salt_prefix) + strlen(rounds_str)
 		+ salt_len + 1));
 	*salt = '\0';
@@ -315,13 +348,8 @@ int main(int argc, char *argv[])
     exit(0);
 }
 
-#ifdef HAVE_XCRYPT
-
-#ifndef RANDOM_DEVICE
-#define RANDOM_DEVICE "/dev/urandom"
-#endif
-
-void* gather_entropy(const int count)
+#ifdef RANDOM_DEVICE
+void* get_random_bytes(const int count)
 {
     char *buf;
     int fd;
@@ -329,31 +357,63 @@ void* gather_entropy(const int count)
     buf = NOFAIL(malloc(count));
     fd = open(RANDOM_DEVICE, O_RDONLY);
     if (fd < 0) {
-	perror("open");
+	perror("open(" RANDOM_DEVICE ")");
 	exit(2);
     }
     if (read(fd, buf, count) != count) {
-	perror("open");
+	if (count < 0)
+	    perror("read(" RANDOM_DEVICE ")");
+	else
+	    fprintf(stderr, "Short read of %s.\n", RANDOM_DEVICE);
 	exit(2);
     }
     close(fd);
 
     return buf;
 }
+#endif
 
-#else
+#ifdef RANDOM_DEVICE
 
 void generate_salt(char *const buf, const unsigned int len)
 {
     unsigned int i;
 
+    unsigned char *entropy = get_random_bytes(len * sizeof(unsigned char));
+    for (i = 0; i < len; i++)
+	buf[i] = valid_salts[entropy[i] % (sizeof valid_salts - 1)];
+    buf[i] = '\0';
+}
+
+#else /* RANDOM_DEVICE */
+
+void generate_salt(char *const buf, const unsigned int len)
+{
+    unsigned int i;
+
+# ifdef HAVE_GETTIMEOFDAY
+    struct timeval tv;
+
+    gettimeofday(&tv, NULL);
+    srand(tv.tv_sec ^ tv.tv_usec);
+
+# else /* HAVE_GETTIMEOFDAY */
+#  warning "This system lacks a strong enough random numbers generator!"
+
+    /*
+     * The possible values of time over one year are 31536000, which is
+     * two orders of magnitude less than the allowed entropy range (2^32).
+     */
     srand(time(NULL) + getpid());
+
+# endif /* HAVE_GETTIMEOFDAY */
+
     for (i = 0; i < len; i++)
 	buf[i] = valid_salts[rand() % (sizeof valid_salts - 1)];
     buf[i] = '\0';
 }
 
-#endif
+#endif /* RANDOM_DEVICE */
 
 void display_help(void)
 {
@@ -361,6 +421,7 @@ void display_help(void)
 	    "Crypts the PASSWORD using crypt(3).\n\n"));
     fprintf(stderr, _(
 "      -m, --method=TYPE     select method TYPE\n"
+"      -5                    like --method=md5\n"
 "      -S, --salt=SALT       use the specified SALT\n"
 "      -R, --rounds=NUMBER   use the specified NUMBER of rounds\n"
 "      -P, --password-fd=NUM read the password from file descriptor NUM\n"
@@ -378,7 +439,7 @@ void display_help(void)
 
 void display_version(void)
 {
-    printf("GNU mkpasswd %s\n\n", VERSION);
+    printf("mkpasswd %s\n\n", VERSION);
     puts("Copyright (C) 2001-2008 Marco d'Itri\n"
 "This is free software; see the source for copying conditions.  There is NO\n"
 "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.");
@@ -386,7 +447,7 @@ void display_version(void)
 
 void display_methods(void)
 {
-    int i;
+    unsigned int i;
 
     printf(_("Available methods:\n"));
     for (i = 0; methods[i].method != NULL; i++)

@@ -1,20 +1,21 @@
-# Portuguese/Brazil translation of whois.
-# Copyright (C) 2006 Marco d'Itri
+# Chinese (China) translation for whois
+# Copyright (c) (c) 2006 Canonical Ltd, and Rosetta Contributors 2006
 # This file is distributed under the same license as the whois package.
-# Anderson Goulart <globalx@gmail.com>, 2006.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2006.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: whois 4.7.5\n"
+"Project-Id-Version: whois\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2010-01-27 13:38+0100\n"
-"PO-Revision-Date: 2006-04-26 21:03-0300\n"
-"Last-Translator: Anderson Goulart <globalx@gmail.com>\n"
-"Language-Team: Portuguese/Brazil\n"
+"PO-Revision-Date: 2009-10-24 03:59+0000\n"
+"Last-Translator: Feng Liu (Maxim) <maximliu@googlemail.com>\n"
+"Language-Team: Chinese (China) <zh_CN@li.org>\n"
 "MIME-Version: 1.0\n"
-"Content-Type: text/plain; charset=iso-8859-1\n"
+"Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=2; plural=n != 1;\n"
+"X-Launchpad-Export-Date: 2009-11-10 02:44+0000\n"
+"X-Generator: Launchpad (build Unknown)\n"
 
 #: ../whois.c:136
 #, c-format
@@ -23,32 +24,30 @@ msgid ""
 "\n"
 "Report bugs to %s.\n"
 msgstr ""
-"Vers�o %s \n"
+"版本 %s。\n"
 "\n"
-"Reporte bugs para %s \n"
+"将 bugs 提交到 %s。\n"
 
 #: ../whois.c:190 ../whois.c:243 ../whois.c:249 ../whois.c:256 ../whois.c:286
 #, c-format
 msgid "Using server %s.\n"
-msgstr "Utilizando servidor %s.\n"
+msgstr "使用服务器 %s。\n"
 
 #: ../whois.c:228
 msgid "This TLD has no whois server, but you can access the whois database at"
-msgstr ""
-"Este TLD n�o tem servidor whois, mas voc� pode acessar a base de dados do "
-"whois em"
+msgstr "此顶级域名没有 whois 服务器，但您可在这里访问 whois 数据库："
 
 #: ../whois.c:233
 msgid "This TLD has no whois server."
-msgstr "N�o existe servidor whois para este TLD."
+msgstr "此顶级域名没有对应的 whois 服务器。"
 
 #: ../whois.c:236
 msgid "No whois server is known for this kind of object."
-msgstr "Nenhum servidor whois � conhecido para este tipo de objeto."
+msgstr "无针对此类对象的 whois 服务器。"
 
 #: ../whois.c:239
 msgid "Unknown AS number or IP network. Please upgrade this program."
-msgstr "N�mero AS ou rede IP desconhecidos. Por favor, atualize este programa."
+msgstr "未知的 AS 号码或 IP 地址。请升级此程序。"
 
 #: ../whois.c:262
 #, c-format
@@ -58,18 +57,18 @@ msgid ""
 "\n"
 msgstr ""
 "\n"
-"Procurando pela extremidade IPv4 %s de um endere�o IPv6. 6to4.\n"
+"查询和一个6to4 IPv6 地址相对应的 IPv4 终端 %s。\n"
 "\n"
 
 #: ../whois.c:268
-#, fuzzy, c-format
+#, c-format
 msgid ""
 "\n"
 "Querying for the IPv4 endpoint %s of a Teredo IPv6 address.\n"
 "\n"
 msgstr ""
 "\n"
-"Procurando pela extremidade IPv4 %s de um endere�o IPv6. 6to4.\n"
+"查询一个Teredo IPv6 地址相对应的 IPv4 终端 %s。\n"
 "\n"
 
 #: ../whois.c:287
@@ -78,7 +77,7 @@ msgid ""
 "Query string: \"%s\"\n"
 "\n"
 msgstr ""
-"Consulta: \"%s\"\n"
+"查询字符串: \"%s\"\n"
 "\n"
 
 #: ../whois.c:297
@@ -91,44 +90,44 @@ msgid ""
 msgstr ""
 "\n"
 "\n"
-"Uma refer�ncia para�%s encontrada.\n"
+"发现一个到 %s 的引用。\n"
 "\n"
 
 #: ../whois.c:339 ../whois.c:342
 #, c-format
 msgid "Cannot parse this line: %s"
-msgstr "N�o p�de processar esta linha: %s"
+msgstr "不能分析该行：%s"
 
 #: ../whois.c:506
 msgid "Warning: RIPE flags used with a traditional server."
-msgstr "Aviso: RIPE flags utilizados com um servidor tradicional."
+msgstr "警告: 对传统服务器使用了 RIPE 标志。"
 
 #: ../whois.c:657 ../whois.c:806
 msgid ""
 "Catastrophic error: disclaimer text has been changed.\n"
 "Please upgrade this program.\n"
 msgstr ""
-"Erro catastr�fico: o texto das condi��es de uso foi alterado.\n"
-"Por favor, atualize este programa. \n"
+"严重错误: 声明(disclaimer)文本已经被改变。\n"
+"请升级此程序。\n"
 
 #: ../whois.c:858
 #, c-format
 msgid "Host %s not found."
-msgstr "Host %s n�o encontrado."
+msgstr "没有找到主机 %s。"
 
 #: ../whois.c:868
 #, c-format
 msgid "%s/tcp: unknown service"
-msgstr "%s/tcp: servi�o desconhecido"
+msgstr "%s/tcp: 未知服务"
 
 #: ../whois.c:943
 msgid "Timeout."
-msgstr "Tempo esgotado."
+msgstr "超时。"
 
 #: ../whois.c:949
 #, c-format
 msgid "Interrupted by signal %d..."
-msgstr "Interrompido pelo sinal %d..."
+msgstr "被信号 %d 中断..."
 
 #: ../whois.c:1175
 #, c-format
@@ -165,97 +164,91 @@ msgid ""
 "      --help           display this help and exit\n"
 "      --version        output version information and exit\n"
 msgstr ""
-"Uso: whois [OP��ES]... OBJETO...\n"
+"用法: whois [选项]... 对象...\n"
 "\n"
-"-l                     descende em um n�vel a especificidade da busca "
-"[RPSL]\n"
-"-L                     busca as correspond�ncias menos espec�ficas\n"
-"-m                     busca o primeiro n�vel mais espec�fico\n"
-"-M                     busca as correspond�ncias mais espec�ficas\n"
-"-c                     busca a correspond�ncia menos espec�fica que cont�m o "
-"atributo mnt-irt\n"
-"-x                     busca exata [RPSL]\n"
-"-d                     retorna tamb�m objetos de delega��o de DNS reverso "
-"[RPSL]\n"
-"-i ATTR[,ATTR]...      efetua uma busca inversa para os ATTRibutos "
-"especificados\n"
-"-T TIPO[,TIPO]...      busca somente por objetos do TIPO\n"
-"-K                     somente chaves prim�rias s�o retornadas [RPSL]\n"
-"-r                     desabilita buscas recursivas para informa��es de "
-"contatos\n"
-"-R                     mostra a c�pia local do objeto especificado incluso\n"
-"                       se cont�m uma refer�ncia\n"
-"-a                     busca em todas as bases de dados\n"
-"-s SOURCE[,SOURCE]...  busca na base de dados de SOURCE\n"
-"-g SOURCE:FIRST-LAST   encontra atualiza��es de SOURCE da s�rie FIRST at� "
-"LAST\n"
-"-t TIPO                obt�m o modelo para objeto de TIPO ('all' para uma "
-"lista)\n"
-"-v TIPO                obt�m o modelo detalhado para objeto de TIPO\n"
-"-q [version|sources|types]  consulta informa��es sobre o servidor [RPSL]\n"
-"-F                     modo r�pido (implica -r)\n"
-"-h HOST                conecta no servidor HOST\n"
-"-p PORTA                conecta na PORTA\n"
-"-H                     esconde o aviso legal\n"
-"      --verbose        mostra o que est� acontecendo\n"
-"      --help           exibe essa ajuda e sai\n"
-"      --version        exibe informa��es sobre a vers�o e sai\n"
+"-l                     将精确度降低一级的查询 [仅 RPSL]\n"
+"-L                     找到所有低精确度匹配\n"
+"-m                     找到第一级较高精确度匹配\n"
+"-M                     找到所有较高精确度匹配\n"
+"-c                     找到最小的包含一个 mnt-irt 属性的匹配\n"
+"-x                     精确匹配 [仅 RPSL]\n"
+"-d                     同时返回 DNS 反向查询的代理对象[仅 RPSL]\n"
+"-i ATTR[,ATTR]...      为指定的属性(ATTRibutes)进行一次反向查询\n"
+"-T TYPE[,TYPE]...      仅查找指定类型(TYPE)的对象\n"
+"-K                     只返回主键(primary keys) [RPSL only]\n"
+"-r                     查询联系信息(contact information)时关闭递归查询\n"
+"-R                     强制显示本地域名对象(domain object)副本\n"
+"                       即使它包含转介(referral)\n"
+"-a                     搜寻所有数据库\n"
+"-s SOURCE[,SOURCE]...  从指定 SOURCE 中搜寻数据库\n"
+"-g SOURCE:FIRST-LAST   从 SOURCE 中查找更新，按照从开始到结束的序列\n"
+"-t TYPE                为指定类型(TYPE)对象请求模板(template) ('all'为一个列"
+"表)\n"
+"-v TYPE                为指定类型(TYPE)对象请求冗余信息模板(verbose "
+"template) \n"
+"-q [version|sources|types]  查询特定的服务器信息[仅 RPSL]\n"
+"-F                     快速输出原始数据(raw) (隐含 -r)\n"
+"-h HOST                连接到指定 HOST 服务器\n"
+"-p PORT                连接到指定 PORT 端口\n"
+"-H                     隐藏法律声明内容\n"
+"      --verbose        输出冗余的处理信息\n"
+"      --help           显示这个帮助并退出\n"
+"      --version        输出版本信息并退出\n"
 
 #: ../mkpasswd.c:80
-#, fuzzy
 msgid "standard 56 bit DES-based crypt(3)"
-msgstr "\tstandard 56 bit DES-based crypt(3)"
+msgstr "以标准56位DES为基础的 crypt(3)"
 
 #: ../mkpasswd.c:162
-#, fuzzy, c-format
+#, c-format
 msgid "Invalid method '%s'.\n"
-msgstr "N�mero inv�lido '%s'.\n"
+msgstr "无效方式 '%s'。\n"
 
 #: ../mkpasswd.c:171 ../mkpasswd.c:181
 #, c-format
 msgid "Invalid number '%s'.\n"
-msgstr "N�mero inv�lido '%s'.\n"
+msgstr "无效的数字 '%s'。\n"
 
 #: ../mkpasswd.c:199
 #, c-format
 msgid "Try '%s --help' for more information.\n"
-msgstr "Tente '%s --help para maiores informa��es.\n"
+msgstr "尝试用 '%s --help' 获取更多的信息。\n"
 
 #: ../mkpasswd.c:240
-#, c-format
+#, fuzzy, c-format
 msgid "Wrong salt length: %d byte when %d expected.\n"
 msgid_plural "Wrong salt length: %d bytes when %d expected.\n"
-msgstr[0] "Tamanho do salt incorreto: %d byte enquanto %d eram esperados.\n"
-msgstr[1] "Tamanho do salt incorreto: %d bytes enquanto %d eram esperados.\n"
+msgstr[0] "错误的 salt 长度: 当前为 %d 字节，预期长度为 %d 字节。\n"
+msgstr[1] "错误的 salt 长度: 当前为 %d 字节，预期长度为 %d 字节。\n"
 
 #: ../mkpasswd.c:245
-#, c-format
+#, fuzzy, c-format
 msgid "Wrong salt length: %d byte when %d <= n <= %d expected.\n"
 msgid_plural "Wrong salt length: %d bytes when %d <= n <= %d expected.\n"
 msgstr[0] ""
-"Tamanho do salt incorreto: %d byte enquanto %d <= n <= %d eram esperados.\n"
+"错误的 salt 长度: 当前为 %d 字节，预期长度范围为 %d <= n <= %d 字节。\n"
 msgstr[1] ""
-"Tamanho do salt incorreto: %d bytes enquanto %d <= n <= %d eram esperados.\n"
+"错误的 salt 长度: 当前为 %d 字节，预期长度范围为 %d <= n <= %d 字节。\n"
 
 #: ../mkpasswd.c:254
 #, c-format
 msgid "Illegal salt character '%c'.\n"
-msgstr "Caractere salt ilegal '%c'.\n"
+msgstr "非法的 salt 字符 '%c'。\n"
 
 #: ../mkpasswd.c:299 ../mkpasswd.c:326
 #, c-format
 msgid "Password: "
-msgstr "Senha: "
+msgstr "密码: "
 
 #: ../mkpasswd.c:320
 #, c-format
 msgid "Illegal password character '0x%hhx'.\n"
-msgstr "Caractere de senha ilegal '0x%hhx'.\n"
+msgstr "非法的密码字符 '0x%hhx'。\n"
 
 #: ../mkpasswd.c:342
 #, c-format
 msgid "Method not supported by crypt(3).\n"
-msgstr ""
+msgstr "不被 crypt(3) 支持的方法。\n"
 
 #: ../mkpasswd.c:420
 #, c-format
@@ -264,8 +257,8 @@ msgid ""
 "Crypts the PASSWORD using crypt(3).\n"
 "\n"
 msgstr ""
-"Uso: mkpasswd [OP��ES]... [PASSWORD [SALT]]\n"
-"Encripta a PASSWORD utilizando crypt(3).\n"
+"用法： mkpasswd [OPTIONS]... [PASSWORD [SALT]]\n"
+"用 crypt(3) 加密 PASSWORD。\n"
 "\n"
 
 #: ../mkpasswd.c:423
@@ -287,24 +280,22 @@ msgid ""
 "\n"
 "Report bugs to %s.\n"
 msgstr ""
-"      -H, --hash=TYPE       seleciona o hash TYPE\n"
-"      -S, --salt=SALT       usa o SALT espec�fico\n"
-"      -P, --password-fd=NUM l� a senha do descritor de arquivo NUM\n"
-"                            ao inv�s do /dev/tty\n"
-"      -s, --stdin           como em --password-fd=0\n"
-"      -h, --help            exibe essa ajuda e sai\n"
-"      -V, --version         exibe informa��es sobre a vers�o e sai\n"
+"      -m, --method=TYPE \t选择使用 TYPE 的方法\n"
+"      -S, --salt=SALT \t\t使用指定 SALT\n"
+"      -R, --rounds=NUMBER \t使用指定的循环次数\n"
+"      -P, --password-fd=NUM \t从文件描述符 NUM 中读取密码来\n"
+"\t\t\t\t替代从 /dev/tty 中获取密码\n"
+"      -s, --stdin \t\t同 --password-fd=0\n"
+"      -h, --help \t\t显示帮助信息并退出\n"
+"      -V, --version \t\t输出版本信息并退出\n"
 "\n"
-"Se PASSWORD estiver faltando, ent�o este ser� requisitado interativamente.\n"
-"Se nenhum SALT for especificado, um rand�mico � gerado.\n"
-"Se TYPE � igual a 'help', os algoritmos dispon�veis s�o exibidos.\n"
+"如果密码不存在，将会要求输入密码。\n"
+"如果未指定，将会随机生成一个SALT。\n"
+"如果类型是 'help'，显示所有可用的方式。\n"
 "\n"
-"Reporte bugs para %s.\n"
+"请将BUGS提交给 %s。\n"
 
 #: ../mkpasswd.c:452
-#, fuzzy, c-format
+#, c-format
 msgid "Available methods:\n"
-msgstr "Algoritmos dispon�veis: \n"
-
-#~ msgid "Invalid hash type '%s'.\n"
-#~ msgstr "Hash-type inv�lido '%s'.\n"
+msgstr "可用方式：\n"

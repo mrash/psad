@@ -6,15 +6,16 @@ msgid ""
 msgstr ""
 "Project-Id-Version: whois 4.6.9\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2008-03-23 22:06+0100\n"
+"POT-Creation-Date: 2010-01-27 13:38+0100\n"
 "PO-Revision-Date: 2003-12-10 08:51+0200\n"
 "Last-Translator: Velonis Petros <velonis@freemail.gr>\n"
 "Language-Team: Greek <velonis@freemail.gr>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
 
-#: ../whois.c:117
+#: ../whois.c:136
 #, c-format
 msgid ""
 "Version %s.\n"
@@ -25,35 +26,33 @@ msgstr ""
 "\n"
 "Αναφέρατε σφάλματα στο %s.\n"
 
-#: ../whois.c:167 ../whois.c:227 ../whois.c:233 ../whois.c:240 ../whois.c:246
-#: ../whois.c:273
+#: ../whois.c:190 ../whois.c:243 ../whois.c:249 ../whois.c:256 ../whois.c:286
 #, c-format
 msgid "Using server %s.\n"
 msgstr "Γίνεται χρήση του εξυπηρετητή %s.\n"
 
-#: ../whois.c:209
+#: ../whois.c:228
 msgid "This TLD has no whois server, but you can access the whois database at"
 msgstr ""
 "Αυτό το TLD δεν έχει εξυπηρετητή whois, ωστόσο μπορείτε να προσπελάσετε την "
 "βάση whois στο"
 
-#: ../whois.c:217
+#: ../whois.c:233
 msgid "This TLD has no whois server."
 msgstr "Αυτό το TLD δεν έχει εξυπηρετητή whois."
 
-#: ../whois.c:220
+#: ../whois.c:236
 msgid "No whois server is known for this kind of object."
 msgstr ""
 "Κανένας εξυπηρετητής whois δεν είναι γνωστός για αυτού του είδους το "
 "αντικείμενο."
 
-#: ../whois.c:223
+#: ../whois.c:239
 msgid "Unknown AS number or IP network. Please upgrade this program."
 msgstr ""
 "Άγνωστος αριθμός AS ή IP δικτύου. Παρακαλώ αναβαθμίστε αυτό το πρόγραμμα."
 
-#. XXX should fail if p = 0.0.0.0
-#: ../whois.c:253
+#: ../whois.c:262
 #, c-format
 msgid ""
 "\n"
@@ -64,7 +63,7 @@ msgstr ""
 "Άντληση πληροφοριών για το σημείο τέλους IPv4 %s μιας διεύθυνσης 6to4 IPv6.\n"
 "\n"
 
-#: ../whois.c:260
+#: ../whois.c:268
 #, fuzzy, c-format
 msgid ""
 "\n"
@@ -75,7 +74,7 @@ msgstr ""
 "Άντληση πληροφοριών για το σημείο τέλους IPv4 %s μιας διεύθυνσης 6to4 IPv6.\n"
 "\n"
 
-#: ../whois.c:274
+#: ../whois.c:287
 #, c-format
 msgid ""
 "Query string: \"%s\"\n"
@@ -84,7 +83,7 @@ msgstr ""
 "Αλφαριθμητικό ερώτησης: \"%s\"\n"
 "\n"
 
-#: ../whois.c:284
+#: ../whois.c:297
 #, c-format
 msgid ""
 "\n"
@@ -97,18 +96,18 @@ msgstr ""
 "Βρέθηκε αναφορά στο %s.\n"
 "\n"
 
-#: ../whois.c:327 ../whois.c:330
+#: ../whois.c:339 ../whois.c:342
 #, c-format
 msgid "Cannot parse this line: %s"
 msgstr "Αδύνατη η ανάλυση αυτής της γραμμής: %s"
 
-#: ../whois.c:483
+#: ../whois.c:506
 msgid "Warning: RIPE flags used with a traditional server."
 msgstr ""
 "Προειδοποίηση: Η σημαίες του RIPE χρησιμοποιούνται σε έναν παραδοσιακό "
 "εξυπηρετητή."
 
-#: ../whois.c:621 ../whois.c:754
+#: ../whois.c:657 ../whois.c:806
 msgid ""
 "Catastrophic error: disclaimer text has been changed.\n"
 "Please upgrade this program.\n"
@@ -116,26 +115,26 @@ msgstr ""
 "Καταστροφικό σφάλμα: το κείμενο της αποποίησης ευθυνών έχει τροποποιηθεί.\n"
 "Παρακαλώ αναβαθμίστε το πρόγραμμα.\n"
 
-#: ../whois.c:795
+#: ../whois.c:858
 #, c-format
 msgid "Host %s not found."
 msgstr "Το σύστημα %s δε βρέθηκε."
 
-#: ../whois.c:805
+#: ../whois.c:868
 #, c-format
 msgid "%s/tcp: unknown service"
 msgstr "%s/tcp: άγνωστη υπηρεσία"
 
-#: ../whois.c:824
+#: ../whois.c:943
 msgid "Timeout."
 msgstr "Διάλειμμα."
 
-#: ../whois.c:830
+#: ../whois.c:949
 #, c-format
 msgid "Interrupted by signal %d..."
 msgstr "Διακοπή από το σήμα %d..."
 
-#: ../whois.c:1000
+#: ../whois.c:1175
 #, c-format
 msgid ""
 "Usage: whois [OPTION]... OBJECT...\n"
@@ -209,52 +208,61 @@ msgstr ""
 "     --help             εμφάνιση αυτής της βοήθειας και έξοδος\n"
 "     --version        εμφάνιση της έκδοσης και έξοδος\n"
 
-#: ../mkpasswd.c:65
+#: ../mkpasswd.c:80
 #, fuzzy
 msgid "standard 56 bit DES-based crypt(3)"
 msgstr "\tκαθεριερωμένη 56 bit με βάση το DES crypt(3)"
 
-#: ../mkpasswd.c:134
+#: ../mkpasswd.c:162
 #, fuzzy, c-format
 msgid "Invalid method '%s'.\n"
 msgstr "Μη αποδεκτό νούμερο '%s'.\n"
 
-#: ../mkpasswd.c:143 ../mkpasswd.c:153
+#: ../mkpasswd.c:171 ../mkpasswd.c:181
 #, c-format
 msgid "Invalid number '%s'.\n"
 msgstr "Μη αποδεκτό νούμερο '%s'.\n"
 
-#: ../mkpasswd.c:171
+#: ../mkpasswd.c:199
 #, c-format
 msgid "Try '%s --help' for more information.\n"
 msgstr "Προσπάθησε '%s --help' για περισσότερες πληροφορίες.\n"
 
-#: ../mkpasswd.c:211
-#, c-format
-msgid "Wrong salt length: %d byte(s) when %d expected.\n"
-msgstr "Εσφαλμένο μήκος salt : %d byte(s) όταν αναμένεται %d .\n"
+#: ../mkpasswd.c:240
+#, fuzzy, c-format
+msgid "Wrong salt length: %d byte when %d expected.\n"
+msgid_plural "Wrong salt length: %d bytes when %d expected.\n"
+msgstr[0] "Εσφαλμένο μήκος salt : %d byte(s) όταν αναμένεται %d .\n"
+msgstr[1] "Εσφαλμένο μήκος salt : %d byte(s) όταν αναμένεται %d .\n"
 
-#: ../mkpasswd.c:217
+#: ../mkpasswd.c:245
+#, fuzzy, c-format
+msgid "Wrong salt length: %d byte when %d <= n <= %d expected.\n"
+msgid_plural "Wrong salt length: %d bytes when %d <= n <= %d expected.\n"
+msgstr[0] "Εσφαλμένο μήκος salt : %d byte(s) όταν αναμένεται %d .\n"
+msgstr[1] "Εσφαλμένο μήκος salt : %d byte(s) όταν αναμένεται %d .\n"
+
+#: ../mkpasswd.c:254
 #, c-format
 msgid "Illegal salt character '%c'.\n"
 msgstr "Μη αποδεκτός χαρακτήρας salt  '%c'.\n"
 
-#: ../mkpasswd.c:254 ../mkpasswd.c:281
+#: ../mkpasswd.c:299 ../mkpasswd.c:326
 #, c-format
 msgid "Password: "
 msgstr "Συνθηματικό: "
 
-#: ../mkpasswd.c:275
+#: ../mkpasswd.c:320
 #, c-format
 msgid "Illegal password character '0x%hhx'.\n"
 msgstr "Μη αποδεκτός χαρακτήρας συνθηματικού '0x%hhx'.\n"
 
-#: ../mkpasswd.c:297
+#: ../mkpasswd.c:342
 #, c-format
 msgid "Method not supported by crypt(3).\n"
 msgstr ""
 
-#: ../mkpasswd.c:360
+#: ../mkpasswd.c:420
 #, c-format
 msgid ""
 "Usage: mkpasswd [OPTIONS]... [PASSWORD [SALT]]\n"
@@ -265,10 +273,11 @@ msgstr ""
 "Κρυπτογραφεί το ΣΥΝΘΗΜΑΤΙΚΟ χρησιμοποιώντας το crypt(3).\n"
 "\n"
 
-#: ../mkpasswd.c:363
+#: ../mkpasswd.c:423
 #, fuzzy, c-format
 msgid ""
 "      -m, --method=TYPE     select method TYPE\n"
+"      -5                    like --method=md5\n"
 "      -S, --salt=SALT       use the specified SALT\n"
 "      -R, --rounds=NUMBER   use the specified NUMBER of rounds\n"
 "      -P, --password-fd=NUM read the password from file descriptor NUM\n"
@@ -298,7 +307,7 @@ msgstr ""
 "\n"
 "Αναφέρατε σφάλματα στο %s.\n"
 
-#: ../mkpasswd.c:391
+#: ../mkpasswd.c:452
 #, fuzzy, c-format
 msgid "Available methods:\n"
 msgstr "Διαθέσιμοι αλγόριθμοι:\n"

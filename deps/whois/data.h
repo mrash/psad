@@ -21,8 +21,10 @@ const char *ripe_servers[] = {
     "whois.arnes.si",
     "www.registry.co.ug",
     "whois.nic.ir",
+    "whois.pandi.or.id",
     "whois.nic.ck",
     "whois.ra.net",
+    "whois.bgpmon.net",
     NULL
 };
 
@@ -45,7 +47,7 @@ const char *hide_strings[] = {
     "Access to America Online", "time. By accessing",		/* AOL */
     "% Access and use restricted", "",				/* GANDI */
     "% The data in the WHOIS database of Schlund", "",
-    "NeuStar, Inc., the Registry", "rules.  For details",	/* us */
+    "NeuStar, Inc., the Registry", "OF THE AVAILABILITY",	/* us */
     "The data in this whois database is", "",			/* enom */
     "By submitting a WHOIS query, you agree you will", "LACK OF A DOMAIN",		/* directNIC */
     "The Data in Moniker.Com", "",
@@ -62,8 +64,9 @@ const char *hide_strings[] = {
     "Access to INFO WHOIS information is provided", "",		/* Afilias */
     "Access to CCTLD WHOIS information is provided", "",	/* Afilias */
     "DotAsia WHOIS LEGAL STATEMENT", "integrity of the database.",
-    "mTLD WHOIS LEGAL STATEMENT", "integrity of the database."	/* .mobi */
+    "mTLD WHOIS LEGAL STATEMENT", "integrity of the database.",	/* .mobi */
     "Access to RegistryPro's Whois", "All rights",		/* .pro */
+    "Telnic, Ltd., the Registry Operator", "(b) harass any person;", /* .tel */
     NULL, NULL
 };
 
@@ -72,12 +75,7 @@ const char *nic_handles[] = {
     "netblk-",	"whois.arin.net",
     "poem-",	"whois.ripe.net",
     "form-",	"whois.ripe.net",
-#if 0
-    // commented until somebody will explain the query format for these
-    "coco-",	"whois.corenic.net",
-    "coho-",	"whois.corenic.net",
-    "core-",	"whois.corenic.net",
-#endif
+    "pgpkey-",	"whois.ripe.net",
     "denic-",	"whois.denic.de",
     /* RPSL objects */
     "as-",	"whois.ripe.net",
@@ -136,4 +134,17 @@ const char *tld_serv[] = {
 #include "tld_serv.h"
     NULL,	NULL
 };
+
+#ifdef HAVE_ICONV
+struct server_charset {
+    const char *name;
+    const char *charset;
+    const char *options;
+};
+
+const struct server_charset servers_charset[] = {
+#include "servers_charset.h"
+    { NULL, NULL, NULL }
+};
+#endif
 

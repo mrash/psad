@@ -1,6 +1,6 @@
 Summary: Enhanced WHOIS client
 Name: whois
-Version: 4.7.26
+Version: 5.0.6
 Release: 1
 License: GPL
 Vendor: Marco d'Itri <md@linux.it>
@@ -20,7 +20,7 @@ server for most queries.
 %setup
 
 %build
-make OPTS="$RPM_OPT_FLAGS" 
+make CFLAGS="$RPM_OPT_FLAGS" HAVE_LIBIDN=1 HAVE_ICONV=1
 
 %install
 rm -rf ${RPM_BUILD_ROOT}
@@ -35,14 +35,21 @@ rm -rf ${RPM_BUILD_ROOT}
 %files
 %defattr(-,root,root)
 %{prefix}/bin/whois
+%{prefix}/bin/mkpasswd
 %doc %{prefix}/share/man/man1/whois.1.gz
+%doc %{prefix}/share/man/man1/mkpasswd.1.gz
+%lang(cs) %{prefix}/share/locale/cs/LC_MESSAGES/whois.mo
 %lang(de) %{prefix}/share/locale/de/LC_MESSAGES/whois.mo
 %lang(el) %{prefix}/share/locale/el/LC_MESSAGES/whois.mo
 %lang(es) %{prefix}/share/locale/es/LC_MESSAGES/whois.mo
+%lang(eu) %{prefix}/share/locale/eu/LC_MESSAGES/whois.mo
 %lang(fr) %{prefix}/share/locale/fr/LC_MESSAGES/whois.mo
 %lang(it) %{prefix}/share/locale/it/LC_MESSAGES/whois.mo
+%lang(ja) %{prefix}/share/locale/ja/LC_MESSAGES/whois.mo
 %lang(no) %{prefix}/share/locale/no/LC_MESSAGES/whois.mo
 %lang(pl) %{prefix}/share/locale/pl/LC_MESSAGES/whois.mo
+%lang(pt_BR) %{prefix}/share/locale/pt_BR/LC_MESSAGES/whois.mo
+%lang(ru) %{prefix}/share/locale/ru/LC_MESSAGES/whois.mo
 
 %changelog
 * Sun Jul 13 2003 Paul Mundt <lethal@linux-sh.org>

@@ -1,9 +1,12 @@
-INSTALL= /usr/bin/install -c
-INSTALLNLSDIR=$(BASEDIR)/usr/share/locale
+prefix = /usr
+
+INSTALL= install
+
+INSTALLNLSDIR=$(BASEDIR)$(prefix)/share/locale
 
 PACKAGE = whois
 
-CATALOGS = cs.mo de.mo el.mo es.mo eu.mo fr.mo it.mo ja.mo no.mo pl.mo pt_BR.mo ru.mo
+CATALOGS = cs.mo de.mo el.mo es.mo eu.mo fi.mo fr.mo it.mo ja.mo no.mo pl.mo pt_BR.mo ru.mo zh_CN.mo
 
 POTFILES=../whois.c ../mkpasswd.c
 

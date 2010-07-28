@@ -1,3 +1,180 @@
+whois (5.0.6) unstable; urgency=medium
+
+  * Added new IPv4 allocations.
+  * Added the .priv.at, .xn--fiqs8s (.中国, China), .xn--fiqz9s
+    (.中國, China) and .xn--wgbh1c (.مصر, Egypt) TLD servers.
+  * Do not use the "AS" prefix for ASN queries to whois.arin.net.
+    (Closes: #583798)
+
+ -- Marco d'Itri <md@linux.it>  Sun, 11 Jul 2010 16:49:19 +0200
+
+whois (5.0.5) unstable; urgency=medium
+
+  * Added the .xn--p1ai (.рф, Russian Federation) TLD server.
+    (Closes: #581611)
+  * Updated the .ls TLD server. (Closes: #582077)
+
+ -- Marco d'Itri <md@linux.it>  Sun, 23 May 2010 03:17:45 +0200
+
+whois (5.0.4) unstable; urgency=high
+
+  * Added new IPv4 allocations.
+  * Stop using inet_pton to parse IP addresses because it does not work
+    when a netmask length is specified. (Closes: #580633)
+
+ -- Marco d'Itri <md@linux.it>  Tue, 11 May 2010 22:33:37 +0200
+
+whois (5.0.3) unstable; urgency=medium
+
+  * Added the .dj, .gl, .xn--mgbaam7a8h (.امارات, United Arabs Emirates),
+    and .xn--mgberp4a5d4ar (.السعودية, Saudi Arabia) TLD servers.
+  * Explicitly ignore Ubuntu patchlevels in the debian/rules version check
+    to help the Ubuntu developers who keep breaking their package every time
+    they patch it.
+
+ -- Marco d'Itri <md@linux.it>  Thu, 06 May 2010 23:51:11 +0200
+
+whois (5.0.2) unstable; urgency=medium
+
+  * Added new IPv4 allocations.
+  * Updated one or more translations. (Closes: #572068)
+  * Updated the .gt TLD server. (Closes: #576521)
+  * Use inet_pton (if available) to parse IP addresses. (Closes: #573006)
+
+ -- Marco d'Itri <md@linux.it>  Sun, 11 Apr 2010 04:17:33 +0200
+
+whois (5.0.1) unstable; urgency=medium
+
+  * Added new IPv4 allocations.
+  * Removed the .dj TLD server.
+  * Added support to mkpasswd for a "-5" convenience command line parameter.
+  * Updated one or more translations. (Closes: #562706)
+  * Removed the broken links from the README. (Closes: #566950)
+
+ -- Marco d'Itri <md@linux.it>  Thu, 28 Jan 2010 00:55:22 +0100
+
+whois (5.0.0) unstable; urgency=low
+
+  * Added optional support for automatically transcoding the output of
+    servers. (Closes: #363366, #402356)
+  * Automatically add --show-handles to queries for .dk domains.
+  * Normalize the querystring and convert it to punycode even if a server
+    is specified on the command line.
+  * Updated the .id, .is, .my, .sb and .tj TLD servers.
+  * Removed the .mm, .pw, .sr and .tp TLD servers.
+  * Cleaned up the horrible strings manipulation code. (Closes: #131924)
+
+ -- Marco d'Itri <md@linux.it>  Sun, 20 Dec 2009 03:01:40 +0100
+
+whois (4.7.37) unstable; urgency=medium
+
+  * Added new ASN allocations.
+  * Added new IPv4 allocations.
+  * Fixed the disclaimer suppression data for .biz. (Closes: #551299)
+  * Added Chinese translation contributed by Feng Liu.
+  * Added the .cm and .kn TLD servers.
+  * Updated the .bi, .ge, .gf, .ki, .ls, .np and .tr TLD servers.
+  * Removed the .mq TLD server.
+
+ -- Marco d'Itri <md@linux.it>  Mon, 07 Dec 2009 22:47:26 +0100
+
+whois (4.7.36) unstable; urgency=medium
+
+  * Fixed the whois server for 182.0.0.0/7 added in 4.7.35.
+  * Fixed the whois servers for some ERX legacy allocations.
+
+ -- Marco d'Itri <md@linux.it>  Wed, 12 Aug 2009 22:01:25 +0200
+
+whois (4.7.35) unstable; urgency=medium
+
+  * Added new IPv4 allocations.
+  * Updated the .ae, .jobs, .ms, .ph and .tv TLD servers. (Closes: #539567)
+  * Added the .ls, .mg, .mk, .tz and .uy TLD servers.
+  * Removed the .td TLD server.
+  * mkpasswd: generate random-length hashes when supported.
+  * mkpasswd: use ngettext to support translation of plural forms.
+    (Patch courtesy of Petr Pisar.)
+  * Updated some translations.
+
+ -- Marco d'Itri <md@linux.it>  Wed, 12 Aug 2009 15:31:20 +0200
+
+whois (4.7.34) unstable; urgency=medium
+
+  * Added new IPv4 allocations.
+  * Fixed the disclaimer suppression data for .mobi. (Closes: #526143)
+  * Updated the French translation. (Closes: #527605)
+  * Updated the .bd TLD server.
+
+ -- Marco d'Itri <md@linux.it>  Wed, 17 Jun 2009 11:59:51 +0200
+
+whois (4.7.33) unstable; urgency=medium
+
+  * mkpasswd: use /dev/urandom to generate the salt. If it is not present,
+    initialize srand(3) with gettimeofday(2) instead of time(2) to have a
+    larger randomness space. (Closes: #523387)
+  * mkpasswd: added preliminary support for variable length salts, patch
+    courtesy of Nicolas François.
+  * Updated the .co.za SLD server. (Closes: #521579)
+
+ -- Marco d'Itri <md@linux.it>  Sun, 12 Apr 2009 05:55:21 +0200
+
+whois (4.7.32) unstable; urgency=medium
+
+  * Added new ASN allocations.
+  * Updated the .tel, .gg and .je TLD servers.
+
+ -- Marco d'Itri <md@linux.it>  Mon, 16 Mar 2009 18:08:04 +0100
+
+whois (4.7.31) unstable; urgency=low
+
+  * Implemented a 10 seconds timeout on connect(2) to allow querying
+    servers with broken IPv6 connectivity. (Closes: #408096)
+  * Added support for automatically determining the server for in-addr.arpa
+    domains.
+  * Added new IPv4 allocations.
+  * Fixed a typo in de.po. (Closes: #514619)
+
+ -- Marco d'Itri <md@linux.it>  Sun, 01 Mar 2009 19:39:42 +0100
+
+whois (4.7.30) unstable; urgency=high
+
+  * Updated the .gi, .lc and .mn TLD servers.
+
+ -- Marco d'Itri <md@linux.it>  Tue, 16 Dec 2008 18:49:28 +0100
+
+whois (4.7.29) unstable; urgency=medium
+
+  * Fixed the short option -S which I broke in 4.7.25.
+  * Added support for ASN32 in the ASPLAIN notation.
+  * Do not disable the timeout after the connection to the server, because
+    it can still hang forever.
+  * Added the .gy, .hn, .ng and .sl TLD servers.
+  * Updated the .tel, .cr, .dz, .ht, .im, .jo, .ly, .mt, .mu, .pr, .rs, .sn,
+    .com.uy, .vc and .vn TLD servers.
+  * Added support for -kenic NIC handles.
+  * Added new IPv4 allocations.
+  * Little portability fixes.
+  * Added Finnish translation contributed by Sami Kerola.
+
+ -- Marco d'Itri <md@linux.it>  Tue, 09 Dec 2008 02:08:35 +0100
+
+whois (4.7.28) unstable; urgency=medium
+
+  * Updated the .aero TLD server.
+  * Added a new ASN allocation.
+  * Search PGPKEY-* objects in the RIPE database.
+
+ -- Marco d'Itri <md@linux.it>  Wed, 10 Sep 2008 18:49:37 +0200
+
+whois (4.7.27) unstable; urgency=medium
+
+  * Updated the .md and .me TLD servers.
+  * Added a new ASN allocation.
+  * Added a new IPv4 allocation.
+  * Updated the Polish and Czech translations.
+
+ -- Marco d'Itri <md@linux.it>  Thu, 17 Jul 2008 00:54:55 +0200
+
 whois (4.7.26) unstable; urgency=medium
 
   * Added support for passing command line options in the environment

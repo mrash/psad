@@ -1654,9 +1654,9 @@ sub match_sigs() {
                     if $debug and $verbose;
                 if ($proto eq 'tcp' or $proto eq 'udp') {
 
-                    TYPE: for my $href (@port_types) {
-                        my $sp_type = $href->{'sp'};
-                        my $dp_type = $href->{'dp'};
+                    TYPE: for my $hr (@port_types) {
+                        my $sp_type = $hr->{'sp'};
+                        my $dp_type = $hr->{'dp'};
 
                         next TYPE unless
                             defined $sig_search{$proto}{$src}{$dst}{$sp_type};
@@ -2126,13 +2126,13 @@ sub check_ignore_port() {
 }
 
 sub match_port() {
-    my ($href, $port) = @_;
-    if (defined $href->{'port'}) {
-        return 1 if defined $href->{'port'}->{$port};
+    my ($hr, $port) = @_;
+    if (defined $hr->{'port'}) {
+        return 1 if defined $hr->{'port'}->{$port};
     }
-    if (defined $href->{'range'}) {
-        for my $low_port (keys %{$href->{'range'}}) {
-            my $high_port = $href->{'range'}->{$low_port};
+    if (defined $hr->{'range'}) {
+        for my $low_port (keys %{$hr->{'range'}}) {
+            my $high_port = $hr->{'range'}->{$low_port};
             return 1 if ($port >= $low_port and $port <= $high_port);
         }
     }
@@ -2467,10 +2467,10 @@ sub id_incr() {
 }
 
 sub ttl_range() {
-    my $href = shift;
+    my $hr = shift;
     my $min_ttl = 256;
     my $max_ttl = 0;
-    for my $ttl (keys %$href) {
+    for my $ttl (keys %$hr) {
         $min_ttl = $ttl if $ttl < $min_ttl;
         $max_ttl = $ttl if $ttl > $max_ttl;
     }
@@ -3223,7 +3223,7 @@ sub parse_ignore_ports() {
 }
 
 sub parse_port_range() {
-    my ($href, $line) = @_;
+    my ($hr, $line) = @_;
 
     my @fields = split /\s*,\s*/, $line;
     for my $field (@fields) {
@@ -3233,23 +3233,23 @@ sub parse_port_range() {
             my $high  = $3;
             if ($low < $high) {
                 my $existing_high = 0;
-                if (defined $href->{$proto}
-                        and defined $href->{$proto}->{'range'}
-                        and defined $href->{$proto}->{'range'}->{$low}) {
-                    $existing_high = $href->{$proto}->{'range'}->{$low};
+                if (defined $hr->{$proto}
+                        and defined $hr->{$proto}->{'range'}
+                        and defined $hr->{$proto}->{'range'}->{$low}) {
+                    $existing_high = $hr->{$proto}->{'range'}->{$low};
                 }
                 if ($existing_high) {
                     if ($high > $existing_high) {
-                        $href->{$proto}->{'range'}->{$low} = $high;
+                        $hr->{$proto}->{'range'}->{$low} = $high;
                     }
                 } else {
-                    $href->{$proto}->{'range'}->{$low} = $high;
+                    $hr->{$proto}->{'range'}->{$low} = $high;
                 }
             }
         } elsif ($field =~ m/(tcp|udp)\/(\d+)/i) {
             my $proto = lc($1);
             my $port  = $2;
-            $href->{$proto}->{'port'}->{$port} = '';
+            $hr->{$proto}->{'port'}->{$port} = '';
         }
     }
     return;
@@ -5106,27 +5106,27 @@ sub scan_logr_signatures() {
 
     for my $proto qw(tcp udp icmp ip) {
         next unless defined $scan{$src}{$dst}{$proto};
-        my $href = $scan{$src}{$dst}{$proto};
+        my $hr = $scan{$src}{$dst}{$proto};
 
-        next unless (defined $href->{'sid'}
-                or defined $href->{'invalid_type'}
-                or defined $href->{'invalid_code'});
+        next unless (defined $hr->{'sid'}
+                or defined $hr->{'invalid_type'}
+                or defined $hr->{'invalid_code'});
 
         print $email_fh "\n\n[+] " . uc($proto) . " scan signatures:\n\n";
         print STDERR "[+] scan_logr_signatures(): src: $src dst: $dst ",
             "proto: $proto\n" if $debug;
 
         my $sid_ctr = 0;
-        for my $sid (keys %{$href->{'sid'}}) {
+        for my $sid (keys %{$hr->{'sid'}}) {
             $sid_ctr++;
             if ($sid_ctr <= $config{'SIG_SID_SYSLOG_THRESHOLD'}) {
                 $found_sid = 1;
             }
-            for my $chain (keys %{$href->{'sid'}->{$sid}}) {
+            for my $chain (keys %{$hr->{'sid'}->{$sid}}) {
 
                 my $sig_hr      = '';
                 my $email_chain = $chain;
-                my $is_fwsnort  = $href->{'sid'}->{$sid}
+                my $is_fwsnort  = $hr->{'sid'}->{$sid}
                     ->{$chain}->{'is_fwsnort'};
 
                 if ($is_fwsnort) {
@@ -5140,16 +5140,16 @@ sub scan_logr_signatures() {
                 my $dp    = 0;
                 my $flags = 'NA';
                 if ($proto eq 'tcp' or $proto eq 'udp') {
-                    $dp = $href->{'sid'}->{$sid}->{$chain}->{'dp'};
+                    $dp = $hr->{'sid'}->{$sid}->{$chain}->{'dp'};
                     if ($proto eq 'tcp') {
-                        $flags = $href->{'sid'}->{$sid}->{$chain}->{'flags'};
+                        $flags = $hr->{'sid'}->{$sid}->{$chain}->{'flags'};
                     }
                 }
 
-                my $pkts = $href->{'sid'}->{$sid}->{$chain}->{'pkts'};
+                my $pkts = $hr->{'sid'}->{$sid}->{$chain}->{'pkts'};
 
                 ### string for the <ip>_signatures file
-                push @log_sigs, "$href->{'sid'}->{$sid}->{$chain}->{'time'} " .
+                push @log_sigs, "$hr->{'sid'}->{$sid}->{$chain}->{'time'} " .
                     qq|$sid $pkts "$sig_hr->{'msg'}" $chain $proto $dp "$flags" | .
                     "$is_fwsnort $sig_hr->{'is_psad_id'}";
 
@@ -5165,7 +5165,7 @@ sub scan_logr_signatures() {
                     if ($is_fwsnort) {
                         $sig_log_str .= ' fwsnort';
 
-                        if (defined $href->{'sid'}->{$sid}->{$chain}
+                        if (defined $hr->{'sid'}->{$sid}->{$chain}
                                 ->{'fwsnort_estab'}) {
 
                             if ($chain eq 'INPUT') {
@@ -5179,7 +5179,7 @@ sub scan_logr_signatures() {
                                 $email_chain = 'FWSNORT_OUTPUT';
                             }
 
-                            if ($href->{'sid'}->{$sid}
+                            if ($hr->{'sid'}->{$sid}
                                     ->{$chain}->{'fwsnort_estab'}) {
 
                                 $sig_log_str .= '_ESTAB';
@@ -5187,12 +5187,12 @@ sub scan_logr_signatures() {
                             }
                         }
 
-                        if (defined $href->{'sid'}->{$sid}->{$chain}
-                                ->{'fwsnort_rnum'} and $href->{'sid'}->{$sid}
+                        if (defined $hr->{'sid'}->{$sid}->{$chain}
+                                ->{'fwsnort_rnum'} and $hr->{'sid'}->{$sid}
                                 ->{$chain}->{'fwsnort_rnum'}) {
 
                             $sig_log_str .= ' rule: ' .
-                                $href->{'sid'}->{$sid}->{$chain}
+                                $hr->{'sid'}->{$sid}->{$chain}
                                 ->{'fwsnort_rnum'};
                         }
                     }
@@ -5266,21 +5266,21 @@ sub scan_logr_signatures() {
                 print $email_fh "\n";
             }
         }
-        if (defined $href->{'invalid_type'}) {
-            for my $type (keys %{$href->{'invalid_type'}}) {
-                for my $chain (keys %{$href->{'invalid_type'}->{$type}}) {
-                    my $pkts = $href->{'invalid_type'}->
+        if (defined $hr->{'invalid_type'}) {
+            for my $type (keys %{$hr->{'invalid_type'}}) {
+                for my $chain (keys %{$hr->{'invalid_type'}->{$type}}) {
+                    my $pkts = $hr->{'invalid_type'}->
                     {$type}->{$chain}->{'pkts'};
                     print $email_fh
                         qq|   Invalid ICMP type "$type" chain=$chain packets=$pkts\n|;
                 }
             }
         }
-        if (defined $href->{'invalid_code'}) {
-            for my $type (keys %{$href->{'invalid_code'}}) {
-                for my $code (keys %{$href->{'invalid_code'}->{$type}}) {
-                    for my $chain (keys %{$href->{'invalid_code'}->{$type}->{$code}}) {
-                        my $pkts = $href->{'invalid_code'}->
+        if (defined $hr->{'invalid_code'}) {
+            for my $type (keys %{$hr->{'invalid_code'}}) {
+                for my $code (keys %{$hr->{'invalid_code'}->{$type}}) {
+                    for my $chain (keys %{$hr->{'invalid_code'}->{$type}->{$code}}) {
+                        my $pkts = $hr->{'invalid_code'}->
                         {$type}->{$code}->{$chain}->{'pkts'};
                         print $email_fh qq|   Invalid ICMP code "$code" for ICMP |,
                               qq|"$valid_icmp_types{$type}{'text'}" packet\n|,
@@ -5289,7 +5289,7 @@ sub scan_logr_signatures() {
                 }
             }
         }
-        push @del_sigs, $href;
+        push @del_sigs, $hr;
     }
 
     if (@log_sigs) {
@@ -5304,15 +5304,15 @@ sub scan_logr_signatures() {
         move "$log_sigs_file.tmp", $log_sigs_file;
     }
     unless ($config{'SHOW_ALL_SIGNATURES'} eq 'Y') {
-        for my $href (@del_sigs) {
+        for my $hr (@del_sigs) {
             ### need to delete the current signature so it
             ### won't show up in the next alert
-            delete $href->{'sid'}
-                if defined $href->{'sid'};
-            delete $href->{'invalid_type'}
-                if defined $href->{'invalid_type'};
-            delete $href->{'invalid_code'}
-                if defined $href->{'invalid_code'};
+            delete $hr->{'sid'}
+                if defined $hr->{'sid'};
+            delete $hr->{'invalid_type'}
+                if defined $hr->{'invalid_type'};
+            delete $hr->{'invalid_code'}
+                if defined $hr->{'invalid_code'};
         }
     }
     close LS;

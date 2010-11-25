@@ -459,3 +459,8 @@ Dean Takemori
       space).  This report led to a change where whois lookups are now done
       against non-local IP addresses by default (see the ENABLE_WHOIS_LOCAL
       variable).
+
+Lukas Baxa
+    - Reported bug for ICMP packet handling where psad would incorrectly
+      interpret ICMP port unreachable messages as UDP packets because the UDP
+      specifics are included in the iptables log message.

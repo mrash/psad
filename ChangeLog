@@ -1,4 +1,21 @@
 psad-2.1.8 (07//2010):
+    - Bug fix for ICMP packet handling where psad would incorrectly interpret
+      ICMP port unreachable messages as UDP packets because the UDP specifics
+      are included in the iptables log message.  This bug was first reported by
+      Lukas Baxa to the Debian maintainers and was followed up by Franck
+      Joncourt:
+
+        http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=596240
+
+      An example ICMP log message that exposed the bug is included below:
+
+      Sep  8 18:04:26 baxic kernel: [28241.572876] IN_DROP IN=wlan0
+      OUT= MAC=00:1a:9f:91:df:ae:00:21:27:e8:0a:a0:08:00
+      SRC=10.0.0.138 DST=192.168.1.103 LEN=96 TOS=0x00 PREC=0xC0 TTL=254
+      ID=63642 PROTO=ICMP TYPE=3 CODE=3
+      [SRC=192.168.1.103 DST=10.0.0.138 LEN=68 TOS=0x00 PREC=0x00 TTL=0
+      ID=22458 PROTO=UDP SPT=35080 DPT=33434 LEN=48 ]
+
     - Updated the bundled whois client to 5.0.6.
 
 psad-2.1.7 (07/14/2010):

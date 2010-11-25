@@ -451,6 +451,10 @@ my %tcp_p0f_opt_types = (
 
 my %ip_options = ();
 
+### for ICMP
+my $ICMP_ECHO_REQUEST = 8;
+my $ICMP_ECHO_REPLY   = 0;
+
 ### These are not directly support by psad because they
 ### do not appear in iptables logs; however, several of
 ### these options are supported if fwsnort is also running.
@@ -1291,6 +1295,10 @@ sub check_scan() {
 sub parse_NF_pkt_str() {
     my ($pkt_hr, $pkt_str) = @_;
 
+    my $is_tcp  = 0;
+    my $is_udp  = 0;
+    my $is_icmp = 0;
+
     ### with ENABLE_SYSLOG_FILE enabled, psad sees all sorts of syslog
     ### messages that aren't just from iptables (kmsgsd is not running
     ### to filter them), so require a preliminary match
@@ -1422,12 +1430,29 @@ sub parse_NF_pkt_str() {
         $pkt_hr->{'ip_opts'} = $1;
     }
 
+    if ($pkt_str =~ /PROTO=TCP/) {
+        $is_tcp = 1;
+    } elsif ($pkt_str =~ /PROTO=ICMP/) {
+        ### test for ICMP before UDP because ICMP destination unreachable
+        ### messages can contain embedded UDP specifics like so:
+        ### Sep  8 18:04:26 minastirith kernel: [28241.572876] IN_DROP
+        ### IN=wlan0 OUT= MAC=00:1a:9f:91:df:ae:00:12:27:12:0a:a0:12:00
+        ### SRC=10.0.0.138 DST=192.168.1.103 LEN=96 TOS=0x00 PREC=0xC0
+        ### TTL=254 ID=63642 PROTO=ICMP TYPE=3 CODE=3 [SRC=192.168.1.103
+        ### DST=10.0.0.138 LEN=68 TOS=0x00 PREC=0x00 TTL=0 ID=22458 PROTO=UDP
+        ### SPT=35080 DPT=33434 LEN=48 ]
+        $is_icmp = 1;
+    } elsif ($pkt_str =~ /PROTO=UDP/) {
+        $is_udp = 1;
+    }
+
     ### May 18 22:21:26 orthanc kernel: DROP IN=eth2 OUT=
     ### MAC=00:60:1d:23:d0:01:00:60:1d:23:d3:0e:08:00 SRC=192.168.20.25
     ### DST=192.168.20.1 LEN=60 TOS=0x10 PREC=0x00 TTL=64 ID=47300 DF
     ### PROTO=TCP SPT=34111 DPT=6345 WINDOW=5840 RES=0x00 SYN URGP=0
 
-    if ($pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+)\s+TOS=(\S+)
+    if ($is_tcp and
+            $pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+)\s+TOS=(\S+)
                 \s*.*\s+TTL=(\d+)\s+ID=(\d+)\s*.*\s+PROTO=TCP\s+
                 SPT=(\d+)\s+DPT=(\d+)\s.*\s*WINDOW=(\d+)\s+
                 (.*)\s+URGP=/x) {
@@ -1523,7 +1548,8 @@ sub parse_NF_pkt_str() {
     ### SRC=192.168.20.25 DST=192.168.20.1 LEN=28 TOS=0x00 PREC=0x00
     ### TTL=40 ID=47523 PROTO=UDP SPT=57339 DPT=305 LEN=8
 
-    } elsif ($pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+)\s+TOS=(\S+)
+    } elsif ($is_udp and
+            $pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+)\s+TOS=(\S+)
                       \s.*TTL=(\d+)\s+ID=(\d+)\s*.*\s+PROTO=UDP\s+
                       SPT=(\d+)\s+DPT=(\d+)\s+LEN=(\d+)/x) {
 
@@ -1566,22 +1592,33 @@ sub parse_NF_pkt_str() {
     ### 20:78:10:70:e7:08:00 SRC=192.168.10.20 DST=192.168.10.1 LEN=84 TOS=0x00
     ### PREC=0x00 TTL=64 ID=0 DF PROTO=ICMP TYPE=8 CODE=0 ID=61055 SEQ=256
 
-    } elsif ($pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+).*
+    } elsif ($is_icmp and
+            $pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+).*
                       TTL=(\d+)\s+ID=(\d+).*PROTO=ICMP\s+TYPE=(\d+)\s+
-                      CODE=(\d+)\s+ID=(\d+)\s+SEQ=(\d+)/x) {
+                      CODE=(\d+)/x) {
 
         ($pkt_hr->{'src'}, $pkt_hr->{'dst'}, $pkt_hr->{'ip_len'},
             $pkt_hr->{'ttl'}, $pkt_hr->{'ip_id'}, $pkt_hr->{'itype'},
-            $pkt_hr->{'icode'}, $pkt_hr->{'icmp_id'}, $pkt_hr->{'icmp_seq'})
-                = ($1,$2,$3,$4,$5,$6,$7,$8,$9);
+            $pkt_hr->{'icode'}) = ($1,$2,$3,$4,$5,$6,$7);
 
         $pkt_hr->{'proto'} = 'icmp';
         $pkt_hr->{'sp'} = $pkt_hr->{'dp'} = 0;
 
+        if ($pkt_hr->{'itype'} == $ICMP_ECHO_REQUEST
+                or $pkt_hr->{'itype'} == $ICMP_ECHO_REPLY) {
+
+            ### we expect the ICMP ID and SEQ fields to be populated
+            if ($pkt_str =~ /CODE=(\d+)\s+ID=(\d+)\s+SEQ=(\d+)/) {
+                $pkt_hr->{'icmp_id'}  = $1;
+                $pkt_hr->{'icmp_seq'} = $2;
+            } else {
+                return $PKT_ERROR;
+            }
+        }
+
         unless ($pkt_hr->{'ip_len'} >= 0 and $pkt_hr->{'ttl'} >= 0
                 and $pkt_hr->{'proto'} and $pkt_hr->{'itype'} >= 0
-                and $pkt_hr->{'icode'} >= 0 and $pkt_hr->{'ip_id'} >= 0
-                and $pkt_hr->{'icmp_seq'} >= 0) {
+                and $pkt_hr->{'icode'} >= 0) {
 
             return $PKT_ERROR;
         }

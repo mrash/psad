@@ -299,7 +299,7 @@ alert tcp $HOME_NET any -> $EXTERNAL_NET $HTTP_PORTS (msg:"ET MALWARE Clicksprin
 
 #Submitted by Chris Norton
 alert tcp $HOME_NET any -> $EXTERNAL_NET $HTTP_PORTS (msg:"ET MALWARE Bundleware Spyware Download"; flow: to_server,established; uricontent:"/app/InternetFuel/AppWrap.exe"; nocase; classtype: policy-violation; sid: 2001451; rev:5;)
-alert tcp $HOME_NET any -> $EXTERNAL_NET $HTTP_PORTS (msg:"ET MALWARE Bundleware Spyware CHM Download"; flow: to_server,established; content:"Referer\: ms-its\:mhtml\:file\://C\:counter.mht!http\://"; nocase; content:"/counter/HELP3.CHM\:\:/help.htm"; nocase; classtype: trojan-activity; sid: 2001452; rev:4;)
+alert tcp $HOME_NET any -> $EXTERNAL_NET $HTTP_PORTS (msg:"ET MALWARE Bundleware Spyware CHM Download"; flow: to_server,established; content:"Referer\: ms-its\:|6d|html\:file\://C\:counter.mht!http\://"; nocase; content:"/counter/HELP3.CHM\:\:/help.htm"; nocase; classtype: trojan-activity; sid: 2001452; rev:4;)
 alert tcp $HOME_NET any -> $EXTERNAL_NET $HTTP_PORTS (msg:"ET MALWARE Bundleware Spyware cab Download"; flow: to_server,established; uricontent:"/counter/counter_v3.cab"; nocase; classtype: trojan-activity; sid: 2001458; rev:4;)
 
 #By Matt Jonkman

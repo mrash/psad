@@ -1,4 +1,16 @@
-psad-2.1.8 (07//2010):
+psad-2.1.8 (12//2010):
+    - Altered the 'ET MALWARE Bundleware Spyware CHM Download' Snort rule in
+      the bundled Emerging Threats rule set to make sure that ClamAV does not
+      flag on the pattern "mhtml\:file\://" which is associated with the
+      following ClamAV signature:
+
+        $ grep Exploit.HTML.MHTRedir-8 main.ndb
+        Exploit.HTML.MHTRedir-8:3:*:6d68746d6c3a66696c653a2f2f{1-20}2168
+
+      An analysis of this issue was posted here:
+
+        http://www.cipherdyne.org/blog/2010/08/22.html
+
     - Bug fix for ICMP packet handling where psad would incorrectly interpret
       ICMP port unreachable messages as UDP packets because the UDP specifics
       are included in the iptables log message.  This bug was first reported by

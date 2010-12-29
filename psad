@@ -2390,7 +2390,7 @@ sub parse_tcp_options() {
             if ($len == 0 or $len == 1) {
                 ### this should never happen; it indicates a broken TCP stack
                 ### or maliciously constructed options since the len field is
-                ### large enough to accomodate the TLV encoding
+                ### not large enough to accomodate the TLV encoding
                 my $msg = "broken $len-byte len field within TCP options " .
                     "string: $tcp_options from source IP: $src";
                 print STDERR "    $msg\n" if $debug;

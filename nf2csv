@@ -32,16 +32,11 @@
 #
 ###########################################################################
 #
-# $Id: nf2csv 1800 2006-12-10 04:51:40Z mbr $
-#
 
 use Getopt::Long 'GetOptions';
 use strict;
 
 my $version = '2.1.8-pre2';
-my $revision_svn = '$Revision$';
-my $rev_num = '1';
-($rev_num) = $revision_svn =~ m|\$Rev.*:\s+(\S+)|;
 
 ### regex to match an ip address
 my $ip_re = qr|(?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2}|;
@@ -122,8 +117,7 @@ Getopt::Long::Configure('no_ignore_case');
 
 ### Print the version number and exit if -V given on the command line.
 if ($print_ver) {
-    print "[+] psad v$version (file revision: $rev_num)\n",
-        "      by Michael Rash <mbr\@cipherdyne.org>\n";
+    print "[+] psad v$version by Michael Rash <mbr\@cipherdyne.org>\n";
     exit 0;
 }
 
@@ -523,7 +517,7 @@ sub usage() {
     print <<_HELP_;
 
 nf2csv
-[+] Version: $version (file revision: $rev_num)
+[+] Version: $version
 [+] By Michael Rash (mbr\@cipherdyne.org, http://www.cipherdyne.org)
 
 Usage: nf2csv [options]

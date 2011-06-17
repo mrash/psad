@@ -26,8 +26,6 @@
 #
 ##############################################################################
 #
-# $Id$
-#
 
 ### snmp.rules
 alert tcp $EXTERNAL_NET any -> $HOME_NET 705 (msg:"SNMP AgentX/tcp request"; flags:S; reference:bugtraq,4088; reference:bugtraq,4089; reference:bugtraq,4132; reference:cve,2002-0012; reference:cve,2002-0013; classtype:attempted-recon; sid:1421; psad_id:100001; psad_dl:2;)

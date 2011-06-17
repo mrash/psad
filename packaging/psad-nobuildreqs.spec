@@ -6,8 +6,6 @@
 %define psadrundir /var/run/psad
 %define psadvarlibdir /var/lib/psad
 
-### $Id: psad.spec 2253 2009-02-21 04:29:50Z mbr $
-
 ### get the first @INC directory that includes the string "linux".
 ### This may be 'i386-linux', or 'i686-linux-thread-multi', etc.
 %define psadmoddir `perl -e '$path='i386-linux'; for (@INC) { if($_ =~ m|.*/(.*linux.*)|) {$path = $1; last; }} print $path'`

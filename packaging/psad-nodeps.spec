@@ -5,8 +5,6 @@
 %define psadrundir /var/run/psad
 %define psadvarlibdir /var/lib/psad
 
-### $Id: psad.spec 2186 2008-06-07 15:52:37Z mbr $
-
 Summary: psad analyzes iptables log messages for suspect traffic
 Name: %name
 Version: %version

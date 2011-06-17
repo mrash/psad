@@ -23,8 +23,6 @@
 #
 ##########################################################################
 #
-#  $Id$
-#
 
 ### default
 all : kmsgsd.c psadwatchd.c psad_funcs.c strlcpy.c strlcat.c psad.h

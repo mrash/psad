@@ -243,13 +243,13 @@ my %ignore_protocols = ();
 my %ignore_interfaces = ();
 
 ### data array used for dshield.org logs
-my @dshield_data;
+my @dshield_data = ();
 
 ### track the last time we sent an alert to dshield.org
-my $last_dshield_alert;
+my $last_dshield_alert = '';
 
 ### calculate how often a dshield alert will be sent
-my $dshield_alert_interval;
+my $dshield_alert_interval = '';
 
 ### dshield stats counters
 my $dshield_email_ctr = 0;
@@ -257,10 +257,10 @@ my $dshield_lines_ctr = 0;
 
 ### get the current timezone for dshield (this is calculated
 ### and re-calculated since the timezone may change).
-my $timezone;
+my $timezone = '';
 
 ### get the current year for dshield
-my $year;
+my $year = '';
 
 ### keep track of how many CHECK_INTERVALS have elapsed; this is
 ### useful for TOP_SCANS_CTR_THRESHOLD
@@ -316,7 +316,7 @@ my $udp_ctr  = 0;
 my $icmp_ctr = 0;
 
 ### pid file hash
-my %pidfiles;
+my %pidfiles = ();
 
 ### initialize and scope some default variables (command
 ### line args can override some default values)

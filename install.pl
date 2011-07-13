@@ -7,11 +7,11 @@
 # Purpose:  install.pl is the installation script for psad.  It is safe
 #           to execute install.pl even if psad has already been installed
 #           on a system since install.pl will preserve the existing
-#           config section within the new script.
+#           config section.
 #
 # Credits:  (see the CREDITS file)
 #
-# Copyright (C) 1999-2008 Michael Rash (mbr@cipherdyne.org)
+# Copyright (C) 1999-2011 Michael Rash (mbr@cipherdyne.org)
 #
 # License (GNU Public License):
 #

@@ -591,9 +591,7 @@ my @args_cp = @ARGV;
 ### Everthing after this point must be executed as root (psad
 ### only needs root if run in auto-blocking mode; should take
 ### this into account and drop privileges).
-$< == 0 && $> == 0 or
-    die '[*] psad: You must be root (or equivalent ',
-        "UID 0 account) to execute psad!  Exiting.\n";
+&is_root();
 
 ### Import all psad configuration and signatures files
 ### (psad.conf, posf, signatures, psad_icmp_types,
@@ -9647,6 +9645,12 @@ sub expand_vars() {
         }
     }
     return;
+}
+
+sub is_root() {
+    $< == 0 && $> == 0 or
+        die '[*] psad: You must be root (or equivalent ',
+            "UID 0 account) to execute psad!  Exiting.\n";
 }
 
 ### check to make sure all required varables are defined in the config

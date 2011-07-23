@@ -301,8 +301,9 @@ my %top_sig_counts = ();
 my %top_packet_counts = ();
 my %local_src = ();
 
-### regex to match an ip address
-my $ip_re = qr|(?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2}|;
+### regex to match IP addresses
+my $ip_re   = qr|(?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2}|;  ### IPv4
+my $ipv6_re = qr|(?:[a-f0-9]{4}:){7}(?:[a-f0-9]{4})|;   ### IPv6
 
 ### ttl values are decremented depending on the number of hops
 ### the packet has taken before it hits the firewall.  We will
@@ -311,9 +312,11 @@ my $ip_re = qr|(?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2}|;
 my $max_hops = 20;
 
 ### packet counters
-my $tcp_ctr  = 0;
-my $udp_ctr  = 0;
-my $icmp_ctr = 0;
+my $tcp_ctr      = 0;
+my $udp_ctr      = 0;
+my $udplite_ctr  = 0;
+my $icmp_ctr     = 0;
+my $icmp6_ctr    = 0;
 
 ### pid file hash
 my %pidfiles = ();
@@ -447,8 +450,10 @@ my %tcp_p0f_opt_types = (
 my %ip_options = ();
 
 ### for ICMP
-my $ICMP_ECHO_REQUEST = 8;
-my $ICMP_ECHO_REPLY   = 0;
+my $ICMP_ECHO_REQUEST  = 8;
+my $ICMP_ECHO_REPLY    = 0;
+my $ICMP6_ECHO_REQUEST = 128;
+my $ICMP6_ECHO_REPLY   = 129;
 
 ### These are not directly support by psad because they
 ### do not appear in iptables logs; however, several of
@@ -496,16 +501,26 @@ my %pkt_NF_init = (
     'src'    => '',
     'dst'    => '',
     'proto'  => '',
+    'ip_len' => -1,
+    'ip_opts'  => '',  ### v4 or v6
+
+    ### IPv4
     'ip_id'  => -1,
     'ttl'    => -1,
     'tos'    => '',
-    'ip_len' => -1,
-    'itype'  => -1,
-    'icode'  => -1,
-    'ip_opts'  => '',
+    'frag_bit' => 0,
+
+    ### IPv6
+    'is_ipv6' => 0,
+    'tc'      => -1,
+    'hop_limit'  => -1,
+    'flow_label' => -1,
+
+    ### ICMP
+    'itype'    => -1,
+    'icode'    => -1,
     'icmp_seq' => -1,
     'icmp_id'  => -1,
-    'frag_bit' => 0,
 
     ### transport layer
     'sp'  => -1,
@@ -1028,8 +1043,13 @@ sub check_scan() {
         } elsif ($pkt{'proto'} eq 'udp') {
             $top_udp_ports{$pkt{'dp'}}++;
             $udp_ctr++;
+        } elsif ($pkt{'proto'} eq 'udplite') {
+            $top_udp_ports{$pkt{'dp'}}++;
+            $udplite_ctr++;
         } elsif ($pkt{'proto'} eq 'icmp') {
             $icmp_ctr++;
+        } elsif ($pkt{'proto'} eq 'icmp6') {
+            $icmp6_ctr++;
         }
 
         ### track packet counts for this source
@@ -1288,9 +1308,12 @@ sub check_scan() {
 sub parse_NF_pkt_str() {
     my ($pkt_hr, $pkt_str) = @_;
 
-    my $is_tcp  = 0;
-    my $is_udp  = 0;
-    my $is_icmp = 0;
+    my $is_ipv6    = 0;
+    my $is_tcp     = 0;
+    my $is_udp     = 0;
+    my $is_udplite = 0;
+    my $is_icmp    = 0;
+    my $is_icmp6   = 0;
 
     ### with ENABLE_SYSLOG_FILE enabled, psad sees all sorts of syslog
     ### messages that aren't just from iptables (kmsgsd is not running
@@ -1417,48 +1440,112 @@ sub parse_NF_pkt_str() {
         return $PKT_IGNORE unless $matched;
     }
 
-    ### get IP options if --log-ip-options is used
-    ### (they appear before the PROTO= field).
+    ### test for IPv6
+    if ($pkt_str =~ /HOPLIMIT=\d+\s+FLOWLBL=\d+/) {
+        $is_ipv6 = 1;
+        $pkt_hr->{'is_ipv6'} = 1;
+    }
+
+    ### test for IPv4 "don't fragment" bit
+    unless ($is_ipv6) {
+        $pkt_hr->{'frag_bit'} = 1 if $pkt_str =~ /\sDF\s+PROTO/;
+    }
+
+    ### get IP options if --log-ip-options is used - they appear before the
+    ### PROTO= field for either IPv4 or IPv6 packets
     if ($pkt_str =~ /OPT\s+\((\S+)\)\s+PROTO=/) {
         $pkt_hr->{'ip_opts'} = $1;
     }
 
-    if ($pkt_str =~ /PROTO=TCP/) {
+    if ($pkt_str =~ /PROTO=TCP\s/) {
         $is_tcp = 1;
-    } elsif ($pkt_str =~ /PROTO=ICMP/) {
+    } elsif ($pkt_str =~ /PROTO=ICMPv6\s/) {
         ### test for ICMP before UDP because ICMP destination unreachable
         ### messages can contain embedded UDP specifics like so:
+
+        ### Jul 21 19:07:39 minastirith kernel: [1912155.755921] IPv6 Packet
+        ### IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:86:dd
+        ### SRC=0000:0000:0000:0000:0000:0000:0000:0001
+        ### DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=107 TC=0
+        ### HOPLIMIT=64 FLOWLBL=0 PROTO=ICMPv6 TYPE=1 CODE=4
+        ### [SRC=0000:0000:0000:0000:0000:0000:0000:0001
+        ### DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=59 TC=0
+        ### HOPLIMIT=64 FLOWLBL=0 PROTO=UDP SPT=35186 DPT=12345 LEN=19 ]
+
+        $is_icmp6 = 1;
+    } elsif ($pkt_str =~ /PROTO=ICMP\s/) {
+        ### test for ICMP before UDP because ICMP destination unreachable
+        ### messages can contain embedded UDP specifics like so:
+
         ### Sep  8 18:04:26 minastirith kernel: [28241.572876] IN_DROP
         ### IN=wlan0 OUT= MAC=00:1a:9f:91:df:ae:00:12:27:12:0a:a0:12:00
         ### SRC=10.0.0.138 DST=192.168.1.103 LEN=96 TOS=0x00 PREC=0xC0
         ### TTL=254 ID=63642 PROTO=ICMP TYPE=3 CODE=3 [SRC=192.168.1.103
         ### DST=10.0.0.138 LEN=68 TOS=0x00 PREC=0x00 TTL=0 ID=22458 PROTO=UDP
         ### SPT=35080 DPT=33434 LEN=48 ]
+
         $is_icmp = 1;
-    } elsif ($pkt_str =~ /PROTO=UDP/) {
+    } elsif ($pkt_str =~ /PROTO=UDPLITE\s/) {
+        $is_udplite = 1;
+    } elsif ($pkt_str =~ /PROTO=UDP\s/) {
         $is_udp = 1;
+    } else {
+        print STDERR "[-] err packet: non TCP/UDP/ICMP protocol\n" if $debug;
+        return $PKT_ERROR;
     }
 
-    ### May 18 22:21:26 orthanc kernel: DROP IN=eth2 OUT=
-    ### MAC=00:60:1d:23:d0:01:00:60:1d:23:d3:0e:08:00 SRC=192.168.20.25
-    ### DST=192.168.20.1 LEN=60 TOS=0x10 PREC=0x00 TTL=64 ID=47300 DF
-    ### PROTO=TCP SPT=34111 DPT=6345 WINDOW=5840 RES=0x00 SYN URGP=0
+    if ($is_tcp) {
+        if ($is_ipv6) {
 
-    if ($is_tcp and
-            $pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+)\s+TOS=(\S+)
-                \s*.*\s+TTL=(\d+)\s+ID=(\d+)\s*.*\s+PROTO=TCP\s+
-                SPT=(\d+)\s+DPT=(\d+)\s.*\s*WINDOW=(\d+)\s+
-                (.*)\s+URGP=/x) {
+            ### Jul 18 19:19:08 lorien kernel: [ 1835.131574] IPV6 packet IN=lo
+            ### OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:86:dd
+            ### SRC=0000:0000:0000:0000:0000:0000:0000:0001
+            ### DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=72 TC=0
+            ### HOPLIMIT=255 FLOWLBL=0 PROTO=TCP SPT=22 DPT=57005 WINDOW=512
+            ### RES=0x00 ACK FIN URGP=0 
+            if ($pkt_str =~ /SRC=($ipv6_re)\s+DST=($ipv6_re)\s+LEN=(\d+)\s+
+                    TC=(\d+)\s+HOPLIMIT=(\d+)\s+FLOWLBL=(\d+)\s+PROTO=TCP\s+
+                    SPT=(\d+)\s+DPT=(\d+)\s+WINDOW=(\d+)\s+
+                    (.*)\s+URGP=/x) {
 
-        ($pkt_hr->{'src'}, $pkt_hr->{'dst'}, $pkt_hr->{'ip_len'},
-            $pkt_hr->{'tos'}, $pkt_hr->{'ttl'}, $pkt_hr->{'ip_id'},
-            $pkt_hr->{'sp'}, $pkt_hr->{'dp'}, $pkt_hr->{'win'},
-            $pkt_hr->{'flags'})
-                = ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
+                ($pkt_hr->{'src'}, $pkt_hr->{'dst'}, $pkt_hr->{'ip_len'},
+                    $pkt_hr->{'tc'}, $pkt_hr->{'hop_limit'},
+                    $pkt_hr->{'flow_label'}, $pkt_hr->{'sp'}, $pkt_hr->{'dp'},
+                    $pkt_hr->{'win'}, $pkt_hr->{'flags'})
+                        = ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
+            } else {
+                print STDERR "[-] err packet: strange IPv6 TCP format\n"
+                    if $debug;
+                return $PKT_ERROR;
+            }
 
-        ### the reserve bits are not reported by ulogd, but normal
-        ### iptables syslog messages contain them.
-        $pkt_hr->{'flags'} =~ s/\s*RES=\S+\s*//;
+        } else {
+
+            ### May 18 22:21:26 orthanc kernel: DROP IN=eth2 OUT=
+            ### MAC=00:60:1d:23:d0:01:00:60:1d:23:d3:0e:08:00 SRC=192.168.20.25
+            ### DST=192.168.20.1 LEN=60 TOS=0x10 PREC=0x00 TTL=64 ID=47300 DF
+            ### PROTO=TCP SPT=34111 DPT=6345 WINDOW=5840 RES=0x00 SYN URGP=0
+
+            if ($pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+)\s+TOS=(\S+)
+                    \s*.*\s+TTL=(\d+)\s+ID=(\d+)\s*.*\s+PROTO=TCP\s+
+                    SPT=(\d+)\s+DPT=(\d+)\s.*\s*WINDOW=(\d+)\s+
+                    (.*)\s+URGP=/x) {
+
+                ($pkt_hr->{'src'}, $pkt_hr->{'dst'}, $pkt_hr->{'ip_len'},
+                    $pkt_hr->{'tos'}, $pkt_hr->{'ttl'}, $pkt_hr->{'ip_id'},
+                    $pkt_hr->{'sp'}, $pkt_hr->{'dp'}, $pkt_hr->{'win'},
+                    $pkt_hr->{'flags'})
+                        = ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
+
+                ### the reserve bits are not reported by ulogd, but normal
+                ### iptables syslog messages contain them.
+                $pkt_hr->{'flags'} =~ s/\s*RES=\S+\s*//;
+            } else {
+                print STDERR "[-] err packet: strange IPv4 TCP format\n"
+                    if $debug;
+                return $PKT_ERROR;
+            }
+        }
 
         $pkt_hr->{'proto'} = 'tcp';
 
@@ -1496,22 +1583,11 @@ sub parse_NF_pkt_str() {
             print STDERR "[-] err packet: bad tcp flags.\n" if $debug;
             return $PKT_ERROR;
         }
-        $pkt_hr->{'frag_bit'} = 1 if $pkt_str =~ /\sDF\s+PROTO/;
 
         ### don't pickup IP options if --log-ip-options is used
         ### (they appear before the PROTO= field).
         if ($pkt_str =~ /URGP=\S+\s+OPT\s+\((\S+)\)/) {
             $pkt_hr->{'tcp_opts'} = $1;
-        }
-
-        ### make sure we have a "reasonable" packet (note that nmap
-        ### can scan port 0 and iptables can report this fact)
-        unless ($pkt_hr->{'ip_len'} >= 0 and $pkt_hr->{'tos'}
-                and $pkt_hr->{'ttl'} >= 0 and $pkt_hr->{'ip_id'} >= 0
-                and $pkt_hr->{'proto'} and $pkt_hr->{'sp'} >= 0
-                and $pkt_hr->{'dp'} >= 0 and $pkt_hr->{'win'} >= 0
-                and $pkt_hr->{'flags'}) {
-            return $PKT_ERROR;
         }
 
         if ($pkt_str =~ /\sSEQ=(\d+)\s+ACK=(\d+)/) {
@@ -1536,32 +1612,55 @@ sub parse_NF_pkt_str() {
                 "$dflags";
         }
 
-    ### May 18 22:21:26 orthanc kernel: DROP IN=eth2 OUT=
-    ### MAC=00:60:1d:23:d0:01:00:60:1d:23:d3:0e:08:00
-    ### SRC=192.168.20.25 DST=192.168.20.1 LEN=28 TOS=0x00 PREC=0x00
-    ### TTL=40 ID=47523 PROTO=UDP SPT=57339 DPT=305 LEN=8
+    } elsif ($is_udp or $is_udplite) {
 
-    } elsif ($is_udp and
-            $pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+)\s+TOS=(\S+)
+        if ($is_udplite) {
+            $pkt_hr->{'proto'} = 'udplite';
+        } else {
+            $pkt_hr->{'proto'} = 'udp';
+        }
+
+        if ($is_ipv6) {
+
+            ### Jul 21 21:07:39 minastirith kernel: [1912155.755862] IPv6 Packet IN=lo
+            ### OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:86:dd
+            ### SRC=0000:0000:0000:0000:0000:0000:0000:0001
+            ### DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=59 TC=0 HOPLIMIT=64
+            ### FLOWLBL=0 PROTO=UDP SPT=35186 DPT=12345 LEN=19 
+            if ($pkt_str =~ /SRC=($ipv6_re)\s+DST=($ipv6_re)\s+LEN=(\d+)\s+
+                    TC=(\d+)\s+HOPLIMIT=(\d+)\s+FLOWLBL=(\d+)\s+
+                    PROTO=UDP(?:LITE)?\s+SPT=(\d+)\s+DPT=(\d+)\s+LEN=(\d+)/x) {
+
+                ($pkt_hr->{'src'}, $pkt_hr->{'dst'}, $pkt_hr->{'ip_len'},
+                    $pkt_hr->{'tc'}, $pkt_hr->{'hop_limit'},
+                    $pkt_hr->{'flow_label'}, $pkt_hr->{'sp'}, $pkt_hr->{'dp'},
+                    $pkt_hr->{'udp_len'}) = ($1,$2,$3,$4,$5,$6,$7,$8,$9);
+            } else {
+                print STDERR "[-] err packet: strange IPv6 UDP format\n"
+                    if $debug;
+                return $PKT_ERROR;
+            }
+
+        } else {
+
+            ### May 18 22:21:26 orthanc kernel: DROP IN=eth2 OUT=
+            ### MAC=00:60:1d:23:d0:01:00:60:1d:23:d3:0e:08:00
+            ### SRC=192.168.20.25 DST=192.168.20.1 LEN=28 TOS=0x00 PREC=0x00
+            ### TTL=40 ID=47523 PROTO=UDP SPT=57339 DPT=305 LEN=8
+
+            if ($pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+)\s+TOS=(\S+)
                       \s.*TTL=(\d+)\s+ID=(\d+)\s*.*\s+PROTO=UDP\s+
                       SPT=(\d+)\s+DPT=(\d+)\s+LEN=(\d+)/x) {
 
-        ($pkt_hr->{'src'}, $pkt_hr->{'dst'}, $pkt_hr->{'ip_len'},
-            $pkt_hr->{'tos'}, $pkt_hr->{'ttl'}, $pkt_hr->{'ip_id'},
-            $pkt_hr->{'sp'}, $pkt_hr->{'dp'}, $pkt_hr->{'udp_len'})
-                = ($1,$2,$3,$4,$5,$6,$7,$8,$9);
-
-        $pkt_hr->{'proto'} = 'udp';
-
-        ### make sure we have a "reasonable" packet (note that nmap
-        ### can scan port 0 and iptables can report this fact)
-        unless ($pkt_hr->{'ip_len'} >= 0
-                and $pkt_hr->{'tos'} and $pkt_hr->{'ttl'} >= 0
-                and $pkt_hr->{'ip_id'} >= 0 and $pkt_hr->{'proto'}
-                and $pkt_hr->{'sp'} >= 0 and $pkt_hr->{'dp'} >= 0
-                and $pkt_hr->{'udp_len'} >= 0) {
-
-            return $PKT_ERROR;
+                ($pkt_hr->{'src'}, $pkt_hr->{'dst'}, $pkt_hr->{'ip_len'},
+                    $pkt_hr->{'tos'}, $pkt_hr->{'ttl'}, $pkt_hr->{'ip_id'},
+                    $pkt_hr->{'sp'}, $pkt_hr->{'dp'}, $pkt_hr->{'udp_len'})
+                        = ($1,$2,$3,$4,$5,$6,$7,$8,$9);
+            } else {
+                print STDERR "[-] err packet: strange IPv4 UDP format\n"
+                    if $debug;
+                return $PKT_ERROR;
+            }
         }
 
         ### see if we need to ignore this packet based on the
@@ -1581,21 +1680,55 @@ sub parse_NF_pkt_str() {
                 "$pkt_hr->{'dst'}\t$pkt_hr->{'dp'}\t$pkt_hr->{'proto'}";
         }
 
-    ### Nov 27 15:45:51 orthanc kernel: DROP IN=eth1 OUT= MAC=00:a0:cc:e2:1f:f2:00:
-    ### 20:78:10:70:e7:08:00 SRC=192.168.10.20 DST=192.168.10.1 LEN=84 TOS=0x00
-    ### PREC=0x00 TTL=64 ID=0 DF PROTO=ICMP TYPE=8 CODE=0 ID=61055 SEQ=256
+    } elsif ($is_icmp6 or $is_icmp) {
 
-    } elsif ($is_icmp and
-            $pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+).*
+        $pkt_hr->{'sp'} = $pkt_hr->{'dp'} = 0;
+
+        if ($is_ipv6) {
+
+            ### Jul 18 17:18:19 lorien kernel: [ 1786.520508] IPV6 packet IN=lo
+            ### OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:86:dd
+            ### SRC=0000:0000:0000:0000:0000:0000:0000:0001
+            ### DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=104 TC=0
+            ### HOPLIMIT=255 FLOWLBL=0 PROTO=ICMPv6 TYPE=129 CODE=0 ID=14997 SEQ=1 
+
+            if ($pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+)\s+TC=(\d+)\s+
+                    HOPLIMIT=(\d+)\s+FLOWLBL=(\d+)\s+PROTO=ICMPv6\s+TYPE=(\d+)\s+
+                    CODE=(\d+)/x) {
+
+                ($pkt_hr->{'src'}, $pkt_hr->{'dst'}, $pkt_hr->{'ip_len'},
+                    $pkt_hr->{'tc'}, $pkt_hr->{'hop_limit'},
+                    $pkt_hr->{'flow_label'}, $pkt_hr->{'itype'},
+                    $pkt_hr->{'icode'}) = ($1,$2,$3,$4,$5,$6,$7,$8);
+            } else {
+                print STDERR "[-] err packet: strange IPv6 ICMP format\n"
+                    if $debug;
+                return $PKT_ERROR;
+            }
+
+            $pkt_hr->{'proto'} = 'icmp6';
+
+        } else {
+
+            ### Nov 27 15:45:51 orthanc kernel: DROP IN=eth1 OUT= MAC=00:a0:cc:e2:1f:f2:00:
+            ### 20:78:10:70:e7:08:00 SRC=192.168.10.20 DST=192.168.10.1 LEN=84 TOS=0x00
+            ### PREC=0x00 TTL=64 ID=0 DF PROTO=ICMP TYPE=8 CODE=0 ID=61055 SEQ=256
+
+            if ($pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+).*
                       TTL=(\d+)\s+ID=(\d+).*PROTO=ICMP\s+TYPE=(\d+)\s+
                       CODE=(\d+)/x) {
 
-        ($pkt_hr->{'src'}, $pkt_hr->{'dst'}, $pkt_hr->{'ip_len'},
-            $pkt_hr->{'ttl'}, $pkt_hr->{'ip_id'}, $pkt_hr->{'itype'},
-            $pkt_hr->{'icode'}) = ($1,$2,$3,$4,$5,$6,$7);
+                ($pkt_hr->{'src'}, $pkt_hr->{'dst'}, $pkt_hr->{'ip_len'},
+                    $pkt_hr->{'ttl'}, $pkt_hr->{'ip_id'}, $pkt_hr->{'itype'},
+                    $pkt_hr->{'icode'}) = ($1,$2,$3,$4,$5,$6,$7);
+            } else {
+                print STDERR "[-] err packet: strange IPv4 ICMP format\n"
+                    if $debug;
+                return $PKT_ERROR;
+            }
 
-        $pkt_hr->{'proto'} = 'icmp';
-        $pkt_hr->{'sp'} = $pkt_hr->{'dp'} = 0;
+            $pkt_hr->{'proto'} = 'icmp';
+        }
 
         if ($pkt_hr->{'itype'} == $ICMP_ECHO_REQUEST
                 or $pkt_hr->{'itype'} == $ICMP_ECHO_REPLY) {
@@ -1607,13 +1740,6 @@ sub parse_NF_pkt_str() {
             } else {
                 return $PKT_ERROR;
             }
-        }
-
-        unless ($pkt_hr->{'ip_len'} >= 0 and $pkt_hr->{'ttl'} >= 0
-                and $pkt_hr->{'proto'} and $pkt_hr->{'itype'} >= 0
-                and $pkt_hr->{'icode'} >= 0) {
-
-            return $PKT_ERROR;
         }
 
         ### see if we need to ignore this packet based on the
@@ -1637,15 +1763,21 @@ sub parse_NF_pkt_str() {
 
     if ($restrict_ip) {
         ### we are looking to analyze packets from a specific IP/subnet
-        if ($restrict_ip =~ m|$ip_re/\d+|) {
-            return $PKT_IGNORE unless
-                (ipv4_in_network($restrict_ip, $pkt_hr->{'src'})
-                or ipv4_in_network($restrict_ip, $pkt_hr->{'dst'}));
+        if ($pkt_hr->{'is_ipv6'}) {
         } else {
-            return $PKT_IGNORE unless $pkt_hr->{'src'} eq $restrict_ip
-                    or $pkt_hr->{'dst'} eq $restrict_ip;
+            if ($restrict_ip =~ m|$ip_re/\d+|) {
+                return $PKT_IGNORE unless
+                    (ipv4_in_network($restrict_ip, $pkt_hr->{'src'})
+                    or ipv4_in_network($restrict_ip, $pkt_hr->{'dst'}));
+            } else {
+                return $PKT_IGNORE unless $pkt_hr->{'src'} eq $restrict_ip
+                        or $pkt_hr->{'dst'} eq $restrict_ip;
+            }
         }
     }
+
+    return $PKT_IGNORE if $pkt_hr->{'is_ipv6'};
+
     return $PKT_SUCCESS;
 }
 

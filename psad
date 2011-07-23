@@ -9918,14 +9918,19 @@ sub write_cmd_line() {
 sub send_mail() {
     my ($subject, $body_file, $addr_str, $mailCmd) = @_;
     return if $no_email_alerts;
-    open MAIL, qq{| $mailCmd -s "$subject" $addr_str > /dev/null 2>&1} or die
-        qq{[*] Could not send mail: $mailCmd -s "$subject" $addr_str: $!};
+
+    my @mail_body_lines = ();
     if ($body_file) {
         open F, "< $body_file" or die "[*] Could not open mail file: ",
             "$body_file: $!";
-        my @lines = <F>;
+        @mail_body_lines = <F>;
         close F;
-        print MAIL for @lines;
+    }
+
+    open MAIL, qq{| $mailCmd -s "$subject" $addr_str > /dev/null 2>&1} or die
+        qq{[*] Could not send mail: $mailCmd -s "$subject" $addr_str: $!};
+    if ($body_file and @mail_body_lines) {
+        print MAIL for @mail_body_lines;
     }
     close MAIL;
     return;

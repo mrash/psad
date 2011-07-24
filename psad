@@ -627,7 +627,6 @@ my @args_cp = @ARGV;
 unless ($no_daemon or $debug) {
     my $pid = fork();
     exit 0 if $pid;
-    close STDIN; close STDOUT; close STDERR;
     die "[*] $0: Couldn't fork: $!" unless defined $pid;
     POSIX::setsid() or die "[*] $0: Can't start a new session: $!";
 }

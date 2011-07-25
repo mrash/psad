@@ -311,12 +311,9 @@ my $ipv6_re = qr|(?:[a-f0-9]{4}:){7}(?:[a-f0-9]{4})|;   ### IPv6
 ### average.
 my $max_hops = 20;
 
-### packet counters
-my $tcp_ctr      = 0;
-my $udp_ctr      = 0;
-my $udplite_ctr  = 0;
-my $icmp_ctr     = 0;
-my $icmp6_ctr    = 0;
+### per protocol packet counters
+my @protocols = qw/tcp udp udplite icmp icmp6/;
+my %proto_ctrs = ();
 
 ### pid file hash
 my %pidfiles = ();
@@ -1036,19 +1033,13 @@ sub check_scan() {
             next PKT unless $#$matched_fields_ar > -1;
         }
 
+        $proto_ctrs{$pkt{'proto'}}++;
         if ($pkt{'proto'} eq 'tcp') {
             $top_tcp_ports{$pkt{'dp'}}++;
-            $tcp_ctr++;
         } elsif ($pkt{'proto'} eq 'udp') {
             $top_udp_ports{$pkt{'dp'}}++;
-            $udp_ctr++;
         } elsif ($pkt{'proto'} eq 'udplite') {
             $top_udp_ports{$pkt{'dp'}}++;
-            $udplite_ctr++;
-        } elsif ($pkt{'proto'} eq 'icmp') {
-            $icmp_ctr++;
-        } elsif ($pkt{'proto'} eq 'icmp6') {
-            $icmp6_ctr++;
         }
 
         ### track packet counts for this source
@@ -4558,9 +4549,10 @@ sub check_scan_proto() {
 sub write_global_packet_counters() {
     open P, "> $config{'PACKET_COUNTER_FILE'}" or
         die "[*] Could not open $config{'PACKET_COUNTER_FILE'}: $!";
-    print P "tcp:  $tcp_ctr\n",
-        "udp:  $udp_ctr\n",
-        "icmp: $icmp_ctr\n";
+    for my $proto (@protocols) {
+        next unless defined $proto_ctrs{$proto};
+        printf "%8s: %d\n", $proto, $proto_ctrs{$proto};
+    }
     close P;
     return;
 }
@@ -8392,12 +8384,8 @@ sub import_packet_counters() {
     open F, "< $config{'PACKET_COUNTER_FILE'}" or
         die "[*] $config{'PACKET_COUNTER_FILE'}: $!";
     while (<F>) {
-        if (/tcp:\s+(\d+)/) {
-            $tcp_ctr = $1;
-        } elsif (/udp:\s+(\d+)/) {
-            $udp_ctr = $1;
-        } elsif (/icmp:\s+(\d+)/) {
-            $icmp_ctr = $1;
+        if (/(\w+):\s+(\d+)/) {
+            $proto_ctrs{$1} = $2;
         }
     }
     close F;
@@ -8405,8 +8393,14 @@ sub import_packet_counters() {
 }
 
 sub print_packet_counters() {
-    return ["    Total packet counters: tcp: $tcp_ctr, udp: " .
-        "$udp_ctr, icmp: $icmp_ctr\n\n"];
+    my $str = "    Total packet counters: ";
+    for my $proto (@protocols) {
+        next unless defined $proto_ctrs{$proto};
+        $str .= "$proto: $proto_ctrs{$proto} ";
+    }
+    $str .= "\n\n";
+
+    return [$str];
 }
 
 sub import_dshield_stats() {

@@ -4551,7 +4551,7 @@ sub write_global_packet_counters() {
         die "[*] Could not open $config{'PACKET_COUNTER_FILE'}: $!";
     for my $proto (@protocols) {
         next unless defined $proto_ctrs{$proto};
-        printf "%8s: %d\n", $proto, $proto_ctrs{$proto};
+        printf P "%8s: %d\n", $proto, $proto_ctrs{$proto};
     }
     close P;
     return;

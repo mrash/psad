@@ -3148,7 +3148,9 @@ sub check_enable_vars_value() {
         next unless $var =~ /^ENABLE_/;
         ### make sure that all of the "ENABLE_" vars have a value of
         ### 'Y' or 'N'
-        unless ($config{$var} eq 'Y' or $config{$var} eq 'N') {
+        $config{$var} = uc($config{$var});
+        unless ($config{$var} eq 'Y' or $config{$var} eq 'N'
+                or $config{$var} eq 'YES' or $config{$var} eq 'NO') {
             die "[*] $var variable must be 'Y' or 'N'";
         }
     }

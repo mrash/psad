@@ -1433,6 +1433,7 @@ sub parse_NF_pkt_str() {
 
     ### test for IPv6
     if ($pkt_str =~ /HOPLIMIT=\d+\s+FLOWLBL=\d+/) {
+        return $PKT_IGNORE unless $config{'ENABLE_IPV6_DETECTION'} eq 'Y';
         $is_ipv6 = 1;
         $pkt_hr->{'is_ipv6'} = 1;
     }
@@ -10164,7 +10165,7 @@ sub required_vars() {
         SYSLOG_FACILITY SYSLOG_PRIORITY ENABLE_EMAIL_LIMIT_PER_DST
         ENABLE_SYSLOG_FILE IPT_SYSLOG_FILE IPT_WRITE_FWDATA
         ETC_RSYSLOG_CONF IFCFGTYPE ENABLE_WHOIS_FORCE_ASCII
-        ENABLE_WHOIS_FORCE_SRC_IP
+        ENABLE_WHOIS_FORCE_SRC_IP ENABLE_IPV6_DETECTION
     );
     &defined_vars(\@required_vars);
     return;

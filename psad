@@ -276,7 +276,7 @@ my %auto_assigned_msg = ();
 my %auto_blocked_ips = ();
 
 ### counter to check psad iptables chains and jump rules
-my $netfilter_prereq_check = 0;
+my $iptables_prereq_check = 0;
 
 ### cache the addresses we have issued dns lookups against.
 my %dns_cache = ();
@@ -5824,9 +5824,9 @@ sub ipt_block() {
     }
 
     if ($config{'IPTABLES_PREREQ_CHECK'} > 1) {
-        $netfilter_prereq_check++;
-        $netfilter_prereq_check = 1
-            if $netfilter_prereq_check == $config{'IPTABLES_PREREQ_CHECK'};
+        $iptables_prereq_check++;
+        $iptables_prereq_check = 1
+            if $iptables_prereq_check == $config{'IPTABLES_PREREQ_CHECK'};
     }
 
     ### add block rule for $ip unless it is already blocked
@@ -5843,7 +5843,7 @@ sub ipt_block() {
         my $dst = '';
 
         if ($config{'IPTABLES_PREREQ_CHECK'} == 1
-                or $netfilter_prereq_check == 1) {
+                or $iptables_prereq_check == 1) {
             print STDERR "[+] iptables chains and jump rule check.\n"
                 if $debug;
 

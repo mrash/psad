@@ -215,7 +215,7 @@ fi
 - psad-2.0 release.
 - Added ip_options file for the Snort ipopts rule keyword.
 - Added nf2csv so that normal users can get CSV output from
-  Netfilter log messages.
+  iptables log messages.
 
 * Sun Oct 15 2006 Michael Rash <mbr@cipherdyne.org>
 - psad-1.4.8 release.

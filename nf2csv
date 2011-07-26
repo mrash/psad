@@ -75,7 +75,7 @@ my %pkt_NF_init = (
     'udp_len'  => -1,
 
     ### extra fields for internals (fwsnort sid matching,
-    ### Netfilter logging prefixes and chains, etc.)
+    ### iptables logging prefixes and chains, etc.)
     'fwsnort_sid' => 0,
     'chain'       => '',
     'log_prefix'  => '',

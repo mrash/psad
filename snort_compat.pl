@@ -7,10 +7,10 @@
 # Purpose: To assist in the construction of a set of Snort rules that can be
 #          made compatible with psad.
 #
-# Methodology:  Psad exclusively uses Netfilter log messages as its source
+# Methodology:  Psad exclusively uses iptables log messages as its source
 #   of intrusion detection data.  This means that psad cannot accurately
 #   detect most Snort rules because payload data is not available (the
-#   Netfilter string match extension can provide string matching capabilities
+#   iptables string match extension can provide string matching capabilities
 #   against application layer data; see "fwsnort" at
 #   http://www.cipherdyne.org/fwsnort).  However, there are several backdoor
 #   programs, DDoS tools, and other suspect traffic that can be inferred from
@@ -29,11 +29,11 @@
 #   for example.  Each of the rules only applies to traffic over an
 #   established TCP session (see the "established" argument give to the
 #   "flow" keyword).  It is impossible to extract the same level of
-#   granularity from Netfilter logs alone.  However, if Netfilter logs a SYN
+#   granularity from iptables logs alone.  However, if iptables logs a SYN
 #   packet directed to TCP port 27665, it is a good bet that a Trin00 DDoS
 #   client is attempting to contact a Trin00 master client.  Hence psad will
 #   generate the alert "DDOS Trin00 Attacker to Master" upon monitoring such
-#   a packet in the Netfilter log.  Even if the Snort rules above are
+#   a packet in the iptables log.  Even if the Snort rules above are
 #   improved by the Snort community to use the more advanced features of the
 #   Snort rules language, the basic fact that SYN packets to TCP/27665 may
 #   be associated with the Trin00 DDoS remains.  This is the general

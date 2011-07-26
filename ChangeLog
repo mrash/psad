@@ -377,7 +377,7 @@ psad-2.0 (12/10/2006):
       icmp_id, icmp_seq, itype, icode, ip_proto, ipopts, and sameip.
     - Refactored all signatures in /etc/psad/signatures to conform to new
       signature matching support in this release.  There are now about 190
-      signatures that psad can run directly against Netfilter logging
+      signatures that psad can run directly against iptables logging
       messages (i.e. without the help of fwsnort).
     - Added the ability to download the latest signatures file from
       http://www.cipherdyne.org/psad/signatures with the --sig-update command
@@ -395,7 +395,7 @@ psad-2.0 (12/10/2006):
     - Added --CSV mode so that psad can be used to generate comma-separated
       value output suitable for the AfterGlow project (see
       http://afterglow.sourceforge.net/index.html) for graphical
-      representations of Netfilter logs and associated scan data.  Also added
+      representations of iptables logs and associated scan data.  Also added
       nf2csv so that normal users can take advantage of this feature.
     - Added emulation of the Snort "dsize" test through the use of the IP
       length field for TCP/ICMP signatures, and the UDP length field for UDP
@@ -446,7 +446,7 @@ psad-2.0 (12/10/2006):
     - Bugfix to cleanup any lost blocking rules from the running psad
       timeouts (a separate process might have deleted rules from the psad
       chains).
-    - Bugfix to allow Netfilter log messages to include the PHYSDEV (i.e.
+    - Bugfix to allow iptables log messages to include the PHYSDEV (i.e.
       PHYSIN and PHYSOUT) interfaces.
     - Updated to read architecture-dependent perl module installation
       directory out of /usr/lib/psad (e.g. "/usr/lib/psad/x86_64-linux")
@@ -503,7 +503,7 @@ psad-1.4.7 (09/10/2006):
       is ok upon an unsuccessful test of the syslog reconfiguration.  This
       fixes a bug where some syslog daemons might not re-import their
       configurations after receiving a HUP signal.
-    - Bugfix for incorrect config variable name that gated Netfilter
+    - Bugfix for incorrect config variable name that gated iptables
       prerequisite checks.
     - Added code to install.pl to update command paths in psad.conf and
       psadwatchd.conf if any of the paths are broken (i.e. the local system
@@ -522,7 +522,7 @@ psad-1.4.6 (06/13/2006):
       logging prefixes.
     - Added code to save DShield email to a file.
     - Added IPTABLES_PREREQ_CHECK to allow the administrator to control the
-      frequency of Netfilter checks (for auto-block compatibility).
+      frequency of iptables checks (for auto-block compatibility).
     - Added IGNORE_LOG_PREFIXES to allow certain log prefixes to be completely
       ignored by psad.
     - Added classification.config file from Snort-2.3.3 so that psad can
@@ -546,7 +546,7 @@ psad-1.4.5 (01/13/2006):
       this directory is removed by some Linux distributions at boot time.
     - Bugfix for zero masks in auto_dl; this allows a network of "0.0.0.0/0"
       to be specified.
-    - Added ENABLE_FW_LOGGING_CHECK so that the Netfilter policy check can be
+    - Added ENABLE_FW_LOGGING_CHECK so that the iptables policy check can be
       enabled/disabled easily via psad.conf.
     - Enhanced -D output to include "uname -a" and "perl -V" output.
     - Added ENABLE_RENEW_BLOCK_EMAILS to allow whether renew emails are sent
@@ -571,7 +571,7 @@ psad-1.4.4 (11/27/2005):
       keyword "TRUNCATE_FWDATA" (this is enabled by default).
     - Bugfix in auto-blocking mode for deleting AUTO_IPT_SOCK when a HUP
       signal is received.
-    - Bugfix for parsing Netfilter policies that contain ULOG logging rules
+    - Bugfix for parsing iptables policies that contain ULOG logging rules
       instead of the standard LOG target.
     - Removed the smtpdaemon requirement in the RPM because psad might be
       configured to not send email alerts.
@@ -587,7 +587,7 @@ psad-1.4.3 (09/27/2005):
       messages.  This drastically reduces the amount of memory required
       by psad.
     - Updated to only display psad chains if --verbose is set
-    - Updated to automatically flush the psad auto-response Netfilter chains
+    - Updated to automatically flush the psad auto-response iptables chains
       at start time (subject to a new config keyword "FLUSH_IPT_AT_INIT").
 
 psad-1.4.2 (07/15/2005):
@@ -597,7 +597,7 @@ psad-1.4.2 (07/15/2005):
     - Updated to version 0.2 of the IPTables::ChainMgr module.
     - Updated to not truncate the fwdata file upon psad startup.
     - Added --fw-dump which produces a sanitized (i.e. no IP addresses)
-      version of the local Netfilter policy.  Also added --fw-include-ips
+      version of the local iptables policy.  Also added --fw-include-ips
       to (optionally) not sanitize IPs/nets.  Note that the 0.0.0.0 and
       0.0.0.0/0 IPs/nets are not sanitized since they give no useful
       information about specific IPs/nets.
@@ -628,14 +628,14 @@ psad-1.4.1 (03/12/2005):
     - Updated Psad module directory structure to be consistent with current
       versions of perl (5.8.x).
     - Added IPTables::ChainMgr module.
-    - Completely re-worked the Netfilter auto-blocking code to use
+    - Completely re-worked the iptables auto-blocking code to use
       IPTables::ChainMgr functions so that auto-generated rules are placed
       in chains created by psad.
     - Added IPT_AUTO_CHAIN keyword in psad.conf which is used to define the
-      set of chains to which auto-generated Netfilter rules are added.
-    - Added --fw-list-auto to display the contents of psad Netfilter
+      set of chains to which auto-generated iptables rules are added.
+    - Added --fw-list-auto to display the contents of psad iptables
       chains.
-    - Added the ability to import an IP into the Netfilter auto-blocking
+    - Added the ability to import an IP into the iptableiptablesocking
       chains from the command line with --fw-block-ip.  This allows psad to
       apply its timeout mechanism against such IPs/nets.
     - Added the ability to ignore packets based on input interface with

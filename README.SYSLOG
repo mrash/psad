@@ -1,4 +1,20 @@
-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+This information is documented in the psad.conf file as well:
+
+By default, psad acquires iptables log data from the /var/log/messages
+file which the local syslog daemon (usually) writes iptables log messages
+to.  If the ENABLE_SYSLOG_FILE variable is set to "N", then psad
+reconfigures syslog to write iptables log data to the
+/var/lib/psad/psadfifo fifo file where the messages are picked up by kmsgsd
+written to the file /var/log/psad/fwdata for analysis by psad.  On some
+systems, having syslog communicate log data to kmsgsd can be problematic
+(syslog configs and external factors such as Apparmor and SELinux can play
+a role here), so leaving the ENABLE_SYSLOG_FILE variable set to "Y" is
+usually recommended.
+
+
+*** Pre psad-2.1.3 information below ***
+
 TESTING YOUR INSTALLATION:
 
 The psad installer does its best to reconfigure your syslog daemon to write

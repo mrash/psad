@@ -6866,6 +6866,13 @@ sub analysis_mode() {
     ### work more easily).
     $config{'PSAD_DIR'} = $config{'ANALYSIS_MODE_DIR'};
 
+    ### build @local_nets array
+    my ($connected_subnets_ar, $connected_subnets_cidr_ar)
+        = &get_connected_subnets();
+    for my $net (@$connected_subnets_cidr_ar) {
+        push @local_nets, $net;
+    }
+
     print "[+] Entering analysis mode.  Parsing $fw_data_file\n";
     open MSGS, "< $fw_data_file" or die "[*] Could not open ",
         "$fw_data_file: $!";

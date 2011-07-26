@@ -1019,6 +1019,7 @@ sub check_scan() {
 
         ### main parsing routine for the iptables packet logging message
         my $pkt_parse_rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
+        print STDERR Dumper \%pkt if $debug and $verbose;
         if ($pkt_parse_rv == $PKT_ERROR) {
             push @err_pkts, $pkt_str;
             next PKT;
@@ -1447,11 +1448,10 @@ sub parse_NF_pkt_str() {
         $pkt_hr->{'ip_opts'} = $1;
     }
 
-    if ($pkt_str =~ /PROTO=TCP\s/) {
-        $is_tcp = 1;
-    } elsif ($pkt_str =~ /PROTO=ICMPv6\s/) {
-        ### test for ICMP before UDP because ICMP destination unreachable
-        ### messages can contain embedded UDP specifics like so:
+    if ($is_ipv6 and $pkt_str =~ /PROTO=ICMPv6\s/) {
+        ### test for ICMP before TCP or UDP because ICMP destination
+        ### unreachable messages can contain embedded TCP/UDP specifics like
+        ### so:
 
         ### Jul 21 19:07:39 minastirith kernel: [1912155.755921] IPv6 Packet
         ### IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:86:dd
@@ -1464,8 +1464,9 @@ sub parse_NF_pkt_str() {
 
         $is_icmp6 = 1;
     } elsif ($pkt_str =~ /PROTO=ICMP\s/) {
-        ### test for ICMP before UDP because ICMP destination unreachable
-        ### messages can contain embedded UDP specifics like so:
+        ### test for ICMP before TCP or UDP because ICMP destination
+        ### unreachable messages can contain embedded TCP/UDP specifics like
+        ### so:
 
         ### Sep  8 18:04:26 minastirith kernel: [28241.572876] IN_DROP
         ### IN=wlan0 OUT= MAC=00:1a:9f:91:df:ae:00:12:27:12:0a:a0:12:00
@@ -1475,12 +1476,14 @@ sub parse_NF_pkt_str() {
         ### SPT=35080 DPT=33434 LEN=48 ]
 
         $is_icmp = 1;
+    } elsif ($pkt_str =~ /PROTO=TCP\s/) {
+        $is_tcp = 1;
     } elsif ($pkt_str =~ /PROTO=UDPLITE\s/) {
         $is_udplite = 1;
     } elsif ($pkt_str =~ /PROTO=UDP\s/) {
         $is_udp = 1;
     } else {
-        print STDERR "[-] err packet: non TCP/UDP/ICMP protocol\n" if $debug;
+        print STDERR "[-] err packet: unrecognized protocol\n" if $debug;
         return $PKT_ERROR;
     }
 
@@ -1682,7 +1685,7 @@ sub parse_NF_pkt_str() {
             ### DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=104 TC=0
             ### HOPLIMIT=255 FLOWLBL=0 PROTO=ICMPv6 TYPE=129 CODE=0 ID=14997 SEQ=1 
 
-            if ($pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+)\s+TC=(\d+)\s+
+            if ($pkt_str =~ /SRC=($ipv6_re)\s+DST=($ipv6_re)\s+LEN=(\d+)\s+TC=(\d+)\s+
                     HOPLIMIT=(\d+)\s+FLOWLBL=(\d+)\s+PROTO=ICMPv6\s+TYPE=(\d+)\s+
                     CODE=(\d+)/x) {
 

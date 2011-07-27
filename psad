@@ -295,6 +295,7 @@ my %local_ips = ();
 ### Top attacking statistics
 my %top_tcp_ports = ();
 my %top_udp_ports = ();
+my %top_udplite_ports = ();
 my %top_sigs    = ();
 my %sig_sources = ();
 my %top_sig_counts = ();
@@ -1040,7 +1041,7 @@ sub check_scan() {
         } elsif ($pkt{'proto'} eq 'udp') {
             $top_udp_ports{$pkt{'dp'}}++;
         } elsif ($pkt{'proto'} eq 'udplite') {
-            $top_udp_ports{$pkt{'dp'}}++;
+            $top_udplite_ports{$pkt{'dp'}}++;
         }
 
         ### track packet counts for this source
@@ -1199,7 +1200,8 @@ sub check_scan() {
         $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}{'chain'}
                 {$pkt{'chain'}}{$pkt{'log_prefix'}}++;
 
-        if ($pkt{'proto'} eq 'tcp' or $pkt{'proto'} eq 'udp') {
+        if ($pkt{'proto'} eq 'tcp' or $pkt{'proto'} eq 'udp'
+                or $pkt{'proto'} eq 'udplite') {
             ### initialize the start and end port for the scanned port range
             if (not defined $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}{'strtp'}) {
                 ### make sure the initial start port is not too low
@@ -1808,7 +1810,7 @@ sub match_sigs() {
                 next DST unless &check_sig_ip($pkt_hr->{'dst'}, $dst);
                 print STDERR "    Matched sig IP criteria.\n"
                     if $debug and $verbose;
-                if ($proto eq 'tcp' or $proto eq 'udp') {
+                if ($proto eq 'tcp' or $proto eq 'udp' or $proto eq 'udplite') {
 
                     TYPE: for my $hr (@port_types) {
                         my $sp_type = $hr->{'sp'};
@@ -3964,7 +3966,8 @@ sub import_signatures() {
 
                     $sig_search{$sig{'proto'}}{$src}{$dst}{$sig{'sid'}} = '';
 
-                } elsif ($sig{'proto'} eq 'tcp' or $sig{'proto'} eq 'udp') {
+                } elsif ($sig{'proto'} eq 'tcp' or $sig{'proto'} eq 'udp'
+                        or $sig{'proto'} eq 'udplite') {
 
                     my $sp_type = 'norm';
                     $sp_type = 'neg' if $sig{'sp_neg'};
@@ -4218,6 +4221,10 @@ sub import_auto_dl() {
 
         if ($line =~ m|tcp|i and not defined $auto_dl{$ip}{'proto'}{'tcp'}) {
             $auto_dl{$ip}{'proto'}{'tcp'}{'all'} = '';
+        }
+        if ($line =~ m|udplite|i and
+                not defined $auto_dl{$ip}{'proto'}{'udplite'}) {
+            $auto_dl{$ip}{'proto'}{'udplite'}{'all'} = '';
         }
         if ($line =~ m|udp|i and not defined $auto_dl{$ip}{'proto'}{'udp'}) {
             $auto_dl{$ip}{'proto'}{'udp'}{'all'} = '';
@@ -4589,12 +4596,12 @@ sub write_src_packet_counters() {
         die "[*] Could not open $file: $!";
     for my $chain (keys %$hr) {
         for my $intf (keys %{$hr->{$chain}}) {
-            for my $proto qw(tcp udp icmp) {
+            for my $proto (@protocols) {
                 next unless defined $hr->{$chain}->{$intf}->{$proto};
                 if ($proto eq 'tcp' and $tcp_absrange) {
                     print P "${chain}_${intf}_${proto}:  ",
                         "$hr->{$chain}->{$intf}->{$proto} [$tcp_absrange]\n";
-                } elsif ($proto eq 'udp' and $udp_absrange) {
+                } elsif (($proto eq 'udp' or $proto eq 'udplite') and $udp_absrange) {
                     print P "${chain}_${intf}_${proto}:  ",
                         "$hr->{$chain}->{$intf}->{$proto} [$udp_absrange]\n";
                 } else {
@@ -5263,7 +5270,7 @@ sub scan_logr_signatures() {
     my @log_sigs = ();
     my $found_sid = 0;
 
-    for my $proto qw(tcp udp icmp ip) {
+    for my $proto (@protocols) {
         next unless defined $scan{$src}{$dst}{$proto};
         my $hr = $scan{$src}{$dst}{$proto};
 
@@ -5298,7 +5305,8 @@ sub scan_logr_signatures() {
 
                 my $dp    = 0;
                 my $flags = 'NA';
-                if ($proto eq 'tcp' or $proto eq 'udp') {
+                if ($proto eq 'tcp' or $proto eq 'udp'
+                        or $proto eq 'udplite') {
                     $dp = $hr->{'sid'}->{$sid}->{$chain}->{'dp'};
                     if ($proto eq 'tcp') {
                         $flags = $hr->{'sid'}->{$sid}->{$chain}->{'flags'};
@@ -5317,7 +5325,8 @@ sub scan_logr_signatures() {
                     my $sig_log_str = "src: $src signature match: " .
                         qq|"$sig_hr->{'msg'}" (sid: $sid) $proto|;
 
-                    if ($proto eq 'tcp' or $proto eq 'udp') {
+                    if ($proto eq 'tcp' or $proto eq 'udp'
+                            or $proto eq 'udplite') {
                         $sig_log_str .= " port: $dp";
                     }
 
@@ -5362,7 +5371,8 @@ sub scan_logr_signatures() {
 
                 print $email_fh qq|   "$sig_hr->{'msg'}"\n|;
 
-                if ($proto eq 'tcp' or $proto eq 'udp') {
+                if ($proto eq 'tcp' or $proto eq 'udp'
+                        or $proto eq 'udplite') {
                     if ($chain eq 'INPUT') {
                         if (defined $local_ports{$proto}
                                 and defined $local_ports{$proto}{$dp}) {
@@ -8142,7 +8152,7 @@ sub print_scan_status() {
                 next unless defined $scan{$src}{$dst}{'absnum'};
                 $tot_pkts += $scan{$src}{$dst}{'absnum'};
             }
-            for my $proto qw/tcp udp icmp ip/ {
+            for my $proto (@protocols) {
                 for my $dst (keys %{$scan{$src}}) {
                     next unless defined $scan{$src}{$dst}{$proto}
                         and defined $scan{$src}{$dst}{$proto}{'sid'};
@@ -8198,7 +8208,8 @@ sub print_scan_status() {
                                     {$chain}}) {
                             for my $proto (keys %{$scan{$src}{$dst}{'chain'}
                                         {$chain}{$intf}}) {
-                                next unless $proto eq 'tcp' or $proto eq 'udp';
+                                next unless $proto eq 'tcp' or $proto eq 'udp'
+                                    or $proto eq 'udplite';
                                 my $start_port = $scan{$src}{$dst}
                                         {$proto}{'abs_sp'};
                                 my $end_port   = $scan{$src}{$dst}
@@ -8220,7 +8231,7 @@ sub print_scan_status() {
                 }
 
                 ### signature matches
-                for my $proto qw/tcp udp icmp ip/ {
+                for my $proto (@protocols) {
                     next unless defined $scan{$src}{$dst}{$proto}
                         and defined $scan{$src}{$dst}{$proto}{'sid'};
 
@@ -8244,7 +8255,8 @@ sub print_scan_status() {
                                 "            " . uc($proto) .
                                 ", Chain: $chain, Count: $matches";
 
-                            if ($proto eq 'tcp' or $proto eq 'udp') {
+                            if ($proto eq 'tcp' or $proto eq 'udp'
+                                    or $proto eq 'udplite') {
                                 my $dp = $scan{$src}{$dst}{$proto}
                                     {'sid'}{$sid}{$chain}{'dp'};
                                 $sig_str .= ", DP: $dp";
@@ -8738,6 +8750,8 @@ sub import_top_scanned_ports() {
                 $top_tcp_ports{$port} = $count;
             } elsif ($proto eq 'udp') {
                 $top_udp_ports{$port} = $count;
+            } elsif ($proto eq 'udplite') {
+                $top_udplite_ports{$port} = $count;
             }
         }
     }
@@ -9745,7 +9759,7 @@ sub import_config() {
                 ### found a command
                 $cmds{$1} = $val unless defined $cmds{$1};
             } else {
-                $config{$varname} = $val unless defined $config{$varname};;
+                $config{$varname} = $val unless defined $config{$varname};
             }
         }
     }
@@ -10189,7 +10203,7 @@ Options:
     -e,  --email-analysis         - Send emails for scans detected in
                                     offline analysis mode.
     -w,  --whois-analysis         - Enable whois lookups when running in
-                                    offline analysis mode.
+                                    offline --Analyze-msgs mode.
     -m,  --messages-file <file>   - Specify the path to the iptables logfile
                                     (for --Analyze-msgs mode).
     -i,  --interface <intf>       - Restrict detection to IN interface (for
@@ -10233,8 +10247,8 @@ Options:
     -R,  --Restart                - Restart all running psad processes.
     -S,  --Status                 - Displays the status of any currently
                                     running psad processes.
-    --restrict-ip <IP address>    - Only process packets that have this IP
-                                    as the src or dst.
+    --restrict-ip <IP or net>     - Only process packets that have this IP
+                                    or network as the src or dst.
     --status-ip <IP address>      - View status for a specific IP.
     --status-dl <dl>              - Display status information for only
                                     those scans that have reach at least

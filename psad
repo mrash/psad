@@ -8535,6 +8535,7 @@ sub import_ip_dirs() {
         ### get all of the destination ip addresses
         my %dst_ips;
         for my $scan_file (@scan_files) {
+            next if $scan_file =~ /_whois/;  ### may be <src>_whois
             if ($scan_file =~ /($ip_re)/) {
                 $dst_ips{$1} = '';
             }

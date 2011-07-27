@@ -1,0 +1,907 @@
+psad-2.1.8 (12//2010):
+    - Altered the 'ET MALWARE Bundleware Spyware CHM Download' Snort rule in
+      the bundled Emerging Threats rule set to make sure that ClamAV does not
+      flag on the pattern "mhtml\:file\://" which is associated with the
+      following ClamAV signature:
+
+        $ grep Exploit.HTML.MHTRedir-8 main.ndb
+        Exploit.HTML.MHTRedir-8:3:*:6d68746d6c3a66696c653a2f2f{1-20}2168
+
+      An analysis of this issue was posted here:
+
+        http://www.cipherdyne.org/blog/2010/08/22.html
+
+    - Bug fix for ICMP packet handling where psad would incorrectly interpret
+      ICMP port unreachable messages as UDP packets because the UDP specifics
+      are included in the iptables log message.  This bug was first reported by
+      Lukas Baxa to the Debian maintainers and was followed up by Franck
+      Joncourt:
+
+        http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=596240
+
+      An example ICMP log message that exposed the bug is included below:
+
+      Sep  8 18:04:26 baxic kernel: [28241.572876] IN_DROP IN=wlan0
+      OUT= MAC=00:1a:9f:91:df:ae:00:21:27:e8:0a:a0:08:00
+      SRC=10.0.0.138 DST=192.168.1.103 LEN=96 TOS=0x00 PREC=0xC0 TTL=254
+      ID=63642 PROTO=ICMP TYPE=3 CODE=3
+      [SRC=192.168.1.103 DST=10.0.0.138 LEN=68 TOS=0x00 PREC=0x00 TTL=0
+      ID=22458 PROTO=UDP SPT=35080 DPT=33434 LEN=48 ]
+
+    - Updated the bundled whois client to 5.0.6.
+
+psad-2.1.7 (07/14/2010):
+    - (Dan A. Dickey) Added the ability to use the "ip" command from the
+      iproute2 tools to acquire IP addresses from local interfaces.  Dan's
+      description is as follows: "...A main reason for doing this is in the
+      case of multi-homed hosts. ifconfig sets these up on an interface using
+      aliases, iproute2 does not.  So, for a multi-homed interface (eth0 with
+      multiple addresses), ifconfig -a only shows the first one configured and
+      not the rest.  ip addr shows all of the configured addresses...".
+    - Added ENABLE_WHOIS_FORCE_ASCII to replace any non-ascii characters in
+      whois data (which is common with whois lookups against Chinese IP
+      addresses for example) with the string "NA".  This option is disabled by
+      default, but can be useful if errors like the following are seen upon
+      receiving an email alert from psad:
+
+        <<< 554 5.6.1 Eight bit data not allowed
+        554 5.0.0 Service unavailable
+
+    - Updated psad to issue whois lookups against IP addresses that are not
+      directly connected to the local system.  This is useful for example when
+      an internal system is scanning an external destination system, and the
+      scan is logged in the FORWARD chain.  Issuing whois lookups on the
+      internal system (frequently on RFC 1918 address space) is not usually
+      very useful, but issuing the whois lookup against the destination system
+      gives much more interesting data.  This feature can be disabled with the
+      new ENABLE_WHOIS_FORCE_SRC_IP variable.
+
+psad-2.1.6 (07/09/2010):
+    - Bug fix for Decode_Month() calls used to handle date formats and ensure
+      proper month handling for iptables log message time stamps.  This bug
+      caused psad to die in some cases, and the specific error on the console
+      in --debug mode was:
+        Date::Calc::Decode_Month(): argument is not a string at \
+        /usr/sbin/psad line 1103, <FWDATA> line 2.
+    - (Franck Joncourt) Added --Override-config feature so that alternate
+      configuration files can be specified on the command line to override
+      configuration variables in the standard /etc/psad/psad.conf file.
+    - (Franck Joncourt) Submitted patches to fix stderr redirection for the
+      usage of the mail binary, and to close stdout, stdin, and stderr when
+      running psad as a daemon.
+
+psad-2.1.5 (02/20/2009):
+    - (Miroslav Grepl) Contributed policy files to make psad compatible with
+      SELinux.  The files are located in a new "selinux" directory in the
+      psad sources.
+    - Bug fix for local server ports not reported correctly under netstat
+      parsing (Franck Joncourt).
+    - (Steve B) Submitted patch to fix a bug in the start() function in the
+      Gentoo init script which caused psad to not be started and the error
+      "* ERROR: psad failed to start" to be generated.
+    - Bug fix when ENABLE_SYSLOG_FILE is enabled to run a preliminary regex
+      match on each syslog message because kmsgsd is not running and therefore
+      has not gone through the kmsgsd tests for a properly structured iptables
+      message.
+    - Updated IPTables::Parse to 0.7.
+    - Updated IPTables::ChainMgr to 0.9.
+
+psad-2.1.4 (08/21/2008):
+    - Restructured perl module paths to make it easy to introduce a "nodeps"
+      distribution of psad that does not contain any perl modules.  This
+      allows better integration with systems that already have all necessary
+      modules installed (including the IPTables::ChainMgr and IPTables::Parse
+      modules).  The main driver for this work is to make all cipherdyne.org
+      projects easily integrated with distributions based on Debian, and
+      Franck Joncourt has been instrumental in making this process a reality.
+      All perl modules are now placed within the "deps" directory, and the
+      install.pl script checks to see if this directory exists - a separate
+      psad-<ver>-nodeps tarball will be distributed without this directory.
+      The Debian package for psad can then reference the -nodeps tarball, and
+      a new "psad-nodeps.spec" file has been added to build an RPM from the
+      psad sources that does not install any perl modules.
+    - Updated to use the normal system whois client if the /usr/bin/whois_psad
+      path does not exist, and moved the whois/ directory into the deps/
+      directory.  This removes /usr/bin/whois_psad as a strict dependency.
+    - Bugfix to honor the IPT_SYSLOG_FILE variable in --Analyze-msgs mode.
+    - Switched from the deprecated bleeding-all.rules file to the new
+      emerging-all.rules available from Matt Jonkman at Emerging Threats
+      (http://www.emergingthreats.net).
+
+psad-2.1.3 (06/07/2008):
+    - Updated to enable IPT_SYSLOG_FILE by default.  This is a relatively
+      important change since it changes the method of acquiring iptables log
+      data from reading it out of named pipe from syslog to just parsing the
+      /var/log/messages file.  This implies that kmsgsd does not have to run,
+      and that it is much easier to ensure that psad actually receives
+      iptables log messages.  The most complex and error prone aspect of psad
+      in the past has been the reconfiguration of the various syslog daemons
+      out there (which have very different configuration syntax and features)
+      to write kern.info messages to the /var/lib/psad/psadfifo named pipe.
+    - Updated to version 4.7.26 of the whois client from Marco d'Itri.  This
+      allows whois records for some addresses (such as 116.125.35.98, which
+      which was scanning a system running psad but could not be identified
+      under the older whois client) to be properly queried.
+    - Updated to Bit::Vector 6.4 from 6.3.
+    - Updated to Date::Calc 5.4 from 5.3.
+    - Updated to Storable 2.18 from 2.16.
+
+psad-2.1.2 (04/03/2008):
+    - Bugfix to not include kernel timestamps in iptables log prefixes that
+      contain spaces like "[   65.026008] DROP" (bug reported by Erik Heidt).
+    - Bugfix to skip non-resolved IP addresses (bug reported by Albert Whale)
+    - Better p0f output in --debug mode to display when a passive OS
+      fingerprint cannot be calculated based on iptables log messages that
+      include tcp options (i.e., with --log-tcp-options when building a LOG
+      rule on the iptables command line).
+
+psad-2.1.1 (01/25/2008):
+    - Added a new feature whereby psad can acquire iptables log data just by
+      parsing an existing file (/var/log/messages by default) that is written
+      to by syslog.  By default, psad acquires iptables log data from the
+      /var/log/psad/fwdata file which is written to by kmsgsd, but on some
+      systems, having syslog communicate log data to kmsgsd can be problematic
+      since syslog configs and external factors such as Apparmor and SELinux
+      can play a role here.  This new feature is controled by two new
+      configuration variables "ENABLE_SYSLOG_FILE" (to enable/disable the
+      feature) and "IPT_SYSLOG_FILE" to specifiy the path to the file to
+      parse.
+    - Better installation support for various Linux distributions including
+      Fedora 8 and Ubuntu.  The current runlevel is now acquired via the
+      "runlevel" command instead of attempting to read /etc/inittab (which
+      does not even exist on Ubuntu 7.10), and there are new command line
+      arguments --init-dir, --init-name, and --runlevel to allow the init
+      directory, init script name, and the runlevel to be manually specified
+      on the install.pl command line.
+    - Updated psad to automatically handle situations where the either the
+      /var/log/psad/fwdata file or the /var/log/messages file (whichever
+      syslog is writing iptables log messages to) gets rotated.  The
+      filehandle is closed and reopened if the file shrinks or if the inode
+      changes.  This strategy is borrowed from how the fwknop project deals
+      with the filesystem packet capture file.
+    - Minor bugfix to generate syslog message when restarting a psad process.
+    - Updated install.pl to set the LC_ALL environmental variable to "C"
+      This should address some issues with installing psad on non-English
+      locale systems.
+    - Updated install.pl to be compatible with the rsyslog daemon, which is
+      commonly installed on Fedora 8 systems.
+
+psad-2.1 (10/19/2007):
+    - Changed EMAIL_LIMIT model to apply to scanning source addresses only
+      instead of also factoring in the destination address. The original
+      src/dst email limit behavior can be restored by setting a new variable
+      "ENABLE_EMAIL_LIMIT_PER_DST" to "Y".
+    - Added the patches/iptables-1.3.8_LOG_prefix_space.patch file which can
+      be applied to the iptables-1.3.8 code to enforce a trailing space
+      character before any log prefix when a LOG rule is added. This ensures
+      that the user cannot break the iptables syslog format just by forgetting
+      to include a space at the end of a logging prefix.
+    - Bugfix to ensure that parsing TCP options does not descend into an
+      infinite loop in some some circumstances with obscure or maliciously
+      constructed options.  Also added syslog reporting for broken options
+      lengths of zero or one byte (the minimum option length is two bytes to
+      accomodate the TLV encoding).
+    - Bugfix to enforce the usage of --CSV-fields in --gnuplot mode.
+    - Implemented --get-next-rule-id so that it is easy to assign a new rule
+      ID to a new signature in the /etc/psad/signatures file.
+    - Updated to just call die() if GetOpt fails; this allows erroneous usage
+      of the command line to display informative error messages more clearly.
+
+psad-2.0.8 (07/27/2007):
+    - Added --gnuplot mode so that psad can output data that is suitable for
+      plotting with gnuplot. All output produced in this mode is integer data
+      with the exception of date stamps that are derived from iptables syslog
+      messages.
+    - Added the ability to negate match conditions on fields specified with
+      the --CSV-fields argument by prepending the string "not" (which plays
+      more nicely with shells like bash than a character like "!"). For
+      example, to graph all packet data in --gnuplot or --CSV modes that
+      originates from the 11.11.0.0/16 subnet and is not destined for port
+      80, the following argument does the trick:
+
+            --CSV-fields "src:11.11.0.0/16 dp:not80"
+
+    - In --gnuplot mode, added the ability to generate the count for a CSV
+      field instead of the field itself. Supported modes are an absolute
+      count (<field>:count) , and a unique count (<field>:uniqcount). This
+      is useful to plot graphs of source IP vs. the number unique ports for
+      example.  Also added the ability to count iptables log fields over
+      various time scales (minutes, hours, and days) with the following
+      switches: <field>:countday, <field>:counthour, <field>:countmin.
+    - In --gnuplot mode, added the ability to specify the view coordinates
+      for 3D graph viewing with --gnuplot-view.
+    - Added the Storable-2.16 module along with the --use-store-file argument
+      so that in --gnuplot mode the Gnuplot data can be stored on disk and
+      retrieve quickly.  This eliminates a large performance bottleneck when
+      Gnuplot configuration directives are tweaked while the same graph is
+      generated multiple times.
+    - Added --gnuplot-template so that a template file can be used for all
+      Gnuplot directives (usually psad creates the .gnu file based on the
+      --gnuplot command line arguments).
+    - Added --gnuplot-grayscale to generate graphs without the default red
+      color for graph points.
+    - Bugfix for regular expressions not being imported correctly from within
+      the --CSV-fields argument.
+    - Added --analysis-fields so the iptables log messages that are parsed in
+      -A mode can be restricted to those that meet certain criteria. For
+      example, to restrict the analyze mode to process packets with a source
+      address of 192.168.10.1, use this command:
+
+            psad -A --analysis-fields "src:192.168.10.1"
+
+    - Added --plot-separator to allow the format of plot data (either in
+      --gnuplot or --CSV modes) to be influenced by the user.
+    - Added the ability to configure the syslog facility and priority via the
+      psad.conf file (see the SYSLOG_FACILITY and SYSLOG_PRIORITY variables).
+    - Updated psad.spec file to respect the %_initrddir RPM macro.
+
+psad-2.0.7 (05/28/2007):
+    - Bugfix to define a custom 'source' definition for syslog-ng daemons -
+      this fixes a problem on SuSE systems where the existing syslog-ng
+      reconfig caused the daemon to not start.
+    - Bugfix to allow specific signatures to be ignored by setting SID values
+      of zero in /etc/psad/snort_rule_dl.
+    - Added -X command line argument to allow the user to delete any psad
+      chains (in auto-response mode).  This is a synonym for the iptables -X
+      command line argument.
+
+psad-2.0.6 (03/24/2007):
+    - Better integration with fwsnort; psad signature match syslog messages
+      and email alerts now include the fwsnort rule number (for fwsnort
+      version 0.9.0 and greater) and chain information.
+    - Added the Snort bleeding-all.rules signature file from the Bleeding
+      Snort project (see http://www.bleedingsnort.com).
+    - Bugfix to allow interfaces that have IP aliases.
+    - Added uname, ifconfig, and syslog process information to --Dump-conf
+      output (this can help diagnose various runtime issues).
+    - Changed the --Lib-dir command line argument to --lib-dir, and added
+      --List (similar to iptables) to list the psad auto-blocking chain rules.
+    - Added psad.SlackBuild script contributed by pyllyukko for building psad
+      on Slackware systems.  It uses the Cipherdyne cd_rpmbuilder script to
+      first build and RPM, and then uses it to build a Slackware package.
+
+psad-2.0.5 (03/01/2007):
+    - Consolidated all configuration variables into the /etc/psad/psad.conf
+      file. The kmsgsd.conf, psadwatchd.conf, alert.conf, and fw_search.conf
+      files were all removed since the daemons just reference the psad.conf
+      now.  Updated install.pl to archive and remove these files if they
+      exist from a previous psad installation.
+    - Bugfix to account for iptables -nL output where the protocol may be
+      reported as "0" instead of "all".
+    - Added a function safe_malloc() for kmsgsd.c and psadwatchd.c to ensure
+      that a single API is used to perform a NULL check on heap-allocated
+      memory.
+    - Bugfix to ensure that the psad_ip_len signature matching keyword is
+      checked withing match_snort_ip_keywords() so that it applies to all
+      protocol packets.  This fixes a bug that would cause the "PSAD-CUSTOM
+      Nachi worm reconnaisannce" signature to fire on normal ICMP packet log
+      messages.
+    - Added version and Subversion file revision numbers to die and warn
+      messages that are written to /var/log/psad/errs/.  This helps when
+      trying to track these messages down to a specific file revisions when
+      psad is being upgraded on the local system.
+    - Added version and Subversion file revision numbers to --Dump-conf
+      output.
+    - Minor update to allow --fw-dump to be used on the command line without
+      also having to use the -D argument.
+    - Updated the default_log() function in the IPTables::Parse module to
+      handle iptables policies that were dumped with -v, such as when
+      --Dump-conf is used.
+
+psad-2.0.4 (01/27/2007):
+    - Added Snort rule matches to syslog alerts.  Multiple matches can be
+      controlled with new configuration variables in psad.conf:
+      ENABLE_SIG_MSG_SYSLOG, SIG_MSG_SYSLOG_THRESHOLD, and
+      SIG_SID_SYSLOG_THRESHOLD.
+    - Bugfix to include scanned UDP port ranges in syslog alerts.
+    - Bugfix to parse SEQ and ACK iptables log message fields (requires
+      --log-tcp-sequence on the iptables command line).  This allows the ipEye
+      signature to work.
+    - Added --debug-sid to allow a specific Snort rule to be debugged while
+      psad runs it through its detection engine.  A consequence of this is
+      that the -d command line argument must be spelled out, i.e. "psad
+      --debug".
+    - Bugfix to allow logging prefixes to omit trailing spaces.  This is a bug
+      in the iptables logging format to allow this in the first place, but
+      before this gets fixed psad needs to compensate.
+    - Bugfix for syslog-ng init script path in install.pl.
+    - Bugfix to include a "source" definition for /proc/kmsg if not already
+      defined for syslog-ng daemons.
+    - Minor memory handling bugfixes discovered by valgrind the excellent
+      Valgrind project: http://www.valgrind.org
+
+psad-2.0.3 (12/31/2006):
+    - Removed Psad.pm perl module and kmsgsd.pl and psadwatchd.pl scripts.
+      This is a major change that allows psad to be more flexible and
+      completely derive its config from the psad.conf file and from the
+      command line.  In the previous scheme, psad imported its config with a
+      function within Psad.pm, and this required that psad imported the Psad
+      perl module before reading its config. A consequence was that the
+      PSAD_LIBS_DIR var could not be specified usefully within the config
+      file.
+    - Added the ability to recursively resolve embedded variables from *.conf
+      files (with a limit of 20 resolution attempts).
+    - Added IGNORE_KERNEL_TIMESTAMP so that Linux distros that add a timestamp
+      to all kernel messages (Ubuntu for example) can be ignored.
+    - Consolidated code to import data out of /var/log/psad/<ip> directories
+      with code to display status and analysis output (-S and -A).
+      Essentially the %scan hash is built by the filesystem data import
+      routine and the remainder of the code references this single data
+      structure.
+
+psad-2.0.2 (12/23/2006):
+    - Added the ability to download the latest signatures from cipherdyne.org
+      in install.pl.
+    - Added the cd_rpmbuilder script to make it easy to build RPM's out of
+      CipherDyne projects by automatically downloading the project .tar.gz and
+      .spec files from http://www.cipherdyne.org/.
+    - Added print statements for @INC array in debug mode so that the user can
+      see the additional /usr/lib/psad/* directories added by
+      import_psad_perl_modules().
+    - Changed Unix::Syslog import strategy from "use" to "require" since the
+      path is not known until import_psad_perl_modules() gets a chance to
+      run (psad ran fine without this, but it is more consistent this way).
+    - Bugfix for not properly including elements of the
+      @connected_subnets_cidr array.
+    - IP subnet bugfix to make sure to get the entire subnet in signature
+      import routine if it is not in CIDR format
+    - Bugfix to not print an IP addresses in the "top attackers" section that
+      do not have at least one packet or signature match (for any reason).
+    - Bugfix to not print more than TOP_IP_LOG_THRESHOLD IP addresses in thet
+      top attackers section.
+    - Updated install.pl to reference configuration paths directly from
+      psad.conf instead of defining them separately.  This should fix Debian
+      bug #403566.
+    - Added -c argument to install.pl so that the path to a psad.conf file
+      can be altered from the command line.
+    - Bugfix to not import any IP from the top_attackers file from a previous
+      psad run that does not have a /var/log/psad/<ip> directory.
+    - Added MIN_DANGER_LEVEL to allow all alerts and /var/log/psad/<ip>
+      tracking to be disabled unless an attacker reaches at least this
+      danger level.
+    - Added text in install.pl to mention ifconfig parsing for HOME_NET
+      derivation.
+
+psad-2.0.1 (12/12/2006):
+    - Added Nachi worm reconnaisannce icmp signature
+    - Added the psad_ip_len signature keyword to allow the length field in the
+      IP header to be explicitly tested.
+    - Bugfix for inappropriately removing some directories in @INC when
+      splicing in psad perl module paths.
+    - Switched nf2csv installation path in install.pl to /usr/bin/.
+
+psad-2.0 (12/10/2006):
+    - Completely refactored the Snort rule matching support in psad.  Added
+      many header field tests with full range matching support.  These tests
+      include the following keywords from Snort: ttl, id, seq, ack, window,
+      icmp_id, icmp_seq, itype, icode, ip_proto, ipopts, and sameip.
+    - Refactored all signatures in /etc/psad/signatures to conform to new
+      signature matching support in this release.  There are now about 190
+      signatures that psad can run directly against iptables logging
+      messages (i.e. without the help of fwsnort).
+    - Added the ability to download the latest signatures file from
+      http://www.cipherdyne.org/psad/signatures with the --sig-update command
+      line argument to psad.
+    - Added "MISC Windows popup spam" signature.  This allows psad to detect
+      when attempts are made to send spam via the Windows Messenger service.
+    - Completely reworked --Status and --Analyze output, signature matches
+      are included now, along with a listing of top sig matches, top scanned
+      ports, and top attackers.  Also, scan data is not written to
+      /var/log/psad/ipt_analysis/ before display analysis output in -A mode;
+      analysis results are displayed much faster this way.
+    - Added ipEye, Subversion, Kuang2, Microsoft SQL, Radmin, and Ghostsurf
+      signatures.
+    - Added 'data in TCP SYN packet' signature.
+    - Added --CSV mode so that psad can be used to generate comma-separated
+      value output suitable for the AfterGlow project (see
+      http://afterglow.sourceforge.net/index.html) for graphical
+      representations of iptables logs and associated scan data.  Also added
+      nf2csv so that normal users can take advantage of this feature.
+    - Added emulation of the Snort "dsize" test through the use of the IP
+      length field for TCP/ICMP signatures, and the UDP length field for UDP
+      signatures.  For SYN packets, TCP options are included so psad
+      automatically adds 44 bytes (the maximum length for TCP options) so the
+      dsize test corresponds to the estimated payload length.
+    - Added the psad_id, psad_dsize, and psad_derived_sids fields for the new
+      Snort rule support.
+    - Added the ability to decode IP options, which are included within Snort
+      rules as the "ipopts" keyword.  This functionality requires that the
+      --log-ip-options command line argument is given to iptables when
+      building a rule that uses the LOG target.
+    - Added Snort rules (sids 475, 500, 501, and 502) that detect IP options
+      usage such as source routing and the traceroute IP option with the new
+      IP options decoder.
+    - Enhanced psad email alert output to include sid values that have been
+      derived from existing Snort rules.
+    - Added the ability to expand embedded variables within the psad
+      configuration files.  For example, the path to the FW_DATA_FILE is
+      defined in psad.conf as "$PSAD_DIR/fwdata", which resolves to
+      /var/log/psad/fwdata when the PSAD_DIR variable is expanded.  This
+      feature allows a consistent set of file paths to easily be defined
+      instead of using the full path for each file path.
+    - Better validation of IPT_AUTO_CHAIN{n} variables so that the from_chain
+      cannot be identical to the to_chain.
+    - Added dump_config() to psadwatchd.c and kmsgsd.c when compiled with
+      debugging support.
+    - Added ENABLE_INTF_LOCAL_NETS to have psad automatically treat all IP
+      addresses that are part of the local system as belonging to the HOME_NET
+      for signature matching.
+    - Added ENABLE_SNORT_SIG_STRICT to have psad exit if there are any
+      problems found with Snort rules in the /etc/psad/signatures file.  If
+      this feature is disabled (this is the default), then psad generates
+      syslog warnings for improperly formatted signatures).
+    - Update to print the number of IP addresses at each danger level in -A
+      analysis mode.  This is useful to get a sense for how long the disk IO
+      might take to write out all of the /var/log/psad/ipt_analysis/<IP>
+      directories.
+    - Added code to restart kmsgsd at psad start up if a previous kmsgsd
+      process is still running and TRUNCATE_FWDATA is set to 'Y' (this is the
+      default).  This probably isn't strictly necessary because kmsgsd is
+      capable of writing to the fwdata file even if another process truncates
+      it.
+    - Added code to recreate the AUTO_IPT_SOCK (/var/run/psad/auto_ipt.sock)
+      file if some other process happens to delete it out of /var/run/psad/
+    - Bugfix to allow backwards compatibility with old NOT_USED value
+      for the HOME_NET variable.
+    - Bugfix to cleanup any lost blocking rules from the running psad
+      timeouts (a separate process might have deleted rules from the psad
+      chains).
+    - Bugfix to allow iptables log messages to include the PHYSDEV (i.e.
+      PHYSIN and PHYSOUT) interfaces.
+    - Updated to read architecture-dependent perl module installation
+      directory out of /usr/lib/psad (e.g. "/usr/lib/psad/x86_64-linux")
+      before importing psad perl modules such as IPTables::Parse, etc. These
+      modules are now imported via "require" after the appropriate
+      directories have been added to @INC. This allows the RPM files to be
+      built on one system that builds @INC differently than the system where
+      psad is actually installed since psad can now compensate for this.
+    - Added new code to populate the <dst>_signature file in each of the
+      /var/log/psad/<ip> directories with verbose information including the
+      signature time, sid, protocol, dst port, and packet count.
+    - Changed --interval to --Interval, and added --interface to allow
+      psad's detection to be limited to a specific IN interface for the INPUT
+      and FORWARD chains (or OUT interface for the OUTPUT chain).
+    - Replaced --status-brief with --status-summary, but changed it so that
+      only the detailed IP status information is omitted.
+    - Removed unnecessary --status-sort-dl option.
+    - Added STATUS_OUTPUT_FILE so the --Status and --Analyze output is
+      captured instead of just being lost if the output was not piped to
+      'less' or another similar program.
+    - Added --restrict-ip so that psad will restrict its attack detection
+      operations to a specific IP or network.
+    - Updated psadwatchd.c to parse EMAIL_ADDRESSES out of
+      /etc/psad/psad.conf to avoid duplication of variables.
+    - Bugfix to clear old @ipt_config array after receiving a HUP signal.
+      This bug broke the auto-blocking mode.
+    - Bugfix for syslog-ng config so that any custom source for /proc/kmsg is
+      used for the psadfifo path.
+
+psad-1.4.8 (10/15/2006):
+    - Added the ability to get the auto-blocking status for a specific IP
+      address in --status-ip mode.
+    - Bugfix to use the IPT_OUTPUT_FILE and IPT_ERROR_FILE configuration
+      variables.
+    - Bugfix to restore "start" functionality in Gentoo init script.
+    - Added the ability to selectively disable psad auto-blocking emails.
+    - Added more rigorous IP matching regex from Sebastien J. (contributed
+      originally for fwknop).
+
+psad-1.4.7 (09/10/2006):
+    - Completely re-worked IPTables::ChainMgr to support the return of
+      iptables error messages that are collected via stderr.  This is critical
+      to fixing a bug where psad would sometimes die on an iptables command
+      but no information would be returned to the user.
+    - Added the ability to specify the position for both the jump rule into
+      the psad chains as well as the position for new rules within the psad
+      chains via the -I argument to iptables.  This fixes a bug where the user
+      was given the impression that the IPTABLES_AUTO_RULENUM would accomplish
+      this.
+    - Populated the _debug option in the IPTables::ChainMgr module, and also
+      added a _verbose option so that the specific iptables commands can
+      actually be seen as IPTables::ChainMgr functions are called.
+    - Added code to install.pl to ask the user if a manual restart of syslog
+      is ok upon an unsuccessful test of the syslog reconfiguration.  This
+      fixes a bug where some syslog daemons might not re-import their
+      configurations after receiving a HUP signal.
+    - Bugfix for incorrect config variable name that gated iptables
+      prerequisite checks.
+    - Added code to install.pl to update command paths in psad.conf and
+      psadwatchd.conf if any of the paths are broken (i.e. the local system
+      does not conform to the default paths).  By default this only happens if
+      the user does not want old configs to be merged, but to override this
+      use the new --path-update command line argument to install.pl.
+    - Added the --Skip-mod-install command line argument to install.pl to
+      allow all perl module installs to be skipped.
+    - Added the --force-mod-regex command line argument to install.pl to allow
+      a regex match on perl module names to force matching modules to be
+      installed.
+    - Added the logrotate.psad file (contributed by Albert Whale).
+
+psad-1.4.6 (06/13/2006):
+    - Added ENABLE_AUTO_IDS_REGEX and AUTO_BLOCK_REGEX to allow filtering on
+      logging prefixes.
+    - Added code to save DShield email to a file.
+    - Added IPTABLES_PREREQ_CHECK to allow the administrator to control the
+      frequency of iptables checks (for auto-block compatibility).
+    - Added IGNORE_LOG_PREFIXES to allow certain log prefixes to be completely
+      ignored by psad.
+    - Added classification.config file from Snort-2.3.3 so that psad can
+      assign danger levels based upon Snort rule class type.  This is useful
+      when also running fwsnort.
+    - Added snort_rule_dl to allow specific psad to assign specific danger
+      level values to particular signatures.  This is useful if you want to
+      do define certain Snort rules as being particularly evil (or not).
+      Running fwsnort is also necessary to take advantage of this feature.
+    - Added reference.config so that psad can include reference information in
+      email alerts that are derived from attacks detected by fwsnort.
+    - Updated to Snort-2.3.3 signatures.
+    - Updated to whois-4.7.13.
+
+psad-1.4.5 (01/13/2006):
+    - Bugfix in IPTables::Parse to allow the limit target to apply to
+      logging rules.
+    - Made calls to chain creation and jump rule functions for only every
+      100 block calls in auto-IDS mode.
+    - Bugfix to make sure /var/run/psad directory exists at startup since
+      this directory is removed by some Linux distributions at boot time.
+    - Bugfix for zero masks in auto_dl; this allows a network of "0.0.0.0/0"
+      to be specified.
+    - Added ENABLE_FW_LOGGING_CHECK so that the iptables policy check can be
+      enabled/disabled easily via psad.conf.
+    - Enhanced -D output to include "uname -a" and "perl -V" output.
+    - Added ENABLE_RENEW_BLOCK_EMAILS to allow whether renew emails are sent
+      for auto-blocked addresses.
+
+psad-1.4.4 (11/27/2005):
+    - Added MAC address reporting in psad email alerts.  This feature is
+      enabled via a new config keyword "ENABLE_MAC_ADDR_REPORTING".
+    - Added --fw-rm-block-ip <ip> option to allow IP addresses to be removed
+      from the auto-blocking chains from the command line.
+    - Updated command line firewall arguments to write commands to the
+      AUTO_IPT_SOCK domain socket.
+    - Added the ability to specify ports and port ranges to auto_dl file.
+    - Added --force-mod-install command line argument to installer to force
+      perl modules used by psad to be installed within /usr/lib/psad
+      regardless of whether they already exist in the system perl tree.
+    - Bugfix in the installer to seek() to the end of the fwdata file
+    - Bugfix for psad repeatedly trying to remove the same IP address(es)
+      from the auto-blocking chains.
+      instead of reading the entire thing into memory.
+    - Added the ability to truncate the fwdata file via a new configuration
+      keyword "TRUNCATE_FWDATA" (this is enabled by default).
+    - Bugfix in auto-blocking mode for deleting AUTO_IPT_SOCK when a HUP
+      signal is received.
+    - Bugfix for parsing iptables policies that contain ULOG logging rules
+      instead of the standard LOG target.
+    - Removed the smtpdaemon requirement in the RPM because psad might be
+      configured to not send email alerts.
+
+psad-1.4.3 (09/27/2005):
+    - Bugfixes for auto-blocking code.  Timeouts should be handled
+      properly, including cached IP addresses in the auto_blocked_iptables
+      file that are referenced upon psad startup.  Communication with the
+      running psad is performed over a Unix domain socket in --fw-block
+      mode.
+    - Bugfix to seek to the end of the fwdata file instead of reading the
+      entire thing into memory and then looking for newly written logging
+      messages.  This drastically reduces the amount of memory required
+      by psad.
+    - Updated to only display psad chains if --verbose is set
+    - Updated to automatically flush the psad auto-response iptables chains
+      at start time (subject to a new config keyword "FLUSH_IPT_AT_INIT").
+
+psad-1.4.2 (07/15/2005):
+    - Dependency bugfixes for mail binary.
+    - Bugfix for various IGNORE_* keywords not being honored.
+    - Bugfix for not timing out blocked IP addresses from a previous run.
+    - Updated to version 0.2 of the IPTables::ChainMgr module.
+    - Updated to not truncate the fwdata file upon psad startup.
+    - Added --fw-dump which produces a sanitized (i.e. no IP addresses)
+      version of the local iptables policy.  Also added --fw-include-ips
+      to (optionally) not sanitize IPs/nets.  Note that the 0.0.0.0 and
+      0.0.0.0/0 IPs/nets are not sanitized since they give no useful
+      information about specific IPs/nets.
+    - Added ulogd data collection mode.
+    - Bugfix for FW_MSG_SEARCH default (at least "DROP" is included now
+      even if FW_SEARCH_ALL is set to "N").
+    - Bugfix for non-network address for subnet specified with --fw-block.
+    - Bugfix for multiple --fw-block IPs/nets.
+    - Added README.SYSLOG (Francois Marier contributed the content).
+    - Made email alert prefixes (such as "[psad-alert]") customizable via
+      psad.conf.
+
+psad-1.4.1 (03/12/2005):
+    - Updated to Snort-2.3 rules in the snort_rules directory.
+    - Re-worked syslog installation portion of install.pl.  The user will
+      always be prompted to enter the syslog daemon now, and also added
+      the --syslog-conf arg to allow the config file path to be specified
+      on the install.pl command line.
+    - Bugfix in install.pl for using IP address instead of network address
+      of directly connected subnets.
+    - Updated to version 4.6.23 of the whois client.
+    - Bugfix for distinguishing OPT field associated with --log-tcp-options
+      vs. --log-ip-options.
+    - Bugfix for syslog format that may not include the "kernel:" tag.
+    - Applied patch to only install perl modules that are not already
+      installed (Blair Zajac).
+    - Bugfix for the psad version number that is sent in DShield alerts.
+    - Updated Psad module directory structure to be consistent with current
+      versions of perl (5.8.x).
+    - Added IPTables::ChainMgr module.
+    - Completely re-worked the iptables auto-blocking code to use
+      IPTables::ChainMgr functions so that auto-generated rules are placed
+      in chains created by psad.
+    - Added IPT_AUTO_CHAIN keyword in psad.conf which is used to define the
+      set of chains to which auto-generated iptables rules are added.
+    - Added --fw-list-auto to display the contents of psad iptables
+      chains.
+    - Added the ability to import an IP into the iptableiptablesocking
+      chains from the command line with --fw-block-ip.  This allows psad to
+      apply its timeout mechanism against such IPs/nets.
+    - Added the ability to ignore packets based on input interface with
+      IGNORE_INTERFACES in psad.conf.
+    - Re-worked auto_dl code, better hash design and searching function.
+    - Removed dependency on sendmail command unless DShield alerting is
+      enabled and a DShield user id is specified.
+    - Added ALERTING_METHODS keyword in the file alert.conf to allow either
+      syslog or email alerts (or both) to be disabled.  Psad and psadwatchd
+      reference this file.
+
+psad-1.4.0 (11/26/2004):
+    - Added p0f-style passive OS fingerprinting through the use of the OPT
+      field in iptables log messages (which is only logged through the use
+      of the --log-tcp-options command line arg to iptables).
+    - Bugfix for iptables log messages that include tcp sequence numbers
+      (see the iptables --log-tcp-sequence command line argument).
+    - Bugfix for O_RDONLY open flag when kmsgsd receives a HUP signal.
+
+psad-1.3.4 (10/17/2004):
+    - Bugfix for init script directory on Slackware systems.
+    - Bugfix for null prefix counters.
+    - Added --whois-analysis argument since whois lookups are now disabled
+      by default when running in analysis (-A) mode.
+    - Updated psad_init() to rework setup() and import orderings vs.
+      --fw-analyze and --Benchmark modes.
+    - Added bidirectional iptables auto-blocking support for all chains
+      except for the INPUT and OUTPUT chains.
+    - Better syslog message support when run in auto-blocking mode.
+    - Added iptables auto-block rules section to --Status output.
+    - Added init script for Fedora systems.
+    - Added default_log() function to IPTables::Parse.  This function
+      parses user defined chains in an effort to find default logging
+      rules.
+    - Added EMAIL_LIMIT_STATUS_MSG to control whether or not psad sends a
+      status email when the PSAD_EMAIL_LIMIT threshold has been reached by
+      an IP address.
+    - Added ENABLE_SCAN_ARCHIVE to control whether or not psad archives old
+      scan data within /var/log/psad/scan_archive at start time.
+
+psad-1.3.3 (09/09/2004):
+    - Fixed __WARN__ and __DIE__ exception handlers so that they
+      reference global message variables.
+    - Fixed auto danger level assignments.  Network auto assignments as
+      well as per-protocol assignments work now.
+    - Added SYSLOG_DAEMON variable to define which syslog daemon is running
+      on the underlying system instead of just guessing.
+    - Added the ability to ignore both ranges and specific ports/protocols
+      with a new variable IGNORE_PORTS in psad.conf.
+    - Bugfix to make sure email addresses are separated by spaces when
+      Psad::sendmail() is called.
+    - Bugfix for ipt_prefix counters not being parsed correct at import
+      time.
+    - Removed exclude_auto_ignore_ip() since this function was made
+      unnecessary by newly rewritten auto-assign code.
+    - Bugfix for Text::Wrap calls in install.pl uninstall() routine.
+    - Bugfix for using --no-fw-search-all even when FW_SEARCH_ALL is
+      set to "Y".
+    - Removed extraneous ".." and "**" chars from syslog messages, and
+      updated to use [+] prefix strings.
+    - Moved init scripts into init-scripts directory within source tree.
+    - Removed dependency on Bit::Vector (psad does not seem to make use
+      of any Date::Calc functions that require it).
+    - Wrapped copy() and move() calls with "or die()" to make them
+      safer in install.pl.
+    - Added check for existing psad process in install.pl.
+    - Updated to a new psad email alert subject format.  Prefixes of
+      "[psad-alert]", "[psad-error]", and "[psad-status]" are used now.
+    - Permissions fixes with umask() setting in /var/log/psad, permissions
+      fixes for files in /etc/psad at install time.
+
+psad-1.3.2 (06/25/2004):
+    - Removed FW_MSG_SEARCH from psad.conf, and created a new config
+      file "fw_search.conf" that both psad and kmsgsd use to get the
+      FW_MSG_SEARCH definition(s).
+    - Added default mode of parsing all iptables messages instead of
+      just those that contain specific search strings.  A new config
+      variable "FW_SEARCH_ALL" was added to fw_search.conf that
+      controls this mode.
+    - Updated psad and kmsgsd so that multiple firewall search strings
+      can be specified through multiple FW_MSG_SEARCH variables in
+      fw_search.conf.
+    - Added iptables chain and logging-prefix tracking for current
+      scan interval in email alerts.
+    - Added protocol-specific auto-danger level assignments.
+    - Added total scan source and destination IP address counters in
+      --Status output.
+    - Added number of email alerts sent and OS guess in default
+      --Status output.  The output is getting wide now, so there is
+      also a new option --status-brief that will remove the alerts
+      sent and OS guess columns.
+    - Added getopt() command line arg parsing to kmsgsd with two new
+      options "-c" (for config file path) and "-k" (for fw_search.conf
+      path).
+    - Made iptables parsing code into its own script "fwcheck_psad"
+      that gets called by psad.
+    - Added Dshield stats summary to --Status output.
+    - Bugfix for auto-ignore IP addresses and networks being missed.
+    - Made parsing of ifconfig output language independent (should
+      handle French now for example).
+    - Removed "psad_" prefix on files psad_signatures, psad_auto_ips,
+      psad_posf, and psad_icmp_types in /etc/psad/.
+    - Updated to version 4.6.14 of the whois client.
+
+psad-1.3.1 (12/25/2003):
+    - Added the ability to import /var/log/psad/<ip> directories
+      back into memory so scan data remains persistent across
+      psad restarts or system reboots.
+    - Added --Analyze-msgs to run psad in analysis mode against an
+      iptables logfile (/var/log/psad/fwdata by default).  The logfile
+      path can be changed with --messages-file.
+    - Added icmp type and code validation against RFC 792.
+    - Bugfix for being too strict with FW_MSG_SEARCH.
+    - Added port ranges for tcp and udp scans in <ip>/<dst>_packet_ctr.
+    - Added <ip>/<dst>_start_time and <ip>/os_guess.
+    - Bugfix for missing --no-signatures code.
+    - Updated to Snort-2.1 signatures.
+
+psad-1.3 (11/30/2003):
+    - Replaced all signatures in psad_signatures with updated snort
+      rules.
+    - Added support for source and destination ip addresses in
+      signature matching code.  A new variable "HOME_NET" makes this
+      possible.
+    - Added support for the iptables output chain.
+    - Added chain tracking for all signatures.
+    - Replaced match_fastsigs() with two new routines for tcp and
+      udp signature matching that don't autovivify hash keys.
+    - Removed support for ipchains.
+    - Added support for metalog.
+    - Removed all "Undefined Code" signatures from psad_signatures.
+    - Re-worked %auto_blocked_ips hash and corresponding blocking
+      routines.  This (hopefully) fixes a restart bug seen on older
+      systems such as those that are still running versions of perl
+      less than 5.6.
+    - Re-worked firewall policy parsing routines.  Chains that have
+      a default policy of DROP are handled properly now.
+    - Bugfix for missing NULL char in kmsgsd.c.
+    - Updated scan alerting format.  Put current interval protocol
+      status before source and destination addresses.
+    - Buffer overflow fix in kmsgsd.c for size of buf[MAX_LINE_BUF]
+      buffer in read() call.
+    - Added --no-kmsgsd option to aid in psad --debug mode.
+
+psad-1.2.4 (10/15/2003):
+    - Added danger level to subject line in email alerts.
+    - Removed diskmond altogether since psad now handles disk space
+      thresholds directly.  This allows filehandles to be handled
+      properly.
+    - Added auto_block_ignore_ip() to prevent 0.0.0.0, 127.0.0.1,
+      and local interface ips from being included in auto blocking
+      routines.
+    - Added Bit::Vector module to stop installation warnings from
+      Date::Calc.
+    - Made get_local_ips() called periodically since local addresses
+      may change (dhcp, etc.).
+    - Added installation code and init script for Gentoo Linux.
+    - Bugfix for INIT_DIR in uninstall() routine in install.pl.
+    - Bugfix for auto-blocking loop after timeouts are hit.
+    - Added --status-dl [N] to display status information only for
+      those scans that reach at least [N].
+
+psad-1.2.3 (09/12/2003):
+    - Added interface tracking for scans.
+    - Bugfix for not opening /etc/hosts.deny the right way in
+      tcpwr_block().
+    - Bugfix for psadfifo path in syslog-ng config.
+    - Better format for summary stats section in email alerts.
+    - Bugfix for INIT_DIR path on non-RedHat systems.
+    - Bugfix for gzip path.
+    - Make Psad.pm installed last of all perl modules installed
+      by psad.
+    - Added additional call to incr_syscall_ctr() in psadwatchd.c
+
+psad-1.2.2 (08/24/2003):
+    - psad is finally available as an RPM package.
+    - Added chain tracking for iptables.
+    - Added chain counts to --Status output.
+    - Bugfix for psad not taking into account multiple scan
+      destinations.
+    - Reworked auto-blocking code for both tcpwrappers and
+      iptables.  Lines added to /etc/hosts.deny will no longer be
+      duplicated.  Added IPTABLES_AUTO_RULENUM and
+      IPCHAINS_AUTO_RULENUM so auto rules can be inserted at a
+      configurable point within iptables and ipchains policies.
+    - Psad now installs all perl modules within /usr/lib/psad.
+    - Removed /var/log/psad/<ip>/scanlog file since it was wasting
+      too much disk.
+    - Made psad, psadwatchd, and diskmond take the machine hostname
+      from their respective config files.  This makes installation
+      via the rpm easier, and is generally cleaner.
+    - Added scan destination in --Status output.
+    - Added --status-sort-dl (the default status output is now
+      sorted by ip address by default).
+
+psad-1.2.1 (07/11/2003):
+    - Bugfix for multiple processes being spawned by psadwatchd
+      due to lack of proper config variables in the new split
+      daemon config files.
+    - Bugfix for old scan messages being regenerated if a HUP
+      signal is received.
+    - Bugfix for incorrectly calculating disk utilization in
+      diskmond.c.
+    - Extended install.pl to include compression for archived
+      files in /etc/psad.
+    - Added preserve questions in install.pl for the psad
+      signature and auto ips files.
+    - Bugfix for --USR1 command line switch not mapping to the
+      correct subroutine.
+    - Bugfix for psad man page missing the pipe character in
+      psadfifo line for syslog.conf.
+
+psad-1.2 (06/18/2003):
+    - Added passive OS fingerprinting based on packet ttl, length,
+      tos, and id fields.
+    - Added dshield.org alerting capability.
+    - Added exec_external_script() for external script execution.
+    - Added auto blocked timeouts.
+    - Implemented config re-imports via HUP signals in a manner
+      similar to various other system daemons (sysylog, apache
+      etc.)
+    - Better --Status output that shows packet counts per protocol
+      for each ip.
+    - Added --ip-status for more verbose status output for a
+      particular ip address.
+    - Added config preservation code to install.pl.
+    - Added Psad::psyslog().
+    - Split psad.conf into a separate config file for each of the
+      four psad daemons.
+    - Completely re-worked the auto blocking code (made dedicated
+      files for iptables and ipchains block methods).
+    - Added danger level hash.
+    - Minor code cleanups (shorter hash keys, etc.).
+
+psad-1.1.1 (04/26/2003):
+    - Bugfix for incorrect usage of %scan hash keys associated
+      with tcp/udp when the current protocol is icmp.
+    - Bugfix for being too strict on iptable default log string.
+    - Reworked USR1 signal handler so the Data::Dumper function
+      call is made in the main part of the psad code.
+    - Added a startup message for psad.
+    - Minor bugfix for leading whitespace in auto_ips.
+
+psad-1.1 (04/20/2003):
+    - Added the IPTables::Parse module for better processing of
+      the iptables ruleset.
+    - Added --snort-sids so that iptables messages generated by
+      fwsnort can be included in alerts.  Such alerts now include
+      the content fields of packets (fwsnort uses the iptables
+      string match module).
+    - Added the ability to specify entire networks in the auto
+      ips file through the use of the Net::IPv4Addr module.
+    - Better logging format that reinstates the current interval,
+      and adds an "overall stats" section that includes packet
+      counters per protocol.
+    - Removed the PROTO hash key since it was unnecesssary.
+    - Better benchmarking code.
+    - Bug fix for incorrectly looking for the "MAC" string in
+      iptables messages that could have been generated by the
+      FORWARD chain.
+
+psad-1.0 (02/27/2003):
+    - Added --Benchmark and --packets command line options to support
+      psad benchmarking.
+    - Bugfix for improperly detecting NULL scans.
+    - Completely redesigned website.
+
+psad-1.0.0-pre4 (11/26/2002):
+    - Rewrote kmsgsd and psadwatchd in C.

@@ -198,7 +198,8 @@ my %scan_ext_exec = ();
 my %p0f = ();
 
 ### cache p0f-based passive os fingerprinting signature information
-my %p0f_sigs = ();
+my %p0f_ipv4_sigs = ();
+my %p0f_ipv6_sigs = ();
 
 ### cache TOS-based passive os fingerprinting information
 my %posf = ();
@@ -1247,8 +1248,7 @@ sub check_scan() {
                 if ($pkt{'tcp_opts'}) {  ### got the tcp options portion of the header
 
                     ### p0f based fingerprinting
-                    &p0f($pkt{'src'}, $pkt{'ip_len'}, $pkt{'frag_bit'},
-                            $pkt{'ttl'}, $pkt{'win'}, $pkt{'tcp_opts'});
+                    &p0f(\%pkt);
 
                 } elsif (not defined $posf{$pkt{'src'}}{'guess'}
                         and $scan{$pkt{'src'}}{$pkt{'dst'}}{'absnum'} < 100) {
@@ -2298,12 +2298,48 @@ sub match_port() {
 }
 
 sub p0f() {
-    my ($src, $len, $frag_bit, $ttl, $win, $tcp_options) = @_;
+    my $pkt_hr = shift;
 
-    print STDERR "[+] p0f(): $src len: $len, frag_bit: $frag_bit, " ,
-        "ttl: $ttl, win: $win\n" if $debug;
+    if ($pkt_hr->{'is_ipv6'}) {
+        &p0f_ipv6($pkt_hr);
+    } else {
+        &p0f_ipv4($pkt_hr);
+    }
+    return;
+}
 
-    my $options_ar = &parse_tcp_options($src, $tcp_options);
+sub p0f_ipv6() {
+    my $pkt_hr = shift;
+    return;
+}
+
+sub p0f_ipv4() {
+    my $pkt_hr = shift;
+
+    print STDERR "[+] p0f_ipv4(): $pkt_hr->{'src'} len: $pkt_hr->{'ip_len'}, ",
+        "frag_bit: $pkt_hr->{'frag_bit'}, ttl: $pkt_hr->{'ttl'}, ",
+        "win: $pkt_hr->{'win'}\n" if $debug;
+
+    # p0f Fingerprint entry format:
+    #
+    # wwww:ttt:D:ss:OOO...:OS:Version:Subtype:Details
+    #
+    # wwww     - window size (can be *, %nnn, Snn or Tnn).  The special values
+    #            "S" and "T" which are a multiple of MSS or a multiple of MTU
+    #            respectively.
+    # ttt      - initial TTL
+    # D        - don't fragment bit (0 - not set, 1 - set)
+    # ss       - overall SYN packet size
+    # OOO      - option value and order specification (see below)
+    # OS       - OS genre (Linux, Solaris, Windows)
+    # Version  - OS Version (2.0.27 on x86, etc)
+    # Subtype  - OS subtype or patchlevel (SP3, lo0)
+    # details  - Generic OS details
+    #
+    ### S4:64:1:60:M*,S,T,N,W7:     Linux:2.6:8:Linux 2.6.8 and newer (?)
+
+    my $options_ar = &parse_tcp_options($pkt_hr->{'src'},
+            $pkt_hr->{'tcp_opts'});
 
     unless ($options_ar) {
         print STDERR "[-] Could not fingerprint remote OS.\n" if $debug;
@@ -2313,38 +2349,38 @@ sub p0f() {
     my $matched_os = 0;
 
     ### try to match SYN packet length
-    LEN: for my $sig_len (keys %p0f_sigs) {
+    LEN: for my $sig_len (keys %p0f_ipv4_sigs) {
         my $matched_len = 0;
         if ($sig_len eq '*') {  ### len can be wildcarded in pf.os
             $matched_len = 1;
         } elsif ($sig_len =~ /^\%(\d+)/) {
-            if (($len % $1) == 0) {
+            if (($pkt_hr->{'ip_len'} % $1) == 0) {
                 $matched_len = 1;
             }
-        } elsif ($len == $sig_len) {
+        } elsif ($pkt_hr->{'ip_len'} == $sig_len) {
             $matched_len = 1;
         }
         next LEN unless $matched_len;
 
         ### try to match fragmentation bit
-        FRAG: for my $test_frag_bit ($frag_bit, '*') {  ### don't need "%nnn" check
-            next FRAG unless defined $p0f_sigs{$sig_len}{$test_frag_bit};
+        FRAG: for my $test_frag_bit ($pkt_hr->{'frag_bit'}, '*') {  ### don't need "%nnn" check
+            next FRAG unless defined $p0f_ipv4_sigs{$sig_len}{$test_frag_bit};
 
             ### find out for which p0f sigs the TTL is within range
-            TTL: for my $sig_ttl (keys %{$p0f_sigs{$sig_len}{$test_frag_bit}}) {
-                unless ($ttl > $sig_ttl - $config{'MAX_HOPS'}
-                        and $ttl <= $sig_ttl) {
+            TTL: for my $sig_ttl (keys %{$p0f_ipv4_sigs{$sig_len}{$test_frag_bit}}) {
+                unless ($pkt_hr->{'ttl'} > $sig_ttl - $config{'MAX_HOPS'}
+                        and $pkt_hr->{'ttl'} <= $sig_ttl) {
                     next TTL;
                 }
 
                 ### match tcp window size
                 WIN: for my $sig_win_size (keys
-                        %{$p0f_sigs{$sig_len}{$test_frag_bit}{$sig_ttl}}) {
+                        %{$p0f_ipv4_sigs{$sig_len}{$test_frag_bit}{$sig_ttl}}) {
                     my $matched_win_size = 0;
                     if ($sig_win_size eq '*') {
                         $matched_win_size = 1;
                     } elsif ($sig_win_size =~ /^\%(\d+)/) {
-                        if (($win % $1) == 0) {
+                        if (($pkt_hr->{'win'} % $1) == 0) {
                             $matched_win_size = 1;
                         }
                     } elsif ($sig_win_size =~ /^S(\d+)/) {
@@ -2354,18 +2390,18 @@ sub p0f() {
                         for my $opt_hr (@$options_ar) {
                             if (defined $opt_hr->{$tcp_p0f_opt_types{'M'}}) {
                                 my $mss_val = $opt_hr->{$tcp_p0f_opt_types{'M'}};
-                                if ($win == $mss_val * $multiple) {
+                                if ($pkt_hr->{'win'} == $mss_val * $multiple) {
                                     $matched_win_size = 1;
                                 }
                             }
                             last;
                         }
-                    } elsif ($sig_win_size == $win) {
+                    } elsif ($sig_win_size == $pkt_hr->{'win'}) {
                         $matched_win_size = 1;
                     }
 
                     next WIN unless $matched_win_size;
-                    TCPOPTS: for my $sig_opts (keys %{$p0f_sigs{$sig_len}
+                    TCPOPTS: for my $sig_opts (keys %{$p0f_ipv4_sigs{$sig_len}
                             {$test_frag_bit}{$sig_ttl}{$sig_win_size}}) {
                         my @sig_opts = split /\,/, $sig_opts;
                         for (my $i=0; $i<=$#sig_opts; $i++) {
@@ -2416,15 +2452,15 @@ sub p0f() {
 
                             }
                         }
-                        OS: for my $os (keys %{$p0f_sigs{$sig_len}
+                        OS: for my $os (keys %{$p0f_ipv4_sigs{$sig_len}
                                 {$test_frag_bit}{$sig_ttl}{$sig_win_size}
                                 {$sig_opts}}) {
-                            my $sig = $p0f_sigs{$sig_len}
+                            my $sig = $p0f_ipv4_sigs{$sig_len}
                                 {$test_frag_bit}{$sig_ttl}{$sig_win_size}
                                 {$sig_opts}{$os};
                             print STDERR "[+] os: $os, $sig\n" if $debug;
                             $matched_os = 1;
-                            $p0f{$src}{$os} = '';
+                            $p0f{$pkt_hr->{'src'}}{$os} = '';
                         }
                     }
                 }
@@ -2432,7 +2468,7 @@ sub p0f() {
         }
     }
     if ($debug and not $matched_os) {
-        print STDERR "    Could not match $src against any p0f signature.\n";
+        print STDERR "    Could not match $pkt_hr->{'src'} against any p0f signature.\n";
     }
     return;
 }
@@ -2442,6 +2478,11 @@ sub parse_tcp_options() {
     my @opts = ();
     my @hex_nums = ();
     my $debug_str = '';
+
+    unless ($tcp_options) {
+        print STDERR 'no tcp options' if $debug;
+        return [];
+    }
 
     if (length($tcp_options) % 2 != 0) {  ### make sure length is a multiple of two
         print STDERR 'tcp options length not a multiple of two.' if $debug;
@@ -2994,7 +3035,7 @@ sub psad_init() {
     &import_icmp_types() unless $no_icmp_types;
 
     ### import p0f-based passive OS fingerprinting signatures
-    &import_p0f_sigs() unless $no_posf;
+    &import_p0f_ipv4_sigs() unless $no_posf;
 
     ### import TOS-based passive OS fingerprinting signatures
     &import_posf_sigs() unless $no_posf;
@@ -4260,9 +4301,9 @@ sub import_auto_dl() {
     return;
 }
 
-sub import_p0f_sigs() {
+sub import_p0f_ipv4_sigs() {
 
-    %p0f_sigs = ();
+    %p0f_ipv4_sigs = ();
 
     my $p0f_file = $config{'P0F_FILE'};
     open P, "< $p0f_file" or die '[*] Could not open ',
@@ -4290,13 +4331,13 @@ sub import_p0f_sigs() {
             my $sig_str = "$win_size:$ttl:$frag_bit:$len:$options";
             ### don't know how to handle MTU-based window size yet
             unless ($win_size =~ /T/) {
-                $p0f_sigs{$len}{$frag_bit}{$ttl}{$win_size}{$options}{$os}
+                $p0f_ipv4_sigs{$len}{$frag_bit}{$ttl}{$win_size}{$options}{$os}
                     = $sig_str;
             }
         }
     }
 
-    print STDERR Dumper %p0f_sigs if $debug and $verbose;
+    print STDERR Dumper %p0f_ipv4_sigs if $debug and $verbose;
     &sys_log('imported p0f-based passive OS fingerprinting signatures');
     return;
 }

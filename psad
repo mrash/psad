@@ -386,7 +386,7 @@ my $csv_have_timestamp = 0;
 my $dump_ipt_policy  = 0;
 my $fw_include_ips   = 0;
 my $benchmark        = 0;
-my $b_packets        = 0;
+my $num_packets      = 0;
 my $usr1             = 0;
 my $hup              = 0;
 my $usr1_flag        = 0;
@@ -6935,18 +6935,25 @@ sub analysis_mode() {
         "$fw_data_file: $!";
     my @lines = <MSGS>;
     close MSGS;
-    my @ipt_msgs;
-    for my $line (@lines) {
+    my @ipt_msgs = ();
+    my $pkt_ctr = 0;
+    PKT: for my $line (@lines) {
+        if ($num_packets > 0) {
+            last PKT if $pkt_ctr >= $num_packets;
+        }
         if ($line =~ /IN.*OUT/) {
             if ($config{'FW_SEARCH_ALL'} eq 'Y') {
                 push @ipt_msgs, $line;
+                $pkt_ctr++;
             } else {
                 if ($line =~ /$config{'SNORT_SID_STR'}/) {
                     push @ipt_msgs, $line;
+                    $pkt_ctr++;
                 } else {
                     for my $fw_search_str (@fw_search) {
                         if ($line =~ /$fw_search_str/) {
                             push @ipt_msgs, $line;
+                            $pkt_ctr++;
                         }
                     }
                 }
@@ -7962,15 +7969,15 @@ sub benchmark_mode() {
 
     print scalar localtime(), " [+] Entering benchmark mode.\n";
 
-    if ($b_packets) {
+    if ($num_packets) {
         print scalar localtime(),
-            " [+] Executing a $b_packets packet test.\n";
+            " [+] Executing a $num_packets packet test.\n";
     } else {
         print scalar localtime(), ' [+] The --packets command line ',
             "option was not specified.\n";
         print scalar localtime(),
             " [+] Defaulting to a 10,000 packet test.\n";
-        $b_packets = 10000;
+        $num_packets = 10000;
     }
 
     ### initialize benchmarking test packets if we are running
@@ -7985,7 +7992,7 @@ sub benchmark_mode() {
     my $b_time = time();
     print scalar localtime(), " [+] Creating packet array.\n";
     my $dp = 1000;
-    for (my $i=0; $i <= $b_packets; $i++) {
+    for (my $i=0; $i <= $num_packets; $i++) {
         push @fw_packets, "$test_pkt DPT=$dp $test_pktend";
         $dp++ if $dp < 50000;
     }
@@ -10134,8 +10141,8 @@ sub getopt_wrapper() {
         'restrict-ip=s'     => \$restrict_ip,     # Only process packets that have
                                                   #   either this IP as the src or dst.
         'Benchmark'         => \$benchmark,       # Run in benchmark mode.
-        'packets=i'         => \$b_packets,       # Specify number of packets to use
-                                                  #   in benchmark test.
+        'packets=i'         => \$num_packets,     # Specify number of packets to use
+                                                  #   in benchmark test or in -A mode.
         'USR1'              => \$usr1,            # Send an existing psad process a
                                                   # USR1 signal (useful for debugging).
         'HUP'               => \$hup,             # Send psad processes a HUP signal

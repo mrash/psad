@@ -1,0 +1,464 @@
+Revision history for Perl extension NetAddr::IP
+
+4.058 Fri Nov 11 19:23:11 PST 2011
+        up rev for documentation update
+        update documentation in InetBase v0.06
+
+4.057 Fri Nov 11 15:04:20 PST 2011
+	Lite.pm v1.40
+        add call to InetBase::fillIPv4 to all uses of gethostbyname
+
+        break out the code in InetBase v0.05 that expands short IPv4 
+        addresses into dotquad format to account for broken BSD 
+        implementations of inet_aton and gethostbyname that do 
+        not recognize the short format. EXPORT this as sub 'fillIPv4'
+
+        in Util.pm v1.45, add 'fillIPv4' to calls to gethostbyname to 
+        work around broken inet_aton and gethostbyname implementations
+        in certain BSD implementations
+
+4.056 Wed Nov  2 19:15:31 PDT 2011
+        bump rev to incorporate
+        improved inet_aton in InetBase v0.04 to overcome broken
+        gethostbyname found in NetBSD and OpenBSD
+
+4.055 Fri Oct 28 11:41:22 PDT 2011
+	in Lite.pm v1.38
+        patch for bug 71869, issues with Math::BigInt varients
+
+4.054 Thu Oct 27 12:48:55 PDT 2011
+        In Lite.pm v1.37, remove Calc.pm
+        add detection of early Math::Bigint object structure
+        fix bug 71869 - a failed test routine
+
+4.053 Wed Oct 26 08:52:34 PDT 2011
+	In Lite.pm v1.36
+        fix bug #71925. A a sub-varient of #62521 that showed up only for
+        short notation for IPv4. i.e. 127/n, 127.0/n, 127.0.0/n but
+        not 127.0.0.0/n
+
+4.052 Tue Oct 25 16:18:38 PDT 2011
+        add test in Lite.pm v1.35 for api-version of Math::BigInt to 
+	support versions earlier than 1.70, circa Dec 2003. 
+        Thanks to Paul Howarth <paul@city-fan.org> for spotting that bug.
+
+4.051 Mon Oct 24 14:44:53 PDT 2011
+	fix bug 71869
+	in Lite.pm v1.34
+        use Math::BigInt::Calc for creating BigInt values and fall
+        back to NetAddr::IP::Calc if Math::BigInt is not present.
+
+        remove reference to Config{osname} in InetBase.pm v0.03
+        (Util 1.43)
+
+
+4.050 Sat Oct 22 01:58:57 PDT 2011
+        In Lite/Util/lib/NetAddr/IP/Lite/Util/InetBase.pm v0.02
+        Socket6 prior to version 0.23 does not have AF_INET6 in the  
+        EXPORT_OK array, modify InetBase.pm v0.2 to work around this.
+
+	Add support for Math::BigInt to NetAddr::IP::Lite v1.33
+
+4.049 Sat Oct 15 22:15:10 PDT 2011
+	Updates to Lite.pm, Util.pm, new module InetBase.pm
+
+	In Lite v1.32
+        bug68723, add capability to parse input of the form
+        ->new6(12345,1). This should have been there but was
+        missing. Thanks to Andrei Benea for spotting this.
+        
+        In Util v1.41
+        add inet_pton, inet_ntop, AF_INET, AF_INET6
+
+        modify inet_n2dx and inet_n2ad to
+        recognize the new 128 bit IPv4 format
+        ::FFFF:FFFF:0:0
+
+        replace isIPv4 with a pure perl version for portablity
+
+        split the following into NetAddr::IP::InetBase v0.01
+	to provide better long term support for IPv6
+        inet_aton
+        inet_ntoa
+        ipv6_aton
+        ipv6_n2x
+        ipv6_n2d
+        inet_any2n
+        inet_n2dx
+        inet_n2ad
+        inet_ntop
+        inet_pton
+        packzeros
+        isIPv4
+        isNewIPv4
+        isAnyIPv4
+        AF_INET
+        AF_INET6
+
+4.048 Sat Oct  8 01:33:44 PDT 2011
+	remove debug print statement from Util v1.40
+
+4.047 Thu Oct  6 23:41:42 PDT 2011
+	really correct missing reference in Util v1.39
+	doc update only in Lite.pm v1.30
+
+4.046 Thu Oct  6 20:20:33 PDT 2011		DEPRECATED
+	corrected missing reference to inet_4map6 in Util v1.38
+
+4.045 Thu Oct  6 18:23:04 PDT 2011		DEPRECATED
+	updated NetAddr::IP::Util 1.37
+        addid isAnyIPv4, isNewIPv4, inet_4map6
+        revised naip_gethostbyname
+        to conform to Perl's gethostbyname output
+
+4.044 Wed May 18 14:47:34 PDT 2011
+	added missing support for ->compactref(\@list) which is described
+	in the documentation but not implemented.
+
+	Thanks to Rusty Bourland codebard@gmail.com for spotting this
+	and providing both a patch and test code
+
+4.043 Wed Apr  6 11:31:19 PDT 2011
+	Update documentation on the use of "adding constants 
+	to an IP address".
+
+4.042 Tue Mar 22 15:26:02 PDT 2011
+	Update Lite.pm v1.27 to encompass treatment of /31 and /127 
+	point-to-point networks as described in RFC 3021
+
+	NOTE: for /31's and /127's
+	this changes the behavior of the following methods:
+		first   returns the "network" address
+		last    returns the "broadcast" address
+		nth     index 0 returns "network" addr instead of undef
+		nth     index 1 returns "broadcast" addr instead of undef
+		num     returns 2 instead of 0 (zero)
+
+	"old_nth" behavior is unchanged
+
+	Thanks to Todd Caine todd.caine@gmail.com for pointing this out.
+
+4.041 Tue Mar  8 15:18:16 PST 2011
+	Updated Lite.pm v1.26, "sub num" to support usable IP ranges 
+	greater than 2**32
+
+	Thanks to Jan Ploski jan@plosquare.com for finding this bug
+
+4.040 Sat Feb 19 10:04:00 PST 2011     
+	correction to use of Util.pm package lexicals
+
+	thanks to mishikal@yahoo.com for spotting the bug and to
+	Mark Martinec mark.martinec+ama...@ijs.si for the solution.
+
+4.039 Wed Feb 16 15:48:03 PST 2011
+	Correct documentation for 'split' methods
+
+4.038 Fri Dec 17 17:47:47 PST 2010
+	Modify subs "new" and "new6" in Lite.pm to accomodate
+	Cisco mask syntax that uses space instead of "/" for a separator
+	This eliminates the need for "new_cis" and "newcis6" which are now
+	deprecated.
+
+	Modify LIte/t/v4-cnew.t and add Lite/t/v6-cnew.t to test the above
+
+4.037 Fri Nov 19 10:48:01 PST 2010
+	add :upper and :lower to Lite.pm v1.23
+	add comments about rfc5952 requirement for lowercase ipV6 notation
+	in Lite.pm v1.23 and IP.pm
+	add test for :lower in Lite.pm v1.23
+
+4.036 Tue Nov 16 16:28:37 PST 2010
+	In Util.pm v1.35, naip_gethostbyname modified to return undef 
+	instead of 0 (zero) on failure
+
+	thanks to Terry Cassidy enaudishaylee@tc17.com for the bug report
+
+	In Util.pm v1.35, move sub's ipv6_n2d and ipv6_n2x to non-autosplit 
+	portion of module to eliminate warnings during autosplit of "our" 
+	variables
+
+	thanks to Nicholas Bamber <nicholas@periapt.co.uk>
+	Bug-Debian: http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=517361
+
+	In Lite.pm v1.22, update new6 to properly classify short ipv4 notation
+	i.e. 127/8 with test for ":" rather than match for \d.\d.\d.\d
+	
+	thanks to Steve Huff (SHUFF) * shuff@cpan.org for 
+	spotting that bug.
+
+	In Lite.pm v1.22, update t/v4-new.t for deprecated array syntax in 
+	perl 5.13
+	was:    qw(...stuff...)
+	is:     (qw(...stuff...))
+
+	thanks to Todd Rinaldo <toddr@cpan.org> for reporting this
+
+4.035 Thu Oct 28 14:26:19 PDT 2010
+	fix bug in Lite v1.21 where new6 improperly assigns the mask value 
+	for and ipv4 address in 32 bit space instead of 128 bit space
+
+	Thanks to Mark Martinec and Steve Huff (SHUFF) * shuff@cpan.org
+	for spotting and replicating that bug
+
+	added new_cis and new_cis6 to Lite.pm v1.21 to accomodate
+	Cisco syntax that has IP and MASK seperated by a space.
+
+	Updated typo in documentation that left out example
+	print new6 stuff
+
+4.034 Mon Oct 25 16:22:01 PDT 2010
+	Updated Lite::_xnew v1.20 to properly handle ipV6 notation of the form
+	xxxx:xxxx:xxxx:xxxx:xxxx:xxxx, DDD
+
+	Thanks to Dusty Mabe <Dusty.Mabe@tekelec.com> for spotting this bug
+
+4.033  Wed Sep 29 10:32:50 PDT 2010
+	Conditionalize import of AF_INET6 in Util.pm
+	NetAddr::IP::UtilPolluted
+
+4.032  Wed Sep 22 13:39:08 PDT 2010
+	Added overload => 'ne' and '!=' to Lite.pm v1.18
+
+4.031  Tue Sep 21 19:21:04 PDT 2010
+	Pull Socket6 stuff out of Lite 1.17 and put into
+	NetAddr::IP::Util.pm 1.33 in its own namespace
+
+4.030  Tue Jul 20 15:32:23 PDT 2010
+	Resolve named hosts in Lite.pm using gethostbyname, followed by 
+	gethostbyname6 to determine whether to set ipV6 flag
+
+	Thanks to Dusty Mabe <Dusty.Mabe@tekelec.com> for spotting this bug
+
+4.029  Thu Jul  8 18:17:38 PDT 2010
+	In NetAddr::IP::Lite,
+	added support for the sub "new" to resolve host6 names
+	if the OPTIONAL perl Socket6 module is available
+
+	Thanks to "Mabe, Dusty" <Dusty.Mabe@tekelec.com> for spotting 
+	this and suggesting a fix.
+
+4.028  Wed May 12 14:18:20 PDT 2010
+	In /Lite/Util/Util.xs v1.32,
+	changed netswap() to postincrement 
+	*a++ = to *a and added increment after save to mollify some
+	picky compilers that return possible undefined behavior.
+
+	changed type of _128x10 to 'void'
+
+	Thanks to David Bolt <dbolt@davjam.org> for the above two patches
+
+4.027  Tue Jun  9 10:31:11 PDT 2009
+	In NetAddr::IP::Util v1.31,
+	ferret out shell value for Makefile.PL when calling
+	./configure for systems where the 'x' bit gets lost
+	due to bug in Archive::Tar
+
+4.026  Sat Mar  7 16:35:33 PST 2009
+	make the compiler test check the environment for
+	CC before using Perl's default compiler
+
+4.025  Sat Mar  7 16:15:18 PST 2009
+	revised compiler test in Makefile.PL for Util v1.29
+	to accomodate picky Solaris "cc"
+
+4.024  Mon Jan 26 00:27:32 PST 2009
+	documentation update
+
+4.023  Fri Jan 16 14:30:40 PST 2009
+	added the capability to set the CASE of ipV6 text return
+	values to either upper or lower. Thanks to 
+	Rob Riepel <riepel@networking.Stanford.EDU> for developing
+	this improvement and providing a comprehensive patch
+
+4.022  Sat Dec 20 13:05:01 PST 2008
+  In Util.xs 1.28
+	set uninitialized "carry" in XS bin2bcd to zero
+
+	This insidious bug only showed up on 64 bit hosts running perl 5.6.2
+	Thanks to Oliver Paukstadt <pstadt@sourcentral.org> for taking the 
+	time to do the testing for me on his s390 system.
+
+4.021  Wed Dec 10 11:09:36 PST 2008
+	Removed test code that produces a warning about all perl versions, 
+	OOPS!! instead of just the buggy 5.8.0 - 5.8.5 versions.
+	Thanks to paul@city-fan.org for reporting this.
+
+4.020  Tue Dec  9 16:25:46 PST 2008
+	cleaned up various typo's with good patch from
+	Rob Riepel <riepel@networking.Stanford.EDU>
+	thanks Rob.
+
+	revised UtilPP v1.7 to work around perl 5.8.4
+	failures with certain @_ operations of goto &sub...
+	see perl bug [ 23429]. Unfortunately, perl-5.8.4 is
+	the distribution of choice for many solaris boxes  
+
+4.019  Sat Nov 29 15:15:30 PST 2008
+	in Lite/Util, add pure perl testing to XS build
+
+4.018  Fri Nov 28 23:19:01 PST 2008
+	revised XS code to be full re-entrant, thread safe in Util.xs v1.26
+	removed all traces of mutex locks in Util.xs v1.26
+	removed function 'threads' here an in UtilPP v1.6
+
+4.017  Sun Nov 23 19:32:59 PST 2008
+	Extended the capability of 'splitref' to allow splitting of
+	objects into multiple pieces with differing CIDR masks.
+	Returned object list can be split from bottom to top
+	or from top to bottom depending on which method is called
+
+		split, rsplit, splitref, rsplitref
+
+	Thanks to kashmish <kashmish@gmail.com> for the idea on
+	improving functionality of 'split'.
+
+	Thanks to Rob Riepel <riepel@networking.Stanford.EDU>
+	for a faster and more accurate _compV6 function.
+
+  in UtitPP v1.5
+	correct documentation error
+	add threads reporting (empty string)
+
+  in Util v1.25
+	add threads reporting that returns a comma separated
+	string of build headers.
+
+	added what is hopefully thread safe operation via
+	serialization. Must be invoked by "--with-threads"
+
+  in Lite v1.12
+	corrected missing Zeros subroutine
+	Zeros and Zero both will work
+
+  in Lite v1.12
+	added minus (-) overloading to allow the subtraction
+	of two NetAddr::IP objects to get the difference between
+	the object->{addr}'s as a numeric value
+	Thanks to Rob Riepel <riepel@networking.Stanford.EDU>
+	for the initial code and inspiration for this enhancement
+
+4.016  Wed Nov  5 18:13:20 PST 2008
+	in Util/ version 1.24
+	Clean up Makefile.PL to check actual required link
+	libraries against the perl build for consistency
+
+4.015  Sun Nov  2 10:10:38 PST 2008
+	in Util v1.23 add missing headers in configure and localconf.h
+	for Solaris inet_xton
+	thanks to Karl Bunch <karl@digilink.net> for spotting the bug.
+
+4.014  Sat Nov  1 15:13:48 PST 2008
+	in Lite.pm v1.11, add test for characters not allowed by
+	rfc952 before the call to gethostbyname in sub new() for those
+	people that insist on using deprecated functionality :aton
+	and OS's that fail to notice calls to gethostbyname with
+	binary arguments.
+
+4.013  Wed Oct 22 15:04:49 PDT 2008
+	In Lite.pm v1.10, add new no octal method for
+	improperly formatted ipV4 addresses
+
+	In Util.pm v1.22, eliminated dependence on PL_sawampersand
+	thanks to Mark Martinec <Mark.Martinec@ijs.si>
+	for spotting this and submitting a patch.
+
+	In Util.pm v1.22, force -noxs mode for Win32
+
+	In Util.pm v1.22, use autoconf to configure 'C' build
+
+4.012  Thu Oct 16 19:35:33 PDT 2008
+	clear build bug for Win32 in Util.pm v 1.21
+
+4.011  released Oct 6 13:10
+
+4.010  Sat Sep 27 17:00:28 PDT 2008
+    in NetAddr::IP::Util v0.19
+	updated test for ENDIANess in siteconf
+
+	add test in inet_aton to detect overange IP dot quad values
+	missed by some broken Socket implementations
+	i.e. 256.1.1.1 would fail to return undef
+
+NOTE: 	Versions 4.008 and 4.009 had limited release to tester only
+	and were not uploaded to CPAN. All of the v4.008, 4.009
+	changes are incorporated in v4.010
+
+4.009  Tue Sep  2 19:09:57 PDT 2008
+	In NetAddr::IP::Lite v1.07,
+	in the off chance that NetAddr::IP::Lite objects are created
+	and the caller later loads NetAddr::IP and expects to use
+	those objects, let the AUTOLOAD routine find and redirect
+	NetAddr::IP::Lite method and subroutine calls to NetAddr::IP.
+
+	updated Lite/t/v4-wnew.t so that non-existent
+	domains are "really" not there
+
+4.008  Sat Jun  7 14:01:55 PDT 2008
+	inherit method "new_from_aton" from NetAddr::IP::Lite
+	add related documentation
+
+      Inherited methods from Lite.pm updated as follows:
+
+	comparisons of the form <, >, <=, >=
+		10.0.0.0/24 {operator} 10.0.0.0/16
+	return now return the comparison of the cidr value
+	when the address portion is equal.
+NOTE:	this comparison returns the comparison of the NUMERIC
+	value of the CIDR. This produces the counter intuitive result
+	that /24 > /16. There is logic to this, really! For proper
+	operation of commands like "Compact" and "Coalesce", lists of
+	netaddr objects must sort in ascending order. However, this
+	conflicts with the requirement for larger netblocks to sort
+	FIRST so as to include smaller ones. This logic extends to
+	any requirement for a sort of netaddr objects. It should be
+	further noted that the mixing of netaddr objects with varying
+	IP addresses and CIDR allocations can lead to unexpected
+	results since the comparisons done first on the IP portion
+	and then on the CIDR portion. The documentation has been
+	updated appropriately.
+	Thanks to Peter DeVries for spotting this discrepancy
+
+4.007  Wed Jun  6 16:41:11 VET 2007
+       Update copyright dates
+
+4.006  Wed Jun  6 15:58:04 VET 2007
+
+       A patch from Michael got rid of $& and $` as reported by Daryl
+       O'Shea and documented at
+       http://issues.apache.org/SpamAssassin/show_bug.cgi?id=5312
+
+4.004  Wed Aug 16 16:01:54 PDT 2006
+	update to include/exclude files in corrupted distro
+
+4.003  Sun Aug  6 10:48:25 PDT 2006
+	correct SYNOPSIS documentation
+	add :old_nth
+
+	update Lite.pm documentation
+	update Util.pm documentation
+	Imported into distribution CVS tree - Some revision number
+	mismatches are to be expected
+	Latin-1 is back
+	Fixed some angle brackets so that they show up in the docs
+
+4.002  Fri Aug  4 14:14:16 PDT 2006
+	remove unused global variable $isV6
+
+	update Lite.pm to v1.02
+	$isV6 global converted to a lexical variable within sub "_xnew"
+	$Class global removed and replaced by calls to UNIVERSAL::isa
+	Thanks to julian@mehnle.net for spotting problems related to
+	using the Lite.pm with mod_perl
+
+4.001  Thu Jul  6 14:09:01 PDT 2006
+	various bug fixes courtesy of Luis Munoz:
+	changes to Lite.pm v1.01, Util.pm v0.17 see Changes in those distros.
+	update t/v6-re.t, addconst called as a scalar, should be called to
+	return the address value ()[1]
+
+4.000  Mon Jun 19 21:51:10 PDT 2006
+	initial release of version 4.000 which includes
+	full support of ipV6 addresses and drops the requirement
+	for Math::BigInt and will run on older versions of Perl
+	at least back to  5.005_03
+

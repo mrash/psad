@@ -1,0 +1,255 @@
+1.46  Fri Nov 11 19:23:11 PST 2011
+	update documentation in InetBase v0.06
+
+1.45  Fri Nov 11 13:20:32 PST 2011
+	break out the code in InetBase v0.05 that expands short IPv4 
+	addresses into dotquad format to account for broken BSD 
+	implementations of inet_aton and gethostbyname that do 
+	not recognize the short format. EXPORT this as sub 'fillIPv4'
+
+	in Util.pm, add 'fillIPv4' to calls to gethostbyname to 
+	work around broken inet_aton and gethostbyname implementations
+	in certain BSD implementations
+
+1.44  Wed Nov  2 19:15:31 PDT 2011
+	improve inet_aton in InetBase v0.04 to overcome broken
+	gethostbyname found in NetBSD and OpenBSD
+
+1.43  Mon Oct 24 13:25:09 PDT 2011
+	remove reference to Config{osname} in InetBase.pm v0.03
+
+1.42  Fri Oct 21 10:34:46 PDT 2011
+	Socket6 prior to version 0.23 does not have AF_INET6 in the
+	EXPORT_OK array, modify InetBase.pm v0.02 to work around this.
+
+1.41  Sat Oct 15 17:26:21 PDT 2011
+	add inet_pton, inet_ntop, AF_INET, AF_INET6
+
+	modify inet_n2dx and inet_n2ad to 
+	recognize the new 128 bit IPv4 format
+	::FFFF:FFFF:0:0
+
+	replace isIPv4 with a pure perl version for portablity
+
+	split the following into NetAddr::IP::InetBase v0.01
+	to provide better long term support for IPv6
+        inet_aton
+        inet_ntoa
+        ipv6_aton
+        ipv6_n2x
+        ipv6_n2d
+        inet_any2n
+        inet_n2dx
+        inet_n2ad
+        inet_ntop
+        inet_pton
+        packzeros
+        isIPv4
+        isNewIPv4
+        isAnyIPv4
+        AF_INET
+        AF_INET6
+
+1.40  Sat Oct  8 01:33:44 PDT 2011
+	remove debug print statement from Util.pm
+
+1.39  Thu Oct  6 23:41:42 PDT 2011
+	really correct missing internal reference
+
+1.38  Thu Oct  6 20:20:33 PDT 2011
+	corrected missing internal reference to inet_4map6
+
+1.37  Thu Oct  6 18:23:04 PDT 2011
+	addid isAnyIPv4, isNewIPv4, inet_4map6
+	revised naip_gethostbyname
+	to conform to Perl's gethostbyname output	
+
+1.36  Sat Feb 19 10:04:00 PST 2011
+	correction to use of package lexicals
+
+	thanks to mishikal@yahoo.com for spotting the bug and to
+	Mark Martinec mark.martinec+ama...@ijs.si for the solution.
+
+1.35  Tue Nov 16 16:28:37 PST 2010
+	naip_gethostbyname modified to return undef instead of 
+	0 (zero) on failure
+
+	thanks to Terry Cassidy enaudishaylee@tc17.com for the bug report
+
+	move sub's ipv6_n2d and ipv6_n2x to non-autosplit portion
+	of module to eliminate warnings during autosplit of "our" variables
+
+	thanks to Nicholas Bamber <nicholas@periapt.co.uk>
+	Bug-Debian: http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=517361
+
+1.34  Wed Sep 29 10:32:50 PDT 2010
+	Conditionalize import of AF_INET6 in Util.pm
+	NetAddr::IP::UtilPolluted
+
+1.33  Tue Sep 21 17:50:50 PDT 2010
+	Add UtilPolluted namespace to contain name space pollution
+	created by "use Socket" when invoking Socket6.
+
+1.32  Wed May 12 14:18:20 PDT 2010
+	In Util.xs, 
+	changed netswap() to postincrement 
+        *a++ = to *a and added increment after save to mollify some
+        picky compilers that return possible undefined behavior.
+
+        changed type of _128x10 to 'void'
+
+1.31  Tue Jun  9 10:31:11 PDT 2009
+	ferret out shell value for Makefile.PL when calling
+	./configure for systems where the 'x' bit gets lost
+	due to bug in Archive::Tar
+
+1.30  Sat Mar  7 16:35:33 PST 2009
+	make the compiler test check the environment for
+	CC before using Perl's default compiler
+
+1.29  Sat Mar  7 16:15:18 PST 2009
+	revised compiler test in Makefile.PL for Util v1.29
+	to accomodate picky Solaris "cc"
+
+1.28  Wed Dec 17 14:14:06 PST 2008
+	set uninitialized "carry" in XS bin2bcd to zero
+
+1.27  Tue Dec  9 12:00:08 PST 2008
+	revised UtilPP v1.7 to work around perl 5.8.4 
+	failures with certain @_ operations of goto &sub...
+	see perl bug [ 23429]. Unfortunately, perl-5.8.4 is
+	the distribution of choice for many solaris boxes
+
+1.26  Fri Nov 28 23:19:01 PST 2008
+	revised XS code to be full re-entrant... thread safe.
+	removed all traces of mutex locks
+	removed function 'threads' here an in UtilPP v1.6
+
+1.25  Tue Nov 18 19:08:56 PST 2008
+	correct documentation error in Util_PP v1.5
+
+	add threads reporting to Util.xs and UtilPP
+
+	added what is hopefully thread safe operation via
+	serialization. Must be invoked by "--with-threads"
+
+1.24  Wed Nov  5 18:13:20 PST 2008
+	Clean up Makefile.PL to check actual required link
+	libraries against the perl build for consistency
+
+1.23  Sun Nov  2 10:10:38 PST 2008
+	add missing headers in configure and localconf.h for Solaris inet_xton
+	thanks to Karl Bunch <karl@digilink.net> for spotting the bug.
+
+1.22  Wed Oct 22 14:54:12 PDT 2008
+	eliminated dependence on PL_sawampersand
+	thanks to Mark Martinec <Mark.Martinec@ijs.si>
+	for spotting this and submitting a patch.
+
+	force -noxs mode for Win32
+
+	use autoconf to configure 'C' build
+
+1.21  Thu Oct 16 19:35:33 PDT 2008
+	again... clear build bug for Win32
+	and lets get the version number right since it appears
+	that it was up-rev'd at some point to 1.xx
+
+0.20  Mon Oct  6 13:07:34 PDT 2008
+	clear build bug for Win32
+
+0.19  Sat Sep 27 13:36:58 PDT 2008
+	updated test for ENDIANess in siteconf
+
+	add test in inet_aton to detect overange IP dot quad values
+	missed by some broken Socket implementations
+	i.e. 256.1.1.1
+
+0.18  Sun Aug  6 10:48:25 PDT 2006
+	correct shiftleft documentation
+	correct mask4to6 documentation
+
+0.17  Thu Jul  6 10:46:48 PDT 2006
+	update 'siteconf line 1608' to fix empty variable in inet_aton test
+	update 'siteconf line 1636' to fix empty variable in inet_pton test
+	add missing colon at t/notcontiguous.t line 66
+
+0.16  Sun Jun 25 16:13:00 PDT 2006
+	fixed ->new() issues with long digit strings ->new('::fffff')
+	and non hex digits ->new('::foo').
+	Thanks to Radoslaw Zielinski <radek42@gmail.com>
+	for spotting those bugs
+
+0.15  Tue Jun 13 14:42:34 PDT 2006
+	UtilPP.pm v0.07 & Util.xs 'shiftleft' so that the original
+	argument is returned when the shift count is '0' or missing
+
+0.14  Tue Jun  6 08:37:01 PDT 2006
+	add logic to check LIBS => [-lfiles]
+	individually. ExtUtils::xxx does a bad job and
+	leaves libs that do not exist in the list
+	which causes 'siteconf' to blow up on missing libs
+	on perl 5.053 (and probably others)
+
+0.13  Tue Jun  6 08:33:11 PDT 2006
+	added to xs file, 'hopefully' to allow build on windoze platforms
+
+0.12  Tue Jun  6 08:21:12 PDT 2006
+	add logic to makefile so 'siteconfig' and C libs
+	are not used in PurePerl mode
+
+0.11  Mon Jun  5 14:45:09 PDT 2006
+	fix Sparc problems
+    1)	add workaround for OS's that do not have inet_aton
+
+    2)	add workaround for compilers that do not understand
+	#if MACRO1 == MACRO2
+
+0.10  Sat Jun  3 19:07:51 PDT 2006
+	add site configuration to supply u_intxx_t vars
+	for Sun OS and others that don't have them
+
+0.09  Sun May  7 18:06:43 PDT 2006
+	UtilPP.pm v0.06, removed unnecessary pack(unpack) sequences
+	to speed up ipv4->6, ipv6->4 conversions
+
+0.08  Wed Apr 26 18:33:12 PDT 2006
+	correct documentation error
+	add ipv6to4
+
+0.07  Sun Apr 23 16:11:56 PDT 2006
+	correct reporting error in UtilPP v0.04 for
+	incorrect argument length in ipv4 -> 6 conversions
+
+	add conditional netaddr conversion functions
+	ipanyto6, maskanyto6 to Util.xs and UtilPP v0.05
+
+0.06  Tue Apr 18 16:50:53 PDT 2006
+	add ipv4to6, mask4to6 to Util.pm and UtilPP.pm v0.03
+
+0.05  Sat Apr 15 15:48:17 PDT 2006
+	Fixed some typo's in Makefile.PL that
+	failed to update README during build
+
+0.04  Wed Apr 12 15:43:33 PDT 2006
+	add Util_IS.pm to guarantee that the XS lib is not
+	loaded if a previous incarnation of the same version
+	has previously been installed on the system and the
+	module is built with -noxs
+
+0.03  Tue Apr  4 21:55:35 PDT 2006
+	update minisocket to perl-5.9.3, add header
+	file for backwards compatibility
+
+	add function 'notcontiguous' to return cidr size
+	and check for spurious bits in the network mask
+
+0.02  Fri Mar 31 12:44:15 PST 2006
+	added test for illegal characters to ipv6_aton
+
+	added UtilPP for Pure Perl functionality for the
+	WinTel folks that don't have gcc on their systems
+
+0.01  Tue Mar 28 16:42:44 PST 2006
+	initial release
+

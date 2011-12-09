@@ -21,7 +21,7 @@ use 5.006;
 use POSIX ':sys_wait_h';
 use Carp;
 use IPTables::Parse;
-use Net::IPv4Addr 'ipv4_network';
+use NetAddr::IP;
 use strict;
 use warnings;
 use vars qw($VERSION);
@@ -444,12 +444,10 @@ sub normalize_net() {
     my $ip_re = '(?:\d{1,3}\.){3}\d{1,3}';
 
     my $normalized_net = '';
-    if ($net =~ m|($ip_re)/($ip_re)|) {
-        my ($net_addr, $cidr) = ipv4_network($1, $2);
-        $normalized_net = "$net_addr/$cidr";
-    } elsif ($net =~ m|($ip_re)/(\d+)|) {
-        my ($net_addr, $cidr) = ipv4_network($1, $2);
-        $normalized_net = "$net_addr/$cidr";
+    if ($net =~ m|$ip_re/$ip_re| or $net =~ m|$ip_re/\d+|) {
+        my $n = new NetAddr::IP $net
+            or croak "[*] Could not acquire NetAddr::IP object for $net";
+        $normalized_net = $n->network()->cidr();
     } else {
         ### it is a hostname or an individual IP
         $normalized_net = $net;

@@ -96,9 +96,9 @@ my %required_perl_modules = (
         'force-install' => 0,
         'mod-dir' => 'Date-Calc'
     },
-    'Net::IPv4Addr' => {
+    'NetAddr:IP' => {
         'force-install' => 0,
-        'mod-dir' => 'Net-IPv4Addr'
+        'mod-dir' => 'NetAddr-IP'
     },
     'IPTables::Parse' => {
         'force-install' => 1,

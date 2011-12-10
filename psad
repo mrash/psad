@@ -1028,7 +1028,7 @@ sub check_scan() {
         my $pkt_parse_rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
         print STDERR Dumper \%pkt if $debug and $verbose;
         if ($pkt_parse_rv == $PKT_ERROR) {
-            push @err_pkts, $pkt_str;
+            push @err_pkts, $pkt_str unless $no_ipt_errors;
             next PKT;
         } elsif ($pkt_parse_rv == $PKT_IGNORE) {
             next PKT;

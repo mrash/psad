@@ -905,8 +905,6 @@ MAIN: for (;;) {
 
         ### log the top port and signature matches
         &log_top_scans();
-
-        $check_interval_ctr = 0;
     }
 
     ### Write the number of tcp/udp/icmp packets out
@@ -971,6 +969,19 @@ MAIN: for (;;) {
     if ($warn_msg) {
         &print_sys_msg($warn_msg, "$config{'PSAD_ERR_DIR'}/psad.warn");
         $warn_msg = '';
+    }
+
+    ### see if we need to timeout any old scans
+    if ($config{'ENABLE_PERSISTENCE'} eq 'N') {
+
+        my $do_timeout = 0;
+        if ($config{'PERSISTENCE_CTR_THRESHOLD'} == 0) {
+            $do_timeout = 1;
+        } elsif ($check_interval_ctr % $config{'PERSISTENCE_CTR_THRESHOLD'} == 0) {
+            $do_timeout = 1;
+        }
+
+        &delete_old_scans() if $do_timeout;
     }
 
     $check_interval_ctr++;
@@ -1143,16 +1154,6 @@ sub check_scan() {
                 push @dshield_data, "$year-$month-$day $time_24 " .
                     "$timezone\t$config{'DSHIELD_USER_ID'}\t1" .
                     "\t$pkt{'dshield_str'}\n";
-            }
-        }
-
-        ### see if we need to timeout any old scans
-        if ($config{'ENABLE_PERSISTENCE'} eq 'N') {
-            if (defined $scan{$pkt{'src'}}{$pkt{'dst'}}{'s_time'}) {
-                if ((time() - $scan{$pkt{'src'}}{$pkt{'dst'}}{'s_time'})
-                        >= $config{'SCAN_TIMEOUT'}) {
-                    delete $scan{$pkt{'src'}}{$pkt{'dst'}};
-                }
             }
         }
 
@@ -2835,6 +2836,27 @@ sub add_fwsnort_sid() {
             "corresponding fwsnort rule.\n" if $debug;
     }
     return 0, $NO_SIG_MATCH;
+}
+
+sub delete_old_scans() {
+
+    my $current_time = time();
+
+    print STDERR "[+] delete_old_scans()\n" if $debug;
+
+    ### see if we need to timeout any old scans
+    for my $src (keys %scan) {
+        for my $dst (keys %{$scan{$src}}) {
+            next unless defined $scan{$src}{$dst}{'s_time'};
+            if (($current_time - $scan{$src}{$dst}{'s_time'})
+                    >= $config{'SCAN_TIMEOUT'}) {
+                print STDERR "    delete old scan $src -> $dst\n"
+                    if $debug;
+                delete $scan{$src}{$dst};
+            }
+        }
+    }
+    return;
 }
 
 sub dshield_email_log() {
@@ -10303,6 +10325,7 @@ sub required_vars() {
         ENABLE_SYSLOG_FILE IPT_SYSLOG_FILE IPT_WRITE_FWDATA
         ETC_RSYSLOG_CONF IFCFGTYPE ENABLE_WHOIS_FORCE_ASCII
         ENABLE_WHOIS_FORCE_SRC_IP ENABLE_IPV6_DETECTION
+        PERSISTENCE_CTR_THRESHOLD
     );
     &defined_vars(\@required_vars);
     return;

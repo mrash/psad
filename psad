@@ -268,6 +268,9 @@ my $year = '';
 ### useful for TOP_SCANS_CTR_THRESHOLD
 my $check_interval_ctr = 0;
 
+### track the number of scan IP pairs for MAX_SCAN_IP_PAIRS thresholding
+my $scan_ip_pairs = 0;
+
 ### %auto_dl holds all ip addresses that should automatically
 ### be assigned a danger level (or ignored).
 my %auto_dl = ();
@@ -1017,6 +1020,7 @@ sub check_scan() {
     my %auto_block_regex_match = ();
 
     my $pkt_ctr = 0;
+    my $log_scan_ip_pair_max = 0;
 
     my $print_scale_factor = &get_scale_factor($#$fw_packets_ar);
 
@@ -1061,13 +1065,32 @@ sub check_scan() {
             $top_udplite_ports{$pkt{'dp'}}++;
         }
 
-        ### track packet counts for this source
-        $top_packet_counts{$pkt{'src'}}++;
-
         ### If we made it here then we correctly matched packets
         ### that the firewall logged.
         print STDERR "[+] valid packet: $pkt{'src'} ($pkt{'sp'}) -> ",
             "$pkt{'dst'} ($pkt{'dp'}) $pkt{'proto'}\n" if $debug;
+
+        ### see if we have hit the MAX_SCAN_IP_PAIRS threshold
+        if ($config{'MAX_SCAN_IP_PAIRS'} > 0) {
+            if ($scan_ip_pairs >= $config{'MAX_SCAN_IP_PAIRS'}) {
+                unless (defined $scan{$pkt{'src'}}
+                        and defined $scan{$pkt{'src'}}{$pkt{'dst'}}) {
+                    print STDERR "[-] excluding $pkt{'src'} -> $pkt{'dst'}, ",
+                            "scan IP pairs too high: $scan_ip_pairs\n"
+                        if $debug;
+                    $log_scan_ip_pair_max = 1;
+                    next PKT;
+                }
+            }
+            if (not defined $scan{$pkt{'src'}}) {
+                $scan_ip_pairs++;
+            } elsif (not defined $scan{$pkt{'src'}}{$pkt{'dst'}}) {
+                $scan_ip_pairs++;
+            }
+        }
+
+        ### track packet counts for this source
+        $top_packet_counts{$pkt{'src'}}++;
 
         if ($config{'HOME_NET'} ne 'any') {
             if ($pkt{'chain'} eq 'INPUT') {
@@ -1139,6 +1162,7 @@ sub check_scan() {
                 }
             }
         }
+
         ### note that we send this packet data off to DShield regardless
         ### of whether psad decides that it is associated with a scan so
         ### that DShield can make its own determination
@@ -1305,6 +1329,10 @@ sub check_scan() {
     ### are running on a syslog server, of if we are running in -A mode.
     &auto_psad_response(\%curr_scan, \%auto_block_regex_match)
         if $config{'ENABLE_AUTO_IDS'} eq 'Y' and not $analyze_mode;
+
+    if ($log_scan_ip_pair_max) {
+        &sys_log("scan IP pairs threshold reached");
+    }
 
     return;
 }
@@ -2852,7 +2880,12 @@ sub delete_old_scans() {
                     >= $config{'SCAN_TIMEOUT'}) {
                 print STDERR "    delete old scan $src -> $dst\n"
                     if $debug;
+
                 delete $scan{$src}{$dst};
+
+                if ($config{'MAX_SCAN_IP_PAIRS'} > 0) {
+                    $scan_ip_pairs-- if $scan_ip_pairs > 0;
+                }
             }
         }
     }
@@ -7066,6 +7099,7 @@ sub analysis_mode() {
     &check_scan(\@ipt_msgs);
 
     print "\n[+] Finished --Analyze cycle.\n";
+
     return 0;
 }
 
@@ -10325,7 +10359,7 @@ sub required_vars() {
         ENABLE_SYSLOG_FILE IPT_SYSLOG_FILE IPT_WRITE_FWDATA
         ETC_RSYSLOG_CONF IFCFGTYPE ENABLE_WHOIS_FORCE_ASCII
         ENABLE_WHOIS_FORCE_SRC_IP ENABLE_IPV6_DETECTION
-        PERSISTENCE_CTR_THRESHOLD
+        PERSISTENCE_CTR_THRESHOLD MAX_SCAN_IP_PAIRS
     );
     &defined_vars(\@required_vars);
     return;

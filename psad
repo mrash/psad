@@ -310,7 +310,7 @@ my %local_src = ();
 
 ### regex to match IP addresses
 my $ip_re   = qr|(?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2}|;  ### IPv4
-my $ipv6_re = qr|(?:[a-f0-9]{4}:){7}(?:[a-f0-9]{4})|;   ### IPv6
+my $ipv6_re = qr|(?:[a-f0-9]{4}:){7}(?:[a-f0-9]{4})|i;   ### IPv6
 
 ### ttl values are decremented depending on the number of hops
 ### the packet has taken before it hits the firewall.  We will
@@ -1272,7 +1272,9 @@ sub check_scan() {
         ### system based on the ttl, id, len, window, and tos
         ### fields in tcp syn packets (this technique is based
         ### on the paper "Passive OS Fingerprinting: Details
-        ### and Techniques" by Toby Miller).
+        ### and Techniques" by Toby Miller).  Also attempt to
+        ### fingerprint with a re-implementation of Michal Zalewski's
+        ### p0f that only requires iptables log messages
         unless ($no_posf) {
             ### make sure we have not already guessed the OS,
             ### and if we have been unsuccessful in guessing
@@ -1285,8 +1287,7 @@ sub check_scan() {
 
                 } elsif (not defined $posf{$pkt{'src'}}{'guess'}
                         and $scan{$pkt{'src'}}{$pkt{'dst'}}{'absnum'} < 100) {
-                    &posf($pkt{'src'}, $pkt{'ip_len'}, $pkt{'tos'},
-                            $pkt{'ttl'}, $pkt{'ip_id'}, $pkt{'win'})
+                    &posf(\%pkt);
                 }
             }
         }
@@ -1583,10 +1584,6 @@ sub parse_NF_pkt_str() {
                 $pkt_hr->{'d_obj'} = new NetAddr::IP($pkt_hr->{'dst'})
                     or return $PKT_ERROR;
 
-                ### the reserve bits are not reported by ulogd, but normal
-                ### iptables syslog messages contain them.
-                $pkt_hr->{'flags'} =~ s/\s*RES=\S+\s*//;
-
             } else {
                 print STDERR "[-] err packet: strange IPv4 TCP format\n"
                     if $debug;
@@ -1595,6 +1592,10 @@ sub parse_NF_pkt_str() {
         }
 
         $pkt_hr->{'proto'} = 'tcp';
+
+        ### the reserve bits are not reported by ulogd, but normal
+        ### iptables syslog messages contain them.
+        $pkt_hr->{'flags'} =~ s/\s*RES=\S+\s*//;
 
         ### default to NULL
         $pkt_hr->{'flags'} = 'NULL' unless $pkt_hr->{'flags'};
@@ -1849,8 +1850,6 @@ sub parse_NF_pkt_str() {
         }
     }
 
-    return $PKT_IGNORE if $pkt_hr->{'is_ipv6'};
-
     return $PKT_SUCCESS;
 }
 
@@ -1878,7 +1877,7 @@ sub match_sigs() {
 
         SRC: for my $src (keys %{$sig_search{$proto}}) {
 
-            print STDERR "[+] match_sigs() pkt src: $pkt_hr->{'src'} within sig src: $src?..."
+            print STDERR "[+] match_sigs() pkt src: $pkt_hr->{'src'} within sig src: $src ?..."
                 if $debug and $verbose;
 
             if ($pkt_hr->{'s_obj'}->within($sig_ip_objs{$src})) {
@@ -1892,7 +1891,7 @@ sub match_sigs() {
 
             DST: for my $dst (keys %{$sig_search{$proto}{$src}}) {
 
-                print STDERR "[+] match_sigs() pkt dst: $pkt_hr->{'dst'} within sig dst: $dst?..."
+                print STDERR "[+] match_sigs() pkt dst: $pkt_hr->{'dst'} within sig dst: $dst ?..."
                     if $debug and $verbose;
 
                 if ($pkt_hr->{'d_obj'}->within($sig_ip_objs{$dst})) {
@@ -2279,6 +2278,11 @@ sub match_snort_icmp_keywords() {
 
 sub match_snort_ip_keywords() {
     my ($pkt_hr, $sig_hr) = @_;
+
+    if ($pkt_hr->{'is_ipv6'}) {
+        ### we need to build IPv6 signature keywords
+        return 1, $NO_SIG_MATCH;
+    }
 
     if (defined $sig_hr->{'ttl'} and defined $sig_hr->{'ttl_s'}) {
         return 0, $NO_SIG_MATCH
@@ -2734,7 +2738,30 @@ sub parse_ip_options() {
 }
 
 sub posf() {
-    my ($src, $len, $tos, $ttl, $id, $win) = @_;
+    my $pkt_hr = shift;
+
+    if ($pkt_hr->{'is_ipv4'}) {
+        &posf_ipv4($pkt_hr);
+    } elsif ($pkt_hr->{'is_ipv6'}) {
+        &posf_ipv6($pkt_hr);
+    }
+    return;
+}
+
+sub posf_ipv6() {
+    my $pkt_hr = shift;
+    return;
+}
+
+sub posf_ipv4() {
+    my $pkt_hr = shift;
+
+    my $src = $pkt_hr->{'src'};
+    my $len = $pkt_hr->{'ip_len'};
+    my $tos = $pkt_hr->{'tos'};
+    my $ttl = $pkt_hr->{'ttl'};
+    my $id  = $pkt_hr->{'ip_id'};
+    my $win = $pkt_hr->{'win'};
 
     my $min_ttl;
     my $max_ttl;
@@ -3371,6 +3398,8 @@ sub get_connected_subnets() {
             next if $intf_name =~ /dummy/i;
             if ($line =~ /^\s+inet.*?($ip_re)\/(\d+)/i) {
                 push @connected_subnets, new NetAddr::IP($1, $2);
+            } elsif ($line =~ /inet6\s(\S+)/) {
+                push @connected_subnets, new6 NetAddr::IP($1);
             }
         }
     } else {
@@ -3386,6 +3415,8 @@ sub get_connected_subnets() {
             next if $intf_name =~ /dummy/i;
             if ($line =~ /^\s+inet.*?:($ip_re).*:($ip_re)/i) {
                 push @connected_subnets, new NetAddr::IP($1, $2);
+            } elsif ($line =~ /^\s+inet6\saddr:\s+(\S+)/) {
+                push @connected_subnets, new6 NetAddr::IP($1);
             }
         }
     }
@@ -4252,13 +4283,26 @@ sub expand_sig_ips() {
                     or $ip =~ m|($ip_re)|) {
                 push @arr, $1;
                 $sig_ip_objs{$1} = new NetAddr::IP($1);
+            } elsif ($ip =~ m|\:|) {
+                push @arr, $ip;
+                $sig_ip_objs{$ip} = new NetAddr::IP($ip)
+                    or die "[*] NetAddr::IP error for $ip";
             }
         }
+
     } elsif ($ip_str =~ m|($ip_re/$ip_re)|
             or $ip_str =~ m|($ip_re/\d+)|
             or $ip_str =~ m|($ip_re)|) {
         push @arr, $1;
-        $sig_ip_objs{$1} = new NetAddr::IP($1);
+        $sig_ip_objs{$1} = new NetAddr::IP($1)
+            or die "[*] NetAddr::IP error for $1";
+
+    } elsif ($ip_str =~ m|\:|) {
+
+        push @arr, $ip_str;
+        $sig_ip_objs{$ip_str} = new NetAddr::IP($ip_str)
+            or die "[*] NetAddr::IP error for $ip_str";
+
     } elsif ($ip_str eq 'any' or $ip_str =~ m|NOT_?USED|i) {
         ### handle NOT_USED case from older psad versions
         push @arr, 'any';
@@ -5158,7 +5202,7 @@ sub scan_logr() {
                                     "${src_dir}/${lookup_ip}_whois");
 
                 if ($debug and $verbose) {
-                    print STDERR for $whois_info_ar;
+                    print STDERR for @$whois_info_ar;
                 }
             }
             print STDERR "[+] scan_logr(): generating email.....\n"
@@ -6846,6 +6890,9 @@ sub get_local_ips() {
             if ($line =~ /inet\s+($ip_re)\/\d+\s/) {
                 print STDERR "[+] : Adding $1 to local_ips\n" if $debug;
                 $local_ips{$1} = '';
+            } elsif ($line =~ /inet6\s(\S+)/) {
+                print STDERR "[+] : Adding $1 to local_ips\n" if $debug;
+                $local_ips{$1} = '';
             }
         }
     } else {
@@ -6854,6 +6901,9 @@ sub get_local_ips() {
         return unless @ips;
         for my $line (@ips) {
             if ($line =~ /inet\s+.*?:($ip_re)\s/) {
+                print STDERR "[+] : Adding $1 to local_ips\n" if $debug;
+                $local_ips{$1} = '';
+            } elsif ($line =~ /inet6\s+addr:\s+(\S+)/) {
                 print STDERR "[+] : Adding $1 to local_ips\n" if $debug;
                 $local_ips{$1} = '';
             }
@@ -8344,6 +8394,12 @@ sub print_scan_status() {
             my $src_str = "\nSRC:  $src, DL: $dl, Dsts: $total_dsts" .
                 ", Pkts: $tot_pkts, Unique sigs: $uniq_sigs";
 
+            my $src_obj = new NetAddr::IP($src) or die "[*] NetAddr::IP($src) error";
+            if ($src_obj->version() == 6) {
+                $src_str = "\nSRC:  $src (" . $src_obj->short() . "), DL: $dl, Dsts: $total_dsts" .
+                    ", Pkts: $tot_pkts, Unique sigs: $uniq_sigs";
+            }
+
             unless ($analyze_mode) {
                 my $tot_alerts = 0;
                 if ($config{'ENABLE_EMAIL_LIMIT_PER_DST'} eq 'Y') {
@@ -8355,7 +8411,7 @@ sub print_scan_status() {
                 }
                 $src_str .= ", Email alerts: $tot_alerts";
             }
-            if (&is_local($src, new NetAddr::IP($src))) {
+            if (&is_local($src, $src_obj)) {
                 $src_str .= ', Local IP';
             }
             $printed = 1;
@@ -8374,7 +8430,12 @@ sub print_scan_status() {
 
             DST: for my $dst (keys %{$scan{$src}}) {
                 my $dst_str = "    DST: $dst";
-                if (&is_local($dst, new NetAddr::IP($dst))) {
+                my $dst_obj = new NetAddr::IP($dst)
+                    or die "[*] NetAddr::IP($dst) error";
+                if ($dst_obj->version() == 6) {
+                    $dst_str = "    DST: $dst (" . $dst_obj->short() . ')';
+                }
+                if (&is_local($dst, $dst_obj)) {
                     $dst_str .= ', Local IP';
                 }
                 push @lines, "$dst_str\n";
@@ -9027,8 +9088,11 @@ sub print_top_attackers() {
     } else {
         push @lines, "[+] Top attackers:\n";
     }
+
     my $ctr = 0;
     my %pre_sort_dl = ();
+    my %ip_objs = ();
+
     for my $src (sort {$scan_dl{$b} cmp $scan_dl{$a}} keys %scan_dl) {
         if ($status_min_dl) {
             next unless $scan_dl{$src} >= $status_min_dl;
@@ -9038,6 +9102,26 @@ sub print_top_attackers() {
         $pre_sort_dl{$scan_dl{$src}}{$src} = '';
     }
 
+    my $ip6_short_len = 0;
+    for my $dl qw/5 4 3 2 1/ {
+        next unless defined $pre_sort_dl{$dl};
+
+        for my $src (sort keys %{$pre_sort_dl{$dl}}) {
+            next unless defined $top_packet_counts{$src}
+                    or defined $top_sig_counts{$src};
+
+            my $ip_obj = new NetAddr::IP($src)
+                or die "[*] NetAddr::IP $src error";
+
+            $ip_objs{$src} = $ip_obj;
+            if ($ip_obj->version() == 6) {
+                if (length($ip_obj->short()) > $ip6_short_len) {
+                    $ip6_short_len = length($ip_obj->short());
+                }
+            }
+        }
+    }
+
     for my $dl qw/5 4 3 2 1/ {
         next unless defined $pre_sort_dl{$dl};
 
@@ -9045,6 +9129,10 @@ sub print_top_attackers() {
             next unless defined $top_packet_counts{$src}
                     or defined $top_sig_counts{$src};
             my $str = sprintf "      %-15s DL: %d", $src, $scan_dl{$src};
+            if ($ip_objs{$src}->version() == 6) {
+                $str = sprintf "      %s (%-${ip6_short_len}s) DL: %d", $src,
+                    $ip_objs{$src}->short(), $scan_dl{$src};
+            }
             if (defined $top_packet_counts{$src}) {
                 $str .= ", Packets: $top_packet_counts{$src}";
             } else {
@@ -10170,9 +10258,11 @@ sub getopt_wrapper() {
         'analysis-write-data' => \$analyze_write_data, # Write data to filesystem from
                                                        # -A mode (this can take a long
                                                        # time).
+        'analyze-write-data'  => \$analyze_write_data,
         'analysis-fields=s' => \$analysis_fields, # Place a criteria on various fields
                                                   #   that are parsed from an iptables
                                                   #   logfile.
+        'analyze-fields=s'  => \$analysis_fields,
         'whois-analysis'    => \$analysis_whois,  # Issue whois lookups in analysis
                                                   #   mode.
         'email-analysis'    => \$analysis_emails, # Send analysis mode emails.

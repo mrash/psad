@@ -2740,10 +2740,10 @@ sub parse_ip_options() {
 sub posf() {
     my $pkt_hr = shift;
 
-    if ($pkt_hr->{'is_ipv4'}) {
-        &posf_ipv4($pkt_hr);
-    } elsif ($pkt_hr->{'is_ipv6'}) {
+    if ($pkt_hr->{'is_ipv6'}) {
         &posf_ipv6($pkt_hr);
+    } else {
+        &posf_ipv4($pkt_hr);
     }
     return;
 }

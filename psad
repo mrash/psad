@@ -1185,9 +1185,11 @@ sub check_scan() {
         unless (defined $scan{$pkt{'src'}}{$pkt{'dst'}}{'s_time'}) {
             if ($analyze_mode) {
                 if ($pkt_str =~ /^(.*?)\s+\S+\s+kernel:/) {
-                    $scan{$pkt{'src'}}{$pkt{'dst'}}{'s_time'} = $1;
+                    $scan{$pkt{'src'}}{$pkt{'dst'}}{'s_time'}
+                        = &date_time($1);
                 } elsif ($pkt_str =~ /^\s*(\S+\s+\S+\s+\S+)/) {
-                    $scan{$pkt{'src'}}{$pkt{'dst'}}{'s_time'} = $1;
+                    $scan{$pkt{'src'}}{$pkt{'dst'}}{'s_time'}
+                        = &date_time($1);
                 } else {
                     die "[*] Could not extract time from packet: $pkt_str\n",
                         "    Please send a bug report to: ",
@@ -3039,7 +3041,7 @@ sub import_perl_modules() {
     require Storable if $store_file;
 
     Date::Calc->import(qw(Timezone This_Year Decode_Month
-            Today Date_to_Time Mktime Localtime));
+            Today Date_to_Time This_Year Mktime Localtime));
     Unix::Syslog->import(qw(:subs :macros));
     Storable->import(qw(retrieve store)) if $store_file;
 
@@ -9968,6 +9970,34 @@ sub download_signatures() {
 "    new sigs.\n";
 
     return 0;
+}
+
+sub date_time() {
+    my $date_str = shift;
+
+    my $time = time();
+
+    my $date = $time;
+
+    ### Feb 27 12:36:57
+    if ($date_str =~ /^\s*(\w+)\s+(\d+)\s+(\d{2}):(\d{2}):(\d{2})/) {
+        my $m_tmp = $1;  ### kludge for Decode_Month() call
+        my $month = Decode_Month($m_tmp);
+        my $day   = sprintf("%.2d", $2);
+        my $hour  = $3;
+        my $min   = $4;
+        my $sec   = $5;
+
+        $date = Date_to_Time(This_Year(), $month, $day, $hour, $min, $sec);
+
+        if ($date > $time) {
+            ### date is in the future because the iptables syslog message
+            ### does not include the year - subtract one year
+            $date -= 60*60*24*356;
+        }
+    }
+
+    return $date;
 }
 
 sub archive_conf() {

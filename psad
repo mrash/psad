@@ -4659,7 +4659,7 @@ sub assign_danger_level() {
             }
 
             ### calculate the range over _both_ tcp and udp
-            for my $proto qw(tcp udp) {
+            for my $proto (qw(tcp udp)) {
                 next unless defined $scan{$src}{$dst}{$proto};
                 next unless defined $scan{$src}{$dst}{$proto}{'abs_sp'};
                 if ($s_port > $scan{$src}{$dst}{$proto}{'abs_sp'}) {
@@ -7007,7 +7007,7 @@ sub stop_psad() {
     &sys_log('shutting down psad daemons');
     ### must kill psadwatchd first since if not, it might try to restart
     ### any of the other two daemons.
-    for my $pidname qw(psadwatchd kmsgsd psad) {
+    for my $pidname (qw(psadwatchd kmsgsd psad)) {
         my $pidfile = $pidfiles{$pidname};
         if (-e $pidfile) {
             my $pid = &is_running($pidfile);
@@ -8041,9 +8041,9 @@ sub csv_tokens() {
                 $search =~ s/^not//;
             }
 
-            for my $count_type qw/countabs countuniq
+            for my $count_type (qw/countabs countuniq
                     countday counthouruniq countminuniq countdayuniq
-                    counthour countmin countday count/ {
+                    counthour countmin countday count/) {
 
                 if ($search =~ /,$count_type$/ or $search =~ /^$count_type/) {
 
@@ -8128,7 +8128,7 @@ sub csv_tokens() {
             }
         }
     } else {
-        @tokens = qw(
+        @tokens = (qw(
             timestamp
             src
             dst
@@ -8140,7 +8140,7 @@ sub csv_tokens() {
             intf
             chain
             log_prefix
-        );
+        ));
     }
 
     return \@tokens, \@match_criteria;
@@ -8220,7 +8220,7 @@ sub fw_analyze_mode() {
 sub status() {
 
     my $rv = 0;   ### assume psad is not running and test...
-    for my $pidname qw(psadwatchd kmsgsd psad) {
+    for my $pidname (qw(psadwatchd kmsgsd psad)) {
         my $pidfile = $pidfiles{$pidname};
         if (-e $pidfile) {
             my $pid = &is_running($pidfile);
@@ -8366,7 +8366,7 @@ sub print_scan_status() {
     my %uniq_dsts = ();
 
     my $printed = 0;
-    for my $dl qw/5 4 3 2 1/ {
+    for my $dl (qw/5 4 3 2 1/) {
         SRC: for my $src (sort keys %scan) {
             next SRC unless $scan_dl{$src} == $dl;
             my $dl = $scan_dl{$src};
@@ -9105,7 +9105,7 @@ sub print_top_attackers() {
     }
 
     my $ip6_short_len = 0;
-    for my $dl qw/5 4 3 2 1/ {
+    for my $dl (qw/5 4 3 2 1/) {
         next unless defined $pre_sort_dl{$dl};
 
         for my $src (sort keys %{$pre_sort_dl{$dl}}) {
@@ -9124,7 +9124,7 @@ sub print_top_attackers() {
         }
     }
 
-    for my $dl qw/5 4 3 2 1/ {
+    for my $dl (qw/5 4 3 2 1/) {
         next unless defined $pre_sort_dl{$dl};
 
         for my $src (sort keys %{$pre_sort_dl{$dl}}) {
@@ -9222,7 +9222,7 @@ sub usr1_handler() {
 
 sub hup() {
     my $rv = 0;
-    for my $pidname qw(psadwatchd psad kmsgsd) {
+    for my $pidname (qw(psadwatchd psad kmsgsd)) {
         my $pidfile = $pidfiles{$pidname};
         my $pid = &is_running($pidfile);
         if ($pid) {
@@ -9368,22 +9368,22 @@ sub handle_cmdline() {
 }
 
 sub make_psad_dirs() {
-    for my $dir qw(
+    for my $dir (qw(
         /var/lib
         /var/run
-    ) {
+    )) {
         next if -d $dir;
         mkdir $dir, 0755 or die "[*] Could not mkdir $dir: $!";
     }
 
-    for my $dir qw(
+    for my $dir (qw(
         PSAD_DIR
         PSAD_RUN_DIR
         PSAD_FIFO_DIR
         PSAD_CONF_DIR
         CONF_ARCHIVE_DIR
         PSAD_ERR_DIR
-    ) {
+    )) {
         next if -d $config{$dir};
         mkdir $config{$dir}, 0500 or
             die "[*] Could not mkdir $config{$dir}: $!";
@@ -9734,7 +9734,7 @@ sub disk_space_exceeded() {
                 "on $config{'HOSTNAME'}!",
                 '', $config{'EMAIL_ADDRESSES'},
                 $cmds{'mail'});
-            for my $pidname qw(psadwatchd kmsgsd) {
+            for my $pidname (qw(psadwatchd kmsgsd)) {
                 my $pidfile = $pidfiles{$pidname};
                 my $pid = &is_running($pidfile);
                 if ($pid) {
@@ -10158,14 +10158,14 @@ sub check_commands() {
         }
     }
 
-    my @path = qw(
+    my @path = (qw(
         /bin
         /sbin
         /usr/bin
         /usr/sbin
         /usr/local/bin
         /usr/local/sbin
-    );
+    ));
 
     CMD: for my $cmd (keys %cmds) {
         next CMD if defined $exceptions_hr->{$cmd};
@@ -10469,7 +10469,7 @@ sub getopt_wrapper() {
 }
 
 sub required_vars() {
-    my @required_vars = qw(
+    my @required_vars = (qw(
         EMAIL_ADDRESSES CHECK_INTERVAL FW_DATA_FILE FW_ERROR_LOG
         HOME_NET SNORT_SID_STR ENABLE_AUTO_IDS IGNORE_CONNTRACK_BUG_PKTS
         SCAN_TIMEOUT DANGER_LEVEL1 DANGER_LEVEL2 DANGER_LEVEL3
@@ -10514,7 +10514,7 @@ sub required_vars() {
         ETC_RSYSLOG_CONF IFCFGTYPE ENABLE_WHOIS_FORCE_ASCII
         ENABLE_WHOIS_FORCE_SRC_IP ENABLE_IPV6_DETECTION
         PERSISTENCE_CTR_THRESHOLD MAX_SCAN_IP_PAIRS
-    );
+    ));
     &defined_vars(\@required_vars);
     return;
 }

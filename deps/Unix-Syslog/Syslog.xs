@@ -10,17 +10,19 @@ extern "C" {
 
 #include <syslog.h>
 
-static SV *ident_svptr;
+static SV *ident_svptr = NULL;
 
 MODULE = Unix::Syslog	PACKAGE = Unix::Syslog
 
- # $Id$
+ # $Id: Syslog.xs,v 1.8 2008/05/18 13:40:47 marcus Exp $
  #
- # Copyright (C) 1999,2000,2001,2002 Marcus Harnisch <marcus.harnisch@gmx.net>
+ # Copyright (c) 1999,2000,2001,2002,2007 Marcus Harnisch <marcus.harnisch@gmx.net>
  #
  # This program is free software; you can redistribute it and/or modify
- # it under the terms of the Artistic License. A copy of the license (see
- # file Artistic in this directory) must be included in the package.
+ # it under the terms of the Artistic License 2.0 (see file Artistic in
+ # this directory).
+ # 
+ # Check clause (4) for your rights to distribute this software.
 
 PROTOTYPES: DISABLE
 
@@ -257,4 +259,4 @@ void
 closelog()
 	CODE:
 	closelog();
-	if (SvREFCNT(ident_svptr)) SvREFCNT_dec(ident_svptr);
+	if ((ident_svptr != NULL) && SvREFCNT(ident_svptr)) SvREFCNT_dec(ident_svptr);

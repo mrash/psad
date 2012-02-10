@@ -154,6 +154,10 @@ sub basename {
   return $name;
 }
 
+print "Calling closelog() without preceeding openlog()  ";
+closelog;
+print "ok\n"; # if we got this far, things must have worked right.
+
 print "openlog\n";
 openlog(basename($0), LOG_PID, LOG_LOCAL7);
 

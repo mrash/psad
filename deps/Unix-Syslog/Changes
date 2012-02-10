@@ -1,6 +1,26 @@
 -*- mode: text -*-
 
 Revision history for Perl extension Unix::Syslog.
+1.1   Sun May 18 21:13:38 2007
+        - Released version 1.1.
+
+	- Clearly marked MSWin32 systems as unsupported. (How do
+	  64bit Windows system identify themselves?)
+
+        - Fixed bug that caused Perl to segfault when closelog() was
+	  called before openlog().
+
+
+1.0   Tue Oct 2 22:22:43 2007
+        - Bumped version number to 1.0.
+
+	- License has changed to Artistic 2.0!
+
+	- (Syslog.pm) Get rid of `require AutoLoader', which was wrong
+          to begin with.
+
+
+
 0.100 Wed Aug 28 17:09:37 2002
         - (test.pl) Major changes due to complete misunderstanding of
            eval()

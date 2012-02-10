@@ -1,10 +1,12 @@
-# $Id$
+# $Id: Syslog.pm,v 1.12 2008/05/18 19:26:54 marcus Exp $
 #
-# Copyright (C) 1999,2000,2001,2002 Marcus Harnisch <marcus.harnisch@gmx.net>
+# Copyright (c) 1999,2000,2001,2002,2007 Marcus Harnisch <marcus.harnisch@gmx.net>
 #
 # This program is free software; you can redistribute it and/or modify
-# it under the terms of the Artistic License. A copy of the license (see
-# file Artistic in this directory) must be included in the package.
+# it under the terms of the Artistic License 2.0 (see file Artistic in
+# this directory).
+#
+# Check clause (4) for your rights to distribute this software.
 
 package Unix::Syslog;
 
@@ -13,7 +15,6 @@ use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS);
 
 require Exporter;
 require DynaLoader;
-require AutoLoader;
 
 @ISA = qw(Exporter DynaLoader);
 # Items to export into callers namespace by default. Note: do not export
@@ -43,7 +44,7 @@ require AutoLoader;
 		"subs"  => [qw(closelog openlog syslog setlogmask priorityname
 			       facilityname)]);
 
-$VERSION = '0.100';
+$VERSION = '1.1';
 
 bootstrap Unix::Syslog $VERSION;
 

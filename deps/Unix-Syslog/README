@@ -1,7 +1,16 @@
        Unix::Syslog -- Perl interface to the UNIX system logger
        ========================================================
 
-Copyright (C) 1999,2000,2001,2002 Marcus Harnisch
+Copyright (c) 1999,2000,2001,2002,2007 Marcus Harnisch
+
+Disclaimer
+==========
+
+The text below hasn't really changed in ages and unless someone points
+me to outdated or otherwise wrong information, I will not re-verify
+the statements. What you find here is historic and may or may not have
+any value to you. In particular statements about Sys::Syslog may be
+completely outdated -- or not.
 
 Introduction
 ============
@@ -17,8 +26,10 @@ Copyright and distribution
 ==========================
 
 This program is free software; you can redistribute it and/or modify
-it under the terms of the Artistic License. A copy of the license (see
-file Artistic in this directory) must be included in the package.
+it under the terms of the Artistic License 2.0 (see file Artistic in
+this directory).
+
+Check clause (4) for your rights to distribute this software.
 
 Installation
 ============
@@ -94,9 +105,8 @@ Frequently Asked Questions
         resulting from a misconfiguration may break down your
         (log-)system.
 
-    Peter Stamfest <peter.stamfest@eunet.at> pointed out some
-    other advantages of Unix::Syslog, I didn't came across my
-    self.
+    Peter Stamfest pointed out some other advantages of Unix::Syslog,
+    I didn't came across my self.
 
     o   LOG_PERROR works.
 

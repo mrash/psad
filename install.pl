@@ -96,7 +96,7 @@ my %required_perl_modules = (
         'force-install' => 0,
         'mod-dir' => 'Date-Calc'
     },
-    'NetAddr:IP' => {
+    'NetAddr::IP' => {
         'force-install' => 0,
         'mod-dir' => 'NetAddr-IP'
     },
@@ -507,8 +507,8 @@ sub install() {
     &perms_ownership($prod_file, 0600);
 
     ### install auto_dl, signatures, icmp_types, posf, and pf.os files
-    for my $filename qw(signatures icmp_types
-            posf auto_dl snort_rule_dl pf.os ip_options) {
+    for my $filename (qw(signatures icmp_types
+            posf auto_dl snort_rule_dl pf.os ip_options)) {
         my $file = $config{$file_vars{$filename}};
         if (-e $file) {
             &archive($file) unless $noarchive;
@@ -528,8 +528,8 @@ sub install() {
     }
 
     ### archive and remove legacy config files
-    for my $filename qw(kmsgsd.conf psadwatchd.conf alert.conf
-            fw_search.conf) {
+    for my $filename (qw(kmsgsd.conf psadwatchd.conf alert.conf
+            fw_search.conf)) {
         my $path = "$config{'PSAD_CONF_DIR'}/$filename";
         if (-e $path) {
             &archive($path);
@@ -798,12 +798,12 @@ sub expand_vars() {
 }
 
 sub required_vars() {
-    my @vars = qw(
+    my @vars = (qw(
         INSTALL_LOG_FILE PSAD_DIR PSAD_RUN_DIR PSAD_LIBS_DIR
         SIG_UPDATE_URL PSAD_FIFO_DIR PSAD_FIFO_FILE SNORT_RULES_DIR
         IP_OPTS_FILE SIGS_FILE AUTO_DL_FILE SNORT_RULE_DL_FILE
         POSF_FILE P0F_FILE IP_OPTS_FILE FW_DATA_FILE
-    );
+    ));
     for my $var (@vars) {
         die "[*] Missing required var: $var in $psad_conf_file"
             unless defined $config{$var};

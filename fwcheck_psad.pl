@@ -13,7 +13,7 @@
 #
 # Credits: (see the CREDITS file bundled with the psad sources.)
 #
-# Copyright (C) 1999-2007 Michael Rash (mbr@cipherdyne.org)
+# Copyright (C) 1999-2012 Michael Rash (mbr@cipherdyne.org)
 #
 # License (GNU Public License):
 #
@@ -213,7 +213,7 @@ sub check_forwarding() {
         my $intf_inet_count = 0;
         my $num_intf = 0;
         for my $line (@if_out) {
-            if ($line =~ /^\d+:\s+(\S+): </) {
+            if ($line =~ /^\d+:\s+(\S+)\:\s</) {
                 $intf_name = $1;
                 if ($intf_inet_count > 0) {
                     $num_intf++;
@@ -256,7 +256,7 @@ sub ipt_chk_chain() {
     my $rv = 1;
 
     my $ipt = new IPTables::Parse 'iptables' => $cmds{'iptables'}
-        or die "[*] Could not acquite IPTables::Parse object: $!";
+        or die "[*] Could not acquire IPTables::Parse object: $!";
 
     if ($fw_analyze) {
         print "[+] Parsing iptables $chain chain rules.\n";
@@ -265,8 +265,8 @@ sub ipt_chk_chain() {
     if ($fw_search_all) {
         ### we are not looking for specific log
         ### prefixes, but we need _some_ logging rule
-        my $ipt_log = $ipt->default_log('filter', $chain, $fw_file);
-        return 0 unless $ipt_log;
+        my ($ipt_log, $ipt_rv) = $ipt->default_log('filter', $chain, $fw_file);
+        return 0 unless $ipt_rv;
         if (defined $ipt_log->{'all'}) {
             ### found real default logging rule (assuming it is above a default
             ### drop rule, which we are not actually checking here).
@@ -274,7 +274,7 @@ sub ipt_chk_chain() {
         } else {
             my $log_protos    = '';
             my $no_log_protos = '';
-            for my $proto qw(tcp udp icmp) {
+            for my $proto (qw(tcp udp icmp)) {
                 if (defined $ipt_log->{$proto}) {
                     $log_protos .= "$proto/";
                 } else {
@@ -301,16 +301,18 @@ sub ipt_chk_chain() {
         ### for now we are only looking at the filter table, so if
         ### the iptables ruleset includes the log and drop rules in
         ### a user defined chain then psad will not see this.
-        my $ld_hr = $ipt->default_drop('filter', $chain, $fw_file);
+        my ($ld_hr, $ipt_rv) = $ipt->default_drop('filter', $chain, $fw_file);
+
+        return 0 unless $ipt_rv;
 
         my $num_keys = 0;
         if (defined $ld_hr and keys %$ld_hr) {
             $num_keys++;
             my @protos;
             if (defined $ld_hr->{'all'}) {
-                @protos = qw(all);
+                @protos = (qw(all));
             } else {
-                @protos = qw(tcp udp icmp);
+                @protos = (qw(tcp udp icmp));
             }
             for my $proto (@protos) {
                 my $str1;
@@ -510,14 +512,14 @@ sub expand_vars() {
 sub check_commands() {
     my $exceptions_hr = shift;
     my $caller = $0;
-    my @path = qw(
+    my @path = (qw(
         /bin
         /sbin
         /usr/bin
         /usr/sbin
         /usr/local/bin
         /usr/local/sbin
-    );
+    ));
     CMD: for my $cmd (keys %cmds) {
         ### both mail and sendmail are special cases, mail is not required
         ### if "nomail" is set in REPORT_METHOD, and sendmail is only

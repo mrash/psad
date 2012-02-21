@@ -8,13 +8,13 @@
 #
 # Purpose: psad makes use of iptables logs to detect port scans,
 #          probes for backdoors and DDoS tools, and other suspect traffic
-#          (many signatures were adapted from the snort intrusion
-#          detection system).  Data is provided by kmsgsd which reads
-#          firewall messages out of the /var/lib/psad/psadfifo named pipe
-#          (syslog is reconfigured to write kern.info messages there
-#          which include firewall messages).  For more information read
-#          the psad man page or view the documentation provided at:
-#          http://www.cipherdyne.org.
+#          (many signatures were adapted from the Snort intrusion
+#          detection system).  Data is provided by parsing syslog
+#          firewall messages out of /var/log/messages (or wherever syslog
+#          is configured to write iptables logs to).
+#
+#          For more information read the psad man page or view the
+#          documentation provided at: http://www.cipherdyne.org/psad/
 #
 # Author: Michael Rash (mbr@cipherdyne.org)
 #
@@ -22,7 +22,7 @@
 #
 # Version: 3.0-pre1
 #
-# Copyright (C) 1999-2011 Michael Rash (mbr@cipherdyne.org)
+# Copyright (C) 1999-2012 Michael Rash (mbr@cipherdyne.org)
 #
 # Reference: Snort is a registered trademark of Sourcefire, Inc.
 #
@@ -43,14 +43,14 @@
 # Default behavior is as follows.  Each of these features can be disabled
 # with command line arguments:
 #
-#       - passive OS fingerprinting            = yes
-#       - snort sid signature matching         = yes
-#       - write fw errors to error log         = yes
-#       - daemon mode                          = yes
-#       - reverse dns lookups                  = yes
-#       - validate firewall rules              = yes
-#       - whois lookups of scanning IPs        = yes
-#       - parse netstat output for local ports = yes
+#       - passive OS fingerprinting                   = yes
+#       - snort rule matching                         = yes
+#       - write fw errors to error log                = yes
+#       - daemon mode                                 = yes
+#       - reverse dns lookups                         = yes
+#       - validate firewall rules                     = yes
+#       - whois lookups of scanning IPs               = yes
+#       - parse netstat output for local server ports = yes
 #
 # Coding Style:  All configuration variables from psad.conf are stored in
 #   the %config hash by keys that are in capital letters.  This is

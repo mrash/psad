@@ -50,6 +50,8 @@ my $fw_analyze = 0;
 my $fw_file    = '';
 my $fw_search_all = 1;
 my $no_fw_search_all = 0;
+my $log_and_drop_table = 'filter';
+my $enable_ipv6 = 0;
 my $psad_lib_dir = '';
 
 &usage(1) unless (GetOptions(
@@ -69,7 +71,7 @@ my $psad_lib_dir = '';
 $fw_search_all = 0 if $no_fw_search_all;
 
 ### Everthing after this point must be executed as root.
-$< == 0 && $> == 0 or
+$< == 0 and $> == 0 or
     die '[*] fwcheck_psad.pl: You must be root (or equivalent ',
         "UID 0 account) to execute fwcheck_psad.pl!  Exiting.\n";
 
@@ -120,20 +122,28 @@ sub fw_check() {
     my $send_alert = 0;
 
     my $forward_chain_rv = 1;
-    my $input_chain_rv = &ipt_chk_chain('INPUT');
-
+    my $input_chain_rv = &ipt_chk_chain('INPUT', $cmds{'iptables'});
     unless ($input_chain_rv) {
-        &print_fw_help('INPUT');
+        &print_fw_help('INPUT', $cmds{'iptables'});
         $send_alert = 1;
+    }
+
+    if ($enable_ipv6) {
+        my $tmp_rv = &ipt_chk_chain('INPUT', $cmds{'ip6tables'});
+        unless ($tmp_rv) {
+            &print_fw_help('INPUT', $cmds{'ip6tables'});
+            $send_alert = 1;
+            $input_chain_rv = 0;
+        }
     }
 
     ### we don't always have more than one interface or forwarding
     ### turned on, so we only check the FORWARD iptables chain if we
     ### do and we have multiple interfaces on the box.
     if (&check_forwarding()) {
-        $forward_chain_rv = &ipt_chk_chain('FORWARD');
+        $forward_chain_rv = &ipt_chk_chain('FORWARD', $cmds{'iptables'});
         unless ($forward_chain_rv) {
-            &print_fw_help('FORWARD');
+            &print_fw_help('FORWARD', $cmds{'iptables'});
             $send_alert = 1;
         }
     }
@@ -171,15 +181,15 @@ sub fw_check() {
         print "[+] Results in $config{'FW_CHECK_FILE'}\n",
             "[+] Exiting.\n";
     }
-    return $forward_chain_rv && $input_chain_rv;
+    return $forward_chain_rv and $input_chain_rv;
 }
 
 sub print_fw_help() {
-    my $chain = shift;
+    my ($chain, $ipt_bin) = @_;
     print FWCHECK
-"[-] You may just need to add a default logging rule to the $chain chain on\n",
-"    $config{'HOSTNAME'}.  For more information, see the file \"FW_HELP\" in\n",
-"    the psad sources directory or visit:\n\n",
+"[-] You may just need to add a default logging rule to the $ipt_bin\n",
+"    '$log_and_drop_table' '$chain' chain on $config{'HOSTNAME'}.  For more information,\n",
+"    see the file \"FW_HELP\" in the psad sources directory or visit:\n\n",
 "    http://www.cipherdyne.org/psad/docs/fwconfig.html\n\n";
     return;
 }
@@ -240,7 +250,7 @@ sub check_forwarding() {
         close IFC;
         my $num_intf = 0;
         for my $line (@if_out) {
-            if ($line =~ /inet\s+/i && $line !~ /127\.0\.0\.1/) {
+            if ($line =~ /inet\s+/i and $line !~ /127\.0\.0\.1/) {
                 $num_intf++;
             }
         }
@@ -252,20 +262,20 @@ sub check_forwarding() {
 }
 
 sub ipt_chk_chain() {
-    my $chain = shift;
+    my ($chain, $ipt_bin) = @_;
     my $rv = 1;
 
-    my $ipt = new IPTables::Parse 'iptables' => $cmds{'iptables'}
+    my $ipt = new IPTables::Parse 'iptables' => $ipt_bin
         or die "[*] Could not acquire IPTables::Parse object: $!";
 
     if ($fw_analyze) {
-        print "[+] Parsing iptables $chain chain rules.\n";
+        print "[+] Parsing $ipt_bin $chain chain rules.\n";
     }
 
     if ($fw_search_all) {
         ### we are not looking for specific log
         ### prefixes, but we need _some_ logging rule
-        my ($ipt_log, $ipt_rv) = $ipt->default_log('filter', $chain, $fw_file);
+        my ($ipt_log, $ipt_rv) = $ipt->default_log($log_and_drop_table, $chain, $fw_file);
         return 0 unless $ipt_rv;
         if (defined $ipt_log->{'all'}) {
             ### found real default logging rule (assuming it is above a default
@@ -291,7 +301,7 @@ sub ipt_chk_chain() {
                 return 0;
             } else {
                 print FWCHECK
-"[-] Could not determine whether the iptables $chain chain is configured with\n",
+"[-] Could not determine whether the $ipt_bin $chain chain is configured with\n",
 "    a default logging rule on $config{'HOSTNAME'}.\n\n";
                 return 0;
             }
@@ -301,7 +311,8 @@ sub ipt_chk_chain() {
         ### for now we are only looking at the filter table, so if
         ### the iptables ruleset includes the log and drop rules in
         ### a user defined chain then psad will not see this.
-        my ($ld_hr, $ipt_rv) = $ipt->default_drop('filter', $chain, $fw_file);
+        my ($ld_hr, $ipt_rv) = $ipt->default_drop($log_and_drop_table,
+                $chain, $fw_file);
 
         return 0 unless $ipt_rv;
 
@@ -326,7 +337,7 @@ sub ipt_chk_chain() {
                         $str2 = "$proto scans";
                     }
                     print FWCHECK
-"[-] The $chain chain in the iptables ruleset on $config{'HOSTNAME'} does not\n",
+"[-] The $chain chain in the $ipt_bin ruleset on $config{'HOSTNAME'} does not\n",
 "    appear to include a default LOG rule $str1.  psad will not be able to\n",
 "    detect $str2 without such a rule.\n\n";
 
@@ -340,12 +351,12 @@ sub ipt_chk_chain() {
                     }
                     unless ($found) {
                         if ($proto eq 'all') {
-                            $str1 = "[-] The $chain chain in the iptables ruleset " .
+                            $str1 = "[-] The $chain chain in the $ipt_bin ruleset " .
                             "on $config{'HOSTNAME'} includes a default\n    LOG rule for " .
                             "all protocols,";
                             $str2 = 'scans';
                         } else {
-                            $str1 = "[-] The $chain chain in the iptables ruleset " .
+                            $str1 = "[-] The $chain chain in the $ipt_bin ruleset " .
                             "on $config{'HOSTNAME'} inclues a default\n    LOG rule for " .
                             "the $proto protocol,";
                             $str2 = "$proto scans";
@@ -366,7 +377,7 @@ sub ipt_chk_chain() {
                         $str1 = "for the $proto protocol";
                     }
                     print FWCHECK
-"[-] The $chain chain in the iptables ruleset on $config{'HOSTNAME'} does not\n",
+"[-] The $chain chain in the $ipt_bin ruleset on $config{'HOSTNAME'} does not\n",
 "    appear to include a default DROP rule $str1.\n\n";
                     $rv = 0;
                 }
@@ -474,7 +485,7 @@ sub import_config() {
         if ($line =~ /^\s*(\S+)\s+(.*?)\;/) {
             my $varname = $1;
             my $val     = $2;
-            if ($val =~ m|/.+| && $varname =~ /^\s*(\S+)Cmd$/) {
+            if ($val =~ m|/.+| and $varname =~ /^\s*(\S+)Cmd$/) {
                 ### found a command
                 $cmds{$1} = $val;
             } else {
@@ -482,6 +493,8 @@ sub import_config() {
             }
         }
     }
+
+    $enable_ipv6 = 1 if $config{'ENABLE_IPV6_DETECTION'} eq 'Y';
     return;
 }
 

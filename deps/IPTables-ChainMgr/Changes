@@ -1,5 +1,58 @@
 Revision history for Perl extension IPTables::ChainMgr.
 
+1.2 Fri Mar 02 21:09:57 2012
+    - Added set_chain_policy() function to allow built-in chain policies to be
+      set to the specified target.  iptables/ip6tables does not allow the
+      target to be set for non built-in chains.  Behind the scenes this
+      function runs the command "iptables -t <table> -P <chain> <target>".
+    - Minor update to print the iptables binary name in 'croak' error
+      conditions.  The binary name is either 'iptables' or 'ip6tables'.
+    - Minor perldoc updates to render links better (two spaces at the beginning
+      of lines).
+
+1.1 Tue Feb 28 21:15:11 2012
+    - Added META.{yml,json} files similarly to fixing this bug filed against
+      IPTables::Parse:
+        https://rt.cpan.org/Ticket/Display.html?id=75366
+    - Minor bug fix to ensure not to look for 'extended' hash keys in returned
+      IPTables::Parse data without an existence check first.
+    - Added the ability to specify 'ip6tables' when instantiating an
+      IPTables::ChainMgr object via 'new'.
+    - Updated license to the Artistic license.
+
+1.0 Mon Feb 27 21:56:44 2012
+    - Added 'ctstate' and 'state' keys to extended hashes for find_ip_rule()
+      and add_ip_rule().  This commit fixes:
+        https://rt.cpan.org/Ticket/Display.html?id=67614
+    - Bug fix for missing IPTables::Parse dependency by applying patch from the
+      CPAN bug tracking system here:
+        https://rt.cpan.org/Ticket/Display.html?id=43302
+
+0.9.9 Sun Feb 26 14:03:24 2012
+    - Updated to handle IPv6 via ip6tables.  All functions in the previous
+      version of this module now work with ip6tables - just instantiate the
+      IPTables::ChainMgr object with something like the following:
+
+        my %opts = (
+            'iptables' => $ip6tables_bin,
+            'iptout'   => '/tmp/ip6tables.out',
+            'ipterr'   => '/tmp/ip6tables.err',
+            'debug'    => 0,
+            'verbose'  => 0
+        );
+
+    - Switched to using NetAddr::IP instead of the old Net::IPv4Addr module.
+      This greatly assisted in the ability to offer IPv6 support via ip6tables.
+    - Bug fix to ensure proper handling of empty 'extended' hashes via the
+      'keys' function.
+    - (Miloslav Trmac) Bug fix for "Use of qw(...) as parentheses is
+      deprecated" warnings as described here:
+            https://bugzilla.redhat.com/show_bug.cgi?id=771781
+    - Added a test suite at: t/basic_tests.pl
+    - Migrated to git for source control:
+            http://www.cipherdyne.org/cgi-bin/gitweb.cgi?p=IPTables-ChainMgr.git;a=summary
+            https://github.com/mrash/IPTables-ChainMgr
+
 0.9 Sat Feb 11 23:11:45 2008
     - Added Net::IPv4Addr prerequisite to Makefile.PL (patch submitted by
       Dominik Gehl).

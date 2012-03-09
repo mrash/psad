@@ -1,5 +1,37 @@
 Revision history for Perl extension IPTables::Parse.
 
+1.1 Fri Mar 02 22:31:12 2012
+    - Minor update to print the iptables binary name in 'croak' error
+      conditions.  The binary name is either 'iptables' or 'ip6tables'.
+    - Minor perldoc updates to render links better (two spaces at the beginning
+      of lines).
+
+1.0 Tue Feb 28 21:45:19 2012
+    - Added META.{yml,json} files to fix this bug:
+        https://rt.cpan.org/Ticket/Display.html?id=75366
+    - Added the ability to specify 'ip6tables' when instantiating an
+      IPTables::ChainMgr object via 'new'.
+    - Updated license to the Artistic license.
+
+0.9 Sun Feb 26 21:01:45 2012
+    - Applied slightly modified patch from SSIMON to properly pick up usage of
+      state tracking in rule extended information as shown in this bug:
+            https://rt.cpan.org/Ticket/Display.html?id=67372#txn-925687
+      Rule 'extended' hash now includes the 'state' or 'ctstate' key
+      depending on which iptables state tracking module is being used (if
+      any).
+
+0.8 Sun Feb 26 14:03:24 2012
+    - Major update to support ip6tables policies.
+    - Added test suite script t/basic_tests.pl to exercise major functions for
+      both iptables and ip6tables.
+    - Bugfix for default_log() and default_drop() functions to ensure that
+      a proper return value is given in addition to the return of a results
+      hash.
+    - Migrated to git for source control:
+            http://www.cipherdyne.org/cgi-bin/gitweb.cgi?p=IPTables-Parse.git;a=summary
+            https://github.com/mrash/IPTables-Parse
+
 0.7 Fri Oct 17 11:55:01 2008
     - Completely re-worked the manner in which iptables commands are executed
       so that they are sent through a single function with various options

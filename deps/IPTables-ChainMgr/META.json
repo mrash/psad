@@ -1,0 +1,42 @@
+{
+   "abstract" : "Perl extension for manipulating iptables and ip6tables policies",
+   "author" : [
+      "Michael Rash <mbr@cipherdyne.org>"
+   ],
+   "dynamic_config" : 1,
+   "generated_by" : "ExtUtils::MakeMaker version 6.55_02, CPAN::Meta::Converter version 2.120530",
+   "license" : [
+      "artistic_1"
+   ],
+   "meta-spec" : {
+      "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
+      "version" : "2"
+   },
+   "name" : "IPTables-ChainMgr",
+   "no_index" : {
+      "directory" : [
+         "t",
+         "inc"
+      ]
+   },
+   "prereqs" : {
+      "build" : {
+         "requires" : {
+            "ExtUtils::MakeMaker" : "0"
+         }
+      },
+      "configure" : {
+         "requires" : {
+            "ExtUtils::MakeMaker" : "0"
+         }
+      },
+      "runtime" : {
+         "requires" : {
+            "IPTables::Parse" : "0.9",
+            "NetAddr::IP" : "4"
+         }
+      }
+   },
+   "release_status" : "stable",
+   "version" : "1.2"
+}

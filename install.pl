@@ -110,6 +110,16 @@ my %required_perl_modules = (
     },
 );
 
+my @ordered_modules = (qw/
+    Unix::Syslog
+    Bit::Vector
+    Storable
+    Date::Calc
+    NetAddr::IP
+    IPTables::Parse
+    IPTables::ChainMgr
+/);
+
 my %config = ();
 my %cmds   = ();
 
@@ -226,7 +236,7 @@ unless (-d $init_dir) {
         $init_dir = '/etc/rc.d';
     } else {
         die "[*] Cannot find the init script directory, use ",
-            "--init-dir <path>\n";
+            "--init-dir <path>";
     }
 }
 
@@ -240,7 +250,7 @@ mkdir $config{'PSAD_DIR'}, 0500 unless -d $config{'PSAD_DIR'};
 
 ### check to make sure we are running as root
 $< == 0 && $> == 0 or die "You need to be root (or equivalent UID 0",
-    " account) to install/uninstall psad!\n";
+    " account) to install/uninstall psad!";
 
 ### occasionally things from old psad installations need to be
 ### dealt with separately.
@@ -356,7 +366,7 @@ sub install() {
 
     ### install perl modules
     unless ($skip_module_install) {
-        for my $module (keys %required_perl_modules) {
+        for my $module (@ordered_modules) {
             &install_perl_module($module);
         }
     }
@@ -405,7 +415,7 @@ sub install() {
     &logr("[+] Verifying compilation of fwcheck_psad.pl script:\n");
     unless (((system "$cmds{'perl'} -c fwcheck_psad.pl")>>8) == 0) {
         die "[*] fwcheck_psad.pl does not compile with \"perl -c\".  Download ",
-            "the latest sources from:\n\nhttp://www.cipherdyne.org/\n"
+            "the latest sources from:\n\nhttp://www.cipherdyne.org/"
             unless $skip_module_install;
     }
 
@@ -414,7 +424,7 @@ sub install() {
     &logr("[+] Verifying compilation of psad perl daemon:\n");
     unless (((system "$cmds{'perl'} -c psad")>>8) == 0) {
         die "[*] psad does not compile with \"perl -c\".  Download the",
-            " latest sources from:\n\nhttp://www.cipherdyne.org/\n"
+            " latest sources from:\n\nhttp://www.cipherdyne.org/"
             unless $skip_module_install;
     }
 
@@ -422,7 +432,7 @@ sub install() {
     &logr("[+] Verifying compilation of nf2csv script:\n");
     unless (((system "$cmds{'perl'} -c nf2csv")>>8) == 0) {
         die "[*] nf2csv does not compile with \"perl -c\".  Download ",
-            "the latest sources from:\n\nhttp://www.cipherdyne.org/\n"
+            "the latest sources from:\n\nhttp://www.cipherdyne.org/"
             unless $skip_module_install;
     }
 
@@ -1011,13 +1021,15 @@ sub install_perl_module() {
         unless (-e 'Makefile.PL') {
             die "[*] Your $mod_name source directory appears to be incomplete!\n",
                 "    Download the latest sources from ",
-                "http://www.cipherdyne.org/\n";
+                "http://www.cipherdyne.org/";
         }
+
+        $ENV{'PERL5LIB'} = $config{'PSAD_LIBS_DIR'};  ### for module dependencies
         system "$cmds{'make'} clean"
             if -e 'Makefile' or -e 'makefile' or -e 'GNUmakefile';
         system "$cmds{'perl'} Makefile.PL PREFIX=$config{'PSAD_LIBS_DIR'} " .
             "LIB=$config{'PSAD_LIBS_DIR'}";
-        system $cmds{'make'};
+        system "$cmds{'make'}";
 #        system "$cmds{'make'} test";
         system "$cmds{'make'} install";
         chdir $src_dir or die "[*] Could not chdir $src_dir: $!";
@@ -1200,7 +1212,7 @@ sub set_hostname() {
     } else {
         die "[*] Your source directory appears to be incomplete!  $file ",
             "is missing.\n    Download the latest sources from ",
-            "http://www.cipherdyne.org/\n";
+            "http://www.cipherdyne.org/";
     }
     return;
 }
@@ -1212,7 +1224,7 @@ sub set_hostname() {
 sub check_hostname() {
     my $file = shift;
 
-    open F, "< $file" or die "[*] Could not open $file: $!\n";
+    open F, "< $file" or die "[*] Could not open $file: $!";
     my @lines = <F>;
     close F;
     for my $line (@lines) {
@@ -1236,7 +1248,7 @@ sub check_hostname() {
 sub append_fifo_syslog_ng() {
     my $syslog_conf = shift;
     open RS, "< $syslog_conf" or
-        die "[*] Unable to open $syslog_conf: $!\n";
+        die "[*] Unable to open $syslog_conf: $!";
     my @slines = <RS>;
     close RS;
 
@@ -1256,7 +1268,7 @@ sub append_fifo_syslog_ng() {
         &archive($syslog_conf);
 
         open SYSLOGNG, ">> $syslog_conf" or
-            die "[*] Unable to open $syslog_conf: $!\n";
+            die "[*] Unable to open $syslog_conf: $!";
         print SYSLOGNG "\n",
             qq|source psadsrc { unix-stream("/dev/log"); |,
             qq|internal(); pipe("/proc/kmsg"); };\n|,
@@ -1274,7 +1286,7 @@ sub append_fifo_syslog_ng() {
 sub config_metalog() {
     my $syslog_conf = shift;
     open RS, "< $syslog_conf" or
-        die "[*] Unable to open $syslog_conf: $!\n";
+        die "[*] Unable to open $syslog_conf: $!";
     my @lines = <RS>;
     close RS;
 
@@ -1423,7 +1435,7 @@ sub append_fifo_syslog() {
         }
         &archive($syslog_conf);
         open SYSLOG, "> $syslog_conf" or
-            die "[*] Unable to open $syslog_conf: $!\n";
+            die "[*] Unable to open $syslog_conf: $!";
         for my $line (@slines) {
             unless ($line =~ /psadfifo/) {
                 print SYSLOG $line;
@@ -1796,10 +1808,10 @@ sub query_syslog() {
             die
 "[*] The config file $syslog_conf does not exist. Re-run install.pl\n",
 "    with the --syslog-conf argument to specify the path to the syslog\n",
-"    daemon config file.\n";
+"    daemon config file.";
         }
     }
-    die "[-] Invalid syslog daemon \"$ans\"\n"
+    die "[-] Invalid syslog daemon \"$ans\""
         unless ($ans and
             ($ans eq 'syslogd'
             or $ans eq 'rsyslogd'
@@ -1908,12 +1920,12 @@ sub check_commands() {
                 }
                 die "\n[*] Could not find $cmd anywhere!!!  ",
                     "Please edit the config section to include the path to ",
-                    "$cmd.\n";
+                    "$cmd.";
             }
         }
         unless (-x $cmds{$cmd}) {
             die "\n[*] $cmd is located at ",
-                "$cmds{$cmd} but is not executable by uid: $<\n";
+                "$cmds{$cmd} but is not executable by uid: $<";
         }
     }
     return;

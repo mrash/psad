@@ -310,21 +310,24 @@ sub install() {
         &logr("[+] Creating $config{'CONF_ARCHIVE_DIR'}\n");
         mkdir $config{'CONF_ARCHIVE_DIR'}, 0500;
     }
-    unless (-e $config{'PSAD_FIFO_FILE'}) {
-        &logr("[+] Creating named pipe $config{'PSAD_FIFO_FILE'}\n");
-        unless (((system "$cmds{'mknod'} -m 600 " .
-                "$config{'PSAD_FIFO_FILE'} p")>>8) == 0) {
-            &logr("[*] Could not create the named pipe " .
-                "\"$config{'PSAD_FIFO_FILE'}\"!\n" .
-                "[*] psad requires this file to exist!  Aborting install.\n");
-            die;
-        }
-        unless (-p $config{'PSAD_FIFO_FILE'}) {
-            &logr("[*] Could not create the named pipe " .
-                "\"$config{'PSAD_FIFO_FILE'}\"!\n" .
-                "[*] psad requires this file to exist!  Aborting " .
-                "install.\n");
-            die;
+
+    if ($install_syslog_fifo) {
+        unless (-e $config{'PSAD_FIFO_FILE'}) {
+            &logr("[+] Creating named pipe $config{'PSAD_FIFO_FILE'}\n");
+            unless (((system "$cmds{'mknod'} -m 600 " .
+                    "$config{'PSAD_FIFO_FILE'} p")>>8) == 0) {
+                &logr("[*] Could not create the named pipe " .
+                    "\"$config{'PSAD_FIFO_FILE'}\"!\n" .
+                    "[*] psad requires this file to exist!  Aborting install.\n");
+                die;
+            }
+            unless (-p $config{'PSAD_FIFO_FILE'}) {
+                &logr("[*] Could not create the named pipe " .
+                    "\"$config{'PSAD_FIFO_FILE'}\"!\n" .
+                    "[*] psad requires this file to exist!  Aborting " .
+                    "install.\n");
+                die;
+            }
         }
     }
 

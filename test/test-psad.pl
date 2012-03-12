@@ -9,6 +9,7 @@ my $logfile        = 'test.log';
 my $output_dir     = 'output';
 my $conf_dir       = 'conf';
 my $run_dir        = 'run';
+my $scans_dir      = 'scans';
 
 my $psadCmd        = '../psad';
 
@@ -18,6 +19,7 @@ my $default_conf   = "$conf_dir/default_psad.conf";
 
 my $YES = 1;
 my $NO  = 0;
+my $IGNORE = 2;
 my $current_test_file = "$output_dir/init";
 my $passed = 0;
 my $failed = 0;
@@ -59,6 +61,24 @@ my @tests = (
         'fatal'    => $YES
     },
     {
+        'category' => 'operations',
+        'detail'   => '--help',
+        'err_msg'  => 'could not get --help output',
+        'function' => \&generic_exec,
+        'cmdline'  => "$psadCmd -h -c $default_conf",
+        'exec_err' => $NO,
+        'fatal'    => $NO
+    },
+    {
+        'category' => 'operations',
+        'detail'   => 'config dump+validate',
+        'err_msg'  => 'could not dump+validate config',
+        'function' => \&validate_config,
+        'cmdline'  => "$psadCmd -D -c $default_conf",
+        'exec_err' => $NO,
+        'fatal'    => $NO
+    },
+    {
         'category'  => 'operations',
         'detail'    => 'Dump policy: --fw-dump',
         'err_msg'   => 'could not dump fw policy',
@@ -71,13 +91,66 @@ my @tests = (
         'fatal'     => $NO
     },
     {
-        'category' => 'operations',
-        'detail'   => 'config dump+validate',
-        'err_msg'  => 'could not dump+validate config',
-        'function' => \&validate_config,
-        'cmdline'  => "$psadCmd -D -c $default_conf",
-        'exec_err' => $NO,
-        'fatal'    => $NO
+        'category'  => 'operations',
+        'detail'    => '--fw-list-auto',
+        'err_msg'   => 'could not list auto fw policy',
+        'positive_output_matches' => [qr/Listing\schains\sfrom\sIPT_AUTO_CHAIN/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --fw-list-auto -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => '--fw-analyze',
+        'err_msg'   => 'could not analyze fw policy',
+        'positive_output_matches' => [qr/Parsing.*iptables/, qr/Parsing.*ip6tables/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --fw-analyze -c $default_conf",
+        'exec_err'  => $IGNORE,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => '--Status',
+        'err_msg'   => 'could not get psad status',
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -S -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => '--Status --status-summary',
+        'err_msg'   => 'could not get psad status summary',
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -S --status-summary -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => '--get-next-rule-id',
+        'err_msg'   => 'could not get next rule id',
+        'positive_output_matches' => [qr/Next\savailable.*\s\d+/i],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --get-next-rule-id -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => '--Benchmark --packets 1000',
+        'err_msg'   => 'could not run psad in --Benchmark mode',
+        'positive_output_matches' => [qr/Entering\sbenchmark\smode/, qr/processing\stime\:\s\d+/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --Benchmark --packets 1000 -c $default_conf",
+        'exec_err'  => $IGNORE,
+        'fatal'     => $NO
     },
 
 );
@@ -173,8 +246,10 @@ sub generic_exec() {
 
     if ($test_hr->{'exec_err'} eq $YES) {
         $rv = 0 if $exec_rv;
-    } else {
+    } elsif ($test_hr->{'exec_err'} eq $NO) {
         $rv = 0 unless $exec_rv;
+    } else {
+        $rv = 1;
     }
 
     if ($test_hr->{'positive_output_matches'}) {
@@ -326,6 +401,9 @@ sub init() {
         $saved_last_results = 1;
     } else {
         mkdir $output_dir or die "[*] Could not mkdir $output_dir: $!";
+    }
+    unless (-d $scans_dir) {
+        die "[*] $scans_dir dir does not exist.";
     }
     unless (-d $run_dir) {
         mkdir $run_dir or die "[*] Could not mkdir $run_dir: $!";

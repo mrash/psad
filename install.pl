@@ -53,6 +53,8 @@ my $makeCmd      = '/usr/bin/make';
 my $perlCmd      = '/usr/bin/perl';
 my $wgetCmd      = '/usr/bin/wget';
 my $runlevelCmd  = '/sbin/runlevel';
+
+my $install_root = '/';
 #============ end config ============
 
 my %file_vars = (
@@ -156,6 +158,7 @@ my $cmdline_force_install = 0;
 my $force_path_update = 0;
 my $force_mod_re = '';
 my $exclude_mod_re = '';
+my $install_test_dir = 0;
 my $no_rm_old_lib_dir = 0;
 my $syslog_conf = '';
 my $locale = 'C';  ### default LC_ALL env variable
@@ -165,6 +168,7 @@ my $init_dir = '/etc/init.d';
 my $init_name = 'psad';
 my $install_syslog_fifo = 0;
 my $runlevel = -1;
+my @installation_lines = ();
 
 ### make Getopts case sensitive
 Getopt::Long::Configure('no_ignore_case');
@@ -184,6 +188,8 @@ Getopt::Long::Configure('no_ignore_case');
     'init-dir=s'        => \$init_dir,
     'init-name=s'       => \$init_name,
     'install-syslog-fifo' => \$install_syslog_fifo,
+    'install-root=s'    => \$install_root,
+    'install-test-dir'  => \$install_test_dir,
     'runlevel=i'        => \$runlevel,
     'LC_ALL=s'          => \$locale,
     'no-LC_ALL'         => \$no_locale,
@@ -194,10 +200,10 @@ Getopt::Long::Configure('no_ignore_case');
 ### set LC_ALL env variable
 $ENV{'LC_ALL'} = $locale unless $no_locale;
 
+$install_root = getcwd() . '/test/psad-install' if $install_test_dir;
+
 ### import paths from default psad.conf
 &import_config();
-
-my @LOGR_FILES = (*STDOUT, $config{'INSTALL_LOG_FILE'});
 
 $force_mod_re = qr|$force_mod_re| if $force_mod_re;
 $exclude_mod_re = qr|$exclude_mod_re| if $exclude_mod_re;
@@ -209,12 +215,6 @@ $skip_module_install = 1 unless -d $deps_dir;
 $cmds{'make'}     = $makeCmd;
 $cmds{'perl'}     = $perlCmd;
 $cmds{'runlevel'} = $runlevelCmd;
-
-if (-e $config{'INSTALL_LOG_FILE'}) {
-    open INSTALL, "> $config{'INSTALL_LOG_FILE'}" or
-        die "[*] Could not open $config{'INSTALL_LOG_FILE'}: $!";
-    close INSTALL;
-}
 
 my $distro = &get_distro();
 
@@ -242,15 +242,11 @@ unless (-d $init_dir) {
 
 ### need to make sure this exists before attempting to
 ### write anything to the install log.
-mkdir $config{'PSAD_DIR'}, 0500 unless -d $config{'PSAD_DIR'};
+&full_mkdir($config{'PSAD_DIR'}, 0700);
 
 ### make sure the system binaries are where we expect
 ### them to be.
 &check_commands();
-
-### check to make sure we are running as root
-$< == 0 && $> == 0 or die "You need to be root (or equivalent UID 0",
-    " account) to install/uninstall psad!";
 
 ### occasionally things from old psad installations need to be
 ### dealt with separately.
@@ -261,6 +257,11 @@ if ($uninstall) {
 } else {
     &install();
 }
+
+open F, "> $config{'INSTALL_LOG_FILE'}" or die $!;
+print F for @installation_lines;
+close F;
+
 exit 0;
 #================= end main =================
 
@@ -280,11 +281,11 @@ sub install() {
 
     unless (-d $config{'PSAD_RUN_DIR'}) {
         &logr("[+] Creating $config{'PSAD_RUN_DIR'}\n");
-        mkdir $config{'PSAD_RUN_DIR'}, 0500;
+        &full_mkdir($config{'PSAD_RUN_DIR'}, 0700);
     }
     unless (-d $config{'PSAD_FIFO_DIR'}) {
         &logr("[+] Creating $config{'PSAD_FIFO_DIR'}\n");
-        mkdir $config{'PSAD_FIFO_DIR'}, 0500;
+        &full_mkdir($config{'PSAD_FIFO_DIR'}, 0700);
     }
 
     ### change any existing psad module directory to allow anyone to import
@@ -304,11 +305,11 @@ sub install() {
     }
     unless (-d $config{'PSAD_CONF_DIR'}) {
         &logr("[+] Creating $config{'PSAD_CONF_DIR'}\n");
-        mkdir $config{'PSAD_CONF_DIR'}, 0500;
+        &full_mkdir($config{'PSAD_CONF_DIR'}, 0700);
     }
     unless (-d $config{'CONF_ARCHIVE_DIR'}) {
         &logr("[+] Creating $config{'CONF_ARCHIVE_DIR'}\n");
-        mkdir $config{'CONF_ARCHIVE_DIR'}, 0500;
+        &full_mkdir($config{'CONF_ARCHIVE_DIR'}, 0700);
     }
 
     if ($install_syslog_fifo) {
@@ -333,8 +334,13 @@ sub install() {
 
     unless (-d $config{'PSAD_DIR'}) {
         &logr("[+] Creating $config{'PSAD_DIR'}\n");
-        mkdir $config{'PSAD_DIR'}, 0500;
+        &full_mkdir($config{'PSAD_DIR'}, 0700);
     }
+    unless (-d $config{'PSAD_LIBS_DIR'}) {
+        &logr("[+] Creating $config{'PSAD_LIBS_DIR'}\n");
+        &full_mkdir($config{'PSAD_LIBS_DIR'}, 0755);
+    }
+
     unless (-e $config{'FW_DATA_FILE'}) {
         &logr("[+] Creating $config{'FW_DATA_FILE'} file\n");
         open F, "> $config{'FW_DATA_FILE'}" or die "[*] Could not open ",
@@ -346,7 +352,7 @@ sub install() {
 
     unless (-d $USRSBIN_DIR) {
         &logr("[+] Creating $USRSBIN_DIR\n");
-        mkdir $USRSBIN_DIR,0755;
+        &full_mkdir($USRSBIN_DIR, 0755);
     }
     if (-d 'deps' and -d 'deps/whois') {
         &logr("[+] Compiling Marco d'Itri's whois client\n");
@@ -379,8 +385,7 @@ sub install() {
         &logr("[+] Installing Snort-2.3.3 signatures in " .
             "$config{'SNORT_RULES_DIR'}\n");
         unless (-d $config{'SNORT_RULES_DIR'}) {
-            mkdir $config{'SNORT_RULES_DIR'}, 0500
-                or die "[*] Could not create $config{'SNORT_RULES_DIR'}: $!";
+            &full_mkdir($config{'SNORT_RULES_DIR'}, 0700);
         }
 
         opendir D, 'deps/snort_rules' or die "[*] Could not open ",
@@ -475,7 +480,7 @@ sub install() {
 
     unless (-d $config{'PSAD_CONF_DIR'}) {
         &logr("[+] Creating $config{'PSAD_CONF_DIR'}\n");
-        mkdir $config{'PSAD_CONF_DIR'},0500;
+        &full_mkdir($config{'PSAD_CONF_DIR'}, 0700);
     }
 
     my $syslog_str = '';
@@ -715,6 +720,7 @@ sub install() {
     &install_manpage('nf2csv.1');
 
     my $init_file = '';
+    my $installed_init_script = 0;
     if ($distro eq 'redhat') {
         $init_file = 'init-scripts/psad-init.redhat';
     } elsif ($distro eq 'fedora') {
@@ -725,12 +731,13 @@ sub install() {
         $init_file = 'init-scripts/psad-init.generic';
     }
 
-    if ($init_dir) {
+    if ($init_dir and &is_root()) {
         &logr("[+] Copying $init_file -> ${init_dir}/$init_name\n");
         copy $init_file, "${init_dir}/$init_name" or die "[*] Could not copy ",
             "$init_file -> ${init_dir}/$init_name: $!";
         &perms_ownership("${init_dir}/$init_name", 0744);
         &enable_psad_at_boot($distro);
+        $installed_init_script = 1;
     }
 
     &logr("\n========================================================\n");
@@ -743,10 +750,12 @@ sub install() {
     } else {
         &logr("\n[+] psad has been installed.\n");
     }
-    if ($init_dir) {
-        &logr("\n[+] To start psad, run \"${init_dir}/psad start\"\n");
-    } else {
-        &logr("\n[+] To start psad, run ${USRSBIN_DIR}/psad\"\n");
+    if ($installed_init_script) {
+        if ($init_dir) {
+            &logr("\n[+] To start psad, run \"${init_dir}/psad start\"\n");
+        } else {
+            &logr("\n[+] To start psad, run ${USRSBIN_DIR}/psad\"\n");
+        }
     }
     return;
 }
@@ -768,6 +777,22 @@ sub import_config() {
         }
     }
     close C;
+
+    ### see if the install root is the same as the default in psad.conf and
+    ### update if not
+    if ($install_root ne '/') {
+        $install_root = getcwd() . "/$install_root"
+            unless $install_root =~ m|^/|;
+        $config{'INSTALL_ROOT'} = $install_root;
+        $USRSBIN_DIR = $config{'INSTALL_ROOT'} . $USRSBIN_DIR;
+        $USRBIN_DIR  = $config{'INSTALL_ROOT'} . $USRBIN_DIR;
+
+        &put_string('INSTALL_ROOT', $install_root, $psad_conf_file);
+    }
+
+    for my $dir ($install_root, $USRSBIN_DIR, $USRBIN_DIR) {
+        &full_mkdir($dir, 0755) unless -d $dir;
+    }
 
     ### resolve internal vars within variable values
     &expand_vars();
@@ -796,7 +821,11 @@ sub expand_vars() {
                     die "[*] sub-ver $sub_var not allowed within same ",
                         "variable $var" if $sub_var eq $var;
                     if (defined $config{$sub_var}) {
-                        $val =~ s|\$$sub_var|$config{$sub_var}|;
+                        if ($sub_var eq 'INSTALL_ROOT' and $config{$sub_var} eq '/') {
+                            $val =~ s|\$$sub_var||;
+                        } else {
+                            $val =~ s|\$$sub_var|$config{$sub_var}|;
+                        }
                         $hr->{$var} = $val;
                     } else {
                         die "[*] sub-var \"$sub_var\" not defined in ",
@@ -1011,11 +1040,6 @@ sub install_perl_module() {
     }
 
     if ($install_module) {
-        unless (-d $config{'PSAD_LIBS_DIR'}) {
-            &logr("[+] Creating $config{'PSAD_LIBS_DIR'}\n");
-            mkdir $config{'PSAD_LIBS_DIR'}, 0755 or
-                die "[*] Could not mkdir $config{'PSAD_LIBS_DIR'}: $!";
-        }
         &logr("[+] Installing the $mod_name $version perl " .
             "module in $config{'PSAD_LIBS_DIR'}/\n");
         my $mod_dir = $required_perl_modules{$mod_name}{'mod-dir'};
@@ -1039,6 +1063,7 @@ sub install_perl_module() {
 
         print "\n\n";
     }
+
     return;
 }
 
@@ -1606,6 +1631,9 @@ sub scrub_prefix_ctr() {
 }
 
 sub check_old_psad_installation() {
+
+    return unless &is_root();
+
     my $old_install_dir = '/usr/local/bin';
     if (-e "${old_install_dir}/psad") {
         move "${old_install_dir}/psad", "${USRSBIN_DIR}/psad" or die "[*] ",
@@ -1657,10 +1685,15 @@ sub get_distro() {
 
 sub perms_ownership() {
     my ($file, $perm_value) = @_;
+
     chmod $perm_value, $file or die "[*] Could not ",
         "chmod($perm_value, $file): $!";
+
+    return unless &is_root();
+
     ### root (maybe should take the group assignment out)
     chown 0, 0, $file or die "[*] Could not chown 0,0,$file: $!";
+
     return;
 }
 
@@ -1858,6 +1891,7 @@ sub archive() {
     }
     &logr("[+] Archiving $file -> $config{'CONF_ARCHIVE_DIR'}/${base}1.gz\n");
     unlink "${base}1.gz" if -e "${base}1.gz";
+
     ### move $file into the archive directory
     copy $file, "${base}1" or die "[*] Could not copy ",
         "$file -> ${base}1: $!";
@@ -1869,6 +1903,8 @@ sub archive() {
 
 sub enable_psad_at_boot() {
     my $distro = shift;
+
+    return unless &is_root();
 
     if (&query_yes_no("[+] Enable psad at boot time ([y]/n)?  ",
                 $ACCEPT_YES_DEFAULT)) {
@@ -1901,6 +1937,7 @@ sub enable_psad_at_boot() {
 
 ### check paths to commands and attempt to correct if any are wrong.
 sub check_commands() {
+
     CMD: for my $cmd (keys %cmds) {
         next CMD if defined $exclude_cmds{$cmd};
         unless (-x $cmds{$cmd}) {
@@ -1927,6 +1964,7 @@ sub check_commands() {
             }
         }
         unless (-x $cmds{$cmd}) {
+            return unless &is_root();
             die "\n[*] $cmd is located at ",
                 "$cmds{$cmd} but is not executable by uid: $<";
         }
@@ -1934,11 +1972,16 @@ sub check_commands() {
     return;
 }
 
+sub is_root() {
+    return 1 if $< == 0 and $> == 0;
+    return 0;
+}
+
 sub install_manpage() {
     my $manpage = shift;
 
-    my $name;
-    my $section;
+    my $name    = '';
+    my $section = '';
 
     if ($manpage =~ m|(\w+)\.(\d)|) {
         $name = $1;
@@ -1948,8 +1991,10 @@ sub install_manpage() {
     }
 
     ### remove old man page
-    unlink "/usr/local/man/man$section/${manpage}" if
-        (-e "/usr/local/man/man$section/${manpage}");
+    if (&is_root()) {
+        unlink "/usr/local/man/man$section/${manpage}" if
+            -e "/usr/local/man/man$section/${manpage}";
+    }
 
     ### default location to put the psad man page, but check with
     ### /etc/man.config
@@ -1993,7 +2038,12 @@ sub install_manpage() {
             }
         }
     }
-    mkdir $mpath, 0755 unless -d $mpath;
+
+    if ($install_root ne '/') {
+        $mpath = $config{'INSTALL_ROOT'} . $mpath;
+    }
+
+    &full_mkdir($mpath, 0755);
     my $mfile = "${mpath}/${manpage}";
     &logr("[+] Installing $manpage man page at $mfile\n");
     copy $manpage, $mfile or die "[*] Could not copy $manpage to ",
@@ -2003,6 +2053,23 @@ sub install_manpage() {
     ### remove the old one so gzip doesn't prompt us
     unlink "${mfile}.gz" if -e "${mfile}.gz";
     system "$cmds{'gzip'} $mfile";
+    return;
+}
+
+sub full_mkdir() {
+    my ($dir, $perms) = @_;
+
+    my @dirs = split /\//, $dir;
+    my $path = $dirs[0];
+    shift @dirs;
+    for my $d (@dirs) {
+        next unless $d and $d =~ /\S/;
+        $path .= "/$d";
+        unless (-d $path) {
+            printf "[+] mkdir $path, %o\n", $perms;
+            mkdir $path, $perms or die "[*] Could not mkdir($path): $!";
+        }
+    }
     return;
 }
 
@@ -2033,6 +2100,9 @@ sub update_command_paths() {
             my $cmd    = $1;
             my $spaces = $2;
             my $path   = $3;
+            if ($path =~ /\$INSTALL_ROOT/) {
+                $path =~ s|\$INSTALL_ROOT|$install_root|;
+            }
             unless (-e $path and -x $path) {
                 ### the command is not at this path, try to find it
                 my $cmd_minor_name = $cmd;
@@ -2091,18 +2161,10 @@ sub get_runlevel() {
 ### logging subroutine that handles multiple filehandles
 sub logr() {
     my $msg = shift;
-    for my $file (@LOGR_FILES) {
-        if ($file eq *STDOUT) {
-            print STDOUT $msg;
-        } elsif ($file eq *STDERR) {
-            print STDERR $msg;
-        } else {
-            open F, ">> $file" or die "[*] Could not open ",
-                "$file: $!";
-            print F $msg;
-            close F;
-        }
-    }
+
+    print STDOUT $msg;
+    push @installation_lines, $msg;
+
     return;
 }
 

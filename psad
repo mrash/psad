@@ -310,7 +310,7 @@ my %local_src = ();
 
 ### regex to match IP addresses
 my $ip_re   = qr|(?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2}|;  ### IPv4
-my $ipv6_re = qr|(?:[a-f0-9]{4}:){7}(?:[a-f0-9]{4})|i;   ### IPv6
+my $ipv6_re = qr|(?:[a-f0-9]{4}:){7}(?:[a-f0-9]{4})|i;  ### IPv6
 
 ### ttl values are decremented depending on the number of hops
 ### the packet has taken before it hits the firewall.  We will
@@ -5050,7 +5050,7 @@ sub scan_logr() {
 
             ### make $src directory here in /var/log/psad
             ### unless it already exists
-            mkdir "$config{'PSAD_DIR'}/${src}", 0500
+            mkdir "$config{'PSAD_DIR'}/${src}", 0700
                 unless -d "$config{'PSAD_DIR'}/${src}";
             my $src_dir = "$config{'PSAD_DIR'}/${src}";
             my $dl_file      = "${src_dir}/danger_level";
@@ -9267,7 +9267,7 @@ sub archive_data() {
     chdir $config{'PSAD_DIR'} or die "[*] Could not chdir ",
         "$config{'PSAD_DIR'}: $!";
     unless (-d $config{'SCAN_DATA_ARCHIVE_DIR'}) {
-        mkdir $config{'SCAN_DATA_ARCHIVE_DIR'}, 0500 or
+        mkdir $config{'SCAN_DATA_ARCHIVE_DIR'}, 0700 or
             die "[*] Could not create dir: ",
             "$config{'SCAN_DATA_ARCHIVE_DIR'}: $!";
     }
@@ -9385,7 +9385,7 @@ sub make_psad_dirs() {
         PSAD_ERR_DIR
     )) {
         next if -d $config{$dir};
-        mkdir $config{$dir}, 0500 or
+        mkdir $config{$dir}, 0700 or
             die "[*] Could not mkdir $config{$dir}: $!";
     }
     return;
@@ -9701,7 +9701,7 @@ sub disk_space_exceeded() {
             ### of our worries).
             &sys_log("removing $config{'SCAN_DATA_ARCHIVE_DIR'} directory");
             rmtree $config{'SCAN_DATA_ARCHIVE_DIR'};
-            mkdir $config{'SCAN_DATA_ARCHIVE_DIR'}, 0500;
+            mkdir $config{'SCAN_DATA_ARCHIVE_DIR'}, 0700;
         }
         opendir D, $config{'PSAD_DIR'} or
             die "[*] Could not open dir: $config{'PSAD_DIR'}: $!";
@@ -10109,7 +10109,12 @@ sub expand_vars() {
                     die "[*] sub-ver $sub_var not allowed within same ",
                         "variable $var" if $sub_var eq $var;
                     if (defined $config{$sub_var}) {
-                        $val =~ s|\$$sub_var|$config{$sub_var}|;
+                        if ($sub_var eq 'INSTALL_ROOT'
+                                and $config{$sub_var} eq '/') {
+                            $val =~ s|\$$sub_var||;
+                        } else {
+                            $val =~ s|\$$sub_var|$config{$sub_var}|;
+                        }
                         $hr->{$var} = $val;
                     } else {
                         die "[*] sub-var \"$sub_var\" not defined in ",
@@ -10124,9 +10129,23 @@ sub expand_vars() {
 }
 
 sub is_root() {
-    $< == 0 && $> == 0 or
+
+    ### exceptions
+    for my $var ($download_sigs,
+            $analyze_mode,
+            $get_next_rule_id,
+            $gnuplot_mode,
+            $csv_mode,
+            $dump_conf,
+            $status_mode,
+            $benchmark,
+    ) {
+        return if $var;
+    }
+
+    $< == 0 and $> == 0 or
         die '[*] psad: You must be root (or equivalent ',
-            "UID 0 account) to execute psad!  Exiting.\n";
+            "UID 0 account) to execute psad!  Exiting.";
 }
 
 ### check to make sure all required varables are defined in the config
@@ -10513,7 +10532,7 @@ sub required_vars() {
         ENABLE_SYSLOG_FILE IPT_SYSLOG_FILE IPT_WRITE_FWDATA
         ETC_RSYSLOG_CONF IFCFGTYPE ENABLE_WHOIS_FORCE_ASCII
         ENABLE_WHOIS_FORCE_SRC_IP ENABLE_IPV6_DETECTION
-        PERSISTENCE_CTR_THRESHOLD MAX_SCAN_IP_PAIRS
+        PERSISTENCE_CTR_THRESHOLD MAX_SCAN_IP_PAIRS INSTALL_ROOT
     ));
     &defined_vars(\@required_vars);
     return;

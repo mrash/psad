@@ -10,8 +10,11 @@ my $output_dir     = 'output';
 my $conf_dir       = 'conf';
 my $run_dir        = 'run';
 my $scans_dir      = 'scans';
+my $syn_scan_file  = 'syn_scan_1000_1500';
+my $udp_scan_file  = 'udp_scan_1000_1150';
+my $ignore_ipv4_auto_dl_file = "$conf_dir/auto_dl_ignore_192.168.10.55";
 
-my $psadCmd        = '../psad';
+my $psadCmd        = 'psad-install/usr/sbin/psad';
 
 my $cmd_out_tmp    = 'cmd.out';
 my $default_conf   = "$conf_dir/default_psad.conf";
@@ -80,7 +83,7 @@ my @tests = (
     },
     {
         'category'  => 'operations',
-        'detail'    => 'Dump policy: --fw-dump',
+        'detail'    => '--fw-dump',
         'err_msg'   => 'could not dump fw policy',
         'positive_output_matches' => [qr/^Chain/, qr/pkts\sbytes\starget/,
                 qr/\biptables\b/, qr/\bip6tables\b/],
@@ -150,6 +153,61 @@ my @tests = (
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --Benchmark --packets 1000 -c $default_conf",
         'exec_err'  => $IGNORE,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv4 SYN scan detection',
+        'err_msg'   => 'did not detect SYN scan',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports.*?1000\-1500\b/i,
+                qr/Source\sOS/i, qr/BACKDOOR/i,
+                qr/IP\sstatus/i,
+                qr/192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A -m $scans_dir/" .
+                &fw_type() . "/$syn_scan_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv4 UDP scan detection',
+        'err_msg'   => 'did not detect UDP scan',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports.*?1000\-1150/i,
+                qr/IP\sstatus/i,
+                qr/192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A -m $scans_dir/" .
+                &fw_type() . "/$udp_scan_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'ignore IPv4 SYN scan source',
+        'err_msg'   => 'did not ignore SYN scan',
+        'negative_output_matches' => [qr/SRC\:\s+192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A --auto-dl $ignore_ipv4_auto_dl_file " .
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'ignore IPv4 UDP scan source',
+        'err_msg'   => 'did not ignore UDP scan',
+        'negative_output_matches' => [qr/SRC\:\s+192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A --auto-dl $ignore_ipv4_auto_dl_file " .
+                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf",
+        'exec_err'  => $NO,
         'fatal'     => $NO
     },
 
@@ -359,7 +417,7 @@ sub init() {
 
     $|++; ### turn off buffering
 
-    $< == 0 && $> == 0 or
+    $< == 0 and $> == 0 or
         die "[*] $0: You must be root (or equivalent ",
             "UID 0 account) to effectively test psad";
 
@@ -455,6 +513,10 @@ sub process_include_exclude() {
         return 0 if $found;
     }
     return 1;
+}
+
+sub fw_type() {
+    return 'iptables';
 }
 
 sub write_test_file() {

@@ -13,6 +13,7 @@ my $scans_dir      = 'scans';
 my $syn_scan_file  = 'syn_scan_1000_1500';
 my $udp_scan_file  = 'udp_scan_1000_1150';
 my $ignore_ipv4_auto_dl_file = "$conf_dir/auto_dl_ignore_192.168.10.55";
+my $dl5_ipv4_auto_dl_file = "$conf_dir/auto_dl_5_192.168.10.55";
 
 my $psadCmd        = 'psad-install/usr/sbin/psad';
 
@@ -206,6 +207,36 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd -A --auto-dl $ignore_ipv4_auto_dl_file " .
+                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'DL5 IPv4 SYN scan source',
+        'err_msg'   => 'did not set SYN scan source to DL5',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports.*?1000\-1500/i,
+                qr/IP\sstatus/i,
+                qr/192\.168\.10\.55,\sDL\:\s5/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A --auto-dl $dl5_ipv4_auto_dl_file " .
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'DL5 IPv4 UDP scan source',
+        'err_msg'   => 'did not set UDP scan source to DL5',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports.*?1000\-1150/i,
+                qr/IP\sstatus/i,
+                qr/192\.168\.10\.55,\sDL\:\s5/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A --auto-dl $dl5_ipv4_auto_dl_file " .
                 "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf",
         'exec_err'  => $NO,
         'fatal'     => $NO

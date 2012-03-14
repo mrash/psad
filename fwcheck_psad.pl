@@ -499,21 +499,36 @@ sub import_config() {
 }
 
 sub expand_vars() {
-    for my $hr (\%config, \%cmds) {
-        for my $var (keys %$hr) {
-            my $val = $hr->{$var};
-            die "[*] Multiple variable expansion not supported yet ",
-                "(var $var)." if $val =~ m|\$.+\$|;
-            if ($val =~ m|\$(\w+)|) {
-                my $sub_var = $1;
-                die "[*] sub-ver $sub_var not allowed within same ",
-                    "variable $var" if $sub_var eq $var;
-                if (defined $config{$sub_var}) {
-                    $val =~ s|\$$sub_var|$config{$sub_var}|;
-                    $hr->{$var} = $val;
-                } else {
-                    die "[*] sub-var \"$sub_var\" not defined in ",
-                        "config for var: $var."
+
+    my $has_sub_var = 1;
+    my $resolve_ctr = 0;
+
+    while ($has_sub_var) {
+        $resolve_ctr++;
+        $has_sub_var = 0;
+        if ($resolve_ctr >= 20) {
+            die "[*] Exceeded maximum variable resolution counter.";
+        }
+        for my $hr (\%config, \%cmds) {
+            for my $var (keys %$hr) {
+                my $val = $hr->{$var};
+                if ($val =~ m|\$(\w+)|) {
+                    my $sub_var = $1;
+                    die "[*] sub-ver $sub_var not allowed within same ",
+                        "variable $var" if $sub_var eq $var;
+                    if (defined $config{$sub_var}) {
+                        if ($sub_var eq 'INSTALL_ROOT'
+                                and $config{$sub_var} eq '/') {
+                            $val =~ s|\$$sub_var||;
+                        } else {
+                            $val =~ s|\$$sub_var|$config{$sub_var}|;
+                        }
+                        $hr->{$var} = $val;
+                    } else {
+                        die "[*] sub-var \"$sub_var\" not defined in ",
+                            "config for var: $var."
+                    }
+                    $has_sub_var = 1;
                 }
             }
         }

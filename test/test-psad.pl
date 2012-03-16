@@ -2,6 +2,7 @@
 
 use File::Copy;
 use File::Path;
+use Getopt::Long 'GetOptions';
 use strict;
 
 #==================== config =====================
@@ -13,12 +14,20 @@ my $scans_dir      = 'scans';
 my $syn_scan_file  = 'syn_scan_1000_1500';
 my $udp_scan_file  = 'udp_scan_1000_1150';
 my $ignore_ipv4_auto_dl_file = "$conf_dir/auto_dl_ignore_192.168.10.55";
+my $ignore_ipv4_subnet_auto_dl_file = "$conf_dir/auto_dl_ignore_192.168.10.0_24";
 my $dl5_ipv4_auto_dl_file = "$conf_dir/auto_dl_5_192.168.10.55";
+my $dl5_ipv4_subnet_auto_dl_file = "$conf_dir/auto_dl_5_192.168.10.0_24";
+my $dl5_ipv4_subnet_auto_dl_file_tcp = "$conf_dir/auto_dl_5_192.168.10.0_24_tcp";
+my $dl5_ipv4_subnet_auto_dl_file_udp = "$conf_dir/auto_dl_5_192.168.10.0_24_udp";
 
 my $psadCmd        = 'psad-install/usr/sbin/psad';
 
 my $cmd_out_tmp    = 'cmd.out';
 my $default_conf   = "$conf_dir/default_psad.conf";
+my $ignore_udp_conf = "$conf_dir/ignore_udp.conf";
+my $ignore_tcp_conf = "$conf_dir/ignore_tcp.conf";
+my $require_prefix_conf = "$conf_dir/require_DROP_syslog_prefix_str.conf";
+my $require_missing_prefix_conf = "$conf_dir/require_missing_syslog_prefix_str.conf";
 #================== end config ===================
 
 my $YES = 1;
@@ -33,12 +42,14 @@ my @tests_to_include = ();
 my $test_exclude = '';
 my @tests_to_exclude = ();
 my $list_mode = 0;
+my $diff_mode = 0;
 my $saved_last_results = 0;
 my $PRINT_LEN = 68;
 my $REQUIRED = 1;
 my $OPTIONAL = 0;
 my $MATCH_ALL_RE = 1;
 my $MATCH_SINGLE_RE = 2;
+my $help = 0;
 
 my %test_keys = (
     'category'        => $REQUIRED,
@@ -189,30 +200,6 @@ my @tests = (
     },
     {
         'category'  => 'operations',
-        'detail'    => 'ignore IPv4 SYN scan source',
-        'err_msg'   => 'did not ignore SYN scan',
-        'negative_output_matches' => [qr/SRC\:\s+192\.168\.10\.55/],
-        'match_all' => $MATCH_ALL_RE,
-        'function'  => \&generic_exec,
-        'cmdline'   => "$psadCmd -A --auto-dl $ignore_ipv4_auto_dl_file " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf",
-        'exec_err'  => $NO,
-        'fatal'     => $NO
-    },
-    {
-        'category'  => 'operations',
-        'detail'    => 'ignore IPv4 UDP scan source',
-        'err_msg'   => 'did not ignore UDP scan',
-        'negative_output_matches' => [qr/SRC\:\s+192\.168\.10\.55/],
-        'match_all' => $MATCH_ALL_RE,
-        'function'  => \&generic_exec,
-        'cmdline'   => "$psadCmd -A --auto-dl $ignore_ipv4_auto_dl_file " .
-                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf",
-        'exec_err'  => $NO,
-        'fatal'     => $NO
-    },
-    {
-        'category'  => 'operations',
         'detail'    => 'DL5 IPv4 SYN scan source',
         'err_msg'   => 'did not set SYN scan source to DL5',
         'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
@@ -228,6 +215,49 @@ my @tests = (
     },
     {
         'category'  => 'operations',
+        'detail'    => 'DL5 IPv4 SYN scan source subnet',
+        'err_msg'   => 'did not set SYN scan source to DL5',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports.*?1000\-1500/i,
+                qr/IP\sstatus/i,
+                qr/192\.168\.10\.55,\sDL\:\s5/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A --auto-dl $dl5_ipv4_subnet_auto_dl_file " .
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'DL5 IPv4 SYN scan src subnet+tcp',
+        'err_msg'   => 'did not set SYN scan source to DL5',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports.*?1000\-1500/i,
+                qr/IP\sstatus/i,
+                qr/192\.168\.10\.55,\sDL\:\s5/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A --auto-dl $dl5_ipv4_subnet_auto_dl_file_tcp " .
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'non-DL5 IPv4 SYN scan src subnet+udp',
+        'err_msg'   => 'set SYN scan source to DL5',
+        'negative_output_matches' => [qr/192\.168\.10\.55,\sDL\:\s5/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A --auto-dl $dl5_ipv4_subnet_auto_dl_file_udp " .
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+
+    {
+        'category'  => 'operations',
         'detail'    => 'DL5 IPv4 UDP scan source',
         'err_msg'   => 'did not set UDP scan source to DL5',
         'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
@@ -241,10 +271,164 @@ my @tests = (
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
+    {
+        'category'  => 'operations',
+        'detail'    => 'DL5 IPv4 UDP scan source subnet',
+        'err_msg'   => 'did not set UDP scan source to DL5',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports.*?1000\-1150/i,
+                qr/IP\sstatus/i,
+                qr/192\.168\.10\.55,\sDL\:\s5/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A --auto-dl $dl5_ipv4_subnet_auto_dl_file " .
+                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'DL5 IPv4 UDP scan src subnet+udp',
+        'err_msg'   => 'did not set UDP scan source to DL5',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports.*?1000\-1150/i,
+                qr/IP\sstatus/i,
+                qr/192\.168\.10\.55,\sDL\:\s5/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A --auto-dl $dl5_ipv4_subnet_auto_dl_file_udp " .
+                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'non-DL5 IPv4 UDP scan src subnet+tcp',
+        'err_msg'   => 'set UDP scan source to DL5',
+        'negative_output_matches' => [qr/192\.168\.10\.55,\sDL\:\s5/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A --auto-dl $dl5_ipv4_subnet_auto_dl_file_tcp " .
+                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+
+    {
+        'category'  => 'operations',
+        'detail'    => 'ignore IPv4 SYN scan source',
+        'err_msg'   => 'did not ignore SYN scan',
+        'negative_output_matches' => [qr/SRC\:\s+192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A --auto-dl $ignore_ipv4_auto_dl_file " .
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'ignore IPv4 SYN scan source subnet',
+        'err_msg'   => 'did not ignore SYN scan',
+        'negative_output_matches' => [qr/SRC\:\s+192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A --auto-dl $ignore_ipv4_subnet_auto_dl_file " .
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'psad.conf ignore IPv4 TCP traffic',
+        'err_msg'   => 'did not ignore TCP traffic',
+        'negative_output_matches' => [qr/SRC\:\s+192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A --auto-dl $dl5_ipv4_auto_dl_file " .  ### psad.conf IGNORE_PROTOCOLS trumps auto_dl
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $ignore_tcp_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'psad.conf require DROP prefix',
+        'err_msg'   => 'did not find DROP prefix logs',
+        'positive_output_matches' => [qr/SRC\:\s+192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A --auto-dl $dl5_ipv4_auto_dl_file " .  ### psad.conf FW_MSG_SEARCH trumps auto_dl
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $require_prefix_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'psad.conf require missing DROP prefix',
+        'err_msg'   => 'found DROP prefix logs',
+        'negative_output_matches' => [qr/SRC\:\s+192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A --auto-dl $dl5_ipv4_auto_dl_file " .  ### psad.conf FW_MSG_SEARCH trumps auto_dl
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $require_missing_prefix_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+
+    ### UDP
+    {
+        'category'  => 'operations',
+        'detail'    => 'ignore IPv4 UDP scan source',
+        'err_msg'   => 'did not ignore UDP scan',
+        'negative_output_matches' => [qr/SRC\:\s+192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A --auto-dl $ignore_ipv4_auto_dl_file " .
+                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'ignore IPv4 UDP scan source subnet',
+        'err_msg'   => 'did not ignore UDP scan',
+        'negative_output_matches' => [qr/SRC\:\s+192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A --auto-dl $ignore_ipv4_subnet_auto_dl_file " .
+                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'psad.conf ignore IPv4 UDP traffic',
+        'err_msg'   => 'did not ignore UDP traffic',
+        'negative_output_matches' => [qr/SRC\:\s+192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A --auto-dl $dl5_ipv4_auto_dl_file " .  ### psad.conf IGNORE_PROTOCOLS trumps auto_dl
+                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $ignore_udp_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
 
 );
 
 my @args_cp = @ARGV;
+
+exit 1 unless GetOptions(
+    'psad-path=s'       => \$psadCmd,
+    'test-include=s'    => \$test_include,
+    'include=s'         => \$test_include,  ### synonym
+    'test-exclude=s'    => \$test_exclude,
+    'exclude=s'         => \$test_exclude,  ### synonym
+    'List-mode'         => \$list_mode,
+    'diff'              => \$diff_mode,
+    'help'              => \$help
+);
+
+&usage() if $help;
 
 ### make sure everything looks as expected before continuing
 &init();
@@ -419,7 +603,7 @@ sub file_find_regex() {
             }
         } else {
             push @write_lines, "[.] file_find_regex() " .
-                "did not match '$re'";
+                "did not match '$re'\n";
             if ($match_all_flag == $MATCH_ALL_RE) {
                 last RE;
             }
@@ -574,4 +758,8 @@ sub logr() {
     print F $msg;
     close F;
     return;
+}
+
+sub usage() {
+    ### FIXME
 }

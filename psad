@@ -1646,6 +1646,10 @@ sub parse_NF_pkt_str() {
         }
 
         ### see if we need to ignore this packet based on the
+        ### IGNORE_PROTOCOLS config keyword.
+        return $PKT_IGNORE if &check_ignore_proto($pkt_hr->{'proto'});
+
+        ### see if we need to ignore this packet based on the
         ### IGNORE_PORTS config keyword
         return $PKT_IGNORE if &check_ignore_port($pkt_hr->{'dp'},
                 $pkt_hr->{'proto'});

@@ -14,6 +14,7 @@ my $scans_dir      = 'scans';
 my $syn_scan_file  = 'syn_scan_1000_1500';
 my $fin_scan_file  = 'fin_scan_1000_1150';
 my $xmas_scan_file = 'xmas_scan_1000_1150';
+my $null_scan_file = 'null_scan_1000_1150';
 my $ack_scan_file  = 'ack_scan_1000_1150';
 my $udp_scan_file  = 'udp_scan_1000_1150';
 my $ignore_ipv4_auto_dl_file = "$conf_dir/auto_dl_ignore_192.168.10.55";
@@ -221,6 +222,21 @@ my @tests = (
     },
     {
         'category'  => 'operations',
+        'detail'    => 'IPv4 NULL scan detection',
+        'err_msg'   => 'did not detect NULL scan',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports.*?1000\-1150\b/i,
+                qr/IP\sstatus/i,
+                qr/192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A -m $scans_dir/" .
+                &fw_type() . "/$null_scan_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
         'detail'    => 'IPv4 ACK scan detection',
         'err_msg'   => 'did not detect ACK scan',
         'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
@@ -234,7 +250,6 @@ my @tests = (
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
-
     {
         'category'  => 'operations',
         'detail'    => 'IPv4 UDP scan detection',
@@ -250,6 +265,7 @@ my @tests = (
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
+
     {
         'category'  => 'operations',
         'detail'    => 'DL5 IPv4 SYN scan source',

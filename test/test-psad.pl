@@ -17,6 +17,7 @@ my $xmas_scan_file = 'xmas_scan_1000_1150';
 my $null_scan_file = 'null_scan_1000_1150';
 my $ack_scan_file  = 'ack_scan_1000_1150';
 my $udp_scan_file  = 'udp_scan_1000_1150';
+my $ipv6_connect_scan_file  = 'ipv6_tcp_connect_nmap_default_scan';
 my $ignore_ipv4_auto_dl_file = "$conf_dir/auto_dl_ignore_192.168.10.55";
 my $ignore_ipv4_subnet_auto_dl_file = "$conf_dir/auto_dl_ignore_192.168.10.0_24";
 my $dl5_ipv4_auto_dl_file = "$conf_dir/auto_dl_5_192.168.10.55";
@@ -33,6 +34,7 @@ my $ignore_tcp_conf = "$conf_dir/ignore_tcp.conf";
 my $require_prefix_conf = "$conf_dir/require_DROP_syslog_prefix_str.conf";
 my $require_missing_prefix_conf = "$conf_dir/require_missing_syslog_prefix_str.conf";
 my $enable_ack_detection_conf = "$conf_dir/enable_ack_detection.conf";
+my $disable_ipv6_conf = "$conf_dir/disable_ipv6_detection.conf";
 #================== end config ===================
 
 my $YES = 1;
@@ -477,6 +479,35 @@ my @tests = (
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd -A --auto-dl $dl5_ipv4_auto_dl_file " .  ### psad.conf IGNORE_PROTOCOLS trumps auto_dl
                 "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $ignore_udp_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv6 TCP connect() scan detection',
+        'err_msg'   => 'did not detect TCP connect() scan',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports.*?1\-65389\b/i,
+                qr/IP\sstatus/i,
+                qr/2001\:DB8\:0\:F101\:\:2/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A -m $scans_dir/" .
+                &fw_type() . "/$ipv6_connect_scan_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv6 disabled',
+        'err_msg'   => 'logged IPv6 traffic',
+        'positive_output_matches' => [qr/\[NONE\]/],
+        'negative_output_matches' => [qr/2001\:DB8\:0\:F101\:\:2/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd -A -m $scans_dir/" .
+                &fw_type() . "/$ipv6_connect_scan_file -c $disable_ipv6_conf",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },

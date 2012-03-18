@@ -338,6 +338,7 @@ my $analysis_fields  = '';
 my $analysis_tokens_ar = [];
 my $analysis_match_criteria_ar = [];
 my $get_next_rule_id = 0;
+my $test_mode        = 0;
 my $syslog_server    = 0;
 my $kill             = 0;
 my $restart          = 0;
@@ -3096,7 +3097,9 @@ sub psad_init() {
     ### turn off buffering
     $| = 1;
 
-    $no_syslog_alerts = 1 if $analyze_mode or $status_mode;
+    $no_syslog_alerts = 1 if $analyze_mode or $status_mode or $test_mode;
+    $no_email_alerts = 1 if $test_mode;
+    $debug = 1 if $test_mode;
 
     ### import any override config files first
     &import_override_configs() if $override_config_str;
@@ -3496,6 +3499,11 @@ sub is_local() {
     my ($ip, $ip_obj) = @_;
 
     print STDERR "[+] is_local(): $ip..." if $debug;
+
+    if ($test_mode) {
+        print STDERR "(test mode enabled) no\n";
+        return 0;
+    }
 
     my $found = 0;
     for my $net (@local_nets) {
@@ -8214,6 +8222,7 @@ sub fw_analyze_mode() {
         $opts .= " --fw-analyze" if $fw_analyze;
         $opts .= " --fw-file $fw_file" if $fw_file;
         $opts .= " -L $lib_dir" if $lib_dir;
+        $opts .= " --test-mode" if $test_mode;
         $opts .= " --no-fw-search-all" if $config{'FW_SEARCH_ALL'} eq 'N';
         $exit_status = (system "$cmds{'fwcheck_psad'} $opts") >> 8;
     }
@@ -10476,6 +10485,8 @@ sub getopt_wrapper() {
                                                   #   messages to error log.
         'no-kmsgsd'         => \$no_kmsgsd,       # Do not start kmsgsd (used for
                                                   #   debugging).
+        'test-mode'         => \$test_mode,       # Enable test mode (used by the
+                                                  #   test suite).
         'verbose'           => \$verbose,         # Verbose output (for both alerts
                                                   #   and debug info).
         'Version'           => \$print_ver,       # Print the psad version and exit.

@@ -46,6 +46,7 @@ my %cmds;
 my @fw_search = ();
 
 my $help = 0;
+my $test_mode = 0;
 my $fw_analyze = 0;
 my $fw_file    = '';
 my $fw_search_all = 1;
@@ -64,6 +65,7 @@ my $psad_lib_dir = '';
     'no-fw-search-all' => \$no_fw_search_all, # looking for specific log
                                               # prefixes
     'Lib-dir=s'   => \$psad_lib_dir,# Specify path to psad lib directory.
+    'test-mode'   => \$test_mode,   # Used by the test suite.
     'help'        => \$help,        # Display help.
 ));
 &usage(0) if $help;
@@ -155,14 +157,14 @@ sub fw_check() {
 "    it is possible your firewall config is compatible with psad anyway.\n";
         }
 
-        unless ($config{'ALERTING_METHODS'} =~ /no.?e?mail/i) {
+        unless ($config{'ALERTING_METHODS'} =~ /no.?e?mail/i or $test_mode) {
             &send_mail("[psad-status] firewall setup warning on " .
                 "$config{'HOSTNAME'}!", $config{'FW_CHECK_FILE'},
                 $config{'EMAIL_ADDRESSES'},
                 $cmds{'mail'}
             );
         }
-        if ($fw_analyze) {
+        if ($fw_analyze and not $test_mode) {
             print "[-] Errors found in firewall config.\n";
             print "    emailed to ",
                 "$config{'EMAIL_ADDRESSES'}\n";
@@ -602,7 +604,10 @@ Options:
     --fw-analyze                      - Analyze the local iptables
                                         ruleset and exit.
     --no-fw-search-all                - looking for specific log
-                                        prefixes
+                                        prefixes.
+    --Lib-dir <dir>                   - Path to the psad lib directory.
+    --test-mode                       - Enable test mode (used by the
+                                        test suite).
     --help                            - Display help.
 
 _HELP_

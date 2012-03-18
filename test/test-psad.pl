@@ -21,6 +21,7 @@ my $ipv6_connect_scan_file  = 'ipv6_tcp_connect_nmap_default_scan';
 my $ignore_ipv4_auto_dl_file = "$conf_dir/auto_dl_ignore_192.168.10.55";
 my $ignore_ipv4_subnet_auto_dl_file = "$conf_dir/auto_dl_ignore_192.168.10.0_24";
 my $ignore_ipv6_addr_auto_dl_file = "$conf_dir/auto_dl_ignore_ipv6_addr";
+my $ignore_ipv6_addr_auto_dl_file_abbrev = "$conf_dir/auto_dl_ignore_ipv6_addr_abbrev";
 my $dl5_ipv4_auto_dl_file = "$conf_dir/auto_dl_5_192.168.10.55";
 my $dl5_ipv4_subnet_auto_dl_file = "$conf_dir/auto_dl_5_192.168.10.0_24";
 my $dl5_ipv4_subnet_auto_dl_file_tcp = "$conf_dir/auto_dl_5_192.168.10.0_24_tcp";
@@ -491,7 +492,7 @@ my @tests = (
         'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
                 qr/scanned\sports.*?1\-65389\b/i,
                 qr/IP\sstatus/i,
-                qr/2001\:DB8\:0\:F101\:\:2/],
+                qr/SRC\:.*2001\:DB8\:0\:F101\:\:2/],
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A -m $scans_dir/" .
@@ -504,7 +505,7 @@ my @tests = (
         'detail'    => 'IPv6 disabled',
         'err_msg'   => 'logged IPv6 traffic',
         'positive_output_matches' => [qr/\[NONE\]/],
-        'negative_output_matches' => [qr/2001\:DB8\:0\:F101\:\:2/],
+        'negative_output_matches' => [qr/SRC\:.*2001\:DB8\:0\:F101\:\:2/],
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A -m $scans_dir/" .
@@ -517,10 +518,23 @@ my @tests = (
         'detail'    => 'ignore IPv6 connect() scan source',
         'err_msg'   => 'logged IPv6 traffic',
         'positive_output_matches' => [qr/\[NONE\]/],
-        'negative_output_matches' => [qr/2001\:DB8\:0\:F101\:\:2/],
+        'negative_output_matches' => [qr/SRC\:.*2001\:DB8\:0\:F101\:\:2/],
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --auto-dl $ignore_ipv6_addr_auto_dl_file " .
+                "-m $scans_dir/" . &fw_type() . "/$ipv6_connect_scan_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'ignore IPv6 connect() scan abbrev source',
+        'err_msg'   => 'logged IPv6 traffic',
+        'positive_output_matches' => [qr/\[NONE\]/],
+        'negative_output_matches' => [qr/SRC\:.*2001\:DB8\:0\:F101\:\:2/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A --auto-dl $ignore_ipv6_addr_auto_dl_file_abbrev " .
                 "-m $scans_dir/" . &fw_type() . "/$ipv6_connect_scan_file -c $default_conf",
         'exec_err'  => $NO,
         'fatal'     => $NO

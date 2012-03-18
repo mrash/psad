@@ -309,8 +309,10 @@ my %top_packet_counts = ();
 my %local_src = ();
 
 ### regex to match IP addresses
-my $ip_re   = qr|(?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2}|;  ### IPv4
-my $ipv6_re = qr|(?:[a-f0-9]{4}:){7}(?:[a-f0-9]{4})|i;  ### IPv6
+my $ipv4_re = qr|(?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2}|;  ### IPv4
+
+### IPv6 - full version in ip6tables logs
+my $ipv6_re = qr|(?:[a-f0-9]{4}:){7}(?:[a-f0-9]{4})|i;
 
 ### ttl values are decremented depending on the number of hops
 ### the packet has taken before it hits the firewall.  We will
@@ -1571,7 +1573,7 @@ sub parse_NF_pkt_str() {
             ### DST=192.168.20.1 LEN=60 TOS=0x10 PREC=0x00 TTL=64 ID=47300 DF
             ### PROTO=TCP SPT=34111 DPT=6345 WINDOW=5840 RES=0x00 SYN URGP=0
 
-            if ($pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+)\s+TOS=(\S+)
+            if ($pkt_str =~ /SRC=($ipv4_re)\s+DST=($ipv4_re)\s+LEN=(\d+)\s+TOS=(\S+)
                     \s*.*\s+TTL=(\d+)\s+ID=(\d+)\s*.*\s+PROTO=TCP\s+
                     SPT=(\d+)\s+DPT=(\d+)\s.*\s*WINDOW=(\d+)\s+
                     (.*)\s+URGP=/x) {
@@ -1709,7 +1711,7 @@ sub parse_NF_pkt_str() {
             ### SRC=192.168.20.25 DST=192.168.20.1 LEN=28 TOS=0x00 PREC=0x00
             ### TTL=40 ID=47523 PROTO=UDP SPT=57339 DPT=305 LEN=8
 
-            if ($pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+)\s+TOS=(\S+)
+            if ($pkt_str =~ /SRC=($ipv4_re)\s+DST=($ipv4_re)\s+LEN=(\d+)\s+TOS=(\S+)
                       \s.*TTL=(\d+)\s+ID=(\d+)\s*.*\s+PROTO=UDP\s+
                       SPT=(\d+)\s+DPT=(\d+)\s+LEN=(\d+)/x) {
 
@@ -1787,7 +1789,7 @@ sub parse_NF_pkt_str() {
             ### 20:78:10:70:e7:08:00 SRC=192.168.10.20 DST=192.168.10.1 LEN=84 TOS=0x00
             ### PREC=0x00 TTL=64 ID=0 DF PROTO=ICMP TYPE=8 CODE=0 ID=61055 SEQ=256
 
-            if ($pkt_str =~ /SRC=($ip_re)\s+DST=($ip_re)\s+LEN=(\d+).*
+            if ($pkt_str =~ /SRC=($ipv4_re)\s+DST=($ipv4_re)\s+LEN=(\d+).*
                       TTL=(\d+)\s+ID=(\d+).*PROTO=ICMP\s+TYPE=(\d+)\s+
                       CODE=(\d+)/x) {
 
@@ -2949,7 +2951,7 @@ sub dshield_email_log() {
                 "Could not open $config{'DSHIELD_EMAIL_FILE'}: $!";
             if ($config{'DSHIELD_DL_THRESHOLD'} > 0) {
                 for my $line (@dshield_data) {
-                    if ($line =~ /^.*?($ip_re)/) {
+                    if ($line =~ /^.*?($ipv4_re)/) {
                         my $src = $1;
                         if (defined $scan_dl{$src}
                                 and ($scan_dl{$src}
@@ -2979,7 +2981,7 @@ sub dshield_email_log() {
                 "Subject: $subject\n";
             if ($config{'DSHIELD_DL_THRESHOLD'} > 0) {
                 for my $line (@dshield_data) {
-                    if ($line =~ /^.*?($ip_re)/) {
+                    if ($line =~ /^.*?($ipv4_re)/) {
                         my $src = $1;
                         if (defined $scan_dl{$src}
                                 and ($scan_dl{$src}
@@ -3310,18 +3312,18 @@ sub validate_config() {
     }
 
     if ($fw_block_ip) {
-        unless ($fw_block_ip =~ m|^\s*$ip_re\s*$|
-                or $fw_block_ip =~ m|^\s*$ip_re/\d+\s*$|
-                or $fw_block_ip =~ m|^\s*$ip_re/$ip_re\s*$|) {
+        unless ($fw_block_ip =~ m|^\s*$ipv4_re\s*$|
+                or $fw_block_ip =~ m|^\s*$ipv4_re/\d+\s*$|
+                or $fw_block_ip =~ m|^\s*$ipv4_re/$ipv4_re\s*$|) {
             die '[*] The --fw-block-ip argument accepts ' .
                 'an IP address or network.';
         }
     }
 
     if ($fw_rm_block_ip) {
-        unless ($fw_rm_block_ip =~ m|^\s*$ip_re\s*$|
-                or $fw_rm_block_ip =~ m|^\s*$ip_re/\d+\s*$|
-                or $fw_rm_block_ip =~ m|^\s*$ip_re/$ip_re\s*$|) {
+        unless ($fw_rm_block_ip =~ m|^\s*$ipv4_re\s*$|
+                or $fw_rm_block_ip =~ m|^\s*$ipv4_re/\d+\s*$|
+                or $fw_rm_block_ip =~ m|^\s*$ipv4_re/$ipv4_re\s*$|) {
             die '[*] The --fw-rm-block-ip argument accepts ' .
                 'an IP address or network.';
         }
@@ -3405,7 +3407,7 @@ sub get_connected_subnets() {
             }
             next if $intf_name eq 'lo';
             next if $intf_name =~ /dummy/i;
-            if ($line =~ /^\s+inet.*?($ip_re)\/(\d+)/i) {
+            if ($line =~ /^\s+inet.*?($ipv4_re)\/(\d+)/i) {
                 push @connected_subnets, new NetAddr::IP($1, $2);
             } elsif ($line =~ /inet6\s(\S+)/) {
                 push @connected_subnets, new6 NetAddr::IP($1);
@@ -3422,7 +3424,7 @@ sub get_connected_subnets() {
             }
             next if $intf_name eq 'lo';
             next if $intf_name =~ /dummy/i;
-            if ($line =~ /^\s+inet.*?:($ip_re).*:($ip_re)/i) {
+            if ($line =~ /^\s+inet.*?:($ipv4_re).*:($ipv4_re)/i) {
                 push @connected_subnets, new NetAddr::IP($1, $2);
             } elsif ($line =~ /^\s+inet6\saddr:\s+(\S+)/) {
                 push @connected_subnets, new6 NetAddr::IP($1);
@@ -3466,11 +3468,11 @@ sub validate_home_net() {
         my $found_one_net = 0;
         for my $net (@home_nets) {
             my $home_net = '';
-            if ($net =~ m|($ip_re/$ip_re)|) {
+            if ($net =~ m|($ipv4_re/$ipv4_re)|) {
                 $home_net = new NetAddr::IP $1;
-            } elsif ($net =~ m|($ip_re/\d+)|) {
+            } elsif ($net =~ m|($ipv4_re/\d+)|) {
                 $home_net = new NetAddr::IP $1;
-            } elsif ($net =~ m|($ip_re)|) {
+            } elsif ($net =~ m|($ipv4_re)|) {
                 $home_net = new NetAddr::IP $1;
             } else {
                 next;
@@ -4292,9 +4294,9 @@ sub expand_sig_ips() {
     if ($ip_str =~ m|,|) {
         my @ips = split /\s*,\s*/, $ip_str;
         for my $ip (@ips) {
-            if ($ip =~ m|($ip_re/$ip_re)|
-                    or $ip =~ m|($ip_re/\d+)|
-                    or $ip =~ m|($ip_re)|) {
+            if ($ip =~ m|($ipv4_re/$ipv4_re)|
+                    or $ip =~ m|($ipv4_re/\d+)|
+                    or $ip =~ m|($ipv4_re)|) {
                 push @arr, $1;
                 $sig_ip_objs{$1} = new NetAddr::IP($1);
             } elsif ($ip =~ m|\:|) {
@@ -4304,9 +4306,9 @@ sub expand_sig_ips() {
             }
         }
 
-    } elsif ($ip_str =~ m|($ip_re/$ip_re)|
-            or $ip_str =~ m|($ip_re/\d+)|
-            or $ip_str =~ m|($ip_re)|) {
+    } elsif ($ip_str =~ m|($ipv4_re/$ipv4_re)|
+            or $ip_str =~ m|($ipv4_re/\d+)|
+            or $ip_str =~ m|($ipv4_re)|) {
         push @arr, $1;
         $sig_ip_objs{$1} = new NetAddr::IP($1)
             or die "[*] NetAddr::IP error for $1";
@@ -4396,81 +4398,91 @@ sub import_auto_dl() {
 
     %auto_dl = ();  ### undef so we don't leave old ips in %auto_dl
 
-    open A, "< $config{'AUTO_DL_FILE'}" or die '[*] Could not open ',
-        "$config{'AUTO_DL_FILE'}: $!";
-    my @lines = <A>;
-    close A;
     my $i = 0;
-    LINE: for my $line (@lines) {
+    open F, "< $config{'AUTO_DL_FILE'}" or die '[*] Could not open ',
+        "$config{'AUTO_DL_FILE'}: $!";
+    while (<F>) {
         $i++;
-        next LINE unless $line =~ /\S/;
-        next LINE if $line =~ /^\s*#/;
+        next unless /\S/;
+        next if /^\s*#/;
         my $ip   = '';
         my $mask = '';
         my $dl   = '';
         my $opt_criteria = '';
-        if ($line =~ m|^\s*($ip_re)\s*/\s*($ip_re)\s+([0-5])\s*(.*);|) {
+        if (m|^\s*($ipv4_re)\s*/\s*($ipv4_re)\s+([0-5])\s*(.*);|) {
             $ip   = $1;
             $mask = $2;
             $dl   = $3;
             $opt_criteria = $4;
-        } elsif ($line =~ m|^\s*($ip_re)\s*/\s*(\d+)\s+([0-5])\s*(.*);|) {
+        } elsif (m|^\s*($ipv4_re)\s*/\s*(\d+)\s+([0-5])\s*(.*);|) {
             $ip   = $1;
             $mask = $2;
             $dl   = $3;
             $opt_criteria = $4;
-        } elsif ($line =~ m|^\s*($ip_re)\s+([0-5])\s*(.*);|) {
+        } elsif (m|^\s*($ipv4_re)\s+([0-5])\s*(.*);|) {
             $ip   = $1;
             $mask = '32';  ### single IP
             $dl   = $2;
             $opt_criteria = $3;
-        } elsif ($line =~ m|^\s*(\S+)\s+([0-5])\s*(.*);|) {
-            ### check to see if it is a hostname
-            my $hostname = $1;
-            $dl          = $2;
+        } elsif (m|^\s*(\S+)\s+([0-5])\s*(.*);|) {
+            my $str = $1;
+            $dl           = $2;
             $opt_criteria = $3;
-            my $iaddr = 0;
-            $iaddr = inet_aton($hostname);
-            unless ($iaddr) {
-                &sys_log(qq|could not resolve auto_dl "$hostname" | .
-                    "to an IP at line $i");
-                next LINE;
+            if ($str =~ /\:/) {
+                ### check to see if this is an IPv6 address
+                if ($str =~ m|(\S+)/(\S+)|) {
+                    $ip   = $1;
+                    $mask = $2;
+                } else {
+                    $ip   = $str;
+                    $mask = '128';
+                }
+            } else {
+                ### check to see if it is a hostname
+                my $hostname  = $str;
+                my $iaddr = 0;
+                $iaddr = inet_aton($hostname);
+                unless ($iaddr) {
+                    &sys_log(qq|could not resolve auto_dl "$hostname" | .
+                        "to an IP at line $i");
+                    next;
+                }
+                $ip = inet_ntoa($iaddr) or
+                    &sys_log(qq|could not resolve auto_dl "$hostname" | .
+                        "to an IP at line $i");
+                $mask = '32';  ### single IP
             }
-            $ip = inet_ntoa($iaddr) or
-                &sys_log(qq|could not resolve auto_dl "$hostname" | .
-                    "to an IP at line $i");
-            $mask = '32';  ### single IP
         } else {
             &sys_log("improperly formatted auto_dl line $i");
-            next LINE;
+            next;
         }
 
         $auto_dl_ip_objs{$ip} = new NetAddr::IP($ip, $mask);
         unless (defined $auto_dl_ip_objs{$ip} and $auto_dl_ip_objs{$ip}) {
             &sys_log("auto_dl could not acquire NetAddr::IP object at line $i");
-            next LINE;
+            next;
         }
 
         $auto_dl{$ip}{'mask'} = $mask;
         $auto_dl{$ip}{'dl'}   = $dl;
 
-        if ($line =~ m|icmp|i) {
+        if (m|icmp|i) {
             $auto_dl{$ip}{'proto'}{'icmp'}{'all'} = '';
         }
 
         ### check for optional port/protocol criteria
-        if ($line =~ /tcp/i or $line =~ /udp/i) {
+        if (/tcp/i or /udp/i) {
             &parse_port_range(\%{$auto_dl{$ip}{'proto'}}, $opt_criteria);
         }
 
-        if ($line =~ m|tcp|i and not defined $auto_dl{$ip}{'proto'}{'tcp'}) {
+        if (m|tcp|i and not defined $auto_dl{$ip}{'proto'}{'tcp'}) {
             $auto_dl{$ip}{'proto'}{'tcp'}{'all'} = '';
         }
-        if ($line =~ m|udplite|i and
+        if (m|udplite|i and
                 not defined $auto_dl{$ip}{'proto'}{'udplite'}) {
             $auto_dl{$ip}{'proto'}{'udplite'}{'all'} = '';
         }
-        if ($line =~ m|udp|i and not defined $auto_dl{$ip}{'proto'}{'udp'}) {
+        if (m|udp|i and not defined $auto_dl{$ip}{'proto'}{'udp'}) {
             $auto_dl{$ip}{'proto'}{'udp'}{'all'} = '';
         }
 
@@ -4483,22 +4495,17 @@ sub import_auto_dl() {
             }
         }
     }
+    close F;
+
     if (%auto_dl) {
-        my $ip_ctr = 0;
-        my $net_ctr = 0;
-        for my $ip (keys %auto_dl) {
-            my $mask = $auto_dl{$ip}{'mask'};
-            if ($mask eq '32') {
-                $ip_ctr++;
-            } else {
-                $net_ctr++;
-            }
-        }
+
         ### don't write syslog message if we are running in --fw-block-ip
         ### mode
         unless ($fw_block_ip) {
-            &sys_log("imported auto_dl, got $ip_ctr " .
-                "IP addresses and $net_ctr networks");
+            my $msg = "imported auto_dl file, got " . (keys %auto_dl) .
+                " IP addrs/networks";
+            print STDERR $msg, "\n" if $debug;
+            &sys_log($msg);
         }
     }
     return;
@@ -5793,7 +5800,7 @@ sub renew_auto_blocked_ips() {
         close B;
 
         for my $line (@lines) {
-            if ($line =~ /^\s*($ip_re)\s+(\d+)/) {
+            if ($line =~ /^\s*($ipv4_re)\s+(\d+)/) {
                 my $ip = $1;
                 my $orig_block_time = $2;
 
@@ -5831,7 +5838,7 @@ sub renew_auto_blocked_ips() {
         my @lines = <B>;
         close B;
         for my $line (@lines) {
-            if ($line =~ /^\s*($ip_re)\s+(\d+)/) {
+            if ($line =~ /^\s*($ipv4_re)\s+(\d+)/) {
                 my $ip = $1;
                 my $orig_block_time = $2;
 
@@ -5985,7 +5992,7 @@ sub flush_auto_blocked_ips() {
         my @lines = <B>;
         close B;
         for my $line (@lines) {
-            if ($line =~ /($ip_re)/) {
+            if ($line =~ /($ipv4_re)/) {
                 my $ip = $1;
                 ### remove block rules for $ip if it has been blocked
                 &tcpwr_rm_block($ip) if &tcpwr_test_block($ip);
@@ -6037,7 +6044,7 @@ sub check_auto_response_sock() {
 sub ipt_block() {
     my ($ip, $renewed_status) = @_;
 
-    return unless $ip and $ip =~ /^$ip_re$/;
+    return unless $ip and $ip =~ /^$ipv4_re$/;
 
     ### see if the IP is already blocked
     if (defined $auto_blocked_ips{$ip}) {
@@ -6371,14 +6378,14 @@ sub check_ipt_cmd() {
             $del_chains = 1 if $line =~ /delchains/i;
             &flush_auto_blocked_ips($del_chains);
         } else {
-            if ($line =~ m|add\s+($ip_re)\s*$|i
-                    or $line =~ m|add\s+($ip_re/\d+)\s*$|i
-                    or $line =~ m|add\s+($ip_re/$ip_re)\s*$|i) {
+            if ($line =~ m|add\s+($ipv4_re)\s*$|i
+                    or $line =~ m|add\s+($ipv4_re/\d+)\s*$|i
+                    or $line =~ m|add\s+($ipv4_re/$ipv4_re)\s*$|i) {
                 ### instantiate the blocking rule
                 &ipt_block($1, '');
-            } elsif ($line =~ m|del\s+($ip_re)\s*$|i
-                    or $line =~ m|del\s+($ip_re/\d+)\s*$|i
-                    or $line =~ m|del\s+($ip_re/$ip_re)\s*$|i) {
+            } elsif ($line =~ m|del\s+($ipv4_re)\s*$|i
+                    or $line =~ m|del\s+($ipv4_re/\d+)\s*$|i
+                    or $line =~ m|del\s+($ipv4_re/$ipv4_re)\s*$|i) {
                 ### remove the blocking rule
                 &ipt_rm_block($1);
             }
@@ -6392,21 +6399,21 @@ sub check_ipt_cmd() {
 sub sockwrite_add_ipt_block_ip() {
 
     die "[*] --fw-block-ip takes either an IP or subnet as an argument."
-        unless $fw_block_ip =~ /$ip_re/;
+        unless $fw_block_ip =~ /$ipv4_re/;
 
     my $block_ip   = '';
     my $block_mask = '';
     my $block_net  = '';
 
-    if ($fw_block_ip =~ m|^\s*($ip_re)\s*$|) {
+    if ($fw_block_ip =~ m|^\s*($ipv4_re)\s*$|) {
         $block_ip   = $1;
         $block_mask = '32';
         $block_net = new NetAddr::IP($1);
-    } elsif ($fw_block_ip =~ m|^\s*($ip_re)/($ip_re)\s*$|) {
+    } elsif ($fw_block_ip =~ m|^\s*($ipv4_re)/($ipv4_re)\s*$|) {
         $block_ip   = $1;
         $block_mask = $2;
         $block_net = new NetAddr::IP($1, $2);
-    } elsif ($fw_block_ip =~ m|^\s*($ip_re)/(\d+)\s*$|) {
+    } elsif ($fw_block_ip =~ m|^\s*($ipv4_re)/(\d+)\s*$|) {
         $block_ip   = $1;
         $block_mask = $2;
         $block_net = new NetAddr::IP($1, $2);
@@ -6463,21 +6470,21 @@ sub sockwrite_add_ipt_block_ip() {
 sub sockwrite_rm_ipt_block_ip() {
 
     die "[*] --fw-rm-block-ip takes an IP/subnet as an argument."
-        unless $fw_rm_block_ip =~ /$ip_re/;
+        unless $fw_rm_block_ip =~ /$ipv4_re/;
 
     my $rm_block_ip   = '';
     my $rm_block_mask = '';
     my $rm_block_net  = '';
 
-    if ($fw_rm_block_ip =~ m|^\s*($ip_re)\s*$|) {
+    if ($fw_rm_block_ip =~ m|^\s*($ipv4_re)\s*$|) {
         $rm_block_ip   = $1;
         $rm_block_mask = '32';
         $rm_block_net = new NetAddr::IP($1);
-    } elsif ($fw_rm_block_ip =~ m|^\s*($ip_re)/($ip_re)\s*$|) {
+    } elsif ($fw_rm_block_ip =~ m|^\s*($ipv4_re)/($ipv4_re)\s*$|) {
         $rm_block_ip   = $1;
         $rm_block_mask = $2;
         $rm_block_net = new NetAddr::IP($1, $2);
-    } elsif ($fw_rm_block_ip =~ m|^\s*($ip_re)/(\d+)\s*$|) {
+    } elsif ($fw_rm_block_ip =~ m|^\s*($ipv4_re)/(\d+)\s*$|) {
         $rm_block_ip   = $1;
         $rm_block_mask = $2;
         $rm_block_net = new NetAddr::IP($1, $2);
@@ -6799,7 +6806,7 @@ sub diskwrite_blocked_ip() {
         ### file (or update the time if $renewed_status)
         for my $line (@tmplines) {
             chomp $line;
-            if ($line =~ /^\s*($ip_re)\s*$/) {  ### old format; update to include time
+            if ($line =~ /^\s*($ipv4_re)\s*$/) {  ### old format; update to include time
                 my $tmpsrc = $1;
                 push @lines, "$tmpsrc " . $auto_blocked_ips{$tmpsrc};
                 $skip_src = 1 if $tmpsrc eq $src;
@@ -6853,7 +6860,7 @@ sub diskwrite_rm_blocked_ip() {
         die "[*] Could not open ${file}.tmp: $!";
     for my $line (@lines) {
         chomp $line;
-        if ($line =~ /^\s*($ip_re)/) {
+        if ($line =~ /^\s*($ipv4_re)/) {
             print W $line, "\n" unless $src eq $1;
         }
     }
@@ -6901,7 +6908,7 @@ sub get_local_ips() {
         my @ips = @{&run_command($cmds{'ip'}, 'addr')};
         return unless @ips;
         for my $line (@ips) {
-            if ($line =~ /inet\s+($ip_re)\/\d+\s/) {
+            if ($line =~ /inet\s+($ipv4_re)\/\d+\s/) {
                 print STDERR "[+] : Adding $1 to local_ips\n" if $debug;
                 $local_ips{$1} = '';
             } elsif ($line =~ /inet6\s(\S+)/) {
@@ -6914,7 +6921,7 @@ sub get_local_ips() {
         my @ips = @{&run_command($cmds{'ifconfig'}, '-a')};
         return unless @ips;
         for my $line (@ips) {
-            if ($line =~ /inet\s+.*?:($ip_re)\s/) {
+            if ($line =~ /inet\s+.*?:($ipv4_re)\s/) {
                 print STDERR "[+] : Adding $1 to local_ips\n" if $debug;
                 $local_ips{$1} = '';
             } elsif ($line =~ /inet6\s+addr:\s+(\S+)/) {
@@ -7210,7 +7217,7 @@ sub ipt_match_criteria() {
                     return [], '' unless $pkt_hr->{$tok} =~ m|$match_hr->{'re'}|;
                 }
             } elsif (defined $match_hr->{'net'} or defined $match_hr->{'ip'}) {
-                if ($pkt_hr->{$tok} =~ m|$ip_re|
+                if ($pkt_hr->{$tok} =~ m|$ipv4_re|
                         or $pkt_hr->{$tok} =~ m|$ipv6_re|) {
                     my $ip_match_obj = '';
                     if ($tok eq 'src') {
@@ -8125,11 +8132,11 @@ sub csv_tokens() {
                     $search_hsh{'re'} = qr|$1|;
                 } elsif ($search =~ m|^'(.*?)'$|) {
                     $search_hsh{'str'} = $1;
-                } elsif ($search =~ m|^$ip_re/$ip_re$|) {
+                } elsif ($search =~ m|^$ipv4_re/$ipv4_re$|) {
                     $search_hsh{'net'} = $search;
-                } elsif ($search =~ m|^$ip_re/\d+$|) {
+                } elsif ($search =~ m|^$ipv4_re/\d+$|) {
                     $search_hsh{'net'} = $search;
-                } elsif ($search =~ m|^$ip_re$|) {
+                } elsif ($search =~ m|^$ipv4_re$|) {
                     $search_hsh{'ip'} = $search;
                 } else {
                     die "[*] Unrecognized value for $token";
@@ -8592,7 +8599,7 @@ sub print_blocked_ip_status() {
         chomp $line;
         if ($line =~ /^\s*(\S+)/) {
             my $ip = $1;  ### this may be a subnet
-            next unless $ip =~ /$ip_re/;
+            next unless $ip =~ /$ipv4_re/;
             if ($specific_ip) {
                 next unless $ip eq $specific_ip;
             }
@@ -8753,7 +8760,7 @@ sub import_ip_dirs() {
     chdir $config{'PSAD_DIR'} or die $!;
 
     SRCIP: for my $src (@files) {
-        next SRCIP unless ($src =~ /$ip_re/ and -d $src);
+        next SRCIP unless ($src =~ /$ipv4_re/ and -d $src);
         ### define as many hash keys as we can (older versions
         ### of psad don't include several of these files).
         my $num_emails = 0;
@@ -8790,7 +8797,7 @@ sub import_ip_dirs() {
         my %dst_ips;
         for my $scan_file (@scan_files) {
             next if $scan_file =~ /_whois/;  ### may be <src>_whois
-            if ($scan_file =~ /($ip_re)/) {
+            if ($scan_file =~ /($ipv4_re)/) {
                 $dst_ips{$1} = '';
             }
         }
@@ -9068,7 +9075,7 @@ sub import_top_attackers() {
         next unless /\S/;
         next if /^\s*#\s*$/;
         ###  Format: <IP> <DL> <total_packets> <uniq_sigs> <sig_matches> <is_local>
-        if (/^\s*($ip_re)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d)/) {
+        if (/^\s*($ipv4_re)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d)/) {
             my $ip = $1;
             my $dl = $2;
             my $tot_pkts = $3;
@@ -9184,7 +9191,7 @@ sub remove_old_scans() {
 
     chdir $config{'PSAD_DIR'} or die $!;
     SRCIP: for my $src (@files) {
-        next SRCIP unless ($src =~ /$ip_re/ and -d $src);
+        next SRCIP unless ($src =~ /$ipv4_re/ and -d $src);
         rmtree $src or die
             "[*] Could not remove $config{'PSAD_DIR'}/$src: $!";
     }
@@ -9294,7 +9301,7 @@ sub archive_data() {
     closedir D;
 
     IPDIR: for my $file (@files) {
-        if ($file =~ /$ip_re/ and -d $file) {
+        if ($file =~ /$ipv4_re/ and -d $file) {
             ### check for the danger level associated with this dir
             if (-e "$file/danger_level") {
                 open F, "< $file/danger_level" or next IPDIR;
@@ -9723,7 +9730,7 @@ sub disk_space_exceeded() {
 
         chdir $config{'PSAD_DIR'} or die $!;
         for my $ipdir (@ipdirs) {
-            if ($ipdir =~ /$ip_re/ and -d $ipdir) {
+            if ($ipdir =~ /$ipv4_re/ and -d $ipdir) {
                 opendir IP, $ipdir or die $!;
                 my @scanfiles = readdir IP;
                 closedir IP;
@@ -9811,7 +9818,7 @@ sub dump_conf() {
         my @ifconfig_out = @{&run_command($cmds{'ip'}, 'addr')};
         if (@ifconfig_out) {
             for (@ifconfig_out) {
-                s/$ip_re/x.x.x.x/g;
+                s/$ipv4_re/x.x.x.x/g;
                 s/inet6\s+\S+/inet6 (removed)/;
                 print $fh $_;
             }
@@ -9821,7 +9828,7 @@ sub dump_conf() {
         my @ifconfig_out = @{&run_command($cmds{'ifconfig'}, '-a')};
         if (@ifconfig_out) {
             for (@ifconfig_out) {
-                s/$ip_re/x.x.x.x/g;
+                s/$ipv4_re/x.x.x.x/g;
                 s/inet6\s+addr:\s+\S+/inet6 addr: (removed)/;
                 print $fh $_;
             }
@@ -9901,8 +9908,8 @@ sub dump_ipt_policy() {
                 ### always include 0.0.0.0/0
                 $line =~ s|0\.0\.0\.0/0|___PsAd0Net___|g;
                 $line =~ s|0\.0\.0\.0|___PsAd0IP___|g;
-                $line =~ s|($ip_re/\d+)|x.x.x.x/x|g;
-                $line =~ s|($ip_re)|x.x.x.x|g;
+                $line =~ s|($ipv4_re/\d+)|x.x.x.x/x|g;
+                $line =~ s|($ipv4_re)|x.x.x.x|g;
                 $line =~ s|___PsAd0Net___|0.0.0.0/0|g;
                 $line =~ s|___PsAd0IP___|0.0.0.0|g;
             }

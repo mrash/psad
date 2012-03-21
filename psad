@@ -8175,30 +8175,56 @@ sub benchmark_mode() {
         print scalar localtime(),
             " [+] Executing a $num_packets packet test.\n";
     } else {
-        print scalar localtime(), ' [+] The --packets command line ',
-            "option was not specified.\n";
-        print scalar localtime(),
-            " [+] Defaulting to a 10,000 packet test.\n";
-        $num_packets = 10000;
+        if ($fw_data_file) {
+            print scalar localtime(), ' [+] The --packets command line ',
+                "option was not specified.\n";
+            print scalar localtime(),
+                " [+] Defaulting to read the entire $fw_data_file file.\n";
+        } else {
+            print scalar localtime(), ' [+] The --packets command line ',
+                "option was not specified.\n";
+            print scalar localtime(),
+                " [+] Defaulting to a 10,000 packet test.\n";
+            $num_packets = 10000;
+        }
     }
 
     ### initialize benchmarking test packets if we are running
     ### in benchmark mode
-    ### FIXME better random packet data tests, add IP and TCP options, etc.
-    my $test_pkt = 'Feb 15 16:42:58 orthanc kernel: DROP IN=eth0 ' .
-        'OUT= MAC=00:a0:cc:28:42:5a:00:03:6c:00:98:54:08:00 ' .
-        'SRC=192.168.10.2 DST=192.168.10.1 LEN=48 TOS=0x00 PREC=0x00 ' .
-        'TTL=110 ID=13383 DF PROTO=TCP SPT=1389 ';
-    my $test_pktend = 'WINDOW=16384 RES=0x00 SYN URGP=0';
+    if ($fw_data_file) {
+        if ($num_packets) {
+            print scalar localtime(), " [+] Creating $num_packets packet ",
+                "array from $fw_data_file\n";
+        } else {
+            print scalar localtime(), " [+] Creating packet ",
+                "array from complete $fw_data_file\n";
+        }
+        my $ctr = 0;
+        open F, "< $fw_data_file" or die "[*] Could not open $fw_data_file: $!";
+        while (<F>) {
+            chomp;
+            push @fw_packets, $_;
+            $ctr++;
+            last if $num_packets > 0 and $ctr >= $num_packets;
+        }
+        close F;
+    } else {
+        ### FIXME better random packet data tests, add IP and TCP options, etc.
+        my $test_pkt = 'Feb 15 16:42:58 orthanc kernel: DROP IN=eth0 ' .
+            'OUT= MAC=00:a0:cc:28:42:5a:00:03:6c:00:98:54:08:00 ' .
+            'SRC=192.168.10.2 DST=192.168.10.1 LEN=48 TOS=0x00 PREC=0x00 ' .
+            'TTL=110 ID=13383 DF PROTO=TCP SPT=1389 ';
+        my $test_pktend = 'WINDOW=16384 RES=0x00 SYN URGP=0';
 
-    my $b_time = time();
-    print scalar localtime(), " [+] Creating packet array.\n";
-    my $dp = 1000;
-    for (my $i=0; $i <= $num_packets; $i++) {
-        push @fw_packets, "$test_pkt DPT=$dp $test_pktend";
-        $dp++ if $dp < 50000;
+        print scalar localtime(), " [+] Creating packet array.\n";
+        my $dp = 1000;
+        for (my $i=0; $i <= $num_packets; $i++) {
+            push @fw_packets, "$test_pkt DPT=$dp $test_pktend";
+            $dp++ if $dp < 50000;
+        }
     }
 
+    my $b_time = time();
     print scalar localtime(), " [+] check_scan()\n" if $benchmark;
     &check_scan(\@fw_packets);
 

@@ -413,6 +413,7 @@ my $lib_dir          = '';
 my $rm_data_ctr      = 0;
 my $analysis_emails  = 0;
 my $analysis_whois   = 0;
+my $enable_analysis_dns = 0;
 my $netstat_lkup_ctr = 0;
 my $kmsgsd_started   = 0;
 my $warn_msg         = '';
@@ -1128,6 +1129,43 @@ sub check_scan() {
                 print STDERR "[+] ignoring $pkt{'src'} $pkt{'proto'} ",
                     "$pkt{'dp'} scan.\n" if $debug;
                 next PKT;
+            }
+        }
+
+        if ($pkt{'proto'} eq 'icmp') {
+
+            ### validate icmp type and code fields against the official values
+            ### in RFC 792.  See %inval_type_code for corresponding signature
+            ### message text and danger levels.
+            my $type_code_rv = &check_icmp_type($pkt{'itype'},
+                    $pkt{'icode'});
+
+            my $update_dl = 0;
+            if ($type_code_rv == $BAD_ICMP_TYPE) {  ### bad type
+
+                $scan{$pkt{'src'}}{$pkt{'dst'}}{'icmp'}
+                    {'invalid_type'}{$pkt{'itype'}}
+                    {$pkt{'chain'}}{'pkts'}++;
+
+                $update_dl = 1;
+
+            } elsif ($type_code_rv == $BAD_ICMP_CODE) {
+
+                $scan{$pkt{'src'}}{$pkt{'dst'}}{'icmp'}
+                    {'invalid_code'}{$pkt{'itype'}}{$pkt{'icode'}}
+                    {$pkt{'chain'}}{'pkts'}++;
+
+                $update_dl = 1;
+            }
+
+            if ($update_dl) {
+                if (defined $scan_dl{$pkt{'src'}}) {
+                    if ($scan_dl{$pkt{'src'}} < 2) {
+                        $scan_dl{$pkt{'src'}} = 2;
+                    }
+                } else {
+                    $scan_dl{$pkt{'src'}} = 2;
+                }
             }
         }
 
@@ -2012,7 +2050,8 @@ sub match_snort_keywords() {
     my $dl = 0;
     my $matched_sig = $NO_SIG_MATCH;
 
-    ### see if all Snort keywords match the packet
+    ### see if all Snort keywords match the packet - the sigs hash has
+    ### been restricted to the appropriate protocol
     SIG: for my $sid (keys %$sigs_ids_hr) {
 
         next SIG unless defined $sigs{$sid};  ### should never happen
@@ -2106,30 +2145,6 @@ sub match_snort_keywords() {
                 $top_sig_counts{$pkt_hr->{'src'}}++;
             }
         } elsif ($sig_hr->{'proto'} eq 'icmp') {
-
-            ### validate icmp type and code fields against the official values
-            ### in RFC 792.  See %inval_type_code for corresponding signature
-            ### message text and danger levels.
-            my $type_code_rv = &check_icmp_type($pkt_hr->{'itype'},
-                    $pkt_hr->{'icode'});
-
-            if ($type_code_rv == $BAD_ICMP_TYPE) {  ### bad type
-
-                $dl = 2 if $dl < 2;
-
-                $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'icmp'}
-                    {'invalid_type'}{$pkt_hr->{'itype'}}
-                    {$pkt_hr->{'chain'}}{'pkts'}++;
-
-            } elsif ($type_code_rv == $BAD_ICMP_CODE) {
-
-                $dl = 2 if $dl < 2;
-
-                $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'icmp'}
-                    {'invalid_code'}{$pkt_hr->{'itype'}}{$pkt_hr->{'icode'}}
-                    {$pkt_hr->{'chain'}}{'pkts'}++;
-            }
-            $dl = $dl_tmp if $dl_tmp > $dl;
 
             ($rv, $sig_match_rv) = &match_snort_icmp_keywords($pkt_hr, $sig_hr);
 
@@ -3021,9 +3036,15 @@ sub dshield_email_log() {
 
 sub check_icmp_type() {
     my ($type, $code) = @_;
-    return $BAD_ICMP_TYPE if not defined $valid_icmp_types{$type};
-    return $BAD_ICMP_CODE if not defined
-            $valid_icmp_types{$type}{'codes'}{$code};
+    print STDERR "    check_icmp_type(type: $type, code: $code)\n" if $debug;
+    if (not defined $valid_icmp_types{$type}) {
+        print STDERR "        BAD_ICMP_TYPE\n" if $debug;
+        return $BAD_ICMP_TYPE;
+    } elsif (not defined $valid_icmp_types{$type}{'code'}{$code}) {
+        print STDERR "        BAD_ICMP_CODE\n" if $debug;
+        return $BAD_ICMP_CODE;
+    }
+    print STDERR "        valid type/code\n" if $debug;
     return 0;
 }
 
@@ -5231,15 +5252,11 @@ sub scan_logr() {
 
             ### get the absolute starting time for the scan and the
             ### current time
-            my $abs_s_time = '';
-            if ($analyze_mode) {
-                $abs_s_time = $scan{$src}{$dst}{'s_time'};
-            } else {
-                $abs_s_time = scalar localtime $scan{$src}{$dst}{'s_time'};
-            }
             my $s_time = '';
-            if (not $analyze_mode and time() - $config{'CHECK_INTERVAL'} <
-                    $scan{$src}{$dst}{'s_time'}) {
+            my $abs_s_time = scalar localtime $scan{$src}{$dst}{'s_time'};
+
+            if (not $analyze_mode and ((time() - $config{'CHECK_INTERVAL'}) <
+                    $scan{$src}{$dst}{'s_time'})) {
                 $s_time = $abs_s_time;
             } else {
                 $s_time = scalar localtime((time()
@@ -8444,7 +8461,8 @@ sub print_scan_status() {
 
             my $src_obj = new NetAddr::IP($src) or die "[*] NetAddr::IP($src) error";
             if ($src_obj->version() == 6) {
-                $src_str = "\nSRC:  $src (" . $src_obj->short() . "), DL: $dl, Dsts: $total_dsts" .
+                $src_str = "\nSRC:  $src (" . $src_obj->short() .
+                    "), DL: $dl, Dsts: $total_dsts" .
                     ", Pkts: $tot_pkts, Unique sigs: $uniq_sigs";
             }
 
@@ -8555,6 +8573,36 @@ sub print_scan_status() {
                             }
                             $sig_str .= ", Sid: $sid";
                             push @lines, $sig_str, "\n";
+                        }
+                    }
+                }
+
+                ### icmp validation
+                for my $proto ('icmp', 'icmp6') {
+                    next unless defined $scan{$src}{$dst}{$proto};
+                    if (defined $scan{$src}{$dst}{$proto}{'invalid_type'}) {
+                        my $hr = $scan{$src}{$dst}{$proto}{'invalid_type'};
+                        for my $type (keys %$hr) {
+                            for my $chain (keys %{$hr->{$type}}) {
+                                my $pkts = $hr->{$type}->{$chain}->{'pkts'};
+                                push @lines, qq|        Invalid | . uc($proto) .
+                                    qq| type: "$type" Chain: $chain, Packets: | .
+                                    "$pkts\n";
+                            }
+                        }
+                    }
+                    if (defined $scan{$src}{$dst}{$proto}{'invalid_code'}) {
+                        my $hr = $scan{$src}{$dst}{$proto}{'invalid_code'};
+                        for my $type (keys %$hr) {
+                            for my $code (keys %{$hr->{$type}}) {
+                                for my $chain (keys %{$hr->{$type}->{$code}}) {
+                                    my $pkts = $hr->{$type}->{$code}->{$chain}->{'pkts'};
+                                    push @lines, qq|        Invalid | . uc($proto) .
+                                        qq| code: "$code" for | . uc($proto) .
+                                        qq| "$valid_icmp_types{$type}{'text'}" packet | .
+                                        qq|Chain: $chain, Packets: $pkts\n|;
+                                }
+                            }
                         }
                     }
                 }
@@ -9407,8 +9455,9 @@ sub handle_cmdline() {
     ### file was specified on the command line.
     $fw_analyze = 1 if $fw_file;
 
-    ### disable whois lookups if we are running in -A mode.
+    ### disable whois and DNS lookups if we are running in -A mode.
     $no_whois = 1 if $analyze_mode and not $analysis_whois;
+    $no_rdns = 1 if $analyze_mode and not $enable_analysis_dns;
 
     return;
 }
@@ -10394,6 +10443,7 @@ sub getopt_wrapper() {
         'analyze-fields=s'  => \$analysis_fields,
         'whois-analysis'    => \$analysis_whois,  # Issue whois lookups in analysis
                                                   #   mode.
+        'dns-analysis'      => \$enable_analysis_dns,  # Issue DNS lookups in -A mode.
         'email-analysis'    => \$analysis_emails, # Send analysis mode emails.
         'messages-file=s'   => \$fw_data_file,    # Specify the path to file containing
                                                   #   old iptables messages (fwdata by
@@ -10603,8 +10653,6 @@ Options:
     -A,  --Analyze-msgs           - Analyze iptables logfile and exit.
     -e,  --email-analysis         - Send emails for scans detected in
                                     offline analysis mode.
-    -w,  --whois-analysis         - Enable whois lookups when running in
-                                    offline --Analyze-msgs mode.
     -m,  --messages-file <file>   - Specify the path to the iptables logfile
                                     (for --Analyze-msgs mode).
     -i,  --interface <intf>       - Restrict detection to IN interface (for
@@ -10613,6 +10661,10 @@ Options:
     --sig-update                  - Download the latest set of psad
                                     signatures from:
                                     http://www.cipherdyne.org/
+    -w,  --whois-analysis         - Enable whois lookups when running in
+                                    offline --Analyze-msgs mode.
+    --dns-analysis                - Enable reverse DNS lookups in
+                                    --Analyze-msgs mode.
     --fw-analyze                  - Analyze the local iptables ruleset and
                                     exit.
     --fw-list-auto                - List the contents of any iptables chains

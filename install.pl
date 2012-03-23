@@ -61,6 +61,7 @@ my %file_vars = (
     'signatures'    => 'SIGS_FILE',
     'auto_dl'       => 'AUTO_DL_FILE',
     'icmp_types'    => 'ICMP_TYPES_FILE',
+    'icmp6_types'   => 'ICMP6_TYPES_FILE',
     'posf'          => 'POSF_FILE',
     'pf.os'         => 'P0F_FILE',
     'snort_rule_dl' => 'SNORT_RULE_DL_FILE',
@@ -536,7 +537,7 @@ sub install() {
     &perms_ownership($prod_file, 0600);
 
     ### install auto_dl, signatures, icmp_types, posf, and pf.os files
-    for my $filename (qw(signatures icmp_types
+    for my $filename (qw(signatures icmp_types icmp6_types
             posf auto_dl snort_rule_dl pf.os ip_options)) {
         my $file = $config{$file_vars{$filename}};
         if (-e $file) {

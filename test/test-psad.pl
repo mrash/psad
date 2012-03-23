@@ -18,6 +18,7 @@ my $null_scan_file = 'null_scan_1000_1150';
 my $ack_scan_file  = 'ack_scan_1000_1150';
 my $udp_scan_file  = 'udp_scan_1000_1150';
 my $ipv6_connect_scan_file  = 'ipv6_tcp_connect_nmap_default_scan';
+my $ipv6_ping_scan_file = 'ipv6_ping_scan';
 my $ignore_ipv4_auto_dl_file = "$conf_dir/auto_dl_ignore_192.168.10.55";
 my $ignore_ipv4_subnet_auto_dl_file = "$conf_dir/auto_dl_ignore_192.168.10.0_24";
 my $ignore_ipv6_addr_auto_dl_file = "$conf_dir/auto_dl_ignore_ipv6_addr";
@@ -500,6 +501,20 @@ my @tests = (
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv6 allow valid ping packets',
+        'err_msg'   => 'generated detection event',
+        'negative_output_matches' => [
+                qr/SRC\:.*2001\:DB8\:0\:F101\:\:2/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A -m $scans_dir/" .
+                &fw_type() . "/$ipv6_ping_scan_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+
     {
         'category'  => 'operations',
         'detail'    => 'IPv6 disabled',

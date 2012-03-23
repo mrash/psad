@@ -208,7 +208,8 @@ my %posf = ();
 my %posf_sigs = ();
 
 ### cache valid icmp types and corresponding codes
-my %valid_icmp_types = ();
+my %valid_icmp_types  = ();
+my %valid_icmp6_types = ();
 
 ### Cache snort rule messages unless --no-snort-sids switch was
 ### given.  This is only useful if iptables includes rules
@@ -429,6 +430,7 @@ my $num_hash_marks = 76;  ### for gnuplot output
 my $no_snort_sids = 0;
 my $no_signatures = 0;
 my $no_icmp_types = 0;
+my $no_icmp6_types = 0;
 my $no_auto_dl    = 0;
 my $no_posf       = 0;
 my $no_daemon     = 0;
@@ -1137,11 +1139,12 @@ sub check_scan() {
             ### validate icmp type and code fields against the official values
             ### in RFC 792.  See %inval_type_code for corresponding signature
             ### message text and danger levels.
-            my $type_code_rv = &check_icmp_type($pkt{'itype'},
-                    $pkt{'icode'});
+            my $type_code_rv = &check_icmp_type(
+                    'icmp', \%valid_icmp_types,
+                    $pkt{'itype'}, $pkt{'icode'});
 
             my $update_dl = 0;
-            if ($type_code_rv == $BAD_ICMP_TYPE) {  ### bad type
+            if ($type_code_rv == $BAD_ICMP_TYPE) {
 
                 $scan{$pkt{'src'}}{$pkt{'dst'}}{'icmp'}
                     {'invalid_type'}{$pkt{'itype'}}
@@ -1152,6 +1155,43 @@ sub check_scan() {
             } elsif ($type_code_rv == $BAD_ICMP_CODE) {
 
                 $scan{$pkt{'src'}}{$pkt{'dst'}}{'icmp'}
+                    {'invalid_code'}{$pkt{'itype'}}{$pkt{'icode'}}
+                    {$pkt{'chain'}}{'pkts'}++;
+
+                $update_dl = 1;
+            }
+
+            if ($update_dl) {
+                if (defined $scan_dl{$pkt{'src'}}) {
+                    if ($scan_dl{$pkt{'src'}} < 2) {
+                        $scan_dl{$pkt{'src'}} = 2;
+                    }
+                } else {
+                    $scan_dl{$pkt{'src'}} = 2;
+                }
+            }
+
+        } elsif ($pkt{'proto'} eq 'icmp6') {
+
+            ### validate icmp6 type and code fields against the official values
+            ### defined by IANA.  See %inval_type_code for corresponding signature
+            ### message text and danger levels.
+            my $type_code_rv = &check_icmp_type(
+                    'icmp6', \%valid_icmp6_types,
+                    $pkt{'itype'}, $pkt{'icode'});
+
+            my $update_dl = 0;
+            if ($type_code_rv == $BAD_ICMP_TYPE) {
+
+                $scan{$pkt{'src'}}{$pkt{'dst'}}{'icmp6'}
+                    {'invalid_type'}{$pkt{'itype'}}
+                    {$pkt{'chain'}}{'pkts'}++;
+
+                $update_dl = 1;
+
+            } elsif ($type_code_rv == $BAD_ICMP_CODE) {
+
+                $scan{$pkt{'src'}}{$pkt{'dst'}}{'icmp6'}
                     {'invalid_code'}{$pkt{'itype'}}{$pkt{'icode'}}
                     {$pkt{'chain'}}{'pkts'}++;
 
@@ -1847,17 +1887,17 @@ sub parse_NF_pkt_str() {
             }
 
             $pkt_hr->{'proto'} = 'icmp';
-        }
 
-        if ($pkt_hr->{'itype'} == $ICMP_ECHO_REQUEST
-                or $pkt_hr->{'itype'} == $ICMP_ECHO_REPLY) {
+            if ($pkt_hr->{'itype'} == $ICMP_ECHO_REQUEST
+                    or $pkt_hr->{'itype'} == $ICMP_ECHO_REPLY) {
 
-            ### we expect the ICMP ID and SEQ fields to be populated
-            if ($pkt_str =~ /CODE=(\d+)\s+ID=(\d+)\s+SEQ=(\d+)/) {
-                $pkt_hr->{'icmp_id'}  = $1;
-                $pkt_hr->{'icmp_seq'} = $2;
-            } else {
-                return $PKT_ERROR;
+                ### we expect the ICMP ID and SEQ fields to be populated
+                if ($pkt_str =~ /CODE=(\d+)\s+ID=(\d+)\s+SEQ=(\d+)/) {
+                    $pkt_hr->{'icmp_id'}  = $1;
+                    $pkt_hr->{'icmp_seq'} = $2;
+                } else {
+                    return $PKT_ERROR;
+                }
             }
         }
 
@@ -2116,6 +2156,7 @@ sub match_snort_keywords() {
                 $top_sigs{$sid}++;
                 $top_sig_counts{$pkt_hr->{'src'}}++;
             }
+
         } elsif ($sig_hr->{'proto'} eq 'udp') {
 
             ($rv, $sig_match_rv) = &match_snort_udp_keywords($pkt_hr, $sig_hr);
@@ -2144,6 +2185,7 @@ sub match_snort_keywords() {
                 $top_sigs{$sid}++;
                 $top_sig_counts{$pkt_hr->{'src'}}++;
             }
+
         } elsif ($sig_hr->{'proto'} eq 'icmp') {
 
             ($rv, $sig_match_rv) = &match_snort_icmp_keywords($pkt_hr, $sig_hr);
@@ -2168,8 +2210,10 @@ sub match_snort_keywords() {
                 $top_sigs{$sid}++;
                 $top_sig_counts{$pkt_hr->{'src'}}++;
             }
-        }
 
+        } elsif ($sig_hr->{'proto'} eq 'icmp6') {
+            ### FIXME icmp6 specifc Snort matches?
+        }
     }
     return $dl, $matched_sig;
 }
@@ -3035,16 +3079,16 @@ sub dshield_email_log() {
 }
 
 sub check_icmp_type() {
-    my ($type, $code) = @_;
+    my ($proto, $valid_types_hr, $type, $code) = @_;
     print STDERR "    check_icmp_type(type: $type, code: $code)\n" if $debug;
-    if (not defined $valid_icmp_types{$type}) {
-        print STDERR "        BAD_ICMP_TYPE\n" if $debug;
+    if (not defined $valid_types_hr->{$type}) {
+        print STDERR "        bad $proto type\n" if $debug;
         return $BAD_ICMP_TYPE;
-    } elsif (not defined $valid_icmp_types{$type}{'code'}{$code}) {
-        print STDERR "        BAD_ICMP_CODE\n" if $debug;
+    } elsif (not defined $valid_types_hr->{$type}->{'codes'}->{$code}) {
+        print STDERR "        bad $proto code\n" if $debug;
         return $BAD_ICMP_CODE;
     }
-    print STDERR "        valid type/code\n" if $debug;
+    print STDERR "        valid $proto type/code\n" if $debug;
     return 0;
 }
 
@@ -3231,7 +3275,10 @@ sub psad_init() {
     ### import icmp types and codes from psad_icmp_types; icmp "type"
     ### and "code" fields will be validated against the values in this
     ### file.
-    &import_icmp_types() unless $no_icmp_types;
+    &import_icmp_types('icmp', \%valid_icmp_types, $config{'ICMP_TYPES_FILE'})
+        unless $no_icmp_types;
+    &import_icmp_types('icmp6', \%valid_icmp6_types,
+        $config{'ICMP6_TYPES_FILE'}) unless $no_icmp6_types;
 
     ### import p0f-based passive OS fingerprinting signatures
     &import_p0f_ipv4_sigs() unless $no_posf;
@@ -4258,26 +4305,23 @@ sub check_supported_options() {
 }
 
 sub import_icmp_types() {
+    my ($proto, $type_hr, $file) = @_;
 
-    %valid_icmp_types = ();
-
-    open TYPES, "< $config{'ICMP_TYPES_FILE'}" or die
-        "[*] Could not open $config{'ICMP_TYPES_FILE'}: $!";
-    my @lines = <TYPES>;
-    close TYPES;
+    open F, "< $file" or die "[*] Could not open $file: $!";
     my $icmp_type = -1;
-    for my $line (@lines) {
-        next if $line =~ /^\s*#/;
-        if ($line =~ /^(\d+)\s+(.*)/) {
-            $icmp_type      = $1;
+    while (<F>) {
+        next if /^\s*#/;
+        if (/^(\d+)\s+(.*)/) {
+            $icmp_type = $1;
             my $icmp_type_text = $2;
             if ($icmp_type_text =~ /unassigned/i) {
                 $icmp_type = -1;
             }
-            $valid_icmp_types{$icmp_type}{'text'} = $icmp_type_text;
+            $type_hr->{$icmp_type}->{'text'} = $icmp_type_text;
+            $type_hr->{$icmp_type}->{'codes'}{-1} = '';
             next;
         }
-        if ($icmp_type > -1 and $line =~ /^\s+(\d+)\s+(.*)/) {
+        if (/^\s+(\d+)\s+(.*)/ and $icmp_type > -1) {
             my $icmp_code      = $1;
             my $icmp_code_text = $2;
             next if $icmp_code_text =~ /unassigned/i;
@@ -4285,11 +4329,12 @@ sub import_icmp_types() {
             ### we validate against the icmp type first (i.e. an invalid
             ### icmp code is meaningless unless we first have a valid
             ### icmp type).
-            $valid_icmp_types{$icmp_type}{'codes'}{$icmp_code} = '';
+            $type_hr->{$icmp_type}->{'codes'}->{$icmp_code} = '';
         }
     }
-    print STDERR Dumper %valid_icmp_types if $debug and $verbose;
-    &sys_log('imported valid icmp types and codes');
+    close F;
+    print STDERR Dumper $type_hr if $debug and $verbose;
+    &sys_log("imported valid $proto types and codes");
     return;
 }
 
@@ -10555,6 +10600,7 @@ sub getopt_wrapper() {
                                                   #   fingerprint the remote OS.
         'no-signatures'     => \$no_signatures,   # Disable signature processing.
         'no-icmp-types'     => \$no_icmp_types,   # Disable icmp type/code validation.
+        'no-icmp6-types'    => \$no_icmp6_types,  # Disable icmp6 type/code validation.
         'no-auto-dl'        => \$no_auto_dl,      # Disable auto danger level
                                                   #   assignment.
         'no-daemon'         => \$no_daemon,       # Do not run as a daemon.
@@ -10631,6 +10677,7 @@ sub required_vars() {
         ETC_RSYSLOG_CONF IFCFGTYPE ENABLE_WHOIS_FORCE_ASCII
         ENABLE_WHOIS_FORCE_SRC_IP ENABLE_IPV6_DETECTION
         PERSISTENCE_CTR_THRESHOLD MAX_SCAN_IP_PAIRS INSTALL_ROOT
+        ICMP6_TYPES_FILE
     ));
     &defined_vars(\@required_vars);
     return;

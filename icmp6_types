@@ -1,0 +1,99 @@
+#
+###############################################################################
+#
+# File: icmp6_types
+#
+# Purpose: This file contains all valid icmp6 types and corresponding codes as
+#          defined by IANA.  If a packet is logged by iptables that does
+#          not have a valid type and/or code, then an alert will be generated.
+#
+###############################################################################
+#
+
+# Type
+#  Code values
+
+0    Reserved
+1    Destination Unreachable
+    0   No route to destination
+    1   Communication with destination administratively prohibited
+    2   Beyond scope of source address
+    3   Address unreachable
+    4   Port unreachable
+    5   Source address failed ingress/egress policy
+    6   Reject route to destination
+    7   Error in Source Routing Header
+
+2    Packet Too Big
+    0
+
+3    Time Exceeded
+    0   Hop limit exceeded in transit
+    1   Fragment reassembly time exceeded
+
+4    Parameter Problem
+    0   Erroneous header field encountered
+    1   Unrecognized Next Header type encountered
+    2   Unrecognized IPv6 option encountered
+
+128     Echo Request
+    0
+
+129     Echo Reply
+    0
+
+130     Multicast Listener Query
+    0
+
+131     Multicast Listener Report
+    0
+
+132     Multicast Listener Done
+    0
+
+133     Router Solicitation
+    0
+
+134     Router Advertisement
+    0
+
+135     Neighbor Solicitation
+    0
+
+136     Neighbor Advertisement
+    0
+
+ 137     Redirect Message
+     0
+
+138     Router Renumbering
+    0   Router Renumbering Command
+    1   Router Renumbering Result
+    255   Sequence Number Reset
+
+139     ICMP Node Information Query
+    0   The Data field contains an IPv6 address which is the Subject of this Query.
+    1   The Data field contains a name which is the Subject of this Query, or is empty, as in the case of a NOOP.
+    2   The Data field contains an IPv4 address which is the Subject of this Query.
+
+140     ICMP Node Information Response
+    0   A successful reply.  The Reply Data field may or may not be empty.
+    1   The Responder refuses to supply the answer.  The Reply Data field will be empty.
+    2   The Qtype of the Query is unknown to the Responder.  The Reply Data field will be empty.
+
+141     Inverse Neighbor Discovery Solicitation Message
+    0
+
+142     Inverse Neighbor Discovery Advertisement Message
+    0
+144     Home Agent Address Discovery Request Message
+    0
+
+145     Home Agent Address Discovery Reply Message
+    0
+
+146     Mobile Prefix Solicitation
+    0
+
+147     Mobile Prefix Advertisement
+    0

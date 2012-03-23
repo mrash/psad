@@ -2198,6 +2198,10 @@ Usage: install.pl [options]
                                    (this is not usually necessary since
                                    the default is to enable
                                    ENABLE_SYSLOG_FILE).
+    --install-root <dir>         - Install psad at a custom path (analogous
+                                   to './configure --prefix=/dir').
+    --install-test-dir           - Install psad in test/psad-install for
+                                   test suite.
     -r, --runlevel <N>           - Specify the current system runlevel.
     --no-rm-lib-dir              - Do not remove the /usr/lib/psad/
                                    directory before installing psad.

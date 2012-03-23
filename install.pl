@@ -11,7 +11,7 @@
 #
 # Credits:  (see the CREDITS file)
 #
-# Copyright (C) 1999-2011 Michael Rash (mbr@cipherdyne.org)
+# Copyright (C) 1999-2012 Michael Rash (mbr@cipherdyne.org)
 #
 # License (GNU Public License):
 #
@@ -200,6 +200,10 @@ Getopt::Long::Configure('no_ignore_case');
 ### set LC_ALL env variable
 $ENV{'LC_ALL'} = $locale unless $no_locale;
 
+### make a copy of the original psad.conf file and restore at the end
+copy $psad_conf_file, "${psad_conf_file}.orig" or die "[*] Could not ",
+    "copy $psad_conf_file -> $psad_conf_file.orig";
+
 $install_root = getcwd() . '/test/psad-install' if $install_test_dir;
 
 ### import paths from default psad.conf
@@ -261,6 +265,13 @@ if ($uninstall) {
 open F, "> $config{'INSTALL_LOG_FILE'}" or die $!;
 print F for @installation_lines;
 close F;
+
+### restore the original psad.conf file (this is just the local one in the
+### sources directory).
+if (-e "${psad_conf_file}.orig") {
+    copy "${psad_conf_file}.orig", $psad_conf_file or die "[*] Could not ",
+        "copy $psad_conf_file.orig -> $psad_conf_file";
+}
 
 exit 0;
 #================= end main =================
@@ -757,6 +768,7 @@ sub install() {
             &logr("\n[+] To start psad, run ${USRSBIN_DIR}/psad\"\n");
         }
     }
+
     return;
 }
 

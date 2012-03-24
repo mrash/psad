@@ -20,6 +20,7 @@ my $udp_scan_file  = 'udp_scan_1000_1150';
 my $ipv6_connect_scan_file  = 'ipv6_tcp_connect_nmap_default_scan';
 my $ipv6_ping_scan_file = 'ipv6_ping_scan';
 my $ipv6_invalid_icmp6_type_code_file = 'ipv6_invalid_icmp6_type_code';
+my $ipv4_invalid_icmp6_type_code_file = 'invalid_icmp_type_code';
 my $ignore_ipv4_auto_dl_file = "$conf_dir/auto_dl_ignore_192.168.10.55";
 my $ignore_ipv4_subnet_auto_dl_file = "$conf_dir/auto_dl_ignore_192.168.10.0_24";
 my $ignore_ipv6_addr_auto_dl_file = "$conf_dir/auto_dl_ignore_ipv6_addr";
@@ -526,6 +527,20 @@ my @tests = (
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A -m $scans_dir/" .
                 &fw_type() . "/$ipv6_invalid_icmp6_type_code_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv4 invalid ICMP type/code detection',
+        'err_msg'   => 'did not generate detection event',
+        'positive_output_matches' => [
+                qr/Invalid\sICMP/,
+                qr/SRC\:\s+192.168.10.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A -m $scans_dir/" .
+                &fw_type() . "/$ipv4_invalid_icmp6_type_code_file -c $default_conf",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },

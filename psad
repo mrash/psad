@@ -8642,9 +8642,15 @@ sub print_scan_status() {
                             for my $code (keys %{$hr->{$type}}) {
                                 for my $chain (keys %{$hr->{$type}->{$code}}) {
                                     my $pkts = $hr->{$type}->{$code}->{$chain}->{'pkts'};
+                                    my $type_text = '';
+                                    if ($proto eq 'icmp') {
+                                        $type_text = $valid_icmp_types{$type}{'text'};
+                                    } else {
+                                        $type_text = $valid_icmp6_types{$type}{'text'};
+                                    }
                                     push @lines, qq|        Invalid | . uc($proto) .
                                         qq| code: "$code" for | . uc($proto) .
-                                        qq| "$valid_icmp_types{$type}{'text'}" packet | .
+                                        qq| "$type_text" packet | .
                                         qq|Chain: $chain, Packets: $pkts\n|;
                                 }
                             }

@@ -17,6 +17,9 @@ my $xmas_scan_file = 'xmas_scan_1000_1150';
 my $null_scan_file = 'null_scan_1000_1150';
 my $ack_scan_file  = 'ack_scan_1000_1150';
 my $udp_scan_file  = 'udp_scan_1000_1150';
+my $ms_sql_server_sig_match_file  = 'ms_sql_server_sig_match';
+my $ipv6_ms_sql_server_sig_match_file  = 'ipv6_ms_sql_server_sig_match';
+my $no_ms_sql_server_sig_match_file = "$conf_dir/signatures_no_ms_sql_server_sig";
 my $ipv6_connect_scan_file  = 'ipv6_tcp_connect_nmap_default_scan';
 my $ipv6_ping_scan_file = 'ipv6_ping_scan';
 my $ipv6_invalid_icmp6_type_code_file = 'ipv6_invalid_icmp6_type_code';
@@ -196,6 +199,67 @@ my @tests = (
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv4 MS SQL Server communication attempt detection',
+        'err_msg'   => 'did not detect MS SQL Server attempt',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports/i,
+                qr/IP\sstatus/i,
+                qr/SQL\sServer\scommunication/i,
+                qr/192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A -m $scans_dir/" .
+                &fw_type() . "/$ms_sql_server_sig_match_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv6 MS SQL Server communication attempt detection',
+        'err_msg'   => 'did not detect MS SQL Server attempt',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports/i,
+                qr/IP\sstatus/i,
+                qr/SQL\sServer\scommunication/i,
+                qr/SRC\:.*2001\:DB8\:0\:F101\:\:2/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A -m $scans_dir/" .
+                &fw_type() . "/$ipv6_ms_sql_server_sig_match_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv4 exclude MS SQL Server sig match',
+        'err_msg'   => 'logged MS SQL Server attempt',
+        'negative_output_matches' => [
+                qr/SQL\sServer\scommunication/i],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A -m $scans_dir/" .
+                &fw_type() . "/$ms_sql_server_sig_match_file " .
+                "--signatures $no_ms_sql_server_sig_match_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv6 exclude MS SQL Server sig match',
+        'err_msg'   => 'logged MS SQL Server attempt',
+        'negative_output_matches' => [
+                qr/SQL\sServer\scommunication/i],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A -m $scans_dir/" .
+                &fw_type() . "/$ipv6_ms_sql_server_sig_match_file " .
+                "--signatures $no_ms_sql_server_sig_match_file -c $default_conf",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+
     {
         'category'  => 'operations',
         'detail'    => 'IPv4 FIN scan detection',

@@ -162,6 +162,9 @@ my $exclude_mod_re = '';
 my $install_test_dir = 0;
 my $no_rm_old_lib_dir = 0;
 my $syslog_conf = '';
+my $cmdline_os_type = '';
+my $os_type = 0;
+my $distro = '';
 my $locale = 'C';  ### default LC_ALL env variable
 my $no_locale = 0;
 my $deps_dir = 'deps';
@@ -170,6 +173,20 @@ my $init_name = 'psad';
 my $install_syslog_fifo = 0;
 my $runlevel = -1;
 my @installation_lines = ();
+
+### unless --OS-type is used, install.pl will try to figure out the
+### OS where psad is being installed (this is usually best).
+my $OS_LINUX  = 1;
+my $OS_BSD    = 2;
+my $OS_CYGWIN = 3;
+my $OS_DARWIN = 4;  ### Mac OS X
+
+my %os_types = (
+    'linux'  => $OS_LINUX,
+    'bsd'    => $OS_BSD,
+    'cygwin' => $OS_CYGWIN,
+    'darwin' => $OS_DARWIN
+);
 
 ### make Getopts case sensitive
 Getopt::Long::Configure('no_ignore_case');
@@ -181,6 +198,7 @@ Getopt::Long::Configure('no_ignore_case');
     'Exclude-mod-regex=s' => \$exclude_mod_re, ### exclude a particular perl module
     'path-update'       => \$force_path_update, ### update command paths
     'Skip-mod-install'  => \$skip_module_install,
+    'OS-type=s'        => \$cmdline_os_type,
     'no-rm-lib-dir'     => \$no_rm_old_lib_dir, ### remove any old /usr/lib/psad dir
     'no-preserve'       => \$noarchive,   ### Don't preserve existing configs.
     'syslog-conf=s'     => \$syslog_conf, ### specify path to syslog config file.
@@ -221,27 +239,42 @@ $cmds{'make'}     = $makeCmd;
 $cmds{'perl'}     = $perlCmd;
 $cmds{'runlevel'} = $runlevelCmd;
 
-my $distro = &get_distro();
+### get the OS type
+&get_os() unless $os_type;
 
-if ($distro eq 'redhat' or $distro eq 'fedora') {
-    ### add chkconfig only if we are runing on a redhat distro
-    $cmds{'chkconfig'} = $chkconfigCmd;
-} elsif ($distro eq 'gentoo') {
-    ### add rc-update if we are running on a gentoo distro
-    $cmds{'rc-update'} = $rcupdateCmd;
-} elsif ($distro eq 'ubuntu') {
-    ### add update-rc.d if we are running on an ubuntu distro
-    $cmds{'update-rc.d'} = $updatercdCmd;
+if ($os_type == $OS_LINUX) {
+    print "[+] OS: Linux\n";
+} elsif ($os_type == $OS_CYGWIN) {
+    print "[+] OS: Cygwin\n";
+} elsif ($os_type == $OS_DARWIN) {
+    print "[+] OS: Darwin\n";
+} elsif ($os_type == $OS_BSD) {
+    print "[+] OS: BSD\n";
 }
 
-unless (-d $init_dir) {
-    if (-d '/etc/rc.d/init.d') {
-        $init_dir = '/etc/rc.d/init.d';
-    } elsif (-d '/etc/rc.d') {  ### for Slackware
-        $init_dir = '/etc/rc.d';
-    } else {
-        die "[*] Cannot find the init script directory, use ",
-            "--init-dir <path>";
+if ($os_type == $OS_LINUX) {
+    $distro = &get_distro();
+
+    if ($distro eq 'redhat' or $distro eq 'fedora') {
+        ### add chkconfig only if we are runing on a redhat distro
+        $cmds{'chkconfig'} = $chkconfigCmd;
+    } elsif ($distro eq 'gentoo') {
+        ### add rc-update if we are running on a gentoo distro
+        $cmds{'rc-update'} = $rcupdateCmd;
+    } elsif ($distro eq 'ubuntu') {
+        ### add update-rc.d if we are running on an ubuntu distro
+        $cmds{'update-rc.d'} = $updatercdCmd;
+    }
+
+    unless (-d $init_dir) {
+        if (-d '/etc/rc.d/init.d') {
+            $init_dir = '/etc/rc.d/init.d';
+        } elsif (-d '/etc/rc.d') {  ### for Slackware
+            $init_dir = '/etc/rc.d';
+        } else {
+            die "[*] Cannot find the init script directory, use ",
+                "--init-dir <path>";
+        }
     }
 }
 
@@ -368,7 +401,13 @@ sub install() {
     }
     if (-d 'deps' and -d 'deps/whois') {
         &logr("[+] Compiling Marco d'Itri's whois client\n");
-        system "$cmds{'make'} -C deps/whois";
+        if ($os_type == $OS_LINUX or $os_type == $OS_CYGWIN) {
+            system "$cmds{'make'} -C deps/whois";
+        } else {
+            chdir 'deps/whois' or die $!;
+            system $cmds{'make'};
+            chdir '../..' or die $!;
+        }
         if (-e 'deps/whois/whois') {
             ### if an old whois process is still around ("text file
             ### busy" error), then it is ok to not be able to copy
@@ -379,7 +418,9 @@ sub install() {
             die "[*] Could not copy deps/whois/whois -> $cmds{'whois'}: $!"
                 unless -e $cmds{'whois'};
         } else {
-            die "[*] Could not compile whois";
+            ### switch to to /usr/bin/whois as a last resort
+            ### FIXME
+            $cmds{'whois'} = '/usr/bin/whois';
         }
     }
     &perms_ownership($cmds{'whois'}, 0755);
@@ -743,7 +784,7 @@ sub install() {
         $init_file = 'init-scripts/psad-init.generic';
     }
 
-    if ($init_dir and &is_root()) {
+    if ($init_dir and &is_root() and $os_type == $OS_LINUX) {
         &logr("[+] Copying $init_file -> ${init_dir}/$init_name\n");
         copy $init_file, "${init_dir}/$init_name" or die "[*] Could not copy ",
             "$init_file -> ${init_dir}/$init_name: $!";
@@ -1003,6 +1044,11 @@ sub stop_psad() {
 
 sub install_perl_module() {
     my $mod_name = shift;
+
+    if ($os_type != $OS_LINUX) {
+        return if $mod_name eq 'IPTables::Parse'
+            or $mod_name eq 'IPTables::ChainMgr';
+    }
 
     chdir $src_dir or die "[*] Could not chdir $src_dir: $!";
     chdir $deps_dir or die "[*] Could not chdir($deps_dir): $!";
@@ -1678,6 +1724,74 @@ sub check_old_psad_installation() {
     return;
 }
 
+sub get_os() {
+
+    ### This function implements a set of simple heuristics to determine
+    ### the OS type.  Note that the user can always just set the OS from
+    ### the command line with --OS-type
+
+    ### get OS output from uname
+    open UNAME, 'uname |' or die "[*] Could not execute 'uname', use ",
+        "--OS-type.";
+    while (<UNAME>) {
+
+        if (/Darwin/) {
+
+            print
+"[+] It looks like you are installing psad on a Mac OS X system.\n",
+"    Installation of iptables perl modules will be skipped.\n";
+            $os_type = $OS_DARWIN;
+
+        } elsif (/[a-z]BSD/) {
+
+            print
+"[+] It looks like you are installing psad on a *BSD system. Installation\n",
+"    of iptables perl modules will be skipped.\n";
+            $os_type = $OS_BSD;
+        }
+        last;
+    }
+    close UNAME;
+
+    unless ($os_type) {
+        ### 'uname -o' does not work on Mac OS X or FreeBSD, so we had to check
+        ### for this above
+
+        open UNAME, 'uname -o |' or die "[*] Could not execute 'uname -o', ",
+            "use --OS-type.";
+        while (<UNAME>) {
+
+            if (/Cygwin/ or /Gygwin/) {
+
+                print
+"[+] It looks like you are installing psad in a Cygwin environment.\n\n";
+                $os_type = $OS_CYGWIN;
+            }
+            last;
+        }
+        close UNAME;
+    }
+
+    ### default to Linux
+    $os_type = $OS_LINUX unless $os_type;
+
+    my $have_iptables = 0;
+    $have_iptables = 1 if (-e '/usr/sbin/iptables' or -e '/sbin/iptables');
+
+    if ($os_type == $OS_LINUX) {
+        unless ($have_iptables) {
+            die "[*] iptables does not seem to be installed, ",
+                "use --OS-type.";
+        }
+    } elsif ($os_type == $OS_BSD or $os_type == $OS_DARWIN) {
+        if ($have_iptables) {
+            die "[*] iptables exists on what looks like a non-Linux ",
+                "system, use --OS-type.";
+        }
+    }
+    return;
+}
+
 sub get_distro() {
     return 'gentoo' if -e '/etc/gentoo-release';
     if (-e '/etc/issue') {
@@ -1712,6 +1826,8 @@ sub perms_ownership() {
 
 sub get_fw_search_strings() {
     my @fw_search_strings = ();
+
+    return unless $os_type == $OS_LINUX or $os_type == $OS_CYGWIN;
 
         print
 "\n[+] By default, psad parses all iptables log messages for scan activity.\n",
@@ -1950,6 +2066,20 @@ sub enable_psad_at_boot() {
 
 ### check paths to commands and attempt to correct if any are wrong.
 sub check_commands() {
+
+    if ($os_type == $OS_LINUX or $os_type == $OS_CYGWIN) {
+        $exclude_cmds{'ipfw'} = '';
+    } else {
+        ### we are installing on BSD or Mac OS X
+        $exclude_cmds{'iptables'} = '';
+        $exclude_cmds{'ip6tables'} = '';
+
+        ### the runlevel does not apply here
+        $exclude_cmds{'runlevel'} = '';
+
+        $exclude_cmds{'ip'} = '';
+        $exclude_cmds{'killall'} = '';
+    }
 
     CMD: for my $cmd (keys %cmds) {
         next CMD if defined $exclude_cmds{$cmd};

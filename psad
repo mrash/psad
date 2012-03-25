@@ -6,12 +6,12 @@
 #
 # URL: http://www.cipherdyne.org/psad/
 #
-# Purpose: psad makes use of iptables logs to detect port scans,
+# Purpose: psad makes use of firewall logs to detect port scans,
 #          probes for backdoors and DDoS tools, and other suspect traffic
 #          (many signatures were adapted from the Snort intrusion
 #          detection system).  Data is provided by parsing syslog
 #          firewall messages out of /var/log/messages (or wherever syslog
-#          is configured to write iptables logs to).
+#          is configured to write firewall logs to).
 #
 #          For more information read the psad man page or view the
 #          documentation provided at: http://www.cipherdyne.org/psad/
@@ -151,7 +151,7 @@ my $version = '3.0-pre1';
 my $config_file  = '/etc/psad/psad.conf';
 
 ### this will be set to either FW_DATA_FILE, ULOG_DATA_FILE
-### or IPT_SYSLOG_FILE
+### or FW_SYSLOG_FILE
 my $fw_data_file = '';
 
 ### disable debugging by default
@@ -375,9 +375,9 @@ my $gnuplot_count_type  = '';
 my $gnuplot_count_element = -1;
 my %gnuplot_cache_uniq = ();
 my @gnuplot_data = ();
-my $gnuplot_data_file = 'psad_iptables.dat';
-my $gnuplot_plot_file = 'psad_iptables.gnu';
-my $gnuplot_png_file  = 'psad_iptables.png';
+my $gnuplot_data_file = 'psad_fw.dat';
+my $gnuplot_plot_file = 'psad_fw.gnu';
+my $gnuplot_png_file  = 'psad_fw.png';
 my $gnuplot_file_prefix = '';
 my $gnuplot_template_file = '';
 my $store_file       = '';
@@ -466,9 +466,10 @@ my $ICMP_ECHO_REPLY    = 0;
 my $ICMP6_ECHO_REQUEST = 128;
 my $ICMP6_ECHO_REPLY   = 129;
 
-### These are not directly support by psad because they
-### do not appear in iptables logs; however, several of
-### these options are supported if fwsnort is also running.
+### These are not directly supported by psad because they
+### do not appear in firewall logs; however, several of
+### these options are supported if fwsnort is also running
+### (iptables only).
 my @unsupported_snort_opts = qw(
     pcre
     fragbits
@@ -653,7 +654,7 @@ unless ($no_daemon or $debug) {
 
 ### psad requires that kmsgsd is running to receive any data (unless
 ### SYSLOG_DAEMON is set to ulogd or psad is configured to acquire data
-### from a normal file via IPT_SYSLOG_FILE), so let's start it here for good
+### from a normal file via FW_SYSLOG_FILE), so let's start it here for good
 ### measure (as of 0.9.2 it makes use of the pid files and unique_pid(),
 ### so we don't have to worry about starting a duplicate copy).  While
 ### we're at it, start psadwatchd as well.  Note that this is the best
@@ -695,7 +696,7 @@ unless ($debug or $no_daemon) {
 if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
     ### always flush old rules (the subsequent renew_auto_blocked_ips()
     ### will re-instantiate any that should not have been expired).
-    &flush_auto_blocked_ips() if $config{'FLUSH_IPT_AT_INIT'} eq 'Y';
+    &flush_auto_blocked_ips() if $config{'FLUSH_FW_AT_INIT'} eq 'Y';
 
     ### Check to see if psad automatically blocked some IPs from
     ### a previous run.  This feature is most useful for preserving
@@ -751,7 +752,8 @@ my $fw_data_file_check_ctr = 0;
 ### Get an open filehandle for the main firewall data file FW_DATA_FILE.
 ### All firewall drop/reject log messages are written to FW_DATA_FILE
 ### by kmsgsd (or by ulogd directly).
-print STDERR "[+] Opening iptables data file: $fw_data_file\n" if $debug;
+print STDERR "[+] Opening $config{'FIREWALL_TYPE'} ",
+    "log file: $fw_data_file\n" if $debug;
 open FWDATA, $fw_data_file or die '[*] Could not open ',
     "$fw_data_file: $!";
 
@@ -780,7 +782,7 @@ MAIN: for (;;) {
         my $orig_fwdata = $fw_data_file;
         my $orig_ipt_sockfile = '';
 
-        $orig_ipt_sockfile = $config{'AUTO_IPT_SOCK'}
+        $orig_ipt_sockfile = $config{'AUTO_FW_SOCK'}
             if $config{'ENABLE_AUTO_IDS'} eq 'Y';
 
         ### Re-import all used config files (psad.conf, auto_dl,
@@ -798,7 +800,7 @@ MAIN: for (;;) {
         }
 
         if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
-            if ($orig_ipt_sockfile ne $config{'AUTO_IPT_SOCK'}) {
+            if ($orig_ipt_sockfile ne $config{'AUTO_FW_SOCK'}) {
                 close $ipt_sock;
 
                 &get_auto_response_domain_sock();
@@ -854,7 +856,8 @@ MAIN: for (;;) {
 
                 close FWDATA;
 
-                &sys_log('[+]', "iptables syslog file $fw_data_file " .
+                &sys_log('[+]', "$config{'FIREWALL_TYPE'} " .
+                    "syslog file $fw_data_file " .
                     "shrank or was rotated, so re-opening");
 
                 ### re-open the fwdata file
@@ -1015,7 +1018,7 @@ exit 0;
 
 ### Keeps track of scanning ip's, increments packet counters,
 ### keeps track of tcp flags for each scan, test for snort sid
-### values in iptables packets (if fwsnort is being used).
+### values in firewall packets (if fwsnort is being used).
 sub check_scan() {
     my $fw_packets_ar = shift;
 
@@ -1031,7 +1034,7 @@ sub check_scan() {
     my $print_scale_factor = &get_scale_factor($#$fw_packets_ar);
 
     ### loop through all of the packet log messages we have just acquired
-    ### from iptables
+    ### from the firewall
 
     PKT: for my $pkt_str (@$fw_packets_ar) {
 
@@ -1045,7 +1048,7 @@ sub check_scan() {
             }
         }
 
-        ### main parsing routine for the iptables packet logging message
+        ### main parsing routine for the firewall packet logging message
         my $pkt_parse_rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
         print STDERR Dumper \%pkt if $debug and $verbose;
         if ($pkt_parse_rv == $PKT_ERROR) {
@@ -1357,7 +1360,7 @@ sub check_scan() {
         ### on the paper "Passive OS Fingerprinting: Details
         ### and Techniques" by Toby Miller).  Also attempt to
         ### fingerprint with a re-implementation of Michal Zalewski's
-        ### p0f that only requires iptables log messages
+        ### p0f that only requires firewall log messages
         unless ($no_posf) {
             ### make sure we have not already guessed the OS,
             ### and if we have been unsuccessful in guessing
@@ -1924,7 +1927,7 @@ sub parse_NF_pkt_str() {
         ### we are looking to analyze packets from a specific IP/subnet
         if ($pkt_hr->{'is_ipv6'}) {
             if ($restrict_ip->version() == 6) {
-                return $PKT_IGNORE unless 
+                return $PKT_IGNORE unless
                     $pkt_hr->{'s_obj'}->within($restrict_ip) or
                     $pkt_hr->{'d_obj'}->within($restrict_ip);
             }
@@ -3214,7 +3217,7 @@ sub psad_init() {
         if ($config{'SYSLOG_DAEMON'} =~ /ulog/i) {
             $fw_data_file = $config{'ULOG_DATA_FILE'};
         } elsif ($config{'ENABLE_SYSLOG_FILE'} eq 'Y') {
-            $fw_data_file = $config{'IPT_SYSLOG_FILE'};
+            $fw_data_file = $config{'FW_SYSLOG_FILE'};
         } else {
             $fw_data_file = $config{'FW_DATA_FILE'};
         }
@@ -3312,7 +3315,7 @@ sub psad_init() {
     ### there is a set of interfaces that should be ignored
     &parse_ignore_interfaces();
 
-    ### enter iptables analysis mode.
+    ### enter firewall analysis mode.
     exit &analysis_mode() if $analyze_mode;
 
     ### enter CSV output mode.
@@ -3321,7 +3324,7 @@ sub psad_init() {
     ### enter benchmarking mode
     exit &benchmark_mode() if $benchmark;
 
-    ### analyze the iptables policy and exit
+    ### analyze the firewall policy and exit
     my $rv = &fw_analyze_mode();
     exit $rv if $fw_analyze;
 
@@ -3398,8 +3401,8 @@ sub validate_config() {
     }
 
     if ($config{'ENABLE_SYSLOG_FILE'} eq 'Y') {
-        die "[*] Cannot set IPT_SYSLOG_FILE and FW_DATA_FILE to point ",
-            "at the same file." if $config{'IPT_SYSLOG_FILE'}
+        die "[*] Cannot set FW_SYSLOG_FILE and FW_DATA_FILE to point ",
+            "at the same file." if $config{'FW_SYSLOG_FILE'}
             eq $config{'FW_DATA_FILE'};
     }
 
@@ -3426,13 +3429,13 @@ sub validate_config() {
     }
 
     if ($analyze_mode or $gnuplot_mode or $csv_mode) {
-        $fw_data_file = $config{'IPT_SYSLOG_FILE'}
+        $fw_data_file = $config{'FW_SYSLOG_FILE'}
             unless $fw_data_file;
     }
 
     if ($gnuplot_mode and not $csv_fields) {
-        die "[*] Must specify which iptables fields to plot with the ",
-            "--CSV-fields argument."
+        die "[*] Must specify which $config{'FIREWALL_TYPE'} fields ",
+            "to plot with the --CSV-fields argument.";
     }
 
     return;
@@ -3904,7 +3907,7 @@ sub import_snort_rule_dl() {
     return;
 }
 
-### for signatures that psad is able to detect with iptables logs that do
+### for signatures that psad is able to detect with firewall logs that do
 ### not contain "SIDnnn" messages generated by fwsnort (and hence have no
 ### application layer matching criteria)
 
@@ -5855,9 +5858,9 @@ sub renew_auto_blocked_ips() {
         $timeout_str = '(unlimited time).';
     }
     if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y'
-            and -e $config{'AUTO_BLOCK_IPT_FILE'}) {
-        open B, "< $config{'AUTO_BLOCK_IPT_FILE'}" or
-            die "[*] Could not open $config{'AUTO_BLOCK_IPT_FILE'}: $!";
+            and -e $config{'AUTO_BLOCK_FW_FILE'}) {
+        open B, "< $config{'AUTO_BLOCK_FW_FILE'}" or
+            die "[*] Could not open $config{'AUTO_BLOCK_FW_FILE'}: $!";
         my @lines = <B>;
         close B;
 
@@ -5959,12 +5962,12 @@ sub sockwrite_flush_auto_rules() {
                 and $config{'ENABLE_AUTO_IDS'} eq 'Y') {
             print "[+] Flushing psad chains via running psad daemon within\n",
                 "    $config{'CHECK_INTERVAL'} seconds.\n";
-            die "[*] $config{'AUTO_IPT_SOCK'} file is missing. Did something ",
+            die "[*] $config{'AUTO_FW_SOCK'} file is missing. Did something ",
                 "remove it?\n    You should stop psad, run the -F command ",
-                "again, then restart psad." unless -e $config{'AUTO_IPT_SOCK'};
+                "again, then restart psad." unless -e $config{'AUTO_FW_SOCK'};
             ### open domain socket with running psad process
-            my $sock = IO::Socket::UNIX->new($config{'AUTO_IPT_SOCK'})
-                or die "[*] Could not acquire $config{'AUTO_IPT_SOCK'} ",
+            my $sock = IO::Socket::UNIX->new($config{'AUTO_FW_SOCK'})
+                or die "[*] Could not acquire $config{'AUTO_FW_SOCK'} ",
                 "socket: $!";
             if ($fw_del_chains) {
                 print $sock "flush delchains\n";
@@ -6040,10 +6043,10 @@ sub flush_auto_blocked_ips() {
     ### zero out the in-memory cache of blocked addresses
     %auto_blocked_ips = ();
 
-    if (-e $config{'AUTO_BLOCK_IPT_FILE'}) {
-        ### we have removed the iptables block rules, so truncate
+    if (-e $config{'AUTO_BLOCK_FW_FILE'}) {
+        ### we have removed the firewall block rules, so truncate
         ### the cache file.
-        &truncate_file($config{'AUTO_BLOCK_IPT_FILE'});
+        &truncate_file($config{'AUTO_BLOCK_FW_FILE'});
     }
 
     if (-e $config{'AUTO_BLOCK_TCPWR_FILE'}) {
@@ -6077,22 +6080,22 @@ sub get_auto_response_domain_sock() {
     ### $ipt_sock is global
     $ipt_sock = IO::Socket::UNIX->new(
         Type   => SOCK_STREAM,
-        Local  => $config{'AUTO_IPT_SOCK'},
+        Local  => $config{'AUTO_FW_SOCK'},
         Listen => SOMAXCONN,
         Timeout => .1
     ) or die "[*] Could not acquire auto-response domain ",
-        "socket $config{'AUTO_IPT_SOCK'}: $!";
+        "socket $config{'AUTO_FW_SOCK'}: $!";
     return;
 }
 
 sub check_auto_response_sock() {
 
-    ### we expect that the AUTO_IPT_SOCK file should exist
+    ### we expect that the AUTO_FW_SOCK file should exist
     ### in the filesystem.  If not, then something deleted it
     ### and we can recover by reopening it.
-    return if -e $config{'AUTO_IPT_SOCK'};
+    return if -e $config{'AUTO_FW_SOCK'};
 
-    &sys_log("domain socket $config{'AUTO_IPT_SOCK'} does not " .
+    &sys_log("domain socket $config{'AUTO_FW_SOCK'} does not " .
         "exist (a separate process must have deleted it), recreating it.");
 
     close $ipt_sock;
@@ -6278,7 +6281,7 @@ sub ipt_block() {
 
         ### write the ip out to the auto blocked file
         &diskwrite_blocked_ip($ip,
-            $config{'AUTO_BLOCK_IPT_FILE'}, $renewed_status);
+            $config{'AUTO_BLOCK_FW_FILE'}, $renewed_status);
 
         print STDERR "[+] ipt_block(): added block for $ip\n"
             if $debug;
@@ -6359,29 +6362,29 @@ sub ipt_rm_block() {
     delete $auto_blocked_ips{$ip}
         if defined $auto_blocked_ips{$ip};
 
-    &diskwrite_rm_blocked_ip($ip, $config{'AUTO_BLOCK_IPT_FILE'});
+    &diskwrite_rm_blocked_ip($ip, $config{'AUTO_BLOCK_FW_FILE'});
 
     if ($rm_block) {
         unless ($flush_fw) {
             ### don't send timeout email if we are manually flushing
             ### the auto-block rules from the command line with --Flush.
-            &sys_log("removed iptables auto-block against " .
+            &sys_log("removed $config{'FIRWALL_TYPE'} auto-block against " .
                 $ip);
             if ($config{'ENABLE_AUTO_IDS_EMAILS'} eq 'Y') {
                 &send_mail("$config{'MAIL_STATUS_PREFIX'} removed " .
-                    "iptables block against $ip", '',
+                    "$config{'FIRWALL_TYPE'} block against $ip", '',
                     $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
             }
         }
-        print STDERR "[+] ipt_rm_block(): removed iptables block ",
+        print STDERR "[+] ipt_rm_block(): removed $config{'FIRWALL_TYPE'} block ",
             "against $ip\n" if $debug;
 
         return 1;
     }
 
-    &sys_log('warning: could not remove iptables ' .
+    &sys_log("warning: could not remove $config{'FIRWALL_TYPE'} " .
         "block rule for $ip");
-    print STDERR "[-] Could not remove iptables block rule for $ip\n"
+    print STDERR "[-] Could not remove $config{'FIRWALL_TYPE'} block rule for $ip\n"
         if $debug;
     return 0;
 }
@@ -6515,8 +6518,8 @@ sub sockwrite_add_ipt_block_ip() {
                 "    within $config{'CHECK_INTERVAL'} seconds.\n";
 
             ### open domain socket with running psad process
-            my $sock = IO::Socket::UNIX->new($config{'AUTO_IPT_SOCK'})
-                or die "[*] Could not acquire $config{'AUTO_IPT_SOCK'} ",
+            my $sock = IO::Socket::UNIX->new($config{'AUTO_FW_SOCK'})
+                or die "[*] Could not acquire $config{'AUTO_FW_SOCK'} ",
                 "socket: $!";
             print $sock "add $fw_block_ip\n";
             close $sock;
@@ -6570,8 +6573,8 @@ sub sockwrite_rm_ipt_block_ip() {
                 "    within $config{'CHECK_INTERVAL'} seconds.\n";
 
             ### open domain socket with running psad process
-            my $sock = IO::Socket::UNIX->new($config{'AUTO_IPT_SOCK'})
-                or die "[*] Could not acquire $config{'AUTO_IPT_SOCK'} ",
+            my $sock = IO::Socket::UNIX->new($config{'AUTO_FW_SOCK'})
+                or die "[*] Could not acquire $config{'AUTO_FW_SOCK'} ",
                 "socket: $!";
             print $sock "del $fw_rm_block_ip\n";
             close $sock;
@@ -6725,7 +6728,7 @@ sub auto_block_ignore_ip() {
         }
     }
     ### matching the following two addresses is less likely (assuming
-    ### iptables is not logging traffic from localhost) than matching
+    ### the firewall is not logging traffic from localhost) than matching
     ### a legitimate interface address
     if ($ip eq '127.0.0.1' or $ip eq '0.0.0.0') {
         print STDERR "[+] Skipping IP $ip from auto-block.\n"
@@ -7224,8 +7227,8 @@ sub analysis_mode() {
             }
         }
     }
-    print "[+] Found ", ($#ipt_msgs+1), " iptables log messages out of ",
-        ($#lines+1), " total lines.\n";
+    print "[+] Found ", ($#ipt_msgs+1), " $config{'FIREWALL_TYPE'} ",
+        "log messages out of ", ($#lines+1), " total lines.\n";
     print "    This may take a while...\n" if $#ipt_msgs > 15000;
 
     ### analyze all packets
@@ -7312,7 +7315,7 @@ sub csv_mode() {
 
     print "[+] Entering Gnuplot mode...\n" if $gnuplot_mode;
 
-    ### see what we should be parsing out of the iptables logs
+    ### see what we should be parsing out of the firewall logs
     my ($tokens_ar, $match_criteria_ar) = &csv_tokens();
 
     $csv_regex = qr/$csv_regex/ if $csv_regex;
@@ -7327,11 +7330,11 @@ sub csv_mode() {
 
     my $fh = '';
     if ($csv_stdin) {
-        print "[+] Parsing iptables log messages from STDIN\n"
+        print "[+] Parsing $config{'FIREWALL_TYPE'} log messages from STDIN\n"
             if $gnuplot_mode;
         $fh = *STDIN;
     } else {
-        print "[+] Parsing iptables log messages from file: $fw_data_file\n"
+        print "[+] Parsing $config{'FIREWALL_TYPE'} log messages from file: $fw_data_file\n"
             if $gnuplot_mode;
         open MSGS, "< $fw_data_file" or die "[*] Could not open ",
             "$fw_data_file: $!";
@@ -7430,7 +7433,7 @@ sub csv_mode() {
                 chmod 0644, $store_file;
             }
         } else {
-            print "[+] Parsed $line_ctr iptables log messages.\n";
+            print "[+] Parsed $line_ctr $config{'FIREWALL_TYPE'} log messages.\n";
         }
         ### print out the gnuplot data after appropriate
         ### integer conversions
@@ -7479,7 +7482,7 @@ sub gnuplot_write_plot_file() {
             "$gnuplot_plot_file: $!";
         print GP "$_\n", for @{&gnuplot_header()};
         unless ($gnuplot_title) {
-            $gnuplot_title = "psad iptables log visualization: $csv_fields";
+            $gnuplot_title = "psad $config{'FIREWALL_TYPE'} log visualization: $csv_fields";
             $gnuplot_title =~ s/_//g;  ### some fonts used by Gnuplot don't like "-" chars
         }
         print GP "reset\n", qq|set title "$gnuplot_title"\n|;
@@ -7605,7 +7608,7 @@ sub gnuplot_write_data() {
     ### of just the port values themselves)
     my @gnuplot_count_data = ();
 
-    print "[+] Writing parsed iptables data to: $gnuplot_data_file\n";
+    print "[+] Writing parsed $config{'FIREWALL_TYPE'} data to: $gnuplot_data_file\n";
     open GP, "> $gnuplot_data_file" or die "[*] Could not open ",
         "$gnuplot_data_file: $!";
     print GP "$_\n", for @{&gnuplot_header()};
@@ -8304,7 +8307,7 @@ sub fw_analyze_mode() {
     } else {
         ### if psad is running on a syslog server, do not check the firewall
         ### rules since they may not be local.  Also, do not check the
-        ### firewall if psad is configured to parse all iptables messages.
+        ### firewall if psad is configured to parse all firewall messages.
         unless ($no_fwcheck or $syslog_server
                 or $config{'ENABLE_FW_LOGGING_CHECK'} eq 'N') {
             $run_fw_check = 1;
@@ -8453,7 +8456,7 @@ sub print_scan_status() {
     unless ($analyze_mode) {
         push @lines, $_ for @{&print_dshield_stats()};
 
-        ### print block status of IP addresses blocked by iptables
+        ### print block status of blocked IP addresses
         if ($status_ip) {
             my $ar = &print_blocked_ip_status($status_ip);
             push @lines, $_ for @$ar;
@@ -8686,26 +8689,26 @@ sub print_scan_status() {
 sub print_blocked_ip_status() {
     my $specific_ip = shift;
 
-    return unless -e $config{'AUTO_BLOCK_IPT_FILE'};
+    return unless -e $config{'AUTO_BLOCK_FW_FILE'};
 
-    unlink "$config{'AUTO_BLOCK_IPT_FILE'}.status"
-        if -e "$config{'AUTO_BLOCK_IPT_FILE'}.status";
+    unlink "$config{'AUTO_BLOCK_FW_FILE'}.status"
+        if -e "$config{'AUTO_BLOCK_FW_FILE'}.status";
 
-    copy $config{'AUTO_BLOCK_IPT_FILE'},
-        "$config{'AUTO_BLOCK_IPT_FILE'}.status";
+    copy $config{'AUTO_BLOCK_FW_FILE'},
+        "$config{'AUTO_BLOCK_FW_FILE'}.status";
 
-    open F, "< $config{'AUTO_BLOCK_IPT_FILE'}.status" or
-        die "[*] $config{'AUTO_BLOCK_IPT_FILE'}.status: $!";
+    open F, "< $config{'AUTO_BLOCK_FW_FILE'}.status" or
+        die "[*] $config{'AUTO_BLOCK_FW_FILE'}.status: $!";
     my @lines = <F>;
     close F;
 
-    unlink "$config{'AUTO_BLOCK_IPT_FILE'}.status";
+    unlink "$config{'AUTO_BLOCK_FW_FILE'}.status";
 
     my @print_lines = ();
     if ($specific_ip) {
-        push @print_lines,  "    iptables auto-blocking status for: $specific_ip: \n";
+        push @print_lines,  "    $config{'FIREWALL_TYPE'} auto-blocking status for: $specific_ip: \n";
     } else {
-        push @print_lines,  "    iptables auto-blocked IPs:\n";
+        push @print_lines,  "    $config{'FIREWALL_TYPE'} auto-blocked IPs:\n";
     }
 
     my %ipt_opts = (
@@ -9575,7 +9578,7 @@ sub setup() {
             }
         }
 
-        ### create the iptables data file if it doesn't exist
+        ### create the firewall data file if it doesn't exist
         ### (this is better than dying because it isn't there).
         &truncate_file($fw_data_file) if $truncate_or_create;
 
@@ -9585,7 +9588,7 @@ sub setup() {
 
         ### unlink socket file if it exists from a previous run (only
         ### if we have not received a HUP signal)
-        unlink $config{'AUTO_IPT_SOCK'} if -e $config{'AUTO_IPT_SOCK'};
+        unlink $config{'AUTO_FW_SOCK'} if -e $config{'AUTO_FW_SOCK'};
 
         ### if we are not importing old scans, then remove old counter
         ### values
@@ -9902,9 +9905,11 @@ sub dump_conf() {
     my $fh = *STDOUT;
     $fh = *STDERR if $debug;
 
+    ### we assume many of these commands are in the path
+
     ### uname output
     print $fh "[+] uname output:\n";
-    my @uname_out = @{&run_command($cmds{'uname'}, '-a')};
+    my @uname_out = @{&run_command('uname', '-a')};
     if (@uname_out) {
         for (@uname_out) {
             s/Linux\s+(\S+)\s/Linux (removed) /;
@@ -9922,7 +9927,7 @@ sub dump_conf() {
     print $fh "\n";
 
     print $fh "[+] syslog processes:\n";
-    my @ps_out = @{&run_command($cmds{'ps'}, 'auxww')};
+    my @ps_out = @{&run_command('ps', 'auxww')};
     if (@ps_out) {
         for (@ps_out) {
             print $fh $_ if m|syslog|i;
@@ -9931,7 +9936,7 @@ sub dump_conf() {
     print $fh "\n";
 
     print $fh "[+] psad processes:\n";
-    my @ps_psad_out = @{&run_command($cmds{'ps'}, 'auxww')};
+    my @ps_psad_out = @{&run_command('ps', 'auxww')};
     if (@ps_psad_out) {
         for (@ps_psad_out) {
             print $fh $_ if m|psad|i;
@@ -9941,7 +9946,7 @@ sub dump_conf() {
 
     if (defined $config{'IFCFGTYPE'} and $config{'IFCFGTYPE'} =~ /iproute2/i) {
         print $fh "[+] ip addr output:\n";
-        my @ifconfig_out = @{&run_command($cmds{'ip'}, 'addr')};
+        my @ifconfig_out = @{&run_command('ip', 'addr')};
         if (@ifconfig_out) {
             for (@ifconfig_out) {
                 s/$ipv4_re/x.x.x.x/g;
@@ -9951,7 +9956,7 @@ sub dump_conf() {
         }
     } else {
         print $fh "[+] ifconfig output:\n";
-        my @ifconfig_out = @{&run_command($cmds{'ifconfig'}, '-a')};
+        my @ifconfig_out = @{&run_command('ifconfig', '-a')};
         if (@ifconfig_out) {
             for (@ifconfig_out) {
                 s/$ipv4_re/x.x.x.x/g;
@@ -10021,7 +10026,7 @@ sub dump_ipt_policy() {
         }
     }
 
-    print $fh "\n[+] iptables policy dump:\n";
+    print $fh "\n[+] $config{'FIREWALL_TYPE'} policy dump:\n";
     if (defined $cmds{'iptables'} and -x $cmds{'iptables'}) {
         my @ipt_ver = @{&run_command($cmds{'iptables'}, '-V')};
         if (@ipt_ver) {
@@ -10107,6 +10112,11 @@ sub sys_log() {
 sub run_command() {
     my ($cmd_path, $args) = @_;
     my $cmd = $cmd_path;
+    unless (-x $cmd) {
+        ### try to run without the absolute path as a
+        ### last resort
+        $cmd = $1 if $cmd =~ m|.*/(.*)|;
+    }
     $cmd .= " $args" if $args;
     open CMD, "$cmd |" or die "[*] Could not ",
         "execute $cmd: $!";
@@ -10164,7 +10174,7 @@ sub date_time() {
         $date = Date_to_Time(This_Year(), $month, $day, $hour, $min, $sec);
 
         if ($date > $time) {
-            ### date is in the future because the iptables syslog message
+            ### date is in the future because the syslog message
             ### does not include the year - subtract one year
             $date -= 60*60*24*356;
         }
@@ -10480,7 +10490,7 @@ sub getopt_wrapper() {
         'auto-dl=s'         => \$auto_dl_file,    # Path to psad auto IPs file for
                                                   #   auto-setting IP danger level.
         'use-store-file=s'  => \$store_file,      # Path to parsed data written to by Storable
-        'Analyze-msgs'      => \$analyze_mode,    # Analysis mode for old iptables
+        'Analyze-msgs'      => \$analyze_mode,    # Analysis mode for old firewall
                                                   #   messages in the psad fwdata file
                                                   #   (or messages file; see
                                                   #   --messages).
@@ -10489,7 +10499,7 @@ sub getopt_wrapper() {
                                                        # time).
         'analyze-write-data'  => \$analyze_write_data,
         'analysis-fields=s' => \$analysis_fields, # Place a criteria on various fields
-                                                  #   that are parsed from an iptables
+                                                  #   that are parsed from an firewall
                                                   #   logfile.
         'analyze-fields=s'  => \$analysis_fields,
         'whois-analysis'    => \$analysis_whois,  # Issue whois lookups in analysis
@@ -10497,7 +10507,7 @@ sub getopt_wrapper() {
         'dns-analysis'      => \$enable_analysis_dns,  # Issue DNS lookups in -A mode.
         'email-analysis'    => \$analysis_emails, # Send analysis mode emails.
         'messages-file=s'   => \$fw_data_file,    # Specify the path to file containing
-                                                  #   old iptables messages (fwdata by
+                                                  #   old firewall messages (fwdata by
                                                   #   default).
         'get-next-rule-id'  => \$get_next_rule_id, # Show the next available signature ID.
 
@@ -10539,7 +10549,7 @@ sub getopt_wrapper() {
         'CSV-regex=s'       => \$csv_regex,       # Require additional regex match.
         'CSV-neg-regex=s'   => \$csv_neg_regex,   # Require additional negative regex
                                                   #   match.
-        'CSV-stdin'         => \$csv_stdin,       # Acquire iptables log data from
+        'CSV-stdin'         => \$csv_stdin,       # Acquire firewall log data from
                                                   #   stdin.
         'plot-separator'    => \$plot_separator,  # Specify separator character for plot
                                                   #   data (both gnuplot and CSV data).
@@ -10557,7 +10567,7 @@ sub getopt_wrapper() {
         'fw-file=s'         => \$fw_file,         # Analyze ruleset contained within
                                                   #   $fw_file instead of a running
                                                   #   policy.
-        'fw-list-auto'      => \$fw_list_auto,    # Display iptables chains used by
+        'fw-list-auto'      => \$fw_list_auto,    # Display firewall chains used by
                                                   #   psad in auto blocking code.
         'List'              => \$fw_list_auto,    # Synonym for --fw-list-auto
         'fw-block-ip=s'     => \$fw_block_ip,     # Add an IP/net to the psad auto-
@@ -10568,9 +10578,9 @@ sub getopt_wrapper() {
                                                   #   flushing them (requires --F as
                                                   #   well).
         'X'                 => \$fw_del_chains,   # Synonym for --fw-del-chains.
-        'fw-dump'           => \$dump_ipt_policy, # Dump the iptables policy
+        'fw-dump'           => \$dump_ipt_policy, # Dump the firewall policy
                                                   #   (requires -D as well).
-        'fw-include-ips'    => \$fw_include_ips,  # Include all IPs/nets in iptables
+        'fw-include-ips'    => \$fw_include_ips,  # Include all IPs/nets in firewall
                                                   # dump (--fw-dump) output.
         'log-server'        => \$syslog_server,   # We are running psad on a syslog
                                                   #   logging server.
@@ -10647,7 +10657,7 @@ sub required_vars() {
         EMAIL_ALERT_DANGER_LEVEL PSAD_FIFO_FILE WHOIS_LOOKUP_THRESHOLD
         DNS_LOOKUP_THRESHOLD WHOIS_TIMEOUT SNORT_RULES_DIR HOSTNAME
         PACKET_COUNTER_FILE DSHIELD_COUNTER_FILE SCAN_DATA_ARCHIVE_DIR
-        ENABLE_PERSISTENCE AUTO_BLOCK_IPT_FILE AUTO_BLOCK_TCPWR_FILE
+        ENABLE_PERSISTENCE AUTO_BLOCK_FW_FILE AUTO_BLOCK_TCPWR_FILE
         SIGS_FILE AUTO_DL_FILE AUTO_BLOCK_TIMEOUT EXTERNAL_SCRIPT
         ENABLE_EXT_SCRIPT_EXEC EXEC_EXT_SCRIPT_PER_ALERT
         ENABLE_DSHIELD_ALERTS SYSLOG_DAEMON DSHIELD_ALERT_INTERVAL
@@ -10658,10 +10668,10 @@ sub required_vars() {
         IMPORT_OLD_SCANS ICMP_TYPES_FILE SHOW_ALL_SIGNATURES
         IPT_PREFIX_COUNTER_FILE IGNORE_PORTS ENABLE_SCAN_ARCHIVE
         EMAIL_LIMIT_STATUS_MSG P0F_FILE IGNORE_PROTOCOLS IPT_AUTO_CHAIN1
-        AUTO_IPT_SOCK IGNORE_INTERFACES ALERTING_METHODS
+        AUTO_FW_SOCK IGNORE_INTERFACES ALERTING_METHODS
         ULOG_DATA_FILE MAIL_ALERT_PREFIX MAIL_STATUS_PREFIX
         MAIL_ERROR_PREFIX MAIL_FATAL_PREFIX ENABLE_AUTO_IDS_EMAILS
-        FLUSH_IPT_AT_INIT ENABLE_MAC_ADDR_REPORTING TRUNCATE_FWDATA
+        FLUSH_FW_AT_INIT ENABLE_MAC_ADDR_REPORTING TRUNCATE_FWDATA
         PSAD_DIR PSAD_RUN_DIR PSAD_FIFO_DIR ENABLE_FW_LOGGING_CHECK
         ENABLE_RENEW_BLOCK_EMAILS DSHIELD_EMAIL_FILE AUTO_BLOCK_REGEX
         ENABLE_AUTO_IDS_REGEX IPTABLES_PREREQ_CHECK SNORT_RULE_DL_FILE
@@ -10679,11 +10689,11 @@ sub required_vars() {
         SIG_MSG_SYSLOG_THRESHOLD SIG_SID_SYSLOG_THRESHOLD
         PSADWATCHD_CHECK_INTERVAL PSADWATCHD_MAX_RETRIES SYSLOG_IDENTITY
         SYSLOG_FACILITY SYSLOG_PRIORITY ENABLE_EMAIL_LIMIT_PER_DST
-        ENABLE_SYSLOG_FILE IPT_SYSLOG_FILE IPT_WRITE_FWDATA
+        ENABLE_SYSLOG_FILE FW_SYSLOG_FILE FW_WRITE_DATA
         ETC_RSYSLOG_CONF IFCFGTYPE ENABLE_WHOIS_FORCE_ASCII
         ENABLE_WHOIS_FORCE_SRC_IP ENABLE_IPV6_DETECTION
         PERSISTENCE_CTR_THRESHOLD MAX_SCAN_IP_PAIRS INSTALL_ROOT
-        ICMP6_TYPES_FILE
+        ICMP6_TYPES_FILE FIREWALL_TYPE
     ));
     &defined_vars(\@required_vars);
     return;
@@ -10703,10 +10713,10 @@ Usage: psad [options]
 
 Options:
 
-    -A,  --Analyze-msgs           - Analyze iptables logfile and exit.
+    -A,  --Analyze-msgs           - Analyze firewall logfile and exit.
     -e,  --email-analysis         - Send emails for scans detected in
                                     offline analysis mode.
-    -m,  --messages-file <file>   - Specify the path to the iptables logfile
+    -m,  --messages-file <file>   - Specify the path to the firewall logfile
                                     (for --Analyze-msgs mode).
     -i,  --interface <intf>       - Restrict detection to IN interface (for
                                     INPUT and FORWARD chains) or OUT
@@ -10718,26 +10728,26 @@ Options:
                                     offline --Analyze-msgs mode.
     --dns-analysis                - Enable reverse DNS lookups in
                                     --Analyze-msgs mode.
-    --fw-analyze                  - Analyze the local iptables ruleset and
+    --fw-analyze                  - Analyze the local firewall ruleset and
                                     exit.
-    --fw-list-auto                - List the contents of any iptables chains
+    --fw-list-auto                - List the contents of any firewall chains
                                     (for auto-blocking rules).
     --List                        - Synonym for --fw-list-auto (emulates
-                                    iptables command line).
+                                    firewall command line).
     --fw-block-ip  <ip>           - Add an IP/network to the auto-blocking
                                     chains.
     --fw-rm-block-ip  <ip>        - Remove an IP/network from the auto-
                                     blocking chains.
-    --fw-file <rules file>        - Analyze the iptables ruleset contained
+    --fw-file <rules file>        - Analyze the firewall ruleset contained
                                     within <rules file> instead of a running
                                     policy.
     --fw-del-chains               - Delete iptables chains used by psad for
-                                    auto-blocking rules.
+                                    auto-blocking rules (iptables only).
     -X                            - Synonym for --fw-del-chains (emulates
                                     iptables command line).
     --fw-dump                     - Dump a sanitized version of the local
-                                    iptables policy.
-    --fw-include-ips              - Include all IPs/nets in iptables dump
+                                    firewall policy.
+    --fw-include-ips              - Include all IPs/nets in firewall dump
                                     (--fw-dump) output.
     --snort-rdir <rule dir>        - Path to snort rules directory.
     --debug,                      - Run psad in debugging mode.
@@ -10747,7 +10757,7 @@ Options:
     -l,  --log-server             - psad is being run on a syslog logging
                                     server.
     -F,  --Flush                  - Remove any auto-generated firewall
-                                    block rules (emulates iptables command
+                                    block rules (emulates firewall command
                                     line).
     -K,  --Kill                   - Kill all running psad processes.
     -R,  --Restart                - Restart all running psad processes.
@@ -10773,7 +10783,7 @@ Options:
     --get-next-rule-id            - Display the next available rule ID and
                                     exit.
 
-    --gnuplot                     - Parse iptables log data and produce a
+    --gnuplot                     - Parse firewall log data and produce a
                                     file suitable for plotting with Gnuplot.
     --gnuplot-graph-style         - Set the Gnuplot graph style (e.g.
                                     "dots", "lines", "linespoints", etc.).
@@ -10803,18 +10813,18 @@ Options:
     --gnuplot-plot-file           - Specify path to .gnu output file.
     --gnuplot-png-file            - Specify path to .png output file.
 
-    --CSV                         - Parse iptables log messages and dump
+    --CSV                         - Parse firewall log messages and dump
                                     fields to stdout in csv format.
     --CSV-fields <fields>         - Restrict --CSV output to a list of
                                     specfic fields.
     --CSV-unique-lines            - Only print unique lines in CSV output.
     --CSV-max-lines <num>         - Specify the maximum number of CSV output
                                     lines to print.
-    --CSV-start-line <line>       - Starting line within iptables log file.
-    --CSV-end-line <line>         - Ending line within iptables log file.
-    --CSV-regex <regex>           - Require iptables log messages to match
+    --CSV-start-line <line>       - Starting line within firewall log file.
+    --CSV-end-line <line>         - Ending line within firewall log file.
+    --CSV-regex <regex>           - Require firewall log messages to match
                                     an additional regex in --CSV mode.
-    --CSV-neg-regex <regex>       - Require iptables log messages to
+    --CSV-neg-regex <regex>       - Require firewall log messages to
                                     not match an additional regex in --CSV
                                     mode.
     --plot-separator <str>        - Specify a separator string between plot
@@ -10849,7 +10859,7 @@ Options:
 
     --no-snort-sids               - Disable examination for snort sids
                                     (such as those generated by fwsnort) in
-                                    iptables log messages.
+                                    firewall log messages.
     --no-signatures               - Disable psad signature processing
                                     (independent of snort sid matching).
     --no-icmp-types               - Disable icmp type/code validation.
@@ -10860,9 +10870,10 @@ Options:
     --no-fwcheck                  - Disable firewall rules verification.
     --no-rdns                     - Disable name resolution against scanning
                                     IP addresses.
-    --no-kmsgsd                   - Disable startup of kmsgsd (useful for
-                                    debugging with an existing file of
-                                    iptables log messages).
+    --no-kmsgsd                   - Disable startup of kmsgsd (not normally
+                                    needed since kmsgsd is only used if psad
+                                    is configured to acquire log messages
+                                    from a fifo).
     --no-netstat                  - Disable local port lookups for scan
                                     signatures.
     -h   --help                   - Display usage on STDOUT and exit.

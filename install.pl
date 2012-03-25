@@ -1478,10 +1478,17 @@ sub preserve_config() {
             my $found = 0;
             for my $orig_line (@orig_lines) {
                 if ($orig_line =~ /^\s*$var\s/
-                        and $var ne 'PSAD_AUTO_DL_FILE'  ### special case paths
+                        ### special case old vars that need to be replaced
+                        and $var ne 'PSAD_AUTO_DL_FILE'
                         and $var ne 'PSAD_ICMP_TYPES_FILE'
                         and $var ne 'PSAD_SIGS_FILE'
-                        and $var ne 'PSAD_POSF_FILE') {
+                        and $var ne 'PSAD_POSF_FILE'
+                        and $var ne 'FLUSH_IPT_AT_INIT'
+                        and $var ne 'AUTO_IPT_SOCK'
+                        and $var ne 'IPT_SYSLOG_FILE'
+                        and $var ne 'IPT_WRITE_FWDATA'
+                        and $var ne 'AUTO_BLOCK_IPT_FILE'
+                ) {
                     print CONF $orig_line;
                     $found = 1;
                     last;

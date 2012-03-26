@@ -330,6 +330,9 @@ my %pidfiles = ();
 
 ### initialize and scope some default variables (command
 ### line args can override some default values)
+my $fw_parse_func    = '';
+my $firewall_type    = '';
+my $cmdline_fw_type  = '';
 my $sigs_file        = '';
 my $posf_file        = '';
 my $auto_dl_file     = '';
@@ -393,7 +396,7 @@ my $csv_end_line     = 0;
 my $csv_regex        = '';
 my $csv_neg_regex    = '';
 my $csv_have_timestamp = 0;
-my $dump_ipt_policy  = 0;
+my $dump_fw_policy   = 0;
 my $fw_include_ips   = 0;
 my $benchmark        = 0;
 my $num_packets      = 0;
@@ -491,7 +494,7 @@ my @unsupported_snort_opts = qw(
     flowbits
     ip_proto
 );  ### the ip_proto keyword could be supported, but would require
-    ### refactoring parse_NF_pkt_str().
+    ### refactoring parse_iptables_pkt_str().
 
 ### for Snort signature sp/dp matching
 my @port_types = (
@@ -752,7 +755,7 @@ my $fw_data_file_check_ctr = 0;
 ### Get an open filehandle for the main firewall data file FW_DATA_FILE.
 ### All firewall drop/reject log messages are written to FW_DATA_FILE
 ### by kmsgsd (or by ulogd directly).
-print STDERR "[+] Opening $config{'FIREWALL_TYPE'} ",
+print STDERR "[+] Opening $firewall_type ",
     "log file: $fw_data_file\n" if $debug;
 open FWDATA, $fw_data_file or die '[*] Could not open ',
     "$fw_data_file: $!";
@@ -856,7 +859,7 @@ MAIN: for (;;) {
 
                 close FWDATA;
 
-                &sys_log('[+]', "$config{'FIREWALL_TYPE'} " .
+                &sys_log('[+]', "$firewall_type " .
                     "syslog file $fw_data_file " .
                     "shrank or was rotated, so re-opening");
 
@@ -1049,7 +1052,7 @@ sub check_scan() {
         }
 
         ### main parsing routine for the firewall packet logging message
-        my $pkt_parse_rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
+        my $pkt_parse_rv = &{$fw_parse_func}(\%pkt, $pkt_str);
         print STDERR Dumper \%pkt if $debug and $verbose;
         if ($pkt_parse_rv == $PKT_ERROR) {
             push @err_pkts, $pkt_str unless $no_ipt_errors;
@@ -1424,7 +1427,7 @@ sub check_scan() {
     return;
 }
 
-sub parse_NF_pkt_str() {
+sub parse_iptables_pkt_str() {
     my ($pkt_hr, $pkt_str) = @_;
 
     my $is_ipv6    = 0;
@@ -1943,6 +1946,36 @@ sub parse_NF_pkt_str() {
     return $PKT_SUCCESS;
 }
 
+sub parse_pf_pkt_str() {
+    return;
+}
+
+sub parse_ipfw_pkt_str() {
+    return;
+}
+
+sub set_firewall_type() {
+    if ($cmdline_fw_type) {
+        $firewall_type = $cmdline_fw_type;
+    } else {
+        $firewall_type = $config{'FIREWALL_TYPE'};
+    }
+
+    if ($firewall_type eq 'iptables'
+            or $firewall_type eq 'ip6tables') {
+        $fw_parse_func = \&parse_iptables_pkt_str,
+    } elsif ($firewall_type eq 'pf') {
+        $fw_parse_func = \&parse_pf_pkt_str,
+    } elsif ($firewall_type eq 'ipfw') {
+        $fw_parse_func = \&parse_ipfw_pkt_str,
+    } else {
+        die "[*] Invalid firewall type: $firewall_type, must be one of ",
+            "iptables, ip6tables, pf, or ipfw";
+    }
+
+    return;
+}
+
 sub check_ignore_proto() {
     my $pkt_proto = shift;
 
@@ -2371,7 +2404,7 @@ sub match_snort_ip_keywords() {
                     'psad_ip_len', $sig_hr);
     }
 
-    ### to handle the ip_proto keyword parse_NF_pkt_str() would have to be
+    ### to handle the ip_proto keyword parse_iptables_pkt_str() would have to be
     ### modified to handle packets besides TCP, UDP, and ICMP.
     return 0, $NO_SIG_MATCH if defined $sig_hr->{'ip_proto'};
 
@@ -3183,6 +3216,9 @@ sub psad_init() {
     ### expand any embedded vars within config values
     &expand_vars();
 
+    ### set firewall type
+    &set_firewall_type();
+
     ### pid file hash
     %pidfiles = (
         'psadwatchd' => $config{'PSADWATCHD_PID_FILE'},
@@ -3191,11 +3227,11 @@ sub psad_init() {
     );
 
     ### dump configuration to STDOUT
-    if ($dump_conf or $dump_ipt_policy) {
+    if ($dump_conf or $dump_fw_policy) {
         my $rv = 0;
         my $rv_tmp = 0;
         $rv = &dump_conf() if $dump_conf;
-        $rv_tmp = &dump_ipt_policy() if $dump_ipt_policy;
+        $rv_tmp = &dump_fw_policy() if $dump_fw_policy;
         $rv += $rv_tmp if $rv_tmp != 0;
         exit $rv;
     }
@@ -3434,7 +3470,7 @@ sub validate_config() {
     }
 
     if ($gnuplot_mode and not $csv_fields) {
-        die "[*] Must specify which $config{'FIREWALL_TYPE'} fields ",
+        die "[*] Must specify which $firewall_type fields ",
             "to plot with the --CSV-fields argument.";
     }
 
@@ -7227,7 +7263,7 @@ sub analysis_mode() {
             }
         }
     }
-    print "[+] Found ", ($#ipt_msgs+1), " $config{'FIREWALL_TYPE'} ",
+    print "[+] Found ", ($#ipt_msgs+1), " $firewall_type ",
         "log messages out of ", ($#lines+1), " total lines.\n";
     print "    This may take a while...\n" if $#ipt_msgs > 15000;
 
@@ -7330,11 +7366,11 @@ sub csv_mode() {
 
     my $fh = '';
     if ($csv_stdin) {
-        print "[+] Parsing $config{'FIREWALL_TYPE'} log messages from STDIN\n"
+        print "[+] Parsing $firewall_type log messages from STDIN\n"
             if $gnuplot_mode;
         $fh = *STDIN;
     } else {
-        print "[+] Parsing $config{'FIREWALL_TYPE'} log messages from file: $fw_data_file\n"
+        print "[+] Parsing $firewall_type log messages from file: $fw_data_file\n"
             if $gnuplot_mode;
         open MSGS, "< $fw_data_file" or die "[*] Could not open ",
             "$fw_data_file: $!";
@@ -7361,16 +7397,16 @@ sub csv_mode() {
             next MSG unless $pkt_str =~ /IN.*OUT/;
             my %pkt = %pkt_NF_init;
             if ($config{'FW_SEARCH_ALL'} eq 'Y') {
-                my $rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
+                my $rv = &{$fw_parse_func}(\%pkt, $pkt_str);
                 next MSG if $rv == $PKT_ERROR or $rv == $PKT_IGNORE;
             } else {
                 if ($pkt_str =~ /$config{'SNORT_SID_STR'}/) {
-                    my $rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
+                    my $rv = &{$fw_parse_func}(\%pkt, $pkt_str);
                     next MSG if $rv == $PKT_ERROR or $rv == $PKT_IGNORE;
                 } else {
                     for my $fw_search_str (@fw_search) {
                         if ($pkt_str =~ /$fw_search_str/) {
-                            my $rv = &parse_NF_pkt_str(\%pkt, $pkt_str);
+                            my $rv = &{$fw_parse_func}(\%pkt, $pkt_str);
                             next MSG if $rv == $PKT_ERROR or $rv == $PKT_IGNORE;
                         }
                     }
@@ -7433,7 +7469,7 @@ sub csv_mode() {
                 chmod 0644, $store_file;
             }
         } else {
-            print "[+] Parsed $line_ctr $config{'FIREWALL_TYPE'} log messages.\n";
+            print "[+] Parsed $line_ctr $firewall_type log messages.\n";
         }
         ### print out the gnuplot data after appropriate
         ### integer conversions
@@ -7482,7 +7518,7 @@ sub gnuplot_write_plot_file() {
             "$gnuplot_plot_file: $!";
         print GP "$_\n", for @{&gnuplot_header()};
         unless ($gnuplot_title) {
-            $gnuplot_title = "psad $config{'FIREWALL_TYPE'} log visualization: $csv_fields";
+            $gnuplot_title = "psad $firewall_type log visualization: $csv_fields";
             $gnuplot_title =~ s/_//g;  ### some fonts used by Gnuplot don't like "-" chars
         }
         print GP "reset\n", qq|set title "$gnuplot_title"\n|;
@@ -7608,7 +7644,7 @@ sub gnuplot_write_data() {
     ### of just the port values themselves)
     my @gnuplot_count_data = ();
 
-    print "[+] Writing parsed $config{'FIREWALL_TYPE'} data to: $gnuplot_data_file\n";
+    print "[+] Writing parsed $firewall_type data to: $gnuplot_data_file\n";
     open GP, "> $gnuplot_data_file" or die "[*] Could not open ",
         "$gnuplot_data_file: $!";
     print GP "$_\n", for @{&gnuplot_header()};
@@ -8706,9 +8742,9 @@ sub print_blocked_ip_status() {
 
     my @print_lines = ();
     if ($specific_ip) {
-        push @print_lines,  "    $config{'FIREWALL_TYPE'} auto-blocking status for: $specific_ip: \n";
+        push @print_lines,  "    $firewall_type auto-blocking status for: $specific_ip: \n";
     } else {
-        push @print_lines,  "    $config{'FIREWALL_TYPE'} auto-blocked IPs:\n";
+        push @print_lines,  "    $firewall_type auto-blocked IPs:\n";
     }
 
     my %ipt_opts = (
@@ -9996,7 +10032,7 @@ sub dump_conf() {
     return 0;
 }
 
-sub dump_ipt_policy() {
+sub dump_fw_policy() {
     my $rv = 0;
 
     my $fh = *STDOUT;
@@ -10026,7 +10062,7 @@ sub dump_ipt_policy() {
         }
     }
 
-    print $fh "\n[+] $config{'FIREWALL_TYPE'} policy dump:\n";
+    print $fh "\n[+] $firewall_type policy dump:\n";
     if (defined $cmds{'iptables'} and -x $cmds{'iptables'}) {
         my @ipt_ver = @{&run_command($cmds{'iptables'}, '-V')};
         if (@ipt_ver) {
@@ -10477,6 +10513,7 @@ sub getopt_wrapper() {
     Getopt::Long::Configure('no_ignore_case');
 
     die "[*] See 'psad -h' for usage information" unless (GetOptions(
+        'firewall-type=s'   => \$cmdline_fw_type, # Set 'iptables', 'pf', or 'ipfw'.
         'signatures=s'      => \$sigs_file,       # Path to psad signatures file.
         'sig-update'        => \$download_sigs,   # Download the latest signatures from
                                                   # http://www.cipherdyne.org/psad/signatures
@@ -10578,7 +10615,7 @@ sub getopt_wrapper() {
                                                   #   flushing them (requires --F as
                                                   #   well).
         'X'                 => \$fw_del_chains,   # Synonym for --fw-del-chains.
-        'fw-dump'           => \$dump_ipt_policy, # Dump the firewall policy
+        'fw-dump'           => \$dump_fw_policy,  # Dump the firewall policy
                                                   #   (requires -D as well).
         'fw-include-ips'    => \$fw_include_ips,  # Include all IPs/nets in firewall
                                                   # dump (--fw-dump) output.

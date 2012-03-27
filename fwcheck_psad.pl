@@ -47,8 +47,11 @@ my @fw_search = ();
 
 my $help = 0;
 my $test_mode = 0;
+my $firewall_type = 'iptables';  ### default
 my $fw_analyze = 0;
 my $fw_file    = '';
+my $fw_type    = '';
+my $cmdline_fw_type = '';
 my $fw_search_all = 1;
 my $no_fw_search_all = 0;
 my $log_and_drop_table = 'filter';
@@ -62,6 +65,8 @@ my $psad_lib_dir = '';
                                     # policy.
     'fw-analyze'  => \$fw_analyze,  # Analyze the local iptables ruleset
                                     # and exit.
+    'firewall-type=s'  => \$cmdline_fw_type, # Specify firewall type
+    'fw-type=s'        => \$cmdline_fw_type,  # synonym
     'no-fw-search-all' => \$no_fw_search_all, # looking for specific log
                                               # prefixes
     'Lib-dir=s'   => \$psad_lib_dir,# Specify path to psad lib directory.
@@ -84,6 +89,9 @@ if ($fw_file) {
 
 ### import psad.conf
 &import_config($config_file);
+
+### set firewall type
+&set_fw_type();
 
 ### import FW_MSG_SEARCH strings
 &import_fw_search($config_file);
@@ -119,6 +127,26 @@ exit $rv;
 #========================== end main =========================
 
 sub fw_check() {
+
+    if ($fw_type eq 'iptables') {
+        return &fw_check_iptables();
+    } elsif ($fw_type eq 'pf') {
+        return &fw_check_pf();
+    } elsif ($fw_type eq 'ipfw') {
+        return &fw_check_ipfw();
+    }
+    return 0;
+}
+
+sub fw_check_pf() {
+    return 0;
+}
+
+sub fw_check_ipfw() {
+    return 0;
+}
+
+sub fw_check_iptables() {
 
     ### only send a firewall config alert if we really need to.
     my $send_alert = 0;
@@ -401,7 +429,7 @@ sub import_psad_perl_modules() {
         splice @INC, 0, $#$mod_paths_ar+1, @$mod_paths_ar;
     }
 
-    require IPTables::Parse;
+    require IPTables::Parse if $fw_type eq 'iptables';
 
     return;
 }
@@ -542,6 +570,18 @@ sub expand_vars() {
 sub check_commands() {
     my $exceptions_hr = shift;
     my $caller = $0;
+
+    if ($fw_type eq 'iptables') {
+        $exceptions_hr->{'pfctl'} = '';
+        $exceptions_hr->{'ipfw'} = '';
+    } else {
+        $exceptions_hr->{'iptables'} = '';
+        $exceptions_hr->{'ip6tables'} = '';
+        $exceptions_hr->{'ip'} = '';
+        $exceptions_hr->{'killall'} = '';
+        $exceptions_hr->{'runlevel'} = '';
+    }
+
     my @path = (qw(
         /bin
         /sbin
@@ -591,6 +631,24 @@ sub check_commands() {
     return;
 }
 
+sub set_fw_type() {
+    if ($cmdline_fw_type) {
+        $fw_type = $cmdline_fw_type;
+    } else {
+        $fw_type = $config{'FIREWALL_TYPE'};
+    }
+
+    $fw_type = 'iptables' if $fw_type eq 'ip6tables';
+
+    unless ($fw_type eq 'iptables'
+            or $fw_type eq 'pf'
+            or $fw_type eq 'ipfw') {
+        die "[*] Invalid firewall type: $fw_type, must be one of ",
+            "iptables, ip6tables, pf, or ipfw";
+    }
+    return;
+}
+
 sub usage() {
     my $exitcode = shift;
     print <<_HELP_;
@@ -598,6 +656,7 @@ sub usage() {
 Options:
     --config <config_file>            - Specify path to configuration
                                         file.
+    --fw-type   <iptables|pf|ipfw>    - Set the firewall type.
     --fw-file    <fw_file>            - Analyze ruleset contained within
                                         fw_file instead of a running
                                         policy.

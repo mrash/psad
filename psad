@@ -331,7 +331,7 @@ my %pidfiles = ();
 ### initialize and scope some default variables (command
 ### line args can override some default values)
 my $fw_parse_func    = '';
-my $firewall_type    = '';
+my $fw_type          = '';
 my $cmdline_fw_type  = '';
 my $sigs_file        = '';
 my $posf_file        = '';
@@ -755,7 +755,7 @@ my $fw_data_file_check_ctr = 0;
 ### Get an open filehandle for the main firewall data file FW_DATA_FILE.
 ### All firewall drop/reject log messages are written to FW_DATA_FILE
 ### by kmsgsd (or by ulogd directly).
-print STDERR "[+] Opening $firewall_type ",
+print STDERR "[+] Opening $fw_type ",
     "log file: $fw_data_file\n" if $debug;
 open FWDATA, $fw_data_file or die '[*] Could not open ',
     "$fw_data_file: $!";
@@ -859,7 +859,7 @@ MAIN: for (;;) {
 
                 close FWDATA;
 
-                &sys_log('[+]', "$firewall_type " .
+                &sys_log('[+]', "$fw_type " .
                     "syslog file $fw_data_file " .
                     "shrank or was rotated, so re-opening");
 
@@ -1954,22 +1954,23 @@ sub parse_ipfw_pkt_str() {
     return;
 }
 
-sub set_firewall_type() {
+sub set_fw_type() {
     if ($cmdline_fw_type) {
-        $firewall_type = $cmdline_fw_type;
+        $fw_type = $cmdline_fw_type;
     } else {
-        $firewall_type = $config{'FIREWALL_TYPE'};
+        $fw_type = $config{'FIREWALL_TYPE'};
     }
 
-    if ($firewall_type eq 'iptables'
-            or $firewall_type eq 'ip6tables') {
+    $fw_type = 'iptables' if $fw_type eq 'ip6tables';
+
+    if ($fw_type eq 'iptables') {
         $fw_parse_func = \&parse_iptables_pkt_str,
-    } elsif ($firewall_type eq 'pf') {
+    } elsif ($fw_type eq 'pf') {
         $fw_parse_func = \&parse_pf_pkt_str,
-    } elsif ($firewall_type eq 'ipfw') {
+    } elsif ($fw_type eq 'ipfw') {
         $fw_parse_func = \&parse_ipfw_pkt_str,
     } else {
-        die "[*] Invalid firewall type: $firewall_type, must be one of ",
+        die "[*] Invalid firewall type: $fw_type, must be one of ",
             "iptables, ip6tables, pf, or ipfw";
     }
 
@@ -3142,7 +3143,8 @@ sub import_perl_modules() {
         print STDERR "$_\n" for @INC;
     }
 
-    require IPTables::ChainMgr;
+    require IPTables::ChainMgr if $fw_type eq 'iptables';
+
     require NetAddr::IP;
     require Date::Calc;
     require Unix::Syslog;
@@ -3217,7 +3219,7 @@ sub psad_init() {
     &expand_vars();
 
     ### set firewall type
-    &set_firewall_type();
+    &set_fw_type();
 
     ### pid file hash
     %pidfiles = (
@@ -3274,10 +3276,12 @@ sub psad_init() {
     ### set some config variables based on command line input
     &handle_cmdline();
 
-    ### build iptables block config hash out of IPT_AUTO_CHAIN keywords
-    ### (we don't check ENABLE_AUTO_IDS here since someone may have turned
-    ### it off but still want to run --Status checks or use --Flush).
-    &build_ipt_config() unless $syslog_server;
+    if ($fw_type eq 'iptables') {
+        ### build iptables block config hash out of IPT_AUTO_CHAIN keywords
+        ### (we don't check ENABLE_AUTO_IDS here since someone may have turned
+        ### it off but still want to run --Status checks or use --Flush).
+        &build_ipt_config() unless $syslog_server;
+    }
 
     ### The --Kill command line switch was given.
     exit &stop_psad() if $kill;
@@ -3470,7 +3474,7 @@ sub validate_config() {
     }
 
     if ($gnuplot_mode and not $csv_fields) {
-        die "[*] Must specify which $firewall_type fields ",
+        die "[*] Must specify which $fw_type fields ",
             "to plot with the --CSV-fields argument.";
     }
 
@@ -5870,7 +5874,7 @@ sub exec_external_script() {
     $cmd =~ s/SRCIP/$src/;
     my $pid;
     if ($pid = fork()) {
-        local $SIG{'ALRM'} = sub {die "[*] External script timeout.\n"};
+        local $SIG{'ALRM'} = sub {die "[*] External script timeout."};
         alarm 30;  ### the external script should be finished in 30 secs.
         eval {
             waitpid($pid, 0);
@@ -7081,13 +7085,13 @@ sub get_whois_info() {
     } else {
         $whois_cache{$ip} = 0;
         eval {
-            local $SIG{'ALRM'} = sub {die "whois alarm\n"};
+            local $SIG{'ALRM'} = sub {die "whois alarm"};
             alarm $config{'WHOIS_TIMEOUT'};
             system "$cmds{'whois'} $ip > $whois_datafile 2> /dev/null";
             alarm 0;
         };
         if ($@) {
-            ### die unless $@ eq "whois alarm\n";
+            ### die unless $@ eq "whois alarm";
             ### warn "$@: $?";  ### let the warning handler save the error.
             warn $@;
             $#whois_data = 0;
@@ -7263,7 +7267,7 @@ sub analysis_mode() {
             }
         }
     }
-    print "[+] Found ", ($#ipt_msgs+1), " $firewall_type ",
+    print "[+] Found ", ($#ipt_msgs+1), " $fw_type ",
         "log messages out of ", ($#lines+1), " total lines.\n";
     print "    This may take a while...\n" if $#ipt_msgs > 15000;
 
@@ -7366,11 +7370,11 @@ sub csv_mode() {
 
     my $fh = '';
     if ($csv_stdin) {
-        print "[+] Parsing $firewall_type log messages from STDIN\n"
+        print "[+] Parsing $fw_type log messages from STDIN\n"
             if $gnuplot_mode;
         $fh = *STDIN;
     } else {
-        print "[+] Parsing $firewall_type log messages from file: $fw_data_file\n"
+        print "[+] Parsing $fw_type log messages from file: $fw_data_file\n"
             if $gnuplot_mode;
         open MSGS, "< $fw_data_file" or die "[*] Could not open ",
             "$fw_data_file: $!";
@@ -7469,7 +7473,7 @@ sub csv_mode() {
                 chmod 0644, $store_file;
             }
         } else {
-            print "[+] Parsed $line_ctr $firewall_type log messages.\n";
+            print "[+] Parsed $line_ctr $fw_type log messages.\n";
         }
         ### print out the gnuplot data after appropriate
         ### integer conversions
@@ -7518,7 +7522,7 @@ sub gnuplot_write_plot_file() {
             "$gnuplot_plot_file: $!";
         print GP "$_\n", for @{&gnuplot_header()};
         unless ($gnuplot_title) {
-            $gnuplot_title = "psad $firewall_type log visualization: $csv_fields";
+            $gnuplot_title = "psad $fw_type log visualization: $csv_fields";
             $gnuplot_title =~ s/_//g;  ### some fonts used by Gnuplot don't like "-" chars
         }
         print GP "reset\n", qq|set title "$gnuplot_title"\n|;
@@ -7644,7 +7648,7 @@ sub gnuplot_write_data() {
     ### of just the port values themselves)
     my @gnuplot_count_data = ();
 
-    print "[+] Writing parsed $firewall_type data to: $gnuplot_data_file\n";
+    print "[+] Writing parsed $fw_type data to: $gnuplot_data_file\n";
     open GP, "> $gnuplot_data_file" or die "[*] Could not open ",
         "$gnuplot_data_file: $!";
     print GP "$_\n", for @{&gnuplot_header()};
@@ -8742,9 +8746,9 @@ sub print_blocked_ip_status() {
 
     my @print_lines = ();
     if ($specific_ip) {
-        push @print_lines,  "    $firewall_type auto-blocking status for: $specific_ip: \n";
+        push @print_lines,  "    $fw_type auto-blocking status for: $specific_ip: \n";
     } else {
-        push @print_lines,  "    $firewall_type auto-blocked IPs:\n";
+        push @print_lines,  "    $fw_type auto-blocked IPs:\n";
     }
 
     my %ipt_opts = (
@@ -9714,7 +9718,7 @@ sub setup() {
                     "$config{'ETC_SYSLOGNG_CONF'}.orig";
             }
             open RS, "< $config{'ETC_SYSLOGNG_CONF'}" or
-                die "[*] Unable to open $config{'ETC_SYSLOGNG_CONF'}: $!\n";
+                die "[*] Unable to open $config{'ETC_SYSLOGNG_CONF'}: $!";
             my @lines = <RS>;
             close RS;
 
@@ -9760,7 +9764,7 @@ sub setup() {
                     "$config{'ETC_METALOG_CONF'}.orig";
             }
             open RS, "< $config{'ETC_METALOG_CONF'}" or
-                die "[*] Unable to open $config{'ETC_METALOG_CONF'}: $!\n";
+                die "[*] Unable to open $config{'ETC_METALOG_CONF'}: $!";
             my @lines = <RS>;
             close RS;
 
@@ -10033,6 +10037,18 @@ sub dump_conf() {
 }
 
 sub dump_fw_policy() {
+
+    if ($fw_type eq 'iptables') {
+        return &dump_iptables_policy();
+    } elsif ($fw_type eq 'pf') {
+        return &dump_pf_policy();
+    } elsif ($fw_type eq 'ipfw') {
+        return &dump_ipfw_policy();
+    }
+    return 0;
+}
+
+sub dump_iptables_policy() {
     my $rv = 0;
 
     my $fh = *STDOUT;
@@ -10057,12 +10073,12 @@ sub dump_fw_policy() {
                 print $fh $line;
             }
         } else {
-            print $fh "[*] Could not find ip6tables command.\n";
+            print $fh "[*] Could not find ip6tables command.";
             $rv = 1;
         }
     }
 
-    print $fh "\n[+] $firewall_type policy dump:\n";
+    print $fh "\n[+] $fw_type policy dump:\n";
     if (defined $cmds{'iptables'} and -x $cmds{'iptables'}) {
         my @ipt_ver = @{&run_command($cmds{'iptables'}, '-V')};
         if (@ipt_ver) {
@@ -10083,9 +10099,27 @@ sub dump_fw_policy() {
             print $fh $line;
         }
     } else {
-        print $fh "[*] Could not find iptables command.\n";
+        print $fh "[*] Could not find iptables command.";
         $rv = 1;
     }
+
+    return $rv;
+}
+
+sub dump_pf_policy() {
+    my $rv = 0;
+
+    my $fh = *STDOUT;
+    $fh = *STDERR if $debug;
+
+    return $rv;
+}
+
+sub dump_ipfw_policy() {
+    my $rv = 0;
+
+    my $fh = *STDOUT;
+    $fh = *STDERR if $debug;
 
     return $rv;
 }
@@ -10369,6 +10403,17 @@ sub check_commands() {
         }
     }
 
+    if ($fw_type eq 'iptables') {
+        $exceptions_hr->{'pfctl'} = '';
+        $exceptions_hr->{'ipfw'} = '';
+    } else {
+        $exceptions_hr->{'iptables'} = '';
+        $exceptions_hr->{'ip6tables'} = '';
+        $exceptions_hr->{'ip'} = '';
+        $exceptions_hr->{'killall'} = '';
+        $exceptions_hr->{'runlevel'} = '';
+    }
+
     my @path = (qw(
         /bin
         /sbin
@@ -10448,7 +10493,7 @@ sub is_running() {
 ### make sure pid is unique
 sub unique_pid() {
     my $pidfile = shift;
-    die "[*] $0 process is already running! Exiting.\n"
+    die "[*] $0 process is already running! Exiting."
         if &is_running($pidfile);
     return;
 }
@@ -10514,6 +10559,7 @@ sub getopt_wrapper() {
 
     die "[*] See 'psad -h' for usage information" unless (GetOptions(
         'firewall-type=s'   => \$cmdline_fw_type, # Set 'iptables', 'pf', or 'ipfw'.
+        'fw-type=s'         => \$cmdline_fw_type, # Set 'iptables', 'pf', or 'ipfw'.
         'signatures=s'      => \$sigs_file,       # Path to psad signatures file.
         'sig-update'        => \$download_sigs,   # Download the latest signatures from
                                                   # http://www.cipherdyne.org/psad/signatures

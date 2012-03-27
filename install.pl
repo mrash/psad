@@ -2076,6 +2076,7 @@ sub check_commands() {
 
     if ($os_type == $OS_LINUX or $os_type == $OS_CYGWIN) {
         $exclude_cmds{'ipfw'} = '';
+        $exclude_cmds{'pf'} = '';
     } else {
         ### we are installing on BSD or Mac OS X
         $exclude_cmds{'iptables'} = '';

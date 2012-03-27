@@ -1947,11 +1947,11 @@ sub parse_iptables_pkt_str() {
 }
 
 sub parse_pf_pkt_str() {
-    return;
+    return $PKT_IGNORE;
 }
 
 sub parse_ipfw_pkt_str() {
-    return;
+    return $PKT_IGNORE;
 }
 
 sub set_fw_type() {

@@ -79,12 +79,13 @@ exit 1 unless GetOptions(
     'List-mode'         => \$list_mode,
     'diff'              => \$diff_mode,
     'firewall-type=s'   => \$cmdline_fw_type,
+    'fw-type=s'         => \$cmdline_fw_type,  ### synonym
     'help'              => \$help
 );
 
 &usage() if $help;
 
-my $psad_def = "$psadCmd --test-mode --firewall-type ";
+my $psad_def = "$psadCmd --test-mode --fw-type ";
 if ($cmdline_fw_type) {
     $psad_def .= $cmdline_fw_type;
 } else {
@@ -1023,11 +1024,11 @@ sub fw_type() {
 
     ### This function implements a set of simple heuristics to determine
     ### the firewall type.  Note that the user can always just set this
-    ### from the command line with --firewall-type
+    ### from the command line with --fw-type
 
     ### get OS output from uname
     open UNAME, 'uname |' or die "[*] Could not execute 'uname', use ",
-        "--firewall-type.";
+        "--fw-type.";
     while (<UNAME>) {
         if (/darwin/i) {
             $fw_type = 'ipfw';

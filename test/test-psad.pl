@@ -66,6 +66,7 @@ my $OPTIONAL = 0;
 my $MATCH_ALL_RE = 1;
 my $MATCH_SINGLE_RE = 2;
 my $cmdline_fw_type = '';
+my $fw_type = '';
 my $help = 0;
 
 my @args_cp = @ARGV;
@@ -85,12 +86,9 @@ exit 1 unless GetOptions(
 
 &usage() if $help;
 
-my $psad_def = "$psadCmd --test-mode --fw-type ";
-if ($cmdline_fw_type) {
-    $psad_def .= $cmdline_fw_type;
-} else {
-    $psad_def .= &fw_type();
-}
+&set_fw_type();
+
+my $psad_def = "$psadCmd --test-mode --fw-type $fw_type";
 
 my %test_keys = (
     'category'        => $REQUIRED,
@@ -101,6 +99,7 @@ my %test_keys = (
     'fatal'           => $OPTIONAL,
     'exec_err'        => $OPTIONAL,
     'match_all'       => $OPTIONAL,
+    'firewalls'       => $OPTIONAL,
     'postive_output_matches'  => $OPTIONAL,
     'negative_output_matches' => $OPTIONAL,
 );
@@ -220,7 +219,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A -m $scans_dir/" .
-                &fw_type() . "/$syn_scan_file -c $default_conf",
+                "$fw_type/$syn_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -236,7 +238,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A -m $scans_dir/" .
-                &fw_type() . "/$ms_sql_server_sig_match_file -c $default_conf",
+                "$fw_type/$ms_sql_server_sig_match_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -252,7 +257,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A -m $scans_dir/" .
-                &fw_type() . "/$ipv6_ms_sql_server_sig_match_file -c $default_conf",
+                "$fw_type/$ipv6_ms_sql_server_sig_match_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -265,8 +273,11 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A -m $scans_dir/" .
-                &fw_type() . "/$ms_sql_server_sig_match_file " .
+                "$fw_type/$ms_sql_server_sig_match_file " .
                 "--signatures $no_ms_sql_server_sig_match_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -279,8 +290,11 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A -m $scans_dir/" .
-                &fw_type() . "/$ipv6_ms_sql_server_sig_match_file " .
+                "$fw_type/$ipv6_ms_sql_server_sig_match_file " .
                 "--signatures $no_ms_sql_server_sig_match_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -297,7 +311,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A -m $scans_dir/" .
-                &fw_type() . "/$fin_scan_file -c $default_conf",
+                "$fw_type/$fin_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -313,7 +330,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A -m $scans_dir/" .
-                &fw_type() . "/$xmas_scan_file -c $default_conf",
+                "$fw_type/$xmas_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -328,7 +348,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A -m $scans_dir/" .
-                &fw_type() . "/$null_scan_file -c $default_conf",
+                "$fw_type/$null_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -343,7 +366,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A -m $scans_dir/" .
-                &fw_type() . "/$ack_scan_file -c $enable_ack_detection_conf",
+                "$fw_type/$ack_scan_file -c $enable_ack_detection_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -358,7 +384,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A -m $scans_dir/" .
-                &fw_type() . "/$udp_scan_file -c $default_conf",
+                "$fw_type/$udp_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -374,7 +403,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A --auto-dl $dl5_ipv4_auto_dl_file " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf",
+                "-m $scans_dir/$fw_type/$syn_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -389,7 +421,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A --auto-dl $dl5_ipv4_subnet_auto_dl_file " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf",
+                "-m $scans_dir/$fw_type/$syn_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -404,7 +439,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A --auto-dl $dl5_ipv4_subnet_auto_dl_file_tcp " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf",
+                "-m $scans_dir/$fw_type/$syn_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -416,7 +454,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A --auto-dl $dl5_ipv4_subnet_auto_dl_file_udp " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf",
+                "-m $scans_dir/$fw_type/$syn_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -432,7 +473,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A --auto-dl $dl5_ipv4_auto_dl_file " .
-                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf",
+                "-m $scans_dir/$fw_type/$udp_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -447,7 +491,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A --auto-dl $dl5_ipv4_subnet_auto_dl_file " .
-                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf",
+                "-m $scans_dir/$fw_type/$udp_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -462,7 +509,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A --auto-dl $dl5_ipv4_subnet_auto_dl_file_udp " .
-                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf",
+                "-m $scans_dir/$fw_type/$udp_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -474,7 +524,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A --auto-dl $dl5_ipv4_subnet_auto_dl_file_tcp " .
-                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf",
+                "-m $scans_dir/$fw_type/$udp_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -487,7 +540,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A --auto-dl $ignore_ipv4_auto_dl_file " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf",
+                "-m $scans_dir/$fw_type/$syn_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -499,7 +555,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A --auto-dl $ignore_ipv4_subnet_auto_dl_file " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf",
+                "-m $scans_dir/$fw_type/$syn_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -511,7 +570,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A --auto-dl $dl5_ipv4_auto_dl_file " .  ### psad.conf IGNORE_PROTOCOLS trumps auto_dl
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $ignore_tcp_conf",
+                "-m $scans_dir/$fw_type/$syn_scan_file -c $ignore_tcp_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -523,7 +585,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A --auto-dl $dl5_ipv4_auto_dl_file " .  ### psad.conf FW_MSG_SEARCH trumps auto_dl
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $require_prefix_conf",
+                "-m $scans_dir/$fw_type/$syn_scan_file -c $require_prefix_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -535,7 +600,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A --auto-dl $dl5_ipv4_auto_dl_file " .  ### psad.conf FW_MSG_SEARCH trumps auto_dl
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $require_missing_prefix_conf",
+                "-m $scans_dir/$fw_type/$syn_scan_file -c $require_missing_prefix_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -549,7 +617,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A --auto-dl $ignore_ipv4_auto_dl_file " .
-                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf",
+                "-m $scans_dir/$fw_type/$udp_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -561,7 +632,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A --auto-dl $ignore_ipv4_subnet_auto_dl_file " .
-                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf",
+                "-m $scans_dir/$fw_type/$udp_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -573,7 +647,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A --auto-dl $dl5_ipv4_auto_dl_file " .  ### psad.conf IGNORE_PROTOCOLS trumps auto_dl
-                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $ignore_udp_conf",
+                "-m $scans_dir/$fw_type/$udp_scan_file -c $ignore_udp_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -589,7 +666,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A -m $scans_dir/" .
-                &fw_type() . "/$ipv6_connect_scan_file -c $default_conf",
+                "$fw_type/$ipv6_connect_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -602,7 +682,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A -m $scans_dir/" .
-                &fw_type() . "/$ipv6_ping_scan_file -c $default_conf",
+                "$fw_type/$ipv6_ping_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -616,7 +699,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A -m $scans_dir/" .
-                &fw_type() . "/$ipv6_invalid_icmp6_type_code_file -c $default_conf",
+                "$fw_type/$ipv6_invalid_icmp6_type_code_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -630,7 +716,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A -m $scans_dir/" .
-                &fw_type() . "/$ipv4_valid_ping -c $default_conf",
+                "$fw_type/$ipv4_valid_ping -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -645,7 +734,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A -m $scans_dir/" .
-                &fw_type() . "/$ipv4_invalid_icmp6_type_code_file -c $default_conf",
+                "$fw_type/$ipv4_invalid_icmp6_type_code_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -659,7 +751,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A -m $scans_dir/" .
-                &fw_type() . "/$ipv6_connect_scan_file -c $disable_ipv6_conf",
+                "$fw_type/$ipv6_connect_scan_file -c $disable_ipv6_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -672,7 +767,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A --auto-dl $ignore_ipv6_addr_auto_dl_file " .
-                "-m $scans_dir/" . &fw_type() . "/$ipv6_connect_scan_file -c $default_conf",
+                "-m $scans_dir/$fw_type/$ipv6_connect_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -685,7 +783,10 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psad_def -A --auto-dl $ignore_ipv6_addr_auto_dl_file_abbrev " .
-                "-m $scans_dir/" . &fw_type() . "/$ipv6_connect_scan_file -c $default_conf",
+                "-m $scans_dir/$fw_type/$ipv6_connect_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -698,6 +799,9 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&look_for_warnings,
         'cmdline'   => "grep -i uninit $output_dir/*.test",
+        'firewalls' => {
+            'iptables' => ''
+        },
         'exec_err'  => $IGNORE,
         'fatal'     => $NO
     },
@@ -733,6 +837,8 @@ exit 0;
 
 sub run_test() {
     my $test_hr = shift;
+
+    return unless &firewall_check($test_hr);
 
     my $msg = "[$test_hr->{'category'}]";
     $msg .= " [$test_hr->{'subcategory'}]" if $test_hr->{'subcategory'};
@@ -906,6 +1012,17 @@ sub file_find_regex() {
     return $found;
 }
 
+sub firewall_check() {
+    my $test_hr = shift;
+
+    if (defined $test_hr->{'firewalls'}->{'all'}) {
+        return 1;
+    } elsif (defined $test_hr->{'firewalls'}->{$fw_type}) {
+        return 1;
+    }
+    return 0;
+}
+
 sub dots_print() {
     my $msg = shift;
     &logr($msg);
@@ -933,7 +1050,11 @@ sub init() {
                 die "[*] Missing '$key' element in hash: $hash_num"
                     unless defined $test_hr->{$key};
             } else {
-                $test_hr->{$key} = '' unless defined $test_hr->{$key};
+                if ($key eq 'firewalls') {
+                    $test_hr->{$key} = {'all' => ''} unless defined $test_hr->{$key};
+                } else {
+                    $test_hr->{$key} = '' unless defined $test_hr->{$key};
+                }
             }
         }
         $hash_num++;
@@ -1019,31 +1140,36 @@ sub process_include_exclude() {
     return 1;
 }
 
-sub fw_type() {
-    my $fw_type = '';
+sub set_fw_type() {
 
     ### This function implements a set of simple heuristics to determine
     ### the firewall type.  Note that the user can always just set this
     ### from the command line with --fw-type
 
-    ### get OS output from uname
-    open UNAME, 'uname |' or die "[*] Could not execute 'uname', use ",
-        "--fw-type.";
-    while (<UNAME>) {
-        if (/darwin/i) {
-            $fw_type = 'ipfw';
-        } elsif (/openbsd/i) {
-            $fw_type = 'pf';
-        } elsif (/bsd/i) {
-            $fw_type = 'ipfw';
-        } elsif (/linux/i) {
-            $fw_type = 'iptables';
+    if ($cmdline_fw_type) {
+        $fw_type = $cmdline_fw_type;
+    } else {
+        ### get OS output from uname
+        open UNAME, 'uname |' or die "[*] Could not execute 'uname', use ",
+            "--fw-type.";
+        while (<UNAME>) {
+            if (/darwin/i) {
+                $fw_type = 'ipfw';
+            } elsif (/openbsd/i) {
+                $fw_type = 'pf';
+            } elsif (/bsd/i) {
+                $fw_type = 'ipfw';
+            } elsif (/linux/i) {
+                $fw_type = 'iptables';
+            } else {
+                die "[*] Could not determine firewall type, use --fw-type";
+            }
+            last;
         }
-        last;
+        close UNAME;
     }
-    close UNAME;
 
-    return $fw_type;
+    return;
 }
 
 sub write_test_file() {

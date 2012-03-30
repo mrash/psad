@@ -157,6 +157,10 @@ my $fw_data_file = '';
 ### disable debugging by default
 my $debug     = 0;
 my $debug_sid = 0;  ### debug a specific signature
+my $debug_dump_ip_options = 0;
+my $debug_dump_icmp_options = 0;
+my $debug_dump_snort_rules  = 0;
+my $debug_dump_os_sigs  = 0;
 
 my $flush_fw = 0;
 
@@ -331,6 +335,7 @@ my %pidfiles = ();
 ### initialize and scope some default variables (command
 ### line args can override some default values)
 my $fw_parse_func    = '';
+my $parse_tcp_options_func = '';
 my $fw_type          = '';
 my $cmdline_fw_type  = '';
 my $sigs_file        = '';
@@ -505,7 +510,7 @@ my @port_types = (
 );
 
 ### main packet data structure
-my %pkt_NF_init = (
+my %pkt_fw_init = (
 
     ### data link layer
     'src_mac' => '',
@@ -757,6 +762,7 @@ my $fw_data_file_check_ctr = 0;
 ### by kmsgsd (or by ulogd directly).
 print STDERR "[+] Opening $fw_type ",
     "log file: $fw_data_file\n" if $debug;
+
 open FWDATA, $fw_data_file or die '[*] Could not open ',
     "$fw_data_file: $!";
 
@@ -1042,7 +1048,7 @@ sub check_scan() {
     PKT: for my $pkt_str (@$fw_packets_ar) {
 
         ### main packet data structure
-        my %pkt = %pkt_NF_init;
+        my %pkt = %pkt_fw_init;
 
         if ($analyze_mode) {
             $pkt_ctr++;
@@ -1059,6 +1065,24 @@ sub check_scan() {
             next PKT;
         } elsif ($pkt_parse_rv == $PKT_IGNORE) {
             next PKT;
+        }
+
+        if ($restrict_ip) {
+            ### we are looking to analyze packets only to/from a specific
+            ### IP/subnet
+            if ($pkt{'is_ipv6'}) {
+                if ($restrict_ip->version() == 6) {
+                    next PKT unless
+                        $pkt{'s_obj'}->within($restrict_ip) or
+                        $pkt{'d_obj'}->within($restrict_ip);
+                }
+            } else {
+                if ($restrict_ip->version() == 4) {
+                    next PKT unless
+                        $pkt{'s_obj'}->within($restrict_ip) or
+                        $pkt{'d_obj'}->within($restrict_ip);
+                }
+            }
         }
 
         if ($analyze_mode and $analysis_fields) {
@@ -1105,11 +1129,16 @@ sub check_scan() {
         $top_packet_counts{$pkt{'src'}}++;
 
         if ($config{'HOME_NET'} ne 'any') {
-            if ($pkt{'chain'} eq 'INPUT') {
-                $local_src{$pkt{'dst'}} = '';
-            } elsif ($pkt{'chain'} eq 'OUTPUT') {
-                $local_src{$pkt{'src'}} = '';
-            } elsif ($pkt{'chain'} eq 'FORWARD') {
+            if ($fw_type eq 'iptables') {
+                if ($pkt{'chain'} eq 'INPUT') {
+                    $local_src{$pkt{'dst'}} = '';
+                } elsif ($pkt{'chain'} eq 'OUTPUT') {
+                    $local_src{$pkt{'src'}} = '';
+                } elsif ($pkt{'chain'} eq 'FORWARD') {
+                    $local_src{$pkt{'src'}} = ''
+                        if &is_local($pkt{'src'}, $pkt{'s_obj'});
+                }
+            } else {
                 $local_src{$pkt{'src'}} = ''
                     if &is_local($pkt{'src'}, $pkt{'s_obj'});
             }
@@ -1303,25 +1332,27 @@ sub check_scan() {
         $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'syslog_host'}
             {$pkt{'syslog_host'}} = '' if $pkt{'syslog_host'};
 
-        if ($pkt{'log_prefix'}) {
-            ### see if the logging prefix matches the blocking
-            ### regex, and if not the IP will not be blocked
-            if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
-                    and $config{'ENABLE_AUTO_IDS_REGEX'} eq 'Y'
-                    and $config{'AUTO_BLOCK_REGEX'} ne 'NONE') {
-                ### we require a match
-                if (not defined $auto_block_regex_match{$pkt{'src'}}
-                    and $pkt{'log_prefix'} =~ /$config{'AUTO_BLOCK_REGEX'}/) {
-                    $auto_block_regex_match{$pkt{'src'}} = '';
+        if ($fw_type eq 'iptables') {
+            if ($pkt{'log_prefix'}) {
+                ### see if the logging prefix matches the blocking
+                ### regex, and if not the IP will not be blocked
+                if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
+                        and $config{'ENABLE_AUTO_IDS_REGEX'} eq 'Y'
+                        and $config{'AUTO_BLOCK_REGEX'} ne 'NONE') {
+                    ### we require a match
+                    if (not defined $auto_block_regex_match{$pkt{'src'}}
+                        and $pkt{'log_prefix'} =~ /$config{'AUTO_BLOCK_REGEX'}/) {
+                        $auto_block_regex_match{$pkt{'src'}} = '';
+                    }
                 }
+            } else {
+                $pkt{'log_prefix'} = '*noprfx*';
             }
-        } else {
-            $pkt{'log_prefix'} = '*noprfx*';
-        }
 
-        ### keep track of iptables chain and logging prefix
-        $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}{'chain'}
-                {$pkt{'chain'}}{$pkt{'log_prefix'}}++;
+            ### keep track of iptables chain and logging prefix
+            $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}{'chain'}
+                    {$pkt{'chain'}}{$pkt{'log_prefix'}}++;
+        }
 
         if ($pkt{'proto'} eq 'tcp' or $pkt{'proto'} eq 'udp'
                 or $pkt{'proto'} eq 'udplite') {
@@ -1368,7 +1399,8 @@ sub check_scan() {
             ### make sure we have not already guessed the OS,
             ### and if we have been unsuccessful in guessing
             ### the OS after 100 packets don't keep trying.
-            if ($pkt{'proto'} eq 'tcp' and $pkt{'flags'} =~ /SYN/) {
+            if ($pkt{'proto'} eq 'tcp' and ($pkt{'flags'} =~ /SYN/
+                        or ($fw_type ne 'iptables' and $pkt{'flags'} =~ /S/))) {
                 if ($pkt{'tcp_opts'}) {  ### got the tcp options portion of the header
 
                     ### p0f based fingerprinting
@@ -1926,28 +1958,86 @@ sub parse_iptables_pkt_str() {
         return $PKT_ERROR;
     }
 
-    if ($restrict_ip) {
-        ### we are looking to analyze packets from a specific IP/subnet
-        if ($pkt_hr->{'is_ipv6'}) {
-            if ($restrict_ip->version() == 6) {
-                return $PKT_IGNORE unless
-                    $pkt_hr->{'s_obj'}->within($restrict_ip) or
-                    $pkt_hr->{'d_obj'}->within($restrict_ip);
-            }
-        } else {
-            if ($restrict_ip->version() == 4) {
-                return $PKT_IGNORE unless
-                    $pkt_hr->{'s_obj'}->within($restrict_ip) or
-                    $pkt_hr->{'d_obj'}->within($restrict_ip);
-            }
-        }
-    }
-
     return $PKT_SUCCESS;
 }
 
 sub parse_pf_pkt_str() {
-    return $PKT_IGNORE;
+    my ($pkt_hr, $pkt_str) = @_;
+
+    my $is_ipv6    = 0;
+    my $is_tcp     = 0;
+    my $is_udp     = 0;
+    my $is_icmp    = 0;
+    my $is_icmp6   = 0;
+
+    print STDERR "\n", $pkt_str if $debug;
+
+    $pkt_hr->{'raw'} = $pkt_str if $csv_mode or $gnuplot_mode;
+
+    ### Mar 28 20:30:45.323006 rule 5/(match) [uid 0, pid 697] block in on em0: 192.168.56.1.52535 > 192.168.56.101.6000: S [tcp sum ok] 2988846834:2988846834(0) win 5840 <mss 1460,sackOK,timestamp 191372578 0,nop,wscale 7> (DF) [tos 0x10] (ttl 64, id 13264, len 60)
+
+    if ($pkt_str =~ /\son\s(\S+)\:/) {
+        $pkt_hr->{'intf'} = $1;
+    }
+    if (%ignore_interfaces) {
+        for my $ignore_intf (keys %ignore_interfaces) {
+            return $PKT_IGNORE if $pkt_hr->{'intf'} eq $ignore_intf;
+        }
+    }
+    ### -I was used on the command line to require a specific interface
+    if ($cmdl_interface) {
+        return $PKT_IGNORE unless $pkt_hr->{'intf'} eq $cmdl_interface;
+    }
+
+    if ($pkt_str =~ /^\s*(\w{3}\s\d{1,2}\s(?:\d{2}\:){2}\d{2}\.\d+)\s/) {
+        $pkt_hr->{'timestamp'} = $1;
+    }
+    $pkt_hr->{'syslog_host'} = 'unknown';
+
+    ### test for IPv4 "don't fragment" bit
+    unless ($is_ipv6) {
+        $pkt_hr->{'frag_bit'} = 1 if $pkt_str =~ /\s\(DF\)\s/;
+    }
+
+    if ($pkt_str =~ /tcp\ssum/ or $pkt_str =~ /win\s\d/ or $pkt_str =~ /\<mss\s\d/) {
+        $is_tcp = 1;
+    } else {
+        print STDERR "[-] err packet: unrecognized protocol\n" if $debug;
+        return $PKT_ERROR;
+    }
+
+    if ($is_tcp) {
+        ### Mar 28 20:30:45.323006 rule 5/(match) [uid 0, pid 697] block in on em0: 192.168.56.1.52535 > 192.168.56.101.6000: S [tcp sum ok] 2988846834:2988846834(0) win 5840 <mss 1460,sackOK,timestamp 191372578 0,nop,wscale 7> (DF) [tos 0x10] (ttl 64, id 13264, len 60)
+        if ($pkt_str =~ /on\s\S+\:\s($ipv4_re)\.(\d+)\s\>\s($ipv4_re)\.(\d+)\:
+                \s(\w+)\s.*\swin\s(\d+)\s\<(.*)\>\s.*
+                \(ttl\s(\d+),\sid\s(\d+),\slen\s(\d+)\)/x) {
+
+            ($pkt_hr->{'src'}, $pkt_hr->{'sp'}, $pkt_hr->{'dst'},
+                $pkt_hr->{'dp'}, $pkt_hr->{'flags'}, $pkt_hr->{'win'},
+                $pkt_hr->{'tcp_opts'}, $pkt_hr->{'ttl'},
+                $pkt_hr->{'ip_id'}, $pkt_hr->{'ip_len'})
+                    = ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11);
+
+print Dumper $pkt_hr;
+
+            $pkt_hr->{'s_obj'} = new NetAddr::IP($pkt_hr->{'src'})
+                or return $PKT_ERROR;
+            $pkt_hr->{'d_obj'} = new NetAddr::IP($pkt_hr->{'dst'})
+                or return $PKT_ERROR;
+
+            if ($pkt_str =~ /\[tos\s(\S+)\]\s/) {
+                $pkt_hr->{'tos'};
+            }
+
+            $pkt_hr->{'proto'} = 'tcp';
+        } else {
+            print STDERR "[-] err packet: strange IPv4 TCP format\n"
+                if $debug;
+            return $PKT_ERROR;
+        }
+    }
+
+    return $PKT_SUCCESS;
 }
 
 sub parse_ipfw_pkt_str() {
@@ -1965,10 +2055,13 @@ sub set_fw_type() {
 
     if ($fw_type eq 'iptables') {
         $fw_parse_func = \&parse_iptables_pkt_str,
+        $parse_tcp_options_func = \&parse_tcp_options_iptables;
     } elsif ($fw_type eq 'pf') {
         $fw_parse_func = \&parse_pf_pkt_str,
+        $parse_tcp_options_func = \&parse_tcp_options_pf;
     } elsif ($fw_type eq 'ipfw') {
         $fw_parse_func = \&parse_ipfw_pkt_str,
+        $parse_tcp_options_func = \&parse_tcp_options_ipfw;
     } else {
         die "[*] Invalid firewall type: $fw_type, must be one of ",
             "iptables, ip6tables, pf, or ipfw";
@@ -2699,6 +2792,42 @@ sub p0f_ipv4() {
 
 sub parse_tcp_options() {
     my ($src, $tcp_options) = @_;
+    return &{$parse_tcp_options_func}($src, $tcp_options);
+}
+
+sub parse_tcp_options_pf() {
+    my ($src, $tcp_options) = @_;
+
+    my @opts = ();
+
+    ### mss 1460,sackOK,timestamp 191372578 0,nop,wscale 7
+    my @pkt_opts = split /\s*,\s*/, $tcp_options;
+
+    for my $opt (@pkt_opts) {
+        if ($opt eq 'nop') {
+            push @opts, {$tcp_nop_type => ''};
+        } elsif ($opt =~ /mss\s(\d+)/) {
+            push @opts, {$tcp_mss_type => $1};
+        } elsif ($opt =~ /sackOK/) {
+            push @opts, {$tcp_sack_type => ''};
+        } elsif ($opt =~ /timestamp\s(\d+)/) {
+            push @opts, {$tcp_timestamp_type => $1};
+        } elsif ($opt =~ /wscale\s(\d+)/) {
+            push @opts, {$tcp_win_scale_type => $1};
+        }
+    }
+
+    return \@opts;
+}
+
+sub parse_tcp_options_ipfw() {
+    my ($src, $tcp_options) = @_;
+    return [];
+}
+
+sub parse_tcp_options_iptables() {
+    my ($src, $tcp_options) = @_;
+
     my @opts = ();
     my @hex_nums = ();
     my $debug_str = '';
@@ -3374,11 +3503,6 @@ sub psad_init() {
     ### dump config
     &dump_conf() if $debug;
 
-    if ($restrict_ip_cmdline) {
-        $restrict_ip = new NetAddr::IP $restrict_ip_cmdline
-            or die "[*] Could not acquire NetAddr::IP object for $restrict_ip";
-    }
-
     return;
 }
 
@@ -3646,13 +3770,12 @@ sub import_ip_options() {
             $ip_options{$1}{'len'}         = $2;
             $ip_options{$1}{'sig_keyword'} = $3;
             $ip_options{$1}{'desc'}        = $4;
-        } else {
         }
     }
     close O;
 
     print STDERR "[+] IP options:\n", Dumper(\%ip_options)
-        if $debug and $verbose;
+        if $debug and $debug_dump_ip_options;
 
     return;
 }
@@ -3864,7 +3987,7 @@ sub import_snort_rules() {
     ### snort_rule_dl file
     &import_snort_rule_dl();
 
-    print STDERR Dumper %fwsnort_sigs if $debug and $verbose;
+    print STDERR Dumper %fwsnort_sigs if $debug and $debug_dump_snort_rules;
     &sys_log("imported original Snort rules in " .
         "$config{'SNORT_RULES_DIR'}/ for reference info");
     return;
@@ -4320,7 +4443,7 @@ sub import_signatures() {
         print "[+] Next available rule ID: $next_available_sid\n";
         exit 0;
     }
-    if ($debug and $verbose) {
+    if ($debug and $debug_dump_snort_rules) {
         print STDERR "[+] Main signatures hash:\n",
             Dumper(\%sig_search), Dumper(\%sigs);
     }
@@ -4376,7 +4499,7 @@ sub import_icmp_types() {
         }
     }
     close F;
-    print STDERR Dumper $type_hr if $debug and $verbose;
+    print STDERR Dumper $type_hr if $debug and $debug_dump_icmp_options;
     &sys_log("imported valid $proto types and codes");
     return;
 }
@@ -4656,7 +4779,7 @@ sub import_p0f_ipv4_sigs() {
         }
     }
 
-    print STDERR Dumper %p0f_ipv4_sigs if $debug and $verbose;
+    print STDERR Dumper %p0f_ipv4_sigs if $debug and $debug_dump_os_sigs;
     &sys_log('imported p0f-based passive OS fingerprinting signatures');
     return;
 }
@@ -4738,7 +4861,7 @@ sub import_posf_sigs() {
             next OS;
         }
     }
-    print STDERR Dumper %posf_sigs if $debug and $verbose;
+    print STDERR Dumper %posf_sigs if $debug and $debug_dump_os_sigs;
     &sys_log('imported TOS-based passive OS fingerprinting signatures');
     return;
 }
@@ -7242,37 +7365,38 @@ sub analysis_mode() {
         "$fw_data_file: $!";
     my @lines = <MSGS>;
     close MSGS;
-    my @ipt_msgs = ();
+    my @fw_msgs = ();
     my $pkt_ctr = 0;
     PKT: for my $line (@lines) {
         if ($num_packets > 0) {
             last PKT if $pkt_ctr >= $num_packets;
         }
-        if ($line =~ /IN.*OUT/) {
-            if ($config{'FW_SEARCH_ALL'} eq 'Y') {
-                push @ipt_msgs, $line;
+        if ($fw_type eq 'iptables') {
+            next PKT unless $line =~ /IN.*OUT/;
+        }
+        if ($config{'FW_SEARCH_ALL'} eq 'Y') {
+            push @fw_msgs, $line;
+            $pkt_ctr++;
+        } else {
+            if ($line =~ /$config{'SNORT_SID_STR'}/) {
+                push @fw_msgs, $line;
                 $pkt_ctr++;
             } else {
-                if ($line =~ /$config{'SNORT_SID_STR'}/) {
-                    push @ipt_msgs, $line;
-                    $pkt_ctr++;
-                } else {
-                    for my $fw_search_str (@fw_search) {
-                        if ($line =~ /$fw_search_str/) {
-                            push @ipt_msgs, $line;
-                            $pkt_ctr++;
-                        }
+                for my $fw_search_str (@fw_search) {
+                    if ($line =~ /$fw_search_str/) {
+                        push @fw_msgs, $line;
+                        $pkt_ctr++;
                     }
                 }
             }
         }
     }
-    print "[+] Found ", ($#ipt_msgs+1), " $fw_type ",
+    print "[+] Found ", ($#fw_msgs+1), " $fw_type ",
         "log messages out of ", ($#lines+1), " total lines.\n";
-    print "    This may take a while...\n" if $#ipt_msgs > 15000;
+    print "    This may take a while...\n" if $#fw_msgs > 15000;
 
     ### analyze all packets
-    &check_scan(\@ipt_msgs);
+    &check_scan(\@fw_msgs);
 
     print "\n[+] Finished --Analyze cycle.\n";
 
@@ -7399,7 +7523,7 @@ sub csv_mode() {
                 last MSG if $line_ctr == $csv_end_line;
             }
             next MSG unless $pkt_str =~ /IN.*OUT/;
-            my %pkt = %pkt_NF_init;
+            my %pkt = %pkt_fw_init;
             if ($config{'FW_SEARCH_ALL'} eq 'Y') {
                 my $rv = &{$fw_parse_func}(\%pkt, $pkt_str);
                 next MSG if $rv == $PKT_ERROR or $rv == $PKT_IGNORE;
@@ -8211,10 +8335,10 @@ sub csv_tokens() {
             $token = 'icmp_seq' if $token eq 'SEQ';
             $token = 'ip_len'   if $token eq 'LEN';
             $token = 'intf'     if $token eq 'IN' or $token eq 'OUT';
-            unless (defined $pkt_NF_init{$token}) {
+            unless (defined $pkt_fw_init{$token}) {
                 print "[*] $token is not a valid packet field; valid ",
                     "fields are:\n";
-                for my $key (sort keys %pkt_NF_init) {
+                for my $key (sort keys %pkt_fw_init) {
                     print "    $key\n";
                 }
                 die;
@@ -9553,6 +9677,11 @@ sub handle_cmdline() {
     $no_whois = 1 if $analyze_mode and not $analysis_whois;
     $no_rdns = 1 if $analyze_mode and not $enable_analysis_dns;
 
+    if ($restrict_ip_cmdline) {
+        $restrict_ip = new NetAddr::IP $restrict_ip_cmdline
+            or die "[*] Could not acquire NetAddr::IP object for $restrict_ip";
+    }
+
     return;
 }
 
@@ -10638,6 +10767,10 @@ sub getopt_wrapper() {
                                                   #   data (both gnuplot and CSV data).
         'debug'             => \$debug,           # Run in debug mode.
         'debug-sid=i'       => \$debug_sid,       # Debug a specific signature.
+        'debug-dump-ip-opts'     => \$debug_dump_ip_options,
+        'debug-dump-icmp-opts'   => \$debug_dump_icmp_options,
+        'debug-dump-snort-rules' => \$debug_dump_snort_rules,
+        'debug-dump-os-sigs'     => \$debug_dump_os_sigs,
         'Dump-conf'         => \$dump_conf,       # Dump config and exit.
         'Interval=i'        => \$chk_interval,    # Set $chk_interval from the
                                                   #   command line.
@@ -10681,7 +10814,7 @@ sub getopt_wrapper() {
                                                   #   reached at least this danger
                                                   #   level.
         'status-summary'    => \$status_summary,  # Only display status summary info.
-        'restrict-ip=s'     => \$restrict_ip,     # Only process packets that have
+        'restrict-ip=s'     => \$restrict_ip_cmdline,     # Only process packets that have
                                                   #   either this IP as the src or dst.
         'Benchmark'         => \$benchmark,       # Run in benchmark mode.
         'packets=i'         => \$num_packets,     # Specify number of packets to use
@@ -10727,6 +10860,7 @@ sub getopt_wrapper() {
         print "[+] psad v$version by Michael Rash <mbr\@cipherdyne.org>\n";
         exit 0;
     }
+
     return;
 }
 

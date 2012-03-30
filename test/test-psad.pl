@@ -228,6 +228,62 @@ my @tests = (
     },
     {
         'category'  => 'operations',
+        'detail'    => 'IPv4 SYN scan --restrict-ip 192.168.10.55',
+        'err_msg'   => 'did not detect SYN scan',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports.*?1000\-1500\b/i,
+                qr/Source\sOS/i, qr/BACKDOOR/i,
+                qr/IP\sstatus/i,
+                qr/192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psad_def --restrict-ip 192.168.10.55 -A -m $scans_dir/" .
+                "$fw_type/$syn_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv4 SYN scan --restrict-ip 192.168.10.0/24',
+        'err_msg'   => 'did not detect SYN scan',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports.*?1000\-1500\b/i,
+                qr/Source\sOS/i, qr/BACKDOOR/i,
+                qr/IP\sstatus/i,
+                qr/192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psad_def --restrict-ip 192.168.10.0/24 -A -m $scans_dir/" .
+                "$fw_type/$syn_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv4 SYN scan --restrict-ip 1.2.3.0/24',
+        'err_msg'   => 'did not detect SYN scan',
+        'negative_output_matches' => [
+                qr/scanned\sports.*?1000\-1500\b/i,
+                qr/SRC\:\s+192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psad_def --restrict-ip 1.2.3.0/24 -A -m $scans_dir/" .
+                "$fw_type/$syn_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+
+    {
+        'category'  => 'operations',
         'detail'    => 'IPv4 MS SQL Server communication attempt detection',
         'err_msg'   => 'did not detect MS SQL Server attempt',
         'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
@@ -673,6 +729,41 @@ my @tests = (
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv6 TCP connect() --restrict-ip 2001:DB8:0:F101::2',
+        'err_msg'   => 'did not detect TCP connect() scan',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports.*?1\-65389\b/i,
+                qr/IP\sstatus/i,
+                qr/SRC\:.*2001\:DB8\:0\:F101\:\:2/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psad_def --restrict-ip 2001:DB8:0:F101::2 -A -m $scans_dir/" .
+                "$fw_type/$ipv6_connect_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv6 TCP connect() --restrict-ip 2002:DB8:0:F101::2',
+        'err_msg'   => 'detected TCP connect() scan',
+        'negative_output_matches' => [
+                qr/SRC\:.*2001\:DB8\:0\:F101\:\:2/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psad_def --restrict-ip 2002:DB8:0:F101::2 -A -m $scans_dir/" .
+                "$fw_type/$ipv6_connect_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+
     {
         'category'  => 'operations',
         'detail'    => 'IPv6 allow valid ping packets',

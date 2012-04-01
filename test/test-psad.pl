@@ -899,6 +899,11 @@ my @tests = (
 
 );
 
+if ($diff_mode) {
+    &diff_test_results();
+    exit 0;
+}
+
 ### make sure everything looks as expected before continuing
 &init();
 
@@ -1276,6 +1281,81 @@ sub write_test_file() {
             or die "[*] Could not open $current_test_file: $!";
         print F $msg;
         close F;
+    }
+    return;
+}
+
+sub diff_test_results() {
+    die "[*] Need results from a previous run before running --diff"
+        unless -d "${output_dir}.last";
+    die "[*] Current results set does not exist." unless -d $output_dir;
+
+    my %current_tests  = ();
+    my %previous_tests = ();
+
+    ### Only diff results for matching tests (parse the logfile to see which
+    ### test numbers match across the two test cycles).
+    &build_results_hash(\%current_tests, $output_dir);
+    &build_results_hash(\%previous_tests, "${output_dir}.last");
+
+    for my $test_msg (sort {$current_tests{$a}{'num'} <=> $current_tests{$b}{'num'}}
+                keys %current_tests) {
+        my $current_result = $current_tests{$test_msg}{'pass_fail'};
+        my $current_num    = $current_tests{$test_msg}{'num'};
+        if (defined $previous_tests{$test_msg}) {
+            print "[+] Checking: $test_msg\n";
+            my $previous_result = $previous_tests{$test_msg}{'pass_fail'};
+            my $previous_num    = $previous_tests{$test_msg}{'num'};
+            if ($current_result ne $previous_result) {
+                print " DIFF: **$current_result** $test_msg\n";
+            }
+
+            &diff_results($previous_num, $current_num);
+            print "\n";
+        }
+    }
+
+    exit 0;
+}
+
+sub diff_results() {
+    my ($previous_num, $current_num) = @_;
+
+    ### remove CMD timestamps
+    my $cmd_search_re = qr/^\S+\s.*?\s\d{4}\sCMD\:/;
+
+    for my $file ("${output_dir}.last/${previous_num}.test",
+        "${output_dir}.last/${previous_num}_fwknopd.test",
+        "${output_dir}/${current_num}.test",
+        "${output_dir}/${current_num}_fwknopd.test",
+    ) {
+        system qq{perl -p -i -e 's|$cmd_search_re|CMD:|' $file} if -e $file;
+    }
+
+    if (-e "${output_dir}.last/${previous_num}.test"
+            and -e "${output_dir}/${current_num}.test") {
+        system "diff -u ${output_dir}.last/${previous_num}.test " .
+            "${output_dir}/${current_num}.test";
+    }
+
+    if (-e "${output_dir}.last/${previous_num}_fwknopd.test"
+            and -e "${output_dir}/${current_num}_fwknopd.test") {
+        system "diff -u ${output_dir}.last/${previous_num}_fwknopd.test " .
+            "${output_dir}/${current_num}_fwknopd.test";
+    }
+
+    return;
+}
+
+sub build_results_hash() {
+    my ($hr, $dir) = @_;
+
+    open F, "< $dir/$logfile" or die $!;
+    while (<F>) {
+        if (/^(.*?)\.\.\..*(pass|fail)\s\((\d+)\)/) {
+            $hr->{$1}{'pass_fail'} = $2;
+            $hr->{$1}{'num'}       = $3;
+        }
     }
     return;
 }

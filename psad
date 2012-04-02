@@ -1399,8 +1399,7 @@ sub check_scan() {
             ### make sure we have not already guessed the OS,
             ### and if we have been unsuccessful in guessing
             ### the OS after 100 packets don't keep trying.
-            if ($pkt{'proto'} eq 'tcp' and ($pkt{'flags'} =~ /SYN/
-                        or ($fw_type ne 'iptables' and $pkt{'flags'} =~ /S/))) {
+            if ($pkt{'proto'} eq 'tcp' and $pkt{'flags'} =~ /SYN/) {
                 if ($pkt{'tcp_opts'}) {  ### got the tcp options portion of the header
 
                     ### p0f based fingerprinting
@@ -1719,10 +1718,10 @@ sub parse_iptables_pkt_str() {
         $pkt_hr->{'flags'} =~ s/\s*RES=\S+\s*//;
 
         ### default to NULL
-        $pkt_hr->{'flags'} = 'NULL' unless $pkt_hr->{'flags'};
+        $pkt_hr->{'flags'} = &std_tcp_flags_representation($pkt_hr->{'flags'});
 
         if (not $pkt_hr->{'fwsnort_sid'}
-                and $config{'IGNORE_CONNTRACK_BUG_PKTS'} eq 'Y' &&
+                and $config{'IGNORE_CONNTRACK_BUG_PKTS'} eq 'Y' and
                 ($pkt_hr->{'flags'} =~ /ACK/ || $pkt_hr->{'flags'} =~ /RST/)) {
 
             ### $dp > 1024 && ($pkt_hr->{'flags'} =~ /ACK/ ||
@@ -1738,8 +1737,6 @@ sub parse_iptables_pkt_str() {
             return $PKT_IGNORE;
         }
 
-        ### per page 595 of the Camel book, "if /blah1|blah2/"
-        ### can be slower than "if /blah1/ || /blah2/
         unless ($pkt_hr->{'flags'} !~ /WIN/ &&
                 $pkt_hr->{'flags'} =~ /ACK/ ||
                 $pkt_hr->{'flags'} =~ /SYN/ ||
@@ -1974,8 +1971,18 @@ sub parse_pf_pkt_str() {
 
     $pkt_hr->{'raw'} = $pkt_str if $csv_mode or $gnuplot_mode;
 
-    ### Mar 28 20:30:45.323006 rule 5/(match) [uid 0, pid 697] block in on em0: 192.168.56.1.52535 > 192.168.56.101.6000: S [tcp sum ok] 2988846834:2988846834(0) win 5840 <mss 1460,sackOK,timestamp 191372578 0,nop,wscale 7> (DF) [tos 0x10] (ttl 64, id 13264, len 60)
+    ### Mar 28 20:30:45.323006 rule 5/(match) [uid 0, pid 697] block in on em0:
+    ### 192.168.56.1.52535 > 192.168.56.101.6000: S [tcp sum ok]
+    ### 2988846834:2988846834(0) win 5840 <mss 1460,sackOK,timestamp 191372578
+    ### 0,nop,wscale 7> (DF) [tos 0x10] (ttl 64, id 13264, len 60)
 
+    ### timestamp
+    if ($pkt_str =~ /^\s*(\w{3}\s\d{1,2}\s(?:\d{2}\:){2}\d{2}\.\d+)\s/) {
+        $pkt_hr->{'timestamp'} = $1;
+    }
+    $pkt_hr->{'syslog_host'} = 'unknown';
+
+    ### handle the interface
     if ($pkt_str =~ /\son\s(\S+)\:/) {
         $pkt_hr->{'intf'} = $1;
     }
@@ -1984,22 +1991,46 @@ sub parse_pf_pkt_str() {
             return $PKT_IGNORE if $pkt_hr->{'intf'} eq $ignore_intf;
         }
     }
-    ### -I was used on the command line to require a specific interface
-    if ($cmdl_interface) {
+    ### -I was used on the command line to require a specific interface,
+    ### but only exclude the packet if we were actually able to get the
+    ### interface
+    if ($cmdl_interface and $pkt_hr->{'intf'}) {
         return $PKT_IGNORE unless $pkt_hr->{'intf'} eq $cmdl_interface;
     }
 
-    if ($pkt_str =~ /^\s*(\w{3}\s\d{1,2}\s(?:\d{2}\:){2}\d{2}\.\d+)\s/) {
-        $pkt_hr->{'timestamp'} = $1;
-    }
-    $pkt_hr->{'syslog_host'} = 'unknown';
+    ### ipv4 vs. ipv6
+    if ($pkt_str =~ /\s($ipv4_re)\.(\d+)\s\>\s($ipv4_re)\.(\d+)\:/) {
 
-    ### test for IPv4 "don't fragment" bit
-    unless ($is_ipv6) {
+        ($pkt_hr->{'src'}, $pkt_hr->{'sp'}, $pkt_hr->{'dst'},
+            $pkt_hr->{'dp'}) = ($1,$2,$3,$4);
+
+        $pkt_hr->{'s_obj'} = new NetAddr::IP($pkt_hr->{'src'})
+            or return $PKT_ERROR;
+        $pkt_hr->{'d_obj'} = new NetAddr::IP($pkt_hr->{'dst'})
+            or return $PKT_ERROR;
+
+        ### don't fragment bit handling
         $pkt_hr->{'frag_bit'} = 1 if $pkt_str =~ /\s\(DF\)\s/;
+
+        ### other IPv4 header fields
+        if ($pkt_str =~ /\(ttl\s(\d+),\sid\s(\d+),\slen\s(\d+)\)/) {
+            ($pkt_hr->{'ttl'}, $pkt_hr->{'ip_id'}, $pkt_hr->{'ip_len'})
+                = ($1,$2,$3);
+        }
+        $pkt_hr->{'tos'} = $1 if $pkt_str =~ /\[tos\s(\S+)\]/;
+
+    } elsif ($pkt_str =~ /fixme/) {
+        ### IPv6 test
+    } else {
+        print STDERR "[-] err packet: unrecognized network layer\n" if $debug;
+        return $PKT_ERROR;
     }
 
-    if ($pkt_str =~ /tcp\ssum/ or $pkt_str =~ /win\s\d/ or $pkt_str =~ /\<mss\s\d/) {
+    if ($pkt_str =~ /win\s\d/
+            or $pkt_str =~ /<mss\s\d/
+            or $pkt_str =~ /\surg\s/
+            or $pkt_str =~ /tcp\ssum/
+    ) {
         $is_tcp = 1;
     } else {
         print STDERR "[-] err packet: unrecognized protocol\n" if $debug;
@@ -2007,34 +2038,23 @@ sub parse_pf_pkt_str() {
     }
 
     if ($is_tcp) {
-        ### Mar 28 20:30:45.323006 rule 5/(match) [uid 0, pid 697] block in on em0: 192.168.56.1.52535 > 192.168.56.101.6000: S [tcp sum ok] 2988846834:2988846834(0) win 5840 <mss 1460,sackOK,timestamp 191372578 0,nop,wscale 7> (DF) [tos 0x10] (ttl 64, id 13264, len 60)
-        if ($pkt_str =~ /on\s\S+\:\s($ipv4_re)\.(\d+)\s\>\s($ipv4_re)\.(\d+)\:
-                \s(\w+)\s.*\swin\s(\d+)\s\<(.*)\>\s.*
-                \(ttl\s(\d+),\sid\s(\d+),\slen\s(\d+)\)/x) {
 
-            ($pkt_hr->{'src'}, $pkt_hr->{'sp'}, $pkt_hr->{'dst'},
-                $pkt_hr->{'dp'}, $pkt_hr->{'flags'}, $pkt_hr->{'win'},
-                $pkt_hr->{'tcp_opts'}, $pkt_hr->{'ttl'},
-                $pkt_hr->{'ip_id'}, $pkt_hr->{'ip_len'})
-                    = ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11);
+        my $tmp_flags = '';
 
-print Dumper $pkt_hr;
+        $pkt_hr->{'proto'} = 'tcp';
 
-            $pkt_hr->{'s_obj'} = new NetAddr::IP($pkt_hr->{'src'})
-                or return $PKT_ERROR;
-            $pkt_hr->{'d_obj'} = new NetAddr::IP($pkt_hr->{'dst'})
-                or return $PKT_ERROR;
+        $pkt_hr->{'win'} = $1 if $pkt_str =~ /\swin\s(\d+)/;
 
-            if ($pkt_str =~ /\[tos\s(\S+)\]\s/) {
-                $pkt_hr->{'tos'};
-            }
-
-            $pkt_hr->{'proto'} = 'tcp';
+        if ($is_ipv6) {
         } else {
-            print STDERR "[-] err packet: strange IPv4 TCP format\n"
-                if $debug;
-            return $PKT_ERROR;
+            $tmp_flags = $1 if $pkt_str =~ /$ipv4_re\.\d+\:\s(\S+)/;
         }
+        $tmp_flags .= 'U' if $pkt_str =~ /\surg\s\d/;
+        $tmp_flags .= 'A' if $pkt_str =~ /\sack\s\d/;
+
+        $pkt_hr->{'flags'} = &std_tcp_flags_representation($tmp_flags);
+
+        $pkt_hr->{'tcp_opts'} = $1 if $pkt_str =~ /\<(.*?)\>/;
     }
 
     return $PKT_SUCCESS;
@@ -2210,6 +2230,34 @@ sub match_sigs() {
         }
     }
     return $dl, $is_sig_match;
+}
+
+sub std_tcp_flags_representation() {
+    my $flags_str = shift;
+
+    my $flags = '';
+
+    return 'NULL' unless $flags_str;
+
+    if ($fw_type eq 'iptables') {
+        $flags .= 'SYN ' if $flags_str =~ /SYN/;
+        $flags .= 'ACK ' if $flags_str =~ /ACK/;
+        $flags .= 'PSH ' if $flags_str =~ /PSH/;
+        $flags .= 'URG ' if $flags_str =~ /URG/;
+        $flags .= 'RST ' if $flags_str =~ /RST/;
+        $flags .= 'FIN ' if $flags_str =~ /FIN/;
+    } else {
+        $flags .= 'SYN ' if $flags_str =~ /S/;
+        $flags .= 'ACK ' if $flags_str =~ /A/;
+        $flags .= 'PSH ' if $flags_str =~ /P/;
+        $flags .= 'URG ' if $flags_str =~ /U/;
+        $flags .= 'RST ' if $flags_str =~ /R/;
+        $flags .= 'FIN ' if $flags_str =~ /F/;
+    }
+
+    $flags =~ s/\s$//;
+
+    return $flags;
 }
 
 sub match_snort_keywords() {
@@ -4338,7 +4386,7 @@ sub import_signatures() {
                 $flags = 'NULL' if $sig_flags =~ /N/;
                 $flags =~ s/\s*$// if $flags;
 
-                $sig{'flags'} = $flags;
+                $sig{'flags'} = &std_tcp_flags_representation($flags);
             }
 
             ### seq keyword (TCP sequence number)

@@ -281,6 +281,43 @@ my @tests = (
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv4 SYN scan --interface eth1',
+        'err_msg'   => 'did not detect SYN scan',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports.*?1000\-1500\b/i,
+                qr/Source\sOS/i, qr/BACKDOOR/i,
+                qr/IP\sstatus/i,
+                qr/192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psad_def --interface eth1 -A -m $scans_dir/" .
+                "$fw_type/$syn_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv4 SYN scan --interface badintf',
+        'err_msg'   => 'logged SYN scan',
+        'negative_output_matches' => [
+                qr/scanned\sports.*?1000\-1500\b/i,
+                qr/Source\sOS/i, qr/BACKDOOR/i,
+                qr/\b192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psad_def --interface badintf -A -m $scans_dir/" .
+                "$fw_type/$syn_scan_file -c $default_conf",
+        'firewalls' => {
+            'iptables' => ''
+        },
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
 
     {
         'category'  => 'operations',

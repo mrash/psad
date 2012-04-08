@@ -928,7 +928,7 @@ my @tests = (
         'function'  => \&look_for_warnings,
         'cmdline'   => "grep -i uninit $output_dir/*.test",
         'firewalls' => {
-            'iptables' => ''
+            'all' => ''
         },
         'exec_err'  => $IGNORE,
         'fatal'     => $NO

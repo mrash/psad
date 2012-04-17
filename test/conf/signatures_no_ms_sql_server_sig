@@ -1,0 +1,344 @@
+#
+##############################################################################
+#
+# File: signatures (/etc/psad/signatures)
+#
+# Purpose: To provide a set of approximations to the Snort rule set for psad.
+#          These signatures are the closest representations to Snort rules
+#          that are possible given the iptables logging format.  Note that
+#          with the iptables string match extension, iptables along with
+#          fwsnort is able to detect (and optionally block) attacks based on
+#          application layer data, but this is not addressed within the
+#          signatures file itself.
+#
+#          psad_id:     - Unique ID number (analogous to the Snort sid field).
+#          psad_derived_sids:
+#                       - This field tracks all Snort rules that were used to
+#                         construct and approximate psad signature.
+#          psad_dl:     - The psad danger level
+#          psad_dsize:  - Requires a size on application layer data. The size
+#                         in this case is derived from the IP header length
+#                         for TCP and ICMP packets (by assuming a bound on the
+#                         average header sizes) and from the length field in
+#                         the UDP header for UDP packets.
+#          psad_ip_len: - This allows psad to test the length field in the IP
+#                         header (logged as "LEN") within iptables logs.
+#
+##############################################################################
+#
+
+### snmp.rules
+alert tcp $EXTERNAL_NET any -> $HOME_NET 705 (msg:"SNMP AgentX/tcp request"; flags:S; reference:bugtraq,4088; reference:bugtraq,4089; reference:bugtraq,4132; reference:cve,2002-0012; reference:cve,2002-0013; classtype:attempted-recon; sid:1421; psad_id:100001; psad_dl:2;)
+
+### finger.rules
+
+### info.rules
+
+### ddos.rules
+alert udp $EXTERNAL_NET any -> $HOME_NET 31335 (msg:"DDOS Trin00 Daemon to Master"; reference:arachnids,187; reference:url,www.sans.org/resources/idfaq/trinoo.php; classtype:attempted-recon; psad_dsize:>2; psad_id:100002; psad_dl:2; psad_derived_sids:223,231,232;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"DDOS TFN client command BE"; icmp_id:456; icmp_seq:0; itype:0; reference:arachnids,184; classtype:attempted-dos; sid:228; psad_id:100003; psad_dl:2;)
+alert tcp $HOME_NET 20432 -> $EXTERNAL_NET any (msg:"DDOS shaft client login to handler connection attempt"; flags:S; reference:arachnids,254; reference:url,security.royans.net/info/posts/bugtraq_ddos3.shtml; classtype:attempted-dos; sid:230; psad_id:100004; psad_dl:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 18753 (msg:"DDOS shaft handler to agent"; reference:arachnids,255; classtype:attempted-dos; psad_dsize:>10; sid:239; psad_id:100005; psad_dl:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 20433 (msg:"DDOS shaft agent to handler"; reference:arachnids,256; classtype:attempted-dos; psad_dsize:>4; sid:240; psad_id:100006; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 27665 (msg:"DDOS Trin00 Attacker to Master connection attempt"; flags:S; reference:arachnids,197; classtype:attempted-dos; psad_id:100007; psad_dl:2; psad_derived_sids:233,234,235;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 27444 (msg:"DDOS Trin00 Master to Daemon default password attempt"; reference:arachnids,197; classtype:attempted-dos; psad_dsize:>6; sid:237; psad_id:100008; psad_dl:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 6838 (msg:"DDOS mstream agent to handler"; classtype:attempted-dos; psad_dsize:>8; sid:243; psad_id:100009; psad_dl:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 10498 (msg:"DDOS mstream handler to agent"; reference:cve,2000-0138; classtype:attempted-dos; psad_dsize:>3; psad_id:100010; psad_dl:2; psad_derived_sids:244,245,246;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 12754 (msg:"DDOS mstream client to handler"; flags:S; reference:cve,2000-0138; classtype:attempted-dos; sid:247; psad_id:100011; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 15104 (msg:"DDOS mstream client to handler"; flags:S,12; reference:arachnids,111; reference:cve,2000-0138; classtype:attempted-dos; sid:249; psad_id:100012; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"DDOS - TFN client command LE"; icmp_id:51201; icmp_seq:0; itype:0; reference:arachnids,183; classtype:attempted-dos; sid:251; psad_id:100013; psad_dl:2;)
+alert icmp 3.3.3.3/32 any -> $EXTERNAL_NET any (msg:"DDOS Stacheldraht server spoof"; icmp_id:666; itype:0; reference:arachnids,193; classtype:attempted-dos; sid:224; psad_id:100014; psad_dl:2;)
+
+### virus.rules
+
+### icmp.rules
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP PING NMAP"; dsize:0; itype:8; reference:arachnids,162; classtype:attempted-recon; sid:469; psad_id:100015; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP icmpenum v1.1.1"; dsize:0; icmp_id:666; icmp_seq:0; id:666; itype:8; reference:arachnids,450; classtype:attempted-recon; sid:471; psad_id:100016; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP redirect host"; icode:1; itype:5; reference:arachnids,135; reference:cve,1999-0265; classtype:bad-unknown; sid:472; psad_id:100017; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP redirect net"; icode:0; itype:5; reference:arachnids,199; reference:cve,1999-0265; classtype:bad-unknown; sid:473; psad_id:100018; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Source Quench"; icode:0; itype:4; classtype:bad-unknown; sid:477; psad_id:100019; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Broadscan Smurf Scanner"; dsize:4; icmp_id:0; icmp_seq:0; itype:8; classtype:attempted-recon; sid:478; psad_id:100020; psad_dl:2;)
+alert icmp any any -> any any (msg:"ICMP Destination Unreachable Communication Administratively Prohibited"; icode:13; itype:3; classtype:misc-activity; sid:485; psad_id:100021; psad_dl:2;)
+alert icmp any any -> any any (msg:"ICMP Destination Unreachable Communication with Destination Host is Administratively Prohibited"; icode:10; itype:3; classtype:misc-activity; sid:486; psad_id:100022; psad_dl:2;)
+alert icmp any any -> any any (msg:"ICMP Destination Unreachable Communication with Destination Network is Administratively Prohibited"; icode:9; itype:3; classtype:misc-activity; sid:487; psad_id:100023; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Large ICMP Packet"; dsize:>800; reference:arachnids,246; classtype:bad-unknown; sid:499; psad_id:100024; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP traceroute ipopts"; ipopts:rr; itype:0; reference:arachnids,238; classtype:attempted-recon; sid:475; psad_id:100198; psad_dl:2;)
+
+### dns.rules
+
+### rpc.rules
+alert tcp $EXTERNAL_NET any -> $HOME_NET 32771 (msg:"RPC portmap listing TCP 32771"; flags:S; reference:arachnids,429; classtype:rpc-portmap-decode; sid:599; psad_id:100025; psad_dl:2;)
+### psad note: dsize:>12 was added since there were three content fields in the
+### original Snort rule, each 4 bytes large (need to research depth,offset,distance,
+### and within keywords better since these were in the Snort rule as well; might
+### mean that the dsize value should be increased).
+alert udp $EXTERNAL_NET any -> $HOME_NET 32771 (msg:"RPC portmap listing UDP 32771"; reference:arachnids,429; classtype:rpc-portmap-decode; psad_dsize:>12; sid:1281; psad_id:100026; psad_dl:2;)
+
+### backdoor.rules
+alert tcp $EXTERNAL_NET any -> $HOME_NET 16959 (msg:"BACKDOOR Subseven DEFCON8 2.1 connection Attempt"; flags:S; classtype:trojan-activity; sid:107; psad_id:100027; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 27374 (msg:"BACKDOOR Subseven connection attempt"; flags:S; classtype:trojan-activity; psad_id:100207; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 12345:12346 (msg:"BACKDOOR netbus Connection Cttempt"; flags:S; reference:arachnids,401; classtype:misc-activity; psad_id:100028; psad_dl:2; psad_derived_sids:109,110;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 20034 (msg:"BACKDOOR NetBus Pro 2.0 Connection Cttempt"; flags:S; classtype:misc-activity; psad_id:100029; psad_dl:2; psad_derived_sids:115,3009;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 2140 (msg:"BACKDOOR DeepThroat 3.1 Connection attempt"; reference:mcafee,98574; reference:nessus,10053; classtype:misc-activity; psad_dsize:>1; sid:1980; psad_id:100030; psad_dl:2;)
+alert udp $HOME_NET 2140 -> $EXTERNAL_NET any (msg:"BACKDOOR DeepThroat 3.1 Server Response"; reference:arachnids,106; reference:mcafee,98574; reference:nessus,10053; classtype:misc-activity; psad_dsize:>21; sid:195; psad_id:100031; psad_dl:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 3150 (msg:"BACKDOOR DeepThroat 3.1 Connection attempt [3150]"; reference:mcafee,98574; reference:nessus,10053; classtype:misc-activity; psad_dsize:>1; sid:1981; psad_id:100032; psad_dl:2;)
+alert udp $HOME_NET 3150 -> $EXTERNAL_NET any (msg:"BACKDOOR DeepThroat 3.1 Server Response [3150]"; reference:arachnids,106; reference:mcafee,98574; reference:nessus,10053; classtype:misc-activity; psad_dsize:>21; sid:1982; psad_id:100033; psad_dl:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 4120 (msg:"BACKDOOR DeepThroat 3.1 Connection attempt [4120]"; reference:mcafee,98574; reference:nessus,10053; classtype:misc-activity; sid:1983; psad_id:100034; psad_dl:2;)
+alert udp $HOME_NET 4120 -> $EXTERNAL_NET any (msg:"BACKDOOR DeepThroat 3.1 Server Response [4120]"; reference:arachnids,106; reference:mcafee,98574; reference:nessus,10053; classtype:misc-activity; psad_dsize:>21; sid:1984; psad_id:100035; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 6789 (msg:"BACKDOOR Doly 2.0 Connection attempt"; flags:S; reference:arachnids,312; classtype:misc-activity; sid:119; psad_id:100036; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 1015 (msg:"BACKDOOR Doly 1.5 Connection attempt"; flags:S; classtype:trojan-activity; sid:1985; psad_id:100037; psad_dl:2;)
+alert tcp $EXTERNAL_NET 1024: -> $HOME_NET 2589 (msg:"BACKDOOR - Dagger_1.4.0 Connection attempt"; flags:S; reference:arachnids,483; reference:url,www.tlsecurity.net/backdoor/Dagger.1.4.html; classtype:misc-activity; psad_id:100038; psad_dl:2; psad_derived_sids:104,105;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 7597 (msg:"BACKDOOR QAZ Worm Client Login access"; flags:S; reference:MCAFEE,98775; classtype:misc-activity; sid:108; psad_id:100039; psad_dl:2;)
+alert tcp $EXTERNAL_NET 1000: -> $HOME_NET 146 (msg:"BACKDOOR Infector.1.x Connection attempt"; flags:S; reference:arachnids,315; classtype:misc-activity; psad_id:100040; psad_dl:2; psad_derived_sids:117,120,121;)
+alert tcp $EXTERNAL_NET 1024: -> $HOME_NET 666 (msg:"BACKDOOR SatansBackdoor.2.0.Beta, or BackConstruction 2.1 Connection Attempt"; flags:S; reference:arachnids,316; classtype:misc-activity; psad_id:100041; psad_dl:2; psad_derived_sids:118,157,158;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 31785 (msg:"BACKDOOR HackAttack 1.20 Connection attempt"; flags:S; classtype:misc-activity; sid:141; psad_id:100042; psad_dl:2;)
+alert tcp $EXTERNAL_NET !80 -> $HOME_NET 21554 (msg:"BACKDOOR GirlFriend Connection attempt"; flags:S; reference:arachnids,98; classtype:misc-activity; sid:145; psad_id:100043; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 30100:30102 (msg:"BACKDOOR NetSphere Connection attempt"; flags:S; reference:arachnids,76; classtype:misc-activity; psad_id:100044; psad_dl:2; psad_derived_sids:146,155;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 6969 (msg:"BACKDOOR GateCrasher Connection attempt"; flags:S; reference:arachnids,99; classtype:misc-activity; sid:147; psad_id:100045; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 5401:5402 (msg:"BACKDOOR BackConstruction 2.1 connection attempt"; flags:S; classtype:misc-activity; sid:152; psad_id:100046; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 23476 (msg:"BACKDOOR DonaldDick 1.53 connection attempt"; reference:mcafee,98575; classtype:misc-activity; sid:153; psad_id:100047; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 5032 (msg:"BACKDOOR NetMetro File List connection attempt"; flags:S; reference:arachnids,79; classtype:misc-activity; sid:159; psad_id:100048; psad_dl:2;)
+alert udp $EXTERNAL_NET 3344 -> $HOME_NET 3345 (msg:"BACKDOOR Matrix 2.0 Client connect"; reference:arachnids,83; classtype:misc-activity; psad_dsize:>7; sid:161; psad_id:100049; psad_dl:2;)
+alert udp $EXTERNAL_NET 3345 -> $HOME_NET 3344 (msg:"BACKDOOR Matrix 2.0 Server access"; reference:arachnids,83; classtype:misc-activity; psad_dsize:>8; sid:162; psad_id:100050; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 5714 (msg:"BACKDOOR WinCrash 1.0 communication attempt"; flags:S; reference:arachnids,36; classtype:misc-activity; sid:163; psad_id:100051; psad_dl:2;)
+#alert icmp 255.255.255.0/24 any -> $HOME_NET any (msg:"BACKDOOR SIGNATURE - Q ICMP"; dsize:>1; itype:0; reference:arachnids,202; classtype:misc-activity; sid:100; psad_id:100000; psad_dl:2;)
+alert tcp 255.255.255.0/24 any -> $HOME_NET any (msg:"BACKDOOR Q access"; flags:S; reference:arachnids,203; classtype:misc-activity; sid:184; psad_id:100052; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 555 (msg:"BACKDOOR PhaseZero Server Active on Network"; flags:S; classtype:misc-activity; sid:208; psad_id:100053; psad_dl:2;)
+alert tcp $EXTERNAL_NET 31790 -> $HOME_NET 31789 (msg:"BACKDOOR hack-a-tack connection attempt"; flags:S; reference:arachnids,314; classtype:attempted-recon; sid:614; psad_id:100054; psad_dl:2;)
+alert ip any any -> 216.80.99.202 any (msg:"BACKDOOR fragroute trojan connection attempt"; reference:bugtraq,4898; classtype:trojan-activity; sid:1791; psad_id:100055; psad_dl:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 35555 (msg:"BACKDOOR win-trin00 connection attempt"; reference:cve,2000-0138; reference:nessus,10307; classtype:attempted-admin; psad_dsize:>27; sid:1853; psad_id:100056; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 33270 (msg:"BACKDOOR trinity connection attempt"; flags:S; reference:cve,2000-0138; reference:nessus,10501; classtype:attempted-admin; sid:1843; psad_id:100057; psad_dl:2;)
+alert tcp any any -> 212.146.0.34 1963 (msg:"BACKDOOR TCPDUMP/PCAP trojan traffic"; reference:url,hlug.fscker.com; classtype:trojan-activity; sid:1929; psad_id:100058; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 34012 (msg:"BACKDOOR Remote PC Access connection attempt"; flags:S; reference:nessus,11673; classtype:trojan-activity; sid:2124; psad_id:100059; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"BACKDOOR typot trojan traffic"; flags:S; window:55808; reference:mcafee,100406; classtype:trojan-activity; sid:2182; psad_id:100060; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 3127:3199 (msg:"BACKDOOR DoomJuice file upload attempt"; flags:S; reference:url,securityresponse.symantec.com/avcenter/venc/data/w32.hllw.doomjuice.html; classtype:trojan-activity; sid:2375; psad_id:100061; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 63536 (msg:"BACKDOOR Insane Network 4.0 connection established port 63536"; classtype:misc-activity; sid:3016; psad_id:100062; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 22222 (msg:"BACKDOOR RUX the Tick connection attempt"; flags:S; classtype:misc-activity; psad_id:100063; psad_dl:2; psad_derived_sids:3010,3011,3012;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 23432 (msg:"BACKDOOR Asylum 0.1 connection request"; flags:S; classtype:misc-activity; psad_id:100064; psad_dl:2; psad_derived_sids:3013,3014;)
+
+
+### scan.rules
+alert tcp $EXTERNAL_NET 10101 -> $HOME_NET any (msg:"SCAN myscan"; flags:S; ttl:>220; reference:arachnids,439; classtype:attempted-recon; sid:613; psad_id:100065; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN FIN"; flags:F; reference:arachnids,27; classtype:attempted-recon; sid:621; psad_id:100066; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN NULL"; flags:0; reference:arachnids,4; classtype:attempted-recon; sid:623; psad_id:100067; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN SYN FIN"; flags:SF; reference:arachnids,198; classtype:attempted-recon; sid:624; psad_id:100068; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN XMAS"; flags:SRAFPU; reference:arachnids,144; classtype:attempted-recon; sid:625; psad_id:100069; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN nmap XMAS"; flags:FPU; reference:arachnids,30; classtype:attempted-recon; sid:1228; psad_id:100070; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN synscan portscan"; flags:SF; id:39426; reference:arachnids,441; classtype:attempted-recon; sid:630; psad_id:100071; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN ipEye SYN scan"; flags:S; seq:1958810375; reference:arachnids,236; classtype:attempted-recon; sid:622; psad_id:100197; psad_dl:2;)
+
+### x11.rules
+
+### oracle.rules
+
+### web-frontpage.rules
+
+### PSAD-CUSTOM rules
+alert tcp $EXTERNAL_NET any -> $HOME_NET 17300 (msg:"PSAD-CUSTOM Kuang2 virus communication attempt"; flags:S; reference:url,isc.sans.org/port_details.php?port=17300; classtype:trojan-activity; psad_id:100206; psad_dl:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 1434 (msg:"PSAD-CUSTOM Slammer communication attempt"; reference:url,www.linklogger.com/UDP1434.htm; classtype:trojan-activity; psad_id:100208; psad_dl:2; psad_ip_len:404;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"PSAD-CUSTOM Nachi worm reconnaisannce"; itype:8; icode:0; reference:url,www.cisco.com/en/US/products/sw/voicesw/ps556/products_security_notice09186a00801b143a.html; classtype:trojan-activity; psad_id:100209; psad_dl:2; psad_ip_len:92;)
+
+### misc.rules
+alert tcp $EXTERNAL_NET any -> $HOME_NET 1417 (msg:"MISC Insecure TIMBUKTU communication attempt"; flags:S; reference:arachnids,229; classtype:bad-unknown; sid:505; psad_id:100072; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 5631:5632 (msg:"MISC PCAnywhere communication attempt"; flags:S; classtype:attempted-admin; psad_id:100073; psad_dl:2; psad_derived_sids:507,512;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 5900 (msg:"MISC VNC communication attempt"; flags:S; reference:url,isc.sans.org/port_details.php?port=5900; reference:url,secunia.com/advisories/20107; classtype:attempted-admin; psad_id:100202; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 7212 (msg:"MISC Ghostsurf communication attempt"; flags:S; reference:url,isc.sans.org/port_details.php?port=7212; reference:url,www.tenebril.com/src/advisories/open-proxy-relay.php; classtype:misc-activity; psad_id:100203; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 4899 (msg:"MISC Radmin Default install options attempt"; flags:S; reference:url,isc.sans.org/port_details.php?port=4899; reference:url,archives.neohapsis.com/archives/vulnwatch/2002-q3/0099.html; classtype:attempted-admin; psad_id:100204; psad_dl:2;)
+#alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"MISC Tiny Fragments"; dsize:< 25; fragbits:M; classtype:bad-unknown; sid:100; psad_id:100000; psad_dl:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 1900 (msg:"SCAN UPnP communication attempt"; classtype:misc-attack; psad_dsize:>8; psad_id:100074; psad_dl:2; psad_derived_sids:1917,1384,1388;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 32000 (msg:"MISC Xtramail communication attempt"; flags:S; reference:bugtraq,791; reference:cve,1999-1511; reference:nessus,10323; classtype:attempted-admin; sid:1636; psad_id:100075; psad_dl:2;)
+alert udp $EXTERNAL_NET 2002 -> $HTTP_SERVERS 2002 (msg:"MISC slapper worm admin traffic"; reference:url,isc.incidents.org/analysis.html?id=167; reference:url,www.cert.org/advisories/CA-2002-27.html; classtype:trojan-activity; psad_dsize:>20; sid:1889; psad_id:100076; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 3389 (msg:"MISC MS Terminal Server communication attempt"; flags:S; reference:bugtraq,3099; reference:cve,2001-0540; classtype:misc-activity; psad_id:100077; psad_dl:2; psad_derived_sids:1447,1448,2418;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 2533 (msg:"MISC Alcatel PABX 4400 connection attempt"; flags:S; reference:nessus,11019; classtype:misc-activity; sid:1819; psad_id:100078; psad_dl:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 27155 (msg:"MISC GlobalSunTech Access Point Information Disclosure attempt"; reference:bugtraq,6100; classtype:misc-activity; psad_dsize:>8; sid:1966; psad_id:100079; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 7100 (msg:"MISC xfs communication attempt"; flags:S; reference:bugtraq,6241; reference:cve,2002-1317; reference:nessus,11188; classtype:misc-activity; sid:1987; psad_id:100080; psad_dl:2;)
+alert udp $HOME_NET 500 -> $EXTERNAL_NET 500 (msg:"MISC isakmp login failed"; classtype:misc-activity; psad_dsize:>29; sid:2043; psad_id:100081; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 1723 (msg:"MISC Microsoft PPTP communication attempt"; flags:S; reference:bugtraq,5807; reference:cve,2002-1214; classtype:attempted-admin; psad_id:100082; psad_dl:2; psad_derived_sids:2126,2044;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 639 (msg:"MISC LDAP communication attempt"; flags:S; reference:bugtraq,10116; reference:cve,2003-0719; reference:url,www.microsoft.com/technet/security/bulletin/MS04-011.mspx; classtype:attempted-admin; psad_id:100083; psad_dl:2; psad_derived_sids:2516,2532,2533,2534;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 8000 (msg:"MISC HP Web JetAdmin communication attempt"; flags:S; reference:bugtraq,9978; classtype:web-application-activity; psad_id:100084; psad_dl:2; psad_derived_sids:2547,2548,2549,2655;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 1026:1029 (msg:"MISC Windows popup spam attempt"; classtype:misc-activity; reference:url,www.linklogger.com/UDP1026.htm; psad_dsize:>100; psad_id:100196; psad_dl:2;)
+alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"MISC source route lssr"; ipopts:lsrr; reference:arachnids,418; reference:bugtraq,646; reference:cve,1999-0909; classtype:bad-unknown; sid:500; psad_id:100199; psad_dl:2;);
+alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"MISC source route lssre"; ipopts:lsrre; reference:arachnids,420; reference:bugtraq,646; reference:cve,1999-0909; classtype:bad-unknown; sid:501; psad_id:100200; psad_dl:2;)
+alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"MISC source route ssrr"; ipopts:ssrr ; reference:arachnids,422; classtype:bad-unknown; sid:502; psad_id:100201; psad_dl:2;);
+
+### shellcode.rules
+
+### policy.rules
+alert udp $EXTERNAL_NET any -> $HOME_NET 5632 (msg:"POLICY PCAnywhere server response"; reference:arachnids,239; classtype:misc-activity; psad_dsize:>4; sid:556; psad_id:100085; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 9100 (msg:"POLICY HP JetDirect LCD commnication attempt"; flags:S; reference:arachnids,302; reference:bugtraq,2245; classtype:misc-activity; sid:568; psad_id:100086; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 9000:9002 (msg:"POLICY HP JetDirect LCD communication attempt"; flags:S; reference:arachnids,302; reference:bugtraq,2245; classtype:misc-activity; sid:510; psad_id:100087; psad_dl:2;)
+alert ip 66.151.158.177 any -> $HOME_NET any (msg:"POLICY poll.gotomypc.com access"; reference:url,www.gotomypc.com/help2.tmpl; classtype:misc-activity; sid:1429; psad_id:100088; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 5800:5802 (msg:"POLICY vncviewer Java applet communication attempt"; flags:S; reference:nessus,10758; classtype:misc-activity; sid:1846; psad_id:100089; psad_dl:2;)
+
+### p2p.rules
+alert tcp $HOME_NET any -> $EXTERNAL_NET 8888 (msg:"P2P napster communication attempt"; flags:S; classtype:policy-violation; psad_id:100090; psad_dl:2; psad_derived_sids:549,550,551,552;)
+alert tcp $HOME_NET any <> $EXTERNAL_NET 6699 (msg:"P2P Napster Client Data communication attempt"; flags:S; classtype:policy-violation; sid:561; psad_id:100091; psad_dl:2;)
+alert tcp $HOME_NET any <> $EXTERNAL_NET 7777 (msg:"P2P Napster Client Data communication attempt"; flags:S; classtype:policy-violation; sid:562; psad_id:100092; psad_dl:2;)
+alert tcp $HOME_NET any <> $EXTERNAL_NET 6666 (msg:"P2P Napster Client Data communication attempt"; flags:S; classtype:policy-violation; sid:563; psad_id:100093; psad_dl:2;)
+alert tcp $HOME_NET any <> $EXTERNAL_NET 5555 (msg:"P2P Napster Client Data communication attempt"; flags:S; classtype:policy-violation; sid:564; psad_id:100094; psad_dl:2;)
+alert tcp $HOME_NET any <> $EXTERNAL_NET 8875 (msg:"P2P Napster Server Login communication attempt"; flags:S; classtype:policy-violation; sid:565; psad_id:100095; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 1214 (msg:"P2P Fastrack kazaa/morpheus communication attempt"; flags:S; reference:url,www.kazaa.com; reference:url,www.musiccity.com/technology.htm; classtype:policy-violation; sid:1383; psad_id:100096; psad_dl:2;)
+alert tcp $HOME_NET any -> $EXTERNAL_NET 6881:6889 (msg:"P2P BitTorrent communication attempt"; flags:S;; classtype:policy-violation; sid:2181; psad_id:100097; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 4242 (msg:"P2P eDonkey transfer attempt"; flags:S; reference:url,www.kom.e-technik.tu-darmstadt.de/publications/abstracts/HB02-1.html; classtype:policy-violation; sid:2586; psad_id:100098; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $EXTERNAL_NET 4711 (msg:"P2P eDonkey communication attempt"; flags:S; reference:url,www.emule-project.net; classtype:policy-violation; sid:2587; psad_id:100099; psad_dl:2;)
+
+### ftp.rules
+alert tcp $EXTERNAL_NET any -> $HOME_NET 3535 (msg:"FTP Yak! FTP server communication attempt"; flags:S; reference:bugtraq,9072; classtype:suspicious-login; psad_id:100100; psad_dl:2; psad_derived_sids:2334,2335;)
+
+### experimental.rules
+
+### porn.rules
+
+### sql.rules
+
+### pop2.rules
+
+### imap.rules
+
+### smtp.rules
+
+### web-coldfusion.rules
+
+### local.rules
+
+### bad-traffic.rules
+alert tcp $EXTERNAL_NET any <> $HOME_NET 0 (msg:"BAD-TRAFFIC tcp port 0 traffic"; classtype:misc-activity; sid:524; psad_id:100101; psad_dl:2;)
+alert udp $EXTERNAL_NET any <> $HOME_NET 0 (msg:"BAD-TRAFFIC udp port 0 traffic"; reference:bugtraq,576; reference:cve,1999-0675; reference:nessus,10074; classtype:misc-activity; sid:525; psad_id:100102; psad_dl:2;)
+### note that psad derives the payload length of a TCP packet from the
+### IP header, so it treats TCP SYN packets (which contain options) as
+### being 44 bytes longer (this is the maximum possible) than other
+### TCP packets.
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"BAD-TRAFFIC data in TCP SYN packet"; psad_dsize:>20; flags:S; reference:url,www.cert.org/incident_notes/IN-99-07.html; classtype:misc-activity; sid:207; psad_id:100000; psad_dl:2;)
+### traffic may be logged over the loopback interface via iptables
+### much more readily than running Snort on a loopback interface,
+### so disable this sig.
+#alert ip any any <> 127.0.0.0/8 any (msg:"BAD-TRAFFIC loopback traffic"; reference:url,rr.sans.org/firewall/egress.php; classtype:bad-unknown; sid:100; psad_id:100000; psad_dl:2;)
+alert ip any any -> any any (msg:"BAD-TRAFFIC same SRC/DST"; sameip; reference:bugtraq,2666; reference:cve,1999-0016; reference:url,www.cert.org/advisories/CA-1997-28.html; classtype:bad-unknown; sid:527; psad_id:100103; psad_dl:2;)
+alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"BAD-TRAFFIC 0 ttl"; ttl:0; reference:url,support.microsoft.com/default.aspx?scid=kb\;EN-US\;q138268; reference:url,www.isi.edu/in-notes/rfc1122.txt; classtype:misc-activity; sid:1321; psad_id:100104; psad_dl:2;)
+#alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"BAD-TRAFFIC Unassigned/Reserved IP protocol"; ip_proto:>134; reference:url,www.iana.org/assignments/protocol-numbers; classtype:non-standard-protocol; sid:1627; psad_id:100105; psad_dl:2;)
+alert tcp any any -> [232.0.0.0/8,233.0.0.0/8,239.0.0.0/8] any (msg:"BAD-TRAFFIC syn to multicast address"; flags:S; classtype:bad-unknown; sid:1431; psad_id:100106; psad_dl:2;)
+#alert ip any any -> any any (msg:"BAD-TRAFFIC IP Proto 53 SWIPE"; ip_proto:53; reference:bugtraq,8211; reference:cve,2003-0567; classtype:non-standard-protocol; sid:2186; psad_id:100107; psad_dl:2;)
+#alert ip any any -> any any (msg:"BAD-TRAFFIC IP Proto 55 IP Mobility"; ip_proto:55; reference:bugtraq,8211; reference:cve,2003-0567; classtype:non-standard-protocol; sid:2187; psad_id:100108; psad_dl:2;)
+#alert ip any any -> any any (msg:"BAD-TRAFFIC IP Proto 77 Sun ND"; ip_proto:77; reference:bugtraq,8211; reference:cve,2003-0567; classtype:non-standard-protocol; sid:2188; psad_id:100109; psad_dl:2;)
+#alert ip any any -> any any (msg:"BAD-TRAFFIC IP Proto 103 PIM"; ip_proto:103; reference:bugtraq,8211; reference:cve,2003-0567; classtype:non-standard-protocol; sid:2189; psad_id:100110; psad_dl:2;)
+
+### dos.rules
+#alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"DOS Jolt attack"; dsize:408; fragbits:M; reference:cve,1999-0345; classtype:attempted-dos; sid:216; psad_id:100000; psad_dl:2;)
+#alert udp $EXTERNAL_NET any -> $HOME_NET any (msg:"DOS Teardrop attack"; fragbits:M; id:242; reference:bugtraq,124; reference:cve,1999-0015; reference:nessus,10279; reference:url,www.cert.org/advisories/CA-1997-28.html; classtype:attempted-dos; sid:217; psad_id:100000; psad_dl:2;)
+alert tcp $EXTERNAL_NET any <> $HOME_NET any (msg:"DOS NAPTHA"; flags:S; id:413; seq:6060842; reference:bugtraq,2022; reference:cve,2000-1039; reference:url,razor.bindview.com/publish/advisories/adv_NAPTHA.html; reference:url,www.cert.org/advisories/CA-2000-21.html; reference:url,www.microsoft.com/technet/security/bulletin/MS00-091.mspx; classtype:attempted-dos; sid:275; psad_id:100111; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 7070 (msg:"DOS Real Audio Server communication attempt"; flags:S; reference:arachnids,411; reference:bugtraq,1288; reference:cve,2000-0474; classtype:attempted-dos; psad_id:100112; psad_dl:2; psad_derived_sids:276,277;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 617 (msg:"DOS arkiea backup communication attempt"; flags:S; reference:arachnids,261; reference:bugtraq,662; reference:cve,1999-0788; classtype:attempted-dos; sid:282; psad_id:100113; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 3372 (msg:"DOS MSDTC communication attempt"; flags:S; reference:bugtraq,4006; reference:cve,2002-0224; reference:nessus,10939; classtype:attempted-dos; sid:1408; psad_id:100114; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 6004 (msg:"DOS iParty DOS attempt"; flags:S; reference:bugtraq,6844; reference:cve,1999-1566; classtype:misc-attack; sid:1605; psad_id:100115; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 6789:6790 (msg:"DOS DB2 dos communication attempt"; flags:S; reference:bugtraq,3010; reference:cve,2001-1143; reference:nessus,10871; classtype:denial-of-service; sid:1641; psad_id:100116; psad_dl:2;)
+
+### web-client.rules
+
+### web-cgi.rules
+
+### other-ids.rules
+
+### pop3.rules
+
+### multimedia.rules
+
+### rservices.rules
+
+### web-iis.rules
+
+### mysql.rules
+
+### icmp-info.rules
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP IRDP router advertisement"; itype:9; reference:arachnids,173; reference:bugtraq,578; reference:cve,1999-0875; classtype:misc-activity; sid:363; psad_id:100117; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP IRDP router selection"; itype:10; reference:arachnids,174; reference:bugtraq,578; reference:cve,1999-0875; classtype:misc-activity; sid:364; psad_id:100118; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP PING LINUX/*BSD"; dsize:8; id:13170; itype:8; reference:arachnids,447; classtype:misc-activity; sid:375; psad_id:100119; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP PING Sun Solaris"; dsize:8; itype:8; reference:arachnids,448; classtype:misc-activity; sid:381; psad_id:100120; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP traceroute"; itype:8; ttl:1; reference:arachnids,118; classtype:attempted-recon; sid:385; psad_id:100121; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP PING"; icode:0; itype:8; classtype:misc-activity; sid:384; psad_id:100122; psad_dl:2;)
+alert icmp $HOME_NET any -> $EXTERNAL_NET any (msg:"ICMP Address Mask Reply"; icode:0; itype:18; classtype:misc-activity; sid:386; psad_id:100123; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Address Mask Reply undefined code"; icode:>0; itype:18; classtype:misc-activity; sid:387; psad_id:100124; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Address Mask Request"; icode:0; itype:17; classtype:misc-activity; sid:388; psad_id:100125; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Address Mask Request undefined code"; icode:>0; itype:17; classtype:misc-activity; sid:389; psad_id:100126; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Alternate Host Address"; icode:0; itype:6; classtype:misc-activity; sid:390; psad_id:100127; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Alternate Host Address undefined code"; icode:>0; itype:6; classtype:misc-activity; sid:391; psad_id:100128; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Datagram Conversion Error"; icode:0; itype:31; classtype:misc-activity; sid:392; psad_id:100129; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Datagram Conversion Error undefined code"; icode:>0; itype:31; classtype:misc-activity; sid:393; psad_id:100130; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Destination Unreachable Destination Host Unknown"; icode:7; itype:3; classtype:misc-activity; sid:394; psad_id:100131; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Destination Unreachable Destination Network Unknown"; icode:6; itype:3; classtype:misc-activity; sid:395; psad_id:100132; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Destination Unreachable Fragmentation Needed and DF bit was set"; icode:4; itype:3; classtype:misc-activity; sid:396; psad_id:100133; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Destination Unreachable Host Precedence Violation"; icode:14; itype:3; classtype:misc-activity; sid:397; psad_id:100134; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Destination Unreachable Host Unreachable for Type of Service"; icode:12; itype:3; classtype:misc-activity; sid:398; psad_id:100135; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Destination Unreachable Host Unreachable"; icode:1; itype:3; classtype:misc-activity; sid:399; psad_id:100136; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Destination Unreachable Network Unreachable for Type of Service"; icode:11; itype:3; classtype:misc-activity; sid:400; psad_id:100137; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Destination Unreachable Network Unreachable"; icode:0; itype:3; classtype:misc-activity; sid:401; psad_id:100138; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Destination Unreachable Port Unreachable"; icode:3; itype:3; classtype:misc-activity; sid:402; psad_id:100139; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Destination Unreachable Precedence Cutoff in effect"; icode:15; itype:3; classtype:misc-activity; sid:403; psad_id:100140; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Destination Unreachable Protocol Unreachable"; icode:2; itype:3; classtype:misc-activity; sid:404; psad_id:100141; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Destination Unreachable Source Host Isolated"; icode:8; itype:3; classtype:misc-activity; sid:405; psad_id:100142; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Destination Unreachable Source Route Failed"; icode:5; itype:3; classtype:misc-activity; sid:406; psad_id:100143; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Destination Unreachable cndefined code"; icode:>15; itype:3; classtype:misc-activity; sid:407; psad_id:100144; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Echo Reply"; icode:0; itype:0; classtype:misc-activity; sid:408; psad_id:100145; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Echo Reply undefined code"; icode:>0; itype:0; classtype:misc-activity; sid:409; psad_id:100146; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Fragment Reassembly Time Exceeded"; icode:1; itype:11; classtype:misc-activity; sid:410; psad_id:100147; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP IPV6 I-Am-Here"; icode:0; itype:34; classtype:misc-activity; sid:411; psad_id:100148; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP IPV6 I-Am-Here undefined code"; icode:>0; itype:34; classtype:misc-activity; sid:412; psad_id:100149; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP IPV6 Where-Are-You"; icode:0; itype:33; classtype:misc-activity; sid:413; psad_id:100150; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP IPV6 Where-Are-You undefined code"; icode:>0; itype:33; classtype:misc-activity; sid:414; psad_id:100151; psad_dl:2;)
+alert icmp $HOME_NET any -> $EXTERNAL_NET any (msg:"ICMP Information Reply"; icode:0; itype:16; classtype:misc-activity; sid:415; psad_id:100152; psad_dl:2;)
+alert icmp $HOME_NET any -> $EXTERNAL_NET any (msg:"ICMP Information Reply undefined code"; icode:>0; itype:16; classtype:misc-activity; sid:416; psad_id:100153; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Information Request"; icode:0; itype:15; classtype:misc-activity; sid:417; psad_id:100154; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Information Request undefined code"; icode:>0; itype:15; classtype:misc-activity; sid:418; psad_id:100155; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Mobile Host Redirect"; icode:0; itype:32; classtype:misc-activity; sid:419; psad_id:100156; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Mobile Host Redirect undefined code"; icode:>0; itype:32; classtype:misc-activity; sid:420; psad_id:100157; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Mobile Registration Reply"; icode:0; itype:36; classtype:misc-activity; sid:421; psad_id:100158; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Mobile Registration Reply undefined code"; icode:>0; itype:36; classtype:misc-activity; sid:422; psad_id:100159; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Mobile Registration Request"; icode:0; itype:35; classtype:misc-activity; sid:423; psad_id:100160; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Mobile Registration Request undefined code"; icode:>0; itype:35; classtype:misc-activity; sid:424; psad_id:100161; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Parameter Problem Bad Length"; icode:2; itype:12; classtype:misc-activity; sid:425; psad_id:100162; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Parameter Problem Missing a Required Option"; icode:1; itype:12; classtype:misc-activity; sid:426; psad_id:100163; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Parameter Problem Unspecified Error"; icode:0; itype:12; classtype:misc-activity; sid:427; psad_id:100164; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Parameter Problem undefined Code"; icode:>2; itype:12; classtype:misc-activity; sid:428; psad_id:100165; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Photuris Reserved"; icode:0; itype:40; classtype:misc-activity; sid:429; psad_id:100166; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Photuris Unknown Security Parameters Index"; icode:1; itype:40; classtype:misc-activity; sid:430; psad_id:100167; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Photuris Valid Security Parameters, But Authentication Failed"; icode:2; itype:40; classtype:misc-activity; sid:431; psad_id:100168; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Photuris Valid Security Parameters, But Decryption Failed"; icode:3; itype:40; classtype:misc-activity; sid:432; psad_id:100169; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Photuris undefined code!"; icode:>3; itype:40; classtype:misc-activity; sid:433; psad_id:100170; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Redirect for TOS and Host"; icode:3; itype:5; classtype:misc-activity; sid:436; psad_id:100171; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Redirect for TOS and Network"; icode:2; itype:5; classtype:misc-activity; sid:437; psad_id:100172; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Redirect undefined code"; icode:>3; itype:5; classtype:misc-activity; sid:438; psad_id:100173; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Reserved for Security Type 19"; icode:0; itype:19; classtype:misc-activity; sid:439; psad_id:100174; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Reserved for Security Type 19 undefined code"; icode:>0; itype:19; classtype:misc-activity; sid:440; psad_id:100175; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Router Advertisement"; icode:0; itype:9; reference:arachnids,173; classtype:misc-activity; sid:441; psad_id:100176; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Router Selection"; icode:0; itype:10; reference:arachnids,174; classtype:misc-activity; sid:443; psad_id:100177; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP SKIP"; icode:0; itype:39; classtype:misc-activity; sid:445; psad_id:100178; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP SKIP undefined code"; icode:>0; itype:39; classtype:misc-activity; sid:446; psad_id:100179; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Source Quench undefined code"; icode:>0; itype:4; classtype:misc-activity; sid:448; psad_id:100180; psad_dl:2;)
+alert icmp $HOME_NET any -> $EXTERNAL_NET any (msg:"ICMP Time-To-Live Exceeded in Transit"; icode:0; itype:11; classtype:misc-activity; sid:449; psad_id:100181; psad_dl:2;)
+alert icmp $HOME_NET any -> $EXTERNAL_NET any (msg:"ICMP Time-To-Live Exceeded in Transit undefined code"; icode:>1; itype:11; classtype:misc-activity; sid:450; psad_id:100182; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Timestamp Reply"; icode:0; itype:14; classtype:misc-activity; sid:451; psad_id:100183; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Timestamp Reply undefined code"; icode:>0; itype:14; classtype:misc-activity; sid:452; psad_id:100184; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Timestamp Request"; icode:0; itype:13; classtype:misc-activity; sid:453; psad_id:100185; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Timestamp Request undefined code"; icode:>0; itype:13; classtype:misc-activity; sid:454; psad_id:100186; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Traceroute"; icode:0; itype:30; classtype:misc-activity; sid:456; psad_id:100187; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP Traceroute undefined code"; icode:>0; itype:30; classtype:misc-activity; sid:457; psad_id:100188; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP unassigned type 1"; icode:0; itype:1; classtype:misc-activity; sid:458; psad_id:100189; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP unassigned type 1 undefined code"; itype:1; classtype:misc-activity; sid:459; psad_id:100190; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP unassigned type 2"; icode:0; itype:2; classtype:misc-activity; sid:460; psad_id:100191; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP unassigned type 2 undefined code"; itype:2; classtype:misc-activity; sid:461; psad_id:100192; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP unassigned type 7"; icode:0; itype:7; classtype:misc-activity; sid:462; psad_id:100193; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP unassigned type 7 undefined code"; itype:7; classtype:misc-activity; sid:463; psad_id:100194; psad_dl:2;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ICMP PING undefined code"; icode:>0; itype:8; classtype:misc-activity; sid:365; psad_id:100195; psad_dl:2;)
+
+### web-php.rules
+
+### telnet.rules
+
+### netbios.rules
+
+### nntp.rules
+
+### attack-responses.rules
+
+### tftp.rules
+
+### web-attacks.rules

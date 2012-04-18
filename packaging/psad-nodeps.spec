@@ -10,7 +10,7 @@ Name: %name
 Version: %version
 Release: %release
 License: GPL
-Group: System/Servers
+Group: Applications/Internet
 Url: http://www.cipherdyne.org/psad/
 Source: %name-%version.tar.gz
 BuildRoot: %_tmppath/%{name}-buildroot
@@ -76,6 +76,7 @@ install -m 755 init-scripts/psad-init.redhat $RPM_BUILD_ROOT%_initrddir/psad
 install -m 644 psad.conf $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 signatures $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 icmp_types $RPM_BUILD_ROOT%_sysconfdir/%name/
+install -m 644 icmp6_types $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 ip_options $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 auto_dl $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 snort_rule_dl $RPM_BUILD_ROOT%_sysconfdir/%name/
@@ -151,6 +152,7 @@ fi
 %config(noreplace) %_sysconfdir/%name/posf
 %config(noreplace) %_sysconfdir/%name/pf.os
 %config(noreplace) %_sysconfdir/%name/icmp_types
+%config(noreplace) %_sysconfdir/%name/icmp6_types
 
 %changelog
 * Wed Apr 18 2012 Michael Rash <mbr@cipherdyne.org>

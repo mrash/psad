@@ -8,15 +8,15 @@
 
 ### get the first @INC directory that includes the string "linux".
 ### This may be 'i386-linux', or 'i686-linux-thread-multi', etc.
-%define psadmoddir `perl -e '$path='i386-linux'; for (@INC) { if($_ =~ m|.*/(.*linux.*)|) {$path = $1; last; }} print $path'`
+%define psadmoddir `perl -e '$path=q|i386-linux|; for (@INC) { if($_ =~ m|.*/(.*linux.*)|) {$path = $1; last; }} print $path'`
 
 Summary: psad analyzes iptables log messages for suspect traffic
 Name: %name
 Version: %version
 Release: %release
 License: GPL
-Group: System/Servers
-Url: http://www.cipherdyne.org/psad/
+Group: Applications/Internet
+URL: http://www.cipherdyne.org/psad/
 Source: %name-%version.tar.gz
 BuildRoot: %_tmppath/%{name}-buildroot
 Requires: iptables
@@ -54,7 +54,7 @@ cd IPTables-ChainMgr && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
 cd ..
 cd Bit-Vector && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
 cd ..
-cd Net-IPv4Addr && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
+cd NetAddr-IP && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
 cd ..
 cd Unix-Syslog && perl Makefile.PL PREFIX=%psadlibdir LIB=%psadlibdir
 cd ..
@@ -73,14 +73,13 @@ cd deps
 make OPTS="$RPM_OPT_FLAGS" -C IPTables-Parse
 make OPTS="$RPM_OPT_FLAGS" -C IPTables-ChainMgr
 make OPTS="$RPM_OPT_FLAGS" -C Bit-Vector
-make OPTS="$RPM_OPT_FLAGS" -C Net-IPv4Addr
+make OPTS="$RPM_OPT_FLAGS" -C NetAddr-IP
 make OPTS="$RPM_OPT_FLAGS" -C Unix-Syslog
 make OPTS="$RPM_OPT_FLAGS" -C Date-Calc
 cd ..
 
 %install
 ### config directory
-#mkdir -p $RPM_BUILD_ROOT%psadetcdir
 ### log directory
 mkdir -p $RPM_BUILD_ROOT%psadlogdir
 ### dir for psadfifo
@@ -93,15 +92,16 @@ mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Bit/Vector
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Bit
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Unix/Syslog
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Date/Calc
-mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Net/IPv4Addr
+mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/Util
+mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP
+mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/InetBase
+mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/NetAddr/IP
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/IPTables/Parse
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/IPTables/ChainMgr
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Unix
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Carp
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Date/Calc
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Date/Calendar
-mkdir -p $RPM_BUILD_ROOT%psadlibdir/auto/Net/IPv4Addr
-mkdir -p $RPM_BUILD_ROOT%psadlibdir/Net
 mkdir -p $RPM_BUILD_ROOT%psadlibdir/IPTables
 
 ### whois_psad binary
@@ -115,7 +115,6 @@ mkdir -p $RPM_BUILD_ROOT%_sysconfdir/%name
 mkdir -p $RPM_BUILD_ROOT%_initrddir
 
 ### the 700 permissions mode is fixed in the
-### %post phase
 install -m 700 psad $RPM_BUILD_ROOT%_sbindir/
 install -m 700 kmsgsd $RPM_BUILD_ROOT%_sbindir/
 install -m 700 psadwatchd $RPM_BUILD_ROOT%_sbindir/
@@ -126,6 +125,7 @@ install -m 755 init-scripts/psad-init.redhat $RPM_BUILD_ROOT%_initrddir/psad
 install -m 644 psad.conf $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 signatures $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 icmp_types $RPM_BUILD_ROOT%_sysconfdir/%name/
+install -m 644 icmp6_types $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 ip_options $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 auto_dl $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 snort_rule_dl $RPM_BUILD_ROOT%_sysconfdir/%name/
@@ -141,7 +141,7 @@ install -m 444 Bit-Vector/blib/arch/auto/Bit/Vector/Vector.bs $RPM_BUILD_ROOT%ps
 install -m 444 Bit-Vector/blib/lib/Bit/Vector.pm $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Bit/Vector.pm
 install -m 555 Unix-Syslog/blib/arch/auto/Unix/Syslog/Syslog.so $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Unix/Syslog/Syslog.so
 install -m 444 Unix-Syslog/blib/arch/auto/Unix/Syslog/Syslog.bs $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Unix/Syslog/Syslog.bs
-install -m 444 Unix-Syslog/blib/lib/auto/Unix/Syslog/autosplit.ix $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Unix/Syslog/autosplit.ix
+[ -e Unix-Syslog/blib/lib/auto/Unix/Syslog/autosplit.ix ] && install -m 444 Unix-Syslog/blib/lib/auto/Unix/Syslog/autosplit.ix $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Unix/Syslog/autosplit.ix
 install -m 444 Unix-Syslog/blib/lib/Unix/Syslog.pm $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Unix/Syslog.pm
 install -m 555 Date-Calc/blib/arch/auto/Date/Calc/Calc.so $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Date/Calc/Calc.so
 install -m 444 Date-Calc/blib/arch/auto/Date/Calc/Calc.bs $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/Date/Calc/Calc.bs
@@ -157,8 +157,69 @@ install -m 444 Date-Calc/blib/lib/Date/Calendar/Year.pm $RPM_BUILD_ROOT%psadlibd
 install -m 444 Date-Calc/blib/lib/Date/Calendar/Profiles.pod $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Date/Calendar/Profiles.pod
 install -m 444 Date-Calc/blib/lib/Date/Calendar/Profiles.pm $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Date/Calendar/Profiles.pm
 install -m 444 Date-Calc/blib/lib/Date/Calendar/Year.pod $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/Date/Calendar/Year.pod
-install -m 444 Net-IPv4Addr/blib/lib/auto/Net/IPv4Addr/autosplit.ix $RPM_BUILD_ROOT%psadlibdir/auto/Net/IPv4Addr/autosplit.ix
-install -m 444 Net-IPv4Addr/blib/lib/Net/IPv4Addr.pm $RPM_BUILD_ROOT%psadlibdir/Net/IPv4Addr.pm
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/hostenum.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/hostenum.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/compactref.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/compactref.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/nprefix.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/nprefix.al
+[ -e NetAddr-IP/blib/lib/auto/NetAddr/IP/.packlist ] && install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/.packlist $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/.packlist
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/re.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/re.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/prefix.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/prefix.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/do_prefix.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/do_prefix.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/wildcard.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/wildcard.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/_compact_v6.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/_compact_v6.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/autosplit.ix $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/autosplit.ix
+[ -e NetAddr-IP/blib/lib/auto/NetAddr/IP/Util/Util.so ] && install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/Util/Util.so $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/Util/Util.so
+[ -e NetAddr-IP/blib/lib/auto/NetAddr/IP/Util/Util.bs ] && install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/Util/Util.bs $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/Util/Util.bs
+[ -e NetAddr-IP/blib/lib/auto/NetAddr/IP/Util/autosplit.ix ] && install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/Util/autosplit.ix $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/Util/autosplit.ix
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/shiftleft.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/shiftleft.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/ipv4to6.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/ipv4to6.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/maskanyto6.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/maskanyto6.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/comp128.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/comp128.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/_deadlen.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/_deadlen.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/sub128.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/sub128.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/notcontiguous.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/notcontiguous.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/bcdn2bin.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/bcdn2bin.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/add128.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/add128.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/ipv6to4.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/ipv6to4.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/_bcdcheck.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/_bcdcheck.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/mask4to6.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/mask4to6.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/_128x2.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/_128x2.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/ipanyto6.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/ipanyto6.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/hasbits.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/hasbits.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/bcdn2txt.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/bcdn2txt.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/slowadd128.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/slowadd128.al
+[ -e NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/autosplit.ix ] && install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/autosplit.ix $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/autosplit.ix
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/simple_pack.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/simple_pack.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/bcd2bin.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/bcd2bin.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/bin2bcdn.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/bin2bcdn.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/_bin2bcdn.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/_bin2bcdn.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/bin2bcd.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/bin2bcd.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/_sa128.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/_sa128.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/_bcd2bin.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/_bcd2bin.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/addconst.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/addconst.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/UtilPP/_128x10.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/UtilPP/_128x10.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/mod_version.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/mod_version.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/_splitref.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/_splitref.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/_compV6.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/_compV6.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/InetBase/inet_any2n.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/InetBase/inet_any2n.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/InetBase/_inet_ntop.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/InetBase/_inet_ntop.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/InetBase/inet_n2ad.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/InetBase/inet_n2ad.al
+[ -e NetAddr-IP/blib/lib/auto/NetAddr/IP/InetBase/autosplit.ix ] && install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/InetBase/autosplit.ix $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/InetBase/autosplit.ix
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/InetBase/_packzeros.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/InetBase/_packzeros.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/InetBase/inet_n2dx.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/InetBase/inet_n2dx.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/InetBase/ipv6_aton.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/InetBase/ipv6_aton.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/InetBase/ipv6_ntoa.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/InetBase/ipv6_ntoa.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/InetBase/inet_ntoa.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/InetBase/inet_ntoa.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/InetBase/_inet_pton.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/InetBase/_inet_pton.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/coalesce.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/coalesce.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/re6.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/re6.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/short.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/short.al
+install -m 444 NetAddr-IP/blib/lib/auto/NetAddr/IP/_splitplan.al $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/auto/NetAddr/IP/_splitplan.al
+install -m 444 NetAddr-IP/blib/lib/NetAddr/IP/InetBase.pm $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/NetAddr/IP/InetBase.pm
+install -m 444 NetAddr-IP/blib/lib/NetAddr/IP/UtilPP.pm $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/NetAddr/IP/UtilPP.pm
+install -m 444 NetAddr-IP/blib/lib/NetAddr/IP/Util.pm $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/NetAddr/IP/Util.pm
+install -m 444 NetAddr-IP/blib/lib/NetAddr/IP/Lite.pm $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/NetAddr/IP/Lite.pm
+install -m 444 NetAddr-IP/blib/lib/NetAddr/IP/Util_IS.pm $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/NetAddr/IP/Util_IS.pm
+install -m 444 NetAddr-IP/blib/lib/NetAddr/IP.pm $RPM_BUILD_ROOT%psadlibdir/%psadmoddir/NetAddr/IP.pm
 install -m 444 IPTables-Parse/blib/lib/IPTables/Parse.pm $RPM_BUILD_ROOT%psadlibdir/IPTables/Parse.pm
 install -m 444 IPTables-ChainMgr/blib/lib/IPTables/ChainMgr.pm $RPM_BUILD_ROOT%psadlibdir/IPTables/ChainMgr.pm
 cd ..
@@ -211,7 +272,6 @@ echo "    to define the internal network(s) attached to your machine."
 fi
 
 %preun
-#%_preun_service psad
 
 %files
 %defattr(-,root,root)
@@ -233,6 +293,7 @@ fi
 %config(noreplace) %_sysconfdir/%name/posf
 %config(noreplace) %_sysconfdir/%name/pf.os
 %config(noreplace) %_sysconfdir/%name/icmp_types
+%config(noreplace) %_sysconfdir/%name/icmp6_types
 
 %dir %_sysconfdir/%name/snort_rules
 %config(noreplace) %_sysconfdir/%name/snort_rules/*

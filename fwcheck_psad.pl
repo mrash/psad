@@ -38,9 +38,10 @@ my $config_file  = '/etc/psad/psad.conf';
 
 ### config hash
 my %config = ();
+my $override_config_str = '';
 
 ### commands hash
-my %cmds;
+my %cmds = ();
 
 ### fw search string array
 my @fw_search = ();
@@ -65,6 +66,7 @@ my $psad_lib_dir = '';
     'no-fw-search-all' => \$no_fw_search_all, # looking for specific log
                                               # prefixes
     'Lib-dir=s'   => \$psad_lib_dir,# Specify path to psad lib directory.
+    'Override-config=s' => \$override_config_str,
     'test-mode'   => \$test_mode,   # Used by the test suite.
     'help'        => \$help,        # Display help.
 ));
@@ -82,8 +84,13 @@ if ($fw_file) {
         unless -e $fw_file;
 }
 
+### import any override config files first
+&import_override_configs() if $override_config_str;
+
 ### import psad.conf
 &import_config($config_file);
+
+$enable_ipv6 = 1 if $config{'ENABLE_IPV6_DETECTION'} eq 'Y';
 
 ### import FW_MSG_SEARCH strings
 &import_fw_search($config_file);
@@ -474,6 +481,16 @@ sub send_mail() {
     return;
 }
 
+sub import_override_configs() {
+    my @override_configs = split /,/, $override_config_str;
+    for my $file (@override_configs) {
+        die "[*] Override config file $file does not exist"
+            unless -e $file;
+        &import_config($file);
+    }
+    return;
+}
+
 sub import_config() {
     my $conf_file = shift;
 
@@ -489,14 +506,13 @@ sub import_config() {
             my $val     = $2;
             if ($val =~ m|/.+| and $varname =~ /^\s*(\S+)Cmd$/) {
                 ### found a command
-                $cmds{$1} = $val;
+                $cmds{$1} = $val unless defined $cmds{$1};
             } else {
-                $config{$varname} = $val;
+                $config{$varname} = $val unless defined $config{$varname};
             }
         }
     }
 
-    $enable_ipv6 = 1 if $config{'ENABLE_IPV6_DETECTION'} eq 'Y';
     return;
 }
 

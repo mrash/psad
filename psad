@@ -8318,6 +8318,7 @@ sub fw_analyze_mode() {
         $opts .= " --fw-file $fw_file" if $fw_file;
         $opts .= " -L $lib_dir" if $lib_dir;
         $opts .= " --test-mode" if $test_mode;
+        $opts .= " -O $override_config_str" if $override_config_str;
         $opts .= " --no-fw-search-all" if $config{'FW_SEARCH_ALL'} eq 'N';
         $exit_status = (system "$cmds{'fwcheck_psad'} $opts") >> 8;
     }

@@ -3638,20 +3638,15 @@ sub import_fw_search() {
         }
     }
     unless (defined $config{'FW_SEARCH_ALL'}) {
-        &sys_log('defaulting missing ' .
-            "FW_SEARCH_ALL variable in $config_file to Y.");
         $config{'FW_SEARCH_ALL'} = 'Y';
     }
 
     unless ($config{'FW_SEARCH_ALL'} eq 'Y' or
             $config{'FW_SEARCH_ALL'} eq 'N') {
-        &sys_log('setting FW_SEARCH_ALL to Y.');
         $config{'FW_SEARCH_ALL'} = 'Y';
     }
 
     if ($config{'FW_SEARCH_ALL'} eq 'N' and not $found_fw_search) {
-        &sys_log('defaulting missing ' .
-            "FW_MSG_SEARCH variable in $config_file to DROP.");
         push @fw_search, 'DROP';
     }
     return;

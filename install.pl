@@ -270,8 +270,8 @@ close F;
 ### restore the original psad.conf file (this is just the local one in the
 ### sources directory).
 if (-e "${psad_conf_file}.orig") {
-    copy "${psad_conf_file}.orig", $psad_conf_file or die "[*] Could not ",
-        "copy $psad_conf_file.orig -> $psad_conf_file";
+    unlink $psad_conf_file if -e $psad_conf_file;
+    move "${psad_conf_file}.orig", $psad_conf_file;
 }
 
 exit 0;
@@ -1873,6 +1873,7 @@ sub query_syslog() {
 
 sub put_string() {
     my ($var, $value, $file) = @_;
+
     open RF, "< $file" or die "[*] Could not open $file: $!";
     my @lines = <RF>;
     close RF;

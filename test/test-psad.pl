@@ -60,6 +60,8 @@ my @tests_to_exclude = ();
 my $list_mode = 0;
 my $diff_mode = 0;
 my $saved_last_results = 0;
+my $test_system_install = 0;
+my $normal_root_override_str = '';
 my $PRINT_LEN = 68;
 my $REQUIRED = 1;
 my $OPTIONAL = 0;
@@ -72,23 +74,29 @@ my $help = 0;
 my @args_cp = @ARGV;
 
 exit 1 unless GetOptions(
-    'psad-path=s'       => \$psadCmd,
-    'test-include=s'    => \$test_include,
-    'include=s'         => \$test_include,  ### synonym
-    'test-exclude=s'    => \$test_exclude,
-    'exclude=s'         => \$test_exclude,  ### synonym
-    'List-mode'         => \$list_mode,
-    'diff'              => \$diff_mode,
-    'firewall-type=s'   => \$cmdline_fw_type,
-    'fw-type=s'         => \$cmdline_fw_type,  ### synonym
-    'help'              => \$help
+    'psad-path=s'         => \$psadCmd,
+    'test-include=s'      => \$test_include,
+    'include=s'           => \$test_include,  ### synonym
+    'test-exclude=s'      => \$test_exclude,
+    'exclude=s'           => \$test_exclude,  ### synonym
+    'List-mode'           => \$list_mode,
+    'diff'                => \$diff_mode,
+    'test-system-install' => \$test_system_install,
+    'firewall-type=s'     => \$cmdline_fw_type,
+    'fw-type=s'           => \$cmdline_fw_type,  ### synonym
+    'help'                => \$help
 );
 
 &usage() if $help;
 
 &set_fw_type();
 
-my $psad_def = "$psadCmd --test-mode --fw-type $fw_type";
+if ($test_system_install) {
+    $normal_root_override_str = "-O $conf_dir/normal_root_override.conf";
+    $psadCmd = '/usr/sbin/psad';
+}
+
+my $psad_def = "$psadCmd --test-mode --fw-type $fw_type $normal_root_override_str";
 
 my %test_keys = (
     'category'        => $REQUIRED,
@@ -120,7 +128,7 @@ my @tests = (
         'detail'   => '--help',
         'err_msg'  => 'could not get --help output',
         'function' => \&generic_exec,
-        'cmdline'  => "$psadCmd -h -c $default_conf",
+        'cmdline'  => "$psadCmd -h -c $default_conf $normal_root_override_str",
         'exec_err' => $NO,
         'fatal'    => $NO
     },

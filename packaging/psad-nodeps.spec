@@ -1,5 +1,5 @@
 %define name psad
-%define version 2.1.7
+%define version 2.2
 %define release 1
 %define psadlogdir /var/log/psad
 %define psadrundir /var/run/psad
@@ -10,7 +10,7 @@ Name: %name
 Version: %version
 Release: %release
 License: GPL
-Group: System/Servers
+Group: Applications/Internet
 Url: http://www.cipherdyne.org/psad/
 Source: %name-%version.tar.gz
 BuildRoot: %_tmppath/%{name}-buildroot
@@ -76,6 +76,7 @@ install -m 755 init-scripts/psad-init.redhat $RPM_BUILD_ROOT%_initrddir/psad
 install -m 644 psad.conf $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 signatures $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 icmp_types $RPM_BUILD_ROOT%_sysconfdir/%name/
+install -m 644 icmp6_types $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 ip_options $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 auto_dl $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 snort_rule_dl $RPM_BUILD_ROOT%_sysconfdir/%name/
@@ -151,8 +152,13 @@ fi
 %config(noreplace) %_sysconfdir/%name/posf
 %config(noreplace) %_sysconfdir/%name/pf.os
 %config(noreplace) %_sysconfdir/%name/icmp_types
+%config(noreplace) %_sysconfdir/%name/icmp6_types
 
 %changelog
+* Wed Apr 18 2012 Michael Rash <mbr@cipherdyne.org>
+- Update to use the NetAddr::IP module for all IP/subnet calculations
+- psad-2.2 release
+
 * Wed Jul 14 2010 Michael Rash <mbr@cipherdyne.org>
 - psad-2.1.7 release
 

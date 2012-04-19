@@ -51,6 +51,7 @@ char shCmd[MAX_GEN_LEN];
 char mailCmd[MAX_GEN_LEN];
 char alerting_methods[MAX_GEN_LEN];
 char psadCmd[MAX_PATH_LEN];
+char install_root[MAX_PATH_LEN];
 char psad_pid_file[MAX_PATH_LEN];
 char psad_cmdline_file[MAX_PATH_LEN];
 char psad_run_dir[MAX_PATH_LEN];
@@ -451,6 +452,7 @@ static void parse_config(char * file)
                 (*index != ';') && (index != NULL)) {
 
             find_char_var("HOSTNAME", hostname, index);
+            find_char_var("INSTALL_ROOT", install_root, index);
             find_char_var("PSAD_RUN_DIR", psad_run_dir, index);
             find_char_var("PSAD_PID_FILE", psad_pid_file, index);
             find_char_var("PSAD_CMDLINE_FILE", psad_cmdline_file, index);
@@ -514,6 +516,12 @@ static void expand_config_vars(void)
         if (has_sub_var("PSAD_RUN_DIR", psad_run_dir, sub_var,
                 pre_str, post_str)) {
             find_sub_var_value(psad_run_dir, sub_var, pre_str, post_str);
+            found_sub_var = 1;
+        }
+
+        if (has_sub_var("INSTALL_ROOT", install_root, sub_var,
+                pre_str, post_str)) {
+            find_sub_var_value(install_root, sub_var, pre_str, post_str);
             found_sub_var = 1;
         }
 
@@ -594,6 +602,9 @@ static void find_sub_var_value(char *value, char *sub_var, char *pre_str,
     } else if (strncmp(sub_var, "HOSTNAME", MAX_GEN_LEN) == 0) {
         strlcpy(sub_var, hostname, MAX_GEN_LEN);
         found_var = 1;
+    } else if (strncmp(sub_var, "INSTALL_ROOT", MAX_GEN_LEN) == 0) {
+        strlcpy(sub_var, install_root, MAX_GEN_LEN);
+        found_var = 1;
     } else if (strncmp(sub_var, "PSAD_RUN_DIR", MAX_GEN_LEN) == 0) {
         strlcpy(sub_var, psad_run_dir, MAX_GEN_LEN);
         found_var = 1;
@@ -666,8 +677,11 @@ static void check_config(void)
     else if (psad_run_dir[0] == '\0')
         fprintf(stderr, "[*] Could not find PSAD_RUN_DIR\n");
 
+    else if (install_root[0] == '\0')
+        fprintf(stderr, "[*] Could not find INSTALL_ROOT\n");
+
     else if (psad_pid_file[0] == '\0')
-        fprintf(stderr, "[*] Could not find PSAD_PID_DIR\n");
+        fprintf(stderr, "[*] Could not find PSAD_PID_FILE\n");
 
     else if (psad_cmdline_file[0] == '\0')
         fprintf(stderr, "[*] Could not find PSAD_CMDLINE_FILE\n");
@@ -722,6 +736,7 @@ static void clean_settings (void)
 
     *mail_addrs             = '\0';
     *hostname               = '\0';
+    *install_root           = '\0';
     *psad_run_dir           = '\0';
     *psad_pid_file          = '\0';
     *psad_cmdline_file      = '\0';
@@ -732,7 +747,6 @@ static void clean_settings (void)
     *kmsgsdCmd              = '\0';
     *psadCmd                = '\0';
     *alerting_methods       = '\0';
-    
     *data_input_mode        = '\0';
     *enable_syslog_file     = '\0';
 }
@@ -742,6 +756,7 @@ static void dump_config(void)
     fprintf(stderr, "[+] dump_config()\n");
     fprintf(stderr, "    EMAIL_ADDRESSES: %s\n", mail_addrs);
     fprintf(stderr, "    HOSTNAME: %s\n", hostname);
+    fprintf(stderr, "    INSTALL_ROOT: %s\n", install_root);
     fprintf(stderr, "    PSAD_RUN_DIR: %s\n", psad_run_dir);
     fprintf(stderr, "    PSAD_PID_FILE: %s\n", psad_pid_file);
     fprintf(stderr, "    PSAD_CMDLINE_FILE: %s\n", psad_cmdline_file);

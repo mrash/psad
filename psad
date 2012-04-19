@@ -432,6 +432,7 @@ my $cmdl_interface   = '';
 my $analyze_write_data = 0;
 my $local_ips_lkup_ctr = 0;
 my $num_hash_marks = 76;  ### for gnuplot output
+my $imported_syslog_module = 0;
 
 ### these flags are used to disable several features
 ### in psad if specified from the command line
@@ -3332,6 +3333,8 @@ sub import_perl_modules() {
     Unix::Syslog->import(qw(:subs :macros));
     Storable->import(qw(retrieve store)) if $store_file;
 
+    $imported_syslog_module = 1;
+
     return;
 }
 
@@ -3579,9 +3582,9 @@ sub validate_config() {
     if ($config{'ENABLE_AUTO_IDS'} eq 'Y'
             and $config{'IPTABLES_BLOCK_METHOD'} eq 'N'
             and $config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'N') {
-        &sys_log('config warning, ENABLE_AUTO_IDS=Y, but ' .
+        die 'config warning, ENABLE_AUTO_IDS=Y, but ' .
             'both IPTABLES_BLOCK_METHOD and TCPWRAPPERS_BLOCK_METHOD are ' .
-            'set to N.');
+            'set to N.';
     }
     if ($status_min_dl and $status_min_dl > 5) {
         die '[*] The --status-dl must be between 1 and 5.';
@@ -10320,6 +10323,8 @@ sub sys_log_mline() {
 ### write a message to syslog
 sub sys_log() {
     my $msg = shift;
+
+    return unless $imported_syslog_module;
     return if $no_syslog_alerts;
 
     ### this is an ugly hack to avoid the 'can't use string as subroutine'

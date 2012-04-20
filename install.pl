@@ -223,7 +223,10 @@ $ENV{'LC_ALL'} = $locale unless $no_locale;
 copy $psad_conf_file, "${psad_conf_file}.orig" or die "[*] Could not ",
     "copy $psad_conf_file -> $psad_conf_file.orig";
 
-$install_root = getcwd() . '/test/psad-install' if $install_test_dir;
+if ($install_test_dir) {
+    $install_root = getcwd() . '/test/psad-install';
+    $init_dir = $install_root . '/etc/init.d';
+}
 
 ### import paths from default psad.conf
 &import_config();
@@ -273,7 +276,7 @@ if ($os_type == $OS_LINUX) {
             $init_dir = '/etc/rc.d';
         } else {
             die "[*] Cannot find the init script directory, use ",
-                "--init-dir <path>";
+                "--init-dir <path>" unless $install_test_dir;
         }
     }
 }
@@ -614,7 +617,7 @@ sub install() {
         ### get email address(es)
         my $email_str = &query_email();
         if ($email_str) {
-            &put_string('EMAIL_ADDRESSES', $email_str,
+            &put_var('EMAIL_ADDRESSES', $email_str,
                 "$config{'PSAD_CONF_DIR'}/psad.conf");
         }
 
@@ -657,7 +660,7 @@ sub install() {
         ### see if the admin would like to have psad send info to
         ### DShield
         if (&query_dshield()) {
-            &put_string('ENABLE_DSHIELD_ALERTS', 'Y',
+            &put_var('ENABLE_DSHIELD_ALERTS', 'Y',
                 "$config{'PSAD_CONF_DIR'}/psad.conf");
         }
 
@@ -668,7 +671,7 @@ sub install() {
     }
 
     if ($install_syslog_fifo) {
-        &put_string('SYSLOG_DAEMON', $syslog_str,
+        &put_var('SYSLOG_DAEMON', $syslog_str,
             "$config{'PSAD_CONF_DIR'}/psad.conf");
 
         if ($syslog_str ne 'ulogd') {
@@ -841,11 +844,15 @@ sub import_config() {
         $USRSBIN_DIR = $config{'INSTALL_ROOT'} . $USRSBIN_DIR;
         $USRBIN_DIR  = $config{'INSTALL_ROOT'} . $USRBIN_DIR;
 
-        &put_string('INSTALL_ROOT', $install_root, $psad_conf_file);
+        &put_var('INSTALL_ROOT', $install_root, $psad_conf_file);
     }
 
     for my $dir ($install_root, $USRSBIN_DIR, $USRBIN_DIR) {
         &full_mkdir($dir, 0755) unless -d $dir;
+    }
+
+    if ($install_test_dir) {
+        &full_mkdir($init_dir, 0755) unless -d $init_dir;
     }
 
     ### resolve internal vars within variable values
@@ -1142,7 +1149,7 @@ sub set_home_net() {
 #    }
     ### if we make it here, then the admin wants to completely enumerate the
     ### HOME_NET var, so we have to disable ENABLE_INTF_LOCAL_NETS
-#    &put_string('ENABLE_INTF_LOCAL_NETS', 'N',
+#    &put_var('ENABLE_INTF_LOCAL_NETS', 'N',
 #        "$config{'PSAD_CONF_DIR'}/psad.conf");
 
     ### get all interfaces; even those that are down since they may
@@ -1221,7 +1228,7 @@ sub set_home_net() {
         }
     }
     $home_net_str =~ s/\,\s*$//;
-    &put_string('HOME_NET', $home_net_str, $file);
+    &put_var('HOME_NET', $home_net_str, $file);
     return;
 }
 
@@ -1848,7 +1855,7 @@ sub get_fw_search_strings() {
 
 
         ### we are only searching for specific iptables log prefixes
-        &put_string('FW_SEARCH_ALL', 'N',
+        &put_var('FW_SEARCH_ALL', 'N',
             "$config{'PSAD_CONF_DIR'}/psad.conf");
 
     my $str =
@@ -1994,7 +2001,7 @@ sub query_syslog() {
     return $ans;
 }
 
-sub put_string() {
+sub put_var() {
     my ($var, $value, $file) = @_;
 
     open RF, "< $file" or die "[*] Could not open $file: $!";

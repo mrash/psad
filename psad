@@ -20,7 +20,7 @@
 #
 # Credits: (see the CREDITS file bundled with the psad sources.)
 #
-# Version: 2.2
+# Version: 2.2-pre2
 #
 # Copyright (C) 1999-2012 Michael Rash (mbr@cipherdyne.org)
 #
@@ -143,8 +143,8 @@ use strict;
 
 ### ========================== main =================================
 
-### set the current psad version and file revision numbers
-my $version = '2.2';
+### set the current version
+my $version = '2.2-pre2';
 
 ### default config file for psad (can be changed with
 ### --config switch)
@@ -3326,6 +3326,7 @@ sub import_perl_modules() {
     require NetAddr::IP;
     require Date::Calc;
     require Unix::Syslog;
+    require Cwd;
     require Storable if $store_file;
 
     Date::Calc->import(qw(Timezone This_Year Decode_Month
@@ -9108,6 +9109,8 @@ sub import_ip_dirs() {
     closedir D;
 
     my $import_ctr = 0;
+
+    my $curr_pwd = getcwd();
     chdir $config{'PSAD_DIR'} or die $!;
 
     SRCIP: for my $src (@files) {
@@ -9273,6 +9276,8 @@ sub import_ip_dirs() {
         }
         $import_ctr++;
     }
+    chdir $curr_pwd or die $!;
+
     return;
 }
 
@@ -9540,12 +9545,14 @@ sub remove_old_scans() {
     my @files = readdir D;
     closedir D;
 
+    my $curr_pwd = getcwd();
     chdir $config{'PSAD_DIR'} or die $!;
     SRCIP: for my $src (@files) {
         next SRCIP unless ($src =~ /$ipv4_re/ and -d $src);
         rmtree $src or die
             "[*] Could not remove $config{'PSAD_DIR'}/$src: $!";
     }
+    chdir $curr_pwd or die $!;
     return;
 }
 
@@ -9635,6 +9642,8 @@ sub warn_handler() {
 }
 
 sub archive_data() {
+
+    my $curr_pwd = getcwd();
     chdir $config{'PSAD_DIR'} or die "[*] Could not chdir ",
         "$config{'PSAD_DIR'}: $!";
     unless (-d $config{'SCAN_DATA_ARCHIVE_DIR'}) {
@@ -9684,6 +9693,7 @@ sub archive_data() {
         &truncate_file($fwarchive) unless $config{'ENABLE_SYSLOG_FILE'} eq 'Y';
     }
     unless (-e $fwdata) {
+        chdir $curr_pwd or die $!;
         return;
     }
     open FW, "< $fwdata" or die "$fwdata exists but couldn't open it: $!";
@@ -9692,6 +9702,8 @@ sub archive_data() {
     open AR, ">> $fwarchive" or die "Could not open $fwarchive: $!";
     print AR $_ for @fwlines;
     close AR;
+
+    chdir $curr_pwd or die $!;
     return;
 }
 
@@ -10057,6 +10069,8 @@ sub truncate_file() {
 }
 
 sub disk_space_exceeded() {
+
+    my $curr_pwd = getcwd();
     my @df_data = @{&run_command($cmds{'df'}, $config{'PSAD_DIR'})};
     my ($prcnt) = ($df_data[$#df_data] =~ /(\d+)%/);
     my $rv = 0;
@@ -10126,6 +10140,7 @@ sub disk_space_exceeded() {
         ### the disk check interval was exceeded but the utilization is ok.
         $rm_data_ctr = 0;
     }
+    chdir $curr_pwd or die $!;
     return $rv;
 }
 
@@ -10392,6 +10407,7 @@ sub download_signatures() {
     ### for wget
     &check_commands({'sendmail'=>'', 'mail'=>''});
 
+    my $curr_pwd = getcwd();
     chdir '/tmp' or die $!;
 
     print "[+] Downloading latest signatures from:\n",
@@ -10411,6 +10427,8 @@ sub download_signatures() {
 "[+] New signature file $config{'SIGS_FILE'} has been put in\n",
 "    place. You can restart psad (or use 'psad -H') to import the\n",
 "    new sigs.\n";
+
+    chdir $curr_pwd or die $!;
 
     return 0;
 }
@@ -10446,7 +10464,6 @@ sub date_time() {
 sub archive_conf() {
     my $file = shift;
 
-    require Cwd;
     my $curr_pwd = getcwd();
     chdir $config{'CONF_ARCHIVE_DIR'} or die $!;
     my ($filename) = ($file =~ m|.*/(.*)|);

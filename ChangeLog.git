@@ -1,0 +1,1545 @@
+commit 3aebbbf63f85615acd72261d1c2cf7c6555ddedf (HEAD, refs/heads/psad-2.2, refs/heads/master)
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Apr 20 22:18:58 2012 -0400
+
+    bumped version to 2.2
+
+ VERSION |    2 +-
+ nf2csv  |    2 +-
+ psad    |    4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+commit ec89e6785fa7a34215eb99a13ae6eb0762a492dc
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Apr 20 22:17:03 2012 -0400
+
+    Added install.answers.example file to illustrate install.pl answers to be consumed by --Use-answers
+
+ install.answers.example |   16 ++++++++++++++++
+ 1 files changed, 16 insertions(+), 0 deletions(-)
+
+commit e575fc6a1dcf67bd2d6b41ed298e598c93dcce15
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Apr 20 22:06:29 2012 -0400
+
+    changelog and credits update
+
+ CREDITS   |    7 +++++
+ ChangeLog |   79 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 85 insertions(+), 1 deletions(-)
+
+commit f8a113efda883fc833077c975b11e20d878ae747
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Apr 20 21:58:38 2012 -0400
+
+    Added the ability to automatically get query answers from --answers-file
+    
+    By default the install.pl script records user answers to installation queries
+    so they can be used to install psad in an automated fashion later.  A new
+    option --Use-answers makes this possible.  This feature was requests by
+    @pyllyukko.
+
+ install.pl |  310 ++++++++++++++++++++++++++++++++++++++++++------------------
+ 1 files changed, 218 insertions(+), 92 deletions(-)
+
+commit e6cbaed40d97f543305fa8208beb3463d8b09c1f (tag: refs/tags/psad-2.2-pre2, refs/remotes/origin/master)
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Apr 19 21:59:43 2012 -0400
+
+    bumped version to psad-2.2-pre2
+
+ VERSION |    2 +-
+ nf2csv  |    2 +-
+ psad    |    4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+commit a74cfc930721172472328a20cd2475ae51d294df
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Apr 19 21:25:52 2012 -0400
+
+    removed psad-nobuildreqs.spec
+
+ packaging/psad-nobuildreqs.spec |  453 ---------------------------------------
+ 1 files changed, 0 insertions(+), 453 deletions(-)
+
+commit ba384e887aea2cf133267ce9bf774ee092c66a31
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Apr 19 21:25:07 2012 -0400
+
+    moved ChangeLog.old -> ChangeLog (the old style is much more readable)
+
+ ChangeLog     |19166 +++------------------------------------------------------
+ ChangeLog.old |  907 ---
+ 2 files changed, 824 insertions(+), 19249 deletions(-)
+
+commit ef9d2dbc60e1e41a6e37dcd09cd6a496051a4c4a
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Apr 19 21:21:52 2012 -0400
+
+    matched all chdir() calls with getcwd() for easier test suite support
+
+ psad |   21 +++++++++++++++++++--
+ 1 files changed, 19 insertions(+), 2 deletions(-)
+
+commit f2cf933eda42dbd38bdf4f5375b1303d01923fc7
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Apr 19 21:20:52 2012 -0400
+
+    added the psad-require-makemaker.spec file
+
+ packaging/psad-require-makemaker.spec |  454 +++++++++++++++++++++++++++++++++
+ 1 files changed, 454 insertions(+), 0 deletions(-)
+
+commit 8f4ab7e639929552f71d5668887360f953074b85
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Apr 19 21:13:58 2012 -0400
+
+    Removed the ExtUtils::MakeMaker build requirement
+    
+    Although building the psad RPM builds a set of perl modules which themselves
+    have the 'use ExtUtils::MakeMaker' requirement in their respective Makefile.PL
+    scripts, some Linux distributions don't seem to make it easy to install
+    ExtUtils::MakeMaker in a manner in which the local RPM install can see it.
+    And, at the same time, it usually is there since installing perl modules is
+    such a common operation.  The compromise is this solution, which will allow the
+    psad RPM to be built even if RPM dosen't or can't see that ExtUtils::MakeMaker
+    is installed - most likely it will build anyway.  If it doesn't, there are
+    bigger problems since psad is written in perl.  If you want to build the psad
+    RPM with a .spec file that requires ExtUtils::MakeMaker, then use the
+    "psad-require-makemaker.spec" file that is bundled in the psad sources.
+
+ packaging/psad.spec |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
+
+commit 943a5206e10c23974a9c7db54c54b4db41b1e971
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Apr 19 21:13:15 2012 -0400
+
+    update to install the init script in the test dir in --install-test-dir mode
+
+ install.pl |   27 +++++++++++++++++----------
+ 1 files changed, 17 insertions(+), 10 deletions(-)
+
+commit 5c3935a1785ffec107404eae2a06ed89ce82e92e
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Wed Apr 18 23:19:17 2012 -0400
+
+    added guard variable around syslog() calls
+
+ psad |    9 +++++++--
+ 1 files changed, 7 insertions(+), 2 deletions(-)
+
+commit 9ac1978c07e15f74fdb987dfadc87e26f2b316ce
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Wed Apr 18 23:18:56 2012 -0400
+
+    bug fix to expand INSTALL_ROOT variable from psad.conf
+
+ psadwatchd.c |   19 +++++++++++++++++--
+ 1 files changed, 17 insertions(+), 2 deletions(-)
+
+commit ed34b4c5e3ad36758f9409e6e347b9a21d85f6f1 (tag: refs/tags/psad-2.2-pre1)
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Apr 17 22:57:07 2012 -0400
+
+    bug fix to ensure that a pristine psad.conf file is preserved across --install-test-dir mode
+
+ install.pl |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
+
+commit 276f516b2d32d0d8a2683b2ccf7c955b461db539
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Apr 17 22:23:31 2012 -0400
+
+    Bug fix for undefined syslog routine
+    
+    Fixed a bug that caused psad to emit the following:
+    
+    Undefined subroutine &main::LOG_DAEMON called at ./psad line 10071.
+    
+    This problem was noticed by Robert and reported on the psad mailing list.
+
+ psad |    5 -----
+ 1 files changed, 0 insertions(+), 5 deletions(-)
+
+commit 7053ee80eab7a168da37e27a05bb3e1634b3e8f9
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Apr 17 20:44:16 2012 -0400
+
+    RPM spec files switched to NetAddr::IP installation
+
+ packaging/psad-nobuildreqs.spec |   89 ++++++++++++++++++++++++++++++++------
+ packaging/psad-nodeps.spec      |    4 +-
+ packaging/psad.spec             |   89 ++++++++++++++++++++++++++++++++------
+ 3 files changed, 153 insertions(+), 29 deletions(-)
+
+commit da7944b89db548ffcf59f5a71beee12c4a853062
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Apr 17 20:42:42 2012 -0400
+
+    --test-system-install to allow current system installation of psad to be tested through the test suite
+
+ test/test-psad.pl |  124 ++++++++++++++++++++++++++++-------------------------
+ 1 files changed, 66 insertions(+), 58 deletions(-)
+
+commit 459035b1173f2136db05adbc33d1d56cb6ab8207
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Apr 17 20:40:52 2012 -0400
+
+    override -O option for fwcheck_psad.pl
+
+ fwcheck_psad.pl                     |   24 ++++++++++++++++++++----
+ psad                                |    1 +
+ test/conf/normal_root_override.conf |    1 +
+ 3 files changed, 22 insertions(+), 4 deletions(-)
+
+commit 9d7bdc7f05d4bf0c83ffb721b71a5d923bbde312
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Apr 16 21:34:04 2012 -0400
+
+    update psad RPM spec files for the 2.2 release - more updates coming to properly handle the NetAddr::IP modules
+
+ packaging/psad-nobuildreqs.spec |    6 +++++-
+ packaging/psad-nodeps.spec      |    6 +++++-
+ packaging/psad.spec             |    6 +++++-
+ 3 files changed, 15 insertions(+), 3 deletions(-)
+
+commit debfeeb2c1d5ba37ebb599a9bbab651f827dcc2c
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Apr 16 21:27:08 2012 -0400
+
+    version 2.2 nearly ready - bumped version numbers
+
+ VERSION |    2 +-
+ nf2csv  |    2 +-
+ psad    |    4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+commit 50e6a651fe6f59b95ec5543ff0d65703a36c6ec6
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Apr 16 21:17:50 2012 -0400
+
+    added signatures file that excludes the MS SQL connect signature
+
+ test/conf/signatures_no_ms_sql_server_sig |  344 +++++++++++++++++++++++++++++
+ 1 files changed, 344 insertions(+), 0 deletions(-)
+
+commit 11fadd4fce1b7e3e08dd352f4eea07104d8da633
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Apr 10 08:40:41 2012 -0400
+
+    updated test config files to not require the 'mail' binary
+
+ test/conf/default_psad.conf                      |    2 +-
+ test/conf/disable_ipv6_detection.conf            |    2 +-
+ test/conf/enable_ack_detection.conf              |    2 +-
+ test/conf/ignore_tcp.conf                        |    2 +-
+ test/conf/ignore_udp.conf                        |    2 +-
+ test/conf/require_DROP_syslog_prefix_str.conf    |    2 +-
+ test/conf/require_missing_syslog_prefix_str.conf |    2 +-
+ 7 files changed, 7 insertions(+), 7 deletions(-)
+
+commit 10e1418f3af872f706cffe0410098fa2ee428514
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Mar 24 20:34:56 2012 -0400
+
+    Minor compiler warning bug fix for OpenBSD systems.
+    
+    Compiling psad *.c files on OpenBSD issued the following warning before this fix:
+    
+    /usr/bin/gcc -Wall -O psadwatchd.c psad_funcs.c strlcpy.c strlcat.c -o psadwatchd
+    psad_funcs.c: In function 'send_alert_email':
+    psad_funcs.c:325: warning: missing sentinel in function call
+
+ psad_funcs.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit 029059cc3e1a6f7b175f614a51fad8add907ad1d
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Mar 24 10:08:48 2012 -0400
+
+    added IPv6 exclusion test for Snort MS SQl Server communication attempt signature
+
+ test/test-psad.pl |   64 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 64 insertions(+), 0 deletions(-)
+
+commit 43548225246f3cbb2ae910899f419af22b345a31
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Mar 24 09:25:00 2012 -0400
+
+    added Snort sig tests for MS SQL Server communication attempt
+
+ test/scans/iptables/ipv6_ms_sql_server_sig_match |    1 +
+ test/scans/iptables/ms_sql_server_sig_match      |    2 ++
+ 2 files changed, 3 insertions(+), 0 deletions(-)
+
+commit 87a8f3f58c5119e0a2fe789da112fc4388b57784
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Mar 23 22:06:44 2012 -0400
+
+    IPv4 allow valid echo request
+
+ test/scans/iptables/invalid_icmp_type_code |    1 -
+ test/scans/iptables/ipv4_valid_ping        |    5 +++++
+ test/test-psad.pl                          |   16 ++++++++++++++++
+ 3 files changed, 21 insertions(+), 1 deletions(-)
+
+commit bc993a402f4f7944433c3a1e18e1f2ccf8ccddb8
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Mar 23 22:00:23 2012 -0400
+
+    minor hostname update minastirith -> linux
+
+ test/scans/iptables/ack_scan_1000_1150             |  604 +++---
+ test/scans/iptables/fin_scan_1000_1150             |  604 +++---
+ test/scans/iptables/invalid_icmp_type_code         |   10 +-
+ test/scans/iptables/ipv6_invalid_icmp6_type_code   |    4 +-
+ test/scans/iptables/ipv6_ping_scan                 |    4 +-
+ .../iptables/ipv6_tcp_connect_nmap_default_scan    | 2018 ++++++++++----------
+ test/scans/iptables/null_scan_1000_1150            |  606 +++---
+ test/scans/iptables/syn_scan_1000_1500             | 2004 ++++++++++----------
+ test/scans/iptables/udp_scan_1000_1150             |  604 +++---
+ test/scans/iptables/xmas_scan_1000_1150            |  604 +++---
+ 10 files changed, 3531 insertions(+), 3531 deletions(-)
+
+commit b27fe06d1f159d378ae9192134425d24c087eb20
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Mar 23 21:58:19 2012 -0400
+
+    added IPv4 ICMP type/code validation test
+
+ test/scans/iptables/invalid_icmp_type_code |    6 ++++++
+ test/test-psad.pl                          |   15 +++++++++++++++
+ 2 files changed, 21 insertions(+), 0 deletions(-)
+
+commit 1a2761fdded6d655ec5575b006e5831ba8fb2345
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Mar 23 21:09:38 2012 -0400
+
+    ICMP6 type/code validation test, perl warnings test
+
+ test/test-psad.pl |   46 ++++++++++++++++++++++++++++++++++++++++++++--
+ 1 files changed, 44 insertions(+), 2 deletions(-)
+
+commit 1c13664bc95dcb26eb1dff09898937ab89e91b0f
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Mar 23 21:08:59 2012 -0400
+
+    added ipv6_invalid_icmp6_type_code file for test suite support for ICMP6 type/code validation
+
+ test/scans/iptables/ipv6_invalid_icmp6_type_code |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+commit a2233ee4f785216b8d418b7aa2368cb8e1699805
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Mar 23 21:07:41 2012 -0400
+
+    bugfix for uninitialized variable in ICMP6 validation reporting
+
+ psad |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
+
+commit 7cedff04cc7cfd048c55e8077daa93be1dd3ed1f
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Mar 22 23:00:00 2012 -0400
+
+    validate ICMP6 type+code fields
+
+ icmp6_types                                      |   99 ++++++++++++++++++
+ icmp_types                                       |   12 +--
+ install.pl                                       |    3 +-
+ psad                                             |  119 +++++++++++++++-------
+ psad.conf                                        |    1 +
+ test/conf/default_psad.conf                      |    1 +
+ test/conf/disable_ipv6_detection.conf            |    1 +
+ test/conf/enable_ack_detection.conf              |    1 +
+ test/conf/ignore_tcp.conf                        |    1 +
+ test/conf/ignore_udp.conf                        |    1 +
+ test/conf/require_DROP_syslog_prefix_str.conf    |    1 +
+ test/conf/require_missing_syslog_prefix_str.conf |    1 +
+ test/test-psad.pl                                |   15 +++
+ 13 files changed, 208 insertions(+), 48 deletions(-)
+
+commit 6616c6c18bf27288fa38c566b8e90bf07a6ddda5
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Mar 22 20:41:08 2012 -0400
+
+    copy original psad.conf before install and restore at conclusion
+
+ install.pl |   14 +++++++++++++-
+ 1 files changed, 13 insertions(+), 1 deletions(-)
+
+commit 124800928e77515ad72f498092741ea36925da68
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Mar 22 20:27:37 2012 -0400
+
+    move icmp validation code out of Snort rules comparision
+    
+    For better performance and correctness, moved icmp type/code validation code out
+    of Snort rule comparision routine.  Added icmp validation output to --Analyze
+    mode output.  Disabled DNS lookups in -A mode by default, but added --dns-analysis
+    command line arg to provide an override.
+
+ psad |  132 ++++++++++++++++++++++++++++++++++++++++++++++--------------------
+ 1 files changed, 92 insertions(+), 40 deletions(-)
+
+commit 38f010ecb5f8fe0dbd1e8950d1fe9ca2c29ea6e6
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Mar 22 20:26:53 2012 -0400
+
+    added --install-root and --install-test-dir options to --help output
+
+ install.pl |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
+
+commit 378337cc7e64276355461cf10fd32f3ec28f5a4d
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Mar 20 21:15:38 2012 -0400
+
+    added the ability to read iptables packet data from a file with -m in --Benchmark mode
+
+ psad |   60 +++++++++++++++++++++++++++++++++++++++++++-----------------
+ 1 files changed, 43 insertions(+), 17 deletions(-)
+
+commit b0ac5832235bf1738a4d97c769f68ec130354da3
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sun Mar 18 13:43:48 2012 -0400
+
+    added IPv6 abbreviated format test
+
+ test/test-psad.pl |   20 +++++++++++++++++---
+ 1 files changed, 17 insertions(+), 3 deletions(-)
+
+commit cf227a90e3939a089606bd3dafb38c4d2ea141ee
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sun Mar 18 13:32:13 2012 -0400
+
+    bugfix to honor audo_dl lines with IPv6 addresses
+
+ psad |  217 ++++++++++++++++++++++++++++++++++--------------------------------
+ 1 files changed, 112 insertions(+), 105 deletions(-)
+
+commit fae72b9b60cac8597b321f5aa780c839310a8c24
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Mar 17 22:00:09 2012 -0400
+
+    added --test-mode so that fw check emails are not sent, debug is enabled, and is_local() always returns false
+
+ fwcheck_psad.pl   |   11 +++++--
+ psad              |   13 ++++++++-
+ test/test-psad.pl |   78 +++++++++++++++++++++++++++++++---------------------
+ 3 files changed, 66 insertions(+), 36 deletions(-)
+
+commit d485571ebeef8f2354d6747684f611ff34765d29
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Mar 17 15:50:00 2012 -0400
+
+    added --test-mode so that fw check emails are not sent, debug is enabled, and is_local() always returns false
+
+ test/conf/auto_dl_ignore_ipv6_addr        |   26 ++++++++++++++++++++++++++
+ test/conf/auto_dl_ignore_ipv6_addr_abbrev |   26 ++++++++++++++++++++++++++
+ 2 files changed, 52 insertions(+), 0 deletions(-)
+
+commit 964907c2737b0bb36e7334d3567b9635f5324221
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Mar 17 15:48:55 2012 -0400
+
+    added enable_ack_detection.conf file
+
+ test/conf/enable_ack_detection.conf |  571 +++++++++++++++++++++++++++++++++++
+ 1 files changed, 571 insertions(+), 0 deletions(-)
+
+commit 94da8903bed66bc5a89253ce4cedd54218291771
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Mar 17 14:11:30 2012 -0400
+
+    added IPv6 TCP connect() test
+
+ test/conf/disable_ipv6_detection.conf              |  571 +++++++++++
+ test/scans/iptables/ipv6_ping_scan                 |    2 +
+ .../iptables/ipv6_tcp_connect_nmap_default_scan    | 1009 ++++++++++++++++++++
+ test/test-psad.pl                                  |   31 +
+ 4 files changed, 1613 insertions(+), 0 deletions(-)
+
+commit 327d6a9c932fe5323ee40476a0cb10e6e0d728a1
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Mar 17 14:00:07 2012 -0400
+
+    added TCP NULL scan test
+
+ test/test-psad.pl |   18 +++++++++++++++++-
+ 1 files changed, 17 insertions(+), 1 deletions(-)
+
+commit 7370f4a5f536cd67569f4ac67461140fe2042162
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Mar 16 21:31:01 2012 -0400
+
+    added NULL scan test
+
+ test/scans/iptables/null_scan_1000_1150 |  303 +++++++++++++++++++++++++++++++
+ 1 files changed, 303 insertions(+), 0 deletions(-)
+
+commit e1a8aac2430ae6d9a97cd7cb8a912a9ba88900da
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Mar 16 21:12:01 2012 -0400
+
+    added FIN, XMAS, and ACK scan tests
+
+ test/scans/iptables/ack_scan_1000_1150  |  302 +++++++++++++++++++++++++++++++
+ test/scans/iptables/fin_scan_1000_1150  |  302 +++++++++++++++++++++++++++++++
+ test/scans/iptables/xmas_scan_1000_1150 |  302 +++++++++++++++++++++++++++++++
+ test/test-psad.pl                       |   52 ++++++
+ 4 files changed, 958 insertions(+), 0 deletions(-)
+
+commit 5704b0fdac5e2da9908a57d1b714459a25593e08
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Mar 15 20:44:20 2012 -0400
+
+    bugfix in psad to honor IGNORE_PROTOCOLS keyword (found by corresponding tests)
+
+ psad                                             |    4 +
+ test/conf/auto_dl_5_192.168.10.0_24              |   26 +
+ test/conf/auto_dl_5_192.168.10.0_24_tcp          |   26 +
+ test/conf/auto_dl_5_192.168.10.0_24_udp          |   26 +
+ test/conf/auto_dl_ignore_192.168.10.0_24         |   26 +
+ test/conf/ignore_tcp.conf                        |  571 ++++++++++++++++++++++
+ test/conf/ignore_udp.conf                        |  571 ++++++++++++++++++++++
+ test/conf/require_DROP_syslog_prefix_str.conf    |  571 ++++++++++++++++++++++
+ test/conf/require_missing_syslog_prefix_str.conf |  571 ++++++++++++++++++++++
+ test/test-psad.pl                                |  212 ++++++++-
+ 10 files changed, 2592 insertions(+), 12 deletions(-)
+
+commit 79dc2eddaf99a571438a1e394d94e1f7b70c6101
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Mar 15 20:41:40 2012 -0400
+
+    updated to remove kmsgsd discussion since kmsgsd is basically deprecated at this point
+
+ README |   38 +++++++++++++++++++++-----------------
+ 1 files changed, 21 insertions(+), 17 deletions(-)
+
+commit c15b0e845af8c07935fbbf23bb547bdd8f695d53
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Mar 13 21:43:37 2012 -0400
+
+    minor config file comment typo fixes
+
+ psad.conf                   |    2 +-
+ test/conf/default_psad.conf |    6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+commit 046a6a4a26ed90ddf35067141f00a500a98e1912
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Mar 13 21:23:44 2012 -0400
+
+    minor comment typo fixes
+
+ psad.conf |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+commit 43545f1f2dc0afd3ab34440d0433ff4dab375e50
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Mar 13 21:17:02 2012 -0400
+
+    added auto_dl 5 tests
+
+ test/conf/auto_dl_5_192.168.10.55 |   26 ++++++++++++++++++++++++++
+ test/test-psad.pl                 |   31 +++++++++++++++++++++++++++++++
+ 2 files changed, 57 insertions(+), 0 deletions(-)
+
+commit be04d45b62b014f260dc8af04724fb204bd2edae
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Mar 13 20:43:12 2012 -0400
+
+    added SYN scan and UDP scan tests
+
+ test/conf/auto_dl_ignore_192.168.10.55 |   26 ++++++++++++
+ test/test-psad.pl                      |   68 ++++++++++++++++++++++++++++++-
+ 2 files changed, 91 insertions(+), 3 deletions(-)
+
+commit 0d3d38da3242ed9103ee79c41057225ea71f8e8e
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Mar 13 20:38:41 2012 -0400
+
+    updated default INSTALL_ROOT path to the test/ directory install path test/psad-install
+
+ test/conf/default_psad.conf |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit dd815b83202cd6e8e3b11f96e513f00b3861c717
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Mar 13 20:37:44 2012 -0400
+
+    bugfix in variable expansion routine to ensure expansion of multiple sub-vars
+
+ fwcheck_psad.pl |   45 ++++++++++++++++++++++++++++++---------------
+ 1 files changed, 30 insertions(+), 15 deletions(-)
+
+commit 17234b9fc572fec4f7d66e5943d67bd611fae6df
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Mar 12 21:34:03 2012 -0400
+
+    Added the ability to install at custom location
+    
+    This commit adds the ability to install psad at a custom location via the
+    --install-root <root> command line argument to install.pl.  This feature
+    was suggested by @pyllyukko.  In addition, psad can be installed by a
+    normal user instead requiring root.
+
+ install.pl                  |  162 +++++++++++++++++++++++++++++-------------
+ psad                        |   37 ++++++++---
+ psad.conf                   |   21 +++---
+ test/conf/default_psad.conf |   21 +++---
+ 4 files changed, 162 insertions(+), 79 deletions(-)
+
+commit d5f272bdce11cd4163bcd241d760c20d6b5385fb
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sun Mar 11 22:41:17 2012 -0400
+
+    additional basic operations tests, next up: scan tests
+
+ test/test-psad.pl |   94 ++++++++++++++++++++++++++++++++++++++++++++++++----
+ 1 files changed, 86 insertions(+), 8 deletions(-)
+
+commit 575a060402b3e8767179f44c03220be9b4193403
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sun Mar 11 22:38:55 2012 -0400
+
+    added test suite scans/ directory
+
+ test/scans/iptables/syn_scan_1000_1500 | 1002 ++++++++++++++++++++++++++++++++
+ test/scans/iptables/udp_scan_1000_1150 |  302 ++++++++++
+ 2 files changed, 1304 insertions(+), 0 deletions(-)
+
+commit 3cdbe8bd642338a2370e323357c428795b93c464
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Mar 10 21:40:04 2012 -0500
+
+    added test suite via the test/ directory
+
+ test/conf/default_psad.conf |  570 +++++++++++++++++++++++++++++++++++++++++++
+ test/test-psad.pl           |  406 ++++++++++++++++++++++++++++++
+ 2 files changed, 976 insertions(+), 0 deletions(-)
+
+commit 5f525b0fee4f2e67e9b57e06d469c8e77482cf51
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Mar 10 20:44:46 2012 -0500
+
+    bug fix to ensure the psadfifo file is not created unless  is true
+
+ install.pl |   33 ++++++++++++++++++---------------
+ 1 files changed, 18 insertions(+), 15 deletions(-)
+
+commit 191a7fdc1e643c36b49fddd2de6a27daf66b1b91
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Mar 9 21:36:43 2012 -0500
+
+    added PERL5LIB env variable so module installs can reference the current install path, minor 'die' statement update to remove newlines
+
+ INSTALL    |   13 ++++++-------
+ install.pl |   48 ++++++++++++++++++++++++++++++------------------
+ 2 files changed, 36 insertions(+), 25 deletions(-)
+
+commit 67102df177c89750a7c164dd5d2c51492f79e0a1
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Mar 8 21:44:12 2012 -0500
+
+    added support for ip6tables policy default log and drop rule detection
+
+ fwcheck_psad.pl |   59 +++++++++++++++++++++++++++++++++---------------------
+ 1 files changed, 36 insertions(+), 23 deletions(-)
+
+commit 42c04b5b80740914ab070521047d29597e69908b
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Mar 8 21:40:43 2012 -0500
+
+    updated to IPTables::ChainMgr 1.2 and IPTables::Parse 1.1
+
+ deps/IPTables-ChainMgr/Changes                  |   53 +++
+ deps/IPTables-ChainMgr/MANIFEST                 |    1 +
+ deps/IPTables-ChainMgr/Makefile.PL              |    2 +-
+ deps/IPTables-ChainMgr/README                   |    4 +-
+ deps/IPTables-ChainMgr/VERSION                  |    2 +-
+ deps/IPTables-ChainMgr/lib/IPTables/ChainMgr.pm |  387 +++++++++++++++++------
+ deps/IPTables-Parse/Changes                     |   32 ++
+ deps/IPTables-Parse/MANIFEST                    |    1 +
+ deps/IPTables-Parse/README                      |    4 +-
+ deps/IPTables-Parse/VERSION                     |    2 +-
+ deps/IPTables-Parse/lib/IPTables/Parse.pm       |  273 ++++++++++------
+ 11 files changed, 549 insertions(+), 212 deletions(-)
+
+commit caa93021fda862cbb47d2767c2db312a8d591382
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Mar 8 21:39:09 2012 -0500
+
+    updated to IPTables::ChainMgr 1.2 and IPTables::Parse 1.1
+
+ deps/IPTables-ChainMgr/META.json        |   42 +++
+ deps/IPTables-ChainMgr/META.yml         |   23 ++
+ deps/IPTables-ChainMgr/t/basic_tests.pl |  465 +++++++++++++++++++++++++++++++
+ deps/IPTables-Parse/META.json           |   39 +++
+ deps/IPTables-Parse/META.yml            |   21 ++
+ deps/IPTables-Parse/t/basic_tests.pl    |  247 ++++++++++++++++
+ 6 files changed, 837 insertions(+), 0 deletions(-)
+
+commit 996646c2a427f7bfc28d71ca9f85794e796c4ba5
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Feb 20 20:57:02 2012 -0500
+
+    fix 'qw(...) usage as parenthesis' warnings for perl > 5.14
+
+ fwcheck_psad.pl |   24 +++++++++++++-----------
+ install.pl      |   14 +++++++-------
+ 2 files changed, 20 insertions(+), 18 deletions(-)
+
+commit abe482426d9f80cac6dcfdfc0fb3b2d16b7f5fee
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Feb 20 20:54:23 2012 -0500
+
+    minor comment updates (header material)
+
+ psad |   32 ++++++++++++++++----------------
+ 1 files changed, 16 insertions(+), 16 deletions(-)
+
+commit e1ccd2a9567e271891cf2c9d5e5a9c91f3240bc1
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Feb 10 11:37:43 2012 -0500
+
+    updated Unix::Syslog to 1.1 from CPAN
+
+ deps/Unix-Syslog/Artistic    |  284 ++++++++++++++++++++++++++----------------
+ deps/Unix-Syslog/Changes     |   20 +++
+ deps/Unix-Syslog/MANIFEST    |    1 +
+ deps/Unix-Syslog/Makefile.PL |    3 +
+ deps/Unix-Syslog/README      |   22 +++-
+ deps/Unix-Syslog/Syslog.pm   |   13 +-
+ deps/Unix-Syslog/Syslog.xs   |   14 ++-
+ deps/Unix-Syslog/VERSION     |    2 +-
+ deps/Unix-Syslog/test.pl     |    4 +
+ 9 files changed, 237 insertions(+), 126 deletions(-)
+
+commit e013ca6230a6210ac6e405da08df370fb4818831
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Jan 14 14:11:05 2012 -0500
+
+    fix 'qw(...) usage as parenthesis' warnings for perl > 5.14
+
+ psad |   40 ++++++++++++++++++++--------------------
+ 1 files changed, 20 insertions(+), 20 deletions(-)
+
+commit 908c9e55574a553910359768baa80e3102c80fb0
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Dec 23 16:33:05 2011 -0500
+
+    added ip6tables policy dump to --fw-dump mode
+
+ psad      |   34 ++++++++++++++++++++++++++++++++++
+ psad.conf |    1 +
+ 2 files changed, 35 insertions(+), 0 deletions(-)
+
+commit 32a650b58497b0a584ac86c22b157179c7dca36c (tag: refs/tags/psad-3.0-pre1)
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Dec 13 21:51:22 2011 -0500
+
+    bumped version to 3.0-pre1
+
+ VERSION |    2 +-
+ nf2csv  |    2 +-
+ psad    |    4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+commit b3d38e7247c602ca8b93d8e499282d3773883579
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Dec 13 21:49:50 2011 -0500
+
+    bug fix to parse iptables syslog date into a proper numeric time
+
+ psad |   36 +++++++++++++++++++++++++++++++++---
+ 1 files changed, 33 insertions(+), 3 deletions(-)
+
+commit d41c705523321fbbb6bca8fa8e1aae8ee220d9ca
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Dec 13 20:28:46 2011 -0500
+
+    minor bug fix to call older passive OS fingerprinting routine for non-IPv6 packets
+
+ psad |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
+
+commit e6e1a5ca7d9af6aff7554a0db46bf61c1cd511f9
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Dec 12 21:00:39 2011 -0500
+
+    interim commit to maintain better separation between IPv4 and IPv6 passive OS fingerprinting code
+
+ psad |  124 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------
+ 1 files changed, 107 insertions(+), 17 deletions(-)
+
+commit 5d8329af7577f2780d100f75ef6c886e3f0ebdf4
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Dec 10 14:49:21 2011 -0500
+
+    Added MAX_SCAN_IP_PAIRS
+    
+    Thic commit allows psad memory usage to be constrained by restricting the
+    number of unique IP pairs that psad tracks via a new config variable
+    MAX_SCAN_IP_PAIRS.  This is useful for when psad is deployed on systems with
+    little memory, and is best utilized in conjunction with disabling
+    ENABLE_PERSISTENCE so that old scans will also be deleted (and thereby making
+    room for tracking new scans under the MAX_SCAN_IP_PAIRS threshold).
+
+ psad      |   42 ++++++++++++++++++++++++++++++++++++++----
+ psad.conf |   11 ++++++++++-
+ 2 files changed, 48 insertions(+), 5 deletions(-)
+
+commit 2d78332f9c36ccf846a900d7862234d7eb7be6e2
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Dec 10 12:53:23 2011 -0500
+
+    reworked how old scans are deleted, and added a new PERSISTENCE_CTR_THRESHOLD variable to control this
+
+ psad      |   47 +++++++++++++++++++++++++++++++++++------------
+ psad.conf |    7 +++++++
+ 2 files changed, 42 insertions(+), 12 deletions(-)
+
+commit 04a0fe997e4097ac635fb6bd8a2dedc37b2d1280
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Dec 10 10:37:25 2011 -0500
+
+    update to not collect err packets in --no-ipt-errors mode
+
+ psad |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit cc796fd8c3cd2f42d7ceb202c9b62c52c036c663 (refs/heads/psad_netaddr_ip_module_integration)
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Dec 9 15:40:26 2011 -0500
+
+    Completed conversion to NetAddr::IP module
+    
+    This commit completes the conversion to the NetAddr::IP module for all IP
+    address comparisions.  Also re-worked Snort keyword matching to maximize
+    performance.
+
+ deps/IPTables-ChainMgr/lib/IPTables/ChainMgr.pm |   12 +-
+ deps/README                                     |    2 +-
+ install.pl                                      |    4 +-
+ psad                                            |  381 ++++++++++++++---------
+ 4 files changed, 236 insertions(+), 163 deletions(-)
+
+commit bc5bcf7dc4d9cc41e2d43a429985b923902cbd07 (refs/heads/pre_netaddr_integration)
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Dec 5 20:52:15 2011 -0500
+
+    added the deps/NetAddr-IP directory
+
+ deps/NetAddr-IP/Artistic                           |  131 +
+ deps/NetAddr-IP/Changes                            |  464 ++
+ deps/NetAddr-IP/Copying                            |  339 +
+ deps/NetAddr-IP/IP.pm                              | 1572 ++++
+ deps/NetAddr-IP/Lite/Changes                       |  373 +
+ deps/NetAddr-IP/Lite/Lite.pm                       | 1583 ++++
+ deps/NetAddr-IP/Lite/MANIFEST                      |  126 +
+ deps/NetAddr-IP/Lite/MANIFEST.SKIP                 |   31 +
+ deps/NetAddr-IP/Lite/META.yml                      |   10 +
+ deps/NetAddr-IP/Lite/Makefile.PL                   |   42 +
+ deps/NetAddr-IP/Lite/README                        |  510 ++
+ deps/NetAddr-IP/Lite/Util/Changes                  |  255 +
+ deps/NetAddr-IP/Lite/Util/MANIFEST                 |   53 +
+ deps/NetAddr-IP/Lite/Util/MANIFEST.SKIP            |   31 +
+ deps/NetAddr-IP/Lite/Util/Makefile.PL              |  235 +
+ deps/NetAddr-IP/Lite/Util/README                   |  605 ++
+ deps/NetAddr-IP/Lite/Util/Util.pm                  |  968 +++
+ deps/NetAddr-IP/Lite/Util/Util.xs                  |  801 ++
+ deps/NetAddr-IP/Lite/Util/config.h.in              |  127 +
+ deps/NetAddr-IP/Lite/Util/configure                | 7799 ++++++++++++++++++++
+ deps/NetAddr-IP/Lite/Util/configure.ac             |   54 +
+ .../Lite/Util/lib/NetAddr/IP/InetBase.pm           |  791 ++
+ deps/NetAddr-IP/Lite/Util/lib/NetAddr/IP/UtilPP.pm |  722 ++
+ deps/NetAddr-IP/Lite/Util/localconf.h              |   80 +
+ deps/NetAddr-IP/Lite/Util/t/4to6.t                 |   69 +
+ deps/NetAddr-IP/Lite/Util/t/add128.t               |   92 +
+ deps/NetAddr-IP/Lite/Util/t/addconst.t             |   77 +
+ deps/NetAddr-IP/Lite/Util/t/af_inet6.t             |   46 +
+ deps/NetAddr-IP/Lite/Util/t/anyto6.t               |   86 +
+ deps/NetAddr-IP/Lite/Util/t/badd.t                 |   69 +
+ deps/NetAddr-IP/Lite/Util/t/bcd2bin.t              |   68 +
+ deps/NetAddr-IP/Lite/Util/t/bcdn2bin.t             |   73 +
+ deps/NetAddr-IP/Lite/Util/t/bin.t                  |  111 +
+ deps/NetAddr-IP/Lite/Util/t/binet_n2ad.t           |   49 +
+ deps/NetAddr-IP/Lite/Util/t/binet_n2dx.t           |   50 +
+ deps/NetAddr-IP/Lite/Util/t/binet_ntoa.t           |   66 +
+ deps/NetAddr-IP/Lite/Util/t/binet_pton.t           |   96 +
+ deps/NetAddr-IP/Lite/Util/t/bipv4_inet.t           |   59 +
+ deps/NetAddr-IP/Lite/Util/t/bipv6_any2n.t          |   48 +
+ deps/NetAddr-IP/Lite/Util/t/bipv6func.t            |   76 +
+ deps/NetAddr-IP/Lite/Util/t/bisIPv4.t              |  187 +
+ deps/NetAddr-IP/Lite/Util/t/bpackzeros.t           |   52 +
+ deps/NetAddr-IP/Lite/Util/t/comp128.t              |   48 +
+ deps/NetAddr-IP/Lite/Util/t/croak.t                |  168 +
+ deps/NetAddr-IP/Lite/Util/t/hasbits.t              |  147 +
+ deps/NetAddr-IP/Lite/Util/t/inet_4map6.t           |   70 +
+ deps/NetAddr-IP/Lite/Util/t/inet_n2ad.t            |   48 +
+ deps/NetAddr-IP/Lite/Util/t/inet_n2dx.t            |   50 +
+ deps/NetAddr-IP/Lite/Util/t/inet_pton.t            |   96 +
+ deps/NetAddr-IP/Lite/Util/t/ipv4_inet.t            |   59 +
+ deps/NetAddr-IP/Lite/Util/t/ipv6_any2n.t           |   47 +
+ deps/NetAddr-IP/Lite/Util/t/ipv6_ntoa.t            |   66 +
+ deps/NetAddr-IP/Lite/Util/t/ipv6func.t             |   75 +
+ deps/NetAddr-IP/Lite/Util/t/ipv6to4.t              |   55 +
+ deps/NetAddr-IP/Lite/Util/t/isIPv4.t               |  186 +
+ deps/NetAddr-IP/Lite/Util/t/leftshift.t            |   58 +
+ deps/NetAddr-IP/Lite/Util/t/mode.t                 |   26 +
+ deps/NetAddr-IP/Lite/Util/t/naip_gethostbyname.t   |   59 +
+ .../Lite/Util/t/no6_naip_gethostbyname.t           |   58 +
+ deps/NetAddr-IP/Lite/Util/t/notcontiguous.t        |   72 +
+ deps/NetAddr-IP/Lite/Util/t/packzeros.t            |   53 +
+ deps/NetAddr-IP/Lite/Util/t/simple_pack.t          |   51 +
+ deps/NetAddr-IP/Lite/Util/t/sub128.t               |   68 +
+ .../Lite/Util/tlib/NetAddr/IP/Util_IS.pm           |   51 +
+ deps/NetAddr-IP/Lite/Util/typemap                  |   28 +
+ deps/NetAddr-IP/Lite/bug2742981                    |   96 +
+ deps/NetAddr-IP/Lite/t/addr.t                      |   36 +
+ deps/NetAddr-IP/Lite/t/aton.t                      |   33 +
+ deps/NetAddr-IP/Lite/t/bigint.t                    |  170 +
+ deps/NetAddr-IP/Lite/t/bignums.t                   |  130 +
+ deps/NetAddr-IP/Lite/t/bin_ips.t                   |  102 +
+ deps/NetAddr-IP/Lite/t/bits.t                      |   37 +
+ deps/NetAddr-IP/Lite/t/broadcast.t                 |   37 +
+ deps/NetAddr-IP/Lite/t/bug62521.t                  |   28 +
+ deps/NetAddr-IP/Lite/t/cidr.t                      |   36 +
+ deps/NetAddr-IP/Lite/t/constants.t                 |   19 +
+ deps/NetAddr-IP/Lite/t/contains.t                  |   40 +
+ deps/NetAddr-IP/Lite/t/copy.t                      |   52 +
+ deps/NetAddr-IP/Lite/t/firstlast.t                 |   66 +
+ deps/NetAddr-IP/Lite/t/lemasklen.t                 |   19 +
+ deps/NetAddr-IP/Lite/t/loops.t                     |   51 +
+ deps/NetAddr-IP/Lite/t/lower.t                     |   11 +
+ deps/NetAddr-IP/Lite/t/mask.t                      |   44 +
+ deps/NetAddr-IP/Lite/t/masklen.t                   |   37 +
+ deps/NetAddr-IP/Lite/t/netaddr.t                   |  208 +
+ deps/NetAddr-IP/Lite/t/network.t                   |   44 +
+ deps/NetAddr-IP/Lite/t/new-nth.t                   |   44 +
+ deps/NetAddr-IP/Lite/t/new-num.t                   |   33 +
+ deps/NetAddr-IP/Lite/t/numeric.t                   |   36 +
+ deps/NetAddr-IP/Lite/t/old-nth.t                   |   36 +
+ deps/NetAddr-IP/Lite/t/old-num.t                   |   33 +
+ deps/NetAddr-IP/Lite/t/over-qq.t                   |   53 +
+ deps/NetAddr-IP/Lite/t/over_comp.t                 |   66 +
+ deps/NetAddr-IP/Lite/t/over_copy.t                 |   85 +
+ deps/NetAddr-IP/Lite/t/over_equal.t                |  122 +
+ deps/NetAddr-IP/Lite/t/over_math.t                 |   64 +
+ deps/NetAddr-IP/Lite/t/overminus.t                 |   45 +
+ deps/NetAddr-IP/Lite/t/pathological.t              |   27 +
+ deps/NetAddr-IP/Lite/t/range.t                     |   34 +
+ deps/NetAddr-IP/Lite/t/relops.t                    |   59 +
+ deps/NetAddr-IP/Lite/t/v4-aton.t                   |   59 +
+ deps/NetAddr-IP/Lite/t/v4-badnm.t                  |   42 +
+ deps/NetAddr-IP/Lite/t/v4-base.t                   |   19 +
+ deps/NetAddr-IP/Lite/t/v4-basem.t                  |   24 +
+ deps/NetAddr-IP/Lite/t/v4-cidr.t                   |   28 +
+ deps/NetAddr-IP/Lite/t/v4-cnew.t                   |   30 +
+ deps/NetAddr-IP/Lite/t/v4-contains.t               |   60 +
+ deps/NetAddr-IP/Lite/t/v4-last.t                   |   32 +
+ deps/NetAddr-IP/Lite/t/v4-new-first.t              |   30 +
+ deps/NetAddr-IP/Lite/t/v4-new.t                    |   67 +
+ deps/NetAddr-IP/Lite/t/v4-new_from_aton.t          |   27 +
+ deps/NetAddr-IP/Lite/t/v4-no_octal.t               |   50 +
+ deps/NetAddr-IP/Lite/t/v4-num.t                    |   36 +
+ deps/NetAddr-IP/Lite/t/v4-numeric.t                |   36 +
+ deps/NetAddr-IP/Lite/t/v4-old-first.t              |   30 +
+ deps/NetAddr-IP/Lite/t/v4-range.t                  |   48 +
+ deps/NetAddr-IP/Lite/t/v4-snew.t                   |   29 +
+ deps/NetAddr-IP/Lite/t/v4-wnew.t                   |   23 +
+ deps/NetAddr-IP/Lite/t/v4_new_cis.t                |   68 +
+ deps/NetAddr-IP/Lite/t/v6-cnew.t                   |   27 +
+ deps/NetAddr-IP/Lite/t/v6-contains.t               |   51 +
+ deps/NetAddr-IP/Lite/t/v6-inc.t                    |   38 +
+ deps/NetAddr-IP/Lite/t/v6-new-base.t               |   70 +
+ deps/NetAddr-IP/Lite/t/v6-new_cis6_base.t          |   69 +
+ deps/NetAddr-IP/Lite/t/v6-new_cis_base.t           |   69 +
+ deps/NetAddr-IP/Lite/t/v6-num.t                    |   53 +
+ deps/NetAddr-IP/Lite/t/v6-numeric.t                |   91 +
+ deps/NetAddr-IP/Lite/t/v6-old-base.t               |   70 +
+ deps/NetAddr-IP/Lite/t/version.t                   |   29 +
+ deps/NetAddr-IP/Lite/t/within.t                    |   40 +
+ deps/NetAddr-IP/MANIFEST                           |  165 +
+ deps/NetAddr-IP/MANIFEST.SKIP                      |   31 +
+ deps/NetAddr-IP/META.yml                           |   14 +
+ deps/NetAddr-IP/Makefile.PL                        |   91 +
+ deps/NetAddr-IP/TODO                               |    5 +
+ deps/NetAddr-IP/VERSION                            |    1 +
+ deps/NetAddr-IP/docs/rfc1884.txt                   | 1023 +++
+ deps/NetAddr-IP/t/constants.t                      |   20 +
+ deps/NetAddr-IP/t/full.t                           |   25 +
+ deps/NetAddr-IP/t/full6.t                          |   25 +
+ deps/NetAddr-IP/t/imhoff.t                         |   35 +
+ deps/NetAddr-IP/t/loops.t                          |   33 +
+ deps/NetAddr-IP/t/lower.t                          |   11 +
+ deps/NetAddr-IP/t/masklen.t                        |   21 +
+ deps/NetAddr-IP/t/new-store.t                      |   40 +
+ deps/NetAddr-IP/t/old-store.t                      |   40 +
+ deps/NetAddr-IP/t/over-arr.t                       |   20 +
+ deps/NetAddr-IP/t/over-qq.t                        |   55 +
+ deps/NetAddr-IP/t/relops.t                         |   59 +
+ deps/NetAddr-IP/t/short.t                          |   57 +
+ deps/NetAddr-IP/t/splitref.t                       |   27 +
+ deps/NetAddr-IP/t/v4-coalesce.t                    |   54 +
+ deps/NetAddr-IP/t/v4-compact.t                     |  110 +
+ deps/NetAddr-IP/t/v4-compplus.t                    |   35 +
+ deps/NetAddr-IP/t/v4-hostenum.t                    |   50 +
+ deps/NetAddr-IP/t/v4-re.t                          |   38 +
+ deps/NetAddr-IP/t/v4-split-bulk.t                  |   23 +
+ deps/NetAddr-IP/t/v4-split-list.t                  |   54 +
+ deps/NetAddr-IP/t/v4-splitplan.t                   |   73 +
+ deps/NetAddr-IP/t/v4-sprefix.t                     |   51 +
+ deps/NetAddr-IP/t/v4-xprefix.t                     |   48 +
+ deps/NetAddr-IP/t/v6-re.t                          |   69 +
+ deps/NetAddr-IP/t/v6-split-bulk.t                  |   21 +
+ deps/NetAddr-IP/t/v6-splitplan.t                   |   72 +
+ deps/NetAddr-IP/t/wildcard.t                       |   37 +
+ 165 files changed, 26626 insertions(+), 0 deletions(-)
+
+commit 816399fd5fe51f68a43cd18a925851832b248aa1
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Dec 5 20:46:33 2011 -0500
+
+    made --packets apply to --Analyze mode, man page doc fixes relative to the old psadfifo file
+
+ psad   |   25 ++++++++++------
+ psad.8 |   99 +++++++++++++++++++++++++++++++---------------------------------
+ 2 files changed, 64 insertions(+), 60 deletions(-)
+
+commit 31dedad43dfcc8d97a2c01963d8a277c13627367
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sun Jul 31 21:23:28 2011 -0400
+
+    Removed Net::IPv4Addr module for NetAddr:IP replacement
+    
+    The Net::IPv4Addr module does not handle IPv6 addresses, and so it will be
+    replaced with the NetAddr:IP module.
+
+ deps/Net-IPv4Addr/ChangeLog        |   90 ---------
+ deps/Net-IPv4Addr/IPv4Addr.pm      |  385 ------------------------------------
+ deps/Net-IPv4Addr/IPv4Addr.spec    |   90 ---------
+ deps/Net-IPv4Addr/MANIFEST         |   15 --
+ deps/Net-IPv4Addr/Makefile.PL      |    8 -
+ deps/Net-IPv4Addr/NEWS             |   28 ---
+ deps/Net-IPv4Addr/README           |   41 ----
+ deps/Net-IPv4Addr/VERSION          |    1 -
+ deps/Net-IPv4Addr/debian/changelog |   37 ----
+ deps/Net-IPv4Addr/debian/control   |   12 --
+ deps/Net-IPv4Addr/debian/copyright |   14 --
+ deps/Net-IPv4Addr/debian/dirs      |    4 -
+ deps/Net-IPv4Addr/debian/docs      |    4 -
+ deps/Net-IPv4Addr/debian/rules     |   85 --------
+ deps/Net-IPv4Addr/ipv4calc         |   89 ---------
+ deps/Net-IPv4Addr/test.pl          |   68 -------
+ 16 files changed, 0 insertions(+), 971 deletions(-)
+
+commit 9b226ed088c4a5a5b11ca305e2d9b4a16ef47962
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Jul 29 22:15:12 2011 -0400
+
+    Added code to separate ipv4 vs. ipv6 p0f attempts
+    
+    There are not yet any IPv6 fingerprints for p0f, so psad needs to ensure that
+    its p0f implementation over iptables log messages is restricted to IPv4
+    packets.  This change will make it easier to integrate an IPv6 implementation
+    of p0f as well.
+
+ psad |   99 ++++++++++++++++++++++++++++++++++++++++++++++-------------------
+ 1 files changed, 70 insertions(+), 29 deletions(-)
+
+commit c9617d0495410390e48df2f5ba653b8a80f85dca
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Jul 26 22:42:33 2011 -0400
+
+    Renamed ChangeLog -> ChangeLog.old
+    
+    Renamed the original ChangeLog -> ChangeLog.old and replace it with output from
+    'git log'.
+
+ ChangeLog     |19166 ++++++++++++++++++++++++++++++++++++++++++++++++++++++---
+ ChangeLog.old |  907 +++
+ 2 files changed, 19249 insertions(+), 824 deletions(-)
+
+commit eb7266cd9403e6ccbeb516e2b5ce37edb3a0a786
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Jul 26 20:54:24 2011 -0400
+
+    Updated to the latest p0f signatures from OpenBSD
+    
+    Updated to the latest p0f signatures in the pf.os file from the OpenBSD
+    project.
+
+ pf.os |   20 +++++++++++---------
+ 1 files changed, 11 insertions(+), 9 deletions(-)
+
+commit 4b2794f1eca7049b4f30ef4ed27a834c43afd602
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Jul 26 20:41:35 2011 -0400
+
+    Bug fix for scan sources reported as destinations
+    
+    In the /var/log/psad/<ip>/ directories, whois information is stored in the
+    <IP>_whois files, the IP in the filename was included as a destination IP under
+    the psad -S output.  This commit fixes this bug.  Here is an example of the
+    invalid output:
+    
+    [+] IP Status Detail:
+    
+    SRC:  123.123.123.221, DL: 2, Dsts: 2, Pkts: 1, Unique sigs: 1, Email alerts: 1
+    
+        DST: 1.2.3.4, Local IP
+            Scanned ports: TCP 1433, Pkts: 1, Chain: INPUT, Intf: eth0
+            Signature match: "MISC Microsoft SQL Server communication attempt"
+                TCP, Chain: INPUT, Count: 1, DP: 1433, SYN, Sid: 100205
+        DST: 123.123.123.221
+
+ psad |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+commit c17c10abba6eb2f0edfc85a3d9f97ecee503f2c9
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Jul 26 20:38:52 2011 -0400
+
+    Added 'udplite' as a supported protocol
+    
+    iptables can produce log message for the udplite protocol (IP protocol 136),
+    and this commit starts to work in udplite support after such messages have
+    been parsed.
+
+ psad |   50 ++++++++++++++++++++++++++++++++------------------
+ 1 files changed, 32 insertions(+), 18 deletions(-)
+
+commit 57f008860e9b3e5bdb18c52f7a36ad58e3afa060
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Jul 25 22:13:09 2011 -0400
+
+    Added the ENABLE_IPV6_DETECTION variable
+    
+    The ENABLE_IPV6_DETECTION variable controls whether psad will parse or ignore
+    IPv6 iptables log messages.  This is enabled by default.
+
+ psad      |    3 ++-
+ psad.conf |    6 ++++++
+ 2 files changed, 8 insertions(+), 1 deletions(-)
+
+commit cda78b3a00cb574a93a34965fadaab7f3b96a10f
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Jul 25 22:09:11 2011 -0400
+
+    Make ENABLE_* vars accept case-insensitive values
+    
+    Allow ENABLE_* psad.conf variables to have values like 'y', 'n', 'Yes', 'No',
+    etc.
+
+ psad |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
+
+commit 18da758f7514e3a7110ae0716e4fd8936ae48db1
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Jul 25 21:42:57 2011 -0400
+
+    Bug fix for ICMP time exceeded packets for TCP
+    
+    TCP connections can be met with ICMP time exceeded messages, and this fix
+    ensures that they are recognized.  Here is an example of such a message:
+    
+    Jan 24 23:21:46 minastirith kernel: [711473.921049] DROP IN=eth0 OUT= MAC=ff:ff:ff:ff:ff:ff:00:01:5c:24:ea:81:08:00 SRC=123.123.123.1 DST=255.255.255.255 LEN=355 TOS=0x00 Jan 25 11:31:32 minastirith kernel: [755260.336492] DROP INVALID IN=eth0 OUT= MAC=00:13:46:3a:41:36:00:01:5c:24:ea:81:08:00 SRC=202.97.39.53 DST=1.1.1.1 LEN=56 TOS=0x00 PREC=0x20 TTL=240 ID=11594 PROTO=ICMP TYPE=11 CODE=0 [SRC=1.1.1.1 DST=2.2.2.2 LEN=36 TOS=0x00 PREC=0x00 TTL=1 ID=18273 MF PROTO=TCP INCOMPLETE [8 bytes] ]
+
+ psad |   21 ++++++++++++---------
+ 1 files changed, 12 insertions(+), 9 deletions(-)
+
+commit fbab3240232c36c6de9aabf9ff88459041d9e260
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Jul 25 21:17:24 2011 -0400
+
+    Added call to get_connected_subnets() in -A mode.
+    
+    Make sure to get local networks in --Analyze mode for is_local() checks.
+
+ psad |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
+
+commit 6e93cc348b67ffaa93307a8a6ddb7b4ebe2dc826
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Jul 25 21:07:20 2011 -0400
+
+    Bugfix introduced by edc028d46d83cd3f6952e0dde99ebd731366a2f6
+    
+    Bugfix to make sure that protocol counters are written to the counters file
+    via the proper filehandle.
+
+ psad |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit 8454708d5e34c385dfbc0e91bd6331163b5ec273
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Jul 25 21:00:29 2011 -0400
+
+    Minor wording update for syslog messages parsing
+    
+    Minor documentation update to better describe the default parsing behavior of
+    psad (non-usage of the psadfifo and kmsgsd by default).
+
+ README.SYSLOG |   18 +++++++++++++++++-
+ psad.conf     |   17 ++++++++++-------
+ 2 files changed, 27 insertions(+), 8 deletions(-)
+
+commit b13f6babd7ffccf1f45b2925720ba1e833e5a4de
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Jul 25 20:27:55 2011 -0400
+
+    Minor update Netfilter -> iptables wording
+    
+    It is more proper to refer to iptables in the context of psad operations, so
+    changed all "Netfilter" references to "iptables".
+
+ ChangeLog                       |   26 +++++++++++++-------------
+ README.SYSLOG                   |    8 ++++----
+ SCAN_LOG                        |    2 +-
+ TODO                            |    4 ++--
+ nf2csv                          |    2 +-
+ packaging/psad-nobuildreqs.spec |    2 +-
+ packaging/psad-nodeps.spec      |    2 +-
+ packaging/psad.spec             |    2 +-
+ psad                            |   10 +++++-----
+ psad.8                          |    2 +-
+ psad.conf                       |   12 ++++++------
+ signatures                      |    6 +++---
+ snort_compat.pl                 |    8 ++++----
+ 13 files changed, 43 insertions(+), 43 deletions(-)
+
+commit edc028d46d83cd3f6952e0dde99ebd731366a2f6
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sun Jul 24 22:06:54 2011 -0400
+
+    Minor change to rework global protocol counters
+    
+    Minor restructuring to be able to more easily support protocols that are
+    logged via iptables via a 'defined' check on a global protocol tracking
+    hash.
+
+ psad |   42 ++++++++++++++++++------------------------
+ 1 files changed, 18 insertions(+), 24 deletions(-)
+
+commit 46410ccbb84737d3d253472b299481af62d8ab18
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sun Jul 24 15:54:28 2011 -0400
+
+    Minor filehandle warning bug fix.
+    
+    perl likes to generate warnings like the one seen below if the STDOUT or STDERR
+    filehandles are closed when going into daemon mode and other filehandles are
+    used.  This change removes closing these filehandles when psad is run as a
+    daemon:
+    
+    Sun Jul 24 14:27:44 2011 psad v2.1.8-pre2 pid: 11675 Filehandle STDOUT reopened as F only for input at /usr/sbin/psad line 9924.
+
+ psad |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
+
+commit 1de863a77b625ce1be164211298af35a203a9987
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Jul 23 10:39:17 2011 -0400
+
+    Minor update in filehandle usage for mail messages
+    
+    Minor change to try and avoid the following warning messages logged to
+    /var/log/psad/errs/psad.warn:
+    
+    Sun Nov 28 12:09:44 2010 psad v2.1.8-pre1 (file rev: 2309) pid: 1600 Filehandle STDERR reopened as F only for input at /usr/sbin/psad line 9756.
+    
+    It is likely that other changes will be necessary in order to completely stop
+    these messages.
+
+ psad |   13 +++++++++----
+ 1 files changed, 9 insertions(+), 4 deletions(-)
+
+commit 39f8483e80ffc38cd33c4941227e94968a8d1d7d
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Jul 23 10:18:56 2011 -0400
+
+    Implemented parsing support for IPv6 via ip6tables
+    
+    This is the first major commit for IPv6 support, and starts with the ability to
+    parse IPv6 log messages for the following protocols: TCP, UDP, UDPLITE, and
+    ICMP6.  Scans and signature matches are not yet detected, but that is coming
+    soon.  Here are a few example ip6tables logging messages that psad now
+    supports:
+    
+    Jul 21 19:07:39 minastirith kernel: [1912155.755862] IPv6 Packet IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:86:dd SRC=0000:0000:0000:0000:0000:0000:0000:0001 DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=59 TC=0 HOPLIMIT=64 FLOWLBL=0 PROTO=UDP SPT=35186 DPT=12345 LEN=19
+    Jul 21 19:07:39 minastirith kernel: [1912155.755921] IPv6 Packet IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:86:dd SRC=0000:0000:0000:0000:0000:0000:0000:0001 DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=107 TC=0 HOPLIMIT=64 FLOWLBL=0 PROTO=ICMPv6 TYPE=1 CODE=4 [SRC=0000:0000:0000:0000:0000:0000:0000:0001 DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=59 TC=0 HOPLIMIT=64 FLOWLBL=0 PROTO=UDP SPT=35186 DPT=12345 LEN=19 ]
+    Jul 21 19:07:40 minastirith kernel: [1912156.845421] IPv6 Packet IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:86:dd SRC=0000:0000:0000:0000:0000:0000:0000:0001 DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=104 TC=0 HOPLIMIT=64 FLOWLBL=0 PROTO=ICMPv6 TYPE=128 CODE=0 ID=21264 SEQ=1
+    Jul 21 19:07:40 minastirith kernel: [1912156.845478] IPv6 Packet IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:86:dd SRC=0000:0000:0000:0000:0000:0000:0000:0001 DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=104 TC=0 HOPLIMIT=64 FLOWLBL=0 PROTO=ICMPv6 TYPE=129 CODE=0 ID=21264 SEQ=1
+    Jul 21 19:08:15 minastirith kernel: [1912191.806437] IPv6 Packet IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:86:dd SRC=0000:0000:0000:0000:0000:0000:0000:0001 DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=80 TC=0 HOPLIMIT=64 FLOWLBL=0 PROTO=TCP SPT=55551 DPT=22 WINDOW=32752 RES=0x00 SYN URGP=0
+    Jul 21 19:08:15 minastirith kernel: [1912191.806509] IPv6 Packet IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:86:dd SRC=0000:0000:0000:0000:0000:0000:0000:0001 DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=80 TC=0 HOPLIMIT=64 FLOWLBL=0 PROTO=TCP SPT=22 DPT=55551 WINDOW=32728 RES=0x00 ACK SYN URGP=0
+    Jul 21 19:08:15 minastirith kernel: [1912191.806570] IPv6 Packet IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:86:dd SRC=0000:0000:0000:0000:0000:0000:0000:0001 DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=72 TC=0 HOPLIMIT=64 FLOWLBL=0 PROTO=TCP SPT=55551 DPT=22 WINDOW=256 RES=0x00 ACK URGP=0
+    Jul 21 19:08:15 minastirith kernel: [1912191.835221] IPv6 Packet IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:86:dd SRC=0000:0000:0000:0000:0000:0000:0000:0001 DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=111 TC=0 HOPLIMIT=64 FLOWLBL=0 PROTO=TCP SPT=22 DPT=55551 WINDOW=256 RES=0x00 ACK PSH URGP=0
+    Jul 21 19:08:15 minastirith kernel: [1912191.835292] IPv6 Packet IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:86:dd SRC=0000:0000:0000:0000:0000:0000:0000:0001 DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=72 TC=0 HOPLIMIT=64 FLOWLBL=0 PROTO=TCP SPT=55551 DPT=22 WINDOW=256 RES=0x00 ACK URGP=0
+    Jul 21 19:08:17 minastirith kernel: [1912194.391506] IPv6 Packet IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:86:dd SRC=0000:0000:0000:0000:0000:0000:0000:0001 DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=72 TC=0 HOPLIMIT=64 FLOWLBL=0 PROTO=TCP SPT=55551 DPT=22 WINDOW=256 RES=0x00 ACK FIN URGP=0
+    Jul 21 19:08:17 minastirith kernel: [1912194.392596] IPv6 Packet IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:86:dd SRC=0000:0000:0000:0000:0000:0000:0000:0001 DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=72 TC=0 HOPLIMIT=64 FLOWLBL=0 PROTO=TCP SPT=22 DPT=55551 WINDOW=256 RES=0x00 ACK FIN URGP=0
+    Jul 21 19:08:17 minastirith kernel: [1912194.392678] IPv6 Packet IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:86:dd SRC=0000:0000:0000:0000:0000:0000:0000:0001 DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=72 TC=0 HOPLIMIT=64 FLOWLBL=0 PROTO=TCP SPT=55551 DPT=22 WINDOW=256 RES=0x00 ACK URGP=0
+
+ psad |  318 ++++++++++++++++++++++++++++++++++++++++++++++-------------------
+ 1 files changed, 225 insertions(+), 93 deletions(-)
+
+commit 8d41a4095cea450342b3c72b17cd867ade62ca47
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Jul 12 22:07:29 2011 -0400
+
+    Moved running as root check into is_root()
+    
+    Minor update to put the running as root check into a new is_root() function.
+
+ psad |   10 +++++++---
+ 1 files changed, 7 insertions(+), 3 deletions(-)
+
+commit 09d950ea8447e8cbac6d5a8a1f6cad6a328a01d5
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Jul 12 22:05:12 2011 -0400
+
+    Minor copyright update
+    
+    Updated the copyright date to 2011.
+
+ install.pl |    4 ++--
+ psad       |    2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+commit 76e16fba10b96151cde6c71b1c3cf6d61475d459
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Jul 12 22:02:30 2011 -0400
+
+    Minor variable initialization update
+    
+    Minor change to make sure to initialize a few global variables.
+
+ psad |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
+
+commit 7124ec80a10a45d1a5ab325c8578171ca3c113b0
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Jun 17 07:59:29 2011 -0400
+
+    Removed "$Id$" tags (meaningless for git)
+    
+    All "$Id$" expansion tags were removed since they were a hold-over from the
+    svn days.  This also meant that the "file revision: <N>" output for "psad -V"
+    was removed too.
+
+ INSTALL                                         |    2 --
+ Makefile                                        |    2 --
+ README                                          |    3 ---
+ auto_dl                                         |    2 --
+ bump_version.pl                                 |    2 --
+ config_vars.pl                                  |    2 --
+ deps/IPTables-ChainMgr/lib/IPTables/ChainMgr.pm |    2 --
+ deps/IPTables-Parse/lib/IPTables/Parse.pm       |    2 --
+ fwcheck_psad.pl                                 |    2 --
+ icmp_types                                      |    2 --
+ init-scripts/psad-init.generic                  |    1 -
+ init-scripts/psad-init.gentoo                   |    1 -
+ init-scripts/psad-init.redhat                   |    1 -
+ install.pl                                      |    2 --
+ ip_options                                      |    2 --
+ kmsgsd.c                                        |    2 --
+ nf2csv                                          |   10 ++--------
+ packaging/cd_rpmbuilder                         |    2 --
+ packaging/psad-nobuildreqs.spec                 |    2 --
+ packaging/psad-nodeps.spec                      |    2 --
+ packaging/psad.spec                             |    2 --
+ parsetest.pl                                    |    2 --
+ posf                                            |    2 --
+ psad                                            |   18 ++++++------------
+ psad.conf                                       |    2 --
+ psad.h                                          |    2 --
+ psad_funcs.c                                    |    2 --
+ psadwatchd.c                                    |    2 --
+ pscan                                           |    2 --
+ signatures                                      |    2 --
+ snort_compat.pl                                 |    2 --
+ snort_rule_dl                                   |    2 --
+ 32 files changed, 8 insertions(+), 78 deletions(-)
+
+commit c46c0708edd9ede96629008ccd32fa2d2e10a220 (refs/remotes/trunk)
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Wed Dec 29 01:28:27 2010 +0000
+
+    minor comment bug fix
+    
+    git-svn-id: file:///home/mbr/svn/psad_repos/psad/trunk@2315 91a0a83b-1414-0410-bf9a-c3dbc33e90b6
+
+ psad |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit a42832ebc282ffc693efbcb905d00840f53dc056
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Nov 25 18:01:57 2010 +0000
+
+    bumped version to 2.1.8-pre2
+    
+    git-svn-id: file:///home/mbr/svn/psad_repos/psad/trunk@2313 91a0a83b-1414-0410-bf9a-c3dbc33e90b6
+
+ VERSION |    2 +-
+ nf2csv  |    2 +-
+ psad    |    4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+commit e65e92c3be40a5eb6624b3c5db00f5492d55d9bf
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Nov 25 18:01:43 2010 +0000
+
+    - Altered the 'ET MALWARE Bundleware Spyware CHM Download' Snort rule in
+    the bundled Emerging Threats rule set to make sure that ClamAV does not
+    flag on the pattern "mhtml\:file\://" which is associated with the
+    following ClamAV signature:
+    
+    $ grep Exploit.HTML.MHTRedir-8 main.ndb
+    Exploit.HTML.MHTRedir-8:3:*:6d68746d6c3a66696c653a2f2f{1-20}2168
+    
+    An analysis of this issue was posted here:
+    
+    http://www.cipherdyne.org/blog/2010/08/22.html
+    
+    
+    
+    
+    git-svn-id: file:///home/mbr/svn/psad_repos/psad/trunk@2312 91a0a83b-1414-0410-bf9a-c3dbc33e90b6
+
+ ChangeLog                           |   14 +++++++++++++-
+ deps/snort_rules/emerging-all.rules |    2 +-
+ 2 files changed, 14 insertions(+), 2 deletions(-)
+
+commit 91a9183b26aa33d041f1b21db857d1775dd3b499
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Nov 25 16:02:29 2010 +0000
+
+    - Bug fix for ICMP packet handling where psad would incorrectly interpret
+      ICMP port unreachable messages as UDP packets because the UDP specifics
+      are included in the iptables log message.  This bug was first reported by
+      Lukas Baxa to the Debian maintainers and was followed up by Franck
+      Joncourt:
+    
+        http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=596240
+    
+      An example ICMP log message that exposed the bug is included below:
+    
+      Sep  8 18:04:26 baxic kernel: [28241.572876] IN_DROP IN=wlan0
+      OUT= MAC=00:1a:9f:91:df:ae:00:21:27:e8:0a:a0:08:00
+      SRC=10.0.0.138 DST=192.168.1.103 LEN=96 TOS=0x00 PREC=0xC0 TTL=254
+      ID=63642 PROTO=ICMP TYPE=3 CODE=3
+      [SRC=192.168.1.103 DST=10.0.0.138 LEN=68 TOS=0x00 PREC=0x00 TTL=0
+      ID=22458 PROTO=UDP SPT=35080 DPT=33434 LEN=48 ]
+    
+    
+    
+    git-svn-id: file:///home/mbr/svn/psad_repos/psad/trunk@2311 91a0a83b-1414-0410-bf9a-c3dbc33e90b6
+
+ CREDITS   |    5 +++++
+ ChangeLog |   17 +++++++++++++++++
+ psad      |   53 +++++++++++++++++++++++++++++++++++++++++++++--------
+ 3 files changed, 67 insertions(+), 8 deletions(-)
+
+commit e44f16f506128baf55697742a4f093e7d4541b5b
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Aug 7 12:50:18 2010 +0000
+
+    bumped version to 2.1.8-pre1
+    
+    git-svn-id: file:///home/mbr/svn/psad_repos/psad/trunk@2309 91a0a83b-1414-0410-bf9a-c3dbc33e90b6
+
+ VERSION |    2 +-
+ nf2csv  |    2 +-
+ psad    |    4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+commit 4591c2fda54e9978eac552db4ba882fbf7f7d090
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Aug 7 12:49:55 2010 +0000
+
+    minor date update
+    
+    git-svn-id: file:///home/mbr/svn/psad_repos/psad/trunk@2308 91a0a83b-1414-0410-bf9a-c3dbc33e90b6
+
+ ChangeLog |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit c8e5b07a37b7087eae607c2ad40d2705bc5a0c12
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Aug 7 12:49:18 2010 +0000
+
+    changed all instances of 'href' to 'hr'
+    
+    git-svn-id: file:///home/mbr/svn/psad_repos/psad/trunk@2307 91a0a83b-1414-0410-bf9a-c3dbc33e90b6
+
+ psad |  104 +++++++++++++++++++++++++++++++++---------------------------------
+ 1 files changed, 52 insertions(+), 52 deletions(-)
+
+commit 2e7330b28ba2283b775961286f19c85501dca0b8
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Wed Jul 28 02:45:39 2010 +0000
+
+    updated to whois-5.0.6
+    
+    git-svn-id: file:///home/mbr/svn/psad_repos/psad/trunk@2306 91a0a83b-1414-0410-bf9a-c3dbc33e90b6
+
+ ChangeLog |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+commit 2553968039043fbe29f62b31f6638d9de005bcf4
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Wed Jul 28 02:44:29 2010 +0000
+
+    updated to whois-5.0.6
+    
+    git-svn-id: file:///home/mbr/svn/psad_repos/psad/trunk@2305 91a0a83b-1414-0410-bf9a-c3dbc33e90b6
+
+ deps/whois/Makefile                |   99 ++++---
+ deps/whois/README                  |   13 +-
+ deps/whois/VERSION                 |    2 +-
+ deps/whois/as_del.h                |   66 ++++
+ deps/whois/as_del_list             |    6 +-
+ deps/whois/config.h                |   52 +++-
+ deps/whois/data.h                  |   27 ++-
+ deps/whois/debian/changelog        |  177 +++++++++++
+ deps/whois/debian/compat           |    2 +-
+ deps/whois/debian/control          |   11 +-
+ deps/whois/debian/rules            |    7 +-
+ deps/whois/ip6_del.h               |   32 ++
+ deps/whois/ip_del.h                |  226 ++++++++++++++
+ deps/whois/ip_del_list             |   52 +++-
+ deps/whois/make_servers_charset.pl |   21 ++
+ deps/whois/make_tld_serv.pl        |   16 +-
+ deps/whois/mkpasswd.1              |    5 +-
+ deps/whois/mkpasswd.c              |  143 ++++++---
+ deps/whois/po/Makefile             |    9 +-
+ deps/whois/po/cs.po                |  124 +++++---
+ deps/whois/po/de.po                |  250 ++++++++-------
+ deps/whois/po/el.po                |   81 +++---
+ deps/whois/po/es.po                |  339 +++++++++++----------
+ deps/whois/po/eu.po                |   84 +++---
+ deps/whois/po/fi.po                |  303 ++++++++++++++++++
+ deps/whois/po/fr.po                |  164 ++++++-----
+ deps/whois/po/it.po                |   86 +++---
+ deps/whois/po/ja.po                |   81 +++---
+ deps/whois/po/no.po                |   81 +++---
+ deps/whois/po/pl.po                |  113 ++++---
+ deps/whois/po/pt_BR.po             |   84 +++---
+ deps/whois/po/ru.po                |  173 ++++++-----
+ deps/whois/po/zh_CN.po             |  301 ++++++++++++++++++
+ deps/whois/servers_charset.h       |   35 ++
+ deps/whois/servers_charset_list    |   38 +++
+ deps/whois/simple_recode.c         |  176 +++++++++++
+ deps/whois/simple_recode.h         |   14 +
+ deps/whois/tld_serv.h              |  360 ++++++++++++++++++++++
+ deps/whois/tld_serv_list           |  200 +++++++------
+ deps/whois/utils.h                 |    5 +
+ deps/whois/whois.1                 |   35 ++-
+ deps/whois/whois.c                 |  599 ++++++++++++++++++++++++------------
+ deps/whois/whois.conf              |    4 +-
+ deps/whois/whois.h                 |   13 +-
+ deps/whois/whois.spec              |   11 +-
+ 45 files changed, 3513 insertions(+), 1207 deletions(-)

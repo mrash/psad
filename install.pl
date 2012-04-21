@@ -55,6 +55,8 @@ my $wgetCmd      = '/usr/bin/wget';
 my $runlevelCmd  = '/sbin/runlevel';
 
 my $install_root = '/';
+
+my $answers_file = 'install.answers';
 #============ end config ============
 
 my %file_vars = (
@@ -154,6 +156,9 @@ my $uninstall   = 0;
 my $help        = 0;
 my $archived_old = 0;
 my $skip_syslog_test = 0;
+my $use_answers = 0;
+my $no_write_answers = 0;
+my %answers = ();
 my $skip_module_install   = 0;
 my $cmdline_force_install = 0;
 my $force_path_update = 0;
@@ -181,6 +186,9 @@ Getopt::Long::Configure('no_ignore_case');
     'Exclude-mod-regex=s' => \$exclude_mod_re, ### exclude a particular perl module
     'path-update'       => \$force_path_update, ### update command paths
     'Skip-mod-install'  => \$skip_module_install,
+    'Use-answers'       => \$use_answers,
+    'answers-file=s'    => \$answers_file,
+    'no-write-answers'  => \$no_write_answers,
     'no-rm-lib-dir'     => \$no_rm_old_lib_dir, ### remove any old /usr/lib/psad dir
     'no-preserve'       => \$noarchive,   ### Don't preserve existing configs.
     'syslog-conf=s'     => \$syslog_conf, ### specify path to syslog config file.
@@ -207,13 +215,15 @@ copy $psad_conf_file, "${psad_conf_file}.orig" or die "[*] Could not ",
 
 if ($install_test_dir) {
     $install_root = getcwd() . '/test/psad-install';
-    $init_dir = $install_root . '/etc/init.d';
+    $init_dir     = $install_root . '/etc/init.d';
 }
+
+&import_answers() if $use_answers;
 
 ### import paths from default psad.conf
 &import_config();
 
-$force_mod_re = qr|$force_mod_re| if $force_mod_re;
+$force_mod_re   = qr|$force_mod_re|   if $force_mod_re;
 $exclude_mod_re = qr|$exclude_mod_re| if $exclude_mod_re;
 
 ### see if the deps/ directory exists, and if not then we are installing
@@ -1157,6 +1167,7 @@ sub set_home_net() {
     for my $intf (keys %connected_subnets) {
         &logr("      $intf -> $connected_subnets{$intf}\n");
     }
+    my $ans_file_str = 'Specify HOME_NET subnets:';
     my $str =
 "\n    Specify which subnets are part of your internal network.  Note that\n" .
 "    you can correct anything you enter here by editing the \"HOME_NET\"\n" .
@@ -1166,22 +1177,28 @@ sub set_home_net() {
 "    in CIDR notation: 192.168.10.0/24 (preferrable), or regular notation:\n" .
 "    192.168.10.0/255.255.255.0\n\n    End with a \".\" on a line by itself.\n\n";
     &logr($str);
-    my $ans = '';
-    while ($ans !~ /^\s*\.\s*$/) {
-        &logr("    Subnet: ");
-        $ans = <STDIN>;
-        chomp $ans;
-        if ($ans =~ m|^\s*($ip_re/\d+)\s*$|) {
-            ### hard to test this directly without ipv4_network()
-            ### and this module may not be installed, so just use it.
-            $home_net_str .= "$1, ";
-        } elsif ($ans =~ m|^\s*($ip_re/$ip_re)\s*$|) {
-            $home_net_str .= "$1, ";
-        } elsif ($ans !~ /^\s*\.\s*$/) {
-            &logr("[-] Invalid subnet \"$ans\"\n");
+    if ($use_answers and defined $answers{$ans_file_str}) {
+        $home_net_str = $answers{$ans_file_str};
+        print "$answers{$ans_file_str}\n";
+    } else {
+        my $ans = '';
+        while ($ans !~ /^\s*\.\s*$/) {
+            &logr("    Subnet: ");
+            $ans = <STDIN>;
+            chomp $ans;
+            if ($ans =~ m|^\s*($ip_re/\d+)\s*$|) {
+                ### hard to test this directly without ipv4_network()
+                ### and this module may not be installed, so just use it.
+                $home_net_str .= "$1, ";
+            } elsif ($ans =~ m|^\s*($ip_re/$ip_re)\s*$|) {
+                $home_net_str .= "$1, ";
+            } elsif ($ans !~ /^\s*\.\s*$/) {
+                &logr("[-] Invalid subnet \"$ans\"\n");
+            }
         }
+        $home_net_str =~ s/\,\s*$//;
+        &put_answer_file_value($ans_file_str, $home_net_str);
     }
-    $home_net_str =~ s/\,\s*$//;
     &put_var('HOME_NET', $home_net_str, $file);
     return;
 }
@@ -1331,6 +1348,18 @@ sub append_fifo_syslog_ng() {
     return;
 }
 
+sub import_answers() {
+    die "[*] $answers_file does not exist" unless -e $answers_file;
+    open F, "< $answers_file" or die "[*] Could not open $answers_file: $!";
+    while (<F>) {
+        if (/^(.*?:)\s+(.*);/) {
+            $answers{$1} = $2;
+        }
+    }
+    close F;
+    return;
+}
+
 sub config_metalog() {
     my $syslog_conf = shift;
     open RS, "< $syslog_conf" or
@@ -1383,18 +1412,50 @@ sub config_metalog() {
 
 sub query_yes_no() {
     my ($msg, $style) = @_;
-    my $ans = '';
-    while ($ans ne 'y' and $ans ne 'n') {
+
+    my $ans_file_str = $msg;
+    $ans_file_str =~ s|\n| |g;
+    $ans_file_str =~ s|\W| |g;
+    $ans_file_str =~ s|\s+| |g;
+    $ans_file_str =~ s|^\s+||;
+    $ans_file_str =~ s|\s+$||;
+    $ans_file_str =~ s|\sy\sn||;
+    $ans_file_str .= ':' unless $ans_file_str =~ m|\:$|;
+
+    if ($use_answers and defined $answers{$ans_file_str}) {
         &logr($msg);
-        $ans = lc(<STDIN>);
-        if ($style == $ACCEPT_YES_DEFAULT) {
-            return 1 if $ans eq "\n";
-        } elsif ($style == $ACCEPT_NO_DEFAULT) {
-            return 0 if $ans eq "\n";
+        print "$answers{$ans_file_str}\n";
+        if (lc($answers{$ans_file_str}) eq 'y') {
+            return 1;
+        } else {
+            return 0;
         }
-        chomp $ans;
+    } else {
+        my $ans = '';
+        while ($ans ne 'y' and $ans ne 'n') {
+            &logr($msg);
+            $ans = lc(<STDIN>);
+            if ($style == $ACCEPT_YES_DEFAULT) {
+                if ($ans eq "\n") {
+                    &put_answer_file_value($ans_file_str, 'y');
+                    return 1;
+                }
+            } elsif ($style == $ACCEPT_NO_DEFAULT) {
+                if ($ans eq "\n") {
+                    &put_answer_file_value($ans_file_str, 'n');
+                    return 0;
+                }
+            }
+            chomp $ans;
+        }
+        if ($ans eq 'y') {
+            &put_answer_file_value($ans_file_str, 'y');
+            return 1;
+        } else {
+            &put_answer_file_value($ans_file_str, 'n');
+            return 0;
+        }
     }
-    return 1 if $ans eq 'y';
     return 0;
 }
 
@@ -1749,22 +1810,32 @@ sub get_fw_search_strings() {
         &logr("    Add as many search strings as you like; " .
             "each on its own line.\n\n");
         &logr("    End with a \".\" on a line by itself.\n\n");
-        my $ans = '';
-        while ($ans !~ /^\s*\.\s*$/) {
-            &logr("    Enter string (i.e. \"Audit\"):  ");
-            $ans = <STDIN>;
-            chomp $ans;
-            if ($ans =~ /\"/) {
-                &logr("[-] Quotes will be removed from FW search string: $ans\n");
-                $ans =~ s/\"//g;
-            }
-            if ($ans =~ /\S/) {
-                if ($ans !~ /^\s*\.\s*$/) {
-                    push @fw_search_strings, $ans;
+        my $ans_file_str = 'FW search strings:';
+        if ($use_answers and defined $answers{$ans_file_str}) {
+            @fw_search_strings = split /\s*,\s*/, $answers{$ans_file_str};
+            print "$answers{$ans_file_str}\n";
+        } else {
+            my $ans = '';
+            my $str = '';
+            while ($ans !~ /^\s*\.\s*$/) {
+                &logr("    Enter string (i.e. \"Audit\"):  ");
+                $ans = <STDIN>;
+                chomp $ans;
+                if ($ans =~ /\"/) {
+                    &logr("[-] Quotes will be removed from FW search string: $ans\n");
+                    $ans =~ s/\"//g;
                 }
-            } else {
-                &logr("[-] Invalid string\n");
+                if ($ans =~ /\S/) {
+                    if ($ans !~ /^\s*\.\s*$/) {
+                        $str .= "$ans, ";
+                        push @fw_search_strings, $ans;
+                    }
+                } else {
+                    &logr("[-] Invalid string\n");
+                }
             }
+            $str =~ s/\,\s*$//;
+            &put_answer_file_value($ans_file_str, $str);
         }
         &logr("\n    All firewall search strings used by psad are located " .
             "in the psad config file:\n    $config{'PSAD_CONF_DIR'}/psad.conf\n");
@@ -1814,18 +1885,27 @@ sub query_email() {
         &logr("    You can enter as many email addresses as you like; " .
             "each on its own line.\n\n");
         &logr("    End with a \".\" on a line by itself.\n\n");
-        my $ans = '';
-        while ($ans !~ /^\s*\.\s*$/) {
-            &logr("    Email Address: ");
-            $ans = <STDIN>;
-            chomp $ans;
-            if ($ans =~ m|^\s*(\S+\@\S+)$|) {
-                $email_str .= "$1, ";
-            } elsif ($ans !~ /^\s*\.\s*$/) {
-                &logr("[-] Invalid email address \"$ans\"\n");
+
+        my $ans_file_str = 'Email addresses:';
+
+        if ($use_answers and defined $answers{$ans_file_str}) {
+            $email_str = $answers{$ans_file_str};
+            print "$answers{$ans_file_str}\n";
+        } else {
+            my $ans = '';
+            while ($ans !~ /^\s*\.\s*$/) {
+                &logr("    Email Address: ");
+                $ans = <STDIN>;
+                chomp $ans;
+                if ($ans =~ m|^\s*(\S+\@\S+)$|) {
+                    $email_str .= "$1, ";
+                } elsif ($ans !~ /^\s*\.\s*$/) {
+                    &logr("[-] Invalid email address \"$ans\"\n");
+                }
             }
+            $email_str =~ s/\,\s*$//;
+            &put_answer_file_value($ans_file_str, $email_str);
         }
-        $email_str =~ s/\,\s*$//;
     }
     return $email_str;
 }
@@ -1833,49 +1913,88 @@ sub query_email() {
 sub query_syslog() {
     &logr("\n[+] psad supports the syslogd, rsyslogd, syslog-ng, ulogd, and\n" .
         "    metalog logging daemons.  Which system logger is running?\n\n");
-    my $ans = '';
-    while ($ans ne 'syslogd' and $ans ne 'rsyslogd' and
-            $ans ne 'syslog-ng' and $ans ne 'ulogd' and $ans ne 'metalog') {
-        &logr("    syslogd / rsyslogd / syslog-ng / ulogd / metalog? [syslogd] ");
-        $ans = <STDIN>;
-        if ($ans eq "\n") {  ### allow default to take over
-            $ans = 'syslogd';
-        }
-        $ans =~ s/\s*//g;
 
-        if ($ans eq 'syslogd') {
-            ### allow command line --syslog-conf arg to take over
-            $syslog_conf = '/etc/syslog.conf' unless $syslog_conf;
-        } elsif ($ans eq 'rsyslogd') {
-            ### allow command line --syslog-conf arg to take over
-            $syslog_conf = '/etc/rsyslog.conf' unless $syslog_conf;
-        } elsif ($ans eq 'syslog-ng') {
-            ### allow command line --syslog-conf arg to take over
-            $syslog_conf = '/etc/syslog-ng/syslog-ng.conf' unless $syslog_conf;
-        } elsif ($ans eq 'metalog') {
-            ### allow command line --syslog-conf arg to take over
-            $syslog_conf = '/etc/metalog/metalog.conf' unless $syslog_conf;
-        }
-        if ($ans ne 'ulogd' and $syslog_conf and not -e $syslog_conf) {
-            if (-e '/etc/rsyslog.conf') {
-                warn "[-] It looks like /etc/rsyslog.conf exists, ",
-                    "did you mean rsyslog?\n";
+    my $ans = '';
+    my $ans_file_str = 'System logger:';
+
+    if ($use_answers and defined $answers{$ans_file_str}) {
+        $ans = $answers{$ans_file_str};
+        print "$answers{$ans_file_str}\n";
+    } else {
+        while ($ans ne 'syslogd' and $ans ne 'rsyslogd' and
+                $ans ne 'syslog-ng' and $ans ne 'ulogd' and $ans ne 'metalog') {
+            &logr("    syslogd / rsyslogd / syslog-ng / ulogd / metalog? [syslogd] ");
+            $ans = <STDIN>;
+            if ($ans eq "\n") {  ### allow default to take over
+                $ans = 'syslogd';
             }
-            die
-"[*] The config file $syslog_conf does not exist. Re-run install.pl\n",
-"    with the --syslog-conf argument to specify the path to the syslog\n",
-"    daemon config file.";
+            $ans =~ s/\s*//g;
+
+            if ($ans eq 'syslogd') {
+                ### allow command line --syslog-conf arg to take over
+                $syslog_conf = '/etc/syslog.conf' unless $syslog_conf;
+            } elsif ($ans eq 'rsyslogd') {
+                ### allow command line --syslog-conf arg to take over
+                $syslog_conf = '/etc/rsyslog.conf' unless $syslog_conf;
+            } elsif ($ans eq 'syslog-ng') {
+                ### allow command line --syslog-conf arg to take over
+                $syslog_conf = '/etc/syslog-ng/syslog-ng.conf' unless $syslog_conf;
+            } elsif ($ans eq 'metalog') {
+                ### allow command line --syslog-conf arg to take over
+                $syslog_conf = '/etc/metalog/metalog.conf' unless $syslog_conf;
+            }
+            if ($ans ne 'ulogd' and $syslog_conf and not -e $syslog_conf) {
+                if (-e '/etc/rsyslog.conf') {
+                    warn "[-] It looks like /etc/rsyslog.conf exists, ",
+                        "did you mean rsyslog?\n";
+                }
+                die
+    "[*] The config file $syslog_conf does not exist. Re-run install.pl\n",
+    "    with the --syslog-conf argument to specify the path to the syslog\n",
+    "    daemon config file.";
+            }
+        }
+        die "[-] Invalid syslog daemon \"$ans\""
+            unless ($ans and
+                ($ans eq 'syslogd'
+                or $ans eq 'rsyslogd'
+                or $ans eq 'syslog-ng'
+                or $ans eq 'ulogd'
+                or $ans eq 'metalog'));
+        print "\n";
+        &put_answer_file_value($ans_file_str, $ans);
+    }
+    return $ans;
+}
+
+sub put_answer_file_value() {
+    my ($answer_str, $value) = @_;
+
+    return if $no_write_answers;
+
+    my @lines = ();
+
+    if (-e $answers_file) {
+        open F, "< $answers_file" or die "[*] Could not open $answers_file: $!";
+        @lines = <F>;
+        close F;
+    }
+
+    my $found_str = 0;
+    open F, "> $answers_file" or die "[*] Could not open $answers_file: $!";
+    for my $line (@lines) {
+        if ($line =~ /^$answer_str\s+.*;/) {
+            print F "$answer_str        $value;\n";
+            $found_str = 1;
+        } else {
+            print F $line;
         }
     }
-    die "[-] Invalid syslog daemon \"$ans\""
-        unless ($ans and
-            ($ans eq 'syslogd'
-            or $ans eq 'rsyslogd'
-            or $ans eq 'syslog-ng'
-            or $ans eq 'ulogd'
-            or $ans eq 'metalog'));
-    print "\n";
-    return $ans;
+    unless ($found_str) {
+        print F "$answer_str        $value;\n";
+    }
+    close F;
+    return;
 }
 
 sub put_var() {
@@ -2207,7 +2326,7 @@ Usage: install.pl [options]
     -p, --path-update            - Run path update code regardless of whether
                                    a previous config is being merged.
     -S, --Skip-mod-install       - Do not install any perl modules.
-    -s  <file>                   - Specify path to syslog.conf file.
+    -s, --syslog-conf <file>     - Specify path to syslog.conf file.
     -c, --config <file>          - Specify alternate path to psad.conf from
                                    which default installation paths are
                                    derived.
@@ -2223,6 +2342,13 @@ Usage: install.pl [options]
                                    to './configure --prefix=/dir').
     --install-test-dir           - Install psad in test/psad-install for
                                    test suite.
+    -U, --Use-answers            - Apply answers to installation queries
+                                   from the file $answers_file.
+    -a, --answers-file <file>    - Specify path to the answers file.
+    --no-write-answers           - By default the install.pl script
+                                   records installation query answers to
+                                   the file $answers_file, but this option
+                                   disables this behavior.
     -r, --runlevel <N>           - Specify the current system runlevel.
     --no-rm-lib-dir              - Do not remove the /usr/lib/psad/
                                    directory before installing psad.

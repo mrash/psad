@@ -464,3 +464,10 @@ Lukas Baxa
     - Reported bug for ICMP packet handling where psad would incorrectly
       interpret ICMP port unreachable messages as UDP packets because the UDP
       specifics are included in the iptables log message.
+
+@pyllyukko
+    - Suggested --install-root for the install.pl script so that psad can be
+      installed in a directory specified by the user.
+    - Suggested the ability to have install.pl read answers to queries from a
+      file in the filesystem in order to support easy automated installs of
+      psad.

@@ -1,4 +1,45 @@
-psad-2.1.8 (12//2010):
+psad-2.2 (02/20/2012):
+    - Added support for detection of malicious traffic that is delivered via
+      IPv6.  This is accomplished by parsing ip6tables log messages - these are
+      in a slightly different format than the iptables log messages.  Here is
+      an example:
+
+        Mar 17 13:39:13 linux kernel: [956932.483644] DROP IN=eth0 OUT=
+        MAC=00:13:46:3a:41:36:00:1b:b9:76:9c:e4:86:dd
+        SRC=2001:0db8:0000:f101:0000:0000:0000:0002
+        DST=2001:0db8:0000:f101:0000:0000:0000:0001 LEN=80 TC=0 HOPLIMIT=64
+        FLOWLBL=0 PROTO=TCP SPT=50326 DPT=993 WINDOW=5760 RES=0x00 SYN URGP=0
+
+      Detection of malicious IPv6 traffic can be disabled via a new
+      ENABLE_IPV6_DETECTION config variable.
+
+    - For ICMP6 traffic, added protocol validation for ICMP6 type/code
+      combinations.
+    - Replaced Net::IPv4Addr with the excellent NetAddr::IP module which has
+      comprehensive support for IPv6 address network parsing and comparisons.
+    - Added a new test suite in the test/ directory to validate psad run time
+      operations (scan detection, signature matching, and more).  To support
+      this, a new '--install-test-dir' option was added to the install.pl
+      script.  Once this is executed, the test suite can be run via the
+      test-psad.pl script in the test/ directory.
+    - Added a new MAX_SCAN_IP_PAIRS config variable to allow psad memory usage
+      to be constrained by restricting the number of unique IP pairs that psad
+      This is useful for when psad is deployed on systems with little memory,
+      and is best utilized in conjunction with disabling ENABLE_PERSISTENCE so
+      that old scans will also be deleted (and thereby making room for tracking
+      new scans under the MAX_SCAN_IP_PAIRS threshold).
+    - Bug fix for 'qw(...) usage as parenthesis' warnings for perl > 5.14
+    - Bug fix that caused psad to emit the following:
+
+        Undefined subroutine &main::LOG_DAEMON called at ./psad line 10071.
+
+      This problem was noticed by Robert and reported on the psad mailing list.
+    - Added --install-root to the install.pl script so that psad can be
+      installed in a directory specified by the user as opposed to the normal
+      system default.  This was a suggestion from @pyllyukko.
+    - Added PERL5LIB env variable usage to the install.pl script so that module
+      installs can reference the current install path.
+    - Updated to the latest p0f signatures from OpenBSD.
     - Altered the 'ET MALWARE Bundleware Spyware CHM Download' Snort rule in
       the bundled Emerging Threats rule set to make sure that ClamAV does not
       flag on the pattern "mhtml\:file\://" which is associated with the
@@ -29,6 +70,42 @@ psad-2.1.8 (12//2010):
       ID=22458 PROTO=UDP SPT=35080 DPT=33434 LEN=48 ]
 
     - Updated the bundled whois client to 5.0.6.
+    - Removed the ExtUtils::MakeMaker RPM build requirement from the psad.spec
+      file.  This is a compromise which will allow the psad RPM to be built
+      even if RPM dosen't or can't see that ExtUtils::MakeMaker is installed -
+      most likely it will build anyway.  If it doesn't, there are bigger
+      problems since psad is written in perl.  If you want to build the psad
+      RPM with a .spec file that requires ExtUtils::MakeMaker, then use the
+      "psad-require-makemaker.spec" file that is bundled in the psad sources.
+    - Switched to git from svn - comprehensive psad development history can
+      can acquired through gitweb:
+
+        http://www.cipherdyne.org/cgi-bin/gitweb.cgi?p=psad.git;a=summary
+
+      or through git itself:
+
+        $ git clone http://www.cipherdyne.org/git/psad psad.git
+
+    - Updated to IPTables::ChainMgr 1.2 and IPTables::Parse 1.1 in the deps/
+      directory.
+    - In the /var/log/psad/<ip>/ directories, whois information is stored in
+      the <IP>_whois files, the IP in the filename was included as a
+      destination IP under the psad -S output.  This has been fixed.  Here is
+      an example of the invalid output:
+
+        [+] IP Status Detail:
+            SRC:  123.123.123.221, DL: 2, Dsts: 2, Pkts: 1, Unique sigs: 1,
+                    Email alerts: 1
+            DST: 1.2.3.4, Local IP
+                Scanned ports: TCP 1433, Pkts: 1, Chain: INPUT, Intf: eth0
+                Signature match: "MISC Microsoft SQL Server communication attempt"
+                    TCP, Chain: INPUT, Count: 1, DP: 1433, SYN, Sid: 100205
+            DST: 123.123.123.221
+
+    - By default the install.pl script records user answers to installation
+      queries so they can be used to install psad in an automated fashion later.
+      A new option --Use-answers makes this possible.  This feature was requests
+      by @pyllyukko.
 
 psad-2.1.7 (07/14/2010):
     - (Dan A. Dickey) Added the ability to use the "ip" command from the

@@ -49,6 +49,7 @@ char psadfifo_file[MAX_PATH_LEN];
 char fwdata_file[MAX_PATH_LEN];
 char fw_search_file[MAX_PATH_LEN];
 char snort_sid_str[MAX_PATH_LEN];
+char install_root[MAX_PATH_LEN];
 char psad_dir[MAX_PATH_LEN];
 char psad_fifo_dir[MAX_PATH_LEN];
 char psad_run_dir[MAX_PATH_LEN];
@@ -307,6 +308,7 @@ static void parse_config(char * file)
         if ((*index != '#') && (*index != '\n') &&
                 (*index != ';') && (index != NULL)) {
 
+            find_char_var("INSTALL_ROOT", install_root, index);
             find_char_var("PSAD_DIR", psad_dir, index);
             find_char_var("PSAD_FIFO_DIR", psad_fifo_dir, index);
             find_char_var("PSAD_RUN_DIR", psad_run_dir, index);
@@ -347,6 +349,12 @@ static void expand_config_vars(void)
         }
         found_sub_var = 0;
 
+        if (has_sub_var("INSTALL_ROOT", install_root, sub_var,
+                pre_str, post_str)) {
+            find_sub_var_value(install_root, sub_var, pre_str, post_str);
+            found_sub_var = 1;
+        }
+
         if (has_sub_var("SNORT_SID_STR", snort_sid_str, sub_var,
                 pre_str, post_str)) {
             find_sub_var_value(snort_sid_str, sub_var, pre_str, post_str);
@@ -384,6 +392,9 @@ static void find_sub_var_value(char *value, char *sub_var, char *pre_str,
     } else if (strncmp(sub_var, "PSAD_FIFO_DIR", MAX_GEN_LEN) == 0) {
         strlcpy(sub_var, psad_fifo_dir, MAX_GEN_LEN);
         found_var = 1;
+    } else if (strncmp(sub_var, "INSTALL_ROOT", MAX_GEN_LEN) == 0) {
+        strlcpy(sub_var, install_root, MAX_GEN_LEN);
+        found_var = 1;
     } else if (strncmp(sub_var, "PSAD_RUN_DIR", MAX_GEN_LEN) == 0) {
         strlcpy(sub_var, psad_run_dir, MAX_GEN_LEN);
         found_var = 1;
@@ -417,7 +428,9 @@ static void find_sub_var_value(char *value, char *sub_var, char *pre_str,
 static void dump_config(void)
 {
     fprintf(stderr, "[+] dump_config()\n");
+    fprintf(stderr, "    INSTALL_ROOT: %s\n", install_root);
     fprintf(stderr, "    PSAD_DIR: %s\n", psad_dir);
+    fprintf(stderr, "    PSAD_RUN_DIR: %s\n", psad_run_dir);
     fprintf(stderr, "    PSAD_FIFO_FILE: %s\n", psadfifo_file);
     fprintf(stderr, "    FW_DATA_FILE: %s\n", fwdata_file);
     fprintf(stderr, "    SNORT_SID_STR: %s\n", snort_sid_str);
@@ -437,6 +450,12 @@ static void check_config(void)
     err = 1;
     if (psad_dir[0] == '\0')
         fprintf(stderr, "[*] Could not find PSAD_DIR\n");
+
+    else if (install_root[0] == '\0')
+        fprintf(stderr, "[*] Could not find INSTALL_ROOT\n");
+
+    else if (psad_run_dir[0] == '\0')
+        fprintf(stderr, "[*] Could not find PSAD_RUN_DIR\n");
 
     else if (psadfifo_file[0] == '\0')
         fprintf(stderr, "[*] Could not find PSAD_FIFO_FILE\n");
@@ -483,6 +502,7 @@ static void clean_settings (void)
 
     *psad_dir        = '\0';
     *psad_fifo_dir   = '\0';
+    *install_root    = '\0';
     *psad_run_dir    = '\0';
     *psadfifo_file   = '\0';
     *fwdata_file     = '\0';

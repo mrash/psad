@@ -1,3 +1,21 @@
+psad-2.2.1 (11/24/2012):
+    - Bug fix in --Analyze mode when IP fields are to be searched with the
+      --analysis-fields argument (such as --analysis-fields "SRC:1.2.3.4").
+      The bug was reported by Gregorio Narvaez, and looked like this:
+
+      Use of uninitialized value $_[0] in length at
+      ../../blib/lib/NetAddr/IP/UtilPP.pm (autosplit into
+      ../../blib/lib/auto/NetAddr/IP/UtilPP/hasbits.al) line 126.
+      Use of uninitialized value $_[0] in length at
+      ../../blib/lib/NetAddr/IP/UtilPP.pm (autosplit into
+      ../../blib/lib/auto/NetAddr/IP/UtilPP/hasbits.al) line 126.
+      Bad argument length for NetAddr::IP::UtilPP::hasbits, is 0, should be
+      128 at ../../blib/lib/NetAddr/IP/UtilPP.pm (autosplit into
+      ../../blib/lib/auto/NetAddr/IP/UtilPP/_deadlen.al) line 122.
+
+    - Added --stdin argument to allow psad to collect iptables log data from
+      STDIN in --Analyze mode.
+
 psad-2.2 (02/20/2012):
     - Added support for detection of malicious traffic that is delivered via
       IPv6.  This is accomplished by parsing ip6tables log messages - these are

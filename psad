@@ -393,6 +393,7 @@ my $csv_end_line     = 0;
 my $csv_regex        = '';
 my $csv_neg_regex    = '';
 my $csv_have_timestamp = 0;
+my $pkts_from_stdin = 0;
 my $dump_ipt_policy  = 0;
 my $fw_include_ips   = 0;
 my $benchmark        = 0;
@@ -1925,7 +1926,7 @@ sub parse_NF_pkt_str() {
         ### we are looking to analyze packets from a specific IP/subnet
         if ($pkt_hr->{'is_ipv6'}) {
             if ($restrict_ip->version() == 6) {
-                return $PKT_IGNORE unless 
+                return $PKT_IGNORE unless
                     $pkt_hr->{'s_obj'}->within($restrict_ip) or
                     $pkt_hr->{'d_obj'}->within($restrict_ip);
             }
@@ -7194,13 +7195,20 @@ sub analysis_mode() {
     }
 
     print "[+] Entering analysis mode.  Parsing $fw_data_file\n";
-    open MSGS, "< $fw_data_file" or die "[*] Could not open ",
-        "$fw_data_file: $!";
-    my @lines = <MSGS>;
-    close MSGS;
+    my $fh = '';
+    if ($pkts_from_stdin) {
+        $fh = *STDIN;
+    } else {
+        open MSGS, "< $fw_data_file" or die "[*] Could not open ",
+            "$fw_data_file: $!";
+        $fh = *MSGS;
+    }
     my @ipt_msgs = ();
     my $pkt_ctr = 0;
-    PKT: for my $line (@lines) {
+    my $line_ctr = 0;
+    PKT: while (<$fh>) {
+        my $line = $_;
+        $line_ctr++;
         if ($num_packets > 0) {
             last PKT if $pkt_ctr >= $num_packets;
         }
@@ -7223,8 +7231,10 @@ sub analysis_mode() {
             }
         }
     }
-    print "[+] Found ", ($#ipt_msgs+1), " iptables log messages out of ",
-        ($#lines+1), " total lines.\n";
+    close $fh unless $pkts_from_stdin;
+
+    print "[+] Found ", ($#ipt_msgs+1), " iptables log messages out of " .
+        "$line_ctr total lines.\n";
     print "    This may take a while...\n" if $#ipt_msgs > 15000;
 
     ### analyze all packets
@@ -7278,18 +7288,20 @@ sub ipt_match_criteria() {
                     return [], '' unless $pkt_hr->{$tok} =~ m|$match_hr->{'re'}|;
                 }
             } elsif (defined $match_hr->{'net'} or defined $match_hr->{'ip'}) {
+                my $net_or_ip_key = 'ip_obj';
+                $net_or_ip_key = 'net_obj' if defined $match_hr->{'net'};
                 if ($pkt_hr->{$tok} =~ m|$ipv4_re|
                         or $pkt_hr->{$tok} =~ m|$ipv6_re|) {
                     my $ip_match_obj = '';
                     if ($tok eq 'src') {
                         $ip_match_obj = $pkt_hr->{'s_obj'};
                     } elsif ($tok eq 'dst') {
-                        $ip_match_obj = $pkt_hr->{'s_obj'};
+                        $ip_match_obj = $pkt_hr->{'d_obj'};
                     }
                     if ($match_hr->{'negate'}) {
-                        return [], '' if $ip_match_obj->within($match_hr->{'net'});
+                        return [], '' if $ip_match_obj->within($match_hr->{$net_or_ip_key});
                     } else {
-                        return [], '' unless $ip_match_obj->within($match_hr->{'net'});
+                        return [], '' unless $ip_match_obj->within($match_hr->{$net_or_ip_key});
                     }
                 } else {
                     return [], '';
@@ -7413,7 +7425,7 @@ sub csv_mode() {
                 }
             }
         }
-        close MSGS;
+        close $fh unless $csv_stdin;
     }
 
     if ($gnuplot_mode) {
@@ -8113,6 +8125,7 @@ sub csv_tokens() {
                     die "[*] $tok_str requires a search criteria in -A mode.";
                 }
             }
+            $search =~ s/\,$//;
             if ($token eq 'timestamp') {
                 $csv_have_timestamp = 1;
             }
@@ -8195,10 +8208,27 @@ sub csv_tokens() {
                     $search_hsh{'str'} = $1;
                 } elsif ($search =~ m|^$ipv4_re/$ipv4_re$|) {
                     $search_hsh{'net'} = $search;
+                    $search_hsh{'net_obj'} = new NetAddr::IP($search)
+                        or die "[*] NetAddr::IP($search) error";
                 } elsif ($search =~ m|^$ipv4_re/\d+$|) {
                     $search_hsh{'net'} = $search;
+                    $search_hsh{'net_obj'} = new NetAddr::IP($search)
+                        or die "[*] NetAddr::IP($search) error";
                 } elsif ($search =~ m|^$ipv4_re$|) {
                     $search_hsh{'ip'} = $search;
+                    $search_hsh{'ip_obj'} = new NetAddr::IP($search)
+                        or die "[*] NetAddr::IP($search) error";
+                } elsif ($search =~ m|\:|) {
+                    ### see if this is an IPv6 address
+                    if ($search =~ m|\/|) {
+                        $search_hsh{'net'} = $search;
+                        $search_hsh{'net_obj'} = new6 NetAddr::IP($search)
+                            or die "[*] NetAddr::IP($search) error";
+                    } else {
+                        $search_hsh{'net'} = $search;
+                        $search_hsh{'net_obj'} = new6 NetAddr::IP($search)
+                            or die "[*] NetAddr::IP($search) error";
+                    }
                 } else {
                     die "[*] Unrecognized value for $token";
                 }
@@ -9825,7 +9855,7 @@ sub get_scale_factor() {
             $val = 50000;
         }
     }
-    $val++ if $val == 0;
+    $val++;
     return $val;
 }
 
@@ -10509,7 +10539,8 @@ sub getopt_wrapper() {
         'analysis-fields=s' => \$analysis_fields, # Place a criteria on various fields
                                                   #   that are parsed from an iptables
                                                   #   logfile.
-        'analyze-fields=s'  => \$analysis_fields,
+        'analyze-fields=s'  => \$analysis_fields, # Synonym.
+        'stdin'             => \$pkts_from_stdin,
         'whois-analysis'    => \$analysis_whois,  # Issue whois lookups in analysis
                                                   #   mode.
         'dns-analysis'      => \$enable_analysis_dns,  # Issue DNS lookups in -A mode.

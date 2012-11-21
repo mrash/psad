@@ -82,6 +82,12 @@ to point psad at your
 .I /var/log/messages
 file.
 .TP
+.BR \-\^\-analysis-fields\ \<search\ fields>
+In --Analyze mode restrict analysis to iptables log messages that have specific
+values for particular fields.  Examples include "SRC:1.2.3.4", "DST:10.0.0.0/24,
+and "TTL:64", and multiple fields are supported as a comma-separated list like
+"SRC:1.2.3.4, LEN:44, DST:10.0.0.0/24".
+.TP
 .BR \-i "\fR,\fP " \-\^\-interface\ \<interface>
 Specify the interface that
 .B psad

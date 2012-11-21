@@ -1,5 +1,6 @@
 #!/usr/bin/perl -w
 
+use Cwd;
 use File::Copy;
 use File::Path;
 use Getopt::Long 'GetOptions';
@@ -11,6 +12,7 @@ my $output_dir     = 'output';
 my $conf_dir       = 'conf';
 my $run_dir        = 'run';
 my $scans_dir      = 'scans';
+my $test_install_dir = 'psad-install';
 my $syn_scan_file  = 'syn_scan_1000_1500';
 my $fin_scan_file  = 'fin_scan_1000_1150';
 my $xmas_scan_file = 'xmas_scan_1000_1150';
@@ -34,7 +36,7 @@ my $dl5_ipv4_subnet_auto_dl_file = "$conf_dir/auto_dl_5_192.168.10.0_24";
 my $dl5_ipv4_subnet_auto_dl_file_tcp = "$conf_dir/auto_dl_5_192.168.10.0_24_tcp";
 my $dl5_ipv4_subnet_auto_dl_file_udp = "$conf_dir/auto_dl_5_192.168.10.0_24_udp";
 
-my $psadCmd        = 'psad-install/usr/sbin/psad';
+my $psadCmd        = "$test_install_dir/usr/sbin/psad";
 
 my $cmd_out_tmp    = 'cmd.out';
 my $default_conf   = "$conf_dir/default_psad.conf";
@@ -105,6 +107,16 @@ if ($test_system_install) {
 
 ### define all tests
 my @tests = (
+    {
+        'category' => 'install',
+        'detail'   => "test directory: $test_install_dir",
+        'err_msg'  => 'could not install',
+        'function' => \&install_test_dir,
+        'cmdline'  => "./install.pl --install-test-dir --Use-answers " .
+            "--answers-file test/install.answers",
+        'exec_err' => $NO,
+        'fatal'    => $YES
+    },
     {
         'category' => 'compilation',
         'detail'   => 'psad compiles',
@@ -416,6 +428,146 @@ my @tests = (
         'cmdline'   => "$psadCmd --test-mode -A --auto-dl $dl5_ipv4_subnet_auto_dl_file_udp " .
                 "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
         'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'ignore src via --analysis-fields SRC:1.2.3.4',
+        'err_msg'   => 'did not ignore SRC:1.2.3.4',
+        'positive_output_matches' => [
+            qr/Level 1\: 0 IP addresses/,
+            qr/Level 2\: 0 IP addresses/,
+            qr/Level 3\: 0 IP addresses/,
+            qr/Level 4\: 0 IP addresses/,
+            qr/Level 5\: 0 IP addresses/,
+        ],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A --analysis-fields SRC:1.2.3.4 " .
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'match src via --analysis-fields SRC:192.168.10.55',
+        'err_msg'   => 'did not match SRC:192.168.10.55',
+        'positive_output_matches' => [
+            qr/Top\s\d+\sattackers/i,
+            qr/scanned\sports.*?1000\-1500\b/i,
+            qr/Source\sOS/i, qr/BACKDOOR/i,
+            qr/IP\sstatus/i,
+            qr/192\.168\.10\.55/
+        ],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A --analysis-fields SRC:192.168.10.55 " .
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'ignore src via --analysis-fields DST:1.2.3.4',
+        'err_msg'   => 'did not ignore DST:1.2.3.4',
+        'positive_output_matches' => [
+            qr/Level 1\: 0 IP addresses/,
+            qr/Level 2\: 0 IP addresses/,
+            qr/Level 3\: 0 IP addresses/,
+            qr/Level 4\: 0 IP addresses/,
+            qr/Level 5\: 0 IP addresses/,
+        ],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A --analysis-fields DST:1.2.3.4 " .
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'match src via --analysis-fields DST:192.168.10.1',
+        'err_msg'   => 'did not match DST:192.168.10.1',
+        'positive_output_matches' => [
+            qr/Top\s\d+\sattackers/i,
+            qr/scanned\sports.*?1000\-1500\b/i,
+            qr/Source\sOS/i, qr/BACKDOOR/i,
+            qr/IP\sstatus/i,
+            qr/192\.168\.10\.55/
+        ],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A --analysis-fields DST:192.168.10.1 " .
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => '--analysis-fields SRC:192.168.10.55, DST:192.168.10.1',
+        'err_msg'   => 'did not match SRC:192.168.10.55, DST:192.168.10.1',
+        'positive_output_matches' => [
+            qr/Top\s\d+\sattackers/i,
+            qr/scanned\sports.*?1000\-1500\b/i,
+            qr/Source\sOS/i, qr/BACKDOOR/i,
+            qr/IP\sstatus/i,
+            qr/192\.168\.10\.55/
+        ],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => qq|$psadCmd --test-mode -A --analysis-fields "SRC:192.168.10.55, DST:192.168.10.1" | .
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'ignore length via --analysis-fields LEN:15',
+        'err_msg'   => 'did not ignore LEN:15',
+        'positive_output_matches' => [
+            qr/Level 1\: 0 IP addresses/,
+            qr/Level 2\: 0 IP addresses/,
+            qr/Level 3\: 0 IP addresses/,
+            qr/Level 4\: 0 IP addresses/,
+            qr/Level 5\: 0 IP addresses/,
+        ],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A --analysis-fields LEN:15 " .
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'match length via --analysis-fields LEN:44',
+        'err_msg'   => 'did not match LEN:44',
+        'positive_output_matches' => [
+            qr/Top\s\d+\sattackers/i,
+            qr/scanned\sports.*?1000\-1500\b/i,
+            qr/Source\sOS/i, qr/BACKDOOR/i,
+            qr/IP\sstatus/i,
+            qr/192\.168\.10\.55/
+        ],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A --analysis-fields LEN:44 " .
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'invalid --analysis-fields BOGUS:44',
+        'err_msg'   => 'allowed BOGUS:44',
+        'positive_output_matches' => [
+            qr/valid fields are/
+        ],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A --analysis-fields BOGUS:44 " .
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+        'exec_err'  => $YES,
         'fatal'     => $NO
     },
 
@@ -792,6 +944,49 @@ sub look_for_warnings() {
 
     copy $current_test_file, $orig_test_file;
     unlink $current_test_file;
+
+    return $rv;
+}
+
+sub install_test_dir() {
+    my $test_hr = shift;
+
+    my $rv = 1;
+    my $curr_pwd = cwd() or die $!;
+
+    if (-d $test_install_dir) {
+        rmtree $test_install_dir or die $!;
+    }
+    mkdir $test_install_dir  or die $!;
+
+    chdir '..' or die $!;
+
+    my $exec_rv = &run_cmd($test_hr->{'cmdline'},
+                "test/$cmd_out_tmp", "test/$current_test_file");
+
+    if ($test_hr->{'exec_err'} eq $YES) {
+        $rv = 0 if $exec_rv;
+    } elsif ($test_hr->{'exec_err'} eq $NO) {
+        $rv = 0 unless $exec_rv;
+    } else {
+        $rv = 1;
+    }
+
+    if ($test_hr->{'positive_output_matches'}) {
+        $rv = 0 unless &file_find_regex(
+            $test_hr->{'positive_output_matches'},
+            $test_hr->{'match_all'},
+            $current_test_file);
+    }
+
+    if ($test_hr->{'negative_output_matches'}) {
+        $rv = 0 if &file_find_regex(
+            $test_hr->{'negative_output_matches'},
+            $test_hr->{'match_all'},
+            $current_test_file);
+    }
+
+    chdir $curr_pwd or die $!;
 
     return $rv;
 }

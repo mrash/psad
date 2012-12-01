@@ -1,0 +1,85 @@
+* COMPLETE
+  This bucket is for completed tasks.
+* TODO
+** Nmap protocol scan detection
+   :<2012-12-01 Sat>
+** Automated tests to verify correct behavior for command line
+   options (and potentially other things such as correctness of
+   psad alerts).
+** Take into account whether a destination port is in /etc/services for
+   the danger level calculaion.  A SYN packet to tcp/22 is worse than
+   a stray SYN packet to an arbitrary high port (as long as there isn't
+   a backdoor, etc.).  There are (probably) historically more
+   vulnerabilities in sshd than for some service that isn't even listed
+   in /etc/services.
+** Idle scan detection through seeing combination of SYN/ACK and RST
+   packets (i.e. the iptables box was used as a zombie host).
+** XML logging format.
+- HTML output mode, and ability to create IP directories/pages under a
+  web root directory.
+- Add the ability to install.pl to restore the "latest" syslog config
+  backup file (fwknop may have been installed for example) at uninstall
+  time.
+** Infer NMAP scan if OPT does not exist in the iptables log (because tcp options are missing)?
+- Play with SHOW_ALL_SIGNATURES = "Y" since this may not really cause
+  hugely long email alerts.  This trick would be to perhaps associate
+  a "last seen" timestamp with each old signature.
+** MRTG scripts.
+   :<2012-12-01 Sat>
+** Add a DNS_TIMEOUT config keyword.
+   :<2012-12-01 Sat>
+** Add a threshold danger level for ENABLE_EXT_SCRIPT_EXEC functionality.
+** Ability to remove email block for a specific ip from a running psad process.
+** Summary report emails like dshield does.
+** Ability to elevate scan danger level based on specific iptables prefixes.
+** Replace full ascii signature listings in <ip>_signatures with sid numbers and packet counts.
+** Rework IGNORE_CONNTRACK_BUG_PKTS strategy to maximze signature detection.
+** More syslog messages from psad, psadwatchd, and kmsgsd.
+** Put a "psad signature strategy" link in all alert emails.
+** Extract default behavior into psad.conf.
+** Custom logging line upon auto-blocking an ip.
+** Add difference notification (via syslog) for changed variables after receiving a HUP signal.
+** Include the ability to specify a network in CIDR notation with --Status output.
+** Drop root privileges if not running in auto-blocking mode.
+** Extend install.pl to provide an option to dowload the latest perl modules (Date::Calc, Unix::Syslog, etc.) from CPAN.
+** Extend passive OS fingerprinting to make use of more types of packets than just tcp/syn packets.
+** Extend passive OS fingerprinting to include signatures from Xprobe from http://www.sys-security.com.
+- Add a density calculation for a range of scanned ports, and also
+  add a "verbose" mode that will display which of the scanned ports
+  actually resolve to something in the IANA spec.
+** Packet grapher mode with annotated scan alerts.
+** Mysql database support?
+** psad.conf option to disable signature detection; useful if fwsnort is already deployed for this.
+** Include a verbose message in the body of certain emails that as of psad-1.0.0-pre2 only contain a subject line.
+- Deal with the possibility that psad could eat lots of memory over
+  time if $ENABLE_PERSISTENCE="Y". This should involve periodically
+  deleting entries in %scan (or maybe the entire hash), but this
+  should be done in a way that allows some scan data to persist.
+** ipfw/pf/ipfilter support on *BSD platforms.
+** Take into account syslog message summarization; i.e. "last message repeated n times".
+- Possibly add a daemon to take into account ACK PSH, ACK FIN, RST etc.
+  packets that the client may generate after the ip_conntrack module
+  is reloaded.  Without anticipating such packets psad will interpret
+  them as a belonging to a port scan.  NOTE: This problem is mostly
+  corrected by the conntrack patch to the kernel.  Also, the
+  IGNORE_CONNTRACK_BUG_PKTS variable was added to mitigate this
+  problem.
+- Improve check_firewall_rules() to check for a state rule (iptables)
+  since having such a rule greatly improves the quality of the data
+  stream provided to psad by kmsgsd since more packet types will be
+  denied without requiring overly complicated firewall rules to detect
+  odd tcp flag combinations.
+** Configurable iptables prerequisite checks.
+- Handle "pass" action on Snort rules in the signatures file.  This will
+  allow ignore rules to be written in the Snort rules language itself
+  (this will far more powerful than any of the IGNORE_* keywords).
+** Allow auto-response blocking based on either src or dst of a signature match.
+   :<2012-11-21 Wed>
+** Include IP options decode information in email alert if a signature matched against IP options.
+   :<2012-11-21 Wed>
+** Include input/output interfaces, as well as physin and physout interfaces.
+   :<2012-11-21 Wed>
+** IPCop integration.
+   :<2012-11-21 Wed>
+** Script to turn pcap files into equivalent iptables log messages.
+   :<2012-11-21 Wed>

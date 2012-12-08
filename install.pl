@@ -67,7 +67,8 @@ my %file_vars = (
     'posf'          => 'POSF_FILE',
     'pf.os'         => 'P0F_FILE',
     'snort_rule_dl' => 'SNORT_RULE_DL_FILE',
-    'ip_options'    => 'IP_OPTS_FILE'
+    'ip_options'    => 'IP_OPTS_FILE',
+    'protocols'     => 'PROTOCOLS_FILE'
 );
 
 my %exclude_cmds = (
@@ -550,8 +551,7 @@ sub install() {
     &perms_ownership($prod_file, 0600);
 
     ### install auto_dl, signatures, icmp_types, posf, and pf.os files
-    for my $filename (qw(signatures icmp_types icmp6_types
-            posf auto_dl snort_rule_dl pf.os ip_options)) {
+    for my $filename (keys %file_vars) {
         my $file = $config{$file_vars{$filename}};
         if (-e $file) {
             &archive($file) unless $noarchive;

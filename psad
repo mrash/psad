@@ -3551,12 +3551,6 @@ sub is_digit_range() {
     return;
 }
 
-sub is_digit() {
-    my $val = shift;
-    return 1 if $val =~ m|^\d+$|;
-    return 0;
-}
-
 sub get_connected_subnets() {
 
     my @connected_subnets = ();

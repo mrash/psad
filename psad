@@ -20,7 +20,7 @@
 #
 # Credits: (see the CREDITS file bundled with the psad sources.)
 #
-# Version: psad-2.3-pre1
+# Version: 2.3-pre1
 #
 # Copyright (C) 1999-2012 Michael Rash (mbr@cipherdyne.org)
 #
@@ -61,19 +61,20 @@
 #   reading.
 #
 # Scan hash key explanation:
-#   absnum    - Total number of packets from $src to $dst
-#   chain     - iptables chain under which the scan packets appear in the
-#               logs.
-#   s_time    - Start time for the first packet seen from src to dst.
-#   alerted   - An alert has been sent.
-#   pkts      - Number of packets (used for signatures and a packet counter
-#               for the current interval.
-#   flags     - Keeps track of tcp flags.
-#   sid       - Signature tracking
-#   abs_sp    - Absolute starting port.
-#   abs_ep    - Absolute ending port.
-#   strtp     - Starting port.
-#   endp      - Ending port.
+#   absnum        - Total number of packets from $src to $dst
+#   tot_protocols - Total number of IP protocols scanned by $src against $dst
+#   chain         - iptables chain under which the scan packets appear in the
+#                   logs.
+#   s_time        - Start time for the first packet seen from src to dst.
+#   alerted       - An alert has been sent.
+#   pkts          - Number of packets (used for signatures and a packet counter
+#                   for the current interval.
+#   flags         - Keeps track of tcp flags.
+#   sid           - Signature tracking
+#   abs_sp        - Absolute starting port.
+#   abs_ep        - Absolute ending port.
+#   strtp         - Starting port.
+#   endp          - Ending port.
 #
 # Sample iptables log messages:
 #
@@ -144,7 +145,7 @@ use strict;
 ### ========================== main =================================
 
 ### set the current version
-my $version = 'psad-2.3-pre1';
+my $version = '2.3-pre1';
 
 ### default config file for psad (can be changed with
 ### --config switch)
@@ -321,9 +322,17 @@ my $ipv6_re = qr|(?:[a-f0-9]{4}:){7}(?:[a-f0-9]{4})|i;
 ### average.
 my $max_hops = 20;
 
-### per protocol packet counters
-my @protocols = qw/tcp udp udplite icmp icmp6/;
+### initial set of protocol packet counters (may get expanded through
+### things like protocol scan detection)
+my %protocols = (
+    'tcp'     => '',
+    'udp'     => '',
+    'udplite' => '',
+    'icmp'    => '',
+    'icmp6'   => ''
+);
 my %proto_ctrs = ();
+my %protocol_strings = ();
 
 ### pid file hash
 my %pidfiles = ();
@@ -635,7 +644,7 @@ my @args_cp = @ARGV;
 &get_local_ips();
 
 ### get the current services running on this machine
-&get_listening_ports() unless ($no_netstat);
+&get_listening_ports() unless $no_netstat;
 
 ### daemonize psad unless running with --no-daemon or an
 ### analysis mode
@@ -1065,6 +1074,7 @@ sub check_scan() {
         }
 
         $proto_ctrs{$pkt{'proto'}}++;
+        $protocols{$pkt{'proto'}} = '';
         if ($pkt{'proto'} eq 'tcp') {
             $top_tcp_ports{$pkt{'dp'}}++;
         } elsif ($pkt{'proto'} eq 'udp') {
@@ -1283,10 +1293,21 @@ sub check_scan() {
             }
         }
 
+
         ### increment hash values
         $scan{$pkt{'src'}}{$pkt{'dst'}}{'absnum'}++;
+
+        $scan{$pkt{'src'}}{$pkt{'dst'}}{'tot_protocols'} = 0
+            unless defined $scan{$pkt{'src'}}{$pkt{'dst'}}{'tot_protocols'};
+
+        $scan{$pkt{'src'}}{$pkt{'dst'}}{'tot_protocols'}++
+            unless defined $scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}};
+
+        $scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}{'proto_pkt_ctr'}++;
+
         $scan{$pkt{'src'}}{$pkt{'dst'}}{'chain'}
             {$pkt{'chain'}}{$pkt{'intf'}}{$pkt{'proto'}}++;
+
         $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}{'pkts'}++;
         $curr_scan{$pkt{'src'}}{$pkt{'dst'}}
             {$pkt{'proto'}}{'flags'}{$pkt{'flags'}}++ if $pkt{'flags'};
@@ -1321,6 +1342,7 @@ sub check_scan() {
 
         if ($pkt{'proto'} eq 'tcp' or $pkt{'proto'} eq 'udp'
                 or $pkt{'proto'} eq 'udplite') {
+
             ### initialize the start and end port for the scanned port range
             if (not defined $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}{'strtp'}) {
                 ### make sure the initial start port is not too low
@@ -1328,7 +1350,8 @@ sub check_scan() {
                 ### make sure the initial end port is not too high
                 $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}{'endp'} = 0;
             }
-            if (not defined $scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}{'abs_sp'}) {
+            unless (defined $scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}
+                    and defined $scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}{'abs_sp'}) {
                 ### This is the absolute starting port since the
                 ### first packet was detected.  Make sure the initial
                 ### start port is not too low
@@ -1349,9 +1372,13 @@ sub check_scan() {
                 &check_range($pkt{'dp'},
                     $scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}{'abs_sp'},
                     $scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}{'abs_ep'});
+
         }
 
-        print STDERR Dumper $scan{$pkt{'src'}}{$pkt{'dst'}} if $debug and $verbose;
+        if ($debug and $verbose) {
+            print STDERR "    print Dumper scan hash $pkt{'src'} -> $pkt{'dst'}\n";
+            print STDERR Dumper $scan{$pkt{'src'}}{$pkt{'dst'}};
+        }
 
         ### attempt to passively guess the remote operating
         ### system based on the ttl, id, len, window, and tos
@@ -1432,6 +1459,8 @@ sub parse_NF_pkt_str() {
     my $is_udplite = 0;
     my $is_icmp    = 0;
     my $is_icmp6   = 0;
+    my $is_proto_num = 0;
+    my $proto_num = -1;
 
     ### with ENABLE_SYSLOG_FILE enabled, psad sees all sorts of syslog
     ### messages that aren't just from iptables (kmsgsd is not running
@@ -1610,6 +1639,9 @@ sub parse_NF_pkt_str() {
         $is_udplite = 1;
     } elsif ($pkt_str =~ /PROTO=UDP\s/) {
         $is_udp = 1;
+    } elsif ($pkt_str =~ /PROTO=(\d+)\s/) {
+        $proto_num = $1;
+        $is_proto_num = 1;
     } else {
         print STDERR "[-] err packet: unrecognized protocol\n" if $debug;
         return $PKT_ERROR;
@@ -1915,6 +1947,33 @@ sub parse_NF_pkt_str() {
                 "\t$pkt_hr->{'dst'}\t$pkt_hr->{'icode'}\t$pkt_hr->{'proto'}";
         }
 
+    } elsif ($is_proto_num) {
+
+        if ($is_ipv6) {
+
+            ### FIXME future
+
+        } else {
+
+            ### Mar 15 20:59:04 linux kernel: [810523.812773] DROP IN=eth0 OUT=
+            ### MAC=23:87:fc:c6:24:58:00:21:3f:98:99:78:09:00 SRC=192.168.10.55
+            ### DST=192.168.10.1 LEN=20 TOS=0x00 PREC=0x00 TTL=59 ID=3052 PROTO=29
+
+            if ($pkt_str =~ /SRC=($ipv4_re)\s+DST=($ipv4_re)\s+LEN=(\d+).*
+                      TTL=(\d+)\s+ID=(\d+).*PROTO=/x) {
+
+                ($pkt_hr->{'src'}, $pkt_hr->{'dst'}, $pkt_hr->{'ip_len'},
+                    $pkt_hr->{'ttl'}, $pkt_hr->{'ip_id'}) = ($1,$2,$3,$4,$5);
+
+                $pkt_hr->{'s_obj'} = new NetAddr::IP($pkt_hr->{'src'})
+                    or return $PKT_ERROR;
+                $pkt_hr->{'d_obj'} = new NetAddr::IP($pkt_hr->{'dst'})
+                    or return $PKT_ERROR;
+            }
+
+            $pkt_hr->{'proto'} = $proto_num;
+        }
+
     } else {
         ### Sometimes the iptables log entry gets messed up due to
         ### buffering issues so we write it to the error log.
@@ -2137,6 +2196,12 @@ sub match_snort_keywords() {
 
                 $dl = $rv if $rv > $dl;
 
+                $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'tot_protocols'} = 0
+                    unless defined $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'tot_protocols'};
+
+                $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'tot_protocols'}++
+                    unless defined $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'tcp'};
+
                 $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'tcp'}
                     {'sid'}{$sid}{$pkt_hr->{'chain'}}{'dp'}
                         = $pkt_hr->{'dp'};
@@ -2170,6 +2235,12 @@ sub match_snort_keywords() {
 
                 $dl = $rv if $rv > $dl;
 
+                $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'tot_protocols'} = 0
+                    unless defined $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'tot_protocols'};
+
+                $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'tot_protocols'}++
+                    unless defined $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'udp'};
+
                 $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'udp'}
                     {'sid'}{$sid}{$pkt_hr->{'chain'}}{'dp'}
                          = $pkt_hr->{'dp'};
@@ -2198,6 +2269,12 @@ sub match_snort_keywords() {
                 next SIG if $rv == 0;
 
                 $dl = $rv if $rv > $dl;
+
+                $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'tot_protocols'} = 0
+                    unless defined $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'tot_protocols'};
+
+                $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'tot_protocols'}++
+                    unless defined $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'icmp'};
 
                 $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'icmp'}{'sid'}
                     {$sid}{$pkt_hr->{'chain'}}{'pkts'}++;
@@ -2920,6 +2997,12 @@ sub add_fwsnort_sid() {
             return 0, $SIG_MATCH;
         }
 
+        $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'tot_protocols'} = 0
+            unless defined $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'tot_protocols'};
+
+        $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{'tot_protocols'}++
+            unless defined $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{$pkt_hr->{'proto'}};
+
         $scan{$pkt_hr->{'src'}}{$pkt_hr->{'dst'}}{$pkt_hr->{'proto'}}
             {'sid'}{$sid}{$pkt_hr->{'chain'}}{'pkts'}++;
 
@@ -3291,6 +3374,9 @@ sub psad_init() {
     ### import TOS-based passive OS fingerprinting signatures
     &import_posf_sigs() unless $no_posf;
 
+    ### import IP protocols detail (derived from /etc/protocols)
+    &import_protocol_strings();
+
     ### import auto_dl file for automatic ip/network danger
     ### level assignment
     &import_auto_dl() unless $no_auto_dl;
@@ -3463,6 +3549,12 @@ sub is_digit_range() {
         unless $config{$key} =~ m|^\d+$| and $config{$key} >= $min
             and $config{$key} <= $max;
     return;
+}
+
+sub is_digit() {
+    my $val = shift;
+    return 1 if $val =~ m|^\d+$|;
+    return 0;
 }
 
 sub get_connected_subnets() {
@@ -4733,8 +4825,9 @@ sub assign_danger_level() {
         }
 
         DST: for my $dst (keys %{$curr_scan_hr->{$src}}) {
-            my $absnum = $scan{$src}{$dst}{'absnum'};
-            my $range;
+            my $absnum        = $scan{$src}{$dst}{'absnum'};
+            my $tot_protocols = $scan{$src}{$dst}{'tot_protocols'};
+            my $range = 0;
             my $s_port = 65535;
             my $e_port = 0;
 
@@ -4744,7 +4837,7 @@ sub assign_danger_level() {
             }
 
             ### calculate the range over _both_ tcp and udp
-            for my $proto (qw(tcp udp)) {
+            for my $proto (qw(tcp udp udplite)) {
                 next unless defined $scan{$src}{$dst}{$proto};
                 next unless defined $scan{$src}{$dst}{$proto}{'abs_sp'};
                 if ($s_port > $scan{$src}{$dst}{$proto}{'abs_sp'}) {
@@ -4766,7 +4859,8 @@ sub assign_danger_level() {
                 ### don't have enough packets to even reach danger level 1 yet.
                 next DST;
             }
-            if ($range >= $config{'PORT_RANGE_SCAN_THRESHOLD'}) {
+            if ($range >= $config{'PORT_RANGE_SCAN_THRESHOLD'}
+                    or $tot_protocols >= $config{'PROTOCOL_SCAN_THRESHOLD'}) {
                 if ($absnum < $config{'DANGER_LEVEL2'}) {
                     if ($scan_dl{$src} < 1) {
                         $scan{$src}{$dst}{'alerted'} = 0
@@ -4863,7 +4957,7 @@ sub check_scan_proto() {
 sub write_global_packet_counters() {
     open P, "> $config{'PACKET_COUNTER_FILE'}" or
         die "[*] Could not open $config{'PACKET_COUNTER_FILE'}: $!";
-    for my $proto (@protocols) {
+    for my $proto (keys %protocols) {
         next unless defined $proto_ctrs{$proto};
         printf P "%8s: %d\n", $proto, $proto_ctrs{$proto};
     }
@@ -4897,7 +4991,7 @@ sub write_src_packet_counters() {
         die "[*] Could not open $file: $!";
     for my $chain (keys %$hr) {
         for my $intf (keys %{$hr->{$chain}}) {
-            for my $proto (@protocols) {
+            for my $proto (keys %protocols) {
                 next unless defined $hr->{$chain}->{$intf}->{$proto};
                 if ($proto eq 'tcp' and $tcp_absrange) {
                     print P "${chain}_${intf}_${proto}:  ",
@@ -5568,7 +5662,7 @@ sub scan_logr_signatures() {
     my @log_sigs = ();
     my $found_sid = 0;
 
-    for my $proto (@protocols) {
+    for my $proto (keys %protocols) {
         next unless defined $scan{$src}{$dst}{$proto};
         my $hr = $scan{$src}{$dst}{$proto};
 
@@ -8516,14 +8610,18 @@ sub print_scan_status() {
             my $total_dsts = keys %{$scan{$src}};
             my $tot_pkts   = 0;
             my $uniq_sigs  = 0;
+            my $tot_protocols = 0;
             for my $dst (keys %{$scan{$src}}) {
+                if (defined $scan{$src}{$dst}{'tot_protocols'}) {
+                    $tot_protocols += $scan{$src}{$dst}{'tot_protocols'};
+                }
                 next unless defined $scan{$src}{$dst}{'absnum'};
                 $tot_pkts += $scan{$src}{$dst}{'absnum'};
             }
-            for my $proto (@protocols) {
+            for my $proto (keys %protocols) {
                 for my $dst (keys %{$scan{$src}}) {
                     next unless defined $scan{$src}{$dst}{$proto}
-                        and defined $scan{$src}{$dst}{$proto}{'sid'};
+                            and defined $scan{$src}{$dst}{$proto}{'sid'};
                     for my $sid (keys %{$scan{$src}{$dst}{$proto}{'sid'}}) {
                         $uniq_sigs++;
                     }
@@ -8532,13 +8630,15 @@ sub print_scan_status() {
 
             ### source IP line
             my $src_str = "\nSRC:  $src, DL: $dl, Dsts: $total_dsts" .
-                ", Pkts: $tot_pkts, Unique sigs: $uniq_sigs";
+                ", Pkts: $tot_pkts, Total protocols: $tot_protocols, " .
+                "Unique sigs: $uniq_sigs";
 
             my $src_obj = new NetAddr::IP($src) or die "[*] NetAddr::IP($src) error";
             if ($src_obj->version() == 6) {
                 $src_str = "\nSRC:  $src (" . $src_obj->short() .
                     "), DL: $dl, Dsts: $total_dsts" .
-                    ", Pkts: $tot_pkts, Unique sigs: $uniq_sigs";
+                    ", Pkts: $tot_pkts, Total protocols: $tot_protocols, " .
+                    "Unique sigs: $uniq_sigs";
             }
 
             unless ($analyze_mode) {
@@ -8586,8 +8686,10 @@ sub print_scan_status() {
                     for my $chain (keys %{$scan{$src}{$dst}{'chain'}}) {
                         for my $intf (keys %{$scan{$src}{$dst}{'chain'}
                                     {$chain}}) {
+                            my $tot_scanned_protocols = 0;
                             for my $proto (keys %{$scan{$src}{$dst}{'chain'}
                                         {$chain}{$intf}}) {
+                                $tot_scanned_protocols++;
                                 next unless $proto eq 'tcp' or $proto eq 'udp'
                                     or $proto eq 'udplite';
                                 my $start_port = $scan{$src}{$dst}
@@ -8606,12 +8708,14 @@ sub print_scan_status() {
                                         "$ctr, Chain: $chain, Intf: $intf\n";
                                 }
                             }
+                            push @lines, "        Total scanned IP protocols: " .
+                                "$tot_scanned_protocols, Chain: $chain, Intf: $intf\n";
                         }
                     }
                 }
 
                 ### signature matches
-                for my $proto (@protocols) {
+                for my $proto (keys %protocols) {
                     next unless defined $scan{$src}{$dst}{$proto}
                         and defined $scan{$src}{$dst}{$proto}{'sid'};
 
@@ -8834,14 +8938,35 @@ sub import_packet_counters() {
 }
 
 sub print_packet_counters() {
-    my $str = "    Total packet counters: ";
-    for my $proto (@protocols) {
+    my $str = "    Total protocol packet counters:\n";
+    for my $proto (sort keys %protocols) {
         next unless defined $proto_ctrs{$proto};
-        $str .= "$proto: $proto_ctrs{$proto} ";
+        if (defined $protocol_strings{$proto}) {
+            $str .= sprintf "%12s: %s\n", $protocol_strings{$proto}{'name'},
+                "$proto_ctrs{$proto} pkts, ($protocol_strings{$proto}{'desc'})";
+        } else {
+            $str .= sprintf "%12s: %s\n", $proto, "$proto_ctrs{$proto} pkts";
+        }
     }
-    $str .= "\n\n";
+    $str .= "\n";
 
     return [$str];
+}
+
+sub import_protocol_strings() {
+    open F, "< $config{'PROTOCOLS_FILE'}" or die "[*] Could not ",
+        "open $config{'PROTOCOLS_FILE'}: $!";
+    while (<F>) {
+        ### gre     47      GRE             # General Routing Encapsulation
+        next if /^\s*#/;
+        if (/^\s*(\S+)\s+(\d+)\s+\S+\s+#\s+(.*)/) {
+            $protocol_strings{$2}{'name'} = $1;
+            $protocol_strings{$2}{'desc'} = $3;
+        }
+    }
+    close F;
+
+    return;
 }
 
 sub import_dshield_stats() {
@@ -9005,6 +9130,7 @@ sub import_ip_dirs() {
                         $scan{$src}{$dst}{'chain'}{$chain}{$intf}{$proto}
                             += $pkts;
                         $scan{$src}{$dst}{'absnum'} += $pkts;
+                        $scan{$src}{$dst}{'tot_protocols'}++;
                     } elsif ($line =~ /^(\w+)_(\w+)_(tcp|udp):
                             \s+(\d+)\s+\[(\S+)\]/x) {
                         $chain = $1;
@@ -9025,6 +9151,19 @@ sub import_ip_dirs() {
                         $scan{$src}{$dst}{'chain'}{$chain}{$intf}{$proto}
                             += $pkts;
                         $scan{$src}{$dst}{'absnum'} += $pkts;
+                        $scan{$src}{$dst}{'tot_protocols'}++;
+                    } elsif ($line =~ /^(\w+)_(\w+)_(\d+):\s+(\d+)/) {
+                        $chain = $1;
+                        $intf  = $2;
+                        $proto = $3;
+                        $pkts  = $4;
+                        $chain = uc $chain if $chain eq 'input'
+                                or $chain eq 'forward'
+                                or $chain eq 'output';
+                        $scan{$src}{$dst}{'chain'}{$chain}{$intf}{$proto}
+                            += $pkts;
+                        $scan{$src}{$dst}{'absnum'} += $pkts;
+                        $scan{$src}{$dst}{'tot_protocols'}++;
                     }
                 }
             }
@@ -10732,7 +10871,7 @@ sub required_vars() {
         ETC_RSYSLOG_CONF IFCFGTYPE ENABLE_WHOIS_FORCE_ASCII
         ENABLE_WHOIS_FORCE_SRC_IP ENABLE_IPV6_DETECTION
         PERSISTENCE_CTR_THRESHOLD MAX_SCAN_IP_PAIRS INSTALL_ROOT
-        ICMP6_TYPES_FILE
+        ICMP6_TYPES_FILE PROTOCOL_SCAN_THRESHOLD PROTOCOLS_FILE
     ));
     &defined_vars(\@required_vars);
     return;

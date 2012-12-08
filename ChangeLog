@@ -1,4 +1,8 @@
-psad-2.2.1 (11/24/2012):
+psad-2.2.1 (12//2012):
+    - Added IP protocol scan detection (nmap -sO).  A new psad.conf variable
+      PROTOCOL_SCAN_THRESHOLD defines the minimum number of different IP
+      protocols (default = 5) that must be scanned before an alert is
+      triggered.
     - Bug fix in --Analyze mode when IP fields are to be searched with the
       --analysis-fields argument (such as --analysis-fields "SRC:1.2.3.4").
       The bug was reported by Gregorio Narvaez, and looked like this:
@@ -14,7 +18,10 @@ psad-2.2.1 (11/24/2012):
       ../../blib/lib/auto/NetAddr/IP/UtilPP/_deadlen.al) line 122.
 
     - Added --stdin argument to allow psad to collect iptables log data from
-      STDIN in --Analyze mode.
+      STDIN in --Analyze mode.  This makes it easier to run an iptables logs
+      through psad from arbitrary files like so:
+
+      # grep "IN=.*OUT=" /var/log/kern.log | psad -A --stdin
 
 psad-2.2 (02/20/2012):
     - Added support for detection of malicious traffic that is delivered via

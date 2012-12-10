@@ -1299,7 +1299,6 @@ sub check_scan() {
 
         $scan{$pkt{'src'}}{$pkt{'dst'}}{'tot_protocols'} = 0
             unless defined $scan{$pkt{'src'}}{$pkt{'dst'}}{'tot_protocols'};
-
         $scan{$pkt{'src'}}{$pkt{'dst'}}{'tot_protocols'}++
             unless defined $scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}};
 
@@ -1307,6 +1306,11 @@ sub check_scan() {
 
         $scan{$pkt{'src'}}{$pkt{'dst'}}{'chain'}
             {$pkt{'chain'}}{$pkt{'intf'}}{$pkt{'proto'}}++;
+
+        $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'tot_protocols'} = 0
+            unless defined $scan{$pkt{'src'}}{$pkt{'dst'}}{'tot_protocols'};
+        $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'tot_protocols'}++
+            unless defined $scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}};
 
         $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}{'pkts'}++;
         $curr_scan{$pkt{'src'}}{$pkt{'dst'}}
@@ -5130,7 +5134,7 @@ sub scan_logr() {
 
         ### Log scan data
         print "[+] Writing $config{'PSAD_DIR'}/<IP> directories.\n";
-        print "    This may take a while...\n";
+        print "    This may take a while...\n" if ((keys %$curr_scan_hr) > 1000);
         if ($analysis_emails) {
             print "[+] Generating email alerts...\n";
             unless ($no_whois) {
@@ -5191,6 +5195,7 @@ sub scan_logr() {
             my $tcp_newpkts  = 0;
             my $udp_newpkts  = 0;
             my $icmp_newpkts = 0;
+            my $other_proto_newpkts = 0;
             my $tcp_f  = 0;
             my $udp_f  = 0;
             my $icmp_f = 0;
@@ -5330,6 +5335,18 @@ sub scan_logr() {
                 $icmp_f = 1;
                 $icmp_newpkts =
                     $curr_scan_hr->{$src}->{$dst}->{'icmp'}->{'pkts'};
+            }
+
+            for my $proto (keys %{$curr_scan_hr->{$src}->{$dst}}) {
+                next if $proto eq 'tcp' or $proto eq 'udp'
+                    or $proto eq 'udplite' or $proto eq 'icmp'
+                    or $proto eq 'icmp6';
+                next unless defined $scan{$src}{$dst}{$proto}
+                    and defined $scan{$src}{$dst}{$proto}{'proto_pkt_ctr'};
+                next unless defined 
+                    $curr_scan_hr->{$src}->{$dst}->{$proto}->{'pkts'};
+                $other_proto_newpkts +=
+                    $curr_scan_hr->{$src}->{$dst}->{$proto}->{'pkts'};
             }
 
             ### write out the overall packet counters for $src.
@@ -5557,23 +5574,27 @@ sub scan_logr() {
             }
             printf $fh "\n";
 
-            printf $fh "%${log_len}s%-9s%-13s%-7s%-7s%-7s\n", 'Global stats: ',
-                 'chain:', 'interface:', 'TCP:', 'UDP:', 'ICMP:';
+            printf $fh "%${log_len}s%-9s%-12s%-7s%-7s%-7s%-7s\n", 'Global stats: ',
+                 'chain:', 'interface:', 'TCP:', 'UDP:', 'ICMP:', 'Other:';
             for my $chain (keys %{$scan{$src}{$dst}{'chain'}}) {
                 for my $intf (keys %{$scan{$src}{$dst}{'chain'}{$chain}}) {
                     my $tot_tcp  = 0;
                     my $tot_udp  = 0;
                     my $tot_icmp = 0;
+                    my $tot_other = 0;
                     $tot_tcp = $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'tcp'}
                         if defined $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'tcp'};
                     $tot_udp = $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'udp'}
                         if defined $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'udp'};
                     $tot_icmp = $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'icmp'}
                         if defined $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'icmp'};
-                    printf $fh "%${log_len}s%-9s%-13s%-7s%-7s%-7s\n", '', $chain,
-                        $intf, $tot_tcp, $tot_udp, $tot_icmp;
+                    $tot_other = $scan{$src}{$dst}{'tot_protocols'}
+                        - $tcp_f - $udp_f - $icmp_f;
+                    printf $fh "%${log_len}s%-9s%-12s%-7s%-7s%-7s%-7s\n", '', $chain,
+                        $intf, $tot_tcp, $tot_udp, $tot_icmp, $tot_other;
                 }
             }
+
             ### print out any matched signatures to the email
             ### alert file and also to the signature log
             &scan_logr_signatures($src, $dst, $fh, $log_sigs);
@@ -5584,6 +5605,8 @@ sub scan_logr() {
             $syslog_str .= " tcp pkts: $tcp_newpkts" if $tcp_newpkts;
             $syslog_str .= " udp pkts: $udp_newpkts" if $udp_newpkts;
             $syslog_str .= " icmp pkts: $icmp_newpkts" if $icmp_newpkts;
+            $syslog_str .= " other proto pkts: $other_proto_newpkts"
+                if $other_proto_newpkts;
             $syslog_str .= " DL: $curr_dl";
 
             &sys_log($syslog_str);

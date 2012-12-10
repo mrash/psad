@@ -5419,7 +5419,7 @@ sub scan_logr() {
                 print $fh ' Multi-Protocol';
             }
             if (defined $auto_assigned_msg{$src}) {
-                printf $fh ' Auto-assigned';
+                print $fh ' Auto-assigned';
                 delete $auto_assigned_msg{$src};
             }
             print $fh "\n\n";
@@ -5837,9 +5837,15 @@ sub scan_logr_signatures() {
                     for my $chain (keys %{$hr->{'invalid_code'}->{$type}->{$code}}) {
                         my $pkts = $hr->{'invalid_code'}->
                         {$type}->{$code}->{$chain}->{'pkts'};
-                        print $email_fh qq|   Invalid ICMP code "$code" for ICMP |,
-                              qq|"$valid_icmp_types{$type}{'text'}" packet\n|,
-                              "       chain=$chain packets=$pkts\n";
+                        if ($proto eq 'icmp') {
+                            print $email_fh qq|   Invalid ICMP code "$code" for ICMP |,
+                                qq|"$valid_icmp_types{$type}{'text'}" packet\n|,
+                                "       chain=$chain packets=$pkts\n";
+                         } elsif ($proto eq 'icmp6') { 
+                            print $email_fh qq|   Invalid ICMP code "$code" for ICMP |,
+                                qq|"$valid_icmp6_types{$type}{'text'}" packet\n|,
+                                "       chain=$chain packets=$pkts\n";
+                        }
                     }
                 }
             }

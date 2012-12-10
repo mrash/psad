@@ -5332,11 +5332,6 @@ sub scan_logr() {
                     $curr_scan_hr->{$src}->{$dst}->{'icmp'}->{'pkts'};
             }
 
-            if (($tcp_f and $udp_f) or ($tcp_f and $icmp_f) or
-                    ($udp_f and $icmp_f)) {
-                $scan{$src}{$dst}{'multiproto'} = '';
-            }
-
             ### write out the overall packet counters for $src.
             &write_src_packet_counters($scan{$src}{$dst}{'chain'},
                 $tcp_absrange, $udp_absrange, $pkt_ctr_file);
@@ -5415,7 +5410,7 @@ sub scan_logr() {
             printf $fh "%${log_len}s%s", 'Danger level: ',
                 "[$scan_dl{$src}] (out of 5)";
 
-            if (defined $scan{$src}{$dst}{'multiproto'}) {
+            if ($scan{$src}{$dst}{'tot_protocols'} > 1) {
                 print $fh ' Multi-Protocol';
             }
             if (defined $auto_assigned_msg{$src}) {

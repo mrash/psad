@@ -5197,6 +5197,7 @@ sub scan_logr() {
             my $tcp_f  = 0;
             my $udp_f  = 0;
             my $icmp_f = 0;
+            my $nmap_scan_style_str = 'Nmap';
             my $whois_info_ar;
 
             ### get the current danger level and the absolute number
@@ -5437,6 +5438,7 @@ sub scan_logr() {
                 printf $fh "%${log_len}s%s%s\n", 'IP Protocol scan: ',
                     "[$curr_scan_hr->{$src}->{$dst}->{'tot_protocols'}",
                     ' unique protocols, Nmap -sO]';
+                $nmap_scan_style_str .= ' -sO IP protocol scan,';
             }
 
             if ($tcp_f) {
@@ -5468,6 +5470,7 @@ sub scan_logr() {
                         printf $fh "%${log_len}s%s\n", $prefix,
                             "[$flags: $n_pkts packets]";
                     }
+                    $nmap_scan_style_str .= " $nmap_opts scan,";
                     $prefix = '';
                 }
                 if (defined $curr_scan_hr->{$src}->{$dst}->{'tcp'}->{'chain'}) {
@@ -5487,6 +5490,7 @@ sub scan_logr() {
                         $fh);
                 }
                 $syslog_range = "udp: [$udp_newrange]";
+                $nmap_scan_style_str .= ' -sU scan,';
             }
             if ($icmp_f) {
                 printf $fh "%${log_len}s%s\n", 'icmp packets: ',
@@ -5497,6 +5501,7 @@ sub scan_logr() {
                         $fh);
                 }
             }
+            $nmap_scan_style_str =~ s/\,$//;
             printf $fh "\n%${log_len}s%s\n", 'Source: ', $src;
             printf $fh "%${log_len}s%s\n", 'DNS: ', $src_dns_str
                 unless $no_rdns;
@@ -5601,7 +5606,7 @@ sub scan_logr() {
             &scan_logr_signatures($src, $dst, $fh, $log_sigs);
 
             ### write a scan message to syslog
-            my $syslog_str = "scan detected: $src -> $dst";
+            my $syslog_str = "scan detected ($nmap_scan_style_str): $src -> $dst";
             $syslog_str .= " $syslog_range" if $syslog_range;
             $syslog_str .= " tcp pkts: $tcp_newpkts" if $tcp_newpkts;
             $syslog_str .= " udp pkts: $udp_newpkts" if $udp_newpkts;

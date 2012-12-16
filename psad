@@ -1302,23 +1302,21 @@ sub check_scan() {
         $scan{$pkt{'src'}}{$pkt{'dst'}}{'tot_protocols'}++
             unless defined $scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}};
 
-        $scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}{'proto_pkt_ctr'}++;
-
         $scan{$pkt{'src'}}{$pkt{'dst'}}{'chain'}
             {$pkt{'chain'}}{$pkt{'intf'}}{$pkt{'proto'}}++;
-
-        $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'tot_protocols'} = 0
-            unless defined $scan{$pkt{'src'}}{$pkt{'dst'}}{'tot_protocols'};
-        $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'tot_protocols'}++
-            unless defined $scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}};
-
-        $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}{'pkts'}++;
-        $curr_scan{$pkt{'src'}}{$pkt{'dst'}}
-            {$pkt{'proto'}}{'flags'}{$pkt{'flags'}}++ if $pkt{'flags'};
 
         ### keep track of MAC addresses
         $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'s_mac'} = $pkt{'src_mac'};
         $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'d_mac'} = $pkt{'dst_mac'};
+
+        $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'tot_protocols'} = 0
+            unless defined $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'tot_protocols'};
+        $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'tot_protocols'}++
+            unless defined $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}};
+
+        $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}{'pkts'}++;
+        $curr_scan{$pkt{'src'}}{$pkt{'dst'}}
+            {$pkt{'proto'}}{'flags'}{$pkt{'flags'}}++ if $pkt{'flags'};
 
         ### keep track of which syslog daemon reported the message.
         $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'syslog_host'}
@@ -5337,16 +5335,14 @@ sub scan_logr() {
                     $curr_scan_hr->{$src}->{$dst}->{'icmp'}->{'pkts'};
             }
 
-            for my $proto (keys %{$curr_scan_hr->{$src}->{$dst}}) {
-                next if $proto eq 'tcp' or $proto eq 'udp'
-                    or $proto eq 'udplite' or $proto eq 'icmp'
-                    or $proto eq 'icmp6';
-                next unless defined $scan{$src}{$dst}{$proto}
-                    and defined $scan{$src}{$dst}{$proto}{'proto_pkt_ctr'};
-                next unless defined 
-                    $curr_scan_hr->{$src}->{$dst}->{$proto}->{'pkts'};
+            for my $str (keys %{$curr_scan_hr->{$src}->{$dst}}) {
+                next if $str eq 'tcp' or $str eq 'udp'
+                    or $str eq 'udplite' or $str eq 'icmp'
+                    or $str eq 'icmp6' or $str eq 'tot_protocols';
+                next unless defined $scan{$src}{$dst}{$str};
+                next unless defined $curr_scan_hr->{$src}->{$dst}->{$str}->{'pkts'};
                 $other_proto_newpkts +=
-                    $curr_scan_hr->{$src}->{$dst}->{$proto}->{'pkts'};
+                    $curr_scan_hr->{$src}->{$dst}->{$str}->{'pkts'};
             }
 
             ### write out the overall packet counters for $src.
@@ -5435,6 +5431,13 @@ sub scan_logr() {
                 delete $auto_assigned_msg{$src};
             }
             print $fh "\n\n";
+
+            if ($curr_scan_hr->{$src}->{$dst}->{'tot_protocols'}
+                    >= $config{'PROTOCOL_SCAN_THRESHOLD'}) {
+                printf $fh "%${log_len}s%s%s\n", 'IP Protocol scan: ',
+                    "[$curr_scan_hr->{$src}->{$dst}->{'tot_protocols'}",
+                    ' unique protocols, Nmap -sO]';
+            }
 
             if ($tcp_f) {
                 printf $fh "%${log_len}s%s\n", 'Scanned TCP ports: ',
@@ -5573,25 +5576,23 @@ sub scan_logr() {
                 }
             }
             printf $fh "\n";
+            printf $fh "%${log_len}s\n", 'Global stats: ';
 
-            printf $fh "%${log_len}s%-9s%-12s%-7s%-7s%-7s%-7s\n", 'Global stats: ',
-                 'chain:', 'interface:', 'TCP:', 'UDP:', 'ICMP:', 'Other:';
+            printf $fh "%${log_len}s%-9s%-12s%-11s%-10s\n", '',
+                 'chain:', 'interface:', 'protocol:', 'packets:';
+
             for my $chain (keys %{$scan{$src}{$dst}{'chain'}}) {
                 for my $intf (keys %{$scan{$src}{$dst}{'chain'}{$chain}}) {
-                    my $tot_tcp  = 0;
-                    my $tot_udp  = 0;
-                    my $tot_icmp = 0;
-                    my $tot_other = 0;
-                    $tot_tcp = $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'tcp'}
-                        if defined $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'tcp'};
-                    $tot_udp = $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'udp'}
-                        if defined $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'udp'};
-                    $tot_icmp = $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'icmp'}
-                        if defined $scan{$src}{$dst}{'chain'}{$chain}{$intf}{'icmp'};
-                    $tot_other = $scan{$src}{$dst}{'tot_protocols'}
-                        - $tcp_f - $udp_f - $icmp_f;
-                    printf $fh "%${log_len}s%-9s%-12s%-7s%-7s%-7s%-7s\n", '', $chain,
-                        $intf, $tot_tcp, $tot_udp, $tot_icmp, $tot_other;
+                    for my $proto (sort {$a cmp $b} keys %{$scan{$src}{$dst}{'chain'}{$chain}{$intf}}) {
+                        my $pkts = $scan{$src}{$dst}{'chain'}{$chain}{$intf}{$proto};
+                        if (defined $protocol_strings{$proto}) {
+                            printf $fh "%${log_len}s%-9s%-12s%-11s%-10s\n", '', $chain,
+                                $intf, $protocol_strings{$proto}{'name'}, $pkts;
+                        } else {
+                            printf $fh "%${log_len}s%-9s%-12s%-11s%-10s\n", '', $chain,
+                                $intf, $proto, $pkts;
+                        }
+                    }
                 }
             }
 
@@ -9119,7 +9120,7 @@ sub import_ip_dirs() {
                 } else {
                     $scan_email_ctrs{$src}{'email_ctr'} = $num_emails;
                 }
-                $scan{$src}{$dst}{'alerted'}   = 1;
+                $scan{$src}{$dst}{'alerted'} = 1;
             } else {
                 if ($config{'ENABLE_EMAIL_LIMIT_PER_DST'} eq 'Y') {
                     $scan_email_ctrs{$src}{$dst}{'email_ctr'} = 0;

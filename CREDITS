@@ -479,3 +479,9 @@ Kat
 Gregorio Narvaez
     - Reported a NetAddr::IP usage bug in "-A --analysis-fields" mode with IP
       searches.
+
+Pui Edylie
+    - Reported a problem where psad could not map an fwsnort log message back
+      to the corresponding Snort 'msg' field.  Added the FWSNORT_RULES_DIR
+      variable to have psad read Snort rules from any installed fwsnort
+      instance.

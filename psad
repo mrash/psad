@@ -3835,67 +3835,72 @@ sub import_snort_rules() {
 
     %fwsnort_sigs = ();
 
-    opendir D, $config{'SNORT_RULES_DIR'}
-        or die "[*] Could not open $config{'SNORT_RULES_DIR'}";
-    my @rfiles = readdir D;
-    closedir D;
+    for my $dir ($config{'SNORT_RULES_DIR'},
+            $config{'FWSNORT_RULES_DIR'}) {
+        next unless -d $dir;
 
-    FILE: for my $rfile (@rfiles) {
-        next FILE unless $rfile =~ /\.rules$/;
-        if ($srules_type) {
-            next FILE unless $rfile =~ /^${srules_type}\.rules$/;
-        }
-        my ($type) = ($rfile =~ /(\w+)\.rules/);
-        open R, "< ${config{'SNORT_RULES_DIR'}}/${rfile}" or
-            die "[*] Could not open: ${srules_type}/${rfile}";
-        my @lines = <R>;
-        close R;
-        RULE: for my $line (@lines) {
-            next RULE unless $line =~ /^\s*alert/;
-            chomp $line;
+        opendir D, $dir or die "[*] Could not open $dir: $!";
+        my @rfiles = readdir D;
+        closedir D;
 
-            my $sid;  ### snort rule id
-            if ($line =~ /[\s;]sid:\s*(\d+)\s*;/) {
-                $sid = $1;
-            } else {
-                next RULE;
+        FILE: for my $rfile (@rfiles) {
+            next FILE unless $rfile =~ /\.rules$/;
+            if ($srules_type) {
+                next FILE unless $rfile =~ /^${srules_type}\.rules$/;
             }
+            my ($type) = ($rfile =~ /(\w+)\.rules/);
 
-            $fwsnort_sigs{$sid}{'msg'} = $1
-                if $line =~ /msg:\s*\"(.*?)\"\s*;/;
-            $fwsnort_sigs{$sid}{'is_psad_id'} = 0;
+            open R, "< $dir/${rfile}" or
+                die "[*] Could not open: ${srules_type}/${rfile}";
 
-            if ($line =~ /^\s*alert\s+(\w+)/) {
-                $fwsnort_sigs{$sid}{'proto'} = lc($1);
-            }
+            while (<R>) {
+                next unless /^\s*alert/;
 
-            if ($line =~ /[\s;]classtype:\s*(.*?)\s*;/) {
-                $fwsnort_sigs{$sid}{'classtype'} = $1;
-            } else {
-                $fwsnort_sigs{$sid}{'classtype'} = '';
-            }
-
-            $fwsnort_sigs{$sid}{'priority'} = &convert_snort_priority($1)
-                if $line =~ /[\s;]priority:\s*(\d+)\s*;/;
-
-            ### import multiple content fields; someone could have built
-            ### a series of custom iptables chains in order to detect
-            ### multiple content strings.
-            while ($line =~ /[\s;](?:uri)?content:\s*\"(.*?)\"\s*;/g) {
-                push @{$fwsnort_sigs{$sid}{'content'}}, $1;
-            }
-
-            while ($line =~ /[\s;]reference:\s*(.*?)\s*;/g) {
-                my $ref = $1;
-                if ($ref =~ /^(\w+),(\S+)/) {
-                    ### reference:bugtraq,9732;
-                    push @{$fwsnort_sigs{$sid}{'reference'}{lc($1)}}, $2;
+                my $sid;  ### snort rule id
+                if (/[\s;]sid:\s*(\d+)\s*;/) {
+                    $sid = $1;
+                } else {
+                    next;
                 }
-            }
 
-            next RULE unless defined $fwsnort_sigs{$sid}{'msg'}
+                $fwsnort_sigs{$sid}{'msg'} = $1
+                    if /msg:\s*\"(.*?)\"\s*;/;
+                $fwsnort_sigs{$sid}{'is_psad_id'} = 0;
+
+                if (/^\s*alert\s+(\w+)/) {
+                    $fwsnort_sigs{$sid}{'proto'} = lc($1);
+                }
+
+                if (/[\s;]classtype:\s*(.*?)\s*;/) {
+                    $fwsnort_sigs{$sid}{'classtype'} = $1;
+                } else {
+                    $fwsnort_sigs{$sid}{'classtype'} = '';
+                }
+
+                $fwsnort_sigs{$sid}{'priority'} = &convert_snort_priority($1)
+                    if /[\s;]priority:\s*(\d+)\s*;/;
+
+                ### import multiple content fields; someone could have built
+                ### a series of custom iptables chains in order to detect
+                ### multiple content strings.
+                while (/[\s;](?:uri)?content:\s*\"(.*?)\"\s*;/g) {
+                    push @{$fwsnort_sigs{$sid}{'content'}}, $1;
+                }
+
+                while (/[\s;]reference:\s*(.*?)\s*;/g) {
+                    my $ref = $1;
+                    if ($ref =~ /^(\w+),(\S+)/) {
+                        ### reference:bugtraq,9732;
+                        push @{$fwsnort_sigs{$sid}{'reference'}{lc($1)}}, $2;
+                    }
+                }
+
+                next unless defined $fwsnort_sigs{$sid}{'msg'}
                     and defined $fwsnort_sigs{$sid}{'classtype'}
                     and defined $fwsnort_sigs{$sid}{'content'};
+            }
+
+            close R;
         }
     }
 
@@ -5606,7 +5611,10 @@ sub scan_logr() {
             &scan_logr_signatures($src, $dst, $fh, $log_sigs);
 
             ### write a scan message to syslog
-            my $syslog_str = "scan detected ($nmap_scan_style_str): $src -> $dst";
+            my $syslog_str = 'scan detected ';
+            $syslog_str .= "($nmap_scan_style_str): "
+                if $nmap_scan_style_str ne 'Nmap';
+            $syslog_str .= "$src -> $dst";
             $syslog_str .= " $syslog_range" if $syslog_range;
             $syslog_str .= " tcp pkts: $tcp_newpkts" if $tcp_newpkts;
             $syslog_str .= " udp pkts: $udp_newpkts" if $udp_newpkts;

@@ -23,6 +23,12 @@ psad-2.2.1 (12//2012):
 
       # grep "IN=.*OUT=" /var/log/kern.log | psad -A --stdin
 
+    - Added the ability to acquire Snort rule 'msg' fields from fwsnort if
+      it's also installed.  A new variable FWSNORT_RULES_DIR tells psad where
+      to look for the fwsnort rule set.  This fixes a problem reported by Pui
+      Edylie to the psad mailing list where fwsnort logged an attack that psad
+      could not map back to a descriptive 'msg' field.
+
 psad-2.2 (02/20/2012):
     - Added support for detection of malicious traffic that is delivered via
       IPv6.  This is accomplished by parsing ip6tables log messages - these are

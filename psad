@@ -561,6 +561,7 @@ my %pkt_NF_init = (
     'fwsnort_sid'   => 0,
     'fwsnort_rnum'  => 0,
     'fwsnort_estab' => 0,
+    'is_topera'     => 0,  ### Topera IPv6 scanner detection, requires --log-ip-options
     'chain'         => '',
     'log_prefix'    => '',
     'dshield_str'   => '',
@@ -1322,6 +1323,8 @@ sub check_scan() {
         $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'syslog_host'}
             {$pkt{'syslog_host'}} = '' if $pkt{'syslog_host'};
 
+        $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'is_topera'} = $pkt{'is_topera'};
+
         if ($pkt{'log_prefix'}) {
             ### see if the logging prefix matches the blocking
             ### regex, and if not the IP will not be blocked
@@ -1330,7 +1333,7 @@ sub check_scan() {
                     and $config{'AUTO_BLOCK_REGEX'} ne 'NONE') {
                 ### we require a match
                 if (not defined $auto_block_regex_match{$pkt{'src'}}
-                    and $pkt{'log_prefix'} =~ /$config{'AUTO_BLOCK_REGEX'}/) {
+                        and $pkt{'log_prefix'} =~ /$config{'AUTO_BLOCK_REGEX'}/) {
                     $auto_block_regex_match{$pkt{'src'}} = '';
                 }
             }
@@ -1657,9 +1660,17 @@ sub parse_NF_pkt_str() {
             ### SRC=0000:0000:0000:0000:0000:0000:0000:0001
             ### DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=72 TC=0
             ### HOPLIMIT=255 FLOWLBL=0 PROTO=TCP SPT=22 DPT=57005 WINDOW=512
-            ### RES=0x00 ACK FIN URGP=0 
+            ### RES=0x00 ACK FIN URGP=0
+
+            ### Topera SYN scan with --log-ip-options turned on:
+            ### Dec 20 20:10:51 rohan kernel: [  499.178765] DROP IN=eth0 OUT=
+            ### MAC=00:1b:f9:76:9c:e4:0a:13:33:3a:33:36:86:ed
+            ### SRC=2012:1234:1234:0000:0000:0000:0000:0001
+            ### DST=2012:1234:1234:0000:0000:0000:0000:0002 LEN=132 TC=0 HOPLIMIT=64
+            ### FLOWLBL=0 OPT ( ) OPT ( ) OPT ( ) OPT ( ) OPT ( ) OPT ( ) OPT ( )
+            ### OPT ( ) OPT ( ) PROTO=TCP SPT=26732 DPT=78 WINDOW=8192 RES=0x00 SYN URGP=0 
             if ($pkt_str =~ /SRC=($ipv6_re)\s+DST=($ipv6_re)\s+LEN=(\d+)\s+
-                    TC=(\d+)\s+HOPLIMIT=(\d+)\s+FLOWLBL=(\d+)\s+PROTO=TCP\s+
+                    TC=(\d+)\s+HOPLIMIT=(\d+)\s+FLOWLBL=(\d+)\s+.*PROTO=TCP\s+
                     SPT=(\d+)\s+DPT=(\d+)\s+WINDOW=(\d+)\s+
                     (.*)\s+URGP=/x) {
 
@@ -1673,6 +1684,12 @@ sub parse_NF_pkt_str() {
                     or return $PKT_ERROR;
                 $pkt_hr->{'d_obj'} = new6 NetAddr::IP($pkt_hr->{'dst'})
                     or return $PKT_ERROR;
+
+                if ($pkt_str =~ /(?:OPT\s+\(\s+\)\s+){7,}/) {
+                    $pkt_hr->{'is_topera'} = 1;
+                    print STDERR "    Topera IPv6 scan\n"
+                        if $debug;
+                }
 
             } else {
                 print STDERR "[-] err packet: strange IPv6 TCP format\n"
@@ -5202,7 +5219,7 @@ sub scan_logr() {
             my $tcp_f  = 0;
             my $udp_f  = 0;
             my $icmp_f = 0;
-            my $nmap_scan_style_str = 'Nmap';
+            my $scan_style_str = '';
             my $whois_info_ar;
 
             ### get the current danger level and the absolute number
@@ -5443,19 +5460,22 @@ sub scan_logr() {
                 printf $fh "%${log_len}s%s%s\n", 'IP Protocol scan: ',
                     "[$curr_scan_hr->{$src}->{$dst}->{'tot_protocols'}",
                     ' unique protocols, Nmap -sO]';
-                $nmap_scan_style_str .= ' -sO IP protocol scan,';
+                $scan_style_str .= 'Nmap -sO IP protocol scan,';
             }
 
             if ($tcp_f) {
                 printf $fh "%${log_len}s%s\n", 'Scanned TCP ports: ',
                     "[$tcp_newrange: $tcp_newpkts packets]";
                 my $prefix = 'TCP flags: ';
+
                 for my $flags (keys %{$curr_scan_hr->{$src}->
                         {$dst}->{'tcp'}->{'flags'}}) {
-                    my $nmap_opts;
+
+                    my $nmap_opts = '';
                     $syslog_flags .= "$flags ";
                     my $n_pkts = $curr_scan_hr->{$src}->{$dst}->
                         {'tcp'}->{'flags'}->{$flags};
+
                     ### FUTURE: replace this with a simple hash lookup
                     if ($flags eq 'SYN') {
                         $nmap_opts = '-sT or -sS';
@@ -5468,15 +5488,26 @@ sub scan_logr() {
                     } elsif ($flags eq 'URG PSH SYN FIN') {
                         $nmap_opts = '-O';
                     }
-                    if ($nmap_opts) {
+
+                    if ($curr_scan_hr->{$src}->{$dst}->{'is_topera'}) {
+                        $scan_style_str = "Topera $flags scan";
                         printf $fh "%${log_len}s%s\n", $prefix,
-                            "[$flags: $n_pkts packets, Nmap: $nmap_opts]";
+                            "[$flags: $n_pkts packets, Topera $flags scan]";
                     } else {
-                        printf $fh "%${log_len}s%s\n", $prefix,
-                            "[$flags: $n_pkts packets]";
+                        if ($nmap_opts) {
+                            printf $fh "%${log_len}s%s\n", $prefix,
+                                "[$flags: $n_pkts packets, Nmap: $nmap_opts]";
+                        } else {
+                            printf $fh "%${log_len}s%s\n", $prefix,
+                                "[$flags: $n_pkts packets]";
+                        }
+                        if ($scan_style_str) {
+                            $scan_style_str .= " $nmap_opts scan,";
+                        } else {
+                            $scan_style_str = "Nmap $nmap_opts scan,";
+                        }
+                        $prefix = '';
                     }
-                    $nmap_scan_style_str .= " $nmap_opts scan,";
-                    $prefix = '';
                 }
                 if (defined $curr_scan_hr->{$src}->{$dst}->{'tcp'}->{'chain'}) {
                     &print_chains_and_prefixes(
@@ -5495,7 +5526,7 @@ sub scan_logr() {
                         $fh);
                 }
                 $syslog_range = "udp: [$udp_newrange]";
-                $nmap_scan_style_str .= ' -sU scan,';
+                $scan_style_str .= ' -sU scan,';
             }
             if ($icmp_f) {
                 printf $fh "%${log_len}s%s\n", 'icmp packets: ',
@@ -5506,7 +5537,7 @@ sub scan_logr() {
                         $fh);
                 }
             }
-            $nmap_scan_style_str =~ s/\,$//;
+            $scan_style_str =~ s/\,$//;
             printf $fh "\n%${log_len}s%s\n", 'Source: ', $src;
             printf $fh "%${log_len}s%s\n", 'DNS: ', $src_dns_str
                 unless $no_rdns;
@@ -5612,8 +5643,7 @@ sub scan_logr() {
 
             ### write a scan message to syslog
             my $syslog_str = 'scan detected ';
-            $syslog_str .= "($nmap_scan_style_str): "
-                if $nmap_scan_style_str ne 'Nmap';
+            $syslog_str .= "($scan_style_str): " if $scan_style_str;
             $syslog_str .= "$src -> $dst";
             $syslog_str .= " $syslog_range" if $syslog_range;
             $syslog_str .= " tcp pkts: $tcp_newpkts" if $tcp_newpkts;

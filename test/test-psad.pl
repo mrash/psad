@@ -14,6 +14,8 @@ my $run_dir        = 'run';
 my $scans_dir      = 'scans';
 my $test_install_dir = 'psad-install';
 my $syn_scan_file  = 'syn_scan_1000_1500';
+my $topera_syn_scan_file = 'topera_ipv6_syn_scan_no_ip_opts';
+my $topera_syn_scan_with_opts_file = 'topera_ipv6_syn_scan_with_ip_opts';
 my $fin_scan_file  = 'fin_scan_1000_1150';
 my $xmas_scan_file = 'xmas_scan_1000_1150';
 my $null_scan_file = 'null_scan_1000_1150';
@@ -235,6 +237,40 @@ my @tests = (
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv6 Topera SYN scan detection',
+        'err_msg'   => 'did not detect SYN scan',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports.*?0\-1023\b/i,
+                qr/BACKDOOR/i,
+                qr/IP\sstatus/i,
+                qr/SRC\:\s+2012\:1234\:1234\:0000\:0000\:0000\:0000\:0001/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
+                &fw_type() . "/$topera_syn_scan_file -c $default_conf $normal_root_override_str",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv6 Topera SYN scan detection (with IP opts)',
+        'err_msg'   => 'did not detect SYN scan',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports.*?0\-1234\b/i,
+                qr/BACKDOOR/i,
+                qr/Topera\sIPv6\sscan/i,
+                qr/IP\sstatus/i,
+                qr/SRC\:\s+2012\:1234\:1234\:0000\:0000\:0000\:0000\:0001/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
+                &fw_type() . "/$topera_syn_scan_with_opts_file -c $default_conf $normal_root_override_str",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+
     {
         'category'  => 'operations',
         'detail'    => 'IPv4 MS SQL Server communication attempt detection',

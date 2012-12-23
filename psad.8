@@ -258,6 +258,12 @@ does not issue whois lookups when running in \-\-Analyze-msgs mode.  The
 and instruct psad to issue whois lookups against IP addresses from which scans
 or other suspect traffic has originated.
 .TP
+.BR \-\^\-analysis-auto-block
+Enable auto-blocking responses when running in \-\-Analyze-msgs mode.  This is
+mostly useful only for the
+.B psad
+test suite when auto-blocking responses are tested and verified.
+.TP
 .BR \-\^\-snort-type\ \<type>
 Restrict the type of snort sids to
 .I type.
@@ -274,7 +280,7 @@ Manually specify the path to the passive operating system fingerprinting
 signatures file.  The default is
 .I /etc/psad/posf.
 .TP
-.BR \-a "\fR,\fP " \-\^\-auto-dl\ \<auto-dl-file>
+.BR \-\^\-auto-dl\ \<auto-dl-file>
 Occasionally certain IP addresses are repeat offenders and
 should automatically be given a higher danger level than
 would normally be assigned.  Additionally, some IP addresses

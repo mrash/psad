@@ -349,6 +349,7 @@ my $analyze_mode     = 0;
 my $analysis_fields  = '';
 my $analysis_tokens_ar = [];
 my $analysis_match_criteria_ar = [];
+my $analyze_mode_auto_block = 0;
 my $get_next_rule_id = 0;
 my $test_mode        = 0;
 my $syslog_server    = 0;
@@ -1446,7 +1447,8 @@ sub check_scan() {
     ### remember that ENABLE_AUTO_IDS may have been set to 'N' if we
     ### are running on a syslog server, of if we are running in -A mode.
     &auto_psad_response(\%curr_scan, \%auto_block_regex_match)
-        if $config{'ENABLE_AUTO_IDS'} eq 'Y' and not $analyze_mode;
+        if $config{'ENABLE_AUTO_IDS'} eq 'Y'
+            and (not $analyze_mode or $analyze_mode_auto_block);
 
     if ($log_scan_ip_pair_max) {
         &sys_log("scan IP pairs threshold reached");
@@ -5412,7 +5414,7 @@ sub scan_logr() {
                 }
             }
             print STDERR "[+] scan_logr(): generating email.....\n"
-                if $debug;
+                if $test_mode or $debug;
 
             ### get the absolute starting time for the scan and the
             ### current time
@@ -6329,16 +6331,18 @@ sub ipt_block() {
                 next;
             }
 
-            ### add jump rule to the "to_chain" from the "from_chain"
-            ($rv, $out_ar, $err_ar) = $ipt->add_jump_rule($table,
-                $from_chain, $jump_rule_position, $to_chain);
+            unless ($test_mode) {
+                ### add jump rule to the "to_chain" from the "from_chain"
+                ($rv, $out_ar, $err_ar) = $ipt->add_jump_rule($table,
+                    $from_chain, $jump_rule_position, $to_chain);
 
-            unless ($rv) {
-                my $msg = "could not add jump rule to $to_chain chain";
-                &sys_log($msg);
-                &sys_log_mline($err_ar);
-                print STDERR "[-] ipt_block(): $msg\n" if $debug;
-                next;
+                unless ($rv) {
+                    my $msg = "could not add jump rule to $to_chain chain";
+                    &sys_log($msg);
+                    &sys_log_mline($err_ar);
+                    print STDERR "[-] ipt_block(): $msg\n" if $debug;
+                    next;
+                }
             }
         }
 
@@ -6803,7 +6807,7 @@ sub auto_psad_response() {
     SRC: for my $src (keys %$curr_scan_hr) {
 
         ### make sure we are not attempting to block 0.0.0.0
-        ### or 127.0.0.1 or any of the interface IP's.
+        ### or 127.0.0.1 or any of the local interface IP's.
         next SRC if &auto_block_ignore_ip($src);
 
         if ($config{'ENABLE_AUTO_IDS_REGEX'} eq 'Y'
@@ -6818,6 +6822,7 @@ sub auto_psad_response() {
         }
 
         my $dl = $scan_dl{$src};
+
         ### We only want to block the IP once.  Currently this will block
         ### all traffic from the host to _all_ destinations that are
         ### protected by the firewall if the IP trips the $auto_psad_level
@@ -9721,7 +9726,8 @@ sub handle_cmdline() {
     ### be absolutely sure to disable auto-response for various
     ### offline modes
     $config{'ENABLE_AUTO_IDS'} = 'N'
-        if $analyze_mode or $syslog_server or $benchmark or $status_mode;
+        if ($analyze_mode and not $analyze_mode_auto_block)
+            or $syslog_server or $benchmark or $status_mode;
 
     ### The -I switch was given
     $config{'CHECK_INTERVAL'} = $chk_interval if $chk_interval;
@@ -10306,6 +10312,8 @@ sub sys_log_mline() {
 sub sys_log() {
     my $msg = shift;
 
+    print STDERR "[+] syslog msg: $msg\n" if ($test_mode or $debug);
+
     return unless $imported_syslog_module;
     return if $no_syslog_alerts;
 
@@ -10737,6 +10745,8 @@ sub getopt_wrapper() {
                                                        # -A mode (this can take a long
                                                        # time).
         'analyze-write-data'  => \$analyze_write_data,
+        'analysis-auto-block' => \$analyze_mode_auto_block, # enable auto-blocking (if
+                                                  # so configured) in -A mode.
         'analysis-fields=s' => \$analysis_fields, # Place a criteria on various fields
                                                   #   that are parsed from an iptables
                                                   #   logfile.

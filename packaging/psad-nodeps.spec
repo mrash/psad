@@ -1,5 +1,5 @@
 %define name psad
-%define version 2.2
+%define version 2.2.1
 %define release 1
 %define psadlogdir /var/log/psad
 %define psadrundir /var/run/psad
@@ -153,6 +153,9 @@ fi
 %config(noreplace) %_sysconfdir/%name/icmp6_types
 
 %changelog
+* Wed Jan 02 2013 Michael Rash <mbr@cipherdyne.org>
+- psad-2.2.1 release
+
 * Wed Apr 18 2012 Michael Rash <mbr@cipherdyne.org>
 - Update to use the NetAddr::IP module for all IP/subnet calculations
 - psad-2.2 release

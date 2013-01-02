@@ -46,6 +46,7 @@ my $default_conf   = "$conf_dir/default_psad.conf";
 my $ignore_udp_conf = "$conf_dir/ignore_udp.conf";
 my $ignore_tcp_conf = "$conf_dir/ignore_tcp.conf";
 my $auto_blocking_conf = "$conf_dir/auto_blocking.conf";
+my $auto_dl5_blocking_conf = "$conf_dir/auto_min_dl5_blocking.conf";
 my $require_prefix_conf = "$conf_dir/require_DROP_syslog_prefix_str.conf";
 my $require_missing_prefix_conf = "$conf_dir/require_missing_syslog_prefix_str.conf";
 my $enable_ack_detection_conf = "$conf_dir/enable_ack_detection.conf";
@@ -492,17 +493,40 @@ my @tests = (
     {
         'category'  => 'operations',
         'detail'    => 'DL5 IPv4 <BLOCK> SYN scan',
-        'err_msg'   => 'did not set SYN scan source to DL5',
+        'err_msg'   => 'did not block scan src',
         'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
                 qr/scanned\sports.*?1000\-1500/i,
                 qr/IP\sstatus/i,
                 qr/192\.168\.10\.55,\sDL\:\s5/,
                 qr/DROP\s.*192\.168\.10\.55/,
                 qr/Flushing\sand\sdeleting\spsad\schains/,
+                qr/unlimited\stime/,
          ],
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_auto_dl_file " .
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $auto_dl5_blocking_conf " .
+                "$normal_root_override_str --analysis-auto-block",
+        'auto_block_test' => $YES,
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv4 <BLOCK> SYN scan',
+        'err_msg'   => 'did not block scan src',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports.*?1000\-1500/i,
+                qr/IP\sstatus/i,
+                qr/192\.168\.10\.55,\sDL\:\s3/,
+                qr/DROP\s.*192\.168\.10\.55/,
+                qr/Flushing\sand\sdeleting\spsad\schains/,
+                qr/for\s3\sseconds/,
+                qr/removed\siptables\sblock/,
+         ],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data " .
                 "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $auto_blocking_conf " .
                 "$normal_root_override_str --analysis-auto-block",
         'auto_block_test' => $YES,

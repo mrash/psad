@@ -485,3 +485,8 @@ Pui Edylie
       to the corresponding Snort 'msg' field.  Added the FWSNORT_RULES_DIR
       variable to have psad read Snort rules from any installed fwsnort
       instance.
+
+Oscar Marley
+    - Suggested configurable auto-blocking timeout values depending on the
+      danger level that a scan or attack achieves.  This resulted in the
+      implementation of the AUTO_BLOCK_DL*_TIMEOUT variables.

@@ -278,6 +278,7 @@ my $scan_ip_pairs = 0;
 my %auto_dl = ();
 my %auto_dl_ip_objs = ();
 my %auto_assigned_msg = ();
+my $PERMANENT = 0;
 
 ### cache the source ips that we have automatically blocked
 ### (if ENABLE_AUTO_IDS == 'Y')
@@ -912,7 +913,6 @@ MAIN: for (;;) {
         ### Extract data and summarize scan packets, assign danger level,
         ### send email/syslog alerts.
         &check_scan(\@fw_packets);
-
     }
 
     ### log top scans data
@@ -940,9 +940,7 @@ MAIN: for (;;) {
         ### Timeout any auto-blocked IPs that are past due (need to
         ### check the timeouts against existing IPs in the scan hash
         ### even if new packets are not found).
-        if ($config{'AUTO_BLOCK_TIMEOUT'} > 0) {
-            &timeout_auto_blocked_ips();
-        }
+        &timeout_auto_blocked_ips();
 
         ### see if we need to add any IP address from the domain
         ### socket
@@ -1449,6 +1447,11 @@ sub check_scan() {
     &auto_psad_response(\%curr_scan, \%auto_block_regex_match)
         if $config{'ENABLE_AUTO_IDS'} eq 'Y'
             and (not $analyze_mode or $analyze_mode_auto_block);
+
+    if ($config{'ENABLE_AUTO_IDS'} eq 'Y' and $analyze_mode_auto_block) {
+        sleep $config{'AUTO_BLOCK_TIMEOUT'} + 1;
+        &timeout_auto_blocked_ips();
+    }
 
     if ($log_scan_ip_pair_max) {
         &sys_log("scan IP pairs threshold reached");
@@ -3305,6 +3308,8 @@ sub psad_init() {
         $rv += $rv_tmp if $rv_tmp != 0;
         exit $rv;
     }
+
+    &dump_conf() if $test_mode;
 
     ### make sure all necessary configuration variables
     ### are defined
@@ -6006,12 +6011,17 @@ sub exec_external_script() {
 }
 
 sub renew_auto_blocked_ips() {
+
+    ### note that if we are renewing IP blocking rules, we just use
+    ### the AUTO_BLOCK_TIMEOUT value initially and then the AUTO_BLOCK_DLN...
+    ### values will take over as psad gets up and running
     my $timeout_str = '.';
     if ($config{'AUTO_BLOCK_TIMEOUT'} > 0) {
         $timeout_str = "for $config{'AUTO_BLOCK_TIMEOUT'} seconds.";
     } else {
         $timeout_str = '(unlimited time).';
     }
+
     if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y'
             and -e $config{'AUTO_BLOCK_IPT_FILE'}) {
         open B, "< $config{'AUTO_BLOCK_IPT_FILE'}" or
@@ -6288,12 +6298,7 @@ sub ipt_block() {
     my $block_success   = 0;
     my $already_blocked = 0;
 
-    my $timeout_str = '';
-    if ($config{'AUTO_BLOCK_TIMEOUT'} > 0) {
-        $timeout_str = "for $config{'AUTO_BLOCK_TIMEOUT'} seconds";
-    } else {
-        $timeout_str = '(unlimited timeout)';
-    }
+    my ($timeout, $timeout_str) = &get_block_timeout($scan_dl{$ip});
 
     if ($config{'IPTABLES_PREREQ_CHECK'} > 1) {
         $iptables_prereq_check++;
@@ -6831,12 +6836,8 @@ sub auto_psad_response() {
 
             next SRC if defined $auto_blocked_ips{$src};
 
-            my $timeout_str = '';
-            if ($config{'AUTO_BLOCK_TIMEOUT'} > 0) {
-                $timeout_str = "for $config{'AUTO_BLOCK_TIMEOUT'} seconds.";
-            } else {
-                $timeout_str = '(unlimited timeout).';
-            }
+            my ($timeout, $timeout_str) = &get_block_timeout($dl);
+
             ### we have seen at least one packet logged by the firewall
             ### at this point
             if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
@@ -6896,12 +6897,35 @@ sub auto_block_ignore_ip() {
     return 0;
 }
 
+sub get_block_timeout() {
+    my $dl = shift;
+
+    my $timeout = $config{'AUTO_BLOCK_DL1_TIMEOUT'};
+    if ($dl == 2) {
+        $timeout = $config{'AUTO_BLOCK_DL2_TIMEOUT'};
+    } elsif ($dl == 3) {
+        $timeout = $config{'AUTO_BLOCK_DL3_TIMEOUT'};
+    } elsif ($dl == 4) {
+        $timeout = $config{'AUTO_BLOCK_DL4_TIMEOUT'};
+    } elsif ($dl == 5) {
+        $timeout = $config{'AUTO_BLOCK_DL5_TIMEOUT'};
+    }
+
+    my $timeout_str = "for $timeout seconds";
+    $timeout_str = '(unlimited timeout)' if $timeout == $PERMANENT;
+
+    return ($timeout, $timeout_str);
+}
+
 sub timeout_auto_blocked_ips() {
-    print STDERR "[+] timeout_auto_block_ips()\n" if $debug;
-    return if $config{'AUTO_BLOCK_TIMEOUT'} == 0;
+
+    print STDERR "[+] timeout_auto_block_ips()\n" if $debug or $test_mode;
+
     for my $ip (keys %auto_blocked_ips) {
-        if ((time() - $auto_blocked_ips{$ip})
-                > $config{'AUTO_BLOCK_TIMEOUT'}) {
+        my ($timeout, $timeout_str) = &get_block_timeout($scan_dl{$ip});
+        next if $timeout == $PERMANENT;
+
+        if ((time() - $auto_blocked_ips{$ip}) > $timeout) {
 
             ### remove all Netfiler blocking rules for $ip
             if ($config{'IPTABLES_BLOCK_METHOD'} eq 'Y') {
@@ -8934,9 +8958,9 @@ sub print_blocked_ip_status() {
             ### older versions do not have the timestamp
             if ($line =~ /^\s*\S+\s+(\d+)/) {
                 $timestamp = $1;
-                if ($config{'AUTO_BLOCK_TIMEOUT'} > 0) {
-                    $time_remain = $config{'AUTO_BLOCK_TIMEOUT'}
-                        - (time() - $timestamp);
+                my ($timeout, $timeout_str) = &get_block_timeout($scan_dl{$ip});
+                if ($timeout > 0) {
+                    $time_remain = $timeout - (time() - $timestamp);
                     $time_remain = 0 if $time_remain < 0;
 
                     push @print_lines,  "      $ip ($time_remain ",
@@ -10944,6 +10968,9 @@ sub required_vars() {
         ENABLE_WHOIS_FORCE_SRC_IP ENABLE_IPV6_DETECTION
         PERSISTENCE_CTR_THRESHOLD MAX_SCAN_IP_PAIRS INSTALL_ROOT
         ICMP6_TYPES_FILE PROTOCOL_SCAN_THRESHOLD PROTOCOLS_FILE
+        AUTO_BLOCK_DL1_TIMEOUT AUTO_BLOCK_DL2_TIMEOUT
+        AUTO_BLOCK_DL3_TIMEOUT AUTO_BLOCK_DL4_TIMEOUT
+        AUTO_BLOCK_DL5_TIMEOUT
     ));
     &defined_vars(\@required_vars);
     return;

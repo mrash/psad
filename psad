@@ -5197,6 +5197,10 @@ sub scan_logr() {
             unless ($no_email_alerts) {
                 $scan_email_ctrs{$src}{'email_ctr'}++;
             }
+            if ($config{'EMAIL_THROTTLE'} > 1) {
+                next SRC if (($scan_email_ctrs{$src}{'email_ctr'}
+                        % $config{'EMAIL_THROTTLE'}) == 0);
+            }
         }
 
         DST: for my $dst (keys %{$curr_scan_hr->{$src}}) {
@@ -5250,6 +5254,10 @@ sub scan_logr() {
                 }
                 unless ($no_email_alerts) {
                     $scan_email_ctrs{$src}{$dst}{'email_ctr'}++;
+                }
+                if ($config{'EMAIL_THROTTLE'} > 1) {
+                    next DST if (($scan_email_ctrs{$src}{$dst}{'email_ctr'}
+                            % $config{'EMAIL_THROTTLE'}) == 0);
                 }
             }
             print STDERR "[+] scan_logr(): dst IP: $dst\n" if $debug;
@@ -10970,7 +10978,7 @@ sub required_vars() {
         ICMP6_TYPES_FILE PROTOCOL_SCAN_THRESHOLD PROTOCOLS_FILE
         AUTO_BLOCK_DL1_TIMEOUT AUTO_BLOCK_DL2_TIMEOUT
         AUTO_BLOCK_DL3_TIMEOUT AUTO_BLOCK_DL4_TIMEOUT
-        AUTO_BLOCK_DL5_TIMEOUT
+        AUTO_BLOCK_DL5_TIMEOUT EMAIL_THROTTLE
     ));
     &defined_vars(\@required_vars);
     return;

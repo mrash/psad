@@ -72,7 +72,7 @@ src_install() {
 	insinto /etc/psad
 	doins *.conf
 	doins psad_*
-	doins auto_dl icmp_types posf signatures pf.os
+	doins auto_dl icmp_types posf signatures protocols pf.os
 
 	cd ${S}/init-scripts
 	exeinto /etc/init.d

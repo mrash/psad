@@ -125,6 +125,7 @@ install -m 755 nf2csv $RPM_BUILD_ROOT/usr/bin/nf2csv
 install -m 755 init-scripts/psad-init.redhat $RPM_BUILD_ROOT%_initrddir/psad
 install -m 644 psad.conf $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 signatures $RPM_BUILD_ROOT%_sysconfdir/%name/
+install -m 644 protocols $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 icmp_types $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 icmp6_types $RPM_BUILD_ROOT%_sysconfdir/%name/
 install -m 644 ip_options $RPM_BUILD_ROOT%_sysconfdir/%name/
@@ -286,6 +287,7 @@ fi
 %dir %_sysconfdir/%name
 %config(noreplace) %_sysconfdir/%name/*.conf
 %config(noreplace) %_sysconfdir/%name/signatures
+%config(noreplace) %_sysconfdir/%name/protocols
 %config(noreplace) %_sysconfdir/%name/auto_dl
 %config(noreplace) %_sysconfdir/%name/ip_options
 %config(noreplace) %_sysconfdir/%name/snort_rule_dl

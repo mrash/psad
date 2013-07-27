@@ -168,6 +168,11 @@ option), and print the packet fields on STDOUT in comma-separate value
 format.  This is useful for graphing iptables log data with AfterGlow
 (see http://afterglow.sourceforge.net/index.html).
 .TP
+.BR \-\^\-stdin
+Acquire iptables log data from STDIN instead of the default
+.I /var/log/messages
+file.
+.TP
 .BR \-\^\-CSV-fields\ \<tokens>
 Instruct
 .B psad

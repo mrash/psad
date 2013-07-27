@@ -7387,11 +7387,12 @@ sub analysis_mode() {
         push @local_nets, $net;
     }
 
-    print "[+] Entering analysis mode.  Parsing $fw_data_file\n";
     my $fh = '';
     if ($pkts_from_stdin) {
+        print "[+] Entering analysis mode.  Parsing STDIN\n";
         $fh = *STDIN;
     } else {
+        print "[+] Entering analysis mode.  Parsing $fw_data_file\n";
         open MSGS, "< $fw_data_file" or die "[*] Could not open ",
             "$fw_data_file: $!";
         $fh = *MSGS;
@@ -10999,6 +11000,8 @@ Usage: psad [options]
 Options:
 
     -A,  --Analyze-msgs           - Analyze iptables logfile and exit.
+         --stdin                  - In --Analyze-msgs mode, acquire iptables
+                                    log data from STDIN.
     -e,  --email-analysis         - Send emails for scans detected in
                                     offline analysis mode.
     -m,  --messages-file <file>   - Specify the path to the iptables logfile

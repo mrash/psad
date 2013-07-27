@@ -66,6 +66,7 @@ my $test_exclude = '';
 my @tests_to_exclude = ();
 my $list_mode = 0;
 my $diff_mode = 0;
+my $test_limit = 0;
 my $saved_last_results = 0;
 my $test_system_install = 0;
 my $normal_root_override_str = '';
@@ -103,6 +104,7 @@ exit 1 unless GetOptions(
     'enable-auto-block-tests' => \$enable_auto_block_tests,
     'List-mode'           => \$list_mode,
     'diff'                => \$diff_mode,
+    'test-limit=i'        => \$test_limit,
     'help'                => \$help
 );
 
@@ -977,6 +979,7 @@ if ($saved_last_results) {
 ### main loop through all of the tests
 for my $test_hr (@tests) {
     &run_test($test_hr);
+    last if $test_limit > 0 and $executed >= $test_limit;
 }
 
 &logr("\n[+] passed/failed/executed: $passed/$failed/$executed tests\n\n");

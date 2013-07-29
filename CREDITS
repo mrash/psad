@@ -498,3 +498,8 @@ Naji Mouawad
 Nicholas Ritter
     - Reported a bug in psad-2.2.1 where the protocols file is not bundled with
       the psad RPM's or included in the psad RPM .spec files.
+
+Gusta-BH
+    - Reported a bug in the auto-blocking mode where the danger level for IP
+      block renewals was not being initialized properly for FLUSH_IPT_AT_INIT
+      set to N.

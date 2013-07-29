@@ -673,7 +673,7 @@ unless ($no_daemon or $debug) {
 ### we're at it, start psadwatchd as well.  Note that this is the best
 ### place to start the other daemons since we just wrote the psad pid
 ### to PID_FILE above.
-my $cmd;
+my $cmd = '';
 unless ($config{'ENABLE_SYSLOG_FILE'} eq 'Y'
         or $no_kmsgsd
         or $config{'SYSLOG_DAEMON'} =~ /ulog/i
@@ -6043,6 +6043,10 @@ sub renew_auto_blocked_ips() {
                 my $orig_block_time = $2;
 
                 if ($config{'AUTO_BLOCK_TIMEOUT'} == 0) {
+
+                    ### set the DL here to the minimum currently required
+                    $scan_dl{$ip} = $config{'AUTO_IDS_DANGER_LEVEL'};
+
                     ### block the IP address (note that checks are built
                     ### into this function to not add a duplicate rule)
                     &ipt_block($ip, 'renew');
@@ -6059,6 +6063,10 @@ sub renew_auto_blocked_ips() {
                         &ipt_rm_block($ip);
 
                     } else {
+
+                        ### set the DL here to the minimum currently required
+                        $scan_dl{$ip} = $config{'AUTO_IDS_DANGER_LEVEL'};
+
                         ### block the IP address (note that checks are built
                         ### into this function to not add a duplicate rule)
                         &ipt_block($ip, 'renew');
@@ -6081,6 +6089,10 @@ sub renew_auto_blocked_ips() {
                 my $orig_block_time = $2;
 
                 if ($config{'AUTO_BLOCK_TIMEOUT'} == 0) {
+
+                    ### set the DL here to the minimum currently required
+                    $scan_dl{$ip} = $config{'AUTO_IDS_DANGER_LEVEL'};
+
                     ### block the IP address (note that checks are built
                     ### into this function to not add a duplicate rule)
                     if (&tcpwr_test_block($ip)) {
@@ -6105,6 +6117,10 @@ sub renew_auto_blocked_ips() {
                         &tcpwr_rm_block($ip);
 
                     } else {
+
+                        ### set the DL here to the minimum currently required
+                        $scan_dl{$ip} = $config{'AUTO_IDS_DANGER_LEVEL'};
+
                         ### block the IP address (note that checks are built
                         ### into this function to not add a duplicate rule)
                         if (&tcpwr_test_block($ip)) {

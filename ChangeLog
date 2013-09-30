@@ -1,4 +1,25 @@
 psad-2.2.2 (//2013):
+    - Added detection for Errata Security's "Masscan" port scanner that was
+      used in an Internet-wide scan for port 22 on Sept. 12, 2013 (see:
+      http://blog.erratasec.com/2013/09/we-scanned-internet-for-port-22.html).
+      The detection strategy used by psad relies on the fact that masscan does
+      not appear to set the options portion of the TCP header, and if the
+      iptables LOG rules that generate log data for psad are built with the
+      --log-tcp-options switch, then no options in a SYN scan can be seen.
+      This is not to say that other scanning software always sets TCP options -
+      Scapy seems to not set options by default when issuing a SYN scan like
+      this either: http://www.secdev.org/projects/scapy/doc/usage.html#syn-scans
+      There is a new psad.conf variable "EXPECT_TCP_OPTIONS" to assist with
+      Masscan detection as well.  When looking for Masscan SYN scans, psad
+      requires at least one TCP options field to be populated within a LOG
+      message (so that it knows --log-tcp-options has been set for at least
+      some logged traffic), and after seeing this then SYN packets with no
+      options are attributed to Masscan traffic.  All usual psad threshold
+      variables continue to apply however, so (by default) a single Masscan
+      SYN packet will not trigger a psad alert.  Masscan detection can be
+      disabled altogether by setting EXPECT_TCP_OPTIONS to "N", and this will
+      not affect any other psad detection techniques such as passive OS
+      fingerprinting, etc.
     - RPM bug fix to include the protocols file.
 
 psad-2.2.1 (01/02/2013):

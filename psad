@@ -463,6 +463,9 @@ my $tcp_win_scale_type = 3;
 my $tcp_sack_type      = 4;
 my $tcp_timestamp_type = 8;
 
+### for EXPECT_TCP_OPTIONS handling
+my $found_one_tcp_options_field = 0;
+
 my %tcp_p0f_opt_types = (
     'N' => $tcp_nop_type,
     'M' => $tcp_mss_type,
@@ -564,6 +567,7 @@ my %pkt_NF_init = (
     'fwsnort_rnum'  => 0,
     'fwsnort_estab' => 0,
     'is_topera'     => 0,  ### Topera IPv6 scanner detection, requires --log-ip-options
+    'is_masscan'    => 0,  ### Masscan detection, requires --log-tcp-options
     'chain'         => '',
     'log_prefix'    => '',
     'dshield_str'   => '',
@@ -1322,7 +1326,8 @@ sub check_scan() {
         $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'syslog_host'}
             {$pkt{'syslog_host'}} = '' if $pkt{'syslog_host'};
 
-        $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'is_topera'} = $pkt{'is_topera'};
+        $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'is_topera'}  = $pkt{'is_topera'};
+        $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'is_masscan'} = $pkt{'is_masscan'};
 
         if ($pkt{'log_prefix'}) {
             ### see if the logging prefix matches the blocking
@@ -1773,10 +1778,22 @@ sub parse_NF_pkt_str() {
             return $PKT_ERROR;
         }
 
-        ### don't pickup IP options if --log-ip-options is used
-        ### (they appear before the PROTO= field).
+        ### look for TCP options, but don't pickup IP options if
+        ### also --log-ip-options is used (IP options appear before
+        ### the PROTO= field).
         if ($pkt_str =~ /URGP=\S+\s+OPT\s+\((\S+)\)/) {
             $pkt_hr->{'tcp_opts'} = $1;
+            $found_one_tcp_options_field = 1
+                if $config{'EXPECT_TCP_OPTIONS'} eq 'Y';
+        }
+
+        if ($pkt_hr->{'flags'}
+                and $pkt_hr->{'flags'} eq 'SYN'
+                and $found_one_tcp_options_field
+                and not $pkt_hr->{'tcp_opts'}) {
+            $pkt_hr->{'is_masscan'} = 1;
+            print STDERR "    Masscan SYN scan\n"
+                if $debug;
         }
 
         if ($pkt_str =~ /\sSEQ=(\d+)\s+ACK=(\d+)/) {
@@ -5508,6 +5525,10 @@ sub scan_logr() {
                         $scan_style_str = "Topera $flags scan";
                         printf $fh "%${log_len}s%s\n", $prefix,
                             "[$flags: $n_pkts packets, Topera $flags scan]";
+                    } elsif ($curr_scan_hr->{$src}->{$dst}->{'is_masscan'}) {
+                        $scan_style_str = "Masscan $flags scan";
+                        printf $fh "%${log_len}s%s\n", $prefix,
+                            "[$flags: $n_pkts packets, Masscan $flags scan]";
                     } else {
                         if ($nmap_opts) {
                             printf $fh "%${log_len}s%s\n", $prefix,
@@ -10995,7 +11016,7 @@ sub required_vars() {
         ICMP6_TYPES_FILE PROTOCOL_SCAN_THRESHOLD PROTOCOLS_FILE
         AUTO_BLOCK_DL1_TIMEOUT AUTO_BLOCK_DL2_TIMEOUT
         AUTO_BLOCK_DL3_TIMEOUT AUTO_BLOCK_DL4_TIMEOUT
-        AUTO_BLOCK_DL5_TIMEOUT EMAIL_THROTTLE
+        AUTO_BLOCK_DL5_TIMEOUT EMAIL_THROTTLE EXPECT_TCP_OPTIONS
     ));
     &defined_vars(\@required_vars);
     return;

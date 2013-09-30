@@ -17,8 +17,8 @@
 #
 # Examples:
 #
-#  10.111.21.23    5;          # Very bad IP.
-#  127.0.0.1       0;          # Ignore this IP.
-#  10.10.1.0/24    0;          # Ignore traffic from this entire class C.
-#  192.168.10.4    3    tcp;   # Assign danger level 3 if protocol is tcp.
-#  10.10.1.0/24    3    tcp/1-1024;  # Danger level 3 for tcp port range
+#  10.111.21.23     5;                # Very bad IP.
+#  127.0.0.1        0;                # Ignore this IP.
+#  10.10.1.0/24     0;                # Ignore traffic from this entire class C.
+#  192.168.10.4     3    tcp;         # Assign danger level 3 if protocol is tcp.
+#  10.10.1.0/24     3    tcp/1-1024;  # Danger level 3 for tcp port range

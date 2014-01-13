@@ -3341,7 +3341,7 @@ sub psad_init() {
     ### setup the appropriate iptables data file depending on whether
     ### SYSLOG_DAEMON is set to ulogd, or if ENABLE_SYSLOG_FILE is set
     ### to 'Y'
-    unless ($fw_data_file) {
+    unless ($benchmark or $fw_data_file) {
         if ($config{'SYSLOG_DAEMON'} =~ /ulog/i) {
             $fw_data_file = $config{'ULOG_DATA_FILE'};
         } elsif ($config{'ENABLE_SYSLOG_FILE'} eq 'Y') {

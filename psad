@@ -700,7 +700,7 @@ unless ($kmsgsd_started) {
     unlink $pidfiles{'kmsgsd'} if -e $pidfiles{'kmsgsd'};
 }
 
-unless ($debug or $no_daemon) {
+unless ($debug or $no_daemon or $config{'ENABLE_PSADWATCHD'} eq 'N') {
     $cmd  = $cmds{'psadwatchd'};
     $cmd .= " -c $config_file";
     $cmd .= " -O $override_config_str"
@@ -11017,6 +11017,7 @@ sub required_vars() {
         AUTO_BLOCK_DL1_TIMEOUT AUTO_BLOCK_DL2_TIMEOUT
         AUTO_BLOCK_DL3_TIMEOUT AUTO_BLOCK_DL4_TIMEOUT
         AUTO_BLOCK_DL5_TIMEOUT EMAIL_THROTTLE EXPECT_TCP_OPTIONS
+        ENABLE_PSADWATCHD
     ));
     &defined_vars(\@required_vars);
     return;

@@ -10729,8 +10729,11 @@ sub is_running() {
 ### make sure pid is unique
 sub unique_pid() {
     my $pidfile = shift;
-    die "[*] $0 process is already running! Exiting.\n"
-        if &is_running($pidfile);
+    if (&is_running($pidfile)) {
+        my $msg = "Another $0 process is already running, exiting.";
+        &sys_log($msg);
+        die "[*] $msg";
+    }
     return;
 }
 

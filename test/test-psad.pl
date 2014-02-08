@@ -45,6 +45,7 @@ my $cmd_out_tmp    = 'cmd.out';
 my $default_conf   = "$conf_dir/default_psad.conf";
 my $ignore_udp_conf = "$conf_dir/ignore_udp.conf";
 my $ignore_tcp_conf = "$conf_dir/ignore_tcp.conf";
+my $ignore_intf_conf = "$conf_dir/ignore_intf.conf";
 my $auto_blocking_conf = "$conf_dir/auto_blocking.conf";
 my $auto_dl5_blocking_conf = "$conf_dir/auto_min_dl5_blocking.conf";
 my $require_prefix_conf = "$conf_dir/require_DROP_syslog_prefix_str.conf";
@@ -768,6 +769,18 @@ my @tests = (
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_auto_dl_file " .  ### psad.conf IGNORE_PROTOCOLS trumps auto_dl
                 "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $ignore_tcp_conf $normal_root_override_str",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'psad.conf ignore eth1 traffic',
+        'err_msg'   => 'did not ignore eth1 traffic',
+        'negative_output_matches' => [qr/SRC\:\s+192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_auto_dl_file " .
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $ignore_intf_conf $normal_root_override_str",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },

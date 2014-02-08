@@ -789,8 +789,7 @@ MAIN: for (;;) {
 
     if ($hup_flag) {
 
-        &sys_log('received HUP signal, ' .
-            're-importing psad.conf');
+        &sys_log('received HUP signal, re-importing psad.conf');
 
         print STDERR "[+] Received HUP signal, re-importing config...\n"
             if $debug;
@@ -3863,7 +3862,7 @@ sub parse_ignore_interfaces() {
 
     my @interfaces = split /\s*,\s*/, $config{'IGNORE_INTERFACES'};
     for my $intf (@interfaces) {
-        if ($intf =~ /\W/) {
+        if ($intf !~ /^[\w.:]+$/) {
             &sys_log('invalid interface in IGNORE_INTERFACES var');
         } else {
             $ignore_interfaces{$intf} = '';

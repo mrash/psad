@@ -6,6 +6,8 @@ psad-2.2.3 (//2014):
       addition, a new init script located at init-scripts/upstart/psad has
       been added that is compatible with upstart - this script is meant to be
       copied to the /etc/init.d/ directory.
+    - (Wolfgang Breyha) Bug fix to allow VLAN interfaces and interface aliases
+      in IGNORE_INTERFACES.  This fixes issue #8 on github.
 
 psad-2.2.2 (01/13/2014):
     - Added detection for Errata Security's "Masscan" port scanner that was

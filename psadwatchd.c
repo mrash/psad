@@ -216,6 +216,9 @@ static void check_process(
 #ifdef DEBUG
     fprintf(stderr, "[-] Could not open pid file: %s\n", pid_file);
 #endif
+        snprintf(syslog_str, MAX_MSG_LEN,
+                "could not open pid file: %s on %s", pid_file, hostname);
+        slogr("psad(psadwatchd)", syslog_str);
         /* the pid file must not exist (or we can't read it), so
          * setup to start the appropriate process */
         restart = 1;
@@ -231,8 +234,13 @@ static void check_process(
 #endif
             fclose(pidfile_ptr);
 
+            snprintf(syslog_str, MAX_MSG_LEN,
+                "could not read pid file: %s on %s", pid_file, hostname);
+            slogr("psad(psadwatchd)", syslog_str);
+
             /* see if we need to give up */
             incr_syscall_ctr(pid_name, max_retries);
+
             return;
         }
 

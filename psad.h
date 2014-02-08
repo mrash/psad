@@ -45,7 +45,7 @@
 #include <ctype.h>
 
 /* DEFINES ********************************************************************/
-#define PSAD_VERSION      "2.1.6-pre1"
+#define PSAD_VERSION      "2.2.2"
 #define MAX_LINE_BUF 1024
 #define MAX_PID_SIZE 6
 #define MAX_PATH_LEN 100

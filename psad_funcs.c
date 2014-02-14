@@ -252,8 +252,14 @@ void expand_sub_var_value(char *value, const char *sub_var,
         exit(EXIT_FAILURE);
     }
     strlcpy(value, pre_str, MAX_GEN_LEN);
-    strlcat(value, sub_var, MAX_GEN_LEN);
-    strlcat(value, post_str, MAX_GEN_LEN);
+    if (sub_var[0] == '/'
+            && (strlen(sub_var) == 1)
+            && post_str[0] == '/') {
+        strlcat(value, post_str, MAX_GEN_LEN);
+    } else {
+        strlcat(value, sub_var, MAX_GEN_LEN);
+        strlcat(value, post_str, MAX_GEN_LEN);
+    }
     return;
 }
 

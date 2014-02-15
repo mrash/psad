@@ -6819,6 +6819,9 @@ sub tcpwr_rm_block() {
         "$config{'ETC_HOSTS_DENY_FILE'}: $!";
     my @lines = <T>;
     close T;
+
+    my $orig_perms = (stat($config{'ETC_HOSTS_DENY_FILE'}))[2] & 07777;
+
     open T, "> $config{'ETC_HOSTS_DENY_FILE'}.tmp" or die '[*] Could not open ',
         "$config{'ETC_HOSTS_DENY_FILE'}.tmp: $!";
     for my $line (@lines) {
@@ -6836,6 +6839,10 @@ sub tcpwr_rm_block() {
         }
     }
     close T;
+
+    ### set permissions on the tmp file to be identical to the original
+    chmod $orig_perms, "$config{'ETC_HOSTS_DENY_FILE'}.tmp";
+
     move "$config{'ETC_HOSTS_DENY_FILE'}.tmp", $config{'ETC_HOSTS_DENY_FILE'}
         or die "[*] Could not move $config{'ETC_HOSTS_DENY_FILE'}.tmp -> ",
         "$config{'ETC_HOSTS_DENY_FILE'}";

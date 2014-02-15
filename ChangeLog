@@ -8,6 +8,10 @@ psad-2.2.3 (//2014):
       copied to the /etc/init.d/ directory.
     - (Wolfgang Breyha) Bug fix to allow VLAN interfaces and interface aliases
       in IGNORE_INTERFACES.  This fixes issue #8 on github.
+    - Bug fix to not modify /etc/hosts.deny permissions when removing
+      tcpwrappers auto-block rules. This issue was reported as Debian bug
+      #724267 (http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=724267) and
+      relayed via Franck Joncourt. Closes issue #7 on github.
 
 psad-2.2.2 (01/13/2014):
     - Added detection for Errata Security's "Masscan" port scanner that was

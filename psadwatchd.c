@@ -247,6 +247,9 @@ static void check_process(
         /* close the pid_file now that we have read it */
         fclose(pidfile_ptr);
 
+        if (pid_line[strlen(pid_line)] == '\n')
+            pid_line[strlen(pid_line)] = '\0';
+
         /* convert the pid_line into an integer */
         pid = atoi(pid_line);
 

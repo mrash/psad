@@ -1,41 +1,108 @@
-commit dcbfd2034d2e8c1f8fc8ccfab3e4bcade22e9c43 (HEAD, refs/heads/master)
+commit 98763c9a8a7dd064f44c91f0c7147bdc9d0c3b4d (HEAD, refs/heads/master)
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Mon Jan 13 18:38:31 2014 -0500
+Date:   Sat Mar 1 20:28:05 2014 -0500
 
-    copyright date update
+    bump version to psad-2.2.3
 
- psad | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-commit 679d49d24957ee6f56269990c8d8980a737101a5
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Mon Jan 13 18:37:24 2014 -0500
-
-    bumped version to 2.2.2
-
- ChangeLog                             | 2 +-
  VERSION                               | 2 +-
  nf2csv                                | 2 +-
- packaging/psad-nodeps.spec            | 5 ++++-
+ packaging/psad-nodeps.spec            | 7 +++++--
  packaging/psad-require-makemaker.spec | 5 ++++-
  packaging/psad.spec                   | 5 ++++-
  psad                                  | 4 ++--
- 7 files changed, 17 insertions(+), 8 deletions(-)
+ 6 files changed, 17 insertions(+), 8 deletions(-)
 
-commit a91f73529e6e799068af6cad68ddd0c2f5cab92d
+commit 6bd297f59932e07067f450abb0a0336ef566bf31
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Mon Jan 13 18:27:53 2014 -0500
+Date:   Sat Mar 1 20:25:13 2014 -0500
 
-    minor bug fix to auto-generate iptables logs in benchmark mode
+    set ENABLE_PSADWATCHD to 'N' by default
 
- psad | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ ChangeLog | 14 +++++++++-----
+ psad.conf |  2 +-
+ 2 files changed, 10 insertions(+), 6 deletions(-)
 
-commit d69cbdfc21dfd9db42efee4fc47fc0999de5c3df
+commit 7f06f204012b9e8d76ce1cc8e03f69a066bd70d1
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Mon Jan 13 18:11:14 2014 -0500
+Date:   Sat Mar 1 20:22:25 2014 -0500
 
-    [test suite] added EXPECT_TCP_OPTIONS to config files
+    moved psad upstart config to psad.conf (meant to be copied to /etc/init/)
+
+ init-scripts/upstart/psad      | 26 --------------------------
+ init-scripts/upstart/psad.conf | 26 ++++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+), 26 deletions(-)
+
+commit b3a86dfe6b48ecd3dfbdf14c593df4d30ed798e9
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Mar 1 20:17:02 2014 -0500
+
+    remove any trailing newline char for pid value
+
+ psadwatchd.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+commit a06ce15012fe71908a749480b02c179d4ac782f7
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Feb 14 21:31:44 2014 -0500
+
+    tcpwrappers /etc/hosts.deny permissions bug fix
+    
+    Bug fix to not modify /etc/hosts.deny permissions when removing
+    tcpwrappers auto-block rules. This issue was reported as Debian bug #724267
+    (http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=724267) and relayed via
+    Franck Joncourt. Closes issue #7 on github.
+
+ ChangeLog | 4 ++++
+ psad      | 7 +++++++
+ 2 files changed, 11 insertions(+)
+
+commit 11ea904906f03022008d35418ed8739ab7cc93dd
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Feb 13 21:41:14 2014 -0500
+
+    minor bug fix in psadwatchd to not have duplicate '/' in directory path
+
+ psad_funcs.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+commit 9e43ba5942a05e80ae4da45bf25716ffcb98981a
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Feb 8 12:28:22 2014 -0500
+
+    (Wolfgang Breyha) Bug fix to allow VLAN interfaces and interface aliases in IGNORE_INTERFACES
+    
+    This fixes issue #8 on github.
+
+ CREDITS                    |   4 +
+ ChangeLog                  |   2 +
+ psad                       |   5 +-
+ test/conf/ignore_intf.conf | 188 +++++++++++++++++++++++++++++++++++++++++++++
+ test/test-psad.pl          |  13 ++++
+ 5 files changed, 209 insertions(+), 3 deletions(-)
+
+commit b0bd270fd188ea1393f2f6af044fe554c2666872
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Feb 8 11:47:44 2014 -0500
+
+    better pid file error reporting under syslog for psadwatchd
+
+ psadwatchd.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+commit 693b3b23f93d3b71502dd45e98358a028cb683e1
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Feb 8 10:07:43 2014 -0500
+
+    write syslog message if an existing psad is already running
+
+ psad | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+commit 53cd31a5ef01c0e5ab92c0b2ae6b5d3a4b5175c2
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Feb 8 09:54:08 2014 -0500
+
+    [test suite] added ENABLE_PSADWATCHD var to test suite config files
 
  test/conf/auto_blocking.conf                     | 1 +
  test/conf/auto_min_dl5_blocking.conf             | 1 +
@@ -48,107 +115,51 @@ Date:   Mon Jan 13 18:11:14 2014 -0500
  test/conf/require_missing_syslog_prefix_str.conf | 1 +
  9 files changed, 9 insertions(+)
 
-commit db91ca09cf5079b821fe8a10f3a2dfe6afaef2cc
+commit 0d95d88e21adfd59a894a998db1e2e78dadba3db
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Mon Jan 13 18:07:36 2014 -0500
+Date:   Sat Feb 8 09:47:39 2014 -0500
 
-    [test suite] removed comments and blank lines for config files
+    close pid files as early as possible in psadwatchd
 
- test/conf/auto_blocking.conf                     | 410 -----------------------
- test/conf/auto_min_dl5_blocking.conf             | 410 -----------------------
- test/conf/default_psad.conf                      | 410 -----------------------
- test/conf/disable_ipv6_detection.conf            | 410 -----------------------
- test/conf/enable_ack_detection.conf              | 410 -----------------------
- test/conf/ignore_tcp.conf                        | 410 -----------------------
- test/conf/ignore_udp.conf                        | 410 -----------------------
- test/conf/require_DROP_syslog_prefix_str.conf    | 410 -----------------------
- test/conf/require_missing_syslog_prefix_str.conf | 410 -----------------------
- 9 files changed, 3690 deletions(-)
+ psadwatchd.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-commit b19a03fd59ab60a1a8811ee506b82905fbe00542 (refs/remotes/origin/master, refs/remotes/origin/HEAD)
+commit 9ef5930ae60d0a4ca32706a654ccd4d5d0eb758e
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sun Sep 29 22:01:53 2013 -0400
+Date:   Sat Feb 8 09:38:25 2014 -0500
 
-    Added detection for Errata Security's "Masscan" port scanner
+    fix psad version in psad.h
+
+ psad.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit 77f40830e259574964764c6283d336f0aeba9670
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Feb 6 22:34:22 2014 -0500
+
+    moved the upstart init script psad.conf to psad
+
+ init-scripts/upstart/psad      | 26 ++++++++++++++++++++++++++
+ init-scripts/upstart/psad.conf | 26 --------------------------
+ 2 files changed, 26 insertions(+), 26 deletions(-)
+
+commit 9d15ebda1bdb59e327d267b5c80c77938ec8dd4f
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Thu Feb 6 22:33:09 2014 -0500
+
+    Add compatibility with 'upstart' init daemons
     
-    Added detection for Errata Security's "Masscan" port scanner that was
-    used in an Internet-wide scan for port 22 on Sept. 12, 2013 (see:
-    http://blog.erratasec.com/2013/09/we-scanned-internet-for-port-22.html).
-    The detection strategy used by psad relies on the fact that masscan does
-    not appear to set the options portion of the TCP header, and if the
-    iptables LOG rules that generate log data for psad are built with the
-    --log-tcp-options switch, then no options in a SYN scan can be seen.
-    This is not to say that other scanning software always sets TCP options -
-    Scapy seems to not set options by default when issuing a SYN scan like
-    this either: http://www.secdev.org/projects/scapy/doc/usage.html#syn-scans
-    There is a new psad.conf variable "EXPECT_TCP_OPTIONS" to assist with
-    Masscan detection as well.  When looking for Masscan SYN scans, psad
-    requires at least one TCP options field to be populated within a LOG
-    message (so that it knows --log-tcp-options has been set for at least
-    some logged traffic), and after seeing this then SYN packets with no
-    options are attributed to Masscan traffic.  All usual psad threshold
-    variables continue to apply however, so (by default) a single Masscan
-    SYN packet will not trigger a psad alert.  Masscan detection can be
-    disabled altogether by setting EXPECT_TCP_OPTIONS to "N", and this will
-    not affect any other psad detection techniques such as passive OS
-    fingerprinting, etc.
+    - Added compatibility with 'upstart' init daemons with assistance from Tim
+    Kramer.  This change adds a new config variable 'ENABLE_PSADWATCHD' that
+    can be used to disable psadwatchd when deployed with upstart since it
+    has built-in process monitoring and restarting capabilities.  In addition,
+    a new init script located at init-scripts/upstart/psad has been added that
+    is compatible with upstart - this script is meant to be copied to the
+    /etc/init.d/ directory.
 
- ChangeLog | 21 +++++++++++++++++++++
- psad      | 29 +++++++++++++++++++++++++----
- psad.conf |  9 +++++++++
- 3 files changed, 55 insertions(+), 4 deletions(-)
-
-commit cb891a8cfae9acdbbac67a68d92f26e07d6d0d70
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sun Sep 29 20:54:32 2013 -0400
-
-    minor auto_dl spacing update
-
- auto_dl | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
-
-commit d1a25b1d011d0d64716cd73e134c11c39020328c
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sun Jul 28 23:52:41 2013 -0400
-
-    fix uninitilized scan danger level for IP block renewals when FLUSH_IPT_AT_INIT=N, closes #6
-
- CREDITS |  5 +++++
- psad    | 18 +++++++++++++++++-
- 2 files changed, 22 insertions(+), 1 deletion(-)
-
-commit 3b7d73b87f21abef746a66abfeb9736258867618
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sat Jul 27 15:41:17 2013 -0400
-
-    [test suite] added --test-limit command line arg
-
- test/test-psad.pl | 3 +++
- 1 file changed, 3 insertions(+)
-
-commit 4f0a212eccea87abe90a8a62f23569b2f74e30fe
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Fri Jul 26 21:25:52 2013 -0400
-
-    minor --stdin usage text addition
-
- psad   | 5 ++++-
- psad.8 | 5 +++++
- 2 files changed, 9 insertions(+), 1 deletion(-)
-
-commit 25edc093c9ca9952103c6f92b66f1f4c38a9743a
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Thu Jan 24 21:13:55 2013 -0500
-
-    psad RPM bug fix to include the protocols file
-    
-    Nicholas-Ritter reported a bug in psad-2.2.1 where the protocols file is not
-    bundled with the psad RPM's or included in the psad RPM .spec files.
-
- CREDITS                               | 4 ++++
- ChangeLog                             | 3 +++
- packaging/psad-nodeps.spec            | 2 ++
- packaging/psad-require-makemaker.spec | 2 ++
- packaging/psad.ebuild                 | 2 +-
- packaging/psad.spec                   | 2 ++
- 6 files changed, 14 insertions(+), 1 deletion(-)
+ CREDITS                        |  4 ++++
+ ChangeLog                      |  9 +++++++++
+ init-scripts/upstart/psad.conf | 26 ++++++++++++++++++++++++++
+ psad                           |  3 ++-
+ psad.conf                      | 13 ++++++++++++-
+ 5 files changed, 53 insertions(+), 2 deletions(-)

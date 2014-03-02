@@ -1,11 +1,15 @@
-psad-2.2.3 (//2014):
+psad-2.2.3 (03/01/2014):
     - Added compatibility with 'upstart' init daemons with assistance from Tim
       Kramer.  This change adds a new config variable 'ENABLE_PSADWATCHD' that
       can be used to disable psadwatchd when deployed with upstart since it
-      has built-in process monitoring and restarting capabilities.  In
-      addition, a new init script located at init-scripts/upstart/psad has
-      been added that is compatible with upstart - this script is meant to be
-      copied to the /etc/init.d/ directory.
+      has built-in process monitoring and restarting capabilities.  By default
+      psadwatchd is not enabled anymore since this variable is set to "N". The
+      reason for this change is that psad is extremely stable and so almost
+      never needs to be restarted in practice, and process monitoring is
+      better provided via other solutions (like upstart) anyway.  In addition,
+      a new init script located at init-scripts/upstart/psad.conf has been
+      added that is compatible with upstart - this script is meant to be copied
+      to the /etc/init/ directory.
     - (Wolfgang Breyha) Bug fix to allow VLAN interfaces and interface aliases
       in IGNORE_INTERFACES.  This fixes issue #8 on github.
     - Bug fix to not modify /etc/hosts.deny permissions when removing

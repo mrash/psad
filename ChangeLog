@@ -1,3 +1,9 @@
+psad-2.2.4 (08//2014):
+    - Bug fix to not create zombie whois processes when whois lookups take too
+      long to complete for whatever reason (slow network, etc.). This fixes
+      issue #15 on Github. The bug was reported by "3Turtles" to the psad
+      mailing list, and Dan Dickey provided valuable input.
+
 psad-2.2.3 (03/01/2014):
     - Added compatibility with 'upstart' init daemons with assistance from Tim
       Kramer.  This change adds a new config variable 'ENABLE_PSADWATCHD' that

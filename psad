@@ -728,7 +728,6 @@ if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
 ### and for reaping zombie whois processes.
 $SIG{'__WARN__'} = \&warn_handler;
 $SIG{'__DIE__'}  = \&die_handler;
-$SIG{'CHLD'}     = \&REAPER;
 $SIG{'USR1'}     = \&usr1_handler;
 $SIG{'HUP'}      = \&hup_handler;
 
@@ -6020,21 +6019,23 @@ sub exec_external_script() {
     $scan_ext_exec{$src} = '';
     my $cmd = $config{'EXTERNAL_SCRIPT'};
     $cmd =~ s/SRCIP/$src/;
+
     my $pid;
-    if ($pid = fork()) {
-        local $SIG{'ALRM'} = sub {die "[*] External script timeout.\n"};
-        alarm 30;  ### the external script should be finished in 30 secs.
-        eval {
-            waitpid($pid, 0);
-        };
-        alarm 0;
-        if ($@) {
-            kill 9, $pid;
+    local $SIG {'ALRM'} = sub {kill 15, $pid or die "[*] kill: $!";
+        die "[*] External script timeout.\n"};
+    eval {
+        $pid = fork();
+
+        die "Could not fork for external script: $!" unless defined $pid;
+
+        unless ($pid) {
+            exec qq{$cmd};
+            die "script exec failed: $!";
         }
-    } else {
-        die "[*] Could not fork for external script: $!" unless defined $pid;
-        exec qq{$cmd};
-    }
+        alarm $config{'WHOIS_TIMEOUT'};
+
+        waitpid $pid => 0;
+    };
     return;
 }
 
@@ -7277,15 +7278,26 @@ sub get_whois_info() {
         $whois_cache{$ip}++;
     } else {
         $whois_cache{$ip} = 0;
+
+        my $pid;
+
+        local $SIG {'ALRM'} = sub {kill 15, $pid or die "[*] kill: $!";
+            die "whois alarm"};
         eval {
-            local $SIG{'ALRM'} = sub {die "whois alarm\n"};
+            $pid = fork();
+
+            die "Could not fork(): $!" unless defined $pid;
+
+            unless ($pid) {
+                exec "$cmds{'whois'} $ip > $whois_datafile";
+                die "whois $ip exec failed: $!";
+            }
             alarm $config{'WHOIS_TIMEOUT'};
-            system "$cmds{'whois'} $ip > $whois_datafile 2> /dev/null";
-            alarm 0;
+
+            waitpid $pid => 0;
         };
+
         if ($@) {
-            ### die unless $@ eq "whois alarm\n";
-            ### warn "$@: $?";  ### let the warning handler save the error.
             warn $@;
             $#whois_data = 0;
             @whois_data = ("Whois data not available!\n");
@@ -7306,16 +7318,6 @@ sub get_whois_info() {
     }
 
     return \@whois_data;
-}
-
-sub REAPER {
-    my $pid;
-    $pid = waitpid(-1, WNOHANG);
-#   if (WIFEXITED($?)) {
-#       print STDERR "[+] **  Process $pid exited.\n";
-#   }
-    $SIG{'CHLD'} = \&REAPER;
-    return;
 }
 
 sub stop_psad() {

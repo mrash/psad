@@ -5728,9 +5728,12 @@ sub scan_logr() {
                     if ($config{'ENABLE_EXT_SCRIPT_EXEC'} eq 'Y') {
                         if ($config{'EXEC_EXT_SCRIPT_PER_ALERT'} eq 'Y') {
                             &exec_external_script($src, $config{'EXTERNAL_SCRIPT'});
+                            $scan_ext_exec{$src} = '';
                         } else {
-                            &exec_external_script($src, $config{'EXTERNAL_SCRIPT'})
-                                unless defined $scan_ext_exec{$src};
+                            unless (defined $scan_ext_exec{$src}) {
+                                &exec_external_script($src, $config{'EXTERNAL_SCRIPT'});
+                                $scan_ext_exec{$src} = '';
+                            }
                         }
                     }
                 }
@@ -6016,7 +6019,7 @@ sub print_chains_and_prefixes() {
 
 sub exec_external_script() {
     my ($src, $cmd) = @_;
-    $scan_ext_exec{$src} = '';
+
     $cmd =~ s/SRCIP/$src/;
 
     my $pid;

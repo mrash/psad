@@ -442,6 +442,9 @@ Dan A. Dickey
       iproute2 does not.  So, for a multi-homed interface (eth0 with multiple
       addresses), ifconfig -a only shows the first one configured and not the
       rest.  ip addr shows all of the configured addresses...".
+    - Valuable input around whois process handling w.r.t. zombie processes.
+      This helped to lead to a solution using fork() and exec(), and was
+      tracked by Github issue #15.
 
 Graham Murray
     - Reported a bug where 8-bit data included in some whois output causes mail

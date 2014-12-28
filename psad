@@ -6659,7 +6659,15 @@ sub check_ipt_cmd() {
             if ($line =~ m|add\s+($ipv4_re)\s*$|i
                     or $line =~ m|add\s+($ipv4_re/\d+)\s*$|i
                     or $line =~ m|add\s+($ipv4_re/$ipv4_re)\s*$|i) {
-                ### instantiate the blocking rule
+                my $ip_net = $1;
+
+                my $ip_only = '';
+                $ip_only = $1 if $line =~ /\s($ipv4_re)/;
+
+                ### instantiate the blocking rule, force a DL value
+                ### equal to the AUTO_IDS_DANGER_LEVEL setting
+                $scan_dl{$ip_only} = $config{'AUTO_IDS_DANGER_LEVEL'};
+
                 &ipt_block($1, '');
             } elsif ($line =~ m|del\s+($ipv4_re)\s*$|i
                     or $line =~ m|del\s+($ipv4_re/\d+)\s*$|i
@@ -6971,6 +6979,9 @@ sub get_block_timeout() {
 
     my $timeout_str = "for $timeout seconds";
     $timeout_str = '(unlimited timeout)' if $timeout == $PERMANENT;
+
+    print STDERR "[+] get_block_timeout() dl: $dl, $timeout, $timeout_str\n"
+        if $debug;
 
     return ($timeout, $timeout_str);
 }

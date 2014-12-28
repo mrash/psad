@@ -1,165 +1,149 @@
-commit 98763c9a8a7dd064f44c91f0c7147bdc9d0c3b4d (HEAD, refs/heads/master)
+commit 5220e1dc1cf36ce51037042fad6aa89517177d72 (HEAD, refs/heads/master)
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sat Mar 1 20:28:05 2014 -0500
+Date:   Sat Dec 27 19:58:28 2014 -0500
 
-    bump version to psad-2.2.3
+    bumped version to 2.2.4
 
- VERSION                               | 2 +-
- nf2csv                                | 2 +-
- packaging/psad-nodeps.spec            | 7 +++++--
- packaging/psad-require-makemaker.spec | 5 ++++-
- packaging/psad.spec                   | 5 ++++-
- psad                                  | 4 ++--
- 6 files changed, 17 insertions(+), 8 deletions(-)
+ VERSION             | 2 +-
+ nf2csv              | 2 +-
+ packaging/psad.spec | 5 ++++-
+ psad                | 2 +-
+ 4 files changed, 7 insertions(+), 4 deletions(-)
 
-commit 6bd297f59932e07067f450abb0a0336ef566bf31
+commit 8d4c54bf9134ad2afd3fcda2f893c239a70222bd
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sat Mar 1 20:25:13 2014 -0500
+Date:   Sat Dec 27 19:57:04 2014 -0500
 
-    set ENABLE_PSADWATCHD to 'N' by default
+    bug fix for reverse DNS lookups against IP addresses that cannot be resolved
 
- ChangeLog | 14 +++++++++-----
- psad.conf |  2 +-
- 2 files changed, 10 insertions(+), 6 deletions(-)
+ ChangeLog |  6 +++++-
+ psad      | 10 ++++++----
+ 2 files changed, 11 insertions(+), 5 deletions(-)
 
-commit 7f06f204012b9e8d76ce1cc8e03f69a066bd70d1
+commit 1c45056e5ed7d7b8f9a674d25333bebd42d1ebf8
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sat Mar 1 20:22:25 2014 -0500
+Date:   Sat Dec 27 19:49:58 2014 -0500
 
-    moved psad upstart config to psad.conf (meant to be copied to /etc/init/)
+    fix uninitialized var bug in --fw-block-ip handling (issue #17)
 
- init-scripts/upstart/psad      | 26 --------------------------
- init-scripts/upstart/psad.conf | 26 ++++++++++++++++++++++++++
- 2 files changed, 26 insertions(+), 26 deletions(-)
+ CREDITS |  2 ++
+ psad    | 13 ++++++++++++-
+ 2 files changed, 14 insertions(+), 1 deletion(-)
 
-commit b3a86dfe6b48ecd3dfbdf14c593df4d30ed798e9
+commit 91a3c6abd1b010dceb4c2f937b50fd30fab4d559
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sat Mar 1 20:17:02 2014 -0500
+Date:   Thu Dec 25 21:26:11 2014 -0500
 
-    remove any trailing newline char for pid value
+    [test suite] add missing vars to test config files
 
- psadwatchd.c | 3 +++
- 1 file changed, 3 insertions(+)
+ test/conf/auto_blocking.conf                     | 2 ++
+ test/conf/auto_min_dl5_blocking.conf             | 2 ++
+ test/conf/default_psad.conf                      | 2 ++
+ test/conf/disable_ipv6_detection.conf            | 2 ++
+ test/conf/enable_ack_detection.conf              | 2 ++
+ test/conf/ignore_intf.conf                       | 2 ++
+ test/conf/ignore_tcp.conf                        | 2 ++
+ test/conf/ignore_udp.conf                        | 2 ++
+ test/conf/require_DROP_syslog_prefix_str.conf    | 2 ++
+ test/conf/require_missing_syslog_prefix_str.conf | 2 ++
+ 10 files changed, 20 insertions(+)
 
-commit a06ce15012fe71908a749480b02c179d4ac782f7
+commit 3d40022424c9f6f7d24826bf1958c1e091cbbe2b (refs/remotes/origin/master, refs/remotes/origin/HEAD)
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Fri Feb 14 21:31:44 2014 -0500
+Date:   Thu Aug 21 19:55:02 2014 -0400
 
-    tcpwrappers /etc/hosts.deny permissions bug fix
+    make per-alert tracking specific to the non-blocking external script
+
+ psad | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+commit c0d49ba9d615017bd9e9b1414b5dfe1a359c388b
+Merge: 5e6ab05 51317a1
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Wed Aug 20 23:01:18 2014 -0400
+
+    Merge branch 'master' of ssh://10.211.55.11/home/mbr/git/psad
+
+commit 51317a16bfe54881f0ac645096f67e630a383ff5 (tag: refs/tags/2.2.4-pre1)
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Wed Aug 20 23:00:45 2014 -0400
+
+    bumped version to 2.2.4-pre1
+
+ VERSION | 2 +-
+ nf2csv  | 2 +-
+ psad    | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+commit d38ec6b31078a23f4a4283c9857b891dc493a557
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Wed Aug 20 22:56:47 2014 -0400
+
+    Added the abiliy to exec a script upon a blocking rule being added.
     
-    Bug fix to not modify /etc/hosts.deny permissions when removing
-    tcpwrappers auto-block rules. This issue was reported as Debian bug #724267
-    (http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=724267) and relayed via
-    Franck Joncourt. Closes issue #7 on github.
+    (Steve Murphy) Added the ability to run an external script whenever an
+    IP is blocked. Two new config variables were added to support this
+    feature, ENABLE_EXT_BLOCK_SCRIPT_EXEC and ENABLE_EXT_BLOCK_SCRIPT_EXEC.
 
- ChangeLog | 4 ++++
- psad      | 7 +++++++
- 2 files changed, 11 insertions(+)
+ CREDITS   |  5 +++++
+ ChangeLog |  3 +++
+ psad      | 19 +++++++++++--------
+ psad.conf | 13 +++++++++++++
+ 4 files changed, 32 insertions(+), 8 deletions(-)
 
-commit 11ea904906f03022008d35418ed8739ab7cc93dd
+commit 5e6ab05b34dd7286b2c5da8191d671d479a6aa1f
+Merge: 5fb2d6d 49ad1da
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Thu Feb 13 21:41:14 2014 -0500
+Date:   Wed Aug 20 22:45:35 2014 -0400
 
-    minor bug fix in psadwatchd to not have duplicate '/' in directory path
+    Merge branch 'master' of ssh://10.211.55.11/home/mbr/git/psad
 
- psad_funcs.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
-
-commit 9e43ba5942a05e80ae4da45bf25716ffcb98981a
+commit 49ad1da2c293fe9f58790ec1b7e59dfa73e785de
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sat Feb 8 12:28:22 2014 -0500
+Date:   Wed Aug 20 22:43:22 2014 -0400
 
-    (Wolfgang Breyha) Bug fix to allow VLAN interfaces and interface aliases in IGNORE_INTERFACES
+    Bug fix to not create zombie whois processes
     
-    This fixes issue #8 on github.
+    Bug fix to not create zombie whois processes when whois lookups take too
+    long to complete for whatever reason (slow network, etc.). This fixes
+    issue #15 on Github. The bug was reported by "3Turtles" to the psad
+    mailing list, and Dan Dickey provided valuable input.
 
- CREDITS                    |   4 +
- ChangeLog                  |   2 +
- psad                       |   5 +-
- test/conf/ignore_intf.conf | 188 +++++++++++++++++++++++++++++++++++++++++++++
- test/test-psad.pl          |  13 ++++
- 5 files changed, 209 insertions(+), 3 deletions(-)
+ CREDITS   |  3 +++
+ ChangeLog |  6 ++++++
+ psad      | 60 +++++++++++++++++++++++++++++++-----------------------------
+ 3 files changed, 40 insertions(+), 29 deletions(-)
 
-commit b0bd270fd188ea1393f2f6af044fe554c2666872
+commit 5fb2d6d4ca1830ff41dcb43453be0f8ab4937e0a
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sat Feb 8 11:47:44 2014 -0500
+Date:   Mon Jun 16 20:40:56 2014 -0400
 
-    better pid file error reporting under syslog for psadwatchd
+    minor psad.conf comment update
 
- psadwatchd.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ psad.conf | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-commit 693b3b23f93d3b71502dd45e98358a028cb683e1
+commit 077b9fd0d7e39a555d7b0e08e7ee71a585cb897a
+Merge: 9052bf0 8d287b8
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sat Feb 8 10:07:43 2014 -0500
+Date:   Sat Mar 1 21:50:41 2014 -0500
 
-    write syslog message if an existing psad is already running
+    Merge branch 'master' of ssh://github.com/mrash/psad
 
- psad | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
-
-commit 53cd31a5ef01c0e5ab92c0b2ae6b5d3a4b5175c2
+commit 9052bf04e2f770adba9aec9f8eb33c158553fad8
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sat Feb 8 09:54:08 2014 -0500
+Date:   Fri Feb 14 21:58:23 2014 -0500
 
-    [test suite] added ENABLE_PSADWATCHD var to test suite config files
+    update to properly credit Franck for being the Debian package maintainer
 
- test/conf/auto_blocking.conf                     | 1 +
- test/conf/auto_min_dl5_blocking.conf             | 1 +
- test/conf/default_psad.conf                      | 1 +
- test/conf/disable_ipv6_detection.conf            | 1 +
- test/conf/enable_ack_detection.conf              | 1 +
- test/conf/ignore_tcp.conf                        | 1 +
- test/conf/ignore_udp.conf                        | 1 +
- test/conf/require_DROP_syslog_prefix_str.conf    | 1 +
- test/conf/require_missing_syslog_prefix_str.conf | 1 +
- 9 files changed, 9 insertions(+)
+ CREDITS | 1 +
+ 1 file changed, 1 insertion(+)
 
-commit 0d95d88e21adfd59a894a998db1e2e78dadba3db
+commit 8d287b8475ca44baf1351108d8b7ad5093f54e3d
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sat Feb 8 09:47:39 2014 -0500
+Date:   Fri Feb 14 21:58:23 2014 -0500
 
-    close pid files as early as possible in psadwatchd
+    update to properly credit Franck for being the Debian package maintainer
 
- psadwatchd.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
-
-commit 9ef5930ae60d0a4ca32706a654ccd4d5d0eb758e
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sat Feb 8 09:38:25 2014 -0500
-
-    fix psad version in psad.h
-
- psad.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-commit 77f40830e259574964764c6283d336f0aeba9670
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Thu Feb 6 22:34:22 2014 -0500
-
-    moved the upstart init script psad.conf to psad
-
- init-scripts/upstart/psad      | 26 ++++++++++++++++++++++++++
- init-scripts/upstart/psad.conf | 26 --------------------------
- 2 files changed, 26 insertions(+), 26 deletions(-)
-
-commit 9d15ebda1bdb59e327d267b5c80c77938ec8dd4f
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Thu Feb 6 22:33:09 2014 -0500
-
-    Add compatibility with 'upstart' init daemons
-    
-    - Added compatibility with 'upstart' init daemons with assistance from Tim
-    Kramer.  This change adds a new config variable 'ENABLE_PSADWATCHD' that
-    can be used to disable psadwatchd when deployed with upstart since it
-    has built-in process monitoring and restarting capabilities.  In addition,
-    a new init script located at init-scripts/upstart/psad has been added that
-    is compatible with upstart - this script is meant to be copied to the
-    /etc/init.d/ directory.
-
- CREDITS                        |  4 ++++
- ChangeLog                      |  9 +++++++++
- init-scripts/upstart/psad.conf | 26 ++++++++++++++++++++++++++
- psad                           |  3 ++-
- psad.conf                      | 13 ++++++++++++-
- 5 files changed, 53 insertions(+), 2 deletions(-)
+ CREDITS | 1 +
+ 1 file changed, 1 insertion(+)

@@ -7275,10 +7275,12 @@ sub get_dns_info() {
     } else {
         my $ipaddr = gethostbyname($ip);
         ### gethostbyaddr($ipaddr, AF_INET);
-        my $dns_tmp = gethostbyaddr($ipaddr, 2);
-        $dns_str = $dns_tmp if $dns_tmp;
-        $dns_cache{$ip}{'ctr'}      = 0;
-        $dns_cache{$ip}{'hostname'} = $dns_str;
+        if (defined $ipaddr) {
+            my $dns_tmp = gethostbyaddr($ipaddr, 2);
+            $dns_str = $dns_tmp if $dns_tmp;
+            $dns_cache{$ip}{'ctr'}      = 0;
+            $dns_cache{$ip}{'hostname'} = $dns_str;
+        }
     }
     return $dns_str;
 }

@@ -1,4 +1,4 @@
-psad-2.2.4 (08//2014):
+psad-2.2.4 (12/27/2014):
     - (Steve Murphy) Added the ability to run an external script whenever an
       IP is blocked. Two new config variables were added to support this
       feature, ENABLE_EXT_BLOCK_SCRIPT_EXEC and ENABLE_EXT_BLOCK_SCRIPT_EXEC.
@@ -6,6 +6,10 @@ psad-2.2.4 (08//2014):
       long to complete for whatever reason (slow network, etc.). This fixes
       issue #15 on Github. The bug was reported by "3Turtles" to the psad
       mailing list, and Dan Dickey provided valuable input.
+    - Bug fix for uninitialized variable in --fw-block-ip handling reported by
+      Albert Whale (fixes issue #17).
+    - Bug fix in reverse DNS resolution for IP addresses that cannot be
+      properly resolved.
 
 psad-2.2.3 (03/01/2014):
     - Added compatibility with 'upstart' init daemons with assistance from Tim

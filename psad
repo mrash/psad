@@ -145,7 +145,7 @@ use strict;
 ### ========================== main =================================
 
 ### set the current version
-my $version = '2.2.3b';
+my $version = '2.2.4';
 
 ### default config file for psad (can be changed with
 ### --config switch)
@@ -6581,8 +6581,7 @@ sub ipt_rm_block() {
         unless ($flush_fw) {
             ### don't send timeout email if we are manually flushing
             ### the auto-block rules from the command line with --Flush.
-            &sys_log("removed iptables auto-block against " .
-                $ip);
+            &sys_log("removed iptables auto-block against $ip");
             if ($config{'ENABLE_AUTO_IDS_EMAILS'} eq 'Y') {
                 &send_mail("$config{'MAIL_STATUS_PREFIX'} removed " .
                     "iptables block against $ip", '',
@@ -9031,6 +9030,10 @@ sub print_blocked_ip_status() {
             ### older versions do not have the timestamp
             if ($line =~ /^\s*\S+\s+(\d+)/) {
                 $timestamp = $1;
+                unless (defined $scan_dl{$ip}) {
+                    ### set the DL here to the minimum currently required
+                    $scan_dl{$ip} = $config{'AUTO_IDS_DANGER_LEVEL'};
+                }
                 my ($timeout, $timeout_str) = &get_block_timeout($scan_dl{$ip});
                 if ($timeout > 0) {
                     $time_remain = $timeout - (time() - $timestamp);

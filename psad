@@ -6037,6 +6037,8 @@ sub exec_external_script() {
         alarm 30;
 
         waitpid $pid => 0;
+
+        alarm 0;
     };
     return;
 }
@@ -7307,12 +7309,18 @@ sub get_whois_info() {
             die "Could not fork(): $!" unless defined $pid;
 
             unless ($pid) {
+
+                ### perl invokes the shell because of the output
+                ### redirect
                 exec "$cmds{'whois'} $ip > $whois_datafile";
+
                 die "whois $ip exec failed: $!";
             }
             alarm $config{'WHOIS_TIMEOUT'};
 
             waitpid $pid => 0;
+
+            alarm 0;
         };
 
         if ($@) {
@@ -10463,6 +10471,7 @@ sub run_command() {
     my ($cmd_path, $args) = @_;
     my $cmd = $cmd_path;
     $cmd .= " $args" if $args;
+    print STDERR "[+] run_command(): $cmd\n" if $debug;
     open CMD, "$cmd |" or die "[*] Could not ",
         "execute $cmd: $!";
     my @lines = <CMD>;

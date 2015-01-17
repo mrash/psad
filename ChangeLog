@@ -1,7 +1,7 @@
 psad-2.2.4 (01/16/2015):
     - (Steve Murphy) Added the ability to run an external script whenever an
       IP is blocked. Two new config variables were added to support this
-      feature, ENABLE_EXT_BLOCK_SCRIPT_EXEC and ENABLE_EXT_BLOCK_SCRIPT_EXEC.
+      feature, ENABLE_EXT_BLOCK_SCRIPT_EXEC and EXTERNAL_BLOCK_SCRIPT.
     - Bug fix to not create zombie whois processes when whois lookups take too
       long to complete for whatever reason (slow network, etc.). This fixes
       issue #15 on Github. The bug was reported by "3Turtles" to the psad

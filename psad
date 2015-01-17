@@ -7324,6 +7324,9 @@ sub get_whois_info() {
         };
 
         if ($@) {
+            system "$cmds{'killall'} $cmds{'whois'}";
+            kill 9, $pid unless kill 15, $pid;
+            print STDERR "[-] whois alarm on pid: $pid\n" if $debug;
             warn $@;
             $#whois_data = 0;
             @whois_data = ("Whois data not available!\n");

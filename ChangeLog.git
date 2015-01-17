@@ -1,4 +1,73 @@
-commit 5220e1dc1cf36ce51037042fad6aa89517177d72 (HEAD, refs/heads/master)
+commit 9b12d584eaf42796d872629242a52b3679f2c862 (HEAD, refs/heads/master)
+Author: Michael Rash <mbr@localhost.localdomain>
+Date:   Fri Jan 16 21:21:37 2015 -0500
+
+    updated 2.2.4 release date
+
+ ChangeLog                             | 2 +-
+ packaging/psad-nodeps.spec            | 2 +-
+ packaging/psad-require-makemaker.spec | 2 +-
+ packaging/psad.spec                   | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+commit c082e6709a8caab50d938d7cfbdd98d9df9e94ae
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Jan 16 21:15:52 2015 -0500
+
+    minor SNORT capitalization update
+
+ psad | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+commit 0e72c57d746b4961241fd336a62611caa49152ca (refs/remotes/origin/master, refs/remotes/origin/HEAD)
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Jan 16 20:58:41 2015 -0500
+
+    add killall for whois processes for which an alarm has gone off
+
+ psad | 3 +++
+ 1 file changed, 3 insertions(+)
+
+commit 1dd0bf26363b0efece512bc25e97d3c63d564a13
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Jan 16 20:20:19 2015 -0500
+
+    bugfix to restore alarm(0) calls
+
+ psad | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+commit b6d16b716823fbd56aa2ea81d0880df497e2f871 (tag: refs/tags/2.2.4-pre3)
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Jan 12 20:15:41 2015 -0500
+
+    fix uninitialized var in auto blocking mode when printing status
+
+ psad | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+commit 57779c419ddc70238e0e9a24ffe6beb5d759d24e
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Jan 12 20:11:01 2015 -0500
+
+    2.2.4-pre2
+
+ ChangeLog                             | 2 +-
+ packaging/psad-nodeps.spec            | 5 ++++-
+ packaging/psad-require-makemaker.spec | 5 ++++-
+ packaging/psad.spec                   | 2 +-
+ 4 files changed, 10 insertions(+), 4 deletions(-)
+
+commit fbb5782667cf16aa585d62721ad0b363409bb6be (tag: refs/tags/2.2.4-pre2)
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Dec 27 20:01:32 2014 -0500
+
+    changes since 2.2.3
+
+ ChangeLog.git | 222 +++++++++++++++++++++++++++-------------------------------
+ 1 file changed, 103 insertions(+), 119 deletions(-)
+
+commit 5220e1dc1cf36ce51037042fad6aa89517177d72
 Author: Michael Rash <mbr@cipherdyne.org>
 Date:   Sat Dec 27 19:58:28 2014 -0500
 
@@ -48,7 +117,7 @@ Date:   Thu Dec 25 21:26:11 2014 -0500
  test/conf/require_missing_syslog_prefix_str.conf | 2 ++
  10 files changed, 20 insertions(+)
 
-commit 3d40022424c9f6f7d24826bf1958c1e091cbbe2b (refs/remotes/origin/master, refs/remotes/origin/HEAD)
+commit 3d40022424c9f6f7d24826bf1958c1e091cbbe2b
 Author: Michael Rash <mbr@cipherdyne.org>
 Date:   Thu Aug 21 19:55:02 2014 -0400
 

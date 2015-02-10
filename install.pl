@@ -275,11 +275,10 @@ if ($uninstall) {
     &uninstall();
 } else {
     &install();
+    open F, "> $config{'INSTALL_LOG_FILE'}" or die $!;
+    print F for @installation_lines;
+    close F;
 }
-
-open F, "> $config{'INSTALL_LOG_FILE'}" or die $!;
-print F for @installation_lines;
-close F;
 
 ### restore the original psad.conf file (this is just the local one in the
 ### sources directory).
@@ -965,10 +964,6 @@ sub uninstall() {
             rmtree $dir;
         }
     }
-    print "[+] You will need to remove psad-specific config lines ",
-        "from your syslog config.\n",
-        "    Your original syslog config at psad install time is preserved here:\n",
-        "    $config{'CONF_ARCHIVE_DIR'}\n";
     print "\n[+] psad has been uninstalled!\n";
     return;
 }

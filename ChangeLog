@@ -1,3 +1,19 @@
+psad-2.2.5 (02/09/2015):
+    - Added signature to detect fwknop Single Packet Authorization (SPA)
+      packets that are destined to the default UDP port 62201. More
+      information about fwknop can be found here:
+
+        https://www.cipherdyne.org/fwknop/
+
+    - (Rinck Sonnenberg): Spotted install.pl exit code bug when uninstalling
+      psad. Gettting this fixed will enable a proper Puppet module to be
+      developed which Rinck is working on.
+    - (Rinck Sonnenberg) UFW and Logstash integration capabilities for psad
+      are now available:
+
+        Logstash:  https://gist.github.com/netson/cc6ffa751aa4610c13c0
+        UFW:       https://gist.github.com/netson/c45b2dc4e835761fbccc
+
 psad-2.2.4 (01/17/2015):
     - (Steve Murphy) Added the ability to run an external script whenever an
       IP is blocked. Two new config variables were added to support this

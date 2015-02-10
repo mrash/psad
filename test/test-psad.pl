@@ -22,6 +22,7 @@ my $null_scan_file = 'null_scan_1000_1150';
 my $ack_scan_file  = 'ack_scan_1000_1150';
 my $udp_scan_file  = 'udp_scan_1000_1150';
 my $proto_scan_file = 'proto_scan';
+my $fwknop_pkt_file = 'fwknop_spa_pkt';
 my $ms_sql_server_sig_match_file  = 'ms_sql_server_sig_match';
 my $ipv6_ms_sql_server_sig_match_file  = 'ipv6_ms_sql_server_sig_match';
 my $no_ms_sql_server_sig_match_file = "$conf_dir/signatures_no_ms_sql_server_sig";
@@ -399,6 +400,21 @@ my @tests = (
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
                 &fw_type() . "/$proto_scan_file -c $default_conf $normal_root_override_str",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv4 fwknop SPA packet detection',
+        'err_msg'   => 'did not detect fwknop SPA packet',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/fwknop\sSingle\sPacket/i,
+                qr/IP\sstatus/i,
+                qr/192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
+                &fw_type() . "/$fwknop_pkt_file -c $default_conf $normal_root_override_str",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },

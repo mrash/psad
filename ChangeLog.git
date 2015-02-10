@@ -1,218 +1,73 @@
-commit 9b12d584eaf42796d872629242a52b3679f2c862 (HEAD, refs/heads/master)
-Author: Michael Rash <mbr@localhost.localdomain>
-Date:   Fri Jan 16 21:21:37 2015 -0500
-
-    updated 2.2.4 release date
-
- ChangeLog                             | 2 +-
- packaging/psad-nodeps.spec            | 2 +-
- packaging/psad-require-makemaker.spec | 2 +-
- packaging/psad.spec                   | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
-
-commit c082e6709a8caab50d938d7cfbdd98d9df9e94ae
+commit 94beee46092129e80c8cd8e3ed6b8b5910b47198 (HEAD, refs/heads/master)
+Merge: a34431b ed20606
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Fri Jan 16 21:15:52 2015 -0500
+Date:   Mon Feb 9 20:01:50 2015 -0500
 
-    minor SNORT capitalization update
-
- psad | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-commit 0e72c57d746b4961241fd336a62611caa49152ca (refs/remotes/origin/master, refs/remotes/origin/HEAD)
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Fri Jan 16 20:58:41 2015 -0500
-
-    add killall for whois processes for which an alarm has gone off
-
- psad | 3 +++
- 1 file changed, 3 insertions(+)
-
-commit 1dd0bf26363b0efece512bc25e97d3c63d564a13
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Fri Jan 16 20:20:19 2015 -0500
-
-    bugfix to restore alarm(0) calls
-
- psad | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-commit b6d16b716823fbd56aa2ea81d0880df497e2f871 (tag: refs/tags/2.2.4-pre3)
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Mon Jan 12 20:15:41 2015 -0500
-
-    fix uninitialized var in auto blocking mode when printing status
-
- psad | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
-
-commit 57779c419ddc70238e0e9a24ffe6beb5d759d24e
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Mon Jan 12 20:11:01 2015 -0500
-
-    2.2.4-pre2
-
- ChangeLog                             | 2 +-
- packaging/psad-nodeps.spec            | 5 ++++-
- packaging/psad-require-makemaker.spec | 5 ++++-
- packaging/psad.spec                   | 2 +-
- 4 files changed, 10 insertions(+), 4 deletions(-)
-
-commit fbb5782667cf16aa585d62721ad0b363409bb6be (tag: refs/tags/2.2.4-pre2)
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sat Dec 27 20:01:32 2014 -0500
-
-    changes since 2.2.3
-
- ChangeLog.git | 222 +++++++++++++++++++++++++++-------------------------------
- 1 file changed, 103 insertions(+), 119 deletions(-)
-
-commit 5220e1dc1cf36ce51037042fad6aa89517177d72
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sat Dec 27 19:58:28 2014 -0500
-
-    bumped version to 2.2.4
-
- VERSION             | 2 +-
- nf2csv              | 2 +-
- packaging/psad.spec | 5 ++++-
- psad                | 2 +-
- 4 files changed, 7 insertions(+), 4 deletions(-)
-
-commit 8d4c54bf9134ad2afd3fcda2f893c239a70222bd
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sat Dec 27 19:57:04 2014 -0500
-
-    bug fix for reverse DNS lookups against IP addresses that cannot be resolved
-
- ChangeLog |  6 +++++-
- psad      | 10 ++++++----
- 2 files changed, 11 insertions(+), 5 deletions(-)
-
-commit 1c45056e5ed7d7b8f9a674d25333bebd42d1ebf8
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sat Dec 27 19:49:58 2014 -0500
-
-    fix uninitialized var bug in --fw-block-ip handling (issue #17)
-
- CREDITS |  2 ++
- psad    | 13 ++++++++++++-
- 2 files changed, 14 insertions(+), 1 deletion(-)
-
-commit 91a3c6abd1b010dceb4c2f937b50fd30fab4d559
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Thu Dec 25 21:26:11 2014 -0500
-
-    [test suite] add missing vars to test config files
-
- test/conf/auto_blocking.conf                     | 2 ++
- test/conf/auto_min_dl5_blocking.conf             | 2 ++
- test/conf/default_psad.conf                      | 2 ++
- test/conf/disable_ipv6_detection.conf            | 2 ++
- test/conf/enable_ack_detection.conf              | 2 ++
- test/conf/ignore_intf.conf                       | 2 ++
- test/conf/ignore_tcp.conf                        | 2 ++
- test/conf/ignore_udp.conf                        | 2 ++
- test/conf/require_DROP_syslog_prefix_str.conf    | 2 ++
- test/conf/require_missing_syslog_prefix_str.conf | 2 ++
- 10 files changed, 20 insertions(+)
-
-commit 3d40022424c9f6f7d24826bf1958c1e091cbbe2b
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Thu Aug 21 19:55:02 2014 -0400
-
-    make per-alert tracking specific to the non-blocking external script
-
- psad | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
-
-commit c0d49ba9d615017bd9e9b1414b5dfe1a359c388b
-Merge: 5e6ab05 51317a1
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Wed Aug 20 23:01:18 2014 -0400
-
-    Merge branch 'master' of ssh://10.211.55.11/home/mbr/git/psad
-
-commit 51317a16bfe54881f0ac645096f67e630a383ff5 (tag: refs/tags/2.2.4-pre1)
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Wed Aug 20 23:00:45 2014 -0400
-
-    bumped version to 2.2.4-pre1
-
- VERSION | 2 +-
- nf2csv  | 2 +-
- psad    | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
-
-commit d38ec6b31078a23f4a4283c9857b891dc493a557
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Wed Aug 20 22:56:47 2014 -0400
-
-    Added the abiliy to exec a script upon a blocking rule being added.
+    Merge branch 'master' of https://github.com/mrash/psad
     
-    (Steve Murphy) Added the ability to run an external script whenever an
-    IP is blocked. Two new config variables were added to support this
-    feature, ENABLE_EXT_BLOCK_SCRIPT_EXEC and ENABLE_EXT_BLOCK_SCRIPT_EXEC.
+    Conflicts:
+    	ChangeLog
+    	packaging/psad-nodeps.spec
+    	packaging/psad-require-makemaker.spec
+    	packaging/psad.spec
 
- CREDITS   |  5 +++++
- ChangeLog |  3 +++
- psad      | 19 +++++++++++--------
- psad.conf | 13 +++++++++++++
- 4 files changed, 32 insertions(+), 8 deletions(-)
-
-commit 5e6ab05b34dd7286b2c5da8191d671d479a6aa1f
-Merge: 5fb2d6d 49ad1da
+commit a34431b825d450f196924427e28d3efdf6d87b07
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Wed Aug 20 22:45:35 2014 -0400
+Date:   Mon Feb 9 19:48:41 2015 -0500
 
-    Merge branch 'master' of ssh://10.211.55.11/home/mbr/git/psad
+    added fwknop SPA packet for fwknop detection test
 
-commit 49ad1da2c293fe9f58790ec1b7e59dfa73e785de
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Wed Aug 20 22:43:22 2014 -0400
-
-    Bug fix to not create zombie whois processes
-    
-    Bug fix to not create zombie whois processes when whois lookups take too
-    long to complete for whatever reason (slow network, etc.). This fixes
-    issue #15 on Github. The bug was reported by "3Turtles" to the psad
-    mailing list, and Dan Dickey provided valuable input.
-
- CREDITS   |  3 +++
- ChangeLog |  6 ++++++
- psad      | 60 +++++++++++++++++++++++++++++++-----------------------------
- 3 files changed, 40 insertions(+), 29 deletions(-)
-
-commit 5fb2d6d4ca1830ff41dcb43453be0f8ab4937e0a
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Mon Jun 16 20:40:56 2014 -0400
-
-    minor psad.conf comment update
-
- psad.conf | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-commit 077b9fd0d7e39a555d7b0e08e7ee71a585cb897a
-Merge: 9052bf0 8d287b8
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sat Mar 1 21:50:41 2014 -0500
-
-    Merge branch 'master' of ssh://github.com/mrash/psad
-
-commit 9052bf04e2f770adba9aec9f8eb33c158553fad8
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Fri Feb 14 21:58:23 2014 -0500
-
-    update to properly credit Franck for being the Debian package maintainer
-
- CREDITS | 1 +
+ test/scans/iptables/fwknop_spa_pkt | 1 +
  1 file changed, 1 insertion(+)
 
-commit 8d287b8475ca44baf1351108d8b7ad5093f54e3d
+commit b601e30c0e442293a99e6a291e3b59c653ff34c6
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Fri Feb 14 21:58:23 2014 -0500
+Date:   Mon Feb 9 19:47:50 2015 -0500
 
-    update to properly credit Franck for being the Debian package maintainer
+    updated ChangeLog for 2.2.5 and bumped version
 
- CREDITS | 1 +
+ ChangeLog                             | 16 ++++++++++++++++
+ VERSION                               |  2 +-
+ nf2csv                                |  2 +-
+ packaging/psad-nodeps.spec            |  5 ++++-
+ packaging/psad-require-makemaker.spec |  5 ++++-
+ packaging/psad.spec                   |  5 ++++-
+ psad                                  |  4 ++--
+ test/test-psad.pl                     | 16 ++++++++++++++++
+ 8 files changed, 48 insertions(+), 7 deletions(-)
+
+commit 257174e8d85b21fbd73212026ab4d6614fbdb4a5
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Feb 9 19:47:21 2015 -0500
+
+    add Rinck Sonnenberg
+
+ CREDITS | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+commit 17e0da10b6a52d1fccc53c097841f0e61953ddb6
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Feb 9 19:46:56 2015 -0500
+
+    exit status bug fix in --uninstall mode spotted by Rinck Sonnenberg
+
+ install.pl | 11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
+
+commit 0e59ac0c123586fba231104bc59f77e4fa06b6ef
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Feb 9 19:46:23 2015 -0500
+
+    added a signature for fwknop SPA traffic to the default port of UDP 62201
+
+ signatures | 1 +
  1 file changed, 1 insertion(+)
+
+commit ed20606bd2e2334ea9cc9d98fe89ecbfd7a177c6 (refs/remotes/origin/master, refs/remotes/origin/HEAD)
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Fri Jan 16 22:24:49 2015 -0500
+
+    minor ChangeLog typo fix
+
+ ChangeLog | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)

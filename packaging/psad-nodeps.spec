@@ -158,7 +158,7 @@ fi
 * Mon Feb 09 2015 Michael Rash <mbr@cipherdyne.org>
 - psad-2.2.5 release
 
-* Sat Jan 17 2015 Michael Rash <mbr@cipherdyne.org>
+* Fri Jan 16 2015 Michael Rash <mbr@cipherdyne.org>
 - psad-2.2.4 release
 
 * Sat Mar 01 2014 Michael Rash <mbr@cipherdyne.org>

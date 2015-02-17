@@ -4,6 +4,8 @@ BEGIN { eval { require bytes; }; }
 use strict;
 no strict "vars";
 
+BEGIN { $Date::Calc::XS_DISABLE = $Date::Calc::XS_DISABLE = 1; }
+
 use Date::Calc::Object qw(:all);
 
 # ======================================================================
@@ -383,7 +385,7 @@ if ($@ =~ /\bDate::Calc::OVERLOAD\(\): operator 'x' is unimplemented\b/)
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
-if ($] >= 5.004) # Perl 5.003 coughes at the overloaded 'x=' operator
+if ($] >= 5.004) # Perl 5.003 coughs at the overloaded 'x=' operator
 {
     $temp1 = $date1->clone();
     $temp2 = $date2->clone();

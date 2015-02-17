@@ -7,23 +7,18 @@
 #
 
 sub BEGIN {
-    if ($ENV{PERL_CORE}){
-	chdir('t') if -d 't';
-	@INC = ('.', '../lib', '../ext/Storable/t');
-    } else {
-	unshift @INC, 't';
-    }
+    unshift @INC, 't';
+    unshift @INC, 't/compat' if $] < 5.006002;
     require Config; import Config;
     if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
         exit 0;
     }
-    require 'st-dump.pl';
 }
 
-sub ok;
+use Test::More;
 
-use Storable qw(freeze thaw);
+use Storable qw(freeze thaw store retrieve);
 
 %::immortals
   = (u => \undef,
@@ -31,9 +26,18 @@ use Storable qw(freeze thaw);
      n => \(1 == 0)
 );
 
+{
+    %::weird_refs = (
+        REF     => \(my $aref    = []),
+        VSTRING => \(my $vstring = v1.2.3),
+       'long VSTRING' => \(my $vstring = eval "v" . 0 x 300),
+        LVALUE  => \(my $substr  = substr((my $str = "foo"), 0, 3)),
+    );
+}
+
 my $test = 12;
-my $tests = $test + 6 + 2 * 6 * keys %::immortals;
-print "1..$tests\n";
+my $tests = $test + 23 + (2 * 6 * keys %::immortals) + (3 * keys %::weird_refs);
+plan(tests => $tests);
 
 package SHORT_NAME;
 
@@ -66,15 +70,14 @@ package $name;
 
 \@ISA = ("SHORT_NAME");
 EOC
-die $@ if $@;
-ok 1, $@ eq '';
+is($@, '');
 
 eval <<EOC;
 package ${name}_WITH_HOOK;
 
 \@ISA = ("SHORT_NAME_WITH_HOOK");
 EOC
-ok 2, $@ eq '';
+is($@, '');
 
 # Construct a pool of objects
 my @pool;
@@ -87,16 +90,16 @@ for (my $i = 0; $i < 10; $i++) {
 }
 
 my $x = freeze \@pool;
-ok 3, 1;
+pass("Freeze didn't crash");
 
 my $y = thaw $x;
-ok 4, ref $y eq 'ARRAY';
-ok 5, @{$y} == @pool;
+is(ref $y, 'ARRAY');
+is(scalar @{$y}, @pool);
 
-ok 6, ref $y->[0] eq 'SHORT_NAME';
-ok 7, ref $y->[1] eq 'SHORT_NAME_WITH_HOOK';
-ok 8, ref $y->[2] eq $name;
-ok 9, ref $y->[3] eq "${name}_WITH_HOOK";
+is(ref $y->[0], 'SHORT_NAME');
+is(ref $y->[1], 'SHORT_NAME_WITH_HOOK');
+is(ref $y->[2], $name);
+is(ref $y->[3], "${name}_WITH_HOOK");
 
 my $good = 1;
 for (my $i = 0; $i < 10; $i++) {
@@ -105,14 +108,14 @@ for (my $i = 0; $i < 10; $i++) {
 	do { $good = 0; last } unless ref $y->[4*$i+2] eq $name;
 	do { $good = 0; last } unless ref $y->[4*$i+3] eq "${name}_WITH_HOOK";
 }
-ok 10, $good;
+is($good, 1);
 
 {
 	my $blessed_ref = bless \\[1,2,3], 'Foobar';
 	my $x = freeze $blessed_ref;
 	my $y = thaw $x;
-	ok 11, ref $y eq 'Foobar';
-	ok 12, $$$y->[0] == 1;
+	is(ref $y, 'Foobar');
+	is($$$y->[0], 1);
 }
 
 package RETURNS_IMMORTALS;
@@ -132,14 +135,14 @@ sub STORABLE_thaw {
 	my ($x, @refs) = @_;
 	my ($what, $times) = $x =~ /(.)(\d+)/;
 	die "'$x' didn't match" unless defined $times;
-	main::ok ++$test, @refs == $times;
+	main::is(scalar @refs, $times);
 	my $expect = $::immortals{$what};
 	die "'$x' did not give a reference" unless ref $expect;
 	my $fail;
 	foreach (@refs) {
 	  $fail++ if $_ != $expect;
 	}
-	main::ok ++$test, !$fail;
+	main::is($fail, undef);
 }
 
 package main;
@@ -153,9 +156,9 @@ foreach $count (1..3) {
     my $i =  RETURNS_IMMORTALS->make ($immortal, $count);
 
     my $f = freeze ($i);
-    ok ++$test, $f;
+    isnt($f, undef);
     my $t = thaw $f;
-    ok ++$test, 1;
+    pass("thaw didn't crash");
   }
 }
 
@@ -179,22 +182,126 @@ package main;
 
 my $f = freeze (HAS_HOOK->make);
 
-ok ++$test, $HAS_HOOK::loaded_count == 0;
-ok ++$test, $HAS_HOOK::thawed_count == 0;
+is($HAS_HOOK::loaded_count, 0);
+is($HAS_HOOK::thawed_count, 0);
 
 my $t = thaw $f;
-ok ++$test, $HAS_HOOK::loaded_count == 1;
-ok ++$test, $HAS_HOOK::thawed_count == 1;
-ok ++$test, $t;
-ok ++$test, ref $t eq 'HAS_HOOK';
+is($HAS_HOOK::loaded_count, 1);
+is($HAS_HOOK::thawed_count, 1);
+isnt($t, undef);
+is(ref $t, 'HAS_HOOK');
 
-# Can't do this because the method is still cached by UNIVERSAL::can
-# delete $INC{"HAS_HOOK.pm"};
-# undef &HAS_HOOK::STORABLE_thaw;
-# 
-# warn HAS_HOOK->can('STORABLE_thaw');
-# $t = thaw $f;
-# ok ++$test, $HAS_HOOK::loaded_count == 2;
-# ok ++$test, $HAS_HOOK::thawed_count == 2;
-# ok ++$test, $t;
-# ok ++$test, ref $t eq 'HAS_HOOK';
+delete $INC{"HAS_HOOK.pm"};
+delete $HAS_HOOK::{STORABLE_thaw};
+
+$t = thaw $f;
+is($HAS_HOOK::loaded_count, 2);
+is($HAS_HOOK::thawed_count, 2);
+isnt($t, undef);
+is(ref $t, 'HAS_HOOK');
+
+{
+    package STRESS_THE_STACK;
+
+    my $stress;
+    sub make {
+	bless [];
+    }
+
+    sub no_op {
+	0;
+    }
+
+    sub STORABLE_freeze {
+	my $self = shift;
+	++$freeze_count;
+	return no_op(1..(++$stress * 2000)) ? die "can't happen" : '';
+    }
+
+    sub STORABLE_thaw {
+	my $self = shift;
+	++$thaw_count;
+	no_op(1..(++$stress * 2000)) && die "can't happen";
+	return;
+    }
+}
+
+$STRESS_THE_STACK::freeze_count = 0;
+$STRESS_THE_STACK::thaw_count = 0;
+
+$f = freeze (STRESS_THE_STACK->make);
+
+is($STRESS_THE_STACK::freeze_count, 1);
+is($STRESS_THE_STACK::thaw_count, 0);
+
+$t = thaw $f;
+is($STRESS_THE_STACK::freeze_count, 1);
+is($STRESS_THE_STACK::thaw_count, 1);
+isnt($t, undef);
+is(ref $t, 'STRESS_THE_STACK');
+
+my $file = "storable-testfile.$$";
+die "Temporary file '$file' already exists" if -e $file;
+
+END { while (-f $file) {unlink $file or die "Can't unlink '$file': $!" }}
+
+$STRESS_THE_STACK::freeze_count = 0;
+$STRESS_THE_STACK::thaw_count = 0;
+
+store (STRESS_THE_STACK->make, $file);
+
+is($STRESS_THE_STACK::freeze_count, 1);
+is($STRESS_THE_STACK::thaw_count, 0);
+
+$t = retrieve ($file);
+is($STRESS_THE_STACK::freeze_count, 1);
+is($STRESS_THE_STACK::thaw_count, 1);
+isnt($t, undef);
+is(ref $t, 'STRESS_THE_STACK');
+
+{
+    package ModifyARG112358;
+    sub STORABLE_freeze { $_[0] = "foo"; }
+    my $o= {str=>bless {}};
+    my $f= ::freeze($o);
+    ::is ref $o->{str}, __PACKAGE__,
+	'assignment to $_[0] in STORABLE_freeze does not corrupt things';
+}
+
+# [perl #113880]
+{
+    {
+        package WeirdRefHook;
+        sub STORABLE_freeze { () }
+        $INC{'WeirdRefHook.pm'} = __FILE__;
+    }
+
+    for my $weird (keys %weird_refs) {
+        my $obj = $weird_refs{$weird};
+        bless $obj, 'WeirdRefHook';
+        my $frozen;
+        my $success = eval { $frozen = freeze($obj); 1 };
+        ok($success, "can freeze $weird objects")
+            || diag("freezing failed: $@");
+        my $thawn = thaw($frozen);
+        # is_deeply ignores blessings
+        is ref $thawn, ref $obj, "get the right blessing back for $weird";
+        if ($weird =~ 'VSTRING') {
+            # It is not just Storable that did not support vstrings. :-)
+            # See https://rt.cpan.org/Ticket/Display.html?id=78678
+            my $newver = "version"->can("new")
+                           ? sub { "version"->new(shift) }
+                           : sub { "" };
+            if (!ok
+                  $$thawn eq $$obj && &$newver($$thawn) eq &$newver($$obj),
+                 "get the right value back"
+            ) {
+                diag "$$thawn vs $$obj";
+                diag &$newver($$thawn) eq &$newver($$obj) if &$newver(1);
+             }
+        }
+        else {
+            is_deeply($thawn, $obj, "get the right value back");
+        }
+    }
+}

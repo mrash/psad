@@ -12,7 +12,7 @@ require Exporter;
 
 @ISA = qw(Exporter);
 
-$VERSION = do { my @r = (q$Revision: 1.8 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r };
+$VERSION = do { my @r = (q$Revision: 1.9 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r };
 
 @EXPORT_OK = qw(
 	hasbits
@@ -680,7 +680,7 @@ Michael Robinton E<lt>michael@bizsystems.comE<gt>
 
 =head1 COPYRIGHT
 
-Copyright 2003 - 2011, Michael Robinton E<lt>michael@bizsystems.comE<gt>
+Copyright 2003 - 2012, Michael Robinton E<lt>michael@bizsystems.comE<gt>
 
 All rights reserved.
 
@@ -705,9 +705,9 @@ one.
 You should also have received a copy of the GNU General Public License
 along with this program in the file named "Copying". If not, write to the
 
-        Free Software Foundation, Inc.
-        59 Temple Place, Suite 330
-        Boston, MA  02111-1307, USA
+        Free Software Foundation, Inc.,
+        51 Franklin Street, Fifth Floor
+        Boston, MA 02110-1301 USA
 
 or visit their web page on the internet at:
 

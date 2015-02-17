@@ -3,7 +3,6 @@ MANIFEST.SKIP
 Changes
 Lite.pm
 Makefile.PL
-META.yml
 README
 bug2742981
 t/addr.t
@@ -14,11 +13,13 @@ t/bin_ips.t
 t/bits.t
 t/broadcast.t
 t/bug62521.t
+t/bug75976.t
 t/cidr.t
 t/constants.t
 t/contains.t
 t/copy.t
 t/firstlast.t
+t/ipv4FFFF.t
 t/lemasklen.t
 t/loops.t
 t/lower.t
@@ -28,6 +29,7 @@ t/netaddr.t
 t/network.t
 t/new-nth.t
 t/new-num.t
+t/nofqdn.t
 t/numeric.t
 t/old-nth.t
 t/old-num.t
@@ -40,6 +42,7 @@ t/overminus.t
 t/pathological.t
 t/range.t
 t/relops.t
+t/rfc_1918.t
 t/v4-aton.t
 t/v4-badnm.t
 t/v4-base.t
@@ -70,10 +73,15 @@ t/v6-numeric.t
 t/v6-old-base.t
 t/version.t
 t/within.t
+t/v6-cnew-uri.t
+t/v6-new-base-uri.t
+t/v6-numeric-uri.t
+t/v6-old-base-uri.t
 Util/MANIFEST
 Util/MANIFEST.SKIP
 Util/Changes
-Util/configure
+Util/configure.cc
+Util/configure.gcc
 Util/configure.ac
 Util/config.h.in
 Util/lib/NetAddr/IP/UtilPP.pm

@@ -2,7 +2,7 @@
 
 ###############################################################################
 ##                                                                           ##
-##    Copyright (c) 1995 - 2004 by Steffen Beyer.                            ##
+##    Copyright (c) 1995 - 2013 by Steffen Beyer.                            ##
 ##    All rights reserved.                                                   ##
 ##                                                                           ##
 ##    This package is free software; you can redistribute it                 ##
@@ -19,11 +19,15 @@ use Config;
 WriteMakefile(
     'NAME'              => 'Bit::Vector',
     'VERSION_FROM'      => 'Vector.pm',
-    'PREREQ_PM'         => { 'Carp::Clan' => 5.3 },
+    'PREREQ_PM'         =>
+                              {
+                                  'Carp::Clan' => 5.3,
+                                  'Storable'   => 2.21
+                              },
     'OBJECT'            => '$(O_FILES)',
 #   ($] >= 5.005 ?
 #       ('ABSTRACT'     => 'Efficient base class implementing bit vectors',
-#        'AUTHOR'       => 'Steffen Beyer (sb@engelschall.com)') : ()),
+#        'AUTHOR'       => 'Steffen Beyer (STBEY@cpan.org)') : ()),
 #   ($] >= 5.005 && $^O eq 'MSWin32' && $Config{archname} =~ /-object\b/i ?
 #       ('CAPI'         => 'TRUE') : ()),
     'dist'              => { COMPRESS => "gzip -9", SUFFIX => "gz" }

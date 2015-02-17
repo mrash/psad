@@ -6,6 +6,8 @@ BEGIN { eval { require bytes; }; }
 use strict;
 no strict "vars";
 
+BEGIN { $Date::Calc::XS_DISABLE = $Date::Calc::XS_DISABLE = 1; }
+
 use Date::Calc::Object qw(:all);
 
 @ISA = qw(Date::Calc);

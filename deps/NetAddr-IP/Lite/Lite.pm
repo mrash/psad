@@ -30,9 +30,9 @@ use NetAddr::IP::Util qw(
 	havegethostbyname2
 );
 
-use vars qw(@ISA @EXPORT_OK $VERSION $Accept_Binary_IP $Old_nth $AUTOLOAD *Zero);
+use vars qw(@ISA @EXPORT_OK $VERSION $Accept_Binary_IP $Old_nth $NoFQDN $AUTOLOAD *Zero);
 
-$VERSION = do { my @r = (q$Revision: 1.41 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r };
+$VERSION = do { my @r = (q$Revision: 1.54 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r };
 
 require Exporter;
 
@@ -47,6 +47,10 @@ require Exporter;
 $Accept_Binary_IP = 0;
 $Old_nth = 0;
 *Zero = \&Zeros;
+
+=pod
+
+=encoding UTF-8
 
 =head1 NAME
 
@@ -63,6 +67,7 @@ NetAddr::IP::Lite - Manages IPv4 and IPv6 addresses and subnets
 	:old_nth
 	:upper
 	:lower
+	:nofqdn
   );
 
   my $ip = new NetAddr::IP::Lite '127.0.0.1';
@@ -88,6 +93,9 @@ NetAddr::IP::Lite - Manages IPv4 and IPv6 addresses and subnets
   FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF  = Ones();
   FFFF:FFFF:FFFF:FFFF:FFFF:FFFF::	   = V4mask();
   ::FFFF:FFFF				   = V4net();
+
+  Will also return an ipV4 or ipV6 representation of a
+  resolvable Fully Qualified Domanin Name (FQDN).
 
 =head1 INSTALLATION
 
@@ -195,6 +203,7 @@ my $_zero = pack('L4',0,0,0,0);
 my $_ones = ~$_zero;
 my $_v4mask = pack('L4',0xffffffff,0xffffffff,0xffffffff,0);
 my $_v4net = ~ $_v4mask;
+my $_ipv4FFFF = pack('N4',0,0,0xffff,0);
 
 sub Zeros() {
   return $_zero;
@@ -504,6 +513,8 @@ sub _new ($$$) {
 
 =item C<-E<gt>new6([$addr, [ $mask]])>
 
+=item C<-E<gt>new6FFFF([$addr, [ $mask]])>
+
 =item C<-E<gt>new_no([$addr, [ $mask]])>
 
 =item C<-E<gt>new_from_aton($netaddr)>
@@ -514,9 +525,14 @@ sub _new ($$$) {
 
 =item C<-E<gt>new_cis6("$addr $mask)>
 
-The first two methods create a new address with the supplied address in
+The first three methods create a new address with the supplied address in
 C<$addr> and an optional netmask C<$mask>, which can be omitted to get 
-a /32 or /128 netmask for IPv4 / IPv6 addresses respectively.
+a /32 or /128 netmask for IPv4 / IPv6 addresses respectively. 
+
+new6FFFF specifically returns an IPv4 address in IPv6 format according to RFC4291
+
+  new6		     ::xxxx:xxxx
+  new6FFFF	::FFFF:xxxx:xxxx
 
 The third method C<new_no> is exclusively for IPv4 addresses and filters
 improperly formatted
@@ -574,6 +590,8 @@ To accept addresses in that format, invoke the module as in
 
 If called with no arguments, 'default' is assumed.
 
+If called with an empty string as the argument, returns 'undef'
+
 C<$addr> can be any of the following and possibly more...
 
   n.n
@@ -610,7 +628,15 @@ Any RFC1884 notation
   123456789012  a 'big' bcd number (bigger than perl likes)
   and Math::BigInt
 
+A Fully Qualified Domain Name which returns an ipV4 address or an ipV6
+address, embodied in that order. This previously undocumented feature
+may be disabled with:
+
+	use NetAddr::IP::Lite ':nofqdn';
+
 If called with no arguments, 'default' is assumed.
+
+If called with and empty string as the argument, 'undef' is returned;
 
 =cut
 
@@ -695,6 +721,12 @@ sub new6($;$$) {
   goto &_xnew;
 }
 
+sub new6FFFF($;$$) {
+  my $ip = _xnew(1,@_);
+  $ip->{addr} |= $_ipv4FFFF;
+  return $ip;
+}
+
 sub new_cis($;$$) {
   my @in = @_;
   if ( $in[1] && $in[1] =~ m!^(.+)\s+(.+)$! ) {
@@ -729,6 +761,9 @@ sub _xnew($$;$$) {
   my $class	= ref $proto || $proto || __PACKAGE__;
   my $ip	= shift;
 
+# fix for bug #75976
+  return undef if defined $ip && $ip eq '';
+
   $ip = 'default' unless defined $ip;
   $ip = _retMBIstring($ip)		# treat as big bcd string
 	if ref $ip && ref $ip eq 'Math::BigInt';	# can /CIDR notation
@@ -748,7 +783,8 @@ sub _xnew($$;$$) {
 	$mask = Ones;
 	last;
       }
-      elsif ($ip =~ m!^([a-z0-9.:-]+)(?:/|\s+)([a-z0-9.:-]+)$!) {
+      elsif ($ip =~ m!^([a-z0-9.:-]+)(?:/|\s+)([a-z0-9.:-]+)$! ||
+	     $ip =~ m!^[\[]{1}([a-z0-9.:-]+)(?:/|\s+)([a-z0-9.:-]+)[\]]{1}$!) {
 	$ip	= $1;
 	$mask	= $2;
       } elsif (grep($ip eq $_,(qw(default any broadcast loopback unspecified)))) {
@@ -976,12 +1012,12 @@ sub _xnew($$;$$) {
 	last;
       }
 # check for resolvable IPv4 hosts
-      elsif ($ip !~ /[^a-zA-Z0-9\.-]/ && ($tmp = gethostbyname(fillIPv4($ip))) && $tmp ne $_v4zero && $tmp ne $_zero ) {
+      elsif (! $NoFQDN && $ip !~ /[^a-zA-Z0-9\._-]/ && ($tmp = gethostbyname(fillIPv4($ip))) && $tmp ne $_v4zero && $tmp ne $_zero ) {
 	$ip = ipv4to6($tmp);
 	last;
       }
 # check for resolvable IPv6 hosts
-      elsif ($ip !~ /[^a-zA-Z0-9\.-]/ && havegethostbyname2() && ($tmp = naip_gethostbyname($ip))) {
+      elsif (! $NoFQDN && $ip !~ /[^a-zA-Z0-9\._-]/ && havegethostbyname2() && ($tmp = naip_gethostbyname($ip))) {
 	$ip = $tmp;
 	$isV6 = 1;
 	last;
@@ -1005,6 +1041,7 @@ sub _xnew($$;$$) {
 ########## continuing
     else {						# ipv6 address
       $isV6 = 1;
+      $ip = $1 if $ip =~ /\[([^\]]+)\]/;		# transform URI notation
       if (defined ($tmp = ipv6_aton($ip))) {
 	$ip = $tmp;
 	last;
@@ -1324,6 +1361,37 @@ sub within ($$) {
 	? 1 : 0;
 }
 
+=item C-E<gt>is_rfc1918()>
+
+Returns true when C<$me> is an RFC 1918 address.
+
+     10.0.0.0        -   10.255.255.255  (10/8 prefix)
+     172.16.0.0      -   172.31.255.255  (172.16/12 prefix)
+     192.168.0.0     -   192.168.255.255 (192.168/16 prefix)
+
+=cut
+
+my $ip_10	= NetAddr::IP::Lite->new('10.0.0.0/8');
+my $ip_10n	= $ip_10->{addr};               # already the right value
+my $ip_10b	= $ip_10n | ~ $ip_10->{mask};
+
+my $ip_172	= NetAddr::IP::Lite->new('172.16.0.0/12');
+my $ip_172n	= $ip_172->{addr};              # already the right value
+my $ip_172b	= $ip_172n | ~ $ip_172->{mask};
+
+my $ip_192	= NetAddr::IP::Lite->new('192.168.0.0/16');
+my $ip_192n	= $ip_192->{addr};              # already the right value
+my $ip_192b	= $ip_192n | ~ $ip_192->{mask};
+
+sub is_rfc1918 ($) {
+  my $netme     = $_[0]->{addr} & $_[0]->{mask};
+  my $brdme     = $_[0]->{addr} | ~ $_[0]->{mask};
+  return 1 if (sub128($netme,$ip_10n) && sub128($ip_10b,$brdme));
+  return 1 if (sub128($netme,$ip_192n) && sub128($ip_192b,$brdme));
+  return (sub128($netme,$ip_172n) && sub128($ip_172b,$brdme))
+        ? 1 : 0;
+}
+
 =item C<-E<gt>first()>
 
 Returns a new object representing the first usable IP address within
@@ -1469,6 +1537,7 @@ sub num ($) {
     return 1 unless hasbits($net);	# ipV4/32 or ipV6/128
     $net = $net ^ Ones;
     return 2 unless hasbits($net);	# ipV4/31 or ipV6/127
+    $net &= $_v4net unless $_[0]->{isv6};
     return bin2bcd($net);
   }
 }
@@ -1514,6 +1583,11 @@ sub import {
     NetAddr::IP::Util::upper();
     @_ = grep { $_ ne ':upper' } @_;
   }
+  if (grep { $_ eq ':nofqdn' } @_)
+  {
+    $NoFQDN = 1;
+    @_ = grep { $_ ne ':nofqdn' } @_;
+  }
   NetAddr::IP::Lite->export_to_level(1, @_);
 }
 
@@ -1527,10 +1601,11 @@ sub import {
 	:old_nth
 	:upper
 	:lower
+	:nofqdn
 
 =head1 AUTHORS
 
-Luis E. Muñoz E<lt>luismunoz@cpan.orgE<gt>,
+Luis E. MuÃ±oz E<lt>luismunoz@cpan.orgE<gt>,
 Michael Robinton E<lt>michael@bizsystems.comE<gt>
 
 =head1 WARRANTY
@@ -1540,8 +1615,8 @@ so by using it you accept any and all the liability.
 
 =head1 COPYRIGHT
 
- This software is (c) Luis E. Muñoz, 1999 - 2005
- and (c) Michael Robinton, 2006 - 2011.
+ This software is (c) Luis E. MuÃ±oz, 1999 - 2005
+ and (c) Michael Robinton, 2006 - 2014.
 
 All rights reserved.
 
@@ -1566,9 +1641,9 @@ one.
 You should also have received a copy of the GNU General Public License
 along with this program in the file named "Copying". If not, write to the
 
-        Free Software Foundation, Inc.
-        59 Temple Place, Suite 330
-        Boston, MA  02111-1307, USA
+        Free Software Foundation, Inc.,
+        51 Franklin Street, Fifth Floor
+        Boston, MA 02110-1301 USA
 
 or visit their web page on the internet at:
 

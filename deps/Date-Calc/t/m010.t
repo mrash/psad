@@ -4,6 +4,8 @@ BEGIN { eval { require bytes; }; }
 use strict;
 no strict "vars";
 
+BEGIN { $Date::Calc::XS_DISABLE = $Date::Calc::XS_DISABLE = 1; }
+
 eval { require Bit::Vector; };
 
 if ($@)
@@ -22,7 +24,7 @@ require Date::Calendar;
 Date::Calc::Object->import(':all');
 
 # ======================================================================
-#   $cal = Date::Calendar->new(PROFILE);
+#   $cal = Date::Calendar->new(PROFILE[,LANG[,WEEKEND]]);
 #   $cal->cache_add( YEAR [,YEAR]* );
 #   $cal->cache_del( YEAR [,YEAR]* );
 #   @list = $cal->cache_keys();
@@ -36,11 +38,9 @@ print "1..6\n";
 
 $n = 1;
 
-Language(Decode_Language("Deutsch"));
-
 Date::Calc->date_format(3);
 
-$cal = Date::Calendar->new( $Date::Calendar::Profiles::Profiles->{'DE-NW'} );
+$cal = Date::Calendar->new( $Date::Calendar::Profiles::Profiles->{'DE-NW'}, Language(Decode_Language("Deutsch")) );
 
 $cal->cache_add( 2000..2003,2005 );
 

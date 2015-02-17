@@ -11,7 +11,7 @@ require Exporter;
 
 @ISA = qw(Exporter);
 
-$VERSION = do { my @r = (q$Revision: 0.06 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r };
+$VERSION = do { my @r = (q$Revision: 0.08 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r };
 
 @EXPORT_OK = qw(
 	inet_aton
@@ -253,7 +253,7 @@ sub isIPv4 {
 	? 1 : 0;
 }
 
-my $_newV4compat = pack('L4',0,0,0xffffffff,0);
+my $_newV4compat = pack('N4',0,0,0xffff,0);
 
 sub isNewIPv4 {
   my $naddr = $_[0] ^ $_newV4compat;
@@ -659,13 +659,13 @@ Note: this is an old and deprecated ipV4 compatible ipV6 address
 
 This function return true if the IPv6 128 bit string is of the form
 
-	::ffff::d.d.d.d
+	::ffff:d.d.d.d
 
 =item * $rv = isAnyIPv4($bits128);
 
 This function return true if the IPv6 bit string is of the form
 
-	::d.d.d.d	or	::ffff::d.d.d.d
+	::d.d.d.d	or	::ffff:d.d.d.d
 
 =item * NetAddr::IP::InetBase::lower();
 
@@ -745,7 +745,7 @@ Michael Robinton <michael@bizsystems.com>
 
 =head1 COPYRIGHT
 
-Copyright 2003 - 2011, Michael Robinton E<lt>michael@bizsystems.comE<gt>
+Copyright 2003 - 2012, Michael Robinton E<lt>michael@bizsystems.comE<gt>
 
 All rights reserved.
 
@@ -770,9 +770,9 @@ one.
 You should also have received a copy of the GNU General Public License
 along with this program in the file named "Copying". If not, write to the
 
-        Free Software Foundation, Inc.
-        59 Temple Place, Suite 330
-        Boston, MA  02111-1307, USA
+	Free Software Foundation, Inc.,
+	51 Franklin Street, Fifth Floor
+	Boston, MA 02110-1301 USA
 
 or visit their web page on the internet at:
 

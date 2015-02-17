@@ -1,9 +1,9 @@
                      ====================================
-                       Package "Date::Calc" Version 5.4
+                       Package "Date::Calc" Version 6.3
                      ====================================
 
 
-                  Copyright (c) 1995 - 2004 by Steffen Beyer.
+                  Copyright (c) 1995 - 2009 by Steffen Beyer.
                              All rights reserved.
 
 
@@ -261,7 +261,7 @@ Erland Sommarskog <sommar@algonet.se>
 Flemming Mahler Larsen <mahler@dk.net>
 Francois Desarmenien <francois@fdesar.net>
 Gordon Fletcher <G.Fletcher@mailbox.gu.edu.au>
-H. Merijn Brand <h.m.brand@hccnet.nl>
+H. Merijn Brand <h.m.brand@xs4all.nl>
 Hendrik Van Belleghem <beatnik@quickndirty.org>
 Herbert Liechti <herbert.liechti@thinx.ch>
 Jean Forget <ponder.stibbons@wanadoo.fr>
@@ -426,5 +426,43 @@ providing me with more detailed information concerning the
 Many thanks to Vetle Roeim <vetler@opera.com> for sending some more
 commemorative days (some companies give half a day off) for the
 Norwegian profile.
+
+Thanks a lot to Jesse Vincent <jesse@bestpractical.com> and to
+Alistair Francis <alistair.francis@lokku.com> for reporting the
+ongoing problem with the boolean type in MacOS X and to Tatsuhiko
+Miyagawa (?) and Alistair Francis for providing patches.
+
+Thanks to Thanos Chatziathanassiou <tchatzi@arx.gr> along with
+Barret Clark and Qiang (?) for suggesting some changes to the
+documentation. Sorry for not including the changes concerning
+the Orthodox and Julian calendars since these are outside of
+the scope of this module.
+
+Thanks to Anthony DeRobertis <anthony@derobert.net> and Jonathan
+Yu <frequency@cpan.org> for alerting me about the problem that in
+Date::Calendar and Date::Calendar::Year, it is hardcoded that
+Saturday and Sunday are holidays, and for asking to make this
+configurable.
+
+Many thanks to H. Merijn Brand <h.m.brand@xs4all.nl> for triggering
+the development of a new normalized date difference function.
+
+Many thanks to Marek Snowarski <Marek.Snowarski@grzyby.pl> for
+raising my attention to the fact that the Polish names for the
+months and days of week were written wrongly.
+
+Many thanks to Piotr Wierzejewski <nlexposure@gmail.com> for
+providing me with the correct spelling of the Polish names
+for the months and days of week in Unicode.
+
+Many thanks to H.Merijn Brand <h.m.brand@xs4all.nl> for
+discussing the various issues and advantages/disadvantages
+of integrating versus splitting the C/XS-part and the pure-Perl
+part of this distribution with me!
+
+Many thanks to Anthony Mirante <tony@technicon.com> for reporting that
+there can be a difference in the output of "Date::Calc::PP::Mktime()",
+"Date::Calc::XS::Mktime()" and "POSIX::mktime()", and for running a
+test script for me!
 
 

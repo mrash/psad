@@ -21,7 +21,7 @@ require Exporter;
 
 @ISA = qw(Exporter DynaLoader);
 
-$VERSION = do { my @r = (q$Revision: 1.46 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r };
+$VERSION = do { my @r = (q$Revision: 1.51 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r };
 
 @EXPORT_OK = qw(
 	inet_aton
@@ -150,7 +150,7 @@ else {
 
 sub mode() { $Mode };
 
-my $_newV4compat = pack('L4',0,0,0xffffffff,0);
+my $_newV4compat = pack('N4',0,0,0xffff,0);
 
 sub inet_4map6 {
   my $naddr = shift;
@@ -730,7 +730,7 @@ Returns the operating mode of this module.
 Replacement for Perl's gethostbyname if Socket6 is available
 
 In ARRAY context, returns a list of five elements, the hostname or NAME,
-a space seperated list of C_NAMES, AF family, length of the address
+a space separated list of C_NAMES, AF family, length of the address
 structure, and an array of one or more netaddr's
 
 In SCALAR context, returns the first netaddr.
@@ -922,7 +922,7 @@ Michael Robinton <michael@bizsystems.com>
 
 =head1 COPYRIGHT
 
-Copyright 2003 - 2011, Michael Robinton E<lt>michael@bizsystems.comE<gt>
+Copyright 2003 - 2014, Michael Robinton E<lt>michael@bizsystems.comE<gt>
 
 All rights reserved.
 
@@ -947,9 +947,9 @@ one.
 You should also have received a copy of the GNU General Public License
 along with this program in the file named "Copying". If not, write to the
 
-        Free Software Foundation, Inc.
-        59 Temple Place, Suite 330
-        Boston, MA  02111-1307, USA
+	Free Software Foundation, Inc.
+	51 Franklin Street, Fifth Floor
+	Boston, MA 02110-1301 USA.
 
 or visit their web page on the internet at:
 

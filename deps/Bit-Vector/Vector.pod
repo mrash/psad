@@ -501,6 +501,18 @@ All indices for any given bits must lie between "C<0>" and
 "C<$vector-E<gt>Size()-1>", or a fatal "index out of range"
 error will occur.
 
+=item *
+
+Object persistence
+
+Since version 6.5, "Bit::Vector" objects can be serialized
+and de-serialized automatically with "Storable", out-of-the-box,
+without requiring any further user action for this to work.
+
+This is also true for nested data structures (since version 6.8).
+
+See the L<Storable(3)> documentation for more details.
+
 =back
 
 =head1 DESCRIPTION
@@ -3124,7 +3136,8 @@ See L<Math::MatrixBool(3)> for details.
 =head1 SEE ALSO
 
 Bit::Vector::Overload(3),
-Bit::Vector::String(3).
+Bit::Vector::String(3),
+Storable(3).
 
 Set::IntRange(3),
 Math::MatrixBool(3),
@@ -3135,17 +3148,17 @@ Graph::Kruskal(3).
 
 =head1 VERSION
 
-This man page documents "Bit::Vector" version 6.4.
+This man page documents "Bit::Vector" version 7.4.
 
 =head1 AUTHOR
 
   Steffen Beyer
-  mailto:sb@engelschall.com
+  mailto:STBEY@cpan.org
   http://www.engelschall.com/u/sb/download/
 
 =head1 COPYRIGHT
 
-Copyright (c) 1995 - 2004 by Steffen Beyer. All rights reserved.
+Copyright (c) 1995 - 2013 by Steffen Beyer. All rights reserved.
 
 =head1 LICENSE
 

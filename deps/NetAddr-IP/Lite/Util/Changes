@@ -1,3 +1,27 @@
+
+1.51  Mon Jan 27 11:59:58 PST 2014
+        modify Makefile.PL to bypass missing 'pod2text'
+
+1.50  Tue Apr  9 12:02:34 PDT 2013
+	changed Makefile.PL to check for config.h when building for XS
+	with 'gcc', try building with 'cc', and check again.
+	If config.h is not found, force Pure Perl mode.
+
+	Kill XS in winduhs and Darwin, both of which misbehave when compiling XS code
+
+1.49  Wed Apr  3 10:52:24 PDT 2013
+	modify Makefile.PL to better detect 'winduhs'
+
+1.48 Tue Oct  2 12:36:11 PDT 2012
+	correct incorrect format for IPv6 embedded IPv4 addresses
+	in InetBase v0.8
+
+1.47  Fri Aug 10 11:46:18 PDT 2012
+	correct typo in documentation POD
+	Thanks to Gregor Herrmann, Debian Perl Group
+
+	Updated GPL text and address
+
 1.46  Fri Nov 11 19:23:11 PST 2011
 	update documentation in InetBase v0.06
 

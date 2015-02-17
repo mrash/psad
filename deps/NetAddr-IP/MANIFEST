@@ -1,13 +1,14 @@
+About-NetAddr-IP.txt
 Artistic
 Changes
 Copying
 IP.pm
-MANIFEST			This list of files
+MANIFEST
 MANIFEST.SKIP
-META.yml                                 Module meta-data (added by MakeMaker)
 Makefile.PL
 TODO
 docs/rfc1884.txt
+t/canon.t
 t/constants.t
 t/full.t
 t/full6.t
@@ -20,6 +21,7 @@ t/old-store.t
 t/over-arr.t
 t/over-qq.t
 t/relops.t
+t/rfc3021.t
 t/short.t
 t/splitref.t
 t/v4-coalesce.t
@@ -36,11 +38,11 @@ t/v6-re.t
 t/v6-split-bulk.t
 t/v6-splitplan.t
 t/wildcard.t
+t/full6-uri.t
 Lite/Changes
 Lite/Lite.pm
 Lite/MANIFEST
 Lite/MANIFEST.SKIP
-Lite/META.yml
 Lite/Makefile.PL
 Lite/README
 Lite/bug2742981
@@ -52,11 +54,13 @@ Lite/t/bin_ips.t
 Lite/t/bits.t
 Lite/t/broadcast.t
 Lite/t/bug62521.t
+Lite/t/bug75976.t
 Lite/t/cidr.t
 Lite/t/constants.t
 Lite/t/contains.t
 Lite/t/copy.t
 Lite/t/firstlast.t
+Lite/t/ipv4FFFF.t
 Lite/t/lemasklen.t
 Lite/t/loops.t
 Lite/t/lower.t
@@ -66,6 +70,7 @@ Lite/t/netaddr.t
 Lite/t/network.t
 Lite/t/new-nth.t
 Lite/t/new-num.t
+Lite/t/nofqdn.t
 Lite/t/numeric.t
 Lite/t/old-nth.t
 Lite/t/old-num.t
@@ -78,6 +83,7 @@ Lite/t/overminus.t
 Lite/t/pathological.t
 Lite/t/range.t
 Lite/t/relops.t
+Lite/t/rfc_1918.t
 Lite/t/v4-aton.t
 Lite/t/v4-badnm.t
 Lite/t/v4-base.t
@@ -108,6 +114,10 @@ Lite/t/v6-numeric.t
 Lite/t/v6-old-base.t
 Lite/t/version.t
 Lite/t/within.t
+Lite/t/v6-cnew-uri.t
+Lite/t/v6-new-base-uri.t
+Lite/t/v6-numeric-uri.t
+Lite/t/v6-old-base-uri.t
 Lite/Util/Changes
 Lite/Util/MANIFEST
 Lite/Util/MANIFEST.SKIP
@@ -116,7 +126,8 @@ Lite/Util/README
 Lite/Util/Util.pm
 Lite/Util/Util.xs
 Lite/Util/config.h.in
-Lite/Util/configure
+Lite/Util/configure.cc
+Lite/Util/configure.gcc
 Lite/Util/configure.ac
 Lite/Util/lib/NetAddr/IP/InetBase.pm
 Lite/Util/lib/NetAddr/IP/UtilPP.pm
@@ -163,3 +174,4 @@ Lite/Util/t/naip_gethostbyname.t
 Lite/Util/t/no6_naip_gethostbyname.t
 Lite/Util/typemap
 
+META.yml                                 Module meta-data (added by MakeMaker)

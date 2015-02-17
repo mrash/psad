@@ -162,7 +162,7 @@ foreach (@num) {
   &ok;
 }
 
-my $compat = ipv6_aton('::FFFF:FFFF:0:0');
+my $compat = ipv6_aton('::FFFF:0:0');
 
 # check isAnyIPv4	with compatible high bits
 foreach (@num) {
@@ -174,7 +174,6 @@ foreach (@num) {
 	 unless $rv eq $exp;
   &ok;
 }
-
 # check isNewIPv4	with compatible high bits
 foreach (@num) {
   my $bstr = ipv6_aton($_);

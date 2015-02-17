@@ -4,6 +4,8 @@ BEGIN { eval { require bytes; }; }
 use strict;
 no strict "vars";
 
+BEGIN { $Date::Calc::XS_DISABLE = $Date::Calc::XS_DISABLE = 1; }
+
 use Date::Calc qw( Decode_Date_EU Decode_Date_US );
 
 # ======================================================================
@@ -30,11 +32,11 @@ if ((($year,$mm,$dd) = Decode_Date_EU("03/01/64")) &&
 ($year==1964)&&($mm==1)&&($dd==3))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
-if ((($year,$mm,$dd) = Decode_Date_EU("3. Jan 1964")) &&
+if ((($year,$mm,$dd) = Decode_Date_EU("3. Ene 1964",4)) &&
 ($year==1964)&&($mm==1)&&($dd==3))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
-if ((($year,$mm,$dd) = Decode_Date_EU("Birthday: 3. Jan '64 in Backnang/Germany")) &&
+if ((($year,$mm,$dd) = Decode_Date_EU("Geburtstag: 3. Januar '64 in Backnang/Württemberg",3)) &&
 ($year==1964)&&($mm==1)&&($dd==3))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
@@ -42,11 +44,11 @@ if ((($year,$mm,$dd) = Decode_Date_EU("03-Jan-64")) &&
 ($year==1964)&&($mm==1)&&($dd==3))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
-if ((($year,$mm,$dd) = Decode_Date_EU("3.Jan1964")) &&
+if ((($year,$mm,$dd) = Decode_Date_EU("3.Jan1964",6)) &&
 ($year==1964)&&($mm==1)&&($dd==3))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
-if ((($year,$mm,$dd) = Decode_Date_EU("3Jan64")) &&
+if ((($year,$mm,$dd) = Decode_Date_EU("3Jan64",0)) &&
 ($year==1964)&&($mm==1)&&($dd==3))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;

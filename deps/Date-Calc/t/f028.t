@@ -4,6 +4,8 @@ BEGIN { eval { require bytes; }; }
 use strict;
 no strict "vars";
 
+BEGIN { $Date::Calc::XS_DISABLE = $Date::Calc::XS_DISABLE = 1; }
+
 use Date::Calc qw( Decode_Date_EU2 Language Decode_Language );
 
 # ======================================================================
@@ -130,32 +132,32 @@ if ((($year,$mm,$dd) = Decode_Date_EU2("_3_jan_64_")) &&
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
-if ((($year,$mm,$dd) = Decode_Date_EU2("_3_Jan_64_")) &&
+if ((($year,$mm,$dd) = Decode_Date_EU2("_3_Jan_64_",0)) &&
 ($year==1964) && ($mm==1) && ($dd==3))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
-if ((($year,$mm,$dd) = Decode_Date_EU2("_3_jAN_64_")) &&
+if ((($year,$mm,$dd) = Decode_Date_EU2("_3_jAN_64_",1)) &&
 ($year==1964) && ($mm==1) && ($dd==3))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
-if ((($year,$mm,$dd) = Decode_Date_EU2("_3-JAN-64_")) &&
+if ((($year,$mm,$dd) = Decode_Date_EU2("_3-JAN-64_",2)) &&
 ($year==1964) && ($mm==1) && ($dd==3))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
-if ((($year,$mm,$dd) = Decode_Date_EU2("_3-Jan-1964_")) &&
+if ((($year,$mm,$dd) = Decode_Date_EU2("_3-Jan-1964_",3)) &&
 ($year==1964) && ($mm==1) && ($dd==3))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
-if ((($year,$mm,$dd) = Decode_Date_EU2("_3-January-1964_")) &&
+if ((($year,$mm,$dd) = Decode_Date_EU2("_3-January-1964_",'')) &&
 ($year==1964) && ($mm==1) && ($dd==3))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
-if ((($year,$mm,$dd) = Decode_Date_EU2("_000003-Jan-000064_")) &&
+if ((($year,$mm,$dd) = Decode_Date_EU2("_000003-Jan-000064_",undef)) &&
 ($year==1964) && ($mm==1) && ($dd==3))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
@@ -232,9 +234,7 @@ if ((($year,$mm,$dd) = Decode_Date_EU2("x000003_ja_000064x")) &&
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
-Language(Decode_Language("Portug"));
-
-if ((($year,$mm,$dd) = Decode_Date_EU2("_dia_tres_3_janeiro_1964_mil_novecentos_sessenta_e_seis_")) &&
+if ((($year,$mm,$dd) = Decode_Date_EU2("_dia_tres_3_janeiro_1964_mil_novecentos_sessenta_e_seis_",Decode_Language("Portug"))) &&
 ($year==1964) && ($mm==1) && ($dd==3))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;

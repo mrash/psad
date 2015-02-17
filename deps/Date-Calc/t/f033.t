@@ -4,6 +4,8 @@ BEGIN { eval { require bytes; }; }
 use strict;
 no strict "vars";
 
+BEGIN { $Date::Calc::XS_DISABLE = $Date::Calc::XS_DISABLE = 1; }
+
 use Date::Calc qw( Standard_to_Business Business_to_Standard Add_Delta_Days );
 
 # ======================================================================

@@ -2,7 +2,7 @@
 
 ###############################################################################
 ##                                                                           ##
-##    Copyright (c) 2000 - 2004 by Steffen Beyer.                            ##
+##    Copyright (c) 2000 - 2013 by Steffen Beyer.                            ##
 ##    All rights reserved.                                                   ##
 ##                                                                           ##
 ##    This program is free software; you can redistribute it                 ##

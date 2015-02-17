@@ -3,6 +3,8 @@
 BEGIN { eval { require bytes; }; }
 use strict;
 
+BEGIN { $Date::Calc::XS_DISABLE = $Date::Calc::XS_DISABLE = 1; }
+
 # ======================================================================
 #   use Carp::Clan qw(package::pattern);
 #   croak();

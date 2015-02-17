@@ -35,7 +35,7 @@ my @num = qw	# input					expected
     		1.2.3.4					1.2.3.4
     A1B2:C3D4:E5D6:F7E8:08F9:190A:1.2.3.4	A1B2:C3D4:E5D6:F7E8:8F9:190A:102:304
 		::1.2.3.4				1.2.3.4
-	::FFFF:FFFF:1.2.3.4				1.2.3.4
+	::FFFF:1.2.3.4				1.2.3.4
 );
 
 my $ff = ipv6_aton($num[1]);

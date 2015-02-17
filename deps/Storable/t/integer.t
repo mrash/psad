@@ -13,12 +13,8 @@
 # are encountered.
 
 sub BEGIN {
-    if ($ENV{PERL_CORE}){
-	chdir('t') if -d 't';
-	@INC = ('.', '../lib');
-    } else {
-	unshift @INC, 't';
-    }
+    unshift @INC, 't';
+    unshift @INC, 't/compat' if $] < 5.006002;
     require Config; import Config;
     if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
@@ -164,7 +160,7 @@ foreach (@processes) {
       # gets it right, providing you don't have side effects of conversion.
 #      local $TODO;
 #      $TODO = "pre 5.6 doesn't have flag to distinguish IV/UV"
-#        if $[ < 5.005_56 and $copy1 > $max_iv;
+#        if $] < 5.005_56 and $copy1 > $max_iv;
       my $sign = ok (($copy_s2 <=> 0) == ($copy2 <=> 0),
                      "$process $copy1 (sign)");
 

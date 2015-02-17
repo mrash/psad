@@ -1,9 +1,9 @@
                     =====================================
-                      Package "Bit::Vector" Version 6.4
+                      Package "Bit::Vector" Version 7.4
                     =====================================
 
 
-                 Copyright (c) 1995 - 2004 by Steffen Beyer.
+                 Copyright (c) 1995 - 2013 by Steffen Beyer.
                              All rights reserved.
 
 
@@ -13,7 +13,6 @@ Contents:
     +   Prerequisites
     +   Preliminary steps for use with Perl prior to version 5.002
     +   Preliminary steps for use with ActiveState's port of Perl 5
-    +   How to install additional languages
     +   Installation
 
 
@@ -22,7 +21,9 @@ Prerequisites:
 
 Perl version 5.000 or higher, and an ANSI C compiler. (!)
                                      ^^^^^^
-Module "Carp::Clan" version 5.0 or higher.
+Module "Carp::Clan" version 5.3 or higher.
+
+Optionally, module "Storable" version 2.21 or newer.
 
 Note that in order to compile Perl modules which contain
 C (and/or XS) code (such as this one), you always HAVE
@@ -52,8 +53,9 @@ Windows 95/98 since the Win 95/98 command shell doesn't
 support the "&&" operator. You will need the Windows NT
 command shell ("cmd.exe") or the "4DOS" shell to be
 installed on your Windows 95/98 system first. Note that
-Windows NT and Windows 2000 are not affected and just
-work fine. I don't know about Windows XP, however.
+Windows NT, Windows 2000 and Windows XP are not affected
+and just work fine. I don't know about Windows Vista and
+Windows 7, however.
 
 Note that ActiveState provides precompiled binaries of
 this module for their Win32 port of Perl ("ActivePerl")
@@ -77,7 +79,7 @@ Edit the file "Makefile.PL" and change the line
 
     'VERSION_FROM'      => 'Vector.pm',
 to
-    'VERSION'           => '6.4',
+    'VERSION'           => '7.4',
 
 Then edit the file "Vector.pm" and change the line
 
@@ -87,7 +89,7 @@ to
 
 Also edit the file "t/00____version.t" and change the line
 
-    use Bit::Vector 6.4;
+    use Bit::Vector 7.4;
 
 to
 
@@ -131,7 +133,7 @@ Detailed installation guide:
 ----------------------------
 
  1) Change directory to the directory that has been created by unpacking this
-    package ("cd Bit-Vector-6.4").
+    package ("cd Bit-Vector-7.4").
 
  2) Type "perl Makefile.PL" (or whatever the name and path of your Perl 5
     binary is).
@@ -158,7 +160,7 @@ Detailed installation guide:
 
     Should you encounter any compiler warnings or errors (like the redefi-
     nition of certain types already defined by your system), please contact
-    me via e-mail at <sb@engelschall.com>, sending me your compiler output
+    me via e-mail at <STBEY@cpan.org>, sending me your compiler output
     (both STDOUT and STDERR). Thank you!
 
     ======================================================================
@@ -192,34 +194,34 @@ Detailed installation guide:
 
     The output should look somewhat like this:
 
-    PERL_DL_NONLAZY=1 /sw/bin/perl -Iblib/arch
-    -Iblib/lib -I/sw/pkg/perl/lib/5.00503/i386-freebsd
-    -I/sw/pkg/perl/lib/5.00503 -e 'use Test::Harness
-    qw(&runtests $verbose); $verbose=0; runtests @ARGV;' t/*.t
-    t/00____version.....ok
-    t/01________new.....ok
-    t/02____destroy.....ok
-    t/03_operations.....ok
-    t/04__functions.....ok
-    t/05_____primes.....ok
-    t/06_____subset.....ok
-    t/07____compare.....ok
-    t/08_____resize.....ok
-    t/09_parameters.....ok
-    t/10__intervals.....ok
-    t/11______shift.....ok
-    t/12_____string.....ok
-    t/13__increment.....ok
-    t/14______empty.....ok
-    t/15________add.....ok
-    t/16___subtract.....ok
-    t/17________gcd.....ok
-    t/28__chunklist.....ok
-    t/30_overloaded.....ok
-    t/40__auxiliary.....ok
+    PERL_DL_NONLAZY=1 /v/guest/sw/bin/perl "-MExtUtils::Command::MM"
+    "-e" "test_harness(0, 'blib/lib', 'blib/arch')" t/*.t
+    t/00_____version.t .. ok
+    t/01_________new.t .. ok
+    t/02_____destroy.t .. ok
+    t/03__operations.t .. ok
+    t/04___functions.t .. ok
+    t/05______primes.t .. ok
+    t/06______subset.t .. ok
+    t/07_____compare.t .. ok
+    t/08______resize.t .. ok
+    t/09__parameters.t .. ok
+    t/10___intervals.t .. ok
+    t/11_______shift.t .. ok
+    t/12______string.t .. ok
+    t/13___increment.t .. ok
+    t/14_______empty.t .. ok
+    t/15_________add.t .. ok
+    t/16____subtract.t .. ok
+    t/17_________gcd.t .. ok
+    t/28___chunklist.t .. ok
+    t/30__overloaded.t .. ok
+    t/40___auxiliary.t .. ok
+    t/50_freeze_thaw.t .. ok
+    t/51_file_nstore.t .. ok
     All tests successful.
-    Files=21,  Tests=68151, 29 wallclock secs
-    (19.75 cusr +  0.73 csys = 20.48 CPU)
+    Files=23, Tests=91963, 16 wallclock secs (13.63 usr  0.23 sys +  2.91 cusr  0.56 csys = 17.34 CPU)
+    Result: PASS
 
     (Note that the exact number of tests will depend on the number of bits
      of a machine word/an unsigned long on your system!)

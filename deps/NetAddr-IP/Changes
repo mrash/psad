@@ -1,61 +1,138 @@
 Revision history for Perl extension NetAddr::IP
 
+4.075 Wed Jun 11 11:41:17 PDT 2014
+	make CPAN happy with new rev number
+
+4.074 Wed Jun 11 09:36:10 PDT 2014
+	In Lite.pm v1.54,
+	change input filter for resolvable hostnames
+	to allow the underscore character
+	Thanks to grankio [...] gmail.com for the heads up on this issue.
+
+4.073 Sat Apr  5 09:32:11 PDT 2014
+	add documentation about FQDN conversion and
+	an option to disable
+
+4.072 Mon Jan 27 11:59:58 PST 2014
+	modify Makefile.PL to bypass missing 'pod2text'
+
+4.071 Mon Sep 30 13:41:03 PDT 2013
+	add method "canon" by request from <tom.jones@bccx.com>
+
+4.070 Thu Sep 12 12:54:22 PDT 2013
+	nth documention error fixed. thanks to Anton tobez@tobez.org
+
+	Lite v1.51, add new6FFFF, RFC4291 compliant ipv4->ipV6 new
+
+4.069 Sat May 25 15:10:45 PDT 2013
+	IN Lite.pm v1.50, add =encoding UTF-8
+	In Util.pm v1.50
+	changed Makefile.PL to check for config.h when building for XS
+	with 'gcc', try building with 'cc', and check again.
+	If config.h is not found, force Pure Perl mode.
+
+	Kill XS in winduhs and Darwin, both of which misbehave when compiling XS code
+
+4.068 Wed Apr  3 10:52:24 PDT 2013
+	update Makefile.PL in Util.pm v 1.49 to better detect 'winduhs'
+
+4.067 Sat Mar 30 12:57:20 PDT 2013
+	Improved diagnostic message for "die" with bad mask for 
+	hostenum, hostenumref, split, splitref, rsplit, rsplitref
+	Thanks to GENSYM@cpan.org for pointing out the need.
+
+4.066 Mon Oct 29 13:30:14 PDT 2012
+	update Lite.pm v1.47 to support bracketed IPv6 URI notation
+	as described in RFC-3986
+	Thanks to Quanah Gibson-Mount mishikal@yahoo.com
+
+4.065 Tue Oct  2 12:36:11 PDT 2012
+	correct format for IPv6 embedded IPv4 addresses
+	in InetBase v0.8
+
+4.064 Tue Sep 25 13:54:47 PDT 2012
+	added support for rfc3021 /31 networks to hostenum
+
+4.063 Fri Aug 10 11:46:18 PDT 2012
+	Updated GPL v2.0 text and address in all modules
+
+4.062 Wed Jun  6 12:34:48 PDT 2012
+	documentation updates courtesy of
+	Ben Bullock <benkasminbullock@gmail.com>
+	Thank you Ben.
+
+4.061 Tue May  8 16:24:03 PDT 2012
+	fixed bug in Lite v1.44 that returned 
+	$ip->num() = 2^128 for 0.0.0.0/0
+	Thanks to Sebastian <debug@test1.org> for spotting it.
+
+4.060 Fri Apr  6 16:00:02 PDT 2012
+	In Lite.pm v1.43,
+	fix bug #75976, change in behavior introduced in v4.050
+	where an empty string supplied to "new" previously returned
+	'undef' and now returns 'default' for ipV4 or ipV6
+
+4.059 Wed Mar  7 12:50:04 PST 2012
+	add is_rfc1918 to Lite.pm v1.42
+
+	documentation updates
+
 4.058 Fri Nov 11 19:23:11 PST 2011
-        up rev for documentation update
-        update documentation in InetBase v0.06
+	up rev for documentation update
+	update documentation in InetBase v0.06
 
 4.057 Fri Nov 11 15:04:20 PST 2011
 	Lite.pm v1.40
-        add call to InetBase::fillIPv4 to all uses of gethostbyname
+	add call to InetBase::fillIPv4 to all uses of gethostbyname
 
-        break out the code in InetBase v0.05 that expands short IPv4 
-        addresses into dotquad format to account for broken BSD 
-        implementations of inet_aton and gethostbyname that do 
-        not recognize the short format. EXPORT this as sub 'fillIPv4'
+	break out the code in InetBase v0.05 that expands short IPv4 
+	addresses into dotquad format to account for broken BSD 
+	implementations of inet_aton and gethostbyname that do 
+	not recognize the short format. EXPORT this as sub 'fillIPv4'
 
-        in Util.pm v1.45, add 'fillIPv4' to calls to gethostbyname to 
-        work around broken inet_aton and gethostbyname implementations
-        in certain BSD implementations
+	in Util.pm v1.45, add 'fillIPv4' to calls to gethostbyname to 
+	work around broken inet_aton and gethostbyname implementations
+	in certain BSD implementations
 
 4.056 Wed Nov  2 19:15:31 PDT 2011
-        bump rev to incorporate
-        improved inet_aton in InetBase v0.04 to overcome broken
-        gethostbyname found in NetBSD and OpenBSD
+	bump rev to incorporate
+	improved inet_aton in InetBase v0.04 to overcome broken
+	gethostbyname found in NetBSD and OpenBSD
 
 4.055 Fri Oct 28 11:41:22 PDT 2011
 	in Lite.pm v1.38
-        patch for bug 71869, issues with Math::BigInt varients
+	patch for bug 71869, issues with Math::BigInt varients
 
 4.054 Thu Oct 27 12:48:55 PDT 2011
-        In Lite.pm v1.37, remove Calc.pm
-        add detection of early Math::Bigint object structure
-        fix bug 71869 - a failed test routine
+	In Lite.pm v1.37, remove Calc.pm
+	add detection of early Math::Bigint object structure
+	fix bug 71869 - a failed test routine
 
 4.053 Wed Oct 26 08:52:34 PDT 2011
 	In Lite.pm v1.36
-        fix bug #71925. A a sub-varient of #62521 that showed up only for
-        short notation for IPv4. i.e. 127/n, 127.0/n, 127.0.0/n but
-        not 127.0.0.0/n
+	fix bug #71925. A a sub-varient of #62521 that showed up only for
+	short notation for IPv4. i.e. 127/n, 127.0/n, 127.0.0/n but
+	not 127.0.0.0/n
 
 4.052 Tue Oct 25 16:18:38 PDT 2011
-        add test in Lite.pm v1.35 for api-version of Math::BigInt to 
+	add test in Lite.pm v1.35 for api-version of Math::BigInt to 
 	support versions earlier than 1.70, circa Dec 2003. 
-        Thanks to Paul Howarth <paul@city-fan.org> for spotting that bug.
+	Thanks to Paul Howarth <paul@city-fan.org> for spotting that bug.
 
 4.051 Mon Oct 24 14:44:53 PDT 2011
 	fix bug 71869
 	in Lite.pm v1.34
-        use Math::BigInt::Calc for creating BigInt values and fall
-        back to NetAddr::IP::Calc if Math::BigInt is not present.
+	use Math::BigInt::Calc for creating BigInt values and fall
+	back to NetAddr::IP::Calc if Math::BigInt is not present.
 
-        remove reference to Config{osname} in InetBase.pm v0.03
-        (Util 1.43)
+	remove reference to Config{osname} in InetBase.pm v0.03
+	(Util 1.43)
 
 
 4.050 Sat Oct 22 01:58:57 PDT 2011
-        In Lite/Util/lib/NetAddr/IP/Lite/Util/InetBase.pm v0.02
-        Socket6 prior to version 0.23 does not have AF_INET6 in the  
-        EXPORT_OK array, modify InetBase.pm v0.2 to work around this.
+	In Lite/Util/lib/NetAddr/IP/Lite/Util/InetBase.pm v0.02
+	Socket6 prior to version 0.23 does not have AF_INET6 in the  
+	EXPORT_OK array, modify InetBase.pm v0.2 to work around this.
 
 	Add support for Math::BigInt to NetAddr::IP::Lite v1.33
 
@@ -63,37 +140,37 @@ Revision history for Perl extension NetAddr::IP
 	Updates to Lite.pm, Util.pm, new module InetBase.pm
 
 	In Lite v1.32
-        bug68723, add capability to parse input of the form
-        ->new6(12345,1). This should have been there but was
-        missing. Thanks to Andrei Benea for spotting this.
-        
-        In Util v1.41
-        add inet_pton, inet_ntop, AF_INET, AF_INET6
+	bug68723, add capability to parse input of the form
+	->new6(12345,1). This should have been there but was
+	missing. Thanks to Andrei Benea for spotting this.
+	
+	In Util v1.41
+	add inet_pton, inet_ntop, AF_INET, AF_INET6
 
-        modify inet_n2dx and inet_n2ad to
-        recognize the new 128 bit IPv4 format
-        ::FFFF:FFFF:0:0
+	modify inet_n2dx and inet_n2ad to
+	recognize the new 128 bit IPv4 format
+	::FFFF:FFFF:0:0
 
-        replace isIPv4 with a pure perl version for portablity
+	replace isIPv4 with a pure perl version for portablity
 
-        split the following into NetAddr::IP::InetBase v0.01
+	split the following into NetAddr::IP::InetBase v0.01
 	to provide better long term support for IPv6
-        inet_aton
-        inet_ntoa
-        ipv6_aton
-        ipv6_n2x
-        ipv6_n2d
-        inet_any2n
-        inet_n2dx
-        inet_n2ad
-        inet_ntop
-        inet_pton
-        packzeros
-        isIPv4
-        isNewIPv4
-        isAnyIPv4
-        AF_INET
-        AF_INET6
+	inet_aton
+	inet_ntoa
+	ipv6_aton
+	ipv6_n2x
+	ipv6_n2d
+	inet_any2n
+	inet_n2dx
+	inet_n2ad
+	inet_ntop
+	inet_pton
+	packzeros
+	isIPv4
+	isNewIPv4
+	isAnyIPv4
+	AF_INET
+	AF_INET6
 
 4.048 Sat Oct  8 01:33:44 PDT 2011
 	remove debug print statement from Util v1.40
@@ -107,9 +184,9 @@ Revision history for Perl extension NetAddr::IP
 
 4.045 Thu Oct  6 18:23:04 PDT 2011		DEPRECATED
 	updated NetAddr::IP::Util 1.37
-        addid isAnyIPv4, isNewIPv4, inet_4map6
-        revised naip_gethostbyname
-        to conform to Perl's gethostbyname output
+	addid isAnyIPv4, isNewIPv4, inet_4map6
+	revised naip_gethostbyname
+	to conform to Perl's gethostbyname output
 
 4.044 Wed May 18 14:47:34 PDT 2011
 	added missing support for ->compactref(\@list) which is described
@@ -201,7 +278,7 @@ Revision history for Perl extension NetAddr::IP
 	for spotting and replicating that bug
 
 	added new_cis and new_cis6 to Lite.pm v1.21 to accomodate
-	Cisco syntax that has IP and MASK seperated by a space.
+	Cisco syntax that has IP and MASK separated by a space.
 
 	Updated typo in documentation that left out example
 	print new6 stuff

@@ -1,5 +1,60 @@
 Revision history for Perl extension NetAddr::IP::Lite
 
+1.54  Wed Jun 11 09:36:10 PDT 2014
+	change input filter for resolvable hostnames
+	to allow the underscore character
+	Thanks to grankio [...] gmail.com for the heads up on this issue.
+
+1.53  Sat Apr  5 09:32:11 PDT 2014
+        add documentation about FQDN conversion and
+        an option to disable
+
+1.52  Mon Jan 27 11:59:58 PST 2014
+        modify Makefile.PL to bypass missing 'pod2text'
+
+1.51  Thu Sep 12 12:54:22 PDT 2013
+	add new6FFFF, RFC4291 compliant ipv4->ipV6 new
+
+1.50  Sat May 25 15:10:45 PDT 2013
+	add =encoding UTF-8
+
+1.49  Tue Apr  9 12:02:34 PDT 2013
+	In Util.pm v1.50
+        changed Makefile.PL to check for config.h when building for XS
+        with 'gcc', try building with 'cc', and check again.
+        If config.h is not found, force Pure Perl mode.
+
+        Kill XS in winduhs and Darwin, both of which misbehave when compiling XS code
+
+1.48  Wed Apr  3 10:52:24 PDT 2013
+	Update Util.pm v1.49 to better detect 'winduhs'
+
+1.47  Mon Oct 29 13:30:14 PDT 2012
+	update Lite.pm v1.47 to support bracketed IPv6 URI notation
+	as described in RFC-3986
+	Thanks to Quanah Gibson-Mount mishikal@yahoo.com
+
+1.46  Tue Oct  2 12:36:11 PDT 2012
+        correct incorrect format for IPv6 embedded IPv4 addresses
+        in InetBase v0.8
+
+1.45  Fri Aug 10 11:46:18 PDT 2012
+	---
+
+1.44  Tue May  8 16:24:03 PDT 2012
+	fixed bug that return $ip->num() = 2^128 for 0.0.0.0/0
+	Thanks to Sebastian <debug@test1.org> for spotting it.
+
+1.43  Fri Apr  6 13:19:48 PDT 2012
+	fix bug #75976, change in behavior introduced in v4.050
+	where an empty string supplied to "new" previously returned 
+	'undef' and now returns 'default' for ipV4 or ipV6
+
+1.42  Wed Mar  7 12:50:04 PST 2012
+	add "is_rfc1918" and tests
+
+	correct typos in documentation
+
 1.41  Fri Nov 11 19:23:11 PST 2011
 	up rev for documentation update
         update documentation in InetBase v0.06
@@ -164,7 +219,7 @@ Revision history for Perl extension NetAddr::IP::Lite
 	for spotting and replicating that bug
 
 	added new_cis and new_cis6 to Lite.pm v1.21 to accomodate
-	Cisco syntax that has IP and MASK seperated by a space.
+	Cisco syntax that has IP and MASK separated by a space.
 
 	Updated typo in documentation that left out example
 	print new6 stuff

@@ -2,7 +2,7 @@
 
 ###############################################################################
 ##                                                                           ##
-##    Copyright (c) 1995 - 2004 by Steffen Beyer.                            ##
+##    Copyright (c) 1995 - 2009 by Steffen Beyer.                            ##
 ##    All rights reserved.                                                   ##
 ##                                                                           ##
 ##    This package is free software; you can redistribute it                 ##
@@ -14,45 +14,40 @@ use strict;
 
 use ExtUtils::MakeMaker;
 
-use Config;
+BEGIN
+{
+    eval { require Config_m; }; # ExtUtils::FakeConfig (+ ActivePerl)
+    eval { require Config;   }  # Everyone else
+    if ($@);
+}
+
+print qq{\n};
+print qq{*************************************************************\n};
+print qq{****** BEWARE: Use "make install UNINST=1" to install! ******\n};
+print qq{*************************************************************\n};
+print qq{\n};
 
 WriteMakefile(
     'NAME'              => 'Date::Calc',
-    'VERSION_FROM'      => 'Calc.pm',
-    'PREREQ_PM'         =>
-                              {
-                                  'Carp::Clan'  => 5.3,
-                                  'Bit::Vector' => 6.4
-                              },
-    'OBJECT'            => '$(O_FILES)',
-#   ($] >= 5.005 ?
-#       ('ABSTRACT'     => 'Gregorian calendar date calculations',
-#        'AUTHOR'       => 'Steffen Beyer (sb@engelschall.com)') : ()),
-#   ($] >= 5.005 && $^O eq 'MSWin32' && $Config{archname} =~ /-object\b/i ?
-#       ('CAPI'         => 'TRUE') : ()),
-    'dist'              => { COMPRESS => "gzip -9", SUFFIX => "gz" }
+    'VERSION_FROM'      => 'lib/Date/Calc.pm',
+    'ABSTRACT_FROM'     => 'lib/Date/Calc.pod',
+    'LICENSE'           => 'perl',
+    'AUTHOR'            => 'Steffen Beyer <STBEY@cpan.org>',
+    'PREREQ_PM'         => {
+                               'Carp::Clan'  => 6.04,
+                               'Bit::Vector' => 7.1
+                           },
+    'META_MERGE'        => {
+                               'recommends'  =>
+                               {
+                                   'Date::Calc::XS' => 6.2
+                               }
+                           },
+    'dist'              => { COMPRESS => "gzip -9", SUFFIX => "gz" },
+#   for ActivePerl:
+    ($] >= 5.005 && $^O eq 'MSWin32' && $Config::Config{'archname'} =~ /-object\b/i ?
+        ('CAPI'         => 'TRUE') : ())
 );
-
-my $patchlevel = $0;
-
-$patchlevel =~ s![^/\\]*$!patchlevel.h!;
-
-my $PATCHLEVEL = $Config{'PATCHLEVEL'} || $Config{'patchlevel'} || substr($],2,3);
-my $SUBVERSION = $Config{'SUBVERSION'} || $Config{'subversion'} || substr($],5) || 0;
-
-if (open(PATCHLEVEL, ">$patchlevel"))
-{
-    print "Writing $patchlevel for $^X ($])\n";
-    printf PATCHLEVEL "#define PATCHLEVEL %d\n", $PATCHLEVEL;
-    printf PATCHLEVEL "#define SUBVERSION %d\n", $SUBVERSION;
-    close(PATCHLEVEL);
-}
-else
-{
-    warn "Oops: Couldn't write file '$patchlevel': $!\n";
-    warn "However, you might succeed in building this module anyway;\n";
-    warn "Just try it!\n";
-}
 
 __END__
 

@@ -13,12 +13,8 @@
 # which Storable should (correctly) throw errors.
 
 sub BEGIN {
-    if ($ENV{PERL_CORE}){
-	chdir('t') if -d 't';
-	@INC = ('.', '../lib');
-    } else {
-	unshift @INC, 't';
-    }
+    unshift @INC, 't';
+    unshift @INC, 't/compat' if $] < 5.006002;
     require Config; import Config;
     if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
@@ -38,7 +34,7 @@ my $array = [ $ddd ];
 my $string = Storable::freeze( $array );
 my $thawed = Storable::thaw( $string );
 
-# is_deeply infinite loops in ciculars, so do it manually
+# is_deeply infinite loops in circulars, so do it manually
 # is_deeply( $array, $thawed, 'Circular hooked objects work' );
 is( ref($thawed), 'ARRAY', 'Top level ARRAY' );
 is( scalar(@$thawed), 1, 'ARRAY contains one element' );

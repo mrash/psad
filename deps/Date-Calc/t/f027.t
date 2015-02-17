@@ -4,6 +4,8 @@ BEGIN { eval { require bytes; }; }
 use strict;
 no strict "vars";
 
+BEGIN { $Date::Calc::XS_DISABLE = $Date::Calc::XS_DISABLE = 1; }
+
 use Date::Calc qw( Decode_Date_US2 Language Decode_Language );
 
 # ======================================================================
@@ -174,32 +176,32 @@ if ((($year,$mm,$dd) = Decode_Date_US2("_Jan2264_")) &&
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
-if ((($year,$mm,$dd) = Decode_Date_US2("_Jan02264_")) &&
+if ((($year,$mm,$dd) = Decode_Date_US2("_Jan02264_",0)) &&
 ($year==1964) && ($mm==1) && ($dd==22))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
-if ((($year,$mm,$dd) = Decode_Date_US2("_Jan002264_")) &&
+if ((($year,$mm,$dd) = Decode_Date_US2("_Jan002264_",'')) &&
 ($year==1964) && ($mm==1) && ($dd==22))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
-if ((($year,$mm,$dd) = Decode_Date_US2("_ja31964_")) &&
+if ((($year,$mm,$dd) = Decode_Date_US2("_ja31964_",1)) &&
 ($year==1964) && ($mm==1) && ($dd==3))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
-if ((($year,$mm,$dd) = Decode_Date_US2("_ja031964_")) &&
+if ((($year,$mm,$dd) = Decode_Date_US2("_ja031964_",2)) &&
 ($year==1964) && ($mm==1) && ($dd==3))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
-if ((($year,$mm,$dd) = Decode_Date_US2("_ja0031964_")) &&
+if ((($year,$mm,$dd) = Decode_Date_US2("_ja0031964_",3)) &&
 ($year==1964) && ($mm==1) && ($dd==3))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
-if ((($year,$mm,$dd) = Decode_Date_US2("_ja221964_")) &&
+if ((($year,$mm,$dd) = Decode_Date_US2("_ja221964_",undef)) &&
 ($year==1964) && ($mm==1) && ($dd==22))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
@@ -232,9 +234,7 @@ if ((($year,$mm,$dd) = Decode_Date_US2("_ja_000003x000064x")) &&
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;
 
-Language(Decode_Language("Portug"));
-
-if ((($year,$mm,$dd) = Decode_Date_US2("_Janeiro_3_dia_tres_de_janeiro_de_1964_mil_novecentos_sessenta_e_seis_")) &&
+if ((($year,$mm,$dd) = Decode_Date_US2("_Janeiro_3_dia_tres_de_janeiro_de_1964_mil_novecentos_sessenta_e_seis_",Decode_Language("Portug"))) &&
 ($year==1964) && ($mm==1) && ($dd==3))
 {print "ok $n\n";} else {print "not ok $n\n";}
 $n++;

@@ -1,7 +1,7 @@
 
 ###############################################################################
 ##                                                                           ##
-##    Copyright (c) 2000 - 2004 by Steffen Beyer.                            ##
+##    Copyright (c) 2000 - 2009 by Steffen Beyer.                            ##
 ##    All rights reserved.                                                   ##
 ##                                                                           ##
 ##    This package is free software; you can redistribute it                 ##
@@ -35,7 +35,7 @@ require Exporter;
     &Advent
 );
 
-$VERSION = '5.4';
+$VERSION = '6.3';
 
 use Date::Calc qw(:all);
 use Carp::Clan qw(^Date::);
@@ -403,7 +403,10 @@ $Profiles->{'US'} = # United States of America
     # Common legal holidays (in all federal states):
     "New Year's Day"                => \&US_New_Year,
     "Martin Luther King's Birthday" => "3/Mon/Jan",
+    "Civil Rights Day"              => "#3/Mon/Jan", # Thanks to Michael G. Schwern <mschwern@cpan.org>
+    "Human Rights Day"              => "#3/Mon/Jan", # and http://en.wikipedia.org/wiki/Martin_Luther_King_Day
     "President's Day"               => "3/Mon/Feb",
+    "Washington's Birthday"         => "#3/Mon/Feb", # Thanks to Michael G. Schwern <mschwern@cpan.org>
     "Memorial Day"                  => "5/Mon/May",
     "Independence Day"              => \&US_Independence,
     "Labor Day"                     => "1/Mon/Sep",
@@ -413,7 +416,20 @@ $Profiles->{'US'} = # United States of America
     "All Souls Day"                 => "#Nov/2",
     "Veterans' Day"                 => \&US_Veteran,
     "Thanksgiving Day"              => "4/Thu/Nov",
-    "Christmas Day"                 => \&US_Christmas
+    "Christmas Day"                 => \&US_Christmas,
+    # Federal observances (thanks to http://en.wikipedia.org/wiki/US_holidays):
+    "Inauguration Day"              => "#Jan/20",
+    "Super Bowl Sunday"             => "#1/Sun/Feb",
+    "Groundhog Day"                 => "#Feb/2",
+    "St. Patrick's Day"             => "#Mar/17",
+    "Earth Day"                     => "#Apr/22",
+    "Cinco de Mayo"                 => "#May/5",
+    "Mother's Day"                  => "#2/Sun/May",
+    "Father's Day"                  => "#3/Sun/Jun",
+    "Pearl Harbor Remembrance Day"  => "#Dec/7",
+    "Winter Solstice"               => "#Dec/21",
+    "Christmas Eve"                 => "#Dec/24",
+    "New Year's Eve"                => "#Dec/31"
 };
 
 sub US_New_Year # First of January
@@ -761,6 +777,8 @@ $Profiles->{'CA-ON'} = # Ontario
     %{$Profiles->{'CA'}},
     "Victoria Day"         => "May/22",
     "Canada Day"           => "Jul/01",
+    "Family Day"           => "3/Mon/Feb", # Thanks to
+    "Civic Holiday"        => "1/Mon/Aug", # Iain Dwyer <dermanus@gmail.com>
     "Thanksgiving Day"     => "2/Mon/Oct",
     "Boxing Day"           => "Dec/26"
 };
@@ -1238,14 +1256,17 @@ $Profiles->{'IT'} = # Italia
     "S. Stefano"                => "26.12."
 };
 
+# Fixed thanks to:
+# Michele Valzelli <spleen.leveller@gmail.com>
+
 sub IT_Fondazione
 {
     my($year,$label) = @_;
 
     if ($year >= 1947)
     {
-        if ($year <= 1977) { return($year,6,2);     }
-        else               { return($year,6,2,'#'); } # only commemorative
+        if (($year <= 1977) or ($year >= 2000)) { return($year,6,2);     }
+        else                                    { return($year,6,2,'#'); } # only commemorative
     }
     return(); # didn't exist before 1947
 }
@@ -1305,7 +1326,7 @@ $Profiles->{'DK'} = # Denmark
 };
 
 # Thanks to:
-# H. Merijn Brand <h.m.brand@hccnet.nl>
+# H. Merijn Brand <h.m.brand@xs4all.nl>
 # Johan Vromans <JVromans@squirrel.nl>
 # Abigail <abigail@foad.org>
 # Elizabeth Mattijsen <liz@dijkmat.nl>

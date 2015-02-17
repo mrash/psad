@@ -1,14 +1,75 @@
                     =====================================
-                      Package "Bit::Vector" Version 6.4
+                      Package "Bit::Vector" Version 7.4
                     =====================================
 
 
-                 Copyright (c) 1995 - 2004 by Steffen Beyer.
+                 Copyright (c) 1995 - 2013 by Steffen Beyer.
                              All rights reserved.
 
 
 Version history:
 ----------------
+
+Version 7.4   03.09.2013
+
+ +  Modified ToolBox.h to allow bit vectors with more than 2^32 bits
+
+Version 7.3   01.06.2013
+
+ +  Fixed t/02_____destroy.t to make it pass on perl-5.17.11
+
+Version 7.2   17.05.2012
+
+ +  Changed the definition of the "boolean" data type in ToolBox.h
+
+Version 7.1   29.09.2009
+
+ +  Added prefix "BV_" to all global identifiers in "BitVector.c",
+    "BitVector.h" and "Vector.xs"
+
+Version 7.0   22.08.2009
+
+ +  Fixed a bug in "GCD2()" in "BitVector.c" with null-size vectors
+ +  Added more test cases for "GCD()" in "t/17_________gcd.t"
+ +  Almost completely rewrote "BitVector_Boot()" in "BitVector.c"
+    in order to fix the problem that it calculated an unsigned
+    long to have 33 bits under MacOS X (Darwin), leading to
+    failing tests in "t/28___chunklist.t"
+ +  BEWARE that the type "ErrCode", which is part of the inter-
+    face of the C library "BitVector.c", has been changed!
+ +  Added more tests and a debugging aid to "t/28___chunklist.t"
+ +  Removed the two example files showing how to freeze/thaw
+    "Bit::Vector" objects using "Data::Dumper", because after
+    closer inspection this proved to be a can of worms
+
+Version 6.9   12.08.2009
+
+ +  Replaced "Storable::freeze()" by "Storable::nfreeze()"
+ +  Added more test cases for "Storable"
+ +  Added two example files showing how to freeze/thaw
+    using "Data::Dumper"
+
+Version 6.8   10.08.2009
+
+ +  Fixed the bug of "Storable" not reconstructing nested data
+    structures properly which contain several references to
+    the same "Bit::Vector" object
+ +  Fixed hard-coded table size "MASKTABSIZE" in "BitVector.c"
+ +  Small cosmetic fixes to the documentation
+
+Version 6.7   08.08.2009
+
+ +  Replaced "STORABLE_thaw()" by "STORABLE_attach()"
+
+Version 6.6   27.07.2009
+
+ +  Made the module thread-safe and MacOS X compatible
+ +  Prevented "BitVector_Boot()" in "BitVector.c" to leak
+    memory when called repeatedly
+
+Version 6.5   27.07.2009
+
+ +  Added automatic support for module "Storable"
 
 Version 6.4   03.10.2004
 

@@ -7,12 +7,8 @@
 #
 
 sub BEGIN {
-    if ($ENV{PERL_CORE}){
-       chdir('t') if -d 't';
-       @INC = ('.', '../lib');
-    } else {
-       unshift @INC, 't';
-    }
+    unshift @INC, 't';
+    unshift @INC, 't/compat' if $] < 5.006002;
     require Config; import Config;
     if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
@@ -21,17 +17,7 @@ sub BEGIN {
 }
 
 use strict;
-BEGIN {
-    if (!eval q{
-       use Test::More;
-       1;
-    }) {
-       print "1..0 # skip: tests only work with Test::More\n";
-       exit;
-    }
-}
-
-BEGIN { plan tests => 1 }
+use Test::More tests => 1;
 
 my @warns;
 $SIG{__WARN__} = sub { push @warns, shift };

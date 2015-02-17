@@ -9,16 +9,16 @@ and Date::Calendar::Year
   use Date::Calendar::Profiles qw( $Profiles );
   use Date::Calendar;
 
-  $cal_US_AK = Date::Calendar->new( $Profiles->{'US-AK'} [,LANG] );
-  $cal_DE_BY = Date::Calendar->new( $Profiles->{'DE-BY'} [,LANG] );
+  $cal_US_AK = Date::Calendar->new( $Profiles->{'US-AK'} [,LANG[,WEEKEND]] );
+  $cal_DE_BY = Date::Calendar->new( $Profiles->{'DE-BY'} [,LANG[,WEEKEND]] );
 
  or
 
   use Date::Calendar::Profiles qw( $Profiles );
   use Date::Calendar::Year;
 
-  $year_2000_US_FL = Date::Calendar::Year->new( 2000, $Profiles->{'US-FL'} [,LANG] );
-  $year_2001_DE_NW = Date::Calendar::Year->new( 2001, $Profiles->{'DE-NW'} [,LANG] );
+  $year_2000_US_FL = Date::Calendar::Year->new( 2000, $Profiles->{'US-FL'} [,LANG[,WEEKEND]] );
+  $year_2001_DE_NW = Date::Calendar::Year->new( 2001, $Profiles->{'DE-NW'} [,LANG[,WEEKEND]] );
 
  and also
 
@@ -520,7 +520,16 @@ for a short description of that little script.
 =head1 SEE ALSO
 
 Date::Calendar(3), Date::Calendar::Year(3),
-Date::Calc::Object(3), Date::Calc(3).
+Date::Calc::Object(3), Date::Calc(3),
+Date::Calc::Util(3).
+
+=head1 LIMITATIONS
+
+The calendar profiles included in this module usually do not take
+historical irregularities into account (even though some do in order
+to show how this can be done), they only provide means for calculating
+B<regularly> recurring events (B<the profiles should therefore not be
+relied upon for historical faithfulness>).
 
 =head1 KNOWN BUGS
 
@@ -533,26 +542,32 @@ way. This hasn't been finished yet because it is very time-consuming.
 
 =head1 VERSION
 
-This man page documents "Date::Calendar::Profiles" version 5.4.
+This man page documents "Date::Calendar::Profiles" version 6.3.
 
 =head1 AUTHOR
 
   Steffen Beyer
-  mailto:sb@engelschall.com
+  mailto:STBEY@cpan.org
   http://www.engelschall.com/u/sb/download/
 
 =head1 COPYRIGHT
 
-Copyright (c) 2000 - 2004 by Steffen Beyer. All rights reserved.
+Copyright (c) 2000 - 2009 by Steffen Beyer. All rights reserved.
 
 =head1 LICENSE
 
-This package is free software; you can redistribute it and/or
-modify it under the same terms as Perl itself, i.e., under the
-terms of the "Artistic License" or the "GNU General Public License".
+This package is free software; you can use, modify and redistribute
+it under the same terms as Perl itself, i.e., at your option, under
+the terms either of the "Artistic License" or the "GNU General Public
+License".
 
-Please refer to the files "Artistic.txt" and "GNU_GPL.txt"
-in this distribution for details!
+The C library at the core of the module "Date::Calc::XS" can, at your
+discretion, also be used, modified and redistributed under the terms
+of the "GNU Library General Public License".
+
+Please refer to the files "Artistic.txt", "GNU_GPL.txt" and
+"GNU_LGPL.txt" in the "license" subdirectory of this distribution
+for any details!
 
 =head1 DISCLAIMER
 

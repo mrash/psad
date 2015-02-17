@@ -4,8 +4,9 @@ package NetAddr::IP;
 
 use strict;
 #use diagnostics;
-use NetAddr::IP::Lite 1.41 qw(Zero Zeros Ones V4mask V4net);
-use NetAddr::IP::Util 1.46 qw(
+use Carp;
+use NetAddr::IP::Lite 1.54 qw(Zero Zeros Ones V4mask V4net);
+use NetAddr::IP::Util 1.50 qw(
 	sub128
 	inet_aton
 	inet_any2n
@@ -27,6 +28,7 @@ use vars qw(
 	@ISA
 	$VERSION
 	$_netlimit
+	$rfc3021
 );
 require Exporter;
 
@@ -35,9 +37,13 @@ require Exporter;
 
 @ISA = qw(Exporter NetAddr::IP::Lite);
 
-$VERSION = do { sprintf " %d.%03d", (q$Revision: 4.58 $ =~ /\d+/g) };
+$VERSION = do { sprintf " %d.%03d", (q$Revision: 4.75 $ =~ /\d+/g) };
+
+$rfc3021 = 0;
 
 =pod
+
+=encoding UTF-8
 
 =head1 NAME
 
@@ -58,6 +64,8 @@ NetAddr::IP - Manages IPv4 and IPv6 addresses and subnets
 	:upper
 	:old_storable
 	:old_nth
+	:rfc3021
+	:nofqdn
   );
 
   NOTE: NetAddr::IP::Util has a full complement of network address
@@ -70,13 +78,13 @@ NetAddr::IP - Manages IPv4 and IPv6 addresses and subnets
 See L<NetAddr::IP::Util>
 
 
-  my $ip = new NetAddr::IP::Lite '127.0.0.1';
-	 or if your prefer
-  my $ip = NetAddr::IP::Lite->new('127.0.0.1);
+  my $ip = new NetAddr::IP '127.0.0.1';
+	 or if you prefer
+  my $ip = NetAddr::IP->new('127.0.0.1);
 	or from a packed IPv4 address
-  my $ip = new_from_aton NetAddr::IP::Lite (inet_aton('127.0.0.1'));
+  my $ip = new_from_aton NetAddr::IP (inet_aton('127.0.0.1'));
 	or from an octal filtered IPv4 address
-  my $ip = new_no NetAddr::IP::Lite '127.012.0.0';
+  my $ip = new_no NetAddr::IP '127.012.0.0';
 
   print "The address is ", $ip->addr, " with mask ", $ip->mask, "\n" ;
 
@@ -94,6 +102,8 @@ See L<NetAddr::IP::Util>
   FFFF:FFFF:FFFF:FFFF:FFFF:FFFF::          = V4mask();
   ::FFFF:FFFF                              = V4net();
 
+  Will also return an ipV4 or ipV6 representation of a
+  resolvable Fully Qualified Domanin Name (FQDN).
 
 ###### DEPRECATED, will be remove in version 5 ############
 
@@ -140,18 +150,18 @@ invoked as shown on the next line.
 
 * To set a limit on the size of B<nets> processed or returned by NetAddr::IP.
 
-Set the maximum number of nets beyond which NetAddr::IP will return and
-error as a power of 2 (default 16 or 65536 nets). Each 2**16 consumes approximately 4 megs of
-memory. A 2**20 consumes 64 megs of memory, A 2**24 consumes 1 gigabyte of
-memory.
+Set the maximum number of nets beyond which NetAddr::IP will return
+an error as a power of 2 (default 16 or 65536 nets). Each 2**16
+consumes approximately 4 megs of memory. A 2**20 consumes 64 megs of
+memory, A 2**24 consumes 1 gigabyte of memory.
 
   use NetAddr::IP qw(netlimit);
   netlimit 20;
 
-The maximum B<netlimit> allowed is a 2**24. Attempts to set limits below the
-default of 16 or above the maximum of 24 are ignored.
+The maximum B<netlimit> allowed is 2**24. Attempts to set limits below
+the default of 16 or above the maximum of 24 are ignored.
 
-Returns true on success otherwise undef.
+Returns true on success, otherwise C<undef>.
 
 =cut
 
@@ -174,10 +184,11 @@ Un-tar the distribution in an appropriate directory and type:
 	make test
 	make install
 
-B<NetAddr::IP> depends on B<NetAddr::IP::Util> which installs by default with its primary functions compiled
-using Perl's XS extensions to build a 'C' library. If you do not have a 'C'
-complier available or would like the slower Pure Perl version for some other
-reason, then type:
+B<NetAddr::IP> depends on B<NetAddr::IP::Util> which installs by
+default with its primary functions compiled using Perl's XS extensions
+to build a C library. If you do not have a C complier available or
+would like the slower Pure Perl version for some other reason, then
+type:
 
 	perl Makefile.PL -noxs
 	make
@@ -187,9 +198,9 @@ reason, then type:
 =head1 DESCRIPTION
 
 This module provides an object-oriented abstraction on top of IP
-addresses or IP subnets, that allows for easy manipulations.
-Version 4.xx of NetAdder::IP will will work with older
-versions of Perl and is compatible with Math::BigInt.
+addresses or IP subnets that allows for easy manipulations.  Version
+4.xx of NetAddr::IP will work with older versions of Perl and is
+compatible with Math::BigInt.
 
 The internal representation of all IP objects is in 128 bit IPv6 notation.
 IPv4 and IPv6 objects may be freely mixed.
@@ -238,14 +249,14 @@ Will print the string 192.168.1.123/32.
 
 =item B<Equality>
 
-You can test for equality with either C<eq> or C<==>. C<eq> allows the
+You can test for equality with either C<eq> or C<==>. C<eq> allows
 comparison with arbitrary strings as well as NetAddr::IP objects. The
 following example:
 
     if (NetAddr::IP->new('127.0.0.1','255.0.0.0') eq '127.0.0.1/8')
        { print "Yes\n"; }
 
-Will print out "Yes".
+will print out "Yes".
 
 Comparison with C<==> requires both operands to be NetAddr::IP objects.
 
@@ -275,12 +286,12 @@ Add a 32 bit signed constant to the address part of a NetAddr object.
 This operation changes the address part to point so many hosts above the
 current objects start address. For instance, this code:
 
-    print NetAddr::IP::Lite->new('127.0.0.1/8') + 5;
+    print NetAddr::IP->new('127.0.0.1/8') + 5;
 
 will output 127.0.0.6/8. The address will wrap around at the broadcast
 back to the network address. This code:
 
-    print NetAddr::IP::Lite->new('10.0.0.1/24') + 255;
+    print NetAddr::IP->new('10.0.0.1/24') + 255;
 
     outputs 10.0.0.0/24.
 
@@ -295,7 +306,7 @@ The complement of the addition of a constant.
 
 =item B<Difference (C<->)>
 
-Returns the difference between the address parts of two NetAddr::IP::Lite
+Returns the difference between the address parts of two NetAddr::IP
 objects address parts as a 32 bit signed number.
 
 Returns B<undef> if the difference is out of range.
@@ -390,6 +401,11 @@ sub import
         NetAddr::IP::Util::upper();
 	@_ = grep { $_ ne ':upper' } @_;
     }
+    if (grep { $_ eq ':rfc3021' } @_)
+    {
+	$rfc3021 = 1;
+        @_ = grep { $_ ne ':rfc3021' } @_;
+    }
     NetAddr::IP->export_to_level(1, @_);
 }
 
@@ -407,7 +423,8 @@ sub Coalesce {
 
 sub hostenumref($) {
   my $r = _splitref(0,$_[0]);
-  unless ((notcontiguous($_[0]->{mask}))[1] == 128) {
+  unless ((notcontiguous($_[0]->{mask}))[1] == 128 ||
+	  ($rfc3021 && $_[0]->masklen == 31) ) {
     splice(@$r, 0, 1);
     splice(@$r, scalar @$r - 1, 1);
   }
@@ -566,6 +583,8 @@ To accept addresses in that format, invoke the module as in
 
 If called with no arguments, 'default' is assumed.
 
+If called with an empty string as the argument, returns 'undef'
+
 C<$addr> can be any of the following and possibly more...
 
   n.n
@@ -598,7 +617,15 @@ Any RFC1884 notation
   123456789012  a 'big' bcd number (bigger than perl likes)
   and Math::BigInt
 
+A Fully Qualified Domain Name which returns an ipV4 address or an ipV6
+address, embodied in that order. This previously undocumented feature
+may be disabled with:
+
+	use NetAddr::IP::Lite ':nofqdn';
+
 If called with no arguments, 'default' is assumed.
+
+If called with an empty string as the argument, returns 'undef'
 
 =item C<-E<gt>broadcast()>
 
@@ -712,7 +739,7 @@ subnet.
 
 When called in scalar context, will return a Math::BigInt
 representation of the address part of the IP address. When called in
-an array context, it returns a list of tow elements, The first
+an array context, it returns a list of two elements, The first
 element is as described, the second element is the Math::BigInt
 representation of the netmask.
 
@@ -830,6 +857,20 @@ sub short($) {
   return _compV6($addr);
 }
 
+=item C<-E<gt>canon()>
+
+Returns the address part in canonical notation as a string.  For
+ipV4, this is dotted quad, and is the same as the return value from 
+"->addr()".  For ipV6 it is as per RFC5952, and is the same as the LOWER CASE value
+returned by "->short()".
+
+=cut
+
+sub canon($) {
+  my $addr = $_[0]->addr;
+  return $_[0]->{isv6} ? lc _compV6($addr) : $addr;
+}
+
 =item C<-E<gt>full()>
 
 Returns the address part in FULL notation for
@@ -859,6 +900,14 @@ The complement of C<-E<gt>contains()>. Returns true when C<$me> is
 completely contained within C<$other>.
 
 Note that C<$me> and C<$other> must be C<NetAddr::IP> objects.
+
+=item C-E<gt>is_rfc1918()>
+
+Returns true when C<$me> is an RFC 1918 address.
+
+  10.0.0.0      -   10.255.255.255  (10/8 prefix)
+  172.16.0.0    -   172.31.255.255  (172.16/12 prefix)
+  192.168.0.0   -   192.168.255.255 (192.168/16 prefix)
 
 =item C<-E<gt>splitref($bits,[optional $bits1,$bits2,...])>
 
@@ -1037,7 +1086,9 @@ sub _splitplan {
 sub _splitref {
   my $rev = shift;
   my($plan,$masks) = &_splitplan;
-  return undef unless $plan;
+# bug report 82719
+  croak("netmask error: overrange or spurious bits") unless defined $plan;
+#  return undef unless $plan;
   my $net = $_[0]->network();
   return [$net] unless $masks;
   my $addr = $net->{addr};
@@ -1080,6 +1131,15 @@ sub hostenum ($) {
 
 Faster version of C<-E<gt>hostenum()>, returning a reference to a list.
 
+NOTE: hostenum and hostenumref report zero (0) useable hosts in a /31
+network. This is the behavior expected prior to RFC 3021. To report 2
+useable hosts for use in point-to-point networks, use B<:rfc3021> tag.
+
+	use NetAddr::IP qw(:rfc3021);
+
+This will cause hostenum and hostenumref to return two (2) useable hosts in
+a /31 network.
+ 
 =item C<$me-E<gt>compact($addr1, $addr2, ...)>
 
 =item C<@compacted_object_list = Compact(@object_list)>
@@ -1285,8 +1345,8 @@ addresses in the network.
   new behavior:
   NetAddr::IP->new('10/32')->nth(0)  == 10.0.0.0/32
   NetAddr::IP->new('10.1/32'->nth(0) == 10.0.0.1/32
-  NetAddr::IP->new('10/31')->nth(0)  == 10.0.0.0/32
-  NetAddr::IP->new('10/31')->nth(1)  == 10.0.0.1/32
+  NetAddr::IP->new('10/31')->nth(0)  == 10.0.0.0/31
+  NetAddr::IP->new('10/31')->nth(1)  == 10.0.0.1/31
   NetAddr::IP->new('10/30')->nth(0) == 10.0.0.1/30 
   NetAddr::IP->new('10/30')->nth(1) == 10.0.0.2/30 
   NetAddr::IP->new('10/30')->nth(2) == undef
@@ -1524,13 +1584,13 @@ Michael Robinton E<lt>michael@bizsystems.comE<gt>
 
 =head1 WARRANTY
 
-This software comes with the same warranty as perl itself (ie, none),
+This software comes with the same warranty as Perl itself (ie, none),
 so by using it you accept any and all the liability.
 
 =head1 COPYRIGHT
 
 This software is (c) Luis E. Muñoz, 1999 - 2007, and (c) Michael
-Robinton, 2006 - 2011.
+Robinton, 2006 - 2014.
 
 All rights reserved.
 
@@ -1555,9 +1615,9 @@ one.
 You should also have received a copy of the GNU General Public License
 along with this program in the file named "Copying". If not, write to the
 
-        Free Software Foundation, Inc.
-        59 Temple Place, Suite 330
-        Boston, MA  02111-1307, USA
+	Free Software Foundation, Inc.
+	51 Franklin Street, Fifth Floor
+	Boston, MA 02110-1301 USA.
 
 or visit their web page on the internet at:
 
@@ -1565,7 +1625,8 @@ or visit their web page on the internet at:
 
 =head1 SEE ALSO
 
-  perl(1),NetAddr::IP::Lite, NetAddr::IP::Util.
+  perl(1) L<NetAddr::IP::Lite>, L<NetAddr::IP::Util>,
+L<NetAddr::IP::InetBase>
 
 =cut
 

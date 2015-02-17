@@ -15,259 +15,264 @@
 /*****************************************************************************/
 
 typedef enum
-    {
-        ErrCode_Ok = 0,    /* everything went allright                       */
+{
+    BV_ErrCode_Ok = 0,     /* everything went allright                       */
 
-        ErrCode_Type,      /* types word and size_t have incompatible sizes  */
-        ErrCode_Bits,      /* bits of word and sizeof(word) are inconsistent */
-        ErrCode_Word,      /* size of word is less than 16 bits              */
-        ErrCode_Long,      /* size of word is greater than size of long      */
-        ErrCode_Powr,      /* number of bits of word is not a power of two   */
-        ErrCode_Loga,      /* error in calculation of logarithm              */
+    BV_ErrCode_Type,       /* types word and size_t have incompatible sizes  */
+    BV_ErrCode_Bits,       /* bits of word and sizeof(word) are inconsistent */
+    BV_ErrCode_Word,       /* size of word is less than 16 bits              */
+    BV_ErrCode_Powr,       /* number of bits of word is not a power of two   */
+    BV_ErrCode_Loga,       /* error in calculation of logarithm              */
+    BV_ErrCode_Lpwr,       /* number of bits of long is not a power of two   */
+    BV_ErrCode_WgtL,       /* size of word is greater than size of long      */
 
-        ErrCode_Null,      /* unable to allocate memory                      */
+    BV_ErrCode_Null,       /* unable to allocate memory                      */
 
-        ErrCode_Indx,      /* index out of range                             */
-        ErrCode_Ordr,      /* minimum > maximum index                        */
-        ErrCode_Size,      /* bit vector size mismatch                       */
-        ErrCode_Pars,      /* input string syntax error                      */
-        ErrCode_Ovfl,      /* numeric overflow error                         */
-        ErrCode_Same,      /* operands must be distinct                      */
-        ErrCode_Expo,      /* exponent must be positive                      */
-        ErrCode_Zero       /* division by zero error                         */
-    } ErrCode;
+    BV_ErrCode_Indx,       /* index out of range                             */
+    BV_ErrCode_Ordr,       /* minimum > maximum index                        */
+    BV_ErrCode_Size,       /* bit vector size mismatch                       */
+    BV_ErrCode_Pars,       /* input string syntax error                      */
+    BV_ErrCode_Ovfl,       /* numeric overflow error                         */
+    BV_ErrCode_Same,       /* operands must be distinct                      */
+    BV_ErrCode_Expo,       /* exponent must be positive                      */
+    BV_ErrCode_Zero,       /* division by zero error                         */
+    BV_ErrCode_Oops        /* unexpected error (contact author)              */
+}
+           BV_ErrCode;
 
-typedef wordptr *listptr;
+typedef
+wordptr   *bv_listptr;
 
 /* ===> MISCELLANEOUS BASIC FUNCTIONS: <=== */
 
-charptr BitVector_Error      (ErrCode error);  /* return string for err code */
+charptr    BitVector_Error      (BV_ErrCode error); /* map errcode to string */
 
-ErrCode BitVector_Boot       (void);                 /* 0 = ok, 1..7 = error */
+BV_ErrCode BitVector_Boot       (void);             /* 0 = ok, 1..17 = error */
 
-N_word  BitVector_Size       (N_int bits);  /* bit vector size (# of words)  */
-N_word  BitVector_Mask       (N_int bits);  /* bit vector mask (unused bits) */
+N_word     BitVector_Size       (N_int bits); /* bit vec. size (# of words)  */
+N_word     BitVector_Mask       (N_int bits); /* bit vec. mask (unused bits) */
 
 /* ===> CLASS METHODS: <=== */
 
-charptr BitVector_Version    (void);                /* return version string */
+charptr    BitVector_Version    (void);             /* return version string */
 
-N_int   BitVector_Word_Bits  (void);     /* return # of bits in machine word */
-N_int   BitVector_Long_Bits  (void);    /* return # of bits in unsigned long */
+N_int      BitVector_Word_Bits  (void);  /* return # of bits in machine word */
+N_int      BitVector_Long_Bits  (void); /* return # of bits in unsigned long */
 
 /* ===> CONSTRUCTOR METHODS: <=== */
 
-wordptr BitVector_Create     (N_int bits, boolean clear);          /* malloc */
-listptr BitVector_Create_List(N_int bits, boolean clear, N_int count);
+wordptr    BitVector_Create     (N_int bits, boolean clear);       /* malloc */
+bv_listptr BitVector_Create_List(N_int bits, boolean clear, N_int count);
 
-wordptr BitVector_Resize     (wordptr oldaddr, N_int bits);       /* realloc */
+wordptr    BitVector_Resize     (wordptr oldaddr, N_int bits);    /* realloc */
 
-wordptr BitVector_Shadow     (wordptr addr); /* make new same size but empty */
-wordptr BitVector_Clone      (wordptr addr);         /* make exact duplicate */
+wordptr    BitVector_Shadow     (wordptr addr);  /* make same size but empty */
+wordptr    BitVector_Clone      (wordptr addr);      /* make exact duplicate */
 
-wordptr BitVector_Concat     (wordptr X, wordptr Y); /* return concatenation */
+wordptr    BitVector_Concat     (wordptr X, wordptr Y);   /* return concat'd */
 
 /* ===> DESTRUCTOR METHODS: <=== */
 
-void    BitVector_Dispose            (charptr string);             /* string */
-void    BitVector_Destroy            (wordptr addr);               /* bitvec */
-void    BitVector_Destroy_List       (listptr list, N_int count);  /* list   */
+void       BitVector_Dispose            (charptr string);          /* string */
+void       BitVector_Destroy            (wordptr addr);            /* bitvec */
+void       BitVector_Destroy_List       (bv_listptr list, N_int count); /* list */
 
 /* ===> OBJECT METHODS: <=== */
 
 /* ===> bit vector copy function: */
 
-void    BitVector_Copy       (wordptr X, wordptr Y);              /* X = Y   */
+void       BitVector_Copy       (wordptr X, wordptr Y);           /* X = Y   */
 
 /* ===> bit vector initialization: */
 
-void    BitVector_Empty      (wordptr addr);                      /* X = {}  */
-void    BitVector_Fill       (wordptr addr);                      /* X = ~{} */
-void    BitVector_Flip       (wordptr addr);                      /* X = ~X  */
+void       BitVector_Empty      (wordptr addr);                   /* X = {}  */
+void       BitVector_Fill       (wordptr addr);                   /* X = ~{} */
+void       BitVector_Flip       (wordptr addr);                   /* X = ~X  */
 
-void    BitVector_Primes     (wordptr addr);
+void       BitVector_Primes     (wordptr addr);
 
 /* ===> miscellaneous functions: */
 
-void    BitVector_Reverse    (wordptr X, wordptr Y);
+void       BitVector_Reverse    (wordptr X, wordptr Y);
 
 /* ===> bit vector interval operations and functions: */
 
-void    BitVector_Interval_Empty     (wordptr addr, N_int lower, N_int upper);
-void    BitVector_Interval_Fill      (wordptr addr, N_int lower, N_int upper);
-void    BitVector_Interval_Flip      (wordptr addr, N_int lower, N_int upper);
-void    BitVector_Interval_Reverse   (wordptr addr, N_int lower, N_int upper);
+void       BitVector_Interval_Empty     (wordptr addr, N_int lower, N_int upper);
+void       BitVector_Interval_Fill      (wordptr addr, N_int lower, N_int upper);
+void       BitVector_Interval_Flip      (wordptr addr, N_int lower, N_int upper);
+void       BitVector_Interval_Reverse   (wordptr addr, N_int lower, N_int upper);
 
-boolean BitVector_interval_scan_inc  (wordptr addr, N_int start,
-                                      N_intptr min, N_intptr max);
-boolean BitVector_interval_scan_dec  (wordptr addr, N_int start,
-                                      N_intptr min, N_intptr max);
+boolean    BitVector_interval_scan_inc  (wordptr addr, N_int start,
+                                         N_intptr min, N_intptr max);
+boolean    BitVector_interval_scan_dec  (wordptr addr, N_int start,
+                                         N_intptr min, N_intptr max);
 
-void    BitVector_Interval_Copy      (wordptr X, wordptr Y, N_int Xoffset,
-                                      N_int Yoffset, N_int length);
+void       BitVector_Interval_Copy      (wordptr X, wordptr Y, N_int Xoffset,
+                                         N_int Yoffset, N_int length);
 
-wordptr BitVector_Interval_Substitute(wordptr X, wordptr Y,
-                                      N_int Xoffset, N_int Xlength,
-                                      N_int Yoffset, N_int Ylength);
+wordptr    BitVector_Interval_Substitute(wordptr X, wordptr Y,
+                                         N_int Xoffset, N_int Xlength,
+                                         N_int Yoffset, N_int Ylength);
 
 /* ===> bit vector test functions: */
 
-boolean BitVector_is_empty   (wordptr addr);                  /* X == {} ?   */
-boolean BitVector_is_full    (wordptr addr);                  /* X == ~{} ?  */
+boolean    BitVector_is_empty   (wordptr addr);               /* X == {} ?   */
+boolean    BitVector_is_full    (wordptr addr);               /* X == ~{} ?  */
 
-boolean BitVector_equal      (wordptr X, wordptr Y);          /* X == Y ?    */
-Z_int   BitVector_Lexicompare(wordptr X, wordptr Y);          /* X <,=,> Y ? */
-Z_int   BitVector_Compare    (wordptr X, wordptr Y);          /* X <,=,> Y ? */
+boolean    BitVector_equal      (wordptr X, wordptr Y);       /* X == Y ?    */
+Z_int      BitVector_Lexicompare(wordptr X, wordptr Y);       /* X <,=,> Y ? */
+Z_int      BitVector_Compare    (wordptr X, wordptr Y);       /* X <,=,> Y ? */
 
 /* ===> bit vector string conversion functions: */
 
-charptr BitVector_to_Hex     (wordptr addr);
-ErrCode BitVector_from_Hex   (wordptr addr, charptr string);
+charptr    BitVector_to_Hex     (wordptr addr);
+BV_ErrCode BitVector_from_Hex   (wordptr addr, charptr string);
 
-charptr BitVector_to_Bin     (wordptr addr);
-ErrCode BitVector_from_Bin   (wordptr addr, charptr string);
+charptr    BitVector_to_Bin     (wordptr addr);
+BV_ErrCode BitVector_from_Bin   (wordptr addr, charptr string);
 
-charptr BitVector_to_Dec     (wordptr addr);
-ErrCode BitVector_from_Dec   (wordptr addr, charptr string);
+charptr    BitVector_to_Dec     (wordptr addr);
+BV_ErrCode BitVector_from_Dec   (wordptr addr, charptr string);
 
-charptr BitVector_to_Enum    (wordptr addr);
-ErrCode BitVector_from_Enum  (wordptr addr, charptr string);
+charptr    BitVector_to_Enum    (wordptr addr);
+BV_ErrCode BitVector_from_Enum  (wordptr addr, charptr string);
 
 /* ===> bit vector bit operations, functions & tests: */
 
-void    BitVector_Bit_Off    (wordptr addr, N_int index); /*  X = X \ {x}    */
-void    BitVector_Bit_On     (wordptr addr, N_int index); /*  X = X + {x}    */
-boolean BitVector_bit_flip   (wordptr addr, N_int index); /* (X+{x})\(X*{x}) */
+void       BitVector_Bit_Off    (wordptr addr, N_int index); /*  X = X \ {x} */
+void       BitVector_Bit_On     (wordptr addr, N_int index); /*  X = X + {x} */
+boolean    BitVector_bit_flip   (wordptr addr, N_int index); /* (X+{x})\(X*{x}) */
 
-boolean BitVector_bit_test   (wordptr addr, N_int index); /*  {x} in X ?     */
+boolean    BitVector_bit_test   (wordptr addr, N_int index); /*  {x} in X ?  */
 
-void    BitVector_Bit_Copy   (wordptr addr, N_int index, boolean bit);
+void       BitVector_Bit_Copy   (wordptr addr, N_int index, boolean bit);
 
 /* ===> bit vector bit shift & rotate functions: */
 
-void    BitVector_LSB                (wordptr addr, boolean bit);
-void    BitVector_MSB                (wordptr addr, boolean bit);
-boolean BitVector_lsb_               (wordptr addr);
-boolean BitVector_msb_               (wordptr addr);
-boolean BitVector_rotate_left        (wordptr addr);
-boolean BitVector_rotate_right       (wordptr addr);
-boolean BitVector_shift_left         (wordptr addr, boolean carry_in);
-boolean BitVector_shift_right        (wordptr addr, boolean carry_in);
-void    BitVector_Move_Left          (wordptr addr, N_int bits);
-void    BitVector_Move_Right         (wordptr addr, N_int bits);
+void       BitVector_LSB                (wordptr addr, boolean bit);
+void       BitVector_MSB                (wordptr addr, boolean bit);
+boolean    BitVector_lsb_               (wordptr addr);
+boolean    BitVector_msb_               (wordptr addr);
+boolean    BitVector_rotate_left        (wordptr addr);
+boolean    BitVector_rotate_right       (wordptr addr);
+boolean    BitVector_shift_left         (wordptr addr, boolean carry_in);
+boolean    BitVector_shift_right        (wordptr addr, boolean carry_in);
+void       BitVector_Move_Left          (wordptr addr, N_int bits);
+void       BitVector_Move_Right         (wordptr addr, N_int bits);
 
 /* ===> bit vector insert/delete bits: */
 
-void    BitVector_Insert     (wordptr addr, N_int offset, N_int count,
-                              boolean clear);
-void    BitVector_Delete     (wordptr addr, N_int offset, N_int count,
-                              boolean clear);
+void       BitVector_Insert     (wordptr addr, N_int offset, N_int count,
+                                 boolean clear);
+void       BitVector_Delete     (wordptr addr, N_int offset, N_int count,
+                                 boolean clear);
 
 /* ===> bit vector arithmetic: */
 
-boolean BitVector_increment  (wordptr addr);                        /*  X++  */
-boolean BitVector_decrement  (wordptr addr);                        /*  X--  */
+boolean    BitVector_increment  (wordptr addr);                     /*  X++  */
+boolean    BitVector_decrement  (wordptr addr);                     /*  X--  */
 
-boolean BitVector_compute    (wordptr X, wordptr Y, wordptr Z, boolean minus,
-                                                               boolean *carry);
-boolean BitVector_add        (wordptr X, wordptr Y, wordptr Z, boolean *carry);
-boolean BitVector_sub        (wordptr X, wordptr Y, wordptr Z, boolean *carry);
-boolean BitVector_inc        (wordptr X, wordptr Y);
-boolean BitVector_dec        (wordptr X, wordptr Y);
+boolean    BitVector_compute    (wordptr X, wordptr Y, wordptr Z, boolean minus,
+                                                                  boolean *carry);
+boolean    BitVector_add        (wordptr X, wordptr Y, wordptr Z, boolean *carry);
+boolean    BitVector_sub        (wordptr X, wordptr Y, wordptr Z, boolean *carry);
+boolean    BitVector_inc        (wordptr X, wordptr Y);
+boolean    BitVector_dec        (wordptr X, wordptr Y);
 
-void    BitVector_Negate     (wordptr X, wordptr Y);
-void    BitVector_Absolute   (wordptr X, wordptr Y);
-Z_int   BitVector_Sign       (wordptr addr);
-ErrCode BitVector_Mul_Pos    (wordptr X, wordptr Y, wordptr Z, boolean strict);
-ErrCode BitVector_Multiply   (wordptr X, wordptr Y, wordptr Z);
-ErrCode BitVector_Div_Pos    (wordptr Q, wordptr X, wordptr Y, wordptr R);
-ErrCode BitVector_Divide     (wordptr Q, wordptr X, wordptr Y, wordptr R);
-ErrCode BitVector_GCD        (wordptr X, wordptr Y, wordptr Z);
-ErrCode BitVector_GCD2       (wordptr U, wordptr V, wordptr W,      /*   O   */
-                                         wordptr X, wordptr Y);     /*   I   */
-ErrCode BitVector_Power      (wordptr X, wordptr Y, wordptr Z);
+void       BitVector_Negate     (wordptr X, wordptr Y);
+void       BitVector_Absolute   (wordptr X, wordptr Y);
+Z_int      BitVector_Sign       (wordptr addr);
+BV_ErrCode BitVector_Mul_Pos    (wordptr X, wordptr Y, wordptr Z, boolean strict);
+BV_ErrCode BitVector_Multiply   (wordptr X, wordptr Y, wordptr Z);
+BV_ErrCode BitVector_Div_Pos    (wordptr Q, wordptr X, wordptr Y, wordptr R);
+BV_ErrCode BitVector_Divide     (wordptr Q, wordptr X, wordptr Y, wordptr R);
+BV_ErrCode BitVector_GCD        (wordptr X, wordptr Y, wordptr Z);
+BV_ErrCode BitVector_GCD2       (wordptr U, wordptr V, wordptr W,   /*   O   */
+                                            wordptr X, wordptr Y);  /*   I   */
+BV_ErrCode BitVector_Power      (wordptr X, wordptr Y, wordptr Z);
 
 /* ===> direct memory access functions: */
 
-void    BitVector_Block_Store(wordptr addr, charptr buffer, N_int length);
-charptr BitVector_Block_Read (wordptr addr, N_intptr length);
+void       BitVector_Block_Store(wordptr addr, charptr buffer, N_int length);
+charptr    BitVector_Block_Read (wordptr addr, N_intptr length);
 
 /* ===> word array functions: */
 
-void    BitVector_Word_Store (wordptr addr, N_int offset, N_int value);
-N_int   BitVector_Word_Read  (wordptr addr, N_int offset);
+void       BitVector_Word_Store (wordptr addr, N_int offset, N_int value);
+N_int      BitVector_Word_Read  (wordptr addr, N_int offset);
 
-void    BitVector_Word_Insert(wordptr addr, N_int offset, N_int count,
-                              boolean clear);
-void    BitVector_Word_Delete(wordptr addr, N_int offset, N_int count,
-                              boolean clear);
+void       BitVector_Word_Insert(wordptr addr, N_int offset, N_int count,
+                                 boolean clear);
+void       BitVector_Word_Delete(wordptr addr, N_int offset, N_int count,
+                                 boolean clear);
 
 /* ===> arbitrary size chunk functions: */
 
-void    BitVector_Chunk_Store(wordptr addr, N_int chunksize,
-                              N_int offset, N_long value);
-N_long  BitVector_Chunk_Read (wordptr addr, N_int chunksize,
-                              N_int offset);
+void       BitVector_Chunk_Store(wordptr addr, N_int chunksize,
+                                 N_int offset, N_long value);
+N_long     BitVector_Chunk_Read (wordptr addr, N_int chunksize,
+                                 N_int offset);
 
 /* ===> set operations: */
 
-void    Set_Union            (wordptr X, wordptr Y, wordptr Z); /* X = Y + Z */
-void    Set_Intersection     (wordptr X, wordptr Y, wordptr Z); /* X = Y * Z */
-void    Set_Difference       (wordptr X, wordptr Y, wordptr Z); /* X = Y \ Z */
-void    Set_ExclusiveOr      (wordptr X, wordptr Y, wordptr Z); /*(Y+Z)\(Y*Z)*/
-void    Set_Complement       (wordptr X, wordptr Y);            /* X = ~Y    */
+void       Set_Union            (wordptr X, wordptr Y, wordptr Z); /* X = Y + Z */
+void       Set_Intersection     (wordptr X, wordptr Y, wordptr Z); /* X = Y * Z */
+void       Set_Difference       (wordptr X, wordptr Y, wordptr Z); /* X = Y \ Z */
+void       Set_ExclusiveOr      (wordptr X, wordptr Y, wordptr Z); /*(Y+Z)\(Y*Z)*/
+void       Set_Complement       (wordptr X, wordptr Y);            /* X = ~Y */
 
 /* ===> set functions: */
 
-boolean Set_subset           (wordptr X, wordptr Y);            /* X in Y ?  */
+boolean    Set_subset           (wordptr X, wordptr Y);            /* X in Y */
 
-N_int   Set_Norm             (wordptr addr);                    /* = | X |   */
-N_int   Set_Norm2            (wordptr addr);                    /* = | X |   */
-N_int   Set_Norm3            (wordptr addr);                    /* = | X |   */
-Z_long  Set_Min              (wordptr addr);                    /* = min(X)  */
-Z_long  Set_Max              (wordptr addr);                    /* = max(X)  */
+N_int      Set_Norm             (wordptr addr);                    /* = |X|  */
+N_int      Set_Norm2            (wordptr addr);                    /* = |X|  */
+N_int      Set_Norm3            (wordptr addr);                    /* = |X|  */
+Z_long     Set_Min              (wordptr addr);                    /* = min(X) */
+Z_long     Set_Max              (wordptr addr);                    /* = max(X) */
 
 /* ===> matrix-of-booleans operations: */
 
-void    Matrix_Multiplication(wordptr X, N_int rowsX, N_int colsX,
-                              wordptr Y, N_int rowsY, N_int colsY,
-                              wordptr Z, N_int rowsZ, N_int colsZ);
+void       Matrix_Multiplication(wordptr X, N_int rowsX, N_int colsX,
+                                 wordptr Y, N_int rowsY, N_int colsY,
+                                 wordptr Z, N_int rowsZ, N_int colsZ);
 
-void    Matrix_Product       (wordptr X, N_int rowsX, N_int colsX,
-                              wordptr Y, N_int rowsY, N_int colsY,
-                              wordptr Z, N_int rowsZ, N_int colsZ);
+void       Matrix_Product       (wordptr X, N_int rowsX, N_int colsX,
+                                 wordptr Y, N_int rowsY, N_int colsY,
+                                 wordptr Z, N_int rowsZ, N_int colsZ);
 
-void    Matrix_Closure       (wordptr addr, N_int rows, N_int cols);
+void       Matrix_Closure       (wordptr addr, N_int rows, N_int cols);
 
-void    Matrix_Transpose     (wordptr X, N_int rowsX, N_int colsX,
-                              wordptr Y, N_int rowsY, N_int colsY);
+void       Matrix_Transpose     (wordptr X, N_int rowsX, N_int colsX,
+                                 wordptr Y, N_int rowsY, N_int colsY);
 
 /*****************************************************************************/
 /*  MODULE RESOURCES:                                                        */
 /*****************************************************************************/
 
-#define bits_(BitVector) *(BitVector-3)
-#define size_(BitVector) *(BitVector-2)
-#define mask_(BitVector) *(BitVector-1)
+#define BV_BITS_(BitVector) *(BitVector-3)
+#define BV_SIZE_(BitVector) *(BitVector-2)
+#define BV_MASK_(BitVector) *(BitVector-1)
 
-#define  ERRCODE_TYPE  "sizeof(word) > sizeof(size_t)"
-#define  ERRCODE_BITS  "bits(word) != sizeof(word)*8"
-#define  ERRCODE_WORD  "bits(word) < 16"
-#define  ERRCODE_LONG  "bits(word) > bits(long)"
-#define  ERRCODE_POWR  "bits(word) != 2^x"
-#define  ERRCODE_LOGA  "bits(word) != 2^ld(bits(word))"
-#define  ERRCODE_NULL  "unable to allocate memory"
-#define  ERRCODE_INDX  "index out of range"
-#define  ERRCODE_ORDR  "minimum > maximum index"
-#define  ERRCODE_SIZE  "bit vector size mismatch"
-#define  ERRCODE_PARS  "input string syntax error"
-#define  ERRCODE_OVFL  "numeric overflow error"
-#define  ERRCODE_SAME  "result vector(s) must be distinct"
-#define  ERRCODE_EXPO  "exponent must be positive"
-#define  ERRCODE_ZERO  "division by zero error"
-#define  ERRCODE_OOPS  "unexpected internal error - please contact author"
+#define BV_ERRCODE_TYPE  "sizeof(word) > sizeof(size_t)"
+#define BV_ERRCODE_BITS  "bits(word) != sizeof(word)*8"
+#define BV_ERRCODE_WORD  "bits(word) < 16"
+#define BV_ERRCODE_POWR  "bits(word) is not a power of two"
+#define BV_ERRCODE_LOGA  "bits(word) != 2^ld(bits(word))"
+#define BV_ERRCODE_LPWR  "bits(long) is not a power of two"
+#define BV_ERRCODE_WGTL  "bits(word) > bits(long)"
+#define BV_ERRCODE_NULL  "unable to allocate memory"
+#define BV_ERRCODE_INDX  "index out of range"
+#define BV_ERRCODE_ORDR  "minimum > maximum index"
+#define BV_ERRCODE_SIZE  "bit vector size mismatch"
+#define BV_ERRCODE_PARS  "input string syntax error"
+#define BV_ERRCODE_OVFL  "numeric overflow error"
+#define BV_ERRCODE_SAME  "result vector(s) must be distinct"
+#define BV_ERRCODE_EXPO  "exponent must be positive"
+#define BV_ERRCODE_ZERO  "division by zero error"
+#define BV_ERRCODE_OOPS  "unexpected internal error - please contact author"
 
-const N_int BitVector_BYTENORM[256] =
+const N_int BV_ByteNorm[256] =
 {
     0x00, 0x01, 0x01, 0x02,  0x01, 0x02, 0x02, 0x03,
     0x01, 0x02, 0x02, 0x03,  0x02, 0x03, 0x03, 0x04, /* 0x00 */
@@ -311,30 +316,32 @@ const N_int BitVector_BYTENORM[256] =
     /* global implementation-intrinsic constants: */
     /**********************************************/
 
-#define BIT_VECTOR_HIDDEN_WORDS 3
+#define BV_HIDDENWORDS 3
 
     /*****************************************************************/
     /* global machine-dependent constants (set by "BitVector_Boot"): */
     /*****************************************************************/
 
-static N_word BITS;     /* = # of bits in machine word (must be power of 2)  */
-static N_word MODMASK;  /* = BITS - 1 (mask for calculating modulo BITS)     */
-static N_word LOGBITS;  /* = ld(BITS) (logarithmus dualis)                   */
-static N_word FACTOR;   /* = ld(BITS / 8) (ld of # of bytes)                 */
+static N_word BV_WordBits; /* = # of bits in a machine word (power of 2)     */
+static N_word BV_ModMask;  /* = BV_WordBits-1 (for "modulo BV_WordBits")     */
+static N_word BV_LogBits;  /* = ld(BV_WordBits) (logarithmus dualis)         */
+static N_word BV_Factor;   /* = ld(BV_WordBits / 8) (ld of # of bytes)       */
 
-static N_word LSB = 1;  /* = mask for least significant bit                  */
-static N_word MSB;      /* = mask for most significant bit                   */
+static N_word BV_LSB = 1;  /* = mask for least significant bit               */
+static N_word BV_MSB;      /* = mask for most significant bit                */
 
-static N_word LONGBITS; /* = # of bits in unsigned long                      */
+static N_word BV_LongBits; /* = # of bits in unsigned long                   */
 
-static N_word LOG10;    /* = logarithm to base 10 of BITS - 1                */
-static N_word EXP10;    /* = largest possible power of 10 in signed int      */
+static N_word BV_Log10;    /* = logarithm to base 10 of BV_WordBits - 1      */
+static N_word BV_Exp10;    /* = largest possible power of 10 in signed int   */
 
     /********************************************************************/
     /* global bit mask table for fast access (set by "BitVector_Boot"): */
     /********************************************************************/
 
-static wordptr BITMASKTAB;
+#define BV_MASKTABSIZE (sizeof(N_word) << 3)
+
+static N_word BV_BitMaskTab[BV_MASKTABSIZE];
 
     /*****************************/
     /* global macro definitions: */
@@ -356,17 +363,17 @@ static wordptr BITMASKTAB;
     { target += count; source += count; while (count-- > 0) *--target = *--source; }
 
 #define BIT_VECTOR_CLR_BIT(address,index) \
-    *(address+(index>>LOGBITS)) &= NOT BITMASKTAB[index AND MODMASK];
+    *(address+(index>>BV_LogBits)) &= NOT BV_BitMaskTab[index AND BV_ModMask];
 
 #define BIT_VECTOR_SET_BIT(address,index) \
-    *(address+(index>>LOGBITS)) |= BITMASKTAB[index AND MODMASK];
+    *(address+(index>>BV_LogBits)) |= BV_BitMaskTab[index AND BV_ModMask];
 
 #define BIT_VECTOR_TST_BIT(address,index) \
-    ((*(address+(index>>LOGBITS)) AND BITMASKTAB[index AND MODMASK]) != 0)
+    ((*(address+(index>>BV_LogBits)) AND BV_BitMaskTab[index AND BV_ModMask]) != 0)
 
 #define BIT_VECTOR_FLP_BIT(address,index,mask) \
-    (mask = BITMASKTAB[index AND MODMASK]), \
-    (((*(addr+(index>>LOGBITS)) ^= mask) AND mask) != 0)
+    (mask = BV_BitMaskTab[index AND BV_ModMask]), \
+    (((*(addr+(index>>BV_LogBits)) ^= mask) AND mask) != 0)
 
 #define BIT_VECTOR_DIGITIZE(type,value,digit) \
     value = (type) ((digit = value) / 10); \
@@ -377,7 +384,7 @@ static wordptr BITMASKTAB;
     /* private low-level functions (potentially dangerous!): */
     /*********************************************************/
 
-static N_word power10(N_word x)
+static N_word BIT_VECTOR_power10(N_word x)
 {
     N_word y = 1;
 
@@ -501,27 +508,28 @@ static N_word BIT_VECTOR_str2int(charptr string, N_word *value)
     /* routine to convert error code to string: */
     /********************************************/
 
-charptr BitVector_Error(ErrCode error)
+charptr BitVector_Error(BV_ErrCode error)
 {
     switch (error)
     {
-        case ErrCode_Ok:   return( (charptr)     NULL     ); break;
-        case ErrCode_Type: return( (charptr) ERRCODE_TYPE ); break;
-        case ErrCode_Bits: return( (charptr) ERRCODE_BITS ); break;
-        case ErrCode_Word: return( (charptr) ERRCODE_WORD ); break;
-        case ErrCode_Long: return( (charptr) ERRCODE_LONG ); break;
-        case ErrCode_Powr: return( (charptr) ERRCODE_POWR ); break;
-        case ErrCode_Loga: return( (charptr) ERRCODE_LOGA ); break;
-        case ErrCode_Null: return( (charptr) ERRCODE_NULL ); break;
-        case ErrCode_Indx: return( (charptr) ERRCODE_INDX ); break;
-        case ErrCode_Ordr: return( (charptr) ERRCODE_ORDR ); break;
-        case ErrCode_Size: return( (charptr) ERRCODE_SIZE ); break;
-        case ErrCode_Pars: return( (charptr) ERRCODE_PARS ); break;
-        case ErrCode_Ovfl: return( (charptr) ERRCODE_OVFL ); break;
-        case ErrCode_Same: return( (charptr) ERRCODE_SAME ); break;
-        case ErrCode_Expo: return( (charptr) ERRCODE_EXPO ); break;
-        case ErrCode_Zero: return( (charptr) ERRCODE_ZERO ); break;
-        default:           return( (charptr) ERRCODE_OOPS ); break;
+        case BV_ErrCode_Ok:   return( (charptr)       NULL      ); break;
+        case BV_ErrCode_Type: return( (charptr) BV_ERRCODE_TYPE ); break;
+        case BV_ErrCode_Bits: return( (charptr) BV_ERRCODE_BITS ); break;
+        case BV_ErrCode_Word: return( (charptr) BV_ERRCODE_WORD ); break;
+        case BV_ErrCode_Powr: return( (charptr) BV_ERRCODE_POWR ); break;
+        case BV_ErrCode_Loga: return( (charptr) BV_ERRCODE_LOGA ); break;
+        case BV_ErrCode_Lpwr: return( (charptr) BV_ERRCODE_LPWR ); break;
+        case BV_ErrCode_WgtL: return( (charptr) BV_ERRCODE_WGTL ); break;
+        case BV_ErrCode_Null: return( (charptr) BV_ERRCODE_NULL ); break;
+        case BV_ErrCode_Indx: return( (charptr) BV_ERRCODE_INDX ); break;
+        case BV_ErrCode_Ordr: return( (charptr) BV_ERRCODE_ORDR ); break;
+        case BV_ErrCode_Size: return( (charptr) BV_ERRCODE_SIZE ); break;
+        case BV_ErrCode_Pars: return( (charptr) BV_ERRCODE_PARS ); break;
+        case BV_ErrCode_Ovfl: return( (charptr) BV_ERRCODE_OVFL ); break;
+        case BV_ErrCode_Same: return( (charptr) BV_ERRCODE_SAME ); break;
+        case BV_ErrCode_Expo: return( (charptr) BV_ERRCODE_EXPO ); break;
+        case BV_ErrCode_Zero: return( (charptr) BV_ERRCODE_ZERO ); break;
+        default:              return( (charptr) BV_ERRCODE_OOPS ); break;
     }
 }
 
@@ -533,69 +541,80 @@ charptr BitVector_Error(ErrCode error)
     /*                                                     */
     /*   MUST be called once prior to any other function   */
     /*   to initialize the machine dependent constants     */
-    /*   of this package! (But call only ONCE, or you      */
-    /*   will suffer memory leaks!)                        */
+    /*   of this package!                                  */
     /*                                                     */
     /*******************************************************/
 
-ErrCode BitVector_Boot(void)
+BV_ErrCode BitVector_Boot(void)
 {
-    N_long longsample = 1L;
-    N_word sample = LSB;
-    N_word lsb;
+    N_word sample;
+    N_long longsample;
 
-    if (sizeof(N_word) > sizeof(size_t)) return(ErrCode_Type);
+    if (sizeof(N_word) > sizeof(size_t)) return(BV_ErrCode_Type);
 
-    BITS = 1;
-    while (sample <<= 1) BITS++;    /* determine # of bits in a machine word */
-
-    if (BITS != (sizeof(N_word) << 3)) return(ErrCode_Bits);
-
-    if (BITS < 16) return(ErrCode_Word);
-
-    LONGBITS = 1;
-    while (longsample <<= 1) LONGBITS++;  /* = # of bits in an unsigned long */
-
-    if (BITS > LONGBITS) return(ErrCode_Long);
-
-    LOGBITS = 0;
-    sample = BITS;
-    lsb = (sample AND LSB);
-    while ((sample >>= 1) and (not lsb))
+    BV_WordBits = 0;
+    sample = ~0;
+    while (sample)                  /* determine # of bits in a machine word */
     {
-        LOGBITS++;
-        lsb = (sample AND LSB);
+        sample &= sample - 1;
+        BV_WordBits++;
     }
 
-    if (sample) return(ErrCode_Powr);      /* # of bits is not a power of 2! */
+    if (BV_WordBits != (sizeof(N_word) << 3)) return(BV_ErrCode_Bits);
 
-    if (BITS != (LSB << LOGBITS)) return(ErrCode_Loga);
+    if (BV_WordBits < 16) return(BV_ErrCode_Word);
 
-    MODMASK = BITS - 1;
-    FACTOR = LOGBITS - 3;  /* ld(BITS / 8) = ld(BITS) - ld(8) = ld(BITS) - 3 */
-    MSB = (LSB << MODMASK);
-
-    BITMASKTAB = (wordptr) malloc((size_t) (BITS << FACTOR));
-
-    if (BITMASKTAB == NULL) return(ErrCode_Null);
-
-    for ( sample = 0; sample < BITS; sample++ )
+    BV_LongBits = 0;
+    longsample = ~0L;
+    while (longsample)            /* determine # of bits in an unsigned long */
     {
-        BITMASKTAB[sample] = (LSB << sample);
+        longsample &= longsample - 1L;
+        BV_LongBits++;
     }
 
-    LOG10 = (N_word) (MODMASK * 0.30103); /* = (BITS - 1) * ( ln 2 / ln 10 ) */
-    EXP10 = power10(LOG10);
+    BV_LogBits = 0;
+    sample = BV_ModMask = BV_WordBits - 1;
+    if (sample AND BV_WordBits) return(BV_ErrCode_Powr); /* not a power of 2 */
+    while (sample)
+    {
+        sample &= sample - 1;
+        BV_LogBits++;
+    }
+    if (BV_WordBits != (BV_LSB << BV_LogBits)) return(BV_ErrCode_Loga); /* ld wrong */
 
-    return(ErrCode_Ok);
+    longsample = BV_LongBits - 1;
+    if ((longsample AND BV_LongBits) or (BV_LongBits != (sizeof(N_long) << 3)))
+    {
+        BV_LongBits = (sizeof(N_long) << 3);
+        longsample = BV_LongBits - 1;
+        if (longsample AND BV_LongBits) return(BV_ErrCode_Lpwr);
+    }
+
+    if (BV_WordBits > BV_LongBits) return(BV_ErrCode_WgtL);
+
+    if (BV_WordBits > BV_MASKTABSIZE) return(BV_ErrCode_Oops);
+
+    for ( sample = 0; sample < BV_WordBits; sample++ )
+    {
+        BV_BitMaskTab[sample] = (BV_LSB << sample);
+    }
+
+    BV_Factor = BV_LogBits - 3;  /* ld(Bits/8) = ld(Bits)-ld(8) = ld(Bits)-3 */
+
+    BV_MSB = (BV_LSB << BV_ModMask);
+
+    BV_Log10 = (N_word) (BV_ModMask * 0.30103); /* (Bits-1) * ln(2) / ln(10) */
+    BV_Exp10 = BIT_VECTOR_power10(BV_Log10);
+
+    return(BV_ErrCode_Ok);
 }
 
 N_word BitVector_Size(N_int bits)           /* bit vector size (# of words)  */
 {
     N_word size;
 
-    size = bits >> LOGBITS;
-    if (bits AND MODMASK) size++;
+    size = bits >> BV_LogBits;
+    if (bits AND BV_ModMask) size++;
     return(size);
 }
 
@@ -603,24 +622,24 @@ N_word BitVector_Mask(N_int bits)           /* bit vector mask (unused bits) */
 {
     N_word mask;
 
-    mask = bits AND MODMASK;
+    mask = bits AND BV_ModMask;
     if (mask) mask = (N_word) ~(~0L << mask); else mask = (N_word) ~0L;
     return(mask);
 }
 
 charptr BitVector_Version(void)
 {
-    return((charptr)"6.4");
+    return((charptr)"7.4");
 }
 
 N_int BitVector_Word_Bits(void)
 {
-    return(BITS);
+    return(BV_WordBits);
 }
 
 N_int BitVector_Long_Bits(void)
 {
-    return(LONGBITS);
+    return(BV_LongBits);
 }
 
 /********************************************************************/
@@ -644,14 +663,14 @@ void BitVector_Destroy(wordptr addr)                        /* free bitvec   */
 {
     if (addr != NULL)
     {
-        addr -= BIT_VECTOR_HIDDEN_WORDS;
+        addr -= BV_HIDDENWORDS;
         free((voidptr) addr);
     }
 }
 
-void BitVector_Destroy_List(listptr list, N_int count)      /* free list     */
+void BitVector_Destroy_List(bv_listptr list, N_int count)   /* free list     */
 {
-    listptr slot;
+    bv_listptr slot;
 
     if (list != NULL)
     {
@@ -674,7 +693,7 @@ wordptr BitVector_Create(N_int bits, boolean clear)         /* malloc        */
 
     size = BitVector_Size(bits);
     mask = BitVector_Mask(bits);
-    bytes = (size + BIT_VECTOR_HIDDEN_WORDS) << FACTOR;
+    bytes = (size + BV_HIDDENWORDS) << BV_Factor;
     addr = (wordptr) malloc((size_t) bytes);
     if (addr != NULL)
     {
@@ -690,16 +709,16 @@ wordptr BitVector_Create(N_int bits, boolean clear)         /* malloc        */
     return(addr);
 }
 
-listptr BitVector_Create_List(N_int bits, boolean clear, N_int count)
+bv_listptr BitVector_Create_List(N_int bits, boolean clear, N_int count)
 {
-    listptr list = NULL;
-    listptr slot;
+    bv_listptr list = NULL;
+    bv_listptr slot;
     wordptr addr;
     N_int   i;
 
     if (count > 0)
     {
-        list = (listptr) malloc(sizeof(wordptr) * count);
+        list = (bv_listptr) malloc(sizeof(wordptr) * count);
         if (list != NULL)
         {
             slot = list;
@@ -729,22 +748,22 @@ wordptr BitVector_Resize(wordptr oldaddr, N_int bits)       /* realloc       */
     wordptr source;
     wordptr target;
 
-    oldsize = size_(oldaddr);
-    oldmask = mask_(oldaddr);
+    oldsize = BV_SIZE_(oldaddr);
+    oldmask = BV_MASK_(oldaddr);
     newsize = BitVector_Size(bits);
     newmask = BitVector_Mask(bits);
     if (oldsize > 0) *(oldaddr+oldsize-1) &= oldmask;
     if (newsize <= oldsize)
     {
         newaddr = oldaddr;
-        bits_(newaddr) = bits;
-        size_(newaddr) = newsize;
-        mask_(newaddr) = newmask;
+        BV_BITS_(newaddr) = bits;
+        BV_SIZE_(newaddr) = newsize;
+        BV_MASK_(newaddr) = newmask;
         if (newsize > 0) *(newaddr+newsize-1) &= newmask;
     }
     else
     {
-        bytes = (newsize + BIT_VECTOR_HIDDEN_WORDS) << FACTOR;
+        bytes = (newsize + BV_HIDDENWORDS) << BV_Factor;
         newaddr = (wordptr) malloc((size_t) bytes);
         if (newaddr != NULL)
         {
@@ -764,7 +783,7 @@ wordptr BitVector_Resize(wordptr oldaddr, N_int bits)       /* realloc       */
 
 wordptr BitVector_Shadow(wordptr addr)     /* makes new, same size but empty */
 {
-    return( BitVector_Create(bits_(addr),true) );
+    return( BitVector_Create(BV_BITS_(addr),true) );
 }
 
 wordptr BitVector_Clone(wordptr addr)               /* makes exact duplicate */
@@ -772,10 +791,10 @@ wordptr BitVector_Clone(wordptr addr)               /* makes exact duplicate */
     N_word  bits;
     wordptr twin;
 
-    bits = bits_(addr);
+    bits = BV_BITS_(addr);
     twin = BitVector_Create(bits,false);
     if ((twin != NULL) and (bits > 0))
-        BIT_VECTOR_cpy_words(twin,addr,size_(addr));
+        BIT_VECTOR_cpy_words(twin,addr,BV_SIZE_(addr));
     return(twin);
 }
 
@@ -788,25 +807,25 @@ wordptr BitVector_Concat(wordptr X, wordptr Y)      /* returns concatenation */
     N_word  bitsZ;
     wordptr Z;
 
-    bitsX = bits_(X);
-    bitsY = bits_(Y);
+    bitsX = BV_BITS_(X);
+    bitsY = BV_BITS_(Y);
     bitsZ = bitsX + bitsY;
     Z = BitVector_Create(bitsZ,false);
     if ((Z != NULL) and (bitsZ > 0))
     {
-        BIT_VECTOR_cpy_words(Z,Y,size_(Y));
+        BIT_VECTOR_cpy_words(Z,Y,BV_SIZE_(Y));
         BitVector_Interval_Copy(Z,X,bitsY,0,bitsX);
-        *(Z+size_(Z)-1) &= mask_(Z);
+        *(Z+BV_SIZE_(Z)-1) &= BV_MASK_(Z);
     }
     return(Z);
 }
 
 void BitVector_Copy(wordptr X, wordptr Y)                           /* X = Y */
 {
-    N_word  sizeX = size_(X);
-    N_word  sizeY = size_(Y);
-    N_word  maskX = mask_(X);
-    N_word  maskY = mask_(Y);
+    N_word  sizeX = BV_SIZE_(X);
+    N_word  sizeY = BV_SIZE_(Y);
+    N_word  maskX = BV_MASK_(X);
+    N_word  maskY = BV_MASK_(Y);
     N_word  fill  = 0;
     wordptr lastX;
     wordptr lastY;
@@ -838,15 +857,15 @@ void BitVector_Copy(wordptr X, wordptr Y)                           /* X = Y */
 
 void BitVector_Empty(wordptr addr)                        /* X = {}  clr all */
 {
-    N_word size = size_(addr);
+    N_word size = BV_SIZE_(addr);
 
     BIT_VECTOR_ZERO_WORDS(addr,size)
 }
 
 void BitVector_Fill(wordptr addr)                         /* X = ~{} set all */
 {
-    N_word size = size_(addr);
-    N_word mask = mask_(addr);
+    N_word size = BV_SIZE_(addr);
+    N_word mask = BV_MASK_(addr);
     N_word fill = (N_word) ~0L;
 
     if (size > 0)
@@ -858,8 +877,8 @@ void BitVector_Fill(wordptr addr)                         /* X = ~{} set all */
 
 void BitVector_Flip(wordptr addr)                         /* X = ~X flip all */
 {
-    N_word size = size_(addr);
-    N_word mask = mask_(addr);
+    N_word size = BV_SIZE_(addr);
+    N_word mask = BV_MASK_(addr);
     N_word flip = (N_word) ~0L;
 
     if (size > 0)
@@ -871,8 +890,8 @@ void BitVector_Flip(wordptr addr)                         /* X = ~X flip all */
 
 void BitVector_Primes(wordptr addr)
 {
-    N_word  bits = bits_(addr);
-    N_word  size = size_(addr);
+    N_word  bits = BV_BITS_(addr);
+    N_word  size = BV_SIZE_(addr);
     wordptr work;
     N_word  temp;
     N_word  i,j;
@@ -880,7 +899,7 @@ void BitVector_Primes(wordptr addr)
     if (size > 0)
     {
         temp = 0xAAAA;
-        i = BITS >> 4;
+        i = BV_WordBits >> 4;
         while (--i > 0)
         {
             temp <<= 16;
@@ -894,13 +913,13 @@ void BitVector_Primes(wordptr addr)
         {
             for ( ; j < bits; j += i ) BIT_VECTOR_CLR_BIT(addr,j)
         }
-        *(addr+size-1) &= mask_(addr);
+        *(addr+size-1) &= BV_MASK_(addr);
     }
 }
 
 void BitVector_Reverse(wordptr X, wordptr Y)
 {
-    N_word bits = bits_(X);
+    N_word bits = BV_BITS_(X);
     N_word mask;
     N_word bit;
     N_word value;
@@ -908,14 +927,14 @@ void BitVector_Reverse(wordptr X, wordptr Y)
     if (bits > 0)
     {
         if (X == Y) BitVector_Interval_Reverse(X,0,bits-1);
-        else if (bits == bits_(Y))
+        else if (bits == BV_BITS_(Y))
         {
-/*          mask = mask_(Y);  */
+/*          mask = BV_MASK_(Y);  */
 /*          mask &= NOT (mask >> 1);  */
-            mask = BITMASKTAB[(bits-1) AND MODMASK];
-            Y += size_(Y) - 1;
+            mask = BV_BitMaskTab[(bits-1) AND BV_ModMask];
+            Y += BV_SIZE_(Y) - 1;
             value = 0;
-            bit = LSB;
+            bit = BV_LSB;
             while (bits-- > 0)
             {
                 if ((*Y AND mask) != 0)
@@ -925,24 +944,24 @@ void BitVector_Reverse(wordptr X, wordptr Y)
                 if (not (mask >>= 1))
                 {
                     Y--;
-                    mask = MSB;
+                    mask = BV_MSB;
                 }
                 if (not (bit <<= 1))
                 {
                     *X++ = value;
                     value = 0;
-                    bit = LSB;
+                    bit = BV_LSB;
                 }
             }
-            if (bit > LSB) *X = value;
+            if (bit > BV_LSB) *X = value;
         }
     }
 }
 
 void BitVector_Interval_Empty(wordptr addr, N_int lower, N_int upper)
 {                                                  /* X = X \ [lower..upper] */
-    N_word  bits = bits_(addr);
-    N_word  size = size_(addr);
+    N_word  bits = BV_BITS_(addr);
+    N_word  size = BV_SIZE_(addr);
     wordptr loaddr;
     wordptr hiaddr;
     N_word  lobase;
@@ -953,14 +972,14 @@ void BitVector_Interval_Empty(wordptr addr, N_int lower, N_int upper)
 
     if ((size > 0) and (lower < bits) and (upper < bits) and (lower <= upper))
     {
-        lobase = lower >> LOGBITS;
-        hibase = upper >> LOGBITS;
+        lobase = lower >> BV_LogBits;
+        hibase = upper >> BV_LogBits;
         diff = hibase - lobase;
         loaddr = addr + lobase;
         hiaddr = addr + hibase;
 
-        lomask = (N_word)   (~0L << (lower AND MODMASK));
-        himask = (N_word) ~((~0L << (upper AND MODMASK)) << 1);
+        lomask = (N_word)   (~0L << (lower AND BV_ModMask));
+        himask = (N_word) ~((~0L << (upper AND BV_ModMask)) << 1);
 
         if (diff == 0)
         {
@@ -980,8 +999,8 @@ void BitVector_Interval_Empty(wordptr addr, N_int lower, N_int upper)
 
 void BitVector_Interval_Fill(wordptr addr, N_int lower, N_int upper)
 {                                                  /* X = X + [lower..upper] */
-    N_word  bits = bits_(addr);
-    N_word  size = size_(addr);
+    N_word  bits = BV_BITS_(addr);
+    N_word  size = BV_SIZE_(addr);
     N_word  fill = (N_word) ~0L;
     wordptr loaddr;
     wordptr hiaddr;
@@ -993,14 +1012,14 @@ void BitVector_Interval_Fill(wordptr addr, N_int lower, N_int upper)
 
     if ((size > 0) and (lower < bits) and (upper < bits) and (lower <= upper))
     {
-        lobase = lower >> LOGBITS;
-        hibase = upper >> LOGBITS;
+        lobase = lower >> BV_LogBits;
+        hibase = upper >> BV_LogBits;
         diff = hibase - lobase;
         loaddr = addr + lobase;
         hiaddr = addr + hibase;
 
-        lomask = (N_word)   (~0L << (lower AND MODMASK));
-        himask = (N_word) ~((~0L << (upper AND MODMASK)) << 1);
+        lomask = (N_word)   (~0L << (lower AND BV_ModMask));
+        himask = (N_word) ~((~0L << (upper AND BV_ModMask)) << 1);
 
         if (diff == 0)
         {
@@ -1015,14 +1034,14 @@ void BitVector_Interval_Fill(wordptr addr, N_int lower, N_int upper)
             }
             *hiaddr |= himask;
         }
-        *(addr+size-1) &= mask_(addr);
+        *(addr+size-1) &= BV_MASK_(addr);
     }
 }
 
 void BitVector_Interval_Flip(wordptr addr, N_int lower, N_int upper)
 {                                                  /* X = X ^ [lower..upper] */
-    N_word  bits = bits_(addr);
-    N_word  size = size_(addr);
+    N_word  bits = BV_BITS_(addr);
+    N_word  size = BV_SIZE_(addr);
     N_word  flip = (N_word) ~0L;
     wordptr loaddr;
     wordptr hiaddr;
@@ -1034,14 +1053,14 @@ void BitVector_Interval_Flip(wordptr addr, N_int lower, N_int upper)
 
     if ((size > 0) and (lower < bits) and (upper < bits) and (lower <= upper))
     {
-        lobase = lower >> LOGBITS;
-        hibase = upper >> LOGBITS;
+        lobase = lower >> BV_LogBits;
+        hibase = upper >> BV_LogBits;
         diff = hibase - lobase;
         loaddr = addr + lobase;
         hiaddr = addr + hibase;
 
-        lomask = (N_word)   (~0L << (lower AND MODMASK));
-        himask = (N_word) ~((~0L << (upper AND MODMASK)) << 1);
+        lomask = (N_word)   (~0L << (lower AND BV_ModMask));
+        himask = (N_word) ~((~0L << (upper AND BV_ModMask)) << 1);
 
         if (diff == 0)
         {
@@ -1056,13 +1075,13 @@ void BitVector_Interval_Flip(wordptr addr, N_int lower, N_int upper)
             }
             *hiaddr ^= himask;
         }
-        *(addr+size-1) &= mask_(addr);
+        *(addr+size-1) &= BV_MASK_(addr);
     }
 }
 
 void BitVector_Interval_Reverse(wordptr addr, N_int lower, N_int upper)
 {
-    N_word  bits = bits_(addr);
+    N_word  bits = BV_BITS_(addr);
     wordptr loaddr;
     wordptr hiaddr;
     N_word  lomask;
@@ -1070,10 +1089,10 @@ void BitVector_Interval_Reverse(wordptr addr, N_int lower, N_int upper)
 
     if ((bits > 0) and (lower < bits) and (upper < bits) and (lower < upper))
     {
-        loaddr = addr + (lower >> LOGBITS);
-        hiaddr = addr + (upper >> LOGBITS);
-        lomask = BITMASKTAB[lower AND MODMASK];
-        himask = BITMASKTAB[upper AND MODMASK];
+        loaddr = addr + (lower >> BV_LogBits);
+        hiaddr = addr + (upper >> BV_LogBits);
+        lomask = BV_BitMaskTab[lower AND BV_ModMask];
+        himask = BV_BitMaskTab[upper AND BV_ModMask];
         for ( bits = upper - lower + 1; bits > 1; bits -= 2 )
         {
             if (((*loaddr AND lomask) != 0) XOR ((*hiaddr AND himask) != 0))
@@ -1083,12 +1102,12 @@ void BitVector_Interval_Reverse(wordptr addr, N_int lower, N_int upper)
             }
             if (not (lomask <<= 1))
             {
-                lomask = LSB;
+                lomask = BV_LSB;
                 loaddr++;
             }
             if (not (himask >>= 1))
             {
-                himask = MSB;
+                himask = BV_MSB;
                 hiaddr--;
             }
         }
@@ -1098,26 +1117,26 @@ void BitVector_Interval_Reverse(wordptr addr, N_int lower, N_int upper)
 boolean BitVector_interval_scan_inc(wordptr addr, N_int start,
                                     N_intptr min, N_intptr max)
 {
-    N_word  size = size_(addr);
-    N_word  mask = mask_(addr);
+    N_word  size = BV_SIZE_(addr);
+    N_word  mask = BV_MASK_(addr);
     N_word  offset;
     N_word  bitmask;
     N_word  value;
     boolean empty;
 
-    if ((size == 0) or (start >= bits_(addr))) return(false);
+    if ((size == 0) or (start >= BV_BITS_(addr))) return(false);
 
     *min = start;
     *max = start;
 
-    offset = start >> LOGBITS;
+    offset = start >> BV_LogBits;
 
     *(addr+size-1) &= mask;
 
     addr += offset;
     size -= offset;
 
-    bitmask = BITMASKTAB[start AND MODMASK];
+    bitmask = BV_BitMaskTab[start AND BV_ModMask];
     mask = NOT (bitmask OR (bitmask - 1));
 
     value = *addr++;
@@ -1134,10 +1153,10 @@ boolean BitVector_interval_scan_inc(wordptr addr, N_int start,
             }
             if (empty) return(false);
         }
-        start = offset << LOGBITS;
-        bitmask = LSB;
+        start = offset << BV_LogBits;
+        bitmask = BV_LSB;
         mask = value;
-        while (not (mask AND LSB))
+        while (not (mask AND BV_LSB))
         {
             bitmask <<= 1;
             mask >>= 1;
@@ -1157,10 +1176,10 @@ boolean BitVector_interval_scan_inc(wordptr addr, N_int start,
         {
             if ((value = NOT *addr++)) empty = false; else offset++;
         }
-        if (empty) value = LSB;
+        if (empty) value = BV_LSB;
     }
-    start = offset << LOGBITS;
-    while (not (value AND LSB))
+    start = offset << BV_LogBits;
+    while (not (value AND BV_LSB))
     {
         value >>= 1;
         start++;
@@ -1172,19 +1191,19 @@ boolean BitVector_interval_scan_inc(wordptr addr, N_int start,
 boolean BitVector_interval_scan_dec(wordptr addr, N_int start,
                                     N_intptr min, N_intptr max)
 {
-    N_word  size = size_(addr);
-    N_word  mask = mask_(addr);
+    N_word  size = BV_SIZE_(addr);
+    N_word  mask = BV_MASK_(addr);
     N_word offset;
     N_word bitmask;
     N_word value;
     boolean empty;
 
-    if ((size == 0) or (start >= bits_(addr))) return(false);
+    if ((size == 0) or (start >= BV_BITS_(addr))) return(false);
 
     *min = start;
     *max = start;
 
-    offset = start >> LOGBITS;
+    offset = start >> BV_LogBits;
 
     if (offset >= size) return(false);
 
@@ -1193,7 +1212,7 @@ boolean BitVector_interval_scan_dec(wordptr addr, N_int start,
     addr += offset;
     size = ++offset;
 
-    bitmask = BITMASKTAB[start AND MODMASK];
+    bitmask = BV_BitMaskTab[start AND BV_ModMask];
     mask = (bitmask - 1);
 
     value = *addr--;
@@ -1210,10 +1229,10 @@ boolean BitVector_interval_scan_dec(wordptr addr, N_int start,
             }
             if (empty) return(false);
         }
-        start = offset << LOGBITS;
-        bitmask = MSB;
+        start = offset << BV_LogBits;
+        bitmask = BV_MSB;
         mask = value;
-        while (not (mask AND MSB))
+        while (not (mask AND BV_MSB))
         {
             bitmask >>= 1;
             mask <<= 1;
@@ -1233,10 +1252,10 @@ boolean BitVector_interval_scan_dec(wordptr addr, N_int start,
         {
             if ((value = NOT *addr--)) empty = false; else offset--;
         }
-        if (empty) value = MSB;
+        if (empty) value = BV_MSB;
     }
-    start = offset << LOGBITS;
-    while (not (value AND MSB))
+    start = offset << BV_LogBits;
+    while (not (value AND BV_MSB))
     {
         value <<= 1;
         start--;
@@ -1248,8 +1267,8 @@ boolean BitVector_interval_scan_dec(wordptr addr, N_int start,
 void BitVector_Interval_Copy(wordptr X, wordptr Y, N_int Xoffset,
                              N_int Yoffset, N_int length)
 {
-    N_word  bitsX = bits_(X);
-    N_word  bitsY = bits_(Y);
+    N_word  bitsX = BV_BITS_(X);
+    N_word  bitsY = BV_BITS_(Y);
     N_word  source = 0;        /* silence compiler warning */
     N_word  target = 0;        /* silence compiler warning */
     N_word  s_lo_base;
@@ -1285,17 +1304,17 @@ void BitVector_Interval_Copy(wordptr X, wordptr Y, N_int Xoffset,
 
         ascending = (Xoffset <= Yoffset);
 
-        s_lo_base = Yoffset >> LOGBITS;
-        s_lo_bit = Yoffset AND MODMASK;
+        s_lo_base = Yoffset >> BV_LogBits;
+        s_lo_bit = Yoffset AND BV_ModMask;
         Yoffset += --length;
-        s_hi_base = Yoffset >> LOGBITS;
-        s_hi_bit = Yoffset AND MODMASK;
+        s_hi_base = Yoffset >> BV_LogBits;
+        s_hi_bit = Yoffset AND BV_ModMask;
 
-        t_lo_base = Xoffset >> LOGBITS;
-        t_lo_bit = Xoffset AND MODMASK;
+        t_lo_base = Xoffset >> BV_LogBits;
+        t_lo_bit = Xoffset AND BV_ModMask;
         Xoffset += length;
-        t_hi_base = Xoffset >> LOGBITS;
-        t_hi_bit = Xoffset AND MODMASK;
+        t_hi_base = Xoffset >> BV_LogBits;
+        t_hi_bit = Xoffset AND BV_ModMask;
 
         if (ascending)
         {
@@ -1337,14 +1356,14 @@ void BitVector_Interval_Copy(wordptr X, wordptr Y, N_int Xoffset,
                 {
                     case 0:
                         t_lower = 0;
-                        t_upper = BITS - 1;
-                        t_bits = BITS;
+                        t_upper = BV_WordBits - 1;
+                        t_bits = BV_WordBits;
                         target = 0;
                         break;
                     case 1:
                         t_lower = t_lo_bit;
-                        t_upper = BITS - 1;
-                        t_bits = BITS - t_lo_bit;
+                        t_upper = BV_WordBits - 1;
+                        t_bits = BV_WordBits - t_lo_bit;
                         mask = (N_word) (~0L << t_lower);
                         target = *X AND NOT mask;
                         break;
@@ -1388,13 +1407,13 @@ void BitVector_Interval_Copy(wordptr X, wordptr Y, N_int Xoffset,
                 {
                     case 0:
                         s_lower = 0;
-                        s_upper = BITS - 1;
-                        s_bits = BITS;
+                        s_upper = BV_WordBits - 1;
+                        s_bits = BV_WordBits;
                         break;
                     case 1:
                         s_lower = s_lo_bit;
-                        s_upper = BITS - 1;
-                        s_bits = BITS - s_lo_bit;
+                        s_upper = BV_WordBits - 1;
+                        s_bits = BV_WordBits - s_lo_bit;
                         break;
                     case 2:
                         s_lower = 0;
@@ -1454,7 +1473,7 @@ void BitVector_Interval_Copy(wordptr X, wordptr Y, N_int Xoffset,
             s_bits -= bits;
             t_bits -= bits;
         }
-        *(Z+size_(Z)-1) &= mask_(Z);
+        *(Z+BV_SIZE_(Z)-1) &= BV_MASK_(Z);
     }
 }
 
@@ -1463,8 +1482,8 @@ wordptr BitVector_Interval_Substitute(wordptr X, wordptr Y,
                                       N_int Xoffset, N_int Xlength,
                                       N_int Yoffset, N_int Ylength)
 {
-    N_word Xbits = bits_(X);
-    N_word Ybits = bits_(Y);
+    N_word Xbits = BV_BITS_(X);
+    N_word Ybits = BV_BITS_(Y);
     N_word limit;
     N_word diff;
 
@@ -1546,12 +1565,12 @@ wordptr BitVector_Interval_Substitute(wordptr X, wordptr Y,
 
 boolean BitVector_is_empty(wordptr addr)                    /* X == {} ?     */
 {
-    N_word  size = size_(addr);
+    N_word  size = BV_SIZE_(addr);
     boolean r = true;
 
     if (size > 0)
     {
-        *(addr+size-1) &= mask_(addr);
+        *(addr+size-1) &= BV_MASK_(addr);
         while (r and (size-- > 0)) r = ( *addr++ == 0 );
     }
     return(r);
@@ -1559,8 +1578,8 @@ boolean BitVector_is_empty(wordptr addr)                    /* X == {} ?     */
 
 boolean BitVector_is_full(wordptr addr)                     /* X == ~{} ?    */
 {
-    N_word  size = size_(addr);
-    N_word  mask = mask_(addr);
+    N_word  size = BV_SIZE_(addr);
+    N_word  mask = BV_MASK_(addr);
     boolean r = false;
     wordptr last;
 
@@ -1577,11 +1596,11 @@ boolean BitVector_is_full(wordptr addr)                     /* X == ~{} ?    */
 
 boolean BitVector_equal(wordptr X, wordptr Y)               /* X == Y ?      */
 {
-    N_word  size = size_(X);
-    N_word  mask = mask_(X);
+    N_word  size = BV_SIZE_(X);
+    N_word  mask = BV_MASK_(X);
     boolean r = false;
 
-    if (bits_(X) == bits_(Y))
+    if (BV_BITS_(X) == BV_BITS_(Y))
     {
         r = true;
         if (size > 0)
@@ -1596,9 +1615,9 @@ boolean BitVector_equal(wordptr X, wordptr Y)               /* X == Y ?      */
 
 Z_int BitVector_Lexicompare(wordptr X, wordptr Y)           /* X <,=,> Y ?   */
 {                                                           /*  unsigned     */
-    N_word  bitsX = bits_(X);
-    N_word  bitsY = bits_(Y);
-    N_word  size  = size_(X);
+    N_word  bitsX = BV_BITS_(X);
+    N_word  bitsY = BV_BITS_(Y);
+    N_word  size  = BV_SIZE_(X);
     boolean r = true;
 
     if (bitsX == bitsY)
@@ -1623,10 +1642,10 @@ Z_int BitVector_Lexicompare(wordptr X, wordptr Y)           /* X <,=,> Y ?   */
 
 Z_int BitVector_Compare(wordptr X, wordptr Y)               /* X <,=,> Y ?   */
 {                                                           /*   signed      */
-    N_word  bitsX = bits_(X);
-    N_word  bitsY = bits_(Y);
-    N_word  size  = size_(X);
-    N_word  mask  = mask_(X);
+    N_word  bitsX = BV_BITS_(X);
+    N_word  bitsY = BV_BITS_(Y);
+    N_word  size  = BV_SIZE_(X);
+    N_word  mask  = BV_MASK_(X);
     N_word  sign;
     boolean r = true;
 
@@ -1657,8 +1676,8 @@ Z_int BitVector_Compare(wordptr X, wordptr Y)               /* X <,=,> Y ?   */
 
 charptr BitVector_to_Hex(wordptr addr)
 {
-    N_word  bits = bits_(addr);
-    N_word  size = size_(addr);
+    N_word  bits = BV_BITS_(addr);
+    N_word  size = BV_SIZE_(addr);
     N_word  value;
     N_word  count;
     N_word  digit;
@@ -1673,11 +1692,11 @@ charptr BitVector_to_Hex(wordptr addr)
     *string = (N_char) '\0';
     if (size > 0)
     {
-        *(addr+size-1) &= mask_(addr);
+        *(addr+size-1) &= BV_MASK_(addr);
         while ((size-- > 0) and (length > 0))
         {
             value = *addr++;
-            count = BITS >> 2;
+            count = BV_WordBits >> 2;
             while ((count-- > 0) and (length > 0))
             {
                 digit = value AND 0x000F;
@@ -1691,10 +1710,10 @@ charptr BitVector_to_Hex(wordptr addr)
     return(string);
 }
 
-ErrCode BitVector_from_Hex(wordptr addr, charptr string)
+BV_ErrCode BitVector_from_Hex(wordptr addr, charptr string)
 {
-    N_word  size = size_(addr);
-    N_word  mask = mask_(addr);
+    N_word  size = BV_SIZE_(addr);
+    N_word  mask = BV_MASK_(addr);
     boolean ok = true;
     N_word  length;
     N_word  value;
@@ -1708,7 +1727,7 @@ ErrCode BitVector_from_Hex(wordptr addr, charptr string)
         while (size-- > 0)
         {
             value = 0;
-            for ( count = 0; (ok and (length > 0) and (count < BITS)); count += 4 )
+            for ( count = 0; (ok and (length > 0) and (count < BV_WordBits)); count += 4 )
             {
                 digit = (int) *(--string); length--;
                 /* separate because toupper() is likely a macro! */
@@ -1724,31 +1743,31 @@ ErrCode BitVector_from_Hex(wordptr addr, charptr string)
         }
         *(--addr) &= mask;
     }
-    if (ok) return(ErrCode_Ok);
-    else    return(ErrCode_Pars);
+    if (ok) return(BV_ErrCode_Ok);
+    else    return(BV_ErrCode_Pars);
 }
 
 charptr BitVector_to_Bin(wordptr addr)
 {
-    N_word  size = size_(addr);
+    N_word  size = BV_SIZE_(addr);
     N_word  value;
     N_word  count;
     N_word  digit;
     N_word  length;
     charptr string;
 
-    length = bits_(addr);
+    length = BV_BITS_(addr);
     string = (charptr) malloc((size_t) (length+1));
     if (string == NULL) return(NULL);
     string += length;
     *string = (N_char) '\0';
     if (size > 0)
     {
-        *(addr+size-1) &= mask_(addr);
+        *(addr+size-1) &= BV_MASK_(addr);
         while (size-- > 0)
         {
             value = *addr++;
-            count = BITS;
+            count = BV_WordBits;
             if (count > length) count = length;
             while (count-- > 0)
             {
@@ -1762,10 +1781,10 @@ charptr BitVector_to_Bin(wordptr addr)
     return(string);
 }
 
-ErrCode BitVector_from_Bin(wordptr addr, charptr string)
+BV_ErrCode BitVector_from_Bin(wordptr addr, charptr string)
 {
-    N_word  size = size_(addr);
-    N_word  mask = mask_(addr);
+    N_word  size = BV_SIZE_(addr);
+    N_word  mask = BV_MASK_(addr);
     boolean ok = true;
     N_word  length;
     N_word  value;
@@ -1779,7 +1798,7 @@ ErrCode BitVector_from_Bin(wordptr addr, charptr string)
         while (size-- > 0)
         {
             value = 0;
-            for ( count = 0; (ok and (length > 0) and (count < BITS)); count++ )
+            for ( count = 0; (ok and (length > 0) and (count < BV_WordBits)); count++ )
             {
                 digit = (int) *(--string); length--;
                 switch (digit)
@@ -1787,7 +1806,7 @@ ErrCode BitVector_from_Bin(wordptr addr, charptr string)
                     case (int) '0':
                         break;
                     case (int) '1':
-                        value |= BITMASKTAB[count];
+                        value |= BV_BitMaskTab[count];
                         break;
                     default:
                         ok = false;
@@ -1798,13 +1817,13 @@ ErrCode BitVector_from_Bin(wordptr addr, charptr string)
         }
         *(--addr) &= mask;
     }
-    if (ok) return(ErrCode_Ok);
-    else    return(ErrCode_Pars);
+    if (ok) return(BV_ErrCode_Ok);
+    else    return(BV_ErrCode_Pars);
 }
 
 charptr BitVector_to_Dec(wordptr addr)
 {
-    N_word  bits = bits_(addr);
+    N_word  bits = BV_BITS_(addr);
     N_word  length;
     N_word  digits;
     N_word  count;
@@ -1828,7 +1847,7 @@ charptr BitVector_to_Dec(wordptr addr)
     if ((bits < 4) or (sign == 0))
     {
         if (bits > 0) digits = *addr; else digits = (N_word) 0;
-        if (sign < 0) digits = ((N_word)(-((Z_word)digits))) AND mask_(addr);
+        if (sign < 0) digits = ((N_word)(-((Z_word)digits))) AND BV_MASK_(addr);
         *string++ = (N_char) digits + (N_char) '0';
         digits = 1;
     }
@@ -1867,8 +1886,8 @@ charptr BitVector_to_Dec(wordptr addr)
         if (sign < 0) BitVector_Negate(quot,addr);
         else           BitVector_Copy(quot,addr);
         digits = 0;
-        *base = EXP10;
-        loop = (bits >= BITS);
+        *base = BV_Exp10;
+        loop = (bits >= BV_WordBits);
         do
         {
             if (loop)
@@ -1887,7 +1906,7 @@ charptr BitVector_to_Dec(wordptr addr)
                 q = *rest;
             }
             else q = *quot;
-            count = LOG10;
+            count = BV_Log10;
             while (((loop and (count-- > 0)) or ((not loop) and (q != 0))) and
                 (digits < length))
             {
@@ -1916,55 +1935,55 @@ charptr BitVector_to_Dec(wordptr addr)
     return(result);
 }
 
-ErrCode BitVector_from_Dec(wordptr addr, charptr string)
+BV_ErrCode BitVector_from_Dec(wordptr addr, charptr string)
 {
-    ErrCode error = ErrCode_Ok;
-    N_word  bits = bits_(addr);
-    N_word  mask = mask_(addr);
-    boolean init = (bits > BITS);
-    boolean minus;
-    boolean shift;
-    boolean carry;
-    wordptr term;
-    wordptr base;
-    wordptr prod;
-    wordptr rank;
-    wordptr temp;
-    N_word  accu;
-    N_word  powr;
-    N_word  count;
-    N_word  length;
-    int     digit;
+    BV_ErrCode error = BV_ErrCode_Ok;
+    N_word     bits  = BV_BITS_(addr);
+    N_word     mask  = BV_MASK_(addr);
+    boolean    init  = (bits > BV_WordBits);
+    boolean    minus;
+    boolean    shift;
+    boolean    carry;
+    wordptr    term;
+    wordptr    base;
+    wordptr    prod;
+    wordptr    rank;
+    wordptr    temp;
+    N_word     accu;
+    N_word     powr;
+    N_word     count;
+    N_word     length;
+    int        digit;
 
     if (bits > 0)
     {
         length = strlen((char *) string);
-        if (length == 0) return(ErrCode_Pars);
+        if (length == 0) return(BV_ErrCode_Pars);
         digit = (int) *string;
         if ((minus = (digit == (int) '-')) or
                      (digit == (int) '+'))
         {
             string++;
-            if (--length == 0) return(ErrCode_Pars);
+            if (--length == 0) return(BV_ErrCode_Pars);
         }
         string += length;
-        term = BitVector_Create(BITS,false);
+        term = BitVector_Create(BV_WordBits,false);
         if (term == NULL)
         {
-            return(ErrCode_Null);
+            return(BV_ErrCode_Null);
         }
-        base = BitVector_Create(BITS,false);
+        base = BitVector_Create(BV_WordBits,false);
         if (base == NULL)
         {
             BitVector_Destroy(term);
-            return(ErrCode_Null);
+            return(BV_ErrCode_Null);
         }
         prod = BitVector_Create(bits,init);
         if (prod == NULL)
         {
             BitVector_Destroy(term);
             BitVector_Destroy(base);
-            return(ErrCode_Null);
+            return(BV_ErrCode_Null);
         }
         rank = BitVector_Create(bits,init);
         if (rank == NULL)
@@ -1972,7 +1991,7 @@ ErrCode BitVector_from_Dec(wordptr addr, charptr string)
             BitVector_Destroy(term);
             BitVector_Destroy(base);
             BitVector_Destroy(prod);
-            return(ErrCode_Null);
+            return(BV_ErrCode_Null);
         }
         temp = BitVector_Create(bits,false);
         if (temp == NULL)
@@ -1981,16 +2000,16 @@ ErrCode BitVector_from_Dec(wordptr addr, charptr string)
             BitVector_Destroy(base);
             BitVector_Destroy(prod);
             BitVector_Destroy(rank);
-            return(ErrCode_Null);
+            return(BV_ErrCode_Null);
         }
         BitVector_Empty(addr);
-        *base = EXP10;
+        *base = BV_Exp10;
         shift = false;
         while ((not error) and (length > 0))
         {
             accu = 0;
             powr = 1;
-            count = LOG10;
+            count = BV_Log10;
             while ((not error) and (length > 0) and (count-- > 0))
             {
                 digit = (int) *(--string); length--;
@@ -2000,7 +2019,7 @@ ErrCode BitVector_from_Dec(wordptr addr, charptr string)
                     accu += ((N_word) digit - (N_word) '0') * powr;
                     powr *= 10;
                 }
-                else error = ErrCode_Pars;
+                else error = BV_ErrCode_Pars;
             }
             if (not error)
             {
@@ -2013,7 +2032,7 @@ ErrCode BitVector_from_Dec(wordptr addr, charptr string)
                 else
                 {
                     *prod = accu;
-                    if ((not init) and ((accu AND NOT mask) != 0)) error = ErrCode_Ovfl;
+                    if ((not init) and ((accu AND NOT mask) != 0)) error = BV_ErrCode_Ovfl;
                 }
                 if (not error)
                 {
@@ -2021,7 +2040,7 @@ ErrCode BitVector_from_Dec(wordptr addr, charptr string)
                     BitVector_compute(addr,addr,prod,false,&carry);
                     /* ignores sign change (= overflow) but not */
                     /* numbers too large (= carry) for resulting bit vector */
-                    if (carry) error = ErrCode_Ovfl;
+                    if (carry) error = BV_ErrCode_Ovfl;
                     else
                     {
                         if (length > 0)
@@ -2049,8 +2068,8 @@ ErrCode BitVector_from_Dec(wordptr addr, charptr string)
         if (not error and minus)
         {
             BitVector_Negate(addr,addr);
-            if ((*(addr + size_(addr) - 1) AND mask AND NOT (mask >> 1)) == 0)
-                error = ErrCode_Ovfl;
+            if ((*(addr + BV_SIZE_(addr) - 1) AND mask AND NOT (mask >> 1)) == 0)
+                error = BV_ErrCode_Ovfl;
         }
     }
     return(error);
@@ -2058,7 +2077,7 @@ ErrCode BitVector_from_Dec(wordptr addr, charptr string)
 
 charptr BitVector_to_Enum(wordptr addr)
 {
-    N_word  bits = bits_(addr);
+    N_word  bits = BV_BITS_(addr);
     N_word  sample;
     N_word  length;
     N_word  digits;
@@ -2127,14 +2146,14 @@ charptr BitVector_to_Enum(wordptr addr)
     return(string);
 }
 
-ErrCode BitVector_from_Enum(wordptr addr, charptr string)
+BV_ErrCode BitVector_from_Enum(wordptr addr, charptr string)
 {
-    ErrCode error = ErrCode_Ok;
-    N_word  bits = bits_(addr);
-    N_word  state = 1;
-    N_word  token;
-    N_word  index;
-    N_word  start = 0;         /* silence compiler warning */
+    BV_ErrCode error = BV_ErrCode_Ok;
+    N_word     bits  = BV_BITS_(addr);
+    N_word     state = 1;
+    N_word     start = 0;        /* silence compiler warning */
+    N_word     token;
+    N_word     index;
 
     if (bits > 0)
     {
@@ -2147,7 +2166,7 @@ ErrCode BitVector_from_Enum(wordptr addr, charptr string)
             {
                 string += BIT_VECTOR_str2int(string,&index);
                 if (index < bits) token = (N_word) '0';
-                else error = ErrCode_Indx;
+                else error = BV_ErrCode_Indx;
             }
             else string++;
             if (not error)
@@ -2163,7 +2182,7 @@ ErrCode BitVector_from_Enum(wordptr addr, charptr string)
                             state = 0;
                             break;
                         default:
-                            error = ErrCode_Pars;
+                            error = BV_ErrCode_Pars;
                             break;
                     }
                     break;
@@ -2183,7 +2202,7 @@ ErrCode BitVector_from_Enum(wordptr addr, charptr string)
                             state = 0;
                             break;
                         default:
-                            error = ErrCode_Pars;
+                            error = BV_ErrCode_Pars;
                             break;
                     }
                     break;
@@ -2195,11 +2214,11 @@ ErrCode BitVector_from_Enum(wordptr addr, charptr string)
                                 BitVector_Interval_Fill(addr,start,index);
                             else if (start == index)
                                 BIT_VECTOR_SET_BIT(addr,index)
-                            else error = ErrCode_Ordr;
+                            else error = BV_ErrCode_Ordr;
                             state = 4;
                             break;
                         default:
-                            error = ErrCode_Pars;
+                            error = BV_ErrCode_Pars;
                             break;
                     }
                     break;
@@ -2213,7 +2232,7 @@ ErrCode BitVector_from_Enum(wordptr addr, charptr string)
                             state = 0;
                             break;
                         default:
-                            error = ErrCode_Pars;
+                            error = BV_ErrCode_Pars;
                             break;
                     }
                     break;
@@ -2224,7 +2243,7 @@ ErrCode BitVector_from_Enum(wordptr addr, charptr string)
                             state = 2;
                             break;
                         default:
-                            error = ErrCode_Pars;
+                            error = BV_ErrCode_Pars;
                             break;
                     }
                     break;
@@ -2236,31 +2255,31 @@ ErrCode BitVector_from_Enum(wordptr addr, charptr string)
 
 void BitVector_Bit_Off(wordptr addr, N_int index)           /* X = X \ {x}   */
 {
-    if (index < bits_(addr)) BIT_VECTOR_CLR_BIT(addr,index)
+    if (index < BV_BITS_(addr)) BIT_VECTOR_CLR_BIT(addr,index)
 }
 
 void BitVector_Bit_On(wordptr addr, N_int index)            /* X = X + {x}   */
 {
-    if (index < bits_(addr)) BIT_VECTOR_SET_BIT(addr,index)
+    if (index < BV_BITS_(addr)) BIT_VECTOR_SET_BIT(addr,index)
 }
 
 boolean BitVector_bit_flip(wordptr addr, N_int index)   /* X=(X+{x})\(X*{x}) */
 {
     N_word mask;
 
-    if (index < bits_(addr)) return( BIT_VECTOR_FLP_BIT(addr,index,mask) );
+    if (index < BV_BITS_(addr)) return( BIT_VECTOR_FLP_BIT(addr,index,mask) );
     else                     return( false );
 }
 
 boolean BitVector_bit_test(wordptr addr, N_int index)       /* {x} in X ?    */
 {
-    if (index < bits_(addr)) return( BIT_VECTOR_TST_BIT(addr,index) );
+    if (index < BV_BITS_(addr)) return( BIT_VECTOR_TST_BIT(addr,index) );
     else                     return( false );
 }
 
 void BitVector_Bit_Copy(wordptr addr, N_int index, boolean bit)
 {
-    if (index < bits_(addr))
+    if (index < BV_BITS_(addr))
     {
         if (bit) BIT_VECTOR_SET_BIT(addr,index)
         else     BIT_VECTOR_CLR_BIT(addr,index)
@@ -2269,17 +2288,17 @@ void BitVector_Bit_Copy(wordptr addr, N_int index, boolean bit)
 
 void BitVector_LSB(wordptr addr, boolean bit)
 {
-    if (bits_(addr) > 0)
+    if (BV_BITS_(addr) > 0)
     {
-        if (bit) *addr |= LSB;
-        else     *addr &= NOT LSB;
+        if (bit) *addr |= BV_LSB;
+        else     *addr &= NOT BV_LSB;
     }
 }
 
 void BitVector_MSB(wordptr addr, boolean bit)
 {
-    N_word size = size_(addr);
-    N_word mask = mask_(addr);
+    N_word size = BV_SIZE_(addr);
+    N_word mask = BV_MASK_(addr);
 
     if (size-- > 0)
     {
@@ -2290,14 +2309,14 @@ void BitVector_MSB(wordptr addr, boolean bit)
 
 boolean BitVector_lsb_(wordptr addr)
 {
-    if (size_(addr) > 0) return( (*addr AND LSB) != 0 );
-    else                 return( false );
+    if (BV_SIZE_(addr) > 0) return( (*addr AND BV_LSB) != 0 );
+    else                    return( false );
 }
 
 boolean BitVector_msb_(wordptr addr)
 {
-    N_word size = size_(addr);
-    N_word mask = mask_(addr);
+    N_word size = BV_SIZE_(addr);
+    N_word mask = BV_MASK_(addr);
 
     if (size-- > 0)
         return( (*(addr+size) AND (mask AND NOT (mask >> 1))) != 0 );
@@ -2307,8 +2326,8 @@ boolean BitVector_msb_(wordptr addr)
 
 boolean BitVector_rotate_left(wordptr addr)
 {
-    N_word  size = size_(addr);
-    N_word  mask = mask_(addr);
+    N_word  size = BV_SIZE_(addr);
+    N_word  mask = BV_MASK_(addr);
     N_word  msb;
     boolean carry_in;
     boolean carry_out = false;
@@ -2319,15 +2338,15 @@ boolean BitVector_rotate_left(wordptr addr)
         carry_in = ((*(addr+size-1) AND msb) != 0);
         while (size-- > 1)
         {
-            carry_out = ((*addr AND MSB) != 0);
+            carry_out = ((*addr AND BV_MSB) != 0);
             *addr <<= 1;
-            if (carry_in) *addr |= LSB;
+            if (carry_in) *addr |= BV_LSB;
             carry_in = carry_out;
             addr++;
         }
         carry_out = ((*addr AND msb) != 0);
         *addr <<= 1;
-        if (carry_in) *addr |= LSB;
+        if (carry_in) *addr |= BV_LSB;
         *addr &= mask;
     }
     return(carry_out);
@@ -2335,8 +2354,8 @@ boolean BitVector_rotate_left(wordptr addr)
 
 boolean BitVector_rotate_right(wordptr addr)
 {
-    N_word  size = size_(addr);
-    N_word  mask = mask_(addr);
+    N_word  size = BV_SIZE_(addr);
+    N_word  mask = BV_MASK_(addr);
     N_word  msb;
     boolean carry_in;
     boolean carry_out = false;
@@ -2344,10 +2363,10 @@ boolean BitVector_rotate_right(wordptr addr)
     if (size > 0)
     {
         msb = mask AND NOT (mask >> 1);
-        carry_in = ((*addr AND LSB) != 0);
+        carry_in = ((*addr AND BV_LSB) != 0);
         addr += size-1;
         *addr &= mask;
-        carry_out = ((*addr AND LSB) != 0);
+        carry_out = ((*addr AND BV_LSB) != 0);
         *addr >>= 1;
         if (carry_in) *addr |= msb;
         carry_in = carry_out;
@@ -2355,9 +2374,9 @@ boolean BitVector_rotate_right(wordptr addr)
         size--;
         while (size-- > 0)
         {
-            carry_out = ((*addr AND LSB) != 0);
+            carry_out = ((*addr AND BV_LSB) != 0);
             *addr >>= 1;
-            if (carry_in) *addr |= MSB;
+            if (carry_in) *addr |= BV_MSB;
             carry_in = carry_out;
             addr--;
         }
@@ -2367,8 +2386,8 @@ boolean BitVector_rotate_right(wordptr addr)
 
 boolean BitVector_shift_left(wordptr addr, boolean carry_in)
 {
-    N_word  size = size_(addr);
-    N_word  mask = mask_(addr);
+    N_word  size = BV_SIZE_(addr);
+    N_word  mask = BV_MASK_(addr);
     N_word  msb;
     boolean carry_out = carry_in;
 
@@ -2377,15 +2396,15 @@ boolean BitVector_shift_left(wordptr addr, boolean carry_in)
         msb = mask AND NOT (mask >> 1);
         while (size-- > 1)
         {
-            carry_out = ((*addr AND MSB) != 0);
+            carry_out = ((*addr AND BV_MSB) != 0);
             *addr <<= 1;
-            if (carry_in) *addr |= LSB;
+            if (carry_in) *addr |= BV_LSB;
             carry_in = carry_out;
             addr++;
         }
         carry_out = ((*addr AND msb) != 0);
         *addr <<= 1;
-        if (carry_in) *addr |= LSB;
+        if (carry_in) *addr |= BV_LSB;
         *addr &= mask;
     }
     return(carry_out);
@@ -2393,8 +2412,8 @@ boolean BitVector_shift_left(wordptr addr, boolean carry_in)
 
 boolean BitVector_shift_right(wordptr addr, boolean carry_in)
 {
-    N_word  size = size_(addr);
-    N_word  mask = mask_(addr);
+    N_word  size = BV_SIZE_(addr);
+    N_word  mask = BV_MASK_(addr);
     N_word  msb;
     boolean carry_out = carry_in;
 
@@ -2403,7 +2422,7 @@ boolean BitVector_shift_right(wordptr addr, boolean carry_in)
         msb = mask AND NOT (mask >> 1);
         addr += size-1;
         *addr &= mask;
-        carry_out = ((*addr AND LSB) != 0);
+        carry_out = ((*addr AND BV_LSB) != 0);
         *addr >>= 1;
         if (carry_in) *addr |= msb;
         carry_in = carry_out;
@@ -2411,9 +2430,9 @@ boolean BitVector_shift_right(wordptr addr, boolean carry_in)
         size--;
         while (size-- > 0)
         {
-            carry_out = ((*addr AND LSB) != 0);
+            carry_out = ((*addr AND BV_LSB) != 0);
             *addr >>= 1;
-            if (carry_in) *addr |= MSB;
+            if (carry_in) *addr |= BV_MSB;
             carry_in = carry_out;
             addr--;
         }
@@ -2428,9 +2447,9 @@ void BitVector_Move_Left(wordptr addr, N_int bits)
 
     if (bits > 0)
     {
-        count = bits AND MODMASK;
-        words = bits >> LOGBITS;
-        if (bits >= bits_(addr)) BitVector_Empty(addr);
+        count = bits AND BV_ModMask;
+        words = bits >> BV_LogBits;
+        if (bits >= BV_BITS_(addr)) BitVector_Empty(addr);
         else
         {
             while (count-- > 0) BitVector_shift_left(addr,0);
@@ -2446,9 +2465,9 @@ void BitVector_Move_Right(wordptr addr, N_int bits)
 
     if (bits > 0)
     {
-        count = bits AND MODMASK;
-        words = bits >> LOGBITS;
-        if (bits >= bits_(addr)) BitVector_Empty(addr);
+        count = bits AND BV_ModMask;
+        words = bits >> BV_LogBits;
+        if (bits >= BV_BITS_(addr)) BitVector_Empty(addr);
         else
         {
             while (count-- > 0) BitVector_shift_right(addr,0);
@@ -2459,7 +2478,7 @@ void BitVector_Move_Right(wordptr addr, N_int bits)
 
 void BitVector_Insert(wordptr addr, N_int offset, N_int count, boolean clear)
 {
-    N_word bits = bits_(addr);
+    N_word bits = BV_BITS_(addr);
     N_word last;
 
     if ((count > 0) and (offset < bits))
@@ -2476,7 +2495,7 @@ void BitVector_Insert(wordptr addr, N_int offset, N_int count, boolean clear)
 
 void BitVector_Delete(wordptr addr, N_int offset, N_int count, boolean clear)
 {
-    N_word bits = bits_(addr);
+    N_word bits = BV_BITS_(addr);
     N_word last;
 
     if ((count > 0) and (offset < bits))
@@ -2493,8 +2512,8 @@ void BitVector_Delete(wordptr addr, N_int offset, N_int count, boolean clear)
 
 boolean BitVector_increment(wordptr addr)                   /* X++           */
 {
-    N_word  size  = size_(addr);
-    N_word  mask  = mask_(addr);
+    N_word  size  = BV_SIZE_(addr);
+    N_word  mask  = BV_MASK_(addr);
     wordptr last  = addr + size - 1;
     boolean carry = true;
 
@@ -2512,8 +2531,8 @@ boolean BitVector_increment(wordptr addr)                   /* X++           */
 
 boolean BitVector_decrement(wordptr addr)                   /* X--           */
 {
-    N_word  size  = size_(addr);
-    N_word  mask  = mask_(addr);
+    N_word  size  = BV_SIZE_(addr);
+    N_word  mask  = BV_MASK_(addr);
     wordptr last  = addr + size - 1;
     boolean carry = true;
 
@@ -2532,8 +2551,8 @@ boolean BitVector_decrement(wordptr addr)                   /* X--           */
 
 boolean BitVector_compute(wordptr X, wordptr Y, wordptr Z, boolean minus, boolean *carry)
 {
-    N_word size = size_(X);
-    N_word mask = mask_(X);
+    N_word size = BV_SIZE_(X);
+    N_word mask = BV_MASK_(X);
     N_word vv = 0;
     N_word cc;
     N_word mm;
@@ -2552,23 +2571,23 @@ boolean BitVector_compute(wordptr X, wordptr Y, wordptr Z, boolean minus, boolea
             yy = *Y++;
             if (minus) zz = (N_word) NOT ( Z ? *Z++ : 0 );
             else       zz = (N_word)     ( Z ? *Z++ : 0 );
-            lo = (yy AND LSB) + (zz AND LSB) + cc;
+            lo = (yy AND BV_LSB) + (zz AND BV_LSB) + cc;
             hi = (yy >> 1) + (zz >> 1) + (lo >> 1);
-            cc = ((hi AND MSB) != 0);
-            *X++ = (hi << 1) OR (lo AND LSB);
+            cc = ((hi AND BV_MSB) != 0);
+            *X++ = (hi << 1) OR (lo AND BV_LSB);
         }
         /* deal with most significant word (may be used only partially): */
         yy = *Y AND mask;
         if (minus) zz = (N_word) NOT ( Z ? *Z : 0 );
         else       zz = (N_word)     ( Z ? *Z : 0 );
         zz &= mask;
-        if (mask == LSB) /* special case, only one bit used */
+        if (mask == BV_LSB) /* special case, only one bit used */
         {
             vv = cc;
             lo = yy + zz + cc;
             cc = (lo >> 1);
             vv ^= cc;
-            *X = lo AND LSB;
+            *X = lo AND BV_LSB;
         }
         else
         {
@@ -2586,11 +2605,11 @@ boolean BitVector_compute(wordptr X, wordptr Y, wordptr Z, boolean minus, boolea
             }
             else /* other special case, all bits are used */
             {
-                mm = NOT MSB;
+                mm = NOT BV_MSB;
                 lo = (yy AND mm) + (zz AND mm) + cc;
-                vv = lo AND MSB;
-                hi = ((yy AND MSB) >> 1) + ((zz AND MSB) >> 1) + (vv >> 1);
-                cc = hi AND MSB;
+                vv = lo AND BV_MSB;
+                hi = ((yy AND BV_MSB) >> 1) + ((zz AND BV_MSB) >> 1) + (vv >> 1);
+                cc = hi AND BV_MSB;
                 vv ^= cc;
                 *X = (hi << 1) OR (lo AND mm);
             }
@@ -2627,8 +2646,8 @@ boolean BitVector_dec(wordptr X, wordptr Y)
 
 void BitVector_Negate(wordptr X, wordptr Y)
 {
-    N_word  size  = size_(X);
-    N_word  mask  = mask_(X);
+    N_word  size  = BV_SIZE_(X);
+    N_word  mask  = BV_MASK_(X);
     boolean carry = true;
 
     if (size > 0)
@@ -2648,8 +2667,8 @@ void BitVector_Negate(wordptr X, wordptr Y)
 
 void BitVector_Absolute(wordptr X, wordptr Y)
 {
-    N_word size = size_(Y);
-    N_word mask = mask_(Y);
+    N_word size = BV_SIZE_(Y);
+    N_word mask = BV_MASK_(Y);
 
     if (size > 0)
     {
@@ -2660,8 +2679,8 @@ void BitVector_Absolute(wordptr X, wordptr Y)
 
 Z_int BitVector_Sign(wordptr addr)
 {
-    N_word  size = size_(addr);
-    N_word  mask = mask_(addr);
+    N_word  size = BV_SIZE_(addr);
+    N_word  mask = BV_MASK_(addr);
     wordptr last = addr + size - 1;
     boolean r    = true;
 
@@ -2678,7 +2697,7 @@ Z_int BitVector_Sign(wordptr addr)
     }
 }
 
-ErrCode BitVector_Mul_Pos(wordptr X, wordptr Y, wordptr Z, boolean strict)
+BV_ErrCode BitVector_Mul_Pos(wordptr X, wordptr Y, wordptr Z, boolean strict)
 {
     N_word  mask;
     N_word  limit;
@@ -2699,14 +2718,14 @@ ErrCode BitVector_Mul_Pos(wordptr X, wordptr Y, wordptr Z, boolean strict)
             (only Z is preserved!)
     */
 
-    if ((X == Y) or (X == Z) or (Y == Z)) return(ErrCode_Same);
-    if (bits_(X) != bits_(Y)) return(ErrCode_Size);
+    if ((X == Y) or (X == Z) or (Y == Z)) return(BV_ErrCode_Same);
+    if (BV_BITS_(X) != BV_BITS_(Y)) return(BV_ErrCode_Size);
     BitVector_Empty(X);
-    if (BitVector_is_empty(Y)) return(ErrCode_Ok); /* exit also taken if bits_(Y)==0 */
-    if ((last = Set_Max(Z)) < 0L) return(ErrCode_Ok);
+    if (BitVector_is_empty(Y)) return(BV_ErrCode_Ok); /* also if BV_BITS_(Y)==0 */
+    if ((last = Set_Max(Z)) < 0L) return(BV_ErrCode_Ok);
     limit = (N_word) last;
-    sign = Y + size_(Y) - 1;
-    mask = mask_(Y);
+    sign = Y + BV_SIZE_(Y) - 1;
+    mask = BV_MASK_(Y);
     *sign &= mask;
     mask &= NOT (mask >> 1);
     for ( count = 0; (ok and (count <= limit)); count++ )
@@ -2729,26 +2748,26 @@ ErrCode BitVector_Mul_Pos(wordptr X, wordptr Y, wordptr Z, boolean strict)
             else ok = not carry;
         }
     }
-    if (ok) return(ErrCode_Ok); else return(ErrCode_Ovfl);
+    if (ok) return(BV_ErrCode_Ok); else return(BV_ErrCode_Ovfl);
 }
 
-ErrCode BitVector_Multiply(wordptr X, wordptr Y, wordptr Z)
+BV_ErrCode BitVector_Multiply(wordptr X, wordptr Y, wordptr Z)
 {
-    ErrCode error = ErrCode_Ok;
-    N_word  bit_x = bits_(X);
-    N_word  bit_y = bits_(Y);
-    N_word  bit_z = bits_(Z);
-    N_word  size;
-    N_word  mask;
-    N_word  msb;
-    wordptr ptr_y;
-    wordptr ptr_z;
-    boolean sgn_x;
-    boolean sgn_y;
-    boolean sgn_z;
-    boolean zero;
-    wordptr A;
-    wordptr B;
+    BV_ErrCode error = BV_ErrCode_Ok;
+    N_word     bit_x = BV_BITS_(X);
+    N_word     bit_y = BV_BITS_(Y);
+    N_word     bit_z = BV_BITS_(Z);
+    N_word     size;
+    N_word     mask;
+    N_word     msb;
+    wordptr    ptr_y;
+    wordptr    ptr_z;
+    boolean    sgn_x;
+    boolean    sgn_y;
+    boolean    sgn_z;
+    boolean    zero;
+    wordptr    A;
+    wordptr    B;
 
     /*
        Requirements:
@@ -2760,7 +2779,7 @@ ErrCode BitVector_Multiply(wordptr X, wordptr Y, wordptr Z)
             (in-place multiplication is possible!)
     */
 
-    if ((bit_y != bit_z) or (bit_x < bit_y)) return(ErrCode_Size);
+    if ((bit_y != bit_z) or (bit_x < bit_y)) return(BV_ErrCode_Size);
     if (BitVector_is_empty(Y) or BitVector_is_empty(Z))
     {
         BitVector_Empty(X);
@@ -2768,11 +2787,11 @@ ErrCode BitVector_Multiply(wordptr X, wordptr Y, wordptr Z)
     else
     {
         A = BitVector_Create(bit_y,false);
-        if (A == NULL) return(ErrCode_Null);
+        if (A == NULL) return(BV_ErrCode_Null);
         B = BitVector_Create(bit_z,false);
-        if (B == NULL) { BitVector_Destroy(A); return(ErrCode_Null); }
-        size  = size_(Y);
-        mask  = mask_(Y);
+        if (B == NULL) { BitVector_Destroy(A); return(BV_ErrCode_Null); }
+        size  = BV_SIZE_(Y);
+        mask  = BV_MASK_(Y);
         msb   = (mask AND NOT (mask >> 1));
         sgn_y = (((*(Y+size-1) &= mask) AND msb) != 0);
         sgn_z = (((*(Z+size-1) &= mask) AND msb) != 0);
@@ -2792,7 +2811,7 @@ ErrCode BitVector_Multiply(wordptr X, wordptr Y, wordptr Z)
             if (bit_x > bit_y)
             {
                 A = BitVector_Resize(A,bit_x);
-                if (A == NULL) { BitVector_Destroy(B); return(ErrCode_Null); }
+                if (A == NULL) { BitVector_Destroy(B); return(BV_ErrCode_Null); }
             }
             error = BitVector_Mul_Pos(X,A,B,true);
         }
@@ -2801,7 +2820,7 @@ ErrCode BitVector_Multiply(wordptr X, wordptr Y, wordptr Z)
             if (bit_x > bit_z)
             {
                 B = BitVector_Resize(B,bit_x);
-                if (B == NULL) { BitVector_Destroy(A); return(ErrCode_Null); }
+                if (B == NULL) { BitVector_Destroy(A); return(BV_ErrCode_Null); }
             }
             error = BitVector_Mul_Pos(X,B,A,true);
         }
@@ -2812,9 +2831,9 @@ ErrCode BitVector_Multiply(wordptr X, wordptr Y, wordptr Z)
     return(error);
 }
 
-ErrCode BitVector_Div_Pos(wordptr Q, wordptr X, wordptr Y, wordptr R)
+BV_ErrCode BitVector_Div_Pos(wordptr Q, wordptr X, wordptr Y, wordptr R)
 {
-    N_word  bits = bits_(Q);
+    N_word  bits = BV_BITS_(Q);
     N_word  mask;
     wordptr addr;
     Z_long  last;
@@ -2831,21 +2850,21 @@ ErrCode BitVector_Div_Pos(wordptr Q, wordptr X, wordptr Y, wordptr R)
             (only Y is preserved!)
     */
 
-    if ((bits != bits_(X)) or (bits != bits_(Y)) or (bits != bits_(R)))
-        return(ErrCode_Size);
+    if ((bits != BV_BITS_(X)) or (bits != BV_BITS_(Y)) or (bits != BV_BITS_(R)))
+        return(BV_ErrCode_Size);
     if ((Q == X) or (Q == Y) or (Q == R) or (X == Y) or (X == R) or (Y == R))
-        return(ErrCode_Same);
+        return(BV_ErrCode_Same);
     if (BitVector_is_empty(Y))
-        return(ErrCode_Zero);
+        return(BV_ErrCode_Zero);
 
     BitVector_Empty(R);
     BitVector_Copy(Q,X);
-    if ((last = Set_Max(Q)) < 0L) return(ErrCode_Ok);
+    if ((last = Set_Max(Q)) < 0L) return(BV_ErrCode_Ok);
     bits = (N_word) ++last;
     while (bits-- > 0)
     {
-        addr = Q + (bits >> LOGBITS);
-        mask = BITMASKTAB[bits AND MODMASK];
+        addr = Q + (bits >> BV_LogBits);
+        mask = BV_BitMaskTab[bits AND BV_ModMask];
         flag = ((*addr AND mask) != 0);
         if (copy)
         {
@@ -2867,21 +2886,21 @@ ErrCode BitVector_Div_Pos(wordptr Q, wordptr X, wordptr Y, wordptr R)
         }
     }
     if (copy) BitVector_Copy(R,X);
-    return(ErrCode_Ok);
+    return(BV_ErrCode_Ok);
 }
 
-ErrCode BitVector_Divide(wordptr Q, wordptr X, wordptr Y, wordptr R)
+BV_ErrCode BitVector_Divide(wordptr Q, wordptr X, wordptr Y, wordptr R)
 {
-    ErrCode error = ErrCode_Ok;
-    N_word  bits = bits_(Q);
-    N_word  size = size_(Q);
-    N_word  mask = mask_(Q);
-    N_word  msb = (mask AND NOT (mask >> 1));
-    boolean sgn_q;
-    boolean sgn_x;
-    boolean sgn_y;
-    wordptr A;
-    wordptr B;
+    BV_ErrCode error = BV_ErrCode_Ok;
+    N_word     bits  = BV_BITS_(Q);
+    N_word     size  = BV_SIZE_(Q);
+    N_word     mask  = BV_MASK_(Q);
+    N_word     msb   = (mask AND NOT (mask >> 1));
+    boolean    sgn_q;
+    boolean    sgn_x;
+    boolean    sgn_y;
+    wordptr    A;
+    wordptr    B;
 
     /*
        Requirements:
@@ -2896,12 +2915,12 @@ ErrCode BitVector_Divide(wordptr Q, wordptr X, wordptr Y, wordptr R)
             (but not identical with Q!)
     */
 
-    if ((bits != bits_(X)) or (bits != bits_(Y)) or (bits != bits_(R)))
-        return(ErrCode_Size);
+    if ((bits != BV_BITS_(X)) or (bits != BV_BITS_(Y)) or (bits != BV_BITS_(R)))
+        return(BV_ErrCode_Size);
     if (Q == R)
-        return(ErrCode_Same);
+        return(BV_ErrCode_Same);
     if (BitVector_is_empty(Y))
-        return(ErrCode_Zero);
+        return(BV_ErrCode_Zero);
 
     if (BitVector_is_empty(X))
     {
@@ -2911,9 +2930,9 @@ ErrCode BitVector_Divide(wordptr Q, wordptr X, wordptr Y, wordptr R)
     else
     {
         A = BitVector_Create(bits,false);
-        if (A == NULL) return(ErrCode_Null);
+        if (A == NULL) return(BV_ErrCode_Null);
         B = BitVector_Create(bits,false);
-        if (B == NULL) { BitVector_Destroy(A); return(ErrCode_Null); }
+        if (B == NULL) { BitVector_Destroy(A); return(BV_ErrCode_Null); }
         size--;
         sgn_x = (((*(X+size) &= mask) AND msb) != 0);
         sgn_y = (((*(Y+size) &= mask) AND msb) != 0);
@@ -2931,21 +2950,21 @@ ErrCode BitVector_Divide(wordptr Q, wordptr X, wordptr Y, wordptr R)
     return(error);
 }
 
-ErrCode BitVector_GCD(wordptr X, wordptr Y, wordptr Z)
+BV_ErrCode BitVector_GCD(wordptr X, wordptr Y, wordptr Z)
 {
-    ErrCode error = ErrCode_Ok;
-    N_word  bits = bits_(X);
-    N_word  size = size_(X);
-    N_word  mask = mask_(X);
-    N_word  msb = (mask AND NOT (mask >> 1));
-    boolean sgn_a;
-    boolean sgn_b;
-    boolean sgn_r;
-    wordptr Q;
-    wordptr R;
-    wordptr A;
-    wordptr B;
-    wordptr T;
+    BV_ErrCode error = BV_ErrCode_Ok;
+    N_word     bits  = BV_BITS_(X);
+    N_word     size  = BV_SIZE_(X);
+    N_word     mask  = BV_MASK_(X);
+    N_word     msb   = (mask AND NOT (mask >> 1));
+    boolean    sgn_a;
+    boolean    sgn_b;
+    boolean    sgn_r;
+    wordptr    Q;
+    wordptr    R;
+    wordptr    A;
+    wordptr    B;
+    wordptr    T;
 
     /*
        Requirements:
@@ -2958,34 +2977,34 @@ ErrCode BitVector_GCD(wordptr X, wordptr Y, wordptr Z)
          -  negative values are handled correctly
     */
 
-    if ((bits != bits_(Y)) or (bits != bits_(Z))) return(ErrCode_Size);
+    if ((bits != BV_BITS_(Y)) or (bits != BV_BITS_(Z))) return(BV_ErrCode_Size);
     if (BitVector_is_empty(Y))
     {
         if (X != Z) BitVector_Copy(X,Z);
-        return(ErrCode_Ok);
+        return(BV_ErrCode_Ok);
     }
     if (BitVector_is_empty(Z))
     {
         if (X != Y) BitVector_Copy(X,Y);
-        return(ErrCode_Ok);
+        return(BV_ErrCode_Ok);
     }
     Q = BitVector_Create(bits,false);
     if (Q == NULL)
     {
-        return(ErrCode_Null);
+        return(BV_ErrCode_Null);
     }
     R = BitVector_Create(bits,false);
     if (R == NULL)
     {
         BitVector_Destroy(Q);
-        return(ErrCode_Null);
+        return(BV_ErrCode_Null);
     }
     A = BitVector_Create(bits,false);
     if (A == NULL)
     {
         BitVector_Destroy(Q);
         BitVector_Destroy(R);
-        return(ErrCode_Null);
+        return(BV_ErrCode_Null);
     }
     B = BitVector_Create(bits,false);
     if (B == NULL)
@@ -2993,7 +3012,7 @@ ErrCode BitVector_GCD(wordptr X, wordptr Y, wordptr Z)
         BitVector_Destroy(Q);
         BitVector_Destroy(R);
         BitVector_Destroy(A);
-        return(ErrCode_Null);
+        return(BV_ErrCode_Null);
     }
     size--;
     sgn_a = (((*(Y+size) &= mask) AND msb) != 0);
@@ -3022,34 +3041,34 @@ ErrCode BitVector_GCD(wordptr X, wordptr Y, wordptr Z)
     return(error);
 }
 
-ErrCode BitVector_GCD2(wordptr U, wordptr V, wordptr W, wordptr X, wordptr Y)
+BV_ErrCode BitVector_GCD2(wordptr U, wordptr V, wordptr W, wordptr X, wordptr Y)
 {
-    ErrCode error = ErrCode_Ok;
-    N_word  bits = bits_(U);
-    N_word  size = size_(U);
-    N_word  mask = mask_(U);
-    N_word  msb = (mask AND NOT (mask >> 1));
-    boolean minus;
-    boolean carry;
-    boolean sgn_q;
-    boolean sgn_r;
-    boolean sgn_a;
-    boolean sgn_b;
-    boolean sgn_x;
-    boolean sgn_y;
-    listptr L;
-    wordptr Q;
-    wordptr R;
-    wordptr A;
-    wordptr B;
-    wordptr T;
-    wordptr X1;
-    wordptr X2;
-    wordptr X3;
-    wordptr Y1;
-    wordptr Y2;
-    wordptr Y3;
-    wordptr Z;
+    BV_ErrCode error = BV_ErrCode_Ok;
+    N_word     bits  = BV_BITS_(U);
+    N_word     size  = BV_SIZE_(U);
+    N_word     mask  = BV_MASK_(U);
+    N_word     msb   = (mask AND NOT (mask >> 1));
+    bv_listptr L;
+    boolean    minus;
+    boolean    carry;
+    boolean    sgn_q;
+    boolean    sgn_r;
+    boolean    sgn_a;
+    boolean    sgn_b;
+    boolean    sgn_x;
+    boolean    sgn_y;
+    wordptr    Q;
+    wordptr    R;
+    wordptr    A;
+    wordptr    B;
+    wordptr    T;
+    wordptr    X1;
+    wordptr    X2;
+    wordptr    X3;
+    wordptr    Y1;
+    wordptr    Y2;
+    wordptr    Y3;
+    wordptr    Z;
 
     /*
        Requirements:
@@ -3064,36 +3083,40 @@ ErrCode BitVector_GCD2(wordptr U, wordptr V, wordptr W, wordptr X, wordptr Y)
          -  negative values are handled correctly
     */
 
-    if ((bits != bits_(V)) or
-        (bits != bits_(W)) or
-        (bits != bits_(X)) or
-        (bits != bits_(Y)))
+    if ((bits != BV_BITS_(V)) or
+        (bits != BV_BITS_(W)) or
+        (bits != BV_BITS_(X)) or
+        (bits != BV_BITS_(Y)))
     {
-        return(ErrCode_Size);
+        return(BV_ErrCode_Size);
     }
     if ((U == V) or (U == W) or (V == W))
     {
-        return(ErrCode_Same);
+        return(BV_ErrCode_Same);
+    }
+    if ((bits == 0) or (size == 0))
+    {
+        return(BV_ErrCode_Ok);
     }
     if (BitVector_is_empty(X))
     {
         if (U != Y) BitVector_Copy(U,Y);
         BitVector_Empty(V);
         BitVector_Empty(W);
-        *W = 1;
-        return(ErrCode_Ok);
+        if (BV_SIZE_(W)) *W = 1;
+        return(BV_ErrCode_Ok);
     }
     if (BitVector_is_empty(Y))
     {
         if (U != X) BitVector_Copy(U,X);
         BitVector_Empty(V);
         BitVector_Empty(W);
-        *V = 1;
-        return(ErrCode_Ok);
+        if (BV_SIZE_(V)) *V = 1;
+        return(BV_ErrCode_Ok);
     }
     if ((L = BitVector_Create_List(bits,false,11)) == NULL)
     {
-        return(ErrCode_Null);
+        return(BV_ErrCode_Null);
     }
     Q  = L[0];
     R  = L[1];
@@ -3140,7 +3163,7 @@ ErrCode BitVector_GCD2(wordptr U, wordptr V, wordptr W, wordptr X, wordptr Y)
         carry = 0;
         if (BitVector_compute(X3,X1,X3,minus,&carry))
         {
-            error = ErrCode_Ovfl;
+            error = BV_ErrCode_Ovfl;
             break;
         }
         sgn_x = (((*(X3+size) &= mask) AND msb) != 0);
@@ -3154,7 +3177,7 @@ ErrCode BitVector_GCD2(wordptr U, wordptr V, wordptr W, wordptr X, wordptr Y)
         carry = 0;
         if (BitVector_compute(Y3,Y1,Y3,minus,&carry))
         {
-            error = ErrCode_Ovfl;
+            error = BV_ErrCode_Ovfl;
             break;
         }
         sgn_y = (((*(Y3+size) &= mask) AND msb) != 0);
@@ -3184,15 +3207,15 @@ ErrCode BitVector_GCD2(wordptr U, wordptr V, wordptr W, wordptr X, wordptr Y)
     return(error);
 }
 
-ErrCode BitVector_Power(wordptr X, wordptr Y, wordptr Z)
+BV_ErrCode BitVector_Power(wordptr X, wordptr Y, wordptr Z)
 {
-    ErrCode error = ErrCode_Ok;
-    N_word  bits  = bits_(X);
-    boolean first = true;
-    Z_long  last;
-    N_word  limit;
-    N_word  count;
-    wordptr T;
+    BV_ErrCode error = BV_ErrCode_Ok;
+    N_word     bits  = BV_BITS_(X);
+    boolean    first = true;
+    Z_long     last;
+    N_word     limit;
+    N_word     count;
+    wordptr    T;
 
     /*
        Requirements:
@@ -3203,23 +3226,23 @@ ErrCode BitVector_Power(wordptr X, wordptr Y, wordptr Z)
          -  The contents of Y and Z are preserved
     */
 
-    if (X == Z) return(ErrCode_Same);
-    if (bits < bits_(Y)) return(ErrCode_Size);
-    if (BitVector_msb_(Z)) return(ErrCode_Expo);
+    if (X == Z) return(BV_ErrCode_Same);
+    if (bits < BV_BITS_(Y)) return(BV_ErrCode_Size);
+    if (BitVector_msb_(Z)) return(BV_ErrCode_Expo);
     if ((last = Set_Max(Z)) < 0L)
     {
-        if (bits < 2) return(ErrCode_Ovfl);
+        if (bits < 2) return(BV_ErrCode_Ovfl);
         BitVector_Empty(X);
-        *X |= LSB;
-        return(ErrCode_Ok);                             /* anything ^ 0 == 1 */
+        *X |= BV_LSB;
+        return(BV_ErrCode_Ok);                          /* anything ^ 0 == 1 */
     }
     if (BitVector_is_empty(Y))
     {
         if (X != Y) BitVector_Empty(X);
-        return(ErrCode_Ok);                    /* 0 ^ anything not zero == 0 */
+        return(BV_ErrCode_Ok);                 /* 0 ^ anything not zero == 0 */
     }
     T = BitVector_Create(bits,false);
-    if (T == NULL) return(ErrCode_Null);
+    if (T == NULL) return(BV_ErrCode_Null);
     limit = (N_word) last;
     for ( count = 0; ((!error) and (count <= limit)); count++ )
     {
@@ -3245,8 +3268,8 @@ ErrCode BitVector_Power(wordptr X, wordptr Y, wordptr Z)
 
 void BitVector_Block_Store(wordptr addr, charptr buffer, N_int length)
 {
-    N_word  size = size_(addr);
-    N_word  mask = mask_(addr);
+    N_word  size = BV_SIZE_(addr);
+    N_word  mask = BV_MASK_(addr);
     N_word  value;
     N_word  count;
 
@@ -3256,7 +3279,7 @@ void BitVector_Block_Store(wordptr addr, charptr buffer, N_int length)
         while (size-- > 0)
         {
             value = 0;
-            for ( count = 0; (length > 0) and (count < BITS); count += 8 )
+            for ( count = 0; (length > 0) and (count < BV_WordBits); count += 8 )
             {
                 value |= (((N_word) *buffer++) << count); length--;
             }
@@ -3268,24 +3291,24 @@ void BitVector_Block_Store(wordptr addr, charptr buffer, N_int length)
 
 charptr BitVector_Block_Read(wordptr addr, N_intptr length)
 {
-    N_word  size = size_(addr);
+    N_word  size = BV_SIZE_(addr);
     N_word  value;
     N_word  count;
     charptr buffer;
     charptr target;
 
     /* provide translation for independence of endian-ness: */
-    *length = size << FACTOR;
+    *length = size << BV_Factor;
     buffer = (charptr) malloc((size_t) ((*length)+1));
     if (buffer == NULL) return(NULL);
     target = buffer;
     if (size > 0)
     {
-        *(addr+size-1) &= mask_(addr);
+        *(addr+size-1) &= BV_MASK_(addr);
         while (size-- > 0)
         {
             value = *addr++;
-            count = BITS >> 3;
+            count = BV_WordBits >> 3;
             while (count-- > 0)
             {
                 *target++ = (N_char) (value AND 0x00FF);
@@ -3299,22 +3322,22 @@ charptr BitVector_Block_Read(wordptr addr, N_intptr length)
 
 void BitVector_Word_Store(wordptr addr, N_int offset, N_int value)
 {
-    N_word size = size_(addr);
+    N_word size = BV_SIZE_(addr);
 
     if (size > 0)
     {
         if (offset < size) *(addr+offset) = value;
-        *(addr+size-1) &= mask_(addr);
+        *(addr+size-1) &= BV_MASK_(addr);
     }
 }
 
 N_int BitVector_Word_Read(wordptr addr, N_int offset)
 {
-    N_word size = size_(addr);
+    N_word size = BV_SIZE_(addr);
 
     if (size > 0)
     {
-        *(addr+size-1) &= mask_(addr);
+        *(addr+size-1) &= BV_MASK_(addr);
         if (offset < size) return( *(addr+offset) );
     }
     return( (N_int) 0 );
@@ -3323,8 +3346,8 @@ N_int BitVector_Word_Read(wordptr addr, N_int offset)
 void BitVector_Word_Insert(wordptr addr, N_int offset, N_int count,
                            boolean clear)
 {
-    N_word  size = size_(addr);
-    N_word  mask = mask_(addr);
+    N_word  size = BV_SIZE_(addr);
+    N_word  mask = BV_MASK_(addr);
     wordptr last = addr+size-1;
 
     if (size > 0)
@@ -3339,8 +3362,8 @@ void BitVector_Word_Insert(wordptr addr, N_int offset, N_int count,
 void BitVector_Word_Delete(wordptr addr, N_int offset, N_int count,
                            boolean clear)
 {
-    N_word  size = size_(addr);
-    N_word  mask = mask_(addr);
+    N_word  size = BV_SIZE_(addr);
+    N_word  mask = BV_MASK_(addr);
     wordptr last = addr+size-1;
 
     if (size > 0)
@@ -3355,26 +3378,26 @@ void BitVector_Word_Delete(wordptr addr, N_int offset, N_int count,
 void BitVector_Chunk_Store(wordptr addr, N_int chunksize, N_int offset,
                            N_long value)
 {
-    N_word bits = bits_(addr);
+    N_word bits = BV_BITS_(addr);
     N_word mask;
     N_word temp;
 
     if ((chunksize > 0) and (offset < bits))
     {
-        if (chunksize > LONGBITS) chunksize = LONGBITS;
+        if (chunksize > BV_LongBits) chunksize = BV_LongBits;
         if ((offset + chunksize) > bits) chunksize = bits - offset;
-        addr += offset >> LOGBITS;
-        offset &= MODMASK;
+        addr += offset >> BV_LogBits;
+        offset &= BV_ModMask;
         while (chunksize > 0)
         {
             mask = (N_word) (~0L << offset);
             bits = offset + chunksize;
-            if (bits < BITS)
+            if (bits < BV_WordBits)
             {
                 mask &= (N_word) ~(~0L << bits);
                 bits = chunksize;
             }
-            else bits = BITS - offset;
+            else bits = BV_WordBits - offset;
             temp = (N_word) (value << offset);
             temp &= mask;
             *addr &= NOT mask;
@@ -3388,7 +3411,7 @@ void BitVector_Chunk_Store(wordptr addr, N_int chunksize, N_int offset,
 
 N_long BitVector_Chunk_Read(wordptr addr, N_int chunksize, N_int offset)
 {
-    N_word bits = bits_(addr);
+    N_word bits = BV_BITS_(addr);
     N_word chunkbits = 0;
     N_long value = 0L;
     N_long temp;
@@ -3396,14 +3419,14 @@ N_long BitVector_Chunk_Read(wordptr addr, N_int chunksize, N_int offset)
 
     if ((chunksize > 0) and (offset < bits))
     {
-        if (chunksize > LONGBITS) chunksize = LONGBITS;
+        if (chunksize > BV_LongBits) chunksize = BV_LongBits;
         if ((offset + chunksize) > bits) chunksize = bits - offset;
-        addr += offset >> LOGBITS;
-        offset &= MODMASK;
+        addr += offset >> BV_LogBits;
+        offset &= BV_ModMask;
         while (chunksize > 0)
         {
             bits = offset + chunksize;
-            if (bits < BITS)
+            if (bits < BV_WordBits)
             {
                 mask = (N_word) ~(~0L << bits);
                 bits = chunksize;
@@ -3411,7 +3434,7 @@ N_long BitVector_Chunk_Read(wordptr addr, N_int chunksize, N_int offset)
             else
             {
                 mask = (N_word) ~0L;
-                bits = BITS - offset;
+                bits = BV_WordBits - offset;
             }
             temp = (N_long) ((*addr++ AND mask) >> offset);
             value |= temp << chunkbits;
@@ -3429,11 +3452,11 @@ N_long BitVector_Chunk_Read(wordptr addr, N_int chunksize, N_int offset)
 
 void Set_Union(wordptr X, wordptr Y, wordptr Z)             /* X = Y + Z     */
 {
-    N_word bits = bits_(X);
-    N_word size = size_(X);
-    N_word mask = mask_(X);
+    N_word bits = BV_BITS_(X);
+    N_word size = BV_SIZE_(X);
+    N_word mask = BV_MASK_(X);
 
-    if ((size > 0) and (bits == bits_(Y)) and (bits == bits_(Z)))
+    if ((size > 0) and (bits == BV_BITS_(Y)) and (bits == BV_BITS_(Z)))
     {
         while (size-- > 0) *X++ = *Y++ OR *Z++;
         *(--X) &= mask;
@@ -3442,11 +3465,11 @@ void Set_Union(wordptr X, wordptr Y, wordptr Z)             /* X = Y + Z     */
 
 void Set_Intersection(wordptr X, wordptr Y, wordptr Z)      /* X = Y * Z     */
 {
-    N_word bits = bits_(X);
-    N_word size = size_(X);
-    N_word mask = mask_(X);
+    N_word bits = BV_BITS_(X);
+    N_word size = BV_SIZE_(X);
+    N_word mask = BV_MASK_(X);
 
-    if ((size > 0) and (bits == bits_(Y)) and (bits == bits_(Z)))
+    if ((size > 0) and (bits == BV_BITS_(Y)) and (bits == BV_BITS_(Z)))
     {
         while (size-- > 0) *X++ = *Y++ AND *Z++;
         *(--X) &= mask;
@@ -3455,11 +3478,11 @@ void Set_Intersection(wordptr X, wordptr Y, wordptr Z)      /* X = Y * Z     */
 
 void Set_Difference(wordptr X, wordptr Y, wordptr Z)        /* X = Y \ Z     */
 {
-    N_word bits = bits_(X);
-    N_word size = size_(X);
-    N_word mask = mask_(X);
+    N_word bits = BV_BITS_(X);
+    N_word size = BV_SIZE_(X);
+    N_word mask = BV_MASK_(X);
 
-    if ((size > 0) and (bits == bits_(Y)) and (bits == bits_(Z)))
+    if ((size > 0) and (bits == BV_BITS_(Y)) and (bits == BV_BITS_(Z)))
     {
         while (size-- > 0) *X++ = *Y++ AND NOT *Z++;
         *(--X) &= mask;
@@ -3468,11 +3491,11 @@ void Set_Difference(wordptr X, wordptr Y, wordptr Z)        /* X = Y \ Z     */
 
 void Set_ExclusiveOr(wordptr X, wordptr Y, wordptr Z)       /* X=(Y+Z)\(Y*Z) */
 {
-    N_word bits = bits_(X);
-    N_word size = size_(X);
-    N_word mask = mask_(X);
+    N_word bits = BV_BITS_(X);
+    N_word size = BV_SIZE_(X);
+    N_word mask = BV_MASK_(X);
 
-    if ((size > 0) and (bits == bits_(Y)) and (bits == bits_(Z)))
+    if ((size > 0) and (bits == BV_BITS_(Y)) and (bits == BV_BITS_(Z)))
     {
         while (size-- > 0) *X++ = *Y++ XOR *Z++;
         *(--X) &= mask;
@@ -3481,10 +3504,10 @@ void Set_ExclusiveOr(wordptr X, wordptr Y, wordptr Z)       /* X=(Y+Z)\(Y*Z) */
 
 void Set_Complement(wordptr X, wordptr Y)                   /* X = ~Y        */
 {
-    N_word size = size_(X);
-    N_word mask = mask_(X);
+    N_word size = BV_SIZE_(X);
+    N_word mask = BV_MASK_(X);
 
-    if ((size > 0) and (bits_(X) == bits_(Y)))
+    if ((size > 0) and (BV_BITS_(X) == BV_BITS_(Y)))
     {
         while (size-- > 0) *X++ = NOT *Y++;
         *(--X) &= mask;
@@ -3497,10 +3520,10 @@ void Set_Complement(wordptr X, wordptr Y)                   /* X = ~Y        */
 
 boolean Set_subset(wordptr X, wordptr Y)                    /* X subset Y ?  */
 {
-    N_word size = size_(X);
+    N_word size = BV_SIZE_(X);
     boolean r = false;
 
-    if ((size > 0) and (bits_(X) == bits_(Y)))
+    if ((size > 0) and (BV_BITS_(X) == BV_BITS_(Y)))
     {
         r = true;
         while (r and (size-- > 0)) r = ((*X++ AND NOT *Y++) == 0);
@@ -3515,18 +3538,18 @@ N_int Set_Norm(wordptr addr)                                /* = | X |       */
     N_int   n;
 
     byte = (byteptr) addr;
-    bytes = size_(addr) << FACTOR;
+    bytes = BV_SIZE_(addr) << BV_Factor;
     n = 0;
     while (bytes-- > 0)
     {
-        n += BitVector_BYTENORM[*byte++];
+        n += BV_ByteNorm[*byte++];
     }
     return(n);
 }
 
 N_int Set_Norm2(wordptr addr)                               /* = | X |       */
 {
-    N_word  size = size_(addr);
+    N_word  size = BV_SIZE_(addr);
     N_word  w0,w1;
     N_int   n,k;
 
@@ -3542,14 +3565,14 @@ N_int Set_Norm2(wordptr addr)                               /* = | X |       */
             k++;
         }
         if (w0 == 0) n += k;
-        else         n += BITS - k;
+        else         n += BV_WordBits - k;
     }
     return(n);
 }
 
 N_int Set_Norm3(wordptr addr)                               /* = | X |       */
 {
-    N_word  size  = size_(addr);
+    N_word  size  = BV_SIZE_(addr);
     N_int   count = 0;
     N_word  c;
 
@@ -3568,7 +3591,7 @@ N_int Set_Norm3(wordptr addr)                               /* = | X |       */
 Z_long Set_Min(wordptr addr)                                /* = min(X)      */
 {
     boolean empty = true;
-    N_word  size  = size_(addr);
+    N_word  size  = BV_SIZE_(addr);
     N_word  i     = 0;
     N_word  c     = 0;         /* silence compiler warning */
 
@@ -3577,8 +3600,8 @@ Z_long Set_Min(wordptr addr)                                /* = min(X)      */
         if ((c = *addr++)) empty = false; else i++;
     }
     if (empty) return((Z_long) LONG_MAX);                  /* plus infinity  */
-    i <<= LOGBITS;
-    while (not (c AND LSB))
+    i <<= BV_LogBits;
+    while (not (c AND BV_LSB))
     {
         c >>= 1;
         i++;
@@ -3589,7 +3612,7 @@ Z_long Set_Min(wordptr addr)                                /* = min(X)      */
 Z_long Set_Max(wordptr addr)                                /* = max(X)      */
 {
     boolean empty = true;
-    N_word  size  = size_(addr);
+    N_word  size  = BV_SIZE_(addr);
     N_word  i     = size;
     N_word  c     = 0;         /* silence compiler warning */
 
@@ -3599,8 +3622,8 @@ Z_long Set_Max(wordptr addr)                                /* = max(X)      */
         if ((c = *addr--)) empty = false; else i--;
     }
     if (empty) return((Z_long) LONG_MIN);                  /* minus infinity */
-    i <<= LOGBITS;
-    while (not (c AND MSB))
+    i <<= BV_LogBits;
+    while (not (c AND BV_MSB))
     {
         c <<= 1;
         i--;
@@ -3627,9 +3650,9 @@ void Matrix_Multiplication(wordptr X, N_int rowsX, N_int colsX,
     N_word sum;
 
   if ((colsY == rowsZ) and (rowsX == rowsY) and (colsX == colsZ) and
-      (bits_(X) == rowsX*colsX) and
-      (bits_(Y) == rowsY*colsY) and
-      (bits_(Z) == rowsZ*colsZ))
+      (BV_BITS_(X) == rowsX*colsX) and
+      (BV_BITS_(Y) == rowsY*colsY) and
+      (BV_BITS_(Z) == rowsZ*colsZ))
   {
     for ( i = 0; i < rowsY; i++ )
     {
@@ -3668,9 +3691,9 @@ void Matrix_Product(wordptr X, N_int rowsX, N_int colsX,
     N_word sum;
 
   if ((colsY == rowsZ) and (rowsX == rowsY) and (colsX == colsZ) and
-      (bits_(X) == rowsX*colsX) and
-      (bits_(Y) == rowsY*colsY) and
-      (bits_(Z) == rowsZ*colsZ))
+      (BV_BITS_(X) == rowsX*colsX) and
+      (BV_BITS_(Y) == rowsY*colsY) and
+      (BV_BITS_(Z) == rowsZ*colsZ))
   {
     for ( i = 0; i < rowsY; i++ )
     {
@@ -3706,7 +3729,7 @@ void Matrix_Closure(wordptr addr, N_int rows, N_int cols)
     N_word termi;
     N_word termk;
 
-  if ((rows == cols) and (bits_(addr) == rows*cols))
+  if ((rows == cols) and (BV_BITS_(addr) == rows*cols))
   {
     for ( i = 0; i < rows; i++ )
     {
@@ -3754,8 +3777,8 @@ void Matrix_Transpose(wordptr X, N_int rowsX, N_int colsX,
   /* BEWARE that "in-place" is ONLY possible if the matrix is quadratic!! */
 
   if ((rowsX == colsY) and (colsX == rowsY) and
-      (bits_(X) == rowsX*colsX) and
-      (bits_(Y) == rowsY*colsY))
+      (BV_BITS_(X) == rowsX*colsX) and
+      (BV_BITS_(Y) == rowsY*colsY))
   {
     if (rowsY == colsY) /* in-place is possible! */
     {
@@ -3767,10 +3790,10 @@ void Matrix_Transpose(wordptr X, N_int rowsX, N_int colsX,
                 termj = j * colsX;
                 ij = termi + j;
                 ji = termj + i;
-                addij = ij >> LOGBITS;
-                addji = ji >> LOGBITS;
-                bitij = BITMASKTAB[ij AND MODMASK];
-                bitji = BITMASKTAB[ji AND MODMASK];
+                addij = ij >> BV_LogBits;
+                addji = ji >> BV_LogBits;
+                bitij = BV_BitMaskTab[ij AND BV_ModMask];
+                bitji = BV_BitMaskTab[ji AND BV_ModMask];
                 swap = ((*(Y+addij) AND bitij) != 0);
                 if ((*(Y+addji) AND bitji) != 0)
                      *(X+addij) |=     bitij;
@@ -3782,8 +3805,8 @@ void Matrix_Transpose(wordptr X, N_int rowsX, N_int colsX,
                      *(X+addji) &= NOT bitji;
             }
             ii = termi + i;
-            addii = ii >> LOGBITS;
-            bitii = BITMASKTAB[ii AND MODMASK];
+            addii = ii >> BV_LogBits;
+            bitii = BV_BitMaskTab[ii AND BV_ModMask];
             if ((*(Y+addii) AND bitii) != 0)
                  *(X+addii) |=     bitii;
             else
@@ -3800,10 +3823,10 @@ void Matrix_Transpose(wordptr X, N_int rowsX, N_int colsX,
                 termj = j * colsX;
                 ij = termi + j;
                 ji = termj + i;
-                addij = ij >> LOGBITS;
-                addji = ji >> LOGBITS;
-                bitij = BITMASKTAB[ij AND MODMASK];
-                bitji = BITMASKTAB[ji AND MODMASK];
+                addij = ij >> BV_LogBits;
+                addji = ji >> BV_LogBits;
+                bitij = BV_BitMaskTab[ij AND BV_ModMask];
+                bitji = BV_BitMaskTab[ji AND BV_ModMask];
                 if ((*(Y+addij) AND bitij) != 0)
                      *(X+addji) |=     bitji;
                 else
@@ -3815,11 +3838,21 @@ void Matrix_Transpose(wordptr X, N_int rowsX, N_int colsX,
 }
 
 /*****************************************************************************/
-/*  VERSION:  6.4                                                            */
+/*  VERSION:  7.4                                                            */
 /*****************************************************************************/
 /*  VERSION HISTORY:                                                         */
 /*****************************************************************************/
 /*                                                                           */
+/*    Version 7.4  03.09.13  No changes.                                     */
+/*    Version 7.3  01.06.13  No changes.                                     */
+/*    Version 7.2  17.05.12  No changes.                                     */
+/*    Version 7.1  29.09.09  Added prefix "BV_" to all global identifiers.   */
+/*    Version 7.0  22.08.09  Fixed bugs in "GCD2()" and "Boot()".            */
+/*    Version 6.9  12.08.09  Removed an obsolete warning (memory leak).      */
+/*    Version 6.8  10.08.09  Fixed hard-coded table size BV_MASKTABSIZE.     */
+/*    Version 6.7  08.08.09  No changes.                                     */
+/*    Version 6.6  27.07.09  Made it thread-safe and MacOS X compatible.     */
+/*    Version 6.5  27.07.09  Added automatic support for module "Storable".  */
 /*    Version 6.4  03.10.04  Added C++ comp. directives. Improved "Norm()".  */
 /*    Version 6.3  28.09.02  Added "Create_List()" and "GCD2()".             */
 /*    Version 6.2  15.09.02  Overhauled error handling. Fixed "GCD()".       */
@@ -3851,14 +3884,14 @@ void Matrix_Transpose(wordptr X, N_int rowsX, N_int colsX,
 /*****************************************************************************/
 /*                                                                           */
 /*    Steffen Beyer                                                          */
-/*    mailto:sb@engelschall.com                                              */
+/*    mailto:STBEY@cpan.org                                                  */
 /*    http://www.engelschall.com/u/sb/download/                              */
 /*                                                                           */
 /*****************************************************************************/
 /*  COPYRIGHT:                                                               */
 /*****************************************************************************/
 /*                                                                           */
-/*    Copyright (c) 1995 - 2004 by Steffen Beyer.                            */
+/*    Copyright (c) 1995 - 2013 by Steffen Beyer.                            */
 /*    All rights reserved.                                                   */
 /*                                                                           */
 /*****************************************************************************/

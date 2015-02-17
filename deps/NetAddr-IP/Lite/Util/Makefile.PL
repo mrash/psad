@@ -24,7 +24,11 @@ GetOptions(
 	},
 );
 
-if ($^O eq 'MSWin32') {
+print STDERR "building for $^O\n";
+
+#if ($Config{osname} =~ /MSWin32/i || $Config{osname} eq 'dos') {
+# kill windows and Darwin, both of which misbahave when building XS code
+if ($Config{osname} =~ /win/i || $Config{osname} eq 'dos') {
   $useXS = 0;		# force NOXS mode for windows
 }
 
@@ -77,16 +81,26 @@ END
 
 my $begin = '';
 
-if ($useXS) {
+while ($useXS) {
   # turn the XS bits on.
   delete $makeparms{'XS'};
   delete $makeparms{'C'};
 
   unless (-e './config.h') {
-    system $Config{sh}, 'configure';
+    system $Config{sh}, 'configure.gcc';
   }
   my @LIBS;
-  open(F,'config.h') or die "could not open config.h\n";
+  unless (open(F,'config.h')) {
+    warn "Cannot read config.h built by 'gcc', trying 'cc'.\n";
+# try to build with cc
+    system $Config(sh), 'configure.cc';
+    unless (open(F,'config.h')) {
+      warn "Cannot read config.h built by 'cc', using 'pure Perl'.\n";
+      $useXS = 0;
+      last;
+    }
+  }
+
   foreach(<F>) {
     if ($_ =~ /^#define LIBS([ a-zA-Z-]+)/) {
       @LIBS = ($1 =~ /[a-zA-Z0-9-]+/g);
@@ -122,6 +136,7 @@ config  :: config.h
 config.h :
 	$(SHELL) configure
 |;
+  last;
 }
 
 open(F,'>Util_IS.pm');
@@ -218,9 +233,15 @@ sub MY::top_targets {
 }
 
 sub MY::post_constants {
-  my $post_constants = q|
-MY_POD2TEXT = |. $Config{scriptdirexp} .'/pod2text' .q|
+  my $post_constants = $Config{scriptdirexp} .'/pod2text';
+  if (-e $post_constants) {
+    $post_constants = q|
+MY_POD2TEXT = |. $post_constants .q|
 |;
+  } else {   
+    $post_constants = q|
+MY_POD2TEXT = echo "perl distro missing 'pod2text' to convert " |;
+  }
 }
 
 sub MY::postamble {

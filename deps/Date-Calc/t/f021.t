@@ -4,13 +4,15 @@ BEGIN { eval { require bytes; }; }
 use strict;
 no strict "vars";
 
+BEGIN { $Date::Calc::XS_DISABLE = $Date::Calc::XS_DISABLE = 1; }
+
 use Date::Calc qw( Decode_Month );
 
 # ======================================================================
 #   $month_name = Decode_Month($month);
 # ======================================================================
 
-print "1..52\n";
+print "1..58\n";
 
 $n = 1;
 if (Decode_Month("j") == 0)
@@ -168,5 +170,25 @@ if (Decode_Month("Fall") == 0)
 $n++;
 if (Decode_Month("Winter") == 0)
 {print "ok $n\n";} else {print "not ok $n\n";}
+$n++;
+
+if (Decode_Month("May",0) == 5)
+{print "ok $n\n";} else {print "not ok $n\n";}
+$n++;
+if (Decode_Month("Mar",1) == 3)
+{print "ok $n\n";} else {print "not ok $n\n";}
+$n++;
+if (Decode_Month("Mag",7) == 5)
+{print "ok $n\n";} else {print "not ok $n\n";}
+$n++;
+if (Decode_Month("Giu",7) == 6)
+{print "ok $n\n";} else {print "not ok $n\n";}
+$n++;
+if (Decode_Month("Tam",11) == 1)
+{print "ok $n\n";} else {print "not ok $n\n";}
+$n++;
+if (Decode_Month("dic",4) == 12)
+{print "ok $n\n";} else {print "not ok $n\n";}
+$n++;
 
 __END__

@@ -1,5 +1,5 @@
                     =====================================
-                      Package "Bit::Vector" Version 6.4
+                      Package "Bit::Vector" Version 7.4
                     =====================================
 
 
@@ -30,15 +30,24 @@ overloaded operators for maximum ease of use.
 The C library can nevertheless be used stand-alone, without Perl.
 
 
-What's new in version 6.4:
+What's new in version 7.4:
 --------------------------
 
- +  Added compiler directives for C++.
- +  Improved the method "Norm()".
- +  Removed "Carp::Clan" from the distribution (available separately).
- +  Added "Bit::Vector::String" for generic string import/export functions.
- +  Added a new test file "t/40__auxiliary.t" for "Bit::Vector::String".
- +  Fixed a bug in method "Copy()" concerning sign (MSB) extension.
+ +  Modified ToolBox.h to allow bit vectors with more than 2^32 bits
+
+
+What's new since version 6.5:
+-----------------------------
+
+Object persistence:
+
+Since version 6.5, "Bit::Vector" objects can be serialized
+and de-serialized automatically with "Storable", out-of-the-box,
+without requiring any further user action for this to work.
+
+This is also true for nested data structures (since version 6.8).
+
+See the "Storable" documentation for more details.
 
 
 Legal issues:
@@ -46,7 +55,7 @@ Legal issues:
 
 This package with all its parts is
 
-Copyright (c) 1995 - 2004 by Steffen Beyer.
+Copyright (c) 1995 - 2013 by Steffen Beyer.
 All rights reserved.
 
 This package is free software; you can use, modify and redistribute
@@ -66,7 +75,9 @@ Prerequisites:
 
 Perl version 5.000 or higher, and an ANSI C compiler. (!)
                                      ^^^^^^
-Module "Carp::Clan" version 5.0 or higher.
+Module "Carp::Clan" version 5.3 or higher.
+
+Optionally, module "Storable" version 2.21 or newer.
 
 Note that in order to compile Perl modules which contain
 C (and/or XS) code (such as this one), you always HAVE
@@ -96,8 +107,9 @@ Windows 95/98 since the Win 95/98 command shell doesn't
 support the "&&" operator. You will need the Windows NT
 command shell ("cmd.exe") or the "4DOS" shell to be
 installed on your Windows 95/98 system first. Note that
-Windows NT and Windows 2000 are not affected and just
-work fine. I don't know about Windows XP, however.
+Windows NT, Windows 2000 and Windows XP are not affected
+and just work fine. I don't know about Windows Vista and
+Windows 7, however.
 
 Note that ActiveState provides precompiled binaries of
 this module for their Win32 port of Perl ("ActivePerl")
@@ -117,18 +129,10 @@ the "zip" archive.
 Note to CPAN Testers:
 ---------------------
 
-After completion, version 6.4 of this module has already
+After completion, version 7.4 of this module has already
 been tested successfully with the following configurations:
 
-  Perl 5.005_03  -  FreeBSD 4.1.1-RELEASE (with "dlopen() relative paths" patch)
-  Perl 5.6.0     -  FreeBSD 4.1.1-RELEASE
-  Perl 5.6.1     -  FreeBSD 4.1.1-RELEASE
-  Perl 5.7.0     -  FreeBSD 4.1.1-RELEASE
-  Perl 5.7.1     -  FreeBSD 4.1.1-RELEASE
-  Perl 5.7.2     -  FreeBSD 4.1.1-RELEASE
-  Perl 5.8.0     -  FreeBSD 4.1.1-RELEASE
-  Perl 5.8.4     -  FreeBSD 4.10-BETA
-  Perl 5.8.0     -  Windows 2000 & MS VC++ 6.0 (native Perl build)
+  Perl 5.12.3    -  FreeBSD 8.2-PRERELEASE
 
 
 Installation:
@@ -324,6 +328,11 @@ Just compile "BitVector.c" (which automatically includes "ToolBox.h")
 and link the resulting output file "BitVector.o" with your application,
 which in turn should include "ToolBox.h" and "BitVector.h" (in this order).
 
+See also the file "test.c" in the "examples" subdirectory of this
+distribution for an example application (play around with it, e.g.
+by changing the input vectors and the number of bits, and see what
+happens).
+
 
 Example applications:
 ---------------------
@@ -381,6 +390,6 @@ I hope you will find this module useful. Enjoy!
 
 Yours,
 --
-  Steffen Beyer <sb@engelschall.com> http://www.engelschall.com/u/sb/
+  Steffen Beyer <STBEY@cpan.org> http://www.engelschall.com/u/sb/
   "There is enough for the need of everyone in this world, but not
    for the greed of everyone." - Mohandas Karamchand "Mahatma" Gandhi

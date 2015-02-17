@@ -31,7 +31,7 @@ sub ok {
   ++$test;
 }
 
-my $exp = '0:0:0:0:FFFF:FFFF:7F00:1';
+my $exp = '0:0:0:0:0:FFFF:7F00:1';
 my $host = '127.1';
 my $got = ipv6_n2x( scalar naip_gethostbyname($host));
 print "got: $got\nexp: $exp\nnot "

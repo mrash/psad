@@ -11,6 +11,7 @@ SYNOPSIS
             :old_nth
             :upper
             :lower
+            :nofqdn
       );
 
       my $ip = new NetAddr::IP::Lite '127.0.0.1';
@@ -36,6 +37,9 @@ SYNOPSIS
       FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF  = Ones();
       FFFF:FFFF:FFFF:FFFF:FFFF:FFFF::          = V4mask();
       ::FFFF:FFFF                              = V4net();
+
+      Will also return an ipV4 or ipV6 representation of a
+      resolvable Fully Qualified Domanin Name (FQDN).
 
 INSTALLATION
     Un-tar the distribution in an appropriate directory and type:
@@ -187,14 +191,22 @@ DESCRIPTION
 
     "->new([$addr, [ $mask|IPv6 ]])"
     "->new6([$addr, [ $mask]])"
+    "->new6FFFF([$addr, [ $mask]])"
     "->new_no([$addr, [ $mask]])"
     "->new_from_aton($netaddr)"
     new_cis and new_cis6 are DEPRECATED
     "->new_cis("$addr $mask)"
     "->new_cis6("$addr $mask)"
-        The first two methods create a new address with the supplied address
-        in "$addr" and an optional netmask "$mask", which can be omitted to
-        get a /32 or /128 netmask for IPv4 / IPv6 addresses respectively.
+        The first three methods create a new address with the supplied
+        address in "$addr" and an optional netmask "$mask", which can be
+        omitted to get a /32 or /128 netmask for IPv4 / IPv6 addresses
+        respectively.
+
+        new6FFFF specifically returns an IPv4 address in IPv6 format
+        according to RFC4291
+
+          new6               ::xxxx:xxxx
+          new6FFFF      ::FFFF:xxxx:xxxx
 
         The third method "new_no" is exclusively for IPv4 addresses and
         filters improperly formatted dot quad strings for leading 0's that
@@ -252,6 +264,8 @@ DESCRIPTION
 
         If called with no arguments, 'default' is assumed.
 
+        If called with an empty string as the argument, returns 'undef'
+
         "$addr" can be any of the following and possibly more...
 
           n.n
@@ -287,7 +301,16 @@ DESCRIPTION
           123456789012  a 'big' bcd number (bigger than perl likes)
           and Math::BigInt
 
+        A Fully Qualified Domain Name which returns an ipV4 address or an
+        ipV6 address, embodied in that order. This previously undocumented
+        feature may be disabled with:
+
+                use NetAddr::IP::Lite ':nofqdn';
+
         If called with no arguments, 'default' is assumed.
+
+        If called with and empty string as the argument, 'undef' is
+        returned;
 
     "->broadcast()"
         Returns a new object referring to the broadcast address of a given
@@ -366,6 +389,13 @@ DESCRIPTION
         The complement of "->contains()". Returns true when "$me" is
         completely contained within "$other", undef if "$me" and "$other"
         are not both "NetAddr::IP::Lite" objects.
+
+    C->is_rfc1918()>
+        Returns true when "$me" is an RFC 1918 address.
+
+             10.0.0.0        -   10.255.255.255  (10/8 prefix)
+             172.16.0.0      -   172.31.255.255  (172.16/12 prefix)
+             192.168.0.0     -   192.168.255.255 (192.168/16 prefix)
 
     "->first()"
         Returns a new object representing the first usable IP address within
@@ -460,9 +490,10 @@ EXPORT_OK
             :old_nth
             :upper
             :lower
+            :nofqdn
 
 AUTHORS
-    Luis E. Muñoz <luismunoz@cpan.org>, Michael Robinton
+    Luis E. MuÃ±oz <luismunoz@cpan.org>, Michael Robinton
     <michael@bizsystems.com>
 
 WARRANTY
@@ -470,8 +501,8 @@ WARRANTY
     by using it you accept any and all the liability.
 
 COPYRIGHT
-     This software is (c) Luis E. Muñoz, 1999 - 2005
-     and (c) Michael Robinton, 2006 - 2011.
+     This software is (c) Luis E. MuÃ±oz, 1999 - 2005
+     and (c) Michael Robinton, 2006 - 2014.
 
     All rights reserved.
 
@@ -497,9 +528,9 @@ COPYRIGHT
     along with this program in the file named "Copying". If not, write to
     the
 
-            Free Software Foundation, Inc.
-            59 Temple Place, Suite 330
-            Boston, MA  02111-1307, USA
+            Free Software Foundation, Inc.,
+            51 Franklin Street, Fifth Floor
+            Boston, MA 02110-1301 USA
 
     or visit their web page on the internet at:
 

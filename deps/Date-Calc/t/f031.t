@@ -4,8 +4,9 @@ BEGIN { eval { require bytes; }; }
 use strict;
 no strict "vars";
 
-use Date::Calc qw( Date_to_Days );
-use Date::Calc qw( Easter_Sunday );
+BEGIN { $Date::Calc::XS_DISABLE = $Date::Calc::XS_DISABLE = 1; }
+
+use Date::Calc qw( Date_to_Days Easter_Sunday );
 
 # ======================================================================
 #   ($year,$mm,$dd) = Easter_Sunday($year);

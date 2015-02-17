@@ -17,12 +17,8 @@
 # thread when it starts
 
 sub BEGIN {
-    if ($ENV{PERL_CORE}){
-	chdir('t') if -d 't';
-	@INC = ('.', '../lib');
-    } else {
-	unshift @INC, 't';
-    }
+    unshift @INC, 't';
+    unshift @INC, 't/compat' if $] < 5.006002;
     require Config; import Config;
     if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";

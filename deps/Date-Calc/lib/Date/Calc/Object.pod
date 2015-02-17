@@ -56,12 +56,14 @@ See L<Date::Calc(3)> for a list of available functions.
 =head2 Methods
 
   $old = Date::Calc->accurate_mode([FLAG]);
+  $old = Date::Calc->normalized_mode([FLAG]);
   $old = Date::Calc->number_format([NUMBER|CODEREF]);
   $old = Date::Calc->delta_format([NUMBER|CODEREF]);  # global default
   $old = Date::Calc->date_format([NUMBER|CODEREF]);   # global default
-  $old = Date::Calc->language([LANGUAGE]);            # global default
+  $old = Date::Calc->language([LANGUAGE]);            # global default - DEPRECATED
 
   $old = $date->accurate_mode([FLAG]);           # is global nevertheless!
+  $old = $date->normalized_mode([FLAG]);         # is global nevertheless!
   $old = $date->number_format([NUMBER|CODEREF]); # is global nevertheless!
   $old = $date->delta_format([NUMBER|CODEREF]);  # individual override
   $old = $date->date_format([NUMBER|CODEREF]);   # individual override
@@ -270,8 +272,9 @@ FLAG
 
 "FLAG" is either 0 (for "false") or 1 (for "true").
 
-In the case of "C<accurate_mode()>", this switches "accurate mode"
-on and off (see further below for an explanation of what that is).
+In the case of "C<accurate_mode()>" and "C<normalized_mode()>",
+this switches the corresponding mode on and off (see further
+below for an explanation of what these are).
 
 In the case of "C<today()>", "C<now()>" and "C<today_and_now()>",
 a "true" value indicates "GMT" (Greenwich Mean Time), as opposed
@@ -282,8 +285,8 @@ to local time, which is the default.
 NUMBER
 
 "NUMBER" is a number between 0 and 2 (for "number_format()" and "number()")
-or between 0 and 3 (for "delta_format()", "date_format()" and "string()"),
-indicating which of the three/four predefined formats, respectively,
+or between 0 and 4 (for "delta_format()", "date_format()" and "string()"),
+indicating which of the three/five predefined formats, respectively,
 should be used for converting a date into numeric representation
 (needed for comparing dates, for instance) or string representation.
 
@@ -296,8 +299,8 @@ being sortable in chronological order (and of complying with S<ISO 8601>).
 (The numeric formats are (trivially) always sortable in chronological
 order of course.)
 
-The other formats are increasingly more sophisticated (in terms of
-esthetics and computation time) with increasing number:
+The other formats are (mostly) increasingly more sophisticated (in terms of
+esthetics and computation time) with increasing number (except for format #4):
 
   Delta number formats (short):
 
@@ -311,6 +314,7 @@ esthetics and computation time) with increasing number:
       1    '+0 +0 +13603'
       2    '+0Y +0M +13603D'
       3    '+0 Y +0 M +13603 D'
+      4    '(0,0,13603)'
 
   Date number formats (short):
 
@@ -324,6 +328,7 @@ esthetics and computation time) with increasing number:
       1    '01-Apr-2001'
       2    'Sun 1-Apr-2001'
       3    'Sunday, April 1st 2001'
+      4    '[2001,4,1]'
 
   Delta number formats (long):
 
@@ -337,6 +342,7 @@ esthetics and computation time) with increasing number:
       1    '+0 +0 +13603 +1 +29 +59'
       2    '+0Y +0M +13603D +1h +29m +59s'
       3    '+0 Y +0 M +13603 D +1 h +29 m +59 s'
+      4    '(0,0,13603,1,29,59)'
 
   Date number formats (long):
 
@@ -350,6 +356,7 @@ esthetics and computation time) with increasing number:
       1    '01-Apr-2001 08:29:59'
       2    'Sun 1-Apr-2001 08:29:59'
       3    'Sunday, April 1st 2001 08:29:59'
+      4    '[2001,4,1,8,29,59]'
 
 If a number outside of the permitted range is specified, or if the value
 is not a code reference (see also the next section below for more details),
@@ -435,15 +442,14 @@ conversions into strings (where applicable), or "undef" if the global
 language setting applies.
 
 Note that your callback functions (see the section "Callback Functions"
-further below for more details) do not need to pay attention to the
-value at position 3, the language (of the "Date::Calc" module)
-will automatically be set to this value whenever the callback
-functions are called, and automatically reset to its former value
-after the callback.
+further below for more details) should not pay attention to this value
+at position 3, because they get a parameter which tells them which
+language to use (this is necessary in order to allow temporary overrides).
 
-So if your callback functions use the "*_to_Text*" functions from
-the "Date::Calc" module, they will automatically use the correct
-language.
+If your callback handlers use the "*_to_Text*" functions (or any
+other language-dependent function) from the "Date::Calc" module,
+your handlers should pass on this language parameter to these
+functions (and not the value from position 3).
 
 Be reminded though that you should B<NEVER> access the object's
 internal data directly, i.e., through their positional numbers,
@@ -487,6 +493,7 @@ Usage
 The methods
 
         accurate_mode()
+        normalized_mode()
         number_format()
         delta_format()
         date_format()
@@ -507,6 +514,7 @@ return the values in question if they are called without parameters.
 The methods
 
         accurate_mode()
+        normalized_mode()
         number_format()
         delta_format()
         date_format()
@@ -620,10 +628,10 @@ methods "gmtime()", "localtime()", "mktime()", "date2time()" and
 
 =item *
 
-Accurate Mode
+Accurate Mode and Normalized Mode
 
 The method "accurate_mode()" controls the internal flag which
-determines which of two modes of operation is used.
+determines which of two fundamental modes of operation is used.
 
 When set to true (the default at startup), delta vectors are
 calculated to give the exact difference in days between two
@@ -637,40 +645,84 @@ year and month differences.
 E.g., the difference between C<[1999,12,6]> and C<[2000,6,24]>
 is C<[+0 +0 +201]> (plus 201 days) in accurate mode and
 C<[+1 -6 +18]> (plus one year, minus 6 months, plus 18 days)
-when accurate mode is switched off.
+when accurate mode is switched off, and is C<[+0 +6 +18]>
+(plus 6 months, plus 18 days) if additionally, "normalized
+mode" is switched on.
 
-(The delta vector is calculated by simply taking the difference
-in years, the difference in months and the difference in days.)
+The delta vector is calculated by simply taking the difference
+in years, the difference in months and the difference in days
+(if "accurate mode" is switched off and if "normalized mode"
+has not been switched on). This is called "one-by-one" semantics
+or "year-month-day mode"; "YMD mode" for short.
+
+When "normalized mode" is switched on (while "accurate mode"
+is switched off), the delta vector is calculated in a more
+complex way involving the functions "C<Add_Delta_YM()>"
+(for "truncation") and "C<Delta_Days()>".
+
+Moreover, the result is normalized, i.e., the return values
+are guaranteed to all have the same sign (or to be zero),
+and to all be "minimal", i.e., not to exceed the ranges
+C<[-11..+11]> for months, C<[-30..+30]> for days, C<[-23..+23]>
+for hours and C<[-59..+59]> for minutes and seconds.
+
+The rule is to add these result values to a date in a
+left-to-right order, and to truncate invalid intermediate
+dates, such as e.g. C<[2009,2,29]>, to the last valid day
+of that same month, e.g. C<[2009,2,28]>. This is called
+"left-to-right with truncation" semantics or "normalized
+mode"; "N_YMD mode" for short.
+
+The method "normalized_mode()" controls the internal flag which
+determines whether "YMD mode" is used (the default at startup,
+for reasons of backward compatibility) or "N_YMD mode".
+
+Note that also for reasons of backward compatibility, this
+flag only has effect when "accurate mode" is switched off.
+
+Both flags can be set and reset independently from each other,
+however.
+
+Therefore, at startup, you can for instance switch "normalized
+mode" on, without having any immediate effect, and switch off
+"accurate mode" later, which instantly also causes "normalized
+mode" to spring into effect.
 
 Because years and months have varying lengths in terms of days,
-the latter is less accurate than the former because it depends
-on the context of the two dates of which it represents the
-difference. Added to a different date, the latter delta vector
-may yield a different offset in terms of days.
+the "YMD" and "N_YMD" modes are less accurate than "accurate mode",
+because these modes depend on the context of the two dates of which
+the delta vector is the difference. Added to a different date, a
+delta vector calculated in "YMD mode" or "N_YMD mode" may yield
+a different offset in terms of days, i.e., the final result may
+sometimes vary seemingly unpredictably (or in other situations
+may give you the expected result, at the expense of actually
+representing a varying difference in days, determined exclusively
+by context).
 
 Beware also that - for the same reason - the absolute value
 ("C<abs()>") of a delta vector returns a fictitious number
 of days if the delta vector contains non-zero values for
-"year" and/or "month" (see also next section below for
-more details).
+"year" and/or "month" (see also the next section "Absolute
+Value" below for more details).
 
 Example:
 
 The difference between C<[2000,1,1]> and C<[2000,3,1]> is
-C<[+0 +0 +60]> in accurate mode and C<[+0 +2 +0]> else (one
-could also call this "year-month-day mode" or "YMD mode" for
-short).
+C<[+0 +0 +60]> in "accurate mode" and C<[+0 +2 +0]> in "YMD
+mode" (in this "benign" example, the result is the same in
+"YMD mode" and in "N_YMD mode").
 
 When added to the date C<[2000,4,1]>, the "accurate" delta
-vector yields the date C<[2000,5,31]>, whereas the other delta
-vector yields the date C<[2000,6,1]>.
+vector yields the date C<[2000,5,31]>, whereas the "YMD mode"
+delta vector yields the date C<[2000,6,1]> (which is actually
+a difference of 61 days).
 
 Moreover, when added to the date C<[1999,1,1]>, the "accurate"
 delta vector yields the date C<[1999,3,2]>, whereas the "inaccurate"
-delta vector yields the date C<[1999,3,1]>.
+"YMD Mode" delta vector yields the date C<[1999,3,1]> (which is
+actually a difference of 59 days).
 
-Depending on what you want, the one or the other mode may suit
-you better.
+Depending on what you want, either mode may suit you better.
 
 =item *
 
@@ -818,8 +870,8 @@ Under "normal" circumstances, i.e., when accurate mode is on (the
 default), this method only has an effect on the time part of the
 delta vector.
 
-If the delta vector in question does not have a time part, nothing
-is done.
+If the delta vector in question does not have a time part,
+nothing happens.
 
 If accurate mode is off, the "months" value is also normalized,
 i.e., if it lies outside of the range C<[-11..11]>, integer
@@ -834,7 +886,7 @@ the message "normalizing a date is a no-op" will be printed to
 STDERR.
 
 If the object in question is not a valid "Date::Calc" object,
-nothing is done.
+nothing happens.
 
 The method returns its object's reference, which allows chaining
 of method calls, as in the following example:
@@ -847,7 +899,7 @@ Callback Functions
 
 Note that you are not restricted to the built-in formats
 (numbered from 0 to 2 for "number_format()" and "number()"
-and from 0 to 3 for "delta_format()", "date_format()" and
+and from 0 to 4 for "delta_format()", "date_format()" and
 "string()") for converting a date or delta object into a
 number or string.
 
@@ -875,12 +927,23 @@ its second parameter:
   7  =  TO_STRING | IS_DELTA | IS_LONG   (string|delta_format)
 
 The first parameter of the callback function is of course the
-handle of the object in question itself (therefore, the callback
+reference of the object in question itself (therefore, the callback
 function can actually be an object method - but not a class method,
 for obvious reasons).
 
-The handler should return the resulting number or string, as
-requested.
+The third parameter is the number of the language (in the range
+C<[1..Languages()]>) which you should always pass along when using
+any of the following functions from the "Date::Calc" module in
+your handler:
+
+"Decode_Month()", "Decode_Day_of_Week()", "Compressed_to_Text()",
+"Date_to_Text()", "Date_to_Text_Long()", "Calendar()",
+"Month_to_Text()", "Day_of_Week_to_Text()", "Day_of_Week_Abbreviation()",
+"Decode_Date_EU()", "Decode_Date_US()", "Decode_Date_EU2()",
+"Decode_Date_US2()", "Parse_Date()".
+
+The callback handler should return the resulting number or string,
+as requested.
 
 BEWARE that you should NEVER rely upon any knowledge of the
 object's internal structure, as this may be subject to change!
@@ -891,7 +954,7 @@ Example:
 
   sub handler
   {
-      my($self,$code) = @_;
+      my($self,$code,$lang) = @_;
 
       if    ($code == 0) # TO_NUMBER | IS_DATE  | IS_SHORT
       {
@@ -968,9 +1031,9 @@ You can also pass a handler's reference, like so:
   $number = $date->number(\&handler);
   $string = $date->string(\&handler);
 
-This overrides the global setting for the duration of the call of
-"number()" or "string()" (but doesn't change the global setting
-itself).
+This overrides the global setting and the individual object's local
+setting for the duration of the call of "number()" or "string()"
+(but doesn't change the global or local settings themselves).
 
 Moreover, you can also define individual overrides for the date and
 the delta vector formats (but not the number format) for individual
@@ -993,14 +1056,13 @@ method in question:
 You can also define a language for individual objects (see the
 next section immediately below for more details).
 
-If such an individual language override has been set, and if your
-callback handlers only use the "*_to_Text*" functions from the
-"Date::Calc" module to produce any text, the text produced will
-automatically be in the desired language.
+If such an individual language override has been set, it will
+be passed to your callback handlers as the third parameter (in
+the case of "string" conversions, but not in the case of "number"
+conversions).
 
-This is because the language is set to the value determined by
-the individual override before the callback handler is executed,
-and reset to its previous value afterwards.
+Otherwise, the global settings as defined by C<Language($lang);>
+or C<Date::Calc->language($lang);> will be passed to your handler.
 
 =item *
 
@@ -1011,8 +1073,8 @@ of a language in "Date::Calc". This means that you can choose a
 language in "Date::Calc" (with the "Language()" function) and all
 dates subsequently printed by this module will automatically be
 in that language - provided that you use the built-in formats of
-this module, or that you use the "*to_Text*" functions from the
-"Date::Calc" module in your formatting handler (callback function).
+this module, or that you pass the third parameter of the callback
+funtion to the funtions of the "Date::Calc" module which accept it.
 
 However, this global language setting can be overridden for
 individual date (or delta) objects by using the B<OBJECT> method
@@ -1034,11 +1096,30 @@ The B<CLASS> method
 is just a convenient wrapper around the "Language()" function,
 which allows you to enter language numbers (as returned by the
 "Decode_Language()" function) or strings (as returned by the
-"Language_to_Text()" function), at your option.
+"Language_to_Text()" function), whatever you prefer.
 
 The "language()" method (both class and object) always returns
 the B<NAME> (one of "C<Language_to_Text(1..Languages())>") of
 the current setting (and never its number).
+
+BEWARE that in order to avoid possible conflicts between threads
+or modules running concurrently, you should NEVER use the global
+function C<Language($lang);> or the class method
+C<Date::Calc->language($lang);> in this module!
+
+The class method is retained only for backward compatibility
+and for convenience in stand-alone applications when it is
+guaranteed that no such conflicts can arise.
+
+But you should probably avoid to use global settings anyway,
+because it may be especially troublesome to fix your code later
+when suddenly the need arises to use your code with threads
+or when your code needs to use other modules which also use
+"Date::Calc" (with different settings!).
+
+By exclusively using local settings, you are making your code
+invulnerable against other, concurrent modules also using
+"Date::Calc" which still use global settings.
 
 =item *
 
@@ -1220,31 +1301,37 @@ and their descriptions in the file "EXAMPLES.txt".
 
 =head1 SEE ALSO
 
-Date::Calc(3), Date::Calendar(3),
+Date::Calc(3), Date::Calc::Util(3), Date::Calendar(3),
 Date::Calendar::Year(3), Date::Calendar::Profiles(3).
 
 =head1 VERSION
 
-This man page documents "Date::Calc::Object" version 5.3.
+This man page documents "Date::Calc::Object" version 6.3.
 
 =head1 AUTHOR
 
   Steffen Beyer
-  mailto:sb@engelschall.com
+  mailto:STBEY@cpan.org
   http://www.engelschall.com/u/sb/download/
 
 =head1 COPYRIGHT
 
-Copyright (c) 2000 - 2002 by Steffen Beyer. All rights reserved.
+Copyright (c) 2000 - 2009 by Steffen Beyer. All rights reserved.
 
 =head1 LICENSE
 
-This package is free software; you can redistribute it and/or
-modify it under the same terms as Perl itself, i.e., under the
-terms of the "Artistic License" or the "GNU General Public License".
+This package is free software; you can use, modify and redistribute
+it under the same terms as Perl itself, i.e., at your option, under
+the terms either of the "Artistic License" or the "GNU General Public
+License".
 
-Please refer to the files "Artistic.txt" and "GNU_GPL.txt"
-in this distribution for details!
+The C library at the core of the module "Date::Calc::XS" can, at your
+discretion, also be used, modified and redistributed under the terms
+of the "GNU Library General Public License".
+
+Please refer to the files "Artistic.txt", "GNU_GPL.txt" and
+"GNU_LGPL.txt" in the "license" subdirectory of this distribution
+for any details!
 
 =head1 DISCLAIMER
 

@@ -1,7 +1,7 @@
 
 ###############################################################################
 ##                                                                           ##
-##    Copyright (c) 2000 - 2004 by Steffen Beyer.                            ##
+##    Copyright (c) 2000 - 2009 by Steffen Beyer.                            ##
 ##    All rights reserved.                                                   ##
 ##                                                                           ##
 ##    This package is free software; you can redistribute it                 ##
@@ -25,7 +25,7 @@ require Exporter;
 
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-$VERSION = '5.4';
+$VERSION = '6.3';
 
 use Bit::Vector;
 use Carp::Clan qw(^Date::);
@@ -91,10 +91,11 @@ sub _set_fixed_date_
     my($item) = shift;
     my($name) = shift;
     my($year) = shift;
+    my($lang) = shift || 0;
 
     if ($_[1] =~ /^[a-zA-Z]+$/)
     {
-        &_invalid_($item,$name) unless ($_[1] = Decode_Month($_[1]));
+        &_invalid_($item,$name) unless ($_[1] = Decode_Month($_[1]),$lang);
     }
     &_check_init_date_($item,$name,$year,@_);
     &_set_date_($self,$name,@_);
@@ -145,14 +146,14 @@ sub new
     my($class)    = shift;
     my($year)     = shift_year(\@_);
     my($profile)  = shift;
-    my($language) = shift || 0;
+    my($lang)     = shift || 0;
     my($self);
 
     &check_year($year);
     $self = { };
     $class = ref($class) || $class || 'Date::Calendar::Year';
     bless($self, $class);
-    $self->init($year,$profile,$language);
+    $self->init($year,$profile,$lang,@_);
     return $self;
 }
 
@@ -161,10 +162,12 @@ sub init
     my($self)     = shift;
     my($year)     = shift_year(\@_);
     my($profile)  = shift;
-    my($language) = shift || 0;
-    my($days,$dow,$lang,$name,$item,$flag,$temp,$n);
-    my(@easter,@date);
+    my($lang)     = shift || 0;
+    my($days,$dow,$name,$item,$flag,$temp,$n);
+    my(@weekend,@easter,@date);
 
+    if (@_ > 0) { @weekend = @_; }
+    else        { @weekend = (6,7); } # Mon=1 Tue=2 Wed=3 Thu=4 Fri=5 Sat=6 Sun=7
     &check_year($year);
     croak("given profile is not a HASH ref") unless (ref($profile) eq 'HASH');
     $days = Days_in_Year($year,12);
@@ -175,28 +178,20 @@ sub init
     ${$self}{'HALF'} = Bit::Vector->new($days);
     ${$self}{'FULL'} = Bit::Vector->new($days);
     ${$self}{'WORK'} = Bit::Vector->new($days);
-    $dow = 6 - Day_of_Week($year,1,1); # Mon 1 => 5, ... , Fri 5 => 1, Sat 6 => 0, Sun 7 => -1
-    while ($dow < $days)
+    $dow = Day_of_Week($year,1,1); # Mon=1 Tue=2 Wed=3 Thu=4 Fri=5 Sat=6 Sun=7
+    foreach $item (@weekend)
     {
-        ${$self}{'FULL'}->Bit_On( $dow ) unless ($dow < 0);   # Saturday
-        ${$self}{'FULL'}->Bit_On( $dow ) if (++$dow < $days); # Sunday
-        $dow += 6;
+        $n = $item || 0;
+        if (($n >= 1) and ($n <= 7))
+        {
+            $n -= $dow;
+            while ($n < 0)                                     { $n += 7; }
+            while ($n < $days) { ${$self}{'FULL'}->Bit_On( $n ); $n += 7; }
+        }
     }
     @easter = Easter_Sunday($year);
-    if ($language =~ /^\d+$/)
-    {
-        if (($language > 0) and ($language <= Languages()))
-            { $lang = Language($language); }
-        else
-            { $lang = Language(1); }
-    }
-    else
-    {
-        if ($language = Decode_Language($language))
-            { $lang = Language($language); }
-        else
-            { $lang = Language(1); }
-    }
+    $lang = Decode_Language($lang) unless ($lang =~ /^\d+$/);
+    $lang = Language() unless (($lang >= 1) and ($lang <= Languages()));
     foreach $name (keys %{$profile})
     {
         @date = ();
@@ -228,14 +223,14 @@ sub init
         {
             $flag = $1;
             @date = ($year,$3,$2);
-            &_set_fixed_date_($self,$item,$name,$year,@date,$flag);
+            &_set_fixed_date_($self,$item,$name,$year,$lang,@date,$flag);
         }
         elsif (($item =~ /^ ([#:]?) (\d+)       \/  (\d+) $/x) ||
                ($item =~ /^ ([#:]?) ([a-zA-Z]+) \/? (\d+) $/x))
         {
             $flag = $1;
             @date = ($year,$2,$3);
-            &_set_fixed_date_($self,$item,$name,$year,@date,$flag);
+            &_set_fixed_date_($self,$item,$name,$year,$lang,@date,$flag);
         }
         elsif (($item =~ /^ ([#:]?) ([1-5])          ([a-zA-Z]+)    (\d+)           $/x) ||
                ($item =~ /^ ([#:]?) ([1-5]) \/ ([1-7]|[a-zA-Z]+) \/ (\d+|[a-zA-Z]+) $/x))
@@ -246,11 +241,11 @@ sub init
             $temp = $4;
             if ($dow =~ /^[a-zA-Z]+$/)
             {
-                &_invalid_($item,$name) unless ($dow = Decode_Day_of_Week($dow));
+                &_invalid_($item,$name) unless ($dow = Decode_Day_of_Week($dow,$lang));
             }
             if ($temp =~ /^[a-zA-Z]+$/)
             {
-                &_invalid_($item,$name) unless ($temp = Decode_Month($temp));
+                &_invalid_($item,$name) unless ($temp = Decode_Month($temp,$lang));
             }
             else
             {
@@ -273,7 +268,6 @@ sub init
         }
     }
     ${$self}{'HALF'}->AndNot( ${$self}{'HALF'}, ${$self}{'FULL'} );
-    Language($lang);
 }
 
 sub vec_full # full holidays

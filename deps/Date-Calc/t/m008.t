@@ -4,6 +4,8 @@ BEGIN { eval { require bytes; }; }
 use strict;
 no strict "vars";
 
+BEGIN { $Date::Calc::XS_DISABLE = $Date::Calc::XS_DISABLE = 1; }
+
 eval { require Bit::Vector; };
 
 if ($@)
@@ -19,7 +21,7 @@ require Date::Calendar::Year;
 #   ($date,$rest,$sign) = $year->_move_forward_(INDEX,OFFSET,SIGN);
 # ======================================================================
 
-print "1..124\n";
+print "1..166\n";
 
 $n = 1;
 
@@ -55,6 +57,43 @@ foreach $bit (0,1,1,0,0,0,0,0,1,1,0)
     {print "ok $n\n";} else {print "not ok $n\n";}
     $n++;
 }
+
+##################################################
+
+$year = Date::Calendar::Year->new(1995,{},0,1,3,5);
+$full = $year->vec_full();
+$yday = 0;
+
+foreach $bit (0,1,0,1,0,1,0,0,1,0,1,0,1,0,0,1)
+{
+    if ($full->bit_test($yday++) == $bit)
+    {print "ok $n\n";} else {print "not ok $n\n";}
+    $n++;
+}
+
+$year = Date::Calendar::Year->new(1996,{},1,2,4);
+$full = $year->vec_full();
+$yday = 0;
+
+foreach $bit (0,1,0,1,0,0,0,0,1,0,1,0,0,0,0)
+{
+    if ($full->bit_test($yday++) == $bit)
+    {print "ok $n\n";} else {print "not ok $n\n";}
+    $n++;
+}
+
+$year = Date::Calendar::Year->new(1999,{},2,1,2,3,4,5);
+$full = $year->vec_full();
+$yday = 0;
+
+foreach $bit (1,0,0,1,1,1,1,1,0,0,1)
+{
+    if ($full->bit_test($yday++) == $bit)
+    {print "ok $n\n";} else {print "not ok $n\n";}
+    $n++;
+}
+
+##################################################
 
 $year = Date::Calendar::Year->new(2000,{});
 $days = $year->val_days();

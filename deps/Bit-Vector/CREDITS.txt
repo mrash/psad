@@ -1,9 +1,9 @@
                     =====================================
-                      Package "Bit::Vector" Version 6.4
+                      Package "Bit::Vector" Version 7.4
                     =====================================
 
 
-                 Copyright (c) 1995 - 2004 by Steffen Beyer.
+                 Copyright (c) 1995 - 2013 by Steffen Beyer.
                              All rights reserved.
 
 
@@ -192,5 +192,42 @@ at:
     http://www.csd.uwo.ca/%7ejamie/.Refs/code.html
     http://www.csd.uwo.ca/%7ejamie/publications.html#BitVectors
     http://www.csd.uwo.ca/~jamie/BitVectors/
+
+Thanks a lot to Jesse Vincent <jesse@bestpractical.com> and to
+Alistair Francis <alistair.francis@lokku.com> for reporting the
+ongoing problem with the boolean type in MacOS X and to Tatsuhiko
+Miyagawa (?) and Alistair Francis for providing patches.
+
+Also many thanks to Joost Diepenmaat <jdiepen@cpan.org> for alerting
+me about Bit::Vector not being thread-safe, and for providing a patch.
+
+Thanks a lot to Adam Kennedy <adamk@cpan.org> for telling me
+about STORABLE_attach.
+
+Many thanks to Stephen McCamant <smcc@CS.Berkeley.EDU> for alerting me
+about the fact that the function "BitVector_Boot()" in BitVector.c leaks
+memory if called more than once, because of the dynamic allocation of
+the BITMASKTAB. This has been fixed in version 6.6 and improved in
+version 6.8.
+
+Thanks a lot to Christopher Jones <c.jones@ucl.ac.uk> for notifying me
+about the failing tests in "t/28___chunklist.t" under MacOs X / Darwin
+and for running some test scripts on his machine for me.
+
+Many thanks to Nicholas, Zefram, Slaven Rezic and Andreas Koenig
+for providing a patch for the definition of the "boolean" data
+type in Toolbox.h:
+http://cpan.cpantesters.org/authors/id/A/AN/ANDK/patches/Bit-Vector-7.1-ZEFRAMish-01.patch.gz
+
+Many thanks to Gisle Aas <GAAS@cpan.org> for his patch to make
+"t/02_____destroy.t" pass on perl-5.17.11.
+
+Many thanks to A. Bernardo Carvalho <bernardo@biologia.ufrj.br> for letting
+me use his modification of ToolBox.h in order to allow bit vectors with more
+than 2^32 bits. On most machines this will allow bit vectors with up to 2^64
+bits. He needed this for and successfully used it in his research in genomics.
+See http://www.ncbi.nlm.nih.gov/pubmed/23921660 or
+http://genome.cshlp.org/content/early/2013/08/06/gr.156034.113.abstract
+for his corresponding paper.
 
 

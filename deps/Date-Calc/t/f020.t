@@ -4,13 +4,15 @@ BEGIN { eval { require bytes; }; }
 use strict;
 no strict "vars";
 
+BEGIN { $Date::Calc::XS_DISABLE = $Date::Calc::XS_DISABLE = 1; }
+
 use Date::Calc qw( Decode_Day_of_Week );
 
 # ======================================================================
 #   $weekday = Decode_Day_of_Week($buffer);
 # ======================================================================
 
-print "1..34\n";
+print "1..40\n";
 
 $n = 1;
 if (Decode_Day_of_Week("m") == 1)
@@ -114,5 +116,25 @@ if (Decode_Day_of_Week("payday") == 0)                     # too bad! ;-)
 $n++;
 if (Decode_Day_of_Week("holyday") == 0)                    # sigh. ;-)
 {print "ok $n\n";} else {print "not ok $n\n";}
+$n++;
+
+if (Decode_Day_of_Week("Sun",0) == 7)
+{print "ok $n\n";} else {print "not ok $n\n";}
+$n++;
+if (Decode_Day_of_Week("Sonntag",3) == 7)
+{print "ok $n\n";} else {print "not ok $n\n";}
+$n++;
+if (Decode_Day_of_Week("Dimanche",2) == 7)
+{print "ok $n\n";} else {print "not ok $n\n";}
+$n++;
+if (Decode_Day_of_Week("Dim",2) == 7)
+{print "ok $n\n";} else {print "not ok $n\n";}
+$n++;
+if (Decode_Day_of_Week("Jue",4) == 4)
+{print "ok $n\n";} else {print "not ok $n\n";}
+$n++;
+if (Decode_Day_of_Week("Qua",5) == 3)
+{print "ok $n\n";} else {print "not ok $n\n";}
+$n++;
 
 __END__

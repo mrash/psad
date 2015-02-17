@@ -2,7 +2,7 @@
 
 /*****************************************************************************/
 /*                                                                           */
-/*    Copyright (c) 1995 - 2004 by Steffen Beyer.                            */
+/*    Copyright (c) 1995 - 2013 by Steffen Beyer.                            */
 /*    All rights reserved.                                                   */
 /*                                                                           */
 /*    This package is free software; you can redistribute it                 */
@@ -34,30 +34,32 @@
 #include "BitVector.h"
 
 
-static    char *BitVector_Class = "Bit::Vector";
-static      HV *BitVector_Stash;
-
 typedef     SV *BitVector_Object;
 typedef     SV *BitVector_Handle;
 typedef N_word *BitVector_Address;
 typedef     SV *BitVector_Scalar;
 
 
-const char *BitVector_OBJECT_ERROR = "item is not a \"Bit::Vector\" object";
-const char *BitVector_SCALAR_ERROR = "item is not a scalar";
-const char *BitVector_STRING_ERROR = "item is not a string";
-const char *BitVector_MIN_ERROR    = "minimum index out of range";
-const char *BitVector_MAX_ERROR    = "maximum index out of range";
-const char *BitVector_START_ERROR  = "start index out of range";
-const char *BitVector_OFFSET_ERROR = "offset out of range";
-const char *BitVector_CHUNK_ERROR  = "chunk size out of range";
-const char *BitVector_SET_ERROR    = "set size mismatch";
-const char *BitVector_MATRIX_ERROR = "matrix size mismatch";
-const char *BitVector_SHAPE_ERROR  = "not a square matrix";
-const char *BitVector_MEMORY_ERROR = ERRCODE_NULL;
-const char *BitVector_INDEX_ERROR  = ERRCODE_INDX;
-const char *BitVector_ORDER_ERROR  = ERRCODE_ORDR;
-const char *BitVector_SIZE_ERROR   = ERRCODE_SIZE;
+static char *BitVector_Class        = "Bit::Vector"; /* NOT "const" for older Perl versions */
+
+const  char *BitVector_OBJECT_ERROR = "item is not a \"Bit::Vector\" object";
+const  char *BitVector_SCALAR_ERROR = "item is not a scalar";
+const  char *BitVector_STRING_ERROR = "item is not a string";
+const  char *BitVector_MIN_ERROR    = "minimum index out of range";
+const  char *BitVector_MAX_ERROR    = "maximum index out of range";
+const  char *BitVector_START_ERROR  = "start index out of range";
+const  char *BitVector_OFFSET_ERROR = "offset out of range";
+const  char *BitVector_CHUNK_ERROR  = "chunk size out of range";
+const  char *BitVector_SET_ERROR    = "set size mismatch";
+const  char *BitVector_MATRIX_ERROR = "matrix size mismatch";
+const  char *BitVector_SHAPE_ERROR  = "not a square matrix";
+const  char *BitVector_MEMORY_ERROR = BV_ERRCODE_NULL;
+const  char *BitVector_INDEX_ERROR  = BV_ERRCODE_INDX;
+const  char *BitVector_ORDER_ERROR  = BV_ERRCODE_ORDR;
+const  char *BitVector_SIZE_ERROR   = BV_ERRCODE_SIZE;
+
+
+#define BIT_VECTOR_STASH gv_stashpv(BitVector_Class,1)
 
 
 #define BIT_VECTOR_OBJECT(ref,hdl,adr) \
@@ -67,8 +69,17 @@ const char *BitVector_SIZE_ERROR   = ERRCODE_SIZE;
     SvOBJECT(hdl) && \
     SvREADONLY(hdl) && \
     (SvTYPE(hdl) == SVt_PVMG) && \
-    (SvSTASH(hdl) == BitVector_Stash) && \
+    (SvSTASH(hdl) == BIT_VECTOR_STASH) && \
     (adr = (BitVector_Address)SvIV(hdl)) )
+
+#define BIT_VECTOR_FAKE_OBJECT(ref,hdl) \
+    ( ref && \
+    SvROK(ref) && \
+    (hdl = (BitVector_Handle)SvRV(ref)) && \
+    SvOBJECT(hdl) && \
+    !SvREADONLY(hdl) && \
+    (SvTYPE(hdl) == SVt_PVMG) && \
+    (SvSTASH(hdl) == BIT_VECTOR_STASH) )
 
 #define BIT_VECTOR_SCALAR(ref,typ,var) \
     ( ref && !(SvROK(ref)) && ((var = (typ)SvIV(ref)) | 1) )
@@ -144,14 +155,13 @@ PROTOTYPES: DISABLE
 
 BOOT:
 {
-    ErrCode rc;
+    BV_ErrCode rc;
 
     if ((rc = BitVector_Boot()))
     {
         BIT_VECTOR_EXCEPTION(rc);
         exit((int)rc);
     }
-    BitVector_Stash = gv_stashpv(BitVector_Class,1);
 }
 
 
@@ -214,8 +224,8 @@ PPCODE:
     BitVector_Address address;
     BitVector_Handle  handle;
     BitVector_Object  reference;
-    listptr list;
-    listptr slot;
+    bv_listptr list;
+    bv_listptr slot;
     N_int bits;
     N_int count;
 
@@ -239,8 +249,7 @@ PPCODE:
                             {
                                 address = *slot++;
                                 handle = newSViv((IV)address);
-                                reference = sv_bless(sv_2mortal(newRV(handle)),
-                                    BitVector_Stash);
+                                reference = sv_bless(sv_2mortal(newRV(handle)), BIT_VECTOR_STASH);
                                 SvREFCNT_dec(handle);
                                 SvREADONLY_on(handle);
                                 PUSHs(reference);
@@ -257,8 +266,7 @@ PPCODE:
                 if ((address = BitVector_Create(bits,true)) != NULL)
                 {
                     handle = newSViv((IV)address);
-                    reference = sv_bless(sv_2mortal(newRV(handle)),
-                        BitVector_Stash);
+                    reference = sv_bless(sv_2mortal(newRV(handle)), BIT_VECTOR_STASH);
                     SvREFCNT_dec(handle);
                     SvREADONLY_on(handle);
                     PUSHs(reference);
@@ -282,9 +290,9 @@ PPCODE:
     BitVector_Address address;
     BitVector_Handle  handle;
     BitVector_Object  reference;
-    N_int   size;
-    charptr pointer;
-    ErrCode code;
+    charptr           pointer;
+    BV_ErrCode        code;
+    N_int             size;
 
     if ( BIT_VECTOR_SCALAR(bits,N_int,size) )
     {
@@ -300,8 +308,7 @@ PPCODE:
                 else
                 {
                     handle = newSViv((IV)address);
-                    reference = sv_bless(sv_2mortal(newRV(handle)),
-                        BitVector_Stash);
+                    reference = sv_bless(sv_2mortal(newRV(handle)), BIT_VECTOR_STASH);
                     SvREFCNT_dec(handle);
                     SvREADONLY_on(handle);
                     PUSHs(reference);
@@ -325,9 +332,9 @@ PPCODE:
     BitVector_Address address;
     BitVector_Handle  handle;
     BitVector_Object  reference;
-    N_int   size;
-    charptr pointer;
-    ErrCode code;
+    charptr           pointer;
+    BV_ErrCode        code;
+    N_int             size;
 
     if ( BIT_VECTOR_SCALAR(bits,N_int,size) )
     {
@@ -343,8 +350,7 @@ PPCODE:
                 else
                 {
                     handle = newSViv((IV)address);
-                    reference = sv_bless(sv_2mortal(newRV(handle)),
-                        BitVector_Stash);
+                    reference = sv_bless(sv_2mortal(newRV(handle)), BIT_VECTOR_STASH);
                     SvREFCNT_dec(handle);
                     SvREADONLY_on(handle);
                     PUSHs(reference);
@@ -368,9 +374,9 @@ PPCODE:
     BitVector_Address address;
     BitVector_Handle  handle;
     BitVector_Object  reference;
-    N_int   size;
-    charptr pointer;
-    ErrCode code;
+    charptr           pointer;
+    BV_ErrCode        code;
+    N_int             size;
 
     if ( BIT_VECTOR_SCALAR(bits,N_int,size) )
     {
@@ -386,8 +392,7 @@ PPCODE:
                 else
                 {
                     handle = newSViv((IV)address);
-                    reference = sv_bless(sv_2mortal(newRV(handle)),
-                        BitVector_Stash);
+                    reference = sv_bless(sv_2mortal(newRV(handle)), BIT_VECTOR_STASH);
                     SvREFCNT_dec(handle);
                     SvREADONLY_on(handle);
                     PUSHs(reference);
@@ -411,9 +416,9 @@ PPCODE:
     BitVector_Address address;
     BitVector_Handle  handle;
     BitVector_Object  reference;
-    N_int   size;
-    charptr pointer;
-    ErrCode code;
+    charptr           pointer;
+    BV_ErrCode        code;
+    N_int             size;
 
     if ( BIT_VECTOR_SCALAR(bits,N_int,size) )
     {
@@ -429,8 +434,7 @@ PPCODE:
                 else
                 {
                     handle = newSViv((IV)address);
-                    reference = sv_bless(sv_2mortal(newRV(handle)),
-                        BitVector_Stash);
+                    reference = sv_bless(sv_2mortal(newRV(handle)), BIT_VECTOR_STASH);
                     SvREFCNT_dec(handle);
                     SvREADONLY_on(handle);
                     PUSHs(reference);
@@ -457,8 +461,7 @@ PPCODE:
         if ((address = BitVector_Shadow(address)) != NULL)
         {
             handle = newSViv((IV)address);
-            reference = sv_bless(sv_2mortal(newRV(handle)),
-                BitVector_Stash);
+            reference = sv_bless(sv_2mortal(newRV(handle)), BIT_VECTOR_STASH);
             SvREFCNT_dec(handle);
             SvREADONLY_on(handle);
             PUSHs(reference);
@@ -482,8 +485,7 @@ PPCODE:
         if ((address = BitVector_Clone(address)) != NULL)
         {
             handle = newSViv((IV)address);
-            reference = sv_bless(sv_2mortal(newRV(handle)),
-                BitVector_Stash);
+            reference = sv_bless(sv_2mortal(newRV(handle)), BIT_VECTOR_STASH);
             SvREFCNT_dec(handle);
             SvREADONLY_on(handle);
             PUSHs(reference);
@@ -514,8 +516,7 @@ PPCODE:
         if ((address = BitVector_Concat(Xadr,Yadr)) != NULL)
         {
             handle = newSViv((IV)address);
-            reference = sv_bless(sv_2mortal(newRV(handle)),
-                BitVector_Stash);
+            reference = sv_bless(sv_2mortal(newRV(handle)), BIT_VECTOR_STASH);
             SvREFCNT_dec(handle);
             SvREADONLY_on(handle);
             PUSHs(reference);
@@ -547,7 +548,7 @@ PPCODE:
         Xref = ST(index);
         if ( BIT_VECTOR_OBJECT(Xref,Xhdl,Xadr) )
         {
-            bits += bits_(Xadr);
+            bits += BV_BITS_(Xadr);
         }
         else if ((index != 0) or SvROK(Xref))
           BIT_VECTOR_OBJECT_ERROR;
@@ -561,7 +562,7 @@ PPCODE:
             Xref = ST(index);
             if ( BIT_VECTOR_OBJECT(Xref,Xhdl,Xadr) )
             {
-                if ((bits = bits_(Xadr)) > 0)
+                if ((bits = BV_BITS_(Xadr)) > 0)
                 {
                     BitVector_Interval_Copy(address,Xadr,offset,0,bits);
                     offset += bits;
@@ -570,8 +571,7 @@ PPCODE:
             else if ((index != 0) or SvROK(Xref)) BIT_VECTOR_OBJECT_ERROR;
         }
         handle = newSViv((IV)address);
-        reference = sv_bless(sv_2mortal(newRV(handle)),
-            BitVector_Stash);
+        reference = sv_bless(sv_2mortal(newRV(handle)), BIT_VECTOR_STASH);
         SvREFCNT_dec(handle);
         SvREADONLY_on(handle);
         PUSHs(reference);
@@ -590,7 +590,7 @@ CODE:
 
     if ( BIT_VECTOR_OBJECT(reference,handle,address) )
     {
-        RETVAL = bits_(address);
+        RETVAL = BV_BITS_(address);
     }
     else BIT_VECTOR_OBJECT_ERROR;
 }
@@ -614,6 +614,31 @@ CODE:
         {
             address = BitVector_Resize(address,size);
             SvREADONLY_off(handle);
+            sv_setiv(handle,(IV)address);
+            SvREADONLY_on(handle);
+            if (address == NULL) BIT_VECTOR_MEMORY_ERROR;
+        }
+        else BIT_VECTOR_SCALAR_ERROR;
+    }
+    else BIT_VECTOR_OBJECT_ERROR;
+}
+
+
+void
+BitVector_Unfake(reference,bits)
+BitVector_Object	reference
+BitVector_Scalar	bits
+CODE:
+{
+    BitVector_Handle  handle;
+    BitVector_Address address;
+    N_int size;
+
+    if ( BIT_VECTOR_FAKE_OBJECT(reference,handle) )
+    {
+        if ( BIT_VECTOR_SCALAR(bits,N_int,size) )
+        {
+            address = BitVector_Create(size,true);
             sv_setiv(handle,(IV)address);
             SvREADONLY_on(handle);
             if (address == NULL) BIT_VECTOR_MEMORY_ERROR;
@@ -741,7 +766,7 @@ CODE:
     if ( BIT_VECTOR_OBJECT(Xref,Xhdl,Xadr) &&
          BIT_VECTOR_OBJECT(Yref,Yhdl,Yadr) )
     {
-        if (bits_(Xadr) == bits_(Yadr))
+        if (BV_BITS_(Xadr) == BV_BITS_(Yadr))
         {
             BitVector_Reverse(Xadr,Yadr);
         }
@@ -770,9 +795,9 @@ CODE:
         if ( BIT_VECTOR_SCALAR(min,N_int,lower) &&
              BIT_VECTOR_SCALAR(max,N_int,upper) )
         {
-            if      (lower >= bits_(address)) BIT_VECTOR_MIN_ERROR;
-            else if (upper >= bits_(address)) BIT_VECTOR_MAX_ERROR;
-            else if (lower > upper)           BIT_VECTOR_ORDER_ERROR;
+            if      (lower >= BV_BITS_(address)) BIT_VECTOR_MIN_ERROR;
+            else if (upper >= BV_BITS_(address)) BIT_VECTOR_MAX_ERROR;
+            else if (lower >  upper)             BIT_VECTOR_ORDER_ERROR;
             else                       BitVector_Interval_Empty(address,lower,upper);
         }
         else BIT_VECTOR_SCALAR_ERROR;
@@ -800,9 +825,9 @@ CODE:
         if ( BIT_VECTOR_SCALAR(min,N_int,lower) &&
              BIT_VECTOR_SCALAR(max,N_int,upper) )
         {
-            if      (lower >= bits_(address)) BIT_VECTOR_MIN_ERROR;
-            else if (upper >= bits_(address)) BIT_VECTOR_MAX_ERROR;
-            else if (lower > upper)           BIT_VECTOR_ORDER_ERROR;
+            if      (lower >= BV_BITS_(address)) BIT_VECTOR_MIN_ERROR;
+            else if (upper >= BV_BITS_(address)) BIT_VECTOR_MAX_ERROR;
+            else if (lower >  upper)             BIT_VECTOR_ORDER_ERROR;
             else                       BitVector_Interval_Fill(address,lower,upper);
         }
         else BIT_VECTOR_SCALAR_ERROR;
@@ -830,9 +855,9 @@ CODE:
         if ( BIT_VECTOR_SCALAR(min,N_int,lower) &&
              BIT_VECTOR_SCALAR(max,N_int,upper) )
         {
-            if      (lower >= bits_(address)) BIT_VECTOR_MIN_ERROR;
-            else if (upper >= bits_(address)) BIT_VECTOR_MAX_ERROR;
-            else if (lower > upper)           BIT_VECTOR_ORDER_ERROR;
+            if      (lower >= BV_BITS_(address)) BIT_VECTOR_MIN_ERROR;
+            else if (upper >= BV_BITS_(address)) BIT_VECTOR_MAX_ERROR;
+            else if (lower >  upper)             BIT_VECTOR_ORDER_ERROR;
             else                       BitVector_Interval_Flip(address,lower,upper);
         }
         else BIT_VECTOR_SCALAR_ERROR;
@@ -858,9 +883,9 @@ CODE:
         if ( BIT_VECTOR_SCALAR(min,N_int,lower) &&
              BIT_VECTOR_SCALAR(max,N_int,upper) )
         {
-            if      (lower >= bits_(address)) BIT_VECTOR_MIN_ERROR;
-            else if (upper >= bits_(address)) BIT_VECTOR_MAX_ERROR;
-            else if (lower > upper)           BIT_VECTOR_ORDER_ERROR;
+            if      (lower >= BV_BITS_(address)) BIT_VECTOR_MIN_ERROR;
+            else if (upper >= BV_BITS_(address)) BIT_VECTOR_MAX_ERROR;
+            else if (lower >  upper)             BIT_VECTOR_ORDER_ERROR;
             else                       BitVector_Interval_Reverse(address,lower,upper);
         }
         else BIT_VECTOR_SCALAR_ERROR;
@@ -885,7 +910,7 @@ PPCODE:
     {
         if ( BIT_VECTOR_SCALAR(start,N_int,first) )
         {
-            if (first < bits_(address))
+            if (first < BV_BITS_(address))
             {
                 if ( BitVector_interval_scan_inc(address,first,&min,&max) )
                 {
@@ -919,7 +944,7 @@ PPCODE:
     {
         if ( BIT_VECTOR_SCALAR(start,N_int,first) )
         {
-            if (first < bits_(address))
+            if (first < BV_BITS_(address))
             {
                 if ( BitVector_interval_scan_dec(address,first,&min,&max) )
                 {
@@ -961,7 +986,7 @@ CODE:
              BIT_VECTOR_SCALAR(Yoffset,N_int,Yoff) &&
              BIT_VECTOR_SCALAR(length, N_int,len) )
         {
-            if ((Xoff < bits_(Xadr)) and (Yoff < bits_(Yadr)))
+            if ((Xoff < BV_BITS_(Xadr)) and (Yoff < BV_BITS_(Yadr)))
             {
                 if (len > 0) BitVector_Interval_Copy(Xadr,Yadr,Xoff,Yoff,len);
             }
@@ -1000,7 +1025,7 @@ CODE:
              BIT_VECTOR_SCALAR(Yoffset,N_int,Yoff) &&
              BIT_VECTOR_SCALAR(Ylength,N_int,Ylen) )
         {
-            if ((Xoff <= bits_(Xadr)) and (Yoff <= bits_(Yadr)))
+            if ((Xoff <= BV_BITS_(Xadr)) and (Yoff <= BV_BITS_(Yadr)))
             {
                 Xadr = BitVector_Interval_Substitute(Xadr,Yadr,Xoff,Xlen,Yoff,Ylen);
                 SvREADONLY_off(Xhdl);
@@ -1066,7 +1091,7 @@ CODE:
     if ( BIT_VECTOR_OBJECT(Xref,Xhdl,Xadr) &&
          BIT_VECTOR_OBJECT(Yref,Yhdl,Yadr) )
     {
-        if (bits_(Xadr) == bits_(Yadr))
+        if (BV_BITS_(Xadr) == BV_BITS_(Yadr))
         {
             RETVAL = BitVector_equal(Xadr,Yadr);
         }
@@ -1092,7 +1117,7 @@ CODE:
     if ( BIT_VECTOR_OBJECT(Xref,Xhdl,Xadr) &&
          BIT_VECTOR_OBJECT(Yref,Yhdl,Yadr) )
     {
-        if (bits_(Xadr) == bits_(Yadr))
+        if (BV_BITS_(Xadr) == BV_BITS_(Yadr))
         {
             RETVAL = BitVector_Lexicompare(Xadr,Yadr);
         }
@@ -1118,7 +1143,7 @@ CODE:
     if ( BIT_VECTOR_OBJECT(Xref,Xhdl,Xadr) &&
          BIT_VECTOR_OBJECT(Yref,Yhdl,Yadr) )
     {
-        if (bits_(Xadr) == bits_(Yadr))
+        if (BV_BITS_(Xadr) == BV_BITS_(Yadr))
         {
             RETVAL = BitVector_Compare(Xadr,Yadr);
         }
@@ -1166,8 +1191,8 @@ CODE:
 {
     BitVector_Handle  handle;
     BitVector_Address address;
-    charptr pointer;
-    ErrCode code;
+    charptr           pointer;
+    BV_ErrCode        code;
 
     if ( BIT_VECTOR_OBJECT(reference,handle,address) )
     {
@@ -1214,8 +1239,8 @@ CODE:
 {
     BitVector_Handle  handle;
     BitVector_Address address;
-    charptr pointer;
-    ErrCode code;
+    charptr           pointer;
+    BV_ErrCode        code;
 
     if ( BIT_VECTOR_OBJECT(reference,handle,address) )
     {
@@ -1262,8 +1287,8 @@ CODE:
 {
     BitVector_Handle  handle;
     BitVector_Address address;
-    charptr pointer;
-    ErrCode code;
+    charptr           pointer;
+    BV_ErrCode        code;
 
     if ( BIT_VECTOR_OBJECT(reference,handle,address) )
     {
@@ -1314,8 +1339,8 @@ CODE:
 {
     BitVector_Handle  handle;
     BitVector_Address address;
-    charptr pointer;
-    ErrCode code;
+    charptr           pointer;
+    BV_ErrCode        code;
 
     if ( BIT_VECTOR_OBJECT(reference,handle,address) )
     {
@@ -1344,7 +1369,7 @@ CODE:
     {
         if ( BIT_VECTOR_SCALAR(index,N_int,idx) )
         {
-            if (idx < bits_(address))
+            if (idx < BV_BITS_(address))
             {
                 BitVector_Bit_Off(address,idx);
             }
@@ -1370,7 +1395,7 @@ CODE:
     {
         if ( BIT_VECTOR_SCALAR(index,N_int,idx) )
         {
-            if (idx < bits_(address))
+            if (idx < BV_BITS_(address))
             {
                 BitVector_Bit_On(address,idx);
             }
@@ -1398,7 +1423,7 @@ CODE:
     {
         if ( BIT_VECTOR_SCALAR(index,N_int,idx) )
         {
-            if (idx < bits_(address))
+            if (idx < BV_BITS_(address))
             {
                 RETVAL = BitVector_bit_flip(address,idx);
             }
@@ -1429,7 +1454,7 @@ CODE:
     {
         if ( BIT_VECTOR_SCALAR(index,N_int,idx) )
         {
-            if (idx < bits_(address))
+            if (idx < BV_BITS_(address))
             {
                 RETVAL = BitVector_bit_test(address,idx);
             }
@@ -1460,7 +1485,7 @@ CODE:
         if ( BIT_VECTOR_SCALAR(index,N_int,idx) &&
              BIT_VECTOR_SCALAR(bit,boolean,b) )
         {
-            if (idx < bits_(address))
+            if (idx < BV_BITS_(address))
             {
                 BitVector_Bit_Copy(address,idx,b);
             }
@@ -1697,7 +1722,7 @@ CODE:
         if ( BIT_VECTOR_SCALAR(offset,N_int,off) &&
              BIT_VECTOR_SCALAR(count,N_int,cnt) )
         {
-            if (off < bits_(address))
+            if (off < BV_BITS_(address))
             {
                 BitVector_Insert(address,off,cnt,true);
             }
@@ -1726,7 +1751,7 @@ CODE:
         if ( BIT_VECTOR_SCALAR(offset,N_int,off) &&
              BIT_VECTOR_SCALAR(count,N_int,cnt) )
         {
-            if (off < bits_(address))
+            if (off < BV_BITS_(address))
             {
                 BitVector_Delete(address,off,cnt,true);
             }
@@ -1797,7 +1822,7 @@ PPCODE:
     {
         if ( BIT_VECTOR_SCALAR(carry,boolean,c) )
         {
-            if ((bits_(Xadr) == bits_(Yadr)) and (bits_(Xadr) == bits_(Zadr)))
+            if ((BV_BITS_(Xadr) == BV_BITS_(Yadr)) and (BV_BITS_(Xadr) == BV_BITS_(Zadr)))
             {
                 v = BitVector_compute(Xadr,Yadr,Zadr,false,&c);
                 if (GIMME_V == G_ARRAY)
@@ -1845,7 +1870,7 @@ PPCODE:
     {
         if ( BIT_VECTOR_SCALAR(carry,boolean,c) )
         {
-            if ((bits_(Xadr) == bits_(Yadr)) and (bits_(Xadr) == bits_(Zadr)))
+            if ((BV_BITS_(Xadr) == BV_BITS_(Yadr)) and (BV_BITS_(Xadr) == BV_BITS_(Zadr)))
             {
                 v = BitVector_compute(Xadr,Yadr,Zadr,true,&c);
                 if (GIMME_V == G_ARRAY)
@@ -1883,7 +1908,7 @@ CODE:
     if ( BIT_VECTOR_OBJECT(Xref,Xhdl,Xadr) &&
          BIT_VECTOR_OBJECT(Yref,Yhdl,Yadr) )
     {
-        if (bits_(Xadr) == bits_(Yadr))
+        if (BV_BITS_(Xadr) == BV_BITS_(Yadr))
         {
             RETVAL = BitVector_compute(Xadr,Yadr,NULL,false,&c);
         }
@@ -1910,7 +1935,7 @@ CODE:
     if ( BIT_VECTOR_OBJECT(Xref,Xhdl,Xadr) &&
          BIT_VECTOR_OBJECT(Yref,Yhdl,Yadr) )
     {
-        if (bits_(Xadr) == bits_(Yadr))
+        if (BV_BITS_(Xadr) == BV_BITS_(Yadr))
         {
             RETVAL = BitVector_compute(Xadr,Yadr,NULL,true,&c);
         }
@@ -1938,7 +1963,7 @@ CODE:
     if ( BIT_VECTOR_OBJECT(Xref,Xhdl,Xadr) &&
          BIT_VECTOR_OBJECT(Yref,Yhdl,Yadr) )
     {
-        if (bits_(Xadr) == bits_(Yadr))
+        if (BV_BITS_(Xadr) == BV_BITS_(Yadr))
         {
             BitVector_Negate(Xadr,Yadr);
         }
@@ -1964,7 +1989,7 @@ CODE:
     if ( BIT_VECTOR_OBJECT(Xref,Xhdl,Xadr) &&
          BIT_VECTOR_OBJECT(Yref,Yhdl,Yadr) )
     {
-        if (bits_(Xadr) == bits_(Yadr))
+        if (BV_BITS_(Xadr) == BV_BITS_(Yadr))
         {
             BitVector_Absolute(Xadr,Yadr);
         }
@@ -2005,13 +2030,13 @@ CODE:
     BitVector_Address Yadr;
     BitVector_Handle  Zhdl;
     BitVector_Address Zadr;
-    ErrCode           code;
+    BV_ErrCode        code;
 
     if ( BIT_VECTOR_OBJECT(Xref,Xhdl,Xadr) &&
          BIT_VECTOR_OBJECT(Yref,Yhdl,Yadr) &&
          BIT_VECTOR_OBJECT(Zref,Zhdl,Zadr) )
     {
-        if ((bits_(Xadr) >= bits_(Yadr)) and (bits_(Yadr) == bits_(Zadr)))
+        if ((BV_BITS_(Xadr) >= BV_BITS_(Yadr)) and (BV_BITS_(Yadr) == BV_BITS_(Zadr)))
         {
             if ((code = BitVector_Multiply(Xadr,Yadr,Zadr)))
                 BIT_VECTOR_EXCEPTION(code);
@@ -2038,7 +2063,7 @@ CODE:
     BitVector_Address Yadr;
     BitVector_Handle  Rhdl;
     BitVector_Address Radr;
-    ErrCode           code;
+    BV_ErrCode        code;
 
     if ( BIT_VECTOR_OBJECT(Qref,Qhdl,Qadr) &&
          BIT_VECTOR_OBJECT(Xref,Xhdl,Xadr) &&
@@ -2071,7 +2096,7 @@ CODE:
     BitVector_Object  Yref;
     BitVector_Handle  Yhdl;
     BitVector_Address Yadr;
-    ErrCode           code;
+    BV_ErrCode        code;
 
     if      (items == 3)
     {
@@ -2122,7 +2147,7 @@ CODE:
     BitVector_Address Yadr;
     BitVector_Handle  Zhdl;
     BitVector_Address Zadr;
-    ErrCode           code;
+    BV_ErrCode        code;
 
     if ( BIT_VECTOR_OBJECT(Xref,Xhdl,Xadr) &&
          BIT_VECTOR_OBJECT(Yref,Yhdl,Yadr) &&
@@ -2193,7 +2218,7 @@ CODE:
 
     if ( BIT_VECTOR_OBJECT(reference,handle,address) )
     {
-        RETVAL = size_(address);
+        RETVAL = BV_SIZE_(address);
     }
     else BIT_VECTOR_OBJECT_ERROR;
 }
@@ -2218,7 +2243,7 @@ CODE:
         if ( BIT_VECTOR_SCALAR(offset,N_int,off) &&
              BIT_VECTOR_SCALAR(value,N_int,val) )
         {
-            if (off < size_(address))
+            if (off < BV_SIZE_(address))
             {
                 BitVector_Word_Store(address,off,val);
             }
@@ -2244,7 +2269,7 @@ CODE:
     {
         if ( BIT_VECTOR_SCALAR(offset,N_int,off) )
         {
-            if (off < size_(address))
+            if (off < BV_SIZE_(address))
             {
                 RETVAL = BitVector_Word_Read(address,off);
             }
@@ -2273,7 +2298,7 @@ CODE:
 
     if ( BIT_VECTOR_OBJECT(reference,handle,address) )
     {
-        size = size_(address);
+        size = BV_SIZE_(address);
         for ( offset = 0, index = 1;
             ((offset < size) and (index < items)); offset++, index++ )
         {
@@ -2306,7 +2331,7 @@ PPCODE:
 
     if ( BIT_VECTOR_OBJECT(reference,handle,address) )
     {
-        size = size_(address);
+        size = BV_SIZE_(address);
         EXTEND(sp,(int)size);
         for ( offset = 0; (offset < size); offset++ )
         {
@@ -2335,7 +2360,7 @@ CODE:
         if ( BIT_VECTOR_SCALAR(offset,N_int,off) &&
              BIT_VECTOR_SCALAR(count,N_int,cnt) )
         {
-            if (off < size_(address))
+            if (off < BV_SIZE_(address))
             {
                 BitVector_Word_Insert(address,off,cnt,true);
             }
@@ -2364,7 +2389,7 @@ CODE:
         if ( BIT_VECTOR_SCALAR(offset,N_int,off) &&
              BIT_VECTOR_SCALAR(count,N_int,cnt) )
         {
-            if (off < size_(address))
+            if (off < BV_SIZE_(address))
             {
                 BitVector_Word_Delete(address,off,cnt,true);
             }
@@ -2398,7 +2423,7 @@ CODE:
         {
             if ((bits > 0) and (bits <= BitVector_Long_Bits()))
             {
-                if (off < bits_(address))
+                if (off < BV_BITS_(address))
                 {
                     BitVector_Chunk_Store(address,bits,off,val);
                 }
@@ -2431,7 +2456,7 @@ CODE:
         {
             if ((bits > 0) and (bits <= BitVector_Long_Bits()))
             {
-                if (off < bits_(address))
+                if (off < BV_BITS_(address))
                 {
                     RETVAL = BitVector_Chunk_Read(address,bits,off);
                 }
@@ -2476,7 +2501,7 @@ CODE:
             if ((chunkspan > 0) and (chunkspan <= BitVector_Long_Bits()))
             {
                 wordsize = BitVector_Word_Bits();
-                size = size_(address);
+                size = BV_SIZE_(address);
                 chunkmask = ~((~0L << (chunkspan-1)) << 1); /* C bug work-around */
                 chunk = 0L;
                 value = 0L;
@@ -2561,8 +2586,8 @@ PPCODE:
             if ((chunkspan > 0) and (chunkspan <= BitVector_Long_Bits()))
             {
                 wordsize = BitVector_Word_Bits();
-                bits = bits_(address);
-                size = size_(address);
+                bits = BV_BITS_(address);
+                size = BV_SIZE_(address);
                 length = (N_int) (bits / chunkspan);
                 if ((length * chunkspan) < bits) length++;
                 EXTEND(sp,(int)length);
@@ -2631,7 +2656,7 @@ CODE:
 
     if ( BIT_VECTOR_OBJECT(reference,handle,address) )
     {
-        bits = bits_(address);
+        bits = BV_BITS_(address);
         for ( index = 1; index < items; index++ )
         {
             scalar = ST(index);
@@ -2664,7 +2689,7 @@ CODE:
 
     if ( BIT_VECTOR_OBJECT(reference,handle,address) )
     {
-        bits = bits_(address);
+        bits = BV_BITS_(address);
         for ( index = 1; index < items; index++ )
         {
             scalar = ST(index);
@@ -2700,7 +2725,7 @@ PPCODE:
 
     if ( BIT_VECTOR_OBJECT(reference,handle,address) )
     {
-        size = size_(address);
+        size = BV_SIZE_(address);
         bits = BitVector_Word_Bits();
         norm = Set_Norm(address);
         if (norm > 0)
@@ -2747,7 +2772,7 @@ CODE:
          BIT_VECTOR_OBJECT(Yref,Yhdl,Yadr) &&
          BIT_VECTOR_OBJECT(Zref,Zhdl,Zadr) )
     {
-        if ((bits_(Xadr) == bits_(Yadr)) and (bits_(Xadr) == bits_(Zadr)))
+        if ((BV_BITS_(Xadr) == BV_BITS_(Yadr)) and (BV_BITS_(Xadr) == BV_BITS_(Zadr)))
         {
             Set_Union(Xadr,Yadr,Zadr);
         }
@@ -2777,7 +2802,7 @@ CODE:
          BIT_VECTOR_OBJECT(Yref,Yhdl,Yadr) &&
          BIT_VECTOR_OBJECT(Zref,Zhdl,Zadr) )
     {
-        if ((bits_(Xadr) == bits_(Yadr)) and (bits_(Xadr) == bits_(Zadr)))
+        if ((BV_BITS_(Xadr) == BV_BITS_(Yadr)) and (BV_BITS_(Xadr) == BV_BITS_(Zadr)))
         {
             Set_Intersection(Xadr,Yadr,Zadr);
         }
@@ -2807,7 +2832,7 @@ CODE:
          BIT_VECTOR_OBJECT(Yref,Yhdl,Yadr) &&
          BIT_VECTOR_OBJECT(Zref,Zhdl,Zadr) )
     {
-        if ((bits_(Xadr) == bits_(Yadr)) and (bits_(Xadr) == bits_(Zadr)))
+        if ((BV_BITS_(Xadr) == BV_BITS_(Yadr)) and (BV_BITS_(Xadr) == BV_BITS_(Zadr)))
         {
             Set_Difference(Xadr,Yadr,Zadr);
         }
@@ -2837,7 +2862,7 @@ CODE:
          BIT_VECTOR_OBJECT(Yref,Yhdl,Yadr) &&
          BIT_VECTOR_OBJECT(Zref,Zhdl,Zadr) )
     {
-        if ((bits_(Xadr) == bits_(Yadr)) and (bits_(Xadr) == bits_(Zadr)))
+        if ((BV_BITS_(Xadr) == BV_BITS_(Yadr)) and (BV_BITS_(Xadr) == BV_BITS_(Zadr)))
         {
             Set_ExclusiveOr(Xadr,Yadr,Zadr);
         }
@@ -2863,7 +2888,7 @@ CODE:
     if ( BIT_VECTOR_OBJECT(Xref,Xhdl,Xadr) &&
          BIT_VECTOR_OBJECT(Yref,Yhdl,Yadr) )
     {
-        if (bits_(Xadr) == bits_(Yadr))
+        if (BV_BITS_(Xadr) == BV_BITS_(Yadr))
         {
             Set_Complement(Xadr,Yadr);
         }
@@ -2889,7 +2914,7 @@ CODE:
     if ( BIT_VECTOR_OBJECT(Xref,Xhdl,Xadr) &&
          BIT_VECTOR_OBJECT(Yref,Yhdl,Yadr) )
     {
-        if (bits_(Xadr) == bits_(Yadr))
+        if (BV_BITS_(Xadr) == BV_BITS_(Yadr))
         {
             RETVAL = Set_subset(Xadr,Yadr);
         }
@@ -3032,9 +3057,9 @@ CODE:
              BIT_VECTOR_SCALAR(Zcols,N_int,colsZ) )
         {
             if ((colsY == rowsZ) and (rowsX == rowsY) and (colsX == colsZ) and
-                (bits_(Xadr) == rowsX*colsX) and
-                (bits_(Yadr) == rowsY*colsY) and
-                (bits_(Zadr) == rowsZ*colsZ))
+                (BV_BITS_(Xadr) == rowsX*colsX) and
+                (BV_BITS_(Yadr) == rowsY*colsY) and
+                (BV_BITS_(Zadr) == rowsZ*colsZ))
             {
                 Matrix_Multiplication(Xadr,rowsX,colsX,
                                       Yadr,rowsY,colsY,
@@ -3086,9 +3111,9 @@ CODE:
              BIT_VECTOR_SCALAR(Zcols,N_int,colsZ) )
         {
             if ((colsY == rowsZ) and (rowsX == rowsY) and (colsX == colsZ) and
-                (bits_(Xadr) == rowsX*colsX) and
-                (bits_(Yadr) == rowsY*colsY) and
-                (bits_(Zadr) == rowsZ*colsZ))
+                (BV_BITS_(Xadr) == rowsX*colsX) and
+                (BV_BITS_(Yadr) == rowsY*colsY) and
+                (BV_BITS_(Zadr) == rowsZ*colsZ))
             {
                 Matrix_Product(Xadr,rowsX,colsX,
                                Yadr,rowsY,colsY,
@@ -3119,7 +3144,7 @@ CODE:
         if ( BIT_VECTOR_SCALAR(rows,N_int,r) &&
              BIT_VECTOR_SCALAR(cols,N_int,c) )
         {
-            if (bits_(address) == r*c)
+            if (BV_BITS_(address) == r*c)
             {
                 if (r == c)
                 {
@@ -3163,8 +3188,8 @@ CODE:
              BIT_VECTOR_SCALAR(Ycols,N_int,colsY) )
         {
             if ((rowsX == colsY) and (colsX == rowsY) and
-                (bits_(Xadr) == rowsX*colsX) and
-                (bits_(Yadr) == rowsY*colsY))
+                (BV_BITS_(Xadr) == rowsX*colsX) and
+                (BV_BITS_(Yadr) == rowsY*colsY))
             {
                 if ((Xadr != Yadr) or (rowsY == colsY))
                 {

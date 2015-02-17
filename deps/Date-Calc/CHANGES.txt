@@ -1,14 +1,96 @@
                      ====================================
-                       Package "Date::Calc" Version 5.4
+                       Package "Date::Calc" Version 6.3
                      ====================================
 
 
-                  Copyright (c) 1995 - 2004 by Steffen Beyer.
+                  Copyright (c) 1995 - 2009 by Steffen Beyer.
                              All rights reserved.
 
 
 Version history:
 ----------------
+
+Version 6.3   31.10.2009
+
+ +  Changed "Mktime()" to use "POSIX::mktime()"
+ +  Fixed the bug that "Date::Calc::PP" was never tested
+    when "Date::Calc::XS" is installed
+
+Version 6.2   16.10.2009
+
+ +  Split the "Date::Calc" distribution into a pure-Perl and a C/XS part
+
+Version 6.1   15.10.2009
+
+ +  United "Date::Calc" and "Date::Pcalc" into a single distribution
+ +  Fixed Polish names of months and days of week (RT ticket #14159)
+
+Version 6.0   07.10.2009
+
+ +  Added new functions "N_Delta_YMDHMS()", "Add_N_Delta_YMD()"
+    and "Add_N_Delta_YMDHMS()" to "Date::Calc"
+ +  Added more tests to "t/f037.t" for these new functions
+ +  Added a new "normalized" mode to "Date::Calc::Object" which
+    uses the new functions "N_Delta_YMD()", "N_Delta_YMDHMS()",
+    "Add_N_Delta_YMD()" and "Add_N_Delta_YMDHMS()"
+ +  Added test scripts "t/m012.t" and "t/m013.t" for this new mode
+ +  The language can now be set individually for each function
+    in "Date::Calc" that requires it (through a new optional
+    parameter; the default continues to be a global setting
+    for backward compatibility); the affected functions are:
+    "Decode_Month()", "Decode_Day_of_Week()", "Compressed_to_Text()",
+    "Date_to_Text()", "Date_to_Text_Long()", "Calendar()",
+    "Month_to_Text()", "Day_of_Week_to_Text()", "Day_of_Week_Abbreviation()",
+    "Decode_Date_EU()", "Decode_Date_US()", "Decode_Date_EU2()",
+    "Decode_Date_US2()", "Parse_Date()".
+ +  BEWARE that the interface of "DateCalc.c" has changed!
+ +  Module "Date::Calc::Object" has been changed similarly
+ +  Module "Date::Calendar::Year" has also been adapted accordingly
+ +  Many test scripts have been changed to reflect the modifications
+    in "Date::Calc", "Date::Calc::Object" and "Date::Calendar::Year"
+    and more test cases have been added
+ +  Updated the documentation to reflect all changes
+ +  Updated version numbers of dependencies in "t/f000.t"
+
+Version 5.8   12.09.2009
+
+ +  Added a new function "N_Delta_YMD()"
+ +  Added a new test script "t/f037.t"
+ +  Updated the "Calc.pod" manual page accordingly
+ +  Renamed "calendar.cgi" in the "examples"
+    subdirectory to "calendar.pl"
+ +  Added a new CGI script named "datecalc.pl"
+    to the "examples" subdirectory
+
+Version 5.7   23.08.2009
+
+ +  Fixed "october" => "oktober" in Dutch
+ +  Disabled the special abbreviated names
+    of the days of the week in Portuguese
+ +  Made the days which form the weekend con-
+    figurable in "Calendar.pm" and "Year.pm"
+ +  Added some test cases for this new feature
+    in "t/m008.t"
+ +  The file "examples/calendar.cgi" now
+    also supports this new feature
+ +  Updated "README.txt" and "INSTALL.txt"
+    and the dependency on "Bit::Vector" 7.0
+ +  Added an additional "README.htm" file to this
+    distribution highlighting its key points
+ +  Updated the documentation of "Date::Calc",
+    "Date::Calendar", "Date::Calendar::Profiles",
+    "Date::Calendar::Year" and "Date::Object"
+ +  See the new module "Date::Calc::Util" (which
+    is available separately; to be released soon)
+    for all the shortcuts you ever wanted to have
+    in "Date::Calc"
+
+Version 5.6   28.07.2009
+
+ +  Made the module MacOS X compatible
+ +  Made some tiny changes to the documentation
+
+Version 5.5   was skipped due to an unauthorized upload by someone else
 
 Version 5.4   03.10.2004
 

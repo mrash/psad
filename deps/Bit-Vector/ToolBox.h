@@ -9,7 +9,9 @@ extern "C"
 /*****************************************************************************/
 /*  MODULE IMPORTS:                                                          */
 /*****************************************************************************/
-
+#ifdef PERL_DARWIN
+#include <stdbool.h>
+#endif
 /*****************************************************************************/
 /*  MODULE INTERFACE:                                                        */
 /*****************************************************************************/
@@ -29,8 +31,8 @@ typedef  unsigned   char    N_char;
 typedef  unsigned   char    N_byte;
 typedef  unsigned   short   N_short;
 typedef  unsigned   short   N_shortword;
-typedef  unsigned   int     N_int;
-typedef  unsigned   int     N_word;
+typedef  unsigned   long    N_int;       /* used to be "int"! */
+typedef  unsigned   long    N_word;      /* used to be "int"! */
 typedef  unsigned   long    N_long;
 typedef  unsigned   long    N_longword;
 
@@ -41,8 +43,8 @@ typedef  signed     char    Z_char;
 typedef  signed     char    Z_byte;
 typedef  signed     short   Z_short;
 typedef  signed     short   Z_shortword;
-typedef  signed     int     Z_int;
-typedef  signed     int     Z_word;
+typedef  signed     long    Z_int;       /* used to be "int"! */
+typedef  signed     long    Z_word;      /* used to be "int"! */
 typedef  signed     long    Z_long;
 typedef  signed     long    Z_longword;
 
@@ -88,8 +90,13 @@ typedef  Z_longword         *Z_longwordptr;
 #else
     #ifdef MACOS_TRADITIONAL
         #define boolean Boolean
+    #elif PERL_DARWIN
+        #define boolean bool
     #else
-        typedef enum { false = FALSE, true = TRUE } boolean;
+	typedef int boolean;
+	#ifndef I_STDBOOL
+	    enum { false, true };
+	#endif
     #endif
 #endif
 
@@ -116,11 +123,14 @@ typedef  Z_longword         *Z_longwordptr;
 /*****************************************************************************/
 
 /*****************************************************************************/
-/*  VERSION:  5.5                                                            */
+/*  VERSION:  5.8                                                            */
 /*****************************************************************************/
 /*  VERSION HISTORY:                                                         */
 /*****************************************************************************/
 /*                                                                           */
+/*    Version 5.8   03.09.13  Allows bit vectors with > 2^32 bits.           */
+/*    Version 5.7   17.05.12  Changed boolean data type.                     */
+/*    Version 5.6   27.07.09  Made it MacOS X compatible.                    */
 /*    Version 5.5   03.10.04  Added compiler directives for C++.             */
 /*    Version 5.4   08.09.02  Added conditional changes for MacOS/MacPerl.   */
 /*    Version 5.3   12.05.98  Completed history.                             */
@@ -139,14 +149,14 @@ typedef  Z_longword         *Z_longwordptr;
 /*****************************************************************************/
 /*                                                                           */
 /*    Steffen Beyer                                                          */
-/*    mailto:sb@engelschall.com                                              */
+/*    mailto:STBEY@cpan.org                                                  */
 /*    http://www.engelschall.com/u/sb/download/                              */
 /*                                                                           */
 /*****************************************************************************/
 /*  COPYRIGHT:                                                               */
 /*****************************************************************************/
 /*                                                                           */
-/*    Copyright (c) 1995 - 2004 by Steffen Beyer.                            */
+/*    Copyright (c) 1995 - 2013 by Steffen Beyer.                            */
 /*    All rights reserved.                                                   */
 /*                                                                           */
 /*****************************************************************************/

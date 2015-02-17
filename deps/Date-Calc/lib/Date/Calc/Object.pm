@@ -1,7 +1,7 @@
 
 ###############################################################################
 ##                                                                           ##
-##    Copyright (c) 2000 - 2004 by Steffen Beyer.                            ##
+##    Copyright (c) 2000 - 2009 by Steffen Beyer.                            ##
 ##    All rights reserved.                                                   ##
 ##                                                                           ##
 ##    This package is free software; you can redistribute it                 ##
@@ -38,7 +38,7 @@ BEGIN # Re-export imports from Date::Calc:
     %EXPORT_TAGS = (all => [@Date::Calc::EXPORT_OK],
                     aux => [@AUXILIARY],
                     ALL => [@EXPORT_OK]);
-    $VERSION     = '5.4';
+    $VERSION     = '6.3';
     Date::Calc->import(@Date::Calc::EXPORT,@Date::Calc::EXPORT_OK);
 }
 
@@ -251,6 +251,7 @@ sub _times_equal_
 }
 
 my $ACCURATE_MODE = 1;
+my $NORMALIZED_MODE = 0; # disabled by default for backward compatibility
 my $NUMBER_FORMAT = 0;
 my $DELTA_FORMAT = 0;
 my $DATE_FORMAT = 0;
@@ -262,6 +263,17 @@ sub accurate_mode
     if (@_ > 1)
     {
         $ACCURATE_MODE = $_[1] || 0;
+    }
+    return $flag;
+}
+
+sub normalized_mode
+{
+    my($flag) = $NORMALIZED_MODE;
+
+    if (@_ > 1)
+    {
+        $NORMALIZED_MODE = $_[1] || 0;
     }
     return $flag;
 }
@@ -342,10 +354,10 @@ sub language
                     $temp = $_[0];
                     if ($temp !~ /^\d+$/)
                         { $temp = Decode_Language($temp); }
-                    if ($temp > 0 and $temp <= Languages())
+                    if ($temp >= 1 and $temp <= Languages())
                         { $self->[0][3] = $temp; }
                     else
-                        { die "no such language '$_[0]'"; }
+                        { croak "no such language '$_[0]'"; }
                 }
                 else { $self->[0][3] = undef; }
             }
@@ -358,10 +370,10 @@ sub language
                 $temp = $_[0];
                 if ($temp !~ /^\d+$/)
                     { $temp = Decode_Language($temp); }
-                if ($temp > 0 and $temp <= Languages())
+                if ($temp >= 1 and $temp <= Languages())
                     { Language($temp); }
                 else
-                    { die "no such language '$_[0]'"; }
+                    { croak "no such language '$_[0]'"; }
             }
         }
     };
@@ -509,7 +521,7 @@ sub normalize
             {
                 splice( @{$self}, 3, 4, Normalize_DHMS(@{$self}[3..6]) );
             }
-            unless ($ACCURATE_MODE) # YMD_MODE
+            unless ($ACCURATE_MODE) # YMD_MODE or N_YMD_MODE
             {
                 if ($self->[2] and ($quot = int($self->[2] / 12)))
                 {
@@ -1152,30 +1164,21 @@ sub number
 
 sub string
 {
-    my($self,$format,$language) = @_;
+    my($self,$format,$lang) = @_;
     my($restore,$string);
 
     if ($self->is_valid())
     {
-        eval
+        if (defined($lang) and $lang ne '') # because of overloading!
         {
-            if (defined($language) and $language ne '') # because of overloading!
-            {
-                if ($language =~ /^\d+$/)  { $restore = Language($language); }
-                else                       { $restore = Language(Decode_Language($language)); }
-            }
-            else
-            {
-                if (defined $self->[0][3]) { $restore = Language($self->[0][3]); }
-                else                       { $restore = undef; }
-            }
-        };
-        if ($@)
-        {
-            $@ =~ s!^.*[A-Za-z0-9_]+(?:::[A-Za-z0-9_]+)*\(\):\s*!!;
-            $@ =~ s!\s+at\s+\S.*\s*$!!;
-            croak($@);
+            $lang = Decode_Language($lang) unless ($lang =~ /^\d+$/);
         }
+        else
+        {
+            if (defined $self->[0][3]) { $lang = $self->[0][3]; }
+            else                       { $lang = Language(); }
+        }
+        croak "no such language '$lang'" unless ($lang >= 1 and $lang <= Languages());
         eval
         {
             if ($self->[0][0]) # is_delta
@@ -1186,7 +1189,11 @@ sub string
                 {
                     if (ref($format) eq 'CODE')
                     {
-                        $string = &{$format}( $self, 0x06 ); # = TO_STRING | IS_DELTA | IS_SHORT
+                        $string = &{$format}( $self, 0x06, $lang ); # = TO_STRING | IS_DELTA | IS_SHORT
+                    }
+                    elsif ($format == 4)
+                    {
+                        $string = '(' . join(',', @{$self}[1..3]) . ')';
                     }
                     elsif ($format == 3)
                     {
@@ -1213,7 +1220,11 @@ sub string
                 {
                     if (ref($format) eq 'CODE')
                     {
-                        $string = &{$format}( $self, 0x07 ); # = TO_STRING | IS_DELTA | IS_LONG
+                        $string = &{$format}( $self, 0x07, $lang ); # = TO_STRING | IS_DELTA | IS_LONG
+                    }
+                    elsif ($format == 4)
+                    {
+                        $string = '(' . join(',', @{$self}[1..6]) . ')';
                     }
                     elsif ($format == 3)
                     {
@@ -1245,21 +1256,25 @@ sub string
                 {
                     if (ref($format) eq 'CODE')
                     {
-                        $string = &{$format}( $self, 0x04 ); # = TO_STRING | IS_DATE | IS_SHORT
+                        $string = &{$format}( $self, 0x04, $lang ); # = TO_STRING | IS_DATE | IS_SHORT
+                    }
+                    elsif ($format == 4)
+                    {
+                        $string = '[' . join(',', @{$self}[1..3]) . ']';
                     }
                     elsif ($format == 3)
                     {
-                        $string = Date_to_Text_Long( @{$self}[1..3] );
+                        $string = Date_to_Text_Long( @{$self}[1..3], $lang );
                     }
                     elsif ($format == 2)
                     {
-                        $string = Date_to_Text( @{$self}[1..3] );
+                        $string = Date_to_Text( @{$self}[1..3], $lang );
                     }
                     elsif ($format == 1)
                     {
                         $string = sprintf( "%02d-%.3s-%04d",
                             $self->[3],
-                            Month_to_Text($self->[2]),
+                            Month_to_Text($self->[2],$lang),
                             $self->[1] );
                     }
                     else
@@ -1272,23 +1287,27 @@ sub string
                 {
                     if (ref($format) eq 'CODE')
                     {
-                        $string = &{$format}( $self, 0x05 ); # = TO_STRING | IS_DATE | IS_LONG
+                        $string = &{$format}( $self, 0x05, $lang ); # = TO_STRING | IS_DATE | IS_LONG
+                    }
+                    elsif ($format == 4)
+                    {
+                        $string = '[' . join(',', @{$self}[1..6]) . ']';
                     }
                     elsif ($format == 3)
                     {
-                        $string = Date_to_Text_Long( @{$self}[1..3] ) .
+                        $string = Date_to_Text_Long( @{$self}[1..3], $lang ) .
                             sprintf( " %02d:%02d:%02d", @{$self}[4..6] );
                     }
                     elsif ($format == 2)
                     {
-                        $string = Date_to_Text( @{$self}[1..3] ) .
+                        $string = Date_to_Text( @{$self}[1..3], $lang ) .
                             sprintf( " %02d:%02d:%02d", @{$self}[4..6] );
                     }
                     elsif ($format == 1)
                     {
                         $string = sprintf( "%02d-%.3s-%04d %02d:%02d:%02d",
                             $self->[3],
-                            Month_to_Text($self->[2]),
+                            Month_to_Text($self->[2],$lang),
                             $self->[1],
                             @{$self}[4..6] );
                     }
@@ -1300,7 +1319,6 @@ sub string
                 }
             }
         };
-        Language($restore) if (defined $restore);
         if ($@)
         {
             $@ =~ s!^.*[A-Za-z0-9_]+(?:::[A-Za-z0-9_]+)*\(\):\s*!!;
@@ -1518,28 +1536,62 @@ sub _add_
     {
         if ($len1 or $len2)
         {
-            splice( @{$result}, 1, 6,
-                Add_Delta_YMDHMS( $self->_date_time_(),
-                                  $this->_date_time_() ) );
+            if (not $ACCURATE_MODE and $NORMALIZED_MODE)
+            {
+                splice( @{$result}, 1, 6,
+                    Add_N_Delta_YMDHMS( $self->_date_time_(),
+                                        $this->_date_time_() ) );
+            }
+            else # ACCURATE_MODE or YMD_MODE
+            {
+                splice( @{$result}, 1, 6,
+                    Add_Delta_YMDHMS( $self->_date_time_(),
+                                      $this->_date_time_() ) );
+            }
         }
         else # short
         {
-            splice( @{$result}, 1, 3,
-                Add_Delta_YMD( @{$self}[1..3], @{$this}[1..3] ) );
+            if (not $ACCURATE_MODE and $NORMALIZED_MODE)
+            {
+                splice( @{$result}, 1, 3,
+                    Add_N_Delta_YMD( @{$self}[1..3], @{$this}[1..3] ) );
+            }
+            else # ACCURATE_MODE or YMD_MODE
+            {
+                splice( @{$result}, 1, 3,
+                    Add_Delta_YMD( @{$self}[1..3], @{$this}[1..3] ) );
+            }
         }
     }
     else # delta + date => date
     {
         if ($len1 or $len2)
         {
-            splice( @{$result}, 1, 6,
-                Add_Delta_YMDHMS( $this->_date_time_(),
-                                  $self->_date_time_() ) );
+            if (not $ACCURATE_MODE and $NORMALIZED_MODE)
+            {
+                splice( @{$result}, 1, 6,
+                    Add_N_Delta_YMDHMS( $this->_date_time_(),
+                                        $self->_date_time_() ) );
+            }
+            else # ACCURATE_MODE or YMD_MODE
+            {
+                splice( @{$result}, 1, 6,
+                    Add_Delta_YMDHMS( $this->_date_time_(),
+                                      $self->_date_time_() ) );
+            }
         }
         else # short
         {
-            splice( @{$result}, 1, 3,
-                Add_Delta_YMD( @{$this}[1..3], @{$self}[1..3] ) );
+            if (not $ACCURATE_MODE and $NORMALIZED_MODE)
+            {
+                splice( @{$result}, 1, 3,
+                    Add_N_Delta_YMD( @{$this}[1..3], @{$self}[1..3] ) );
+            }
+            else # ACCURATE_MODE or YMD_MODE
+            {
+                splice( @{$result}, 1, 3,
+                    Add_Delta_YMD( @{$this}[1..3], @{$self}[1..3] ) );
+            }
         }
         carp("implicitly changed object type from delta vector to date")
             if (not defined $flag and $^W);
@@ -1587,19 +1639,37 @@ sub _minus_
                                         $self->_date_time_() ) );
                     }
                 }
-                else # YMD_MODE
+                else # YMD_MODE or N_YMD_MODE
                 {
-                    if ($flag)
+                    if ($NORMALIZED_MODE) # N_YMD_MODE
                     {
-                        splice( @{$result}, 1, 6,
-                            Delta_YMDHMS( $self->_date_time_(),
-                                          $this->_date_time_() ) );
+                        if ($flag)
+                        {
+                            splice( @{$result}, 1, 6,
+                                N_Delta_YMDHMS( $self->_date_time_(),
+                                                $this->_date_time_() ) );
+                        }
+                        else
+                        {
+                            splice( @{$result}, 1, 6,
+                                N_Delta_YMDHMS( $this->_date_time_(),
+                                                $self->_date_time_() ) );
+                        }
                     }
-                    else
+                    else # YMD_MODE
                     {
-                        splice( @{$result}, 1, 6,
-                            Delta_YMDHMS( $this->_date_time_(),
-                                          $self->_date_time_() ) );
+                        if ($flag)
+                        {
+                            splice( @{$result}, 1, 6,
+                                Delta_YMDHMS( $self->_date_time_(),
+                                              $this->_date_time_() ) );
+                        }
+                        else
+                        {
+                            splice( @{$result}, 1, 6,
+                                Delta_YMDHMS( $this->_date_time_(),
+                                              $self->_date_time_() ) );
+                        }
                     }
                 }
             }
@@ -1618,17 +1688,33 @@ sub _minus_
                             Delta_Days( @{$this}[1..3], @{$self}[1..3] ) );
                     }
                 }
-                else # YMD_MODE
+                else # YMD_MODE or N_YMD_MODE
                 {
-                    if ($flag)
+                    if ($NORMALIZED_MODE) # N_YMD_MODE
                     {
-                        splice( @{$result}, 1, 3,
-                            Delta_YMD( @{$self}[1..3], @{$this}[1..3] ) );
+                        if ($flag)
+                        {
+                            splice( @{$result}, 1, 3,
+                                N_Delta_YMD( @{$self}[1..3], @{$this}[1..3] ) );
+                        }
+                        else
+                        {
+                            splice( @{$result}, 1, 3,
+                                N_Delta_YMD( @{$this}[1..3], @{$self}[1..3] ) );
+                        }
                     }
-                    else
+                    else # YMD_MODE
                     {
-                        splice( @{$result}, 1, 3,
-                            Delta_YMD( @{$this}[1..3], @{$self}[1..3] ) );
+                        if ($flag)
+                        {
+                            splice( @{$result}, 1, 3,
+                                Delta_YMD( @{$self}[1..3], @{$this}[1..3] ) );
+                        }
+                        else
+                        {
+                            splice( @{$result}, 1, 3,
+                                Delta_YMD( @{$this}[1..3], @{$self}[1..3] ) );
+                        }
                     }
                 }
             }

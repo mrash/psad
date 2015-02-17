@@ -98,6 +98,10 @@ my %required_perl_modules = (
         'force-install' => 0,
         'mod-dir' => 'Storable'
     },
+    'Carp::Clan', => {
+        'force-install' => 0,
+        'mod-dir' => 'Carp-Clan'
+    },
     'Date::Calc', => {
         'force-install' => 0,
         'mod-dir' => 'Date-Calc'
@@ -120,6 +124,7 @@ my @ordered_modules = (qw/
     Unix::Syslog
     Bit::Vector
     Storable
+    'Carp::Clan'
     Date::Calc
     NetAddr::IP
     IPTables::Parse

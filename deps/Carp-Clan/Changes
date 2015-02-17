@@ -1,0 +1,100 @@
+                ============================
+                    Package "Carp::Clan"
+                ============================
+
+             Copyright (c) 2006-2009 by Joshua ben Jore
+             All rights reserved.
+
+             Copyright (c) 2001-2009 by Steffen Beyer
+             All rights reserved.
+
+
+Version history:
+----------------
+
+Version 6.04  24.10.2009
+ + Solved RT ticket #50796 (inform type of license)
+ + Made the test suite compatible with Perl versions < v5.6.0
+
+Version 6.03  18.10.2009
+ + Re-release to resolve confusion in CPAN caused by intermediate release
+   of Carp::Clan 5.4 (backport of bugfix #50560 below for Perls < v5.6.0)
+
+Version 6.02  17.10.2009
+ + Forgot to fix the bug of duplicated prefixes in _longmsg as well
+
+Version 6.01  16.10.2009
+ + Fixed bug of duplicated prefixes (RT ticket #50560)
+
+Version 6.00  17.02.2008
+ + Oops. Fixed version number. '5.10' is less than '5.9'. I thought
+   CPAN would handle this but apparently not..
+
+Version 5.10  10.01.2008
+ + Removed the circular dependency on Object::Deadly. It was only
+   used for testing and would only succeed if you already had O::D
+   installed.
+
+Version 5.9   04.11.2007
+ + Test::Exceptions is mandatory for testing.
+ + Fixed http://rt.cpan.org/Ticket/Display.html?id=26255.
+
+Version 5.8   09.10.2006
+ + Stop testing that ->VERSION is a specific thing. I'm not sure why
+   that was ever tested in the first place.
+
+Version 5.7   02.10.2006
+ +  Stop PAUSE from attempting to index DB package.
+
+Version 5.6   02.10.2006
+
+ +  Fixed test to predefined croak/confess/cluck/carp functions don't
+    break tests.
+ +  Use Object::Deadly even saner.
+ +  Use named lexicals in diag().
+ +  Skip testing import of carp/croak/cluck/confess if they existed
+    prior to loading Carp::Clan.
+ +  Use exists &foo/defined &foo instead of symbol table hackery.
+ +  Remove all the symbol table hackery that had notes about avoiding
+    symrefs. That's dumb. It's better to be clear and have symrefs
+    than have unreadble code w/o symrefs.
+ +  Remove gratituous & sigil on function calls.
+ +  Changed f() so it accepts 1st parameter of carp/cluck/confess/croak
+    instead of 1/2/3/4.
+ +  Renamed files.
+
+Version 5.5   02.10.2006
+ +  Change 01_..._carp.t to use Object::Deadly only if it is 0.08+
+ +  Changed wording of the O::D request in Makefile.PL
+ +  Allowed everything to be perltidied.
+
+Version 5.4   23.09.2006
+ +  Made Carp::Clan safe for overloaded objects.
+ +  Added diag() to 01_..._carp.t
+ +  Release by JJORE
+
+Version 5.3   30.04.2004
+
+ +  Removed the paragraph saying "no tests available" from README.txt
+ +  Changed Clan.pm in order to suppress "subroutine redefined" warnings
+
+Version 5.2   11.04.2004
+
+ +  Added the original test scripts from Date::Calc and Bit::Vector
+
+Version 5.1   19.08.2003
+
+ +  First release as a separate module
+ +  Incremented the version number in order to avoid problems with
+    the automatic installation of prerequisites (no code changes)
+
+Version 5.0   10.10.2001
+
+ +  First official release as part of the Date::Calc 5.0 distribution
+
+Version 5.0   12.06.2001
+
+ +  Last modification of the code (copied from "Carp.pm" from Perl 5.005_03)
+
+----------------------------------------------------------------------------
+

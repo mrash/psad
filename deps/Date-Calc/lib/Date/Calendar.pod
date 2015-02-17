@@ -1,0 +1,613 @@
+
+=head1 NAME
+
+Date::Calendar - Calendar objects for different holiday schemes
+
+=head1 MOTTO
+
+There is more than one way to do it - this is just one of them!
+
+=head1 PREFACE
+
+Basically, Date::Calendar is just a caching proxy class for
+Date::Calendar::Year objects, which are embedded in each
+Date::Calendar object.
+
+However, and in contrast to Date::Calendar::Year methods, Date::Calendar
+methods permit calculations spanning an arbitrary number of years, without
+loss of efficiency.
+
+So you should usually use Date::Calendar and not Date::Calendar::Year,
+since that way you don't have to worry about calculations crossing year
+boundaries.
+
+Note however that Date::Calendar and Date::Calendar::Year can only deal
+with years lying within the range [1583..2299].
+
+=head1 SYNOPSIS
+
+  use Date::Calendar::Profiles qw( $Profiles );
+  use Date::Calendar;
+
+  $calendar_US_AZ  = Date::Calendar->new( $Profiles->{'US-AZ'} [,LANG[,WEEKEND]] );
+  $calendar_DE_SN  = Date::Calendar->new( $Profiles->{'DE-SN'} [,LANG[,WEEKEND]] );
+
+  $year_2000_US_AZ = $calendar_US_AZ->year( 2000 );
+  $year_2001_DE_SN = $calendar_DE_SN->year( 2001 );
+
+  @years = $calendar->cache_keys(); # returns list of year numbers
+  @years = $calendar->cache_vals(); # returns list of year objects
+
+  $calendar->cache_clr();
+  $calendar->cache_add(YEAR|DATE,...);
+  $calendar->cache_del(YEAR|DATE,...);
+
+  $index        = $calendar->date2index(YEAR,MONTH,DAY|DATE);
+
+  @names        = $calendar->labels(YEAR,MONTH,DAY|DATE);
+  @holidays     = $calendar->labels();
+  $holidays     = $calendar->labels();
+
+  @dates        = $calendar->search(PATTERN);
+  $dates        = $calendar->search(PATTERN);
+
+  $hashref      = $calendar->tags(YEAR,MONTH,DAY|DATE);
+
+  $days         = $calendar->delta_workdays(YEAR1,MONTH1,DAY1|DATE1
+                                           ,YEAR2,MONTH2,DAY2|DATE2
+                                           ,FLAG1,FLAG2);
+
+  ($date,$rest) = $calendar->add_delta_workdays(YEAR,MONTH,DAY|DATE
+                                               ,DELTA);
+  $date         = $calendar->add_delta_workdays(YEAR,MONTH,DAY|DATE
+                                               ,DELTA);
+
+  $flag         = $calendar->is_full(YEAR,MONTH,DAY|DATE);
+  $flag         = $calendar->is_half(YEAR,MONTH,DAY|DATE);
+  $flag         = $calendar->is_work(YEAR,MONTH,DAY|DATE);
+
+=head1 INTERFACE
+
+Note that whenever a year number, a date, a time or a combined
+date and time are expected as input parameters by one of the
+methods of this class, you can always pass a Date::Calc[::Object]
+date object or an array reference (of an array of appropriate
+length) instead!
+
+See L<Date::Calc::Object(3)> for more details.
+
+So instead of calling a given method like this:
+
+  $object->method1( $year,$month,$day );
+  $object->method2( $year1,$month1,$day1, $year2,$month2,$day2 );
+  $object->method3( $year1, $year2, $year3 );
+
+You can also call it like so:
+
+  $object->method1( $date );
+  $object->method1( [1964,1,3] );
+
+  $object->method2( $year1,$month1,$day1, $date2 );
+  $object->method2( $date1, $year2,$month2,$day2 );
+  $object->method2( $date1, $date2 );
+  $object->method2( $year1,$month1,$day1, [2001,3,17] );
+  $object->method2( [1964,1,3], $year2,$month2,$day2 );
+  $object->method2( [1964,1,3], [2001,3,17] );
+  $object->method2( $date1, [2001,3,17] );
+  $object->method2( [1964,1,3], $date2 );
+
+  $object->method3( $year1, $date2, [2001,3,17] );
+
+And similarly if a time or a combined date and time are expected.
+
+If you substitute an expected year number by an anonymous array
+(this is the recommended way of writing date constants, for
+increased readability of your programs), it must contain three
+values, nevertheless (otherwise the use of an anonymous array
+would be pointless).
+
+Don't confuse year numbers and their substitutes (a date object
+or an array reference) with Date::Calendar::Year objects, which
+are a totally different thing!
+
+But incidentally C<:-)>, you may also pass a Date::Calendar::Year
+object whenever a year number is expected. However, and perhaps
+against your expectations at times, especially in conjunction
+with the method "cache_add()", only the year number from that
+object will be used, not the year object itself (the year
+object in question might be using the wrong profile!).
+
+Moreover, whenever a method of this class returns a date, it
+does so by returning a Date::Calc[::Object] date object.
+
+=head1 DESCRIPTION
+
+=over 2
+
+=item *
+
+C<$calendar = Date::Calendar-E<gt>new(PROFILE[,LANG[,WEEKEND]]);>
+
+The first argument must be the reference of a hash,
+which contains a holiday scheme or "profile" to be used
+in all calculations involving the new calendar object.
+
+The second argument is optional, and must consist of
+the valid name or number of a language as provided by
+the Date::Calc(3) module if given.
+
+After the second argument, a list of day numbers which
+will constitute the "weekend" can optionally be specified,
+where 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday,
+5=Friday, 6=Saturday and 7=Sunday.
+
+If no values are given, 6 and 7 (Saturday and Sunday)
+are automatically taken as default.
+
+If values outside of the range C<1..7> are given,
+they will be ignored.
+
+This can be used to switch off this feature and to
+have no regularly recurring holidays at all when
+for instance a zero is given.
+
+See L<Date::Calendar::Profiles(3)> and L<Date::Calendar::Year(3)>
+for more details about these arguments and about how
+to roll your own calendar profiles.
+
+The method creates a new calendar object for a given profile,
+i.e., a given location and its scheme of holidays (or a scheme
+of your own).
+
+This calendar object is a caching proxy object; it stores the
+reference of the given profile and contains a hash (the cache)
+of Date::Calendar::Year objects.
+
+=item *
+
+C<$year = $calendar-E<gt>year(YEAR|DATE);>
+
+This method returns a Date::Calendar::Year object for the given
+year and the profile that was associated with the given calendar
+object.
+
+If the cache in the given calendar object already contains an
+object for the requested year, the corresponding object reference
+is simply returned.
+
+If not, a new Date::Calendar::Year object is created using the
+profile that has been associated with the given calendar object.
+The new Date::Calendar::Year object is then stored in the calendar
+object's cache and its object reference is returned.
+
+A fatal "given year out of range" error will occur if the given
+year number lies outside the valid range of [1583..2299].
+
+=item *
+
+C<@years = $calendar-E<gt>cache_keys();>
+
+This method returns the list of B<YEAR NUMBERS> of the
+Date::Calendar::Year objects contained in the given
+calendar object's cache.
+
+=item *
+
+C<@years = $calendar-E<gt>cache_vals();>
+
+This method returns the list of B<OBJECT REFERENCES> of
+the Date::Calendar::Year objects contained in the given
+calendar object's cache.
+
+=item *
+
+C<$calendar-E<gt>cache_clr();>
+
+This method clears the entire cache of the given calendar
+object (by destroying the cache hash and creating a new one).
+
+=item *
+
+C<$calendar-E<gt>cache_add(YEAR|DATE,...);>
+
+Roughly, this method is a shortcut for
+
+  for $year (@list)
+  {
+      $calendar->year($year);
+  }
+
+=item *
+
+C<$calendar-E<gt>cache_del(YEAR|DATE,...);>
+
+This method removes the Date::Calendar::Year objects whose
+year numbers are given from the cache of the given calendar
+object.
+
+Year numbers for which the calendar object's cache doesn't
+contain an entry are simply ignored.
+
+=item *
+
+C<$index = $calendar-E<gt>date2index(YEAR,MONTH,DAY|DATE);>
+
+This method converts a given date into the number of the day in
+that year (this is sometimes also referred to as the "julian"
+date), i.e., a number between 0 (for January 1st) and the number
+of days in the given year minus one, i.e., 364 or 365 (for
+December 31st).
+
+You may need this in order to access the bit vectors returned
+by the Date::Calendar::Year methods "vec_full()", "vec_half()"
+and "vec_work()".
+
+If the Date::Calendar::Year object for the given YEAR is not in
+the C<$calendar>'s cache yet, it will be created and added.
+
+An exception ("invalid date") is thrown if the given arguments
+do not constitute a valid date, or ("given year out of range
+[1583..2299]") if the given year lies outside of the permitted
+range.
+
+=item *
+
+C<@names = $calendar-E<gt>labels(YEAR,MONTH,DAY|DATE);>
+
+C<@holidays = $calendar-E<gt>labels();>
+
+C<$holidays = $calendar-E<gt>labels();>
+
+If any arguments are given, they are supposed to represent a
+date. In that case, a list of all labels (= names of holidays)
+associated with that date are returned. The first item returned
+is always the name of the day of week for that date. The
+corresponding year object for the given date's year is
+added to the calendar's cache first if necessary.
+
+If no arguments are given, the list of all available labels in
+all years that have previously been accessed in the given calendar
+(i.e., the years which are already in the given calendar's cache)
+is constructed. Note that this means that the returned list will
+be empty if there are no year objects in the given calendar's
+cache yet (!). The returned list does B<NOT> include any names
+of the days of week (which would be pointless in this case).
+
+Multiple labels are reported only once.
+
+Usually all years have the same set of labels, so it may seem
+superfluous to scan all the years in the cache instead of just
+one. But there may be exceptions, because it is possible to
+define calendar profiles which do not contain all possible
+holidays in every year. See L<Date::Calendar::Profiles(3)>
+and L<Date::Calendar::Year(3)> for more details.
+
+In list context, the resulting list itself is returned. In scalar
+context, the number of items in the resulting list is returned.
+
+=item *
+
+C<@dates = $calendar-E<gt>search(PATTERN);>
+
+C<$dates = $calendar-E<gt>search(PATTERN);>
+
+This method searches through all the labels in all years that
+have previously been accessed in the given calendar (i.e., the
+years which are already in the given calendar's cache) and
+returns a list of date objects with all dates whose labels
+match the given pattern.
+
+(Use the methods "cache_clr()", "cache_add()" and "cache_del()"
+in order to put the year numbers you want into the calendar
+object's cache, or to make sure it only contains the year
+numbers you want to search.)
+
+Note that this is a simple, case-insensitive substring search,
+B<NOT> a full-fledged regular expression search!
+
+The result is guaranteed to be sorted chronologically.
+
+In scalar context, only the number of items in the resulting list
+is returned, instead of the resulting list itself (as in list context).
+
+=item *
+
+C<$hashref = $calendar-E<gt>tags(YEAR,MONTH,DAY|DATE);>
+
+This method returns a hash reference for the given calendar and
+date. The hash it refers to is a copy of the calendar profile's
+internal hash which contains the names for the given date as keys
+and 0, 1, 2, or 3 as their corresponding values meaning the following:
+
+    0    =>    commemorative day
+    1    =>    "half" holiday
+    2    =>    "full" holiday
+    3    =>    both a "half" and a "full" holiday
+
+The value "3" should only occur if a date has been redefined by the
+underlying profile using the same key (i.e., the same name) but with
+a different type of holiday.
+
+=item *
+
+C<$days = $calendar-E<gt>delta_workdays(YEAR1,MONTH1,DAY1, YEAR2,MONTH2,DAY2, FLAG1,FLAG2);>
+
+C<$days = $calendar-E<gt>delta_workdays(DATE1,DATE2,FLAG1,FLAG2);>
+
+This method calculates the number of work days (i.e., the number
+of days, but excluding all holidays) between two dates.
+
+In other words, this method is equivalent to the "Delta_Days()"
+function of the Date::Calc module, except that it disregards
+holidays in its counting.
+
+The two flags indicate whether the start and end dates should be
+included in the counting (that is, of course, only in case they
+aren't holidays), or not.
+
+It is common, for example, that you want to know how many work
+days are left between the current date and a given deadline.
+
+Typically, you will want to count the current date but not the
+deadline's date. So you would specify "true" ("1") for FLAG1
+and "false" ("0") for FLAG2 in order to achieve that.
+
+In other words, a value of "true" means "including this date",
+a value of "false" means "excluding this date".
+
+As with the "Delta_Days()" function from the Date::Calc module,
+the dates have to be given in chronological order to yield a
+positive result. If the dates are reversed, the result will
+be negative.
+
+The parameter FLAG1 is associated with the first given date,
+the parameter FLAG2 with the second given date (regardless
+of whether the dates are in chronological order or not).
+
+An exception ("invalid date") is raised if either of the two
+date arguments does not constitute a valid date.
+
+=item *
+
+C<($date,$rest) = $calendar-E<gt>add_delta_workdays(YEAR,MONTH,DAY, DELTA);>
+
+C<($date,$rest) = $calendar-E<gt>add_delta_workdays(DATE,DELTA);>
+
+C<$date = $calendar-E<gt>add_delta_workdays(YEAR,MONTH,DAY, DELTA);>
+
+C<$date = $calendar-E<gt>add_delta_workdays(DATE,DELTA);>
+
+This method is the equivalent of the "Add_Delta_Days()" function
+from the Date::Calc module, except that it adds work days and
+skips holidays.
+
+In other words, you can add or subtract a number of work days
+"DELTA" to/from a given date and get a new date as the result
+(as a Date::Calc object).
+
+You add days (i.e., you go forward in time) with a positive
+offset "DELTA", and you subtract days (i.e., you go backwards
+in time) with a negative offset.
+
+Note that an exception ("invalid date") is raised if the
+given date argument does not constitute a valid date.
+
+In scalar context, the method just returns the resulting date
+object, whereas in list context the method not only returns the
+new date, but also a "rest". This rest is useful for cases in
+which your profile contains "half" holidays, or when you add
+or subtract fractions of a day.
+
+Sometimes it is not possible to accomodate the requested number
+of work days, and a rest remains.
+
+This rest can currently only assume the value "0.0" (zero),
+"-0.5" (minus one half) or "0.5" (one half), provided you
+use only integral or multiples of 0.5 as offsets. A rest
+of zero indicates that the calculation yielded an exact
+result. If the rest is 0.5 or -0.5, this is to be interpreted
+as "the resulting date at 12:00 o'clock", instead of as "the
+resulting date at 0:00 o'clock".
+
+The rest is always positive (or zero) if the offset "DELTA"
+is positive (or zero), and always negative (or zero) if the
+offset is negative (or zero).
+
+Example:
+
+  #!perl
+  use Date::Calendar;
+  use Date::Calendar::Profiles qw( $Profiles );
+  $year = shift;
+  $cal = Date::Calendar->new( $Profiles->{'sdm-MUC'} );
+  ($date,$rest) = $cal->add_delta_workdays($year,1,3, -3);
+  $date->date_format(1);
+  print "\$date = $date, \$rest = $rest.\n";
+  __END__
+
+This program calculates "January 3rd of the given year minus
+3 work days":
+
+  > perl test.pl 2001
+  $date = 28-Dec-2000, $rest = 0.
+  > perl test.pl 2002
+  $date = 28-Dec-2001, $rest = -0.5.
+
+Note that December 31st is a "half" holiday in 2001 for the
+calendar profile used in this example.
+
+You can easily verify the results above with the help of the
+"calendar.cgi" CGI script or the "linearcal.pl" script from
+the "examples" subdirectory in the Date::Calc distribution.
+
+B<BEWARE> that this method may currently return unexpected
+(i.e., contradicting the above documentation) or plain wrong
+results when going back in time (this is a bug!).
+
+However, it works correctly and as documented above when
+going forward in time.
+
+=item *
+
+C<$flag = $calendar-E<gt>is_full(YEAR,MONTH,DAY|DATE);>
+
+This method returns "true" ("1") if the bit corresponding to
+the given date is set in the bit vector representing "full"
+holidays, and "false" ("0") otherwise.
+
+I.e., the method returns "true" if the given date is a (full)
+holiday (according to the calendar profile associated with the
+given calendar object).
+
+The corresponding Date::Calendar::Year object is created first
+and stored in the calendar object's cache if necessary (if it's
+not already there).
+
+Note that you can get a reference to this bit vector (in order
+to use this bit vector in bit vector operations) as follows:
+
+  $vec_full = $calendar->year($year)->vec_full();
+
+The number of bits in this bit vector is the same as the number
+of days in the given year "C<$year>", which you can retrieve
+through either "C<$days = $vec_full-E<gt>Size();>" or
+"C<$days = $year-E<gt>val_days();>".
+
+See L<Date::Calendar::Year(3)> and L<Bit::Vector(3)> for more
+details.
+
+=item *
+
+C<$flag = $calendar-E<gt>is_half(YEAR,MONTH,DAY|DATE);>
+
+This method returns "true" ("1") if the bit corresponding to
+the given date is set in the bit vector representing "half"
+holidays, and "false" ("0") otherwise.
+
+I.e., the method returns "true" if the given date is a half
+holiday (according to the calendar profile associated with the
+given calendar object).
+
+Note that if a date is a "full" holiday, the "half" bit is
+never set, even if you try to do so in your calendar profile,
+on purpose or by accident.
+
+The corresponding Date::Calendar::Year object is created first
+and stored in the calendar object's cache if necessary (if it's
+not already there).
+
+Note that you can get a reference to this bit vector (in order
+to use this bit vector in bit vector operations) as follows:
+
+  $vec_half = $calendar->year($year)->vec_half();
+
+The number of bits in this bit vector is the same as the number
+of days in the given year "C<$year>", which you can retrieve
+through either "C<$days = $vec_half-E<gt>Size();>" or
+"C<$days = $year-E<gt>val_days();>".
+
+See L<Date::Calendar::Year(3)> and L<Bit::Vector(3)> for more
+details.
+
+=item *
+
+C<$flag = $calendar-E<gt>is_work(YEAR,MONTH,DAY|DATE);>
+
+This method returns "true" ("1") if the bit corresponding to
+the given date is set in the bit vector used to perform all
+sorts of calculations, and "false" ("0") otherwise.
+
+The corresponding Date::Calendar::Year object is created first
+and stored in the calendar object's cache if necessary (if it's
+not already there).
+
+B<BEWARE> that the "work" in this method's name does B<NOT>
+come from "work days"!
+
+It comes from the fact that the corresponding bit vector can
+be used for any "work" that you need to do. In other words,
+it's a "work space".
+
+Therefore, this bit vector might contain about everything you
+could imagine - including a bit pattern which marks all "work
+days" with set bits, if it so happens!
+
+But you better don't rely on it, unless you put the bit pattern
+there yourself in the first place.
+
+Note that you can get a reference to this bit vector (in order
+to fill it with any bit pattern you like) as follows:
+
+  $vec_work = $calendar->year($year)->vec_work();
+
+The number of bits in this bit vector is the same as the number
+of days in the given year "C<$year>", which you can retrieve
+through either "C<$days = $vec_work-E<gt>Size();>" or
+"C<$days = $year-E<gt>val_days();>".
+
+See L<Date::Calendar::Year(3)> and L<Bit::Vector(3)> for more
+details.
+
+=back
+
+=head1 SEE ALSO
+
+Date::Calendar::Year(3), Date::Calendar::Profiles(3),
+Date::Calc::Object(3), Date::Calc(3), Date::Calc::Util(3),
+Bit::Vector(3).
+
+=head1 LIMITATIONS
+
+The calendar profiles included in L<Date::Calendar::Profiles(3)>
+usually do not take historical irregularities into account
+(even though some do in order to show how this can be done),
+they only provide means for calculating B<regularly> recurring
+events (B<the profiles should therefore not be relied upon
+for historical faithfulness>).
+
+=head1 KNOWN BUGS
+
+The method "add_delta_workdays()" is known to produce results
+which are sometimes off by one working day when a negative
+offset is used. As a workaround, try to add one working day
+first and then subtract one working day more than initially
+intended. See also the file "examples/bug.pl" for how to do
+this.
+
+=head1 VERSION
+
+This man page documents "Date::Calendar" version 6.3.
+
+=head1 AUTHOR
+
+  Steffen Beyer
+  mailto:STBEY@cpan.org
+  http://www.engelschall.com/u/sb/download/
+
+=head1 COPYRIGHT
+
+Copyright (c) 2000 - 2009 by Steffen Beyer. All rights reserved.
+
+=head1 LICENSE
+
+This package is free software; you can use, modify and redistribute
+it under the same terms as Perl itself, i.e., at your option, under
+the terms either of the "Artistic License" or the "GNU General Public
+License".
+
+The C library at the core of the module "Date::Calc::XS" can, at your
+discretion, also be used, modified and redistributed under the terms
+of the "GNU Library General Public License".
+
+Please refer to the files "Artistic.txt", "GNU_GPL.txt" and
+"GNU_LGPL.txt" in the "license" subdirectory of this distribution
+for any details!
+
+=head1 DISCLAIMER
+
+This package is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+See the "GNU General Public License" for more details.
+

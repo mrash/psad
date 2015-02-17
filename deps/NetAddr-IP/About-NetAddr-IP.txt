@@ -1,0 +1,95 @@
+About NetAddr::IP
+
+At some point a user wrote and asked the difference between 
+NetAddr::IP and NetAddr::IP::Lite
+
+NetAddr::IP::Lite contains only "basic" IP address operations to create IP objects, 
+print or return their characteristics, do basic IP arithmetic, etc... a lot of 
+which is implemented in XS in its sub-classes, whereas NetAddr::IP contains complex 
+operations on nets, net ranges , etc... all implemented in perl. If you don't use 
+those, you don't need the overhead of loading them, the autoloader, etc... 
+Likewise, NetAddr::IP::Utilities and NetAddr::IP::InetBase exist to provide 
+"very basic" ipv4 and ipv6 utilities without the overhead of their superclasses 
+for module writers need to work with ipv4 & ipv6 "numbers" but do not need object 
+oriented overhead or functionality. 
+
+Take a brief look at the SRC of each to see what is supported in each without 
+having to wade through the man pages to figure out where the overlap is. 
+Basically the modules are broken down into these functional areas that cover 
+various aspects of manipulating IP numbers.
+
+NetAddr::IP::InetBase mostly XS
+net to text conversion routines
+        inet_aton
+        inet_ntoa
+        ipv6_aton
+        ipv6_ntoa
+        ipv6_n2x
+        ipv6_n2d
+        inet_any2n
+        inet_n2dx
+        inet_n2ad
+        inet_ntop
+        inet_pton
+	etc...
+
+NetAddr::IP::Util adds to above, mostly XS
+	 above + ip arithmetic
+        addconst
+        add128
+        sub128
+        bin2bcd
+        bcd2bin
+        ipv4to6
+        mask4to6
+        ipanyto6
+        maskanyto6
+        ipv6to4
+        bin2bcdn
+        bcdn2txt
+        bcdn2bin
+        comp128
+        naip_gethostbyname (platform/socket independent)
+	etc...
+
+NetAddr::IP::Lite adds to above
+mostly 1 or 2 line functions and/or calls to sub classes
+	all the "new" functions
+	all overload functions ( + - ++ -- = print eq ne == > >= < <= cmp)
+	  "copy"  (clone rather than reference)
+  return of IP parameters such as
+	  broadcast
+	  network
+	  addr
+	  mask
+	  masklen
+	  bits
+	  version
+	  cidr
+	  aton
+	  range
+	  numeric
+	  bigint
+	  contains
+	  within
+	  first
+	  last
+	  nth
+	  num
+
+NetAddr::IP adds to above
+	  wildcard
+	  short
+	  full
+	  full6
+	  splitref
+	  split
+	  rsplit
+	  hostenum
+	  compact
+	  compactref
+	  coalesce
+	  re
+	  re6
+
+enjoy...

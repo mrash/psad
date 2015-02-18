@@ -98,10 +98,10 @@ my @args_cp = @ARGV;
 
 exit 1 unless GetOptions(
     'psad-path=s'         => \$psadCmd,
-    'test-include=s'      => \$test_include,
-    'include=s'           => \$test_include,  ### synonym
-    'test-exclude=s'      => \$test_exclude,
-    'exclude=s'           => \$test_exclude,  ### synonym
+    'test-include=s'      => \@tests_to_include,
+    'include=s'           => \@tests_to_include,  ### synonym
+    'test-exclude=s'      => \@tests_to_exclude,
+    'exclude=s'           => \@tests_to_exclude,  ### synonym
     'test-system-install' => \$test_system_install,
     'enable-auto-block-tests' => \$enable_auto_block_tests,
     'List-mode'           => \$list_mode,
@@ -1320,13 +1320,6 @@ sub init() {
         unlink $logfile or die $!;
     }
 
-    if ($test_include) {
-        @tests_to_include = split /\s*,\s*/, $test_include;
-    }
-    if ($test_exclude) {
-        @tests_to_exclude = split /\s*,\s*/, $test_exclude;
-    }
-
     push @tests_to_exclude, 'BLOCK' unless $enable_auto_block_tests;
 
     return;
@@ -1390,5 +1383,17 @@ sub logr() {
 }
 
 sub usage() {
-    ### FIXME
+    print <<_HELP_;
+
+$0 [options]
+
+    -i, --include <test>        - Include tests that match <str>.
+    --exclude <test>            - Exclude tests that match <str>.
+    --enable-auto-block-tests   - Run auto blocking tests.
+    -t, --test-limit <num>      - Run <num> tests.
+    -L, --List-mode             - List available tests.
+    -h, --help                  - Print help and exit.
+
+_HELP_
+    exit 0;
 }

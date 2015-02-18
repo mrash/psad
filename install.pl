@@ -124,7 +124,7 @@ my @ordered_modules = (qw/
     Unix::Syslog
     Bit::Vector
     Storable
-    'Carp::Clan'
+    Carp::Clan
     Date::Calc
     NetAddr::IP
     IPTables::Parse
@@ -345,8 +345,8 @@ sub install() {
     if ($install_syslog_fifo) {
         unless (-e $config{'PSAD_FIFO_FILE'}) {
             &logr("[+] Creating named pipe $config{'PSAD_FIFO_FILE'}\n");
-            unless (((system "$cmds{'mknod'} -m 600 " .
-                    "$config{'PSAD_FIFO_FILE'} p")>>8) == 0) {
+            unless (&run_cmd("$cmds{'mknod'} -m 600 " .
+                    "$config{'PSAD_FIFO_FILE'} p") == 0) {
                 &logr("[*] Could not create the named pipe " .
                     "\"$config{'PSAD_FIFO_FILE'}\"!\n" .
                     "[*] psad requires this file to exist!  Aborting install.\n");
@@ -386,7 +386,7 @@ sub install() {
     }
     if (-d 'deps' and -d 'deps/whois') {
         &logr("[+] Compiling Marco d'Itri's whois client\n");
-        system "$cmds{'make'} -C deps/whois";
+        &run_cmd("$cmds{'make'} -C deps/whois");
         if (-e 'deps/whois/whois') {
             ### if an old whois process is still around ("text file
             ### busy" error), then it is ok to not be able to copy
@@ -444,14 +444,14 @@ sub install() {
     unlink 'psadwatchd' if -e 'psadwatchd';
 
     ### compile the C psad daemons
-    system $cmds{'make'};
+    &run_cmd($cmds{'make'});
     &logr("[-] Could not compile kmsgsd.c.\n") unless (-e 'kmsgsd');
     &logr("[-] Could not compile psadwatchd.c.\n") unless (-e 'psadwatchd');
 
     ### install fwcheck_psad.pl
     print "\n\n";
     &logr("[+] Verifying compilation of fwcheck_psad.pl script:\n");
-    unless (((system "$cmds{'perl'} -c fwcheck_psad.pl")>>8) == 0) {
+    unless (&run_cmd("$cmds{'perl'} -c fwcheck_psad.pl") == 0) {
         die "[*] fwcheck_psad.pl does not compile with \"perl -c\".  Download ",
             "the latest sources from:\n\nhttp://www.cipherdyne.org/"
             unless $skip_module_install;
@@ -460,7 +460,7 @@ sub install() {
     ### make sure the psad (perl) daemon compiles.  The other three
     ### daemons have all been re-written in C.
     &logr("[+] Verifying compilation of psad perl daemon:\n");
-    unless (((system "$cmds{'perl'} -c psad")>>8) == 0) {
+    unless (&run_cmd("$cmds{'perl'} -c psad") == 0) {
         die "[*] psad does not compile with \"perl -c\".  Download the",
             " latest sources from:\n\nhttp://www.cipherdyne.org/"
             unless $skip_module_install;
@@ -468,7 +468,7 @@ sub install() {
 
     ### install nf2csv
     &logr("[+] Verifying compilation of nf2csv script:\n");
-    unless (((system "$cmds{'perl'} -c nf2csv")>>8) == 0) {
+    unless (&run_cmd("$cmds{'perl'} -c nf2csv") == 0) {
         die "[*] nf2csv does not compile with \"perl -c\".  Download ",
             "the latest sources from:\n\nhttp://www.cipherdyne.org/"
             unless $skip_module_install;
@@ -652,7 +652,7 @@ sub install() {
             if ($syslog_str eq 'syslogd') {
                 if (-e $syslog_conf) {
                     &append_fifo_syslog($syslog_conf);
-                    if (((system "$cmds{'killall'} -HUP syslogd 2> /dev/null")>>8) == 0) {
+                    if (&run_cmd("$cmds{'killall'} -HUP syslogd 2> /dev/null") == 0) {
                         &logr("[+] HUP signal sent to syslogd.\n");
                         $restarted_syslog = 1;
                     }
@@ -660,7 +660,7 @@ sub install() {
             } elsif ($syslog_str eq 'rsyslogd') {
                 if (-e $syslog_conf) {
                     &append_fifo_syslog($syslog_conf);
-                    if (((system "$cmds{'killall'} -HUP rsyslogd 2> /dev/null")>>8) == 0) {
+                    if (&run_cmd("$cmds{'killall'} -HUP rsyslogd 2> /dev/null") == 0) {
                         &logr("[+] HUP signal sent to rsyslogd.\n");
                         $restarted_syslog = 1;
                     }
@@ -669,7 +669,7 @@ sub install() {
             } elsif ($syslog_str eq 'syslog-ng') {
                 if (-e $syslog_conf) {
                     &append_fifo_syslog_ng($syslog_conf);
-                    if (((system "$cmds{'killall'} -HUP syslog-ng 2> /dev/null")>>8) == 0) {
+                    if (&run_cmd("$cmds{'killall'} -HUP syslog-ng 2> /dev/null") == 0) {
                         &logr("[+] HUP signal sent to syslog-ng.\n");
                         $restarted_syslog = 1;
                     }
@@ -702,20 +702,20 @@ sub install() {
                         my $restarted = 0;
                         if ($syslog_str eq 'syslog-ng') {
                             if (-e "$init_dir/syslog-ng") {
-                                system "$init_dir/syslog-ng restart";
+                                &run_cmd("$init_dir/syslog-ng restart");
                                 $restarted = 1;
                             }
                         } elsif ($syslog_str eq 'rsyslogd') {
                             if (-e "$init_dir/sysklogd") {
-                                system "$init_dir/sysklogd restart";
+                                &run_cmd("$init_dir/sysklogd restart");
                                 $restarted = 1;
                             } elsif (-e "$init_dir/syslog") {
-                                system "$init_dir/syslog restart";
+                                &run_cmd("$init_dir/syslog restart");
                                 $restarted = 1;
                             }
                         } else {
                             if (-e "$init_dir/rsyslog") {
-                                system "$init_dir/rsyslog restart";
+                                &run_cmd("$init_dir/rsyslog restart");
                                 $restarted = 1;
                             }
                         }
@@ -908,9 +908,9 @@ sub uninstall() {
         if (kill 0, $pid) {
             print "[+] Stopping psad daemons!\n";
             if (-e "${init_dir}/psad") {  ### prefer this for old versions
-                system "${init_dir}/psad stop";
+                &run_cmd("${init_dir}/psad stop");
             } else {
-                system "${USRSBIN_DIR}/psad --Kill";
+                &run_cmd("${USRSBIN_DIR}/psad --Kill");
             }
         }
     }
@@ -1003,15 +1003,15 @@ sub stop_psad() {
         if (kill 0, $pid) {
             print "[+] Stopping running psad daemons.\n";
             if (-x "$init_dir/psad") {
-                system "$init_dir/psad stop";
+                &run_cmd("$init_dir/psad stop");
                 ### if psad is still running then use -K
                 if (kill 0, $pid) {
-                    system "$USRSBIN_DIR/psad -K";
+                    &run_cmd("$USRSBIN_DIR/psad -K");
                 }
             } else {
                 ### psad may have been started from the command line
                 ### without using the init script, so stop with -K
-                system "$USRSBIN_DIR/psad -K";
+                &run_cmd("$USRSBIN_DIR/psad -K");
             }
         }
     }
@@ -1082,19 +1082,25 @@ sub install_perl_module() {
         }
 
         $ENV{'PERL5LIB'} = $config{'PSAD_LIBS_DIR'};  ### for module dependencies
-        system "$cmds{'make'} clean"
+        &run_cmd("$cmds{'make'} clean")
             if -e 'Makefile' or -e 'makefile' or -e 'GNUmakefile';
-        system "$cmds{'perl'} Makefile.PL PREFIX=$config{'PSAD_LIBS_DIR'} " .
-            "LIB=$config{'PSAD_LIBS_DIR'}";
-        system "$cmds{'make'}";
-#        system "$cmds{'make'} test";
-        system "$cmds{'make'} install";
+        &run_cmd("$cmds{'perl'} Makefile.PL PREFIX=$config{'PSAD_LIBS_DIR'} " .
+            "LIB=$config{'PSAD_LIBS_DIR'}");
+        &run_cmd("$cmds{'make'}");
+#        &run_cmd("$cmds{'make'} test");
+        &run_cmd("$cmds{'make'} install");
         chdir $src_dir or die "[*] Could not chdir $src_dir: $!";
 
         print "\n\n";
     }
 
     return;
+}
+
+sub run_cmd() {
+    my $cmd = shift;
+    &logr("[+] CMD: '$cmd'\n");
+    return (system $cmd) >> 8;
 }
 
 sub set_home_net() {
@@ -1228,7 +1234,7 @@ sub download_signatures() {
         &logr("[-] The $wgetCmd var is not a valid path for wget, " .
             "skipping sig install.\n");
     }
-    system "$wgetCmd $config{'SIG_UPDATE_URL'}";
+    &run_cmd("$wgetCmd $config{'SIG_UPDATE_URL'}");
 
     unless (-e 'signatures') {
         &logr("[-] Could not download signatures, continuing with install.\n");
@@ -1579,9 +1585,7 @@ sub test_syslog_config() {
     $test_port++ while defined $used_ports{$test_port};
 
     ### make sure the interface is actually up
-    my $uprv = (system "$cmds{'ifconfig'} lo up") >> 8;
-
-    if ($uprv) {
+    unless (&run_cmd("$cmds{'ifconfig'} lo up")) {
         &logr("[-] Could not bring up the loopback interface.\n" .
             "    Hoping the syslog reconfig will work anyway.\n");
         return 0;
@@ -1632,7 +1636,7 @@ sub test_syslog_config() {
     if ($start_kmsgsd) {
         ### briefly start kmsgsd just long enough to test syslog
         ### with a packet to port 5000 (or higher).
-        unless (((system "${USRSBIN_DIR}/kmsgsd")>>8) == 0) {
+        unless (&run_cmd("${USRSBIN_DIR}/kmsgsd") == 0) {
             &logr("[-] Could not start kmsgsd to test syslog.\n" .
                 "    Send email to Michael Rash (mbr\@cipherdyne.org)\n");
             return 0;
@@ -1641,8 +1645,8 @@ sub test_syslog_config() {
 
     ### insert a rule to deny traffic to the loopback
     ### interface on $test_port
-    system "$cmds{'iptables'} -I INPUT 1 -i lo -p tcp --dport " .
-        "$test_port -j LOG --log-prefix \"test_DROP \"";
+    &run_cmd("$cmds{'iptables'} -I INPUT 1 -i lo -p tcp --dport " .
+        "$test_port -j LOG --log-prefix \"test_DROP \"");
 
     open FWDATA, "$config{'FW_DATA_FILE'}" or
         die "[*] Could not open $config{'FW_DATA_FILE'}: $!";
@@ -1673,7 +1677,7 @@ sub test_syslog_config() {
     }
 
     ### remove the testing firewall rule
-    system "$cmds{'iptables'} -D INPUT 1";
+    &run_cmd("$cmds{'iptables'} -D INPUT 1");
 
     ### remove the any new test_DROP lines we just created
     ### (this probably is not necessary because psad is not
@@ -2035,7 +2039,7 @@ sub archive() {
     ### move $file into the archive directory
     copy $file, "${base}1" or die "[*] Could not copy ",
         "$file -> ${base}1: $!";
-    system "$cmds{'gzip'} ${base}1";
+    &run_cmd("$cmds{'gzip'} ${base}1");
     chdir $curr_pwd or die $!;
     $archived_old = 1;
     return;
@@ -2049,11 +2053,11 @@ sub enable_psad_at_boot() {
     if (&query_yes_no("[+] Enable psad at boot time ([y]/n)?  ",
                 $ACCEPT_YES_DEFAULT)) {
         if ($distro eq 'redhat' or $distro eq 'fedora') {
-            system "$cmds{'chkconfig'} --add $init_name";
+            &run_cmd("$cmds{'chkconfig'} --add $init_name");
         } elsif ($distro eq 'gentoo') {
-            system "$cmds{'rc-update'} add $init_name default";
+            &run_cmd("$cmds{'rc-update'} add $init_name default");
         } elsif ($distro eq 'ubuntu') {
-            system "$cmds{'update-rc.d'} $init_name defaults";
+            &run_cmd("$cmds{'update-rc.d'} $init_name defaults");
         } else {
 
             ### get the current run level
@@ -2192,7 +2196,7 @@ sub install_manpage() {
     &logr("[+] Compressing manpage $mfile\n");
     ### remove the old one so gzip doesn't prompt us
     unlink "${mfile}.gz" if -e "${mfile}.gz";
-    system "$cmds{'gzip'} $mfile";
+    &run_cmd("$cmds{'gzip'} $mfile");
     return;
 }
 

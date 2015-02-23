@@ -2,17 +2,49 @@
 
 use lib '../lib';
 use Data::Dumper;
+use Getopt::Long 'GetOptions';
 use strict;
 
 require IPTables::Parse;
 
 #==================== config =====================
-my $iptables_bin  = '/sbin/iptables';
-my $ip6tables_bin = '/sbin/ip6tables';
+my $iptables_bin    = '/sbin/iptables';
+my $ip6tables_bin   = '/sbin/ip6tables';
+my $fw_cmd_bin      = '/bin/firewall-cmd';
+my $dummy_path      = '/bin/invalidpath';
 
-my $logfile   = 'test.log';
+my $logfile        = 'test.log';
+my $ipt_rules_file = 'ipt_rules.tmp';
 my $PRINT_LEN = 68;
 #================== end config ===================
+
+my $verbose = 0;
+my $debug   = 0;
+my $help    = 0;
+my $use_fw_cmd = 0;
+
+die "[*] See '$0 -h' for usage information" unless (GetOptions(
+    'verbose' => \$verbose,
+    'debug'   => \$debug,
+    'help'    => \$help,
+));
+&usage() if $help;
+
+my %ipt_opts = (
+    'iptables' => $iptables_bin,
+    'iptout'   => '/tmp/iptables.out',
+    'ipterr'   => '/tmp/iptables.err',
+    'debug'    => $debug,
+    'verbose'  => $verbose
+);
+
+my %ipt6_opts = (
+    'iptables' => $ip6tables_bin,
+    'iptout'   => '/tmp/iptables.out',
+    'ipterr'   => '/tmp/iptables.err',
+    'debug'    => $debug,
+    'verbose'  => $verbose
+);
 
 my %targets = (
     'ACCEPT' => '',
@@ -38,27 +70,45 @@ my $passed = 0;
 my $failed = 0;
 my $executed = 0;
 
+my $SKIP_IPT_EXEC_CHECK = 1;
+my $IPT_EXEC_CHECK = 0;
+
 &init();
 
-&iptables_tests();
-&ip6tables_tests();
+### main testing routines
+&iptables_tests('', $IPT_EXEC_CHECK);
+&iptables_tests($ipt_rules_file, $IPT_EXEC_CHECK);
+&iptables_tests($ipt_rules_file, $SKIP_IPT_EXEC_CHECK);
+&ip6tables_tests('', $IPT_EXEC_CHECK);
+&ip6tables_tests($ipt_rules_file, $IPT_EXEC_CHECK);
+&ip6tables_tests($ipt_rules_file, $SKIP_IPT_EXEC_CHECK);
 
 &logr("\n[+] passed/failed/executed: $passed/$failed/$executed tests\n\n");
 
 exit 0;
 
 sub iptables_tests() {
+    my ($rules_file, $skip_ipt_exec_check) = @_;
 
-    &logr("[+] Running $iptables_bin tests...\n");
-    my %opts = (
-        'iptables' => $iptables_bin,
-        'iptout'   => '/tmp/iptables.out',
-        'ipterr'   => '/tmp/iptables.err',
-        'debug'    => 0,
-        'verbose'  => 0
-    );
+    if ($rules_file) {
+        if ($skip_ipt_exec_check) {
+            &logr("\n[+] Running $iptables_bin $rules_file " .
+                "(skip ipt exec check) tests...\n");
+        } else {
+            &logr("\n[+] Running $iptables_bin $rules_file tests...\n");
+        }
+        $ipt_opts{'ipt_rules_file'} = $rules_file;
+        if ($skip_ipt_exec_check == $SKIP_IPT_EXEC_CHECK) {
+            $ipt_opts{'iptables'}     = $dummy_path;
+            $ipt_opts{'firewall-cmd'} = $dummy_path if $use_fw_cmd;
+            $ipt_opts{'skip_ipt_exec_check'} = $skip_ipt_exec_check;
+        }
+    } else {
+        &logr("\n[+] Running $iptables_bin tests...\n");
+        $ipt_opts{'ipt_rules_file'} = '';
+    }
 
-    my $ipt_obj = new IPTables::Parse(%opts)
+    my $ipt_obj = IPTables::Parse->new(%ipt_opts)
         or die "[*] Could not acquire IPTables::Parse object";
 
     &chain_policy_tests($ipt_obj, \%iptables_chains);
@@ -70,17 +120,26 @@ sub iptables_tests() {
 }
 
 sub ip6tables_tests() {
+    my ($rules_file, $skip_ipt_exec_check) = @_;
 
-    &logr("\n[+] Running $ip6tables_bin tests...\n");
-    my %opts = (
-        'ip6tables' => $ip6tables_bin,
-        'iptout'   => '/tmp/ip6tables.out',
-        'ipterr'   => '/tmp/ip6tables.err',
-        'debug'    => 0,
-        'verbose'  => 0
-    );
+    if ($rules_file) {
+        if ($skip_ipt_exec_check) {
+            &logr("\n[+] Running $iptables_bin $rules_file " .
+                "(skip ipt exec check) tests...\n");
+        } else {
+            &logr("\n[+] Running $ip6tables_bin $rules_file tests...\n");
+        }
+        $ipt_opts{'ipt_rules_file'} = $rules_file;
+        if ($skip_ipt_exec_check == $SKIP_IPT_EXEC_CHECK) {
+            $ipt_opts{'iptables'} = $dummy_path;
+            $ipt_opts{'skip_ipt_exec_check'} = $skip_ipt_exec_check;
+        }
+    } else {
+        &logr("\n[+] Running $ip6tables_bin tests...\n");
+        $ipt_opts{'ipt_rules_file'} = '';
+    }
 
-    my $ipt_obj = new IPTables::Parse(%opts)
+    my $ipt_obj = IPTables::Parse->new(%ipt6_opts)
         or die "[*] Could not acquire IPTables::Parse object";
 
     &chain_policy_tests($ipt_obj, \%ip6tables_chains);
@@ -95,7 +154,12 @@ sub default_log_tests() {
     my $ipt_obj = shift;
 
     for my $chain (qw/INPUT OUTPUT FORWARD/) {
-        &dots_print("default_log(): filter $chain");
+        &dots_print("default_log($ipt_obj->{'_ipt_rules_file'}): filter $chain");
+
+        if ($ipt_obj->{'_ipt_rules_file'}) {
+            &write_rules($ipt_obj,
+                "$ipt_obj->{'_cmd'} -t filter -v -n -L $chain");
+        }
 
         my ($ipt_log, $rv) = $ipt_obj->default_log('filter', $chain);
         $executed++;
@@ -114,7 +178,12 @@ sub default_drop_tests() {
     my $ipt_obj = shift;
 
     for my $chain (qw/INPUT OUTPUT FORWARD/) {
-        &dots_print("default_drop(): filter $chain");
+        &dots_print("default_drop($ipt_obj->{'_ipt_rules_file'}): filter $chain");
+
+        if ($ipt_obj->{'_ipt_rules_file'}) {
+            &write_rules($ipt_obj,
+                "$ipt_obj->{'_cmd'} -t filter -v -n -L $chain");
+        }
 
         my ($ipt_drop, $rv) = $ipt_obj->default_drop('filter', $chain);
         $executed++;
@@ -134,7 +203,13 @@ sub chain_policy_tests() {
 
     for my $table (keys %$tables_chains_hr) {
         for my $chain (@{$tables_chains_hr->{$table}}) {
-            &dots_print("chain_policy(): $table $chain policy");
+
+            if ($ipt_obj->{'_ipt_rules_file'}) {
+                &write_rules($ipt_obj,
+                    "$ipt_obj->{'_cmd'} -t $table -v -n -L $chain");
+            }
+
+            &dots_print("chain_policy($ipt_obj->{'_ipt_rules_file'}): $table $chain policy");
 
             my $target = $ipt_obj->chain_policy($table, $chain);
 
@@ -158,11 +233,32 @@ sub chain_rules_tests() {
     my ($ipt_obj, $tables_chains_hr) = @_;
 
     for my $table (keys %$tables_chains_hr) {
-        for my $chain (@{$tables_chains_hr->{$table}}) {
-            &dots_print("chain_rules(): $table $chain rules");
 
-            my ($rv, $out_ar, $err_ar) = $ipt_obj->exec_iptables(
-                "$ipt_obj->{'_iptables'} -t $table -v -n -L $chain");
+        &dots_print("list_table_chains($ipt_obj->{'_ipt_rules_file'}): $table");
+
+        if ($ipt_obj->{'_ipt_rules_file'}) {
+            &write_rules($ipt_obj,
+                "$ipt_obj->{'_cmd'} -t $table -v -n -L");
+        }
+
+        my $chains_ar = $ipt_obj->list_table_chains($table);
+        if ($#$chains_ar > -1) {
+            &logr("pass ($executed)\n");
+            $passed++;
+        } else {
+            &logr("fail ($executed)\n");
+            $failed++;
+        }
+        $executed++;
+
+        for my $chain (@{$tables_chains_hr->{$table}}) {
+            &dots_print("chain_rules($ipt_obj->{'_ipt_rules_file'}): $table $chain rules");
+
+            my $out_ar = &write_rules($ipt_obj,
+                "$ipt_obj->{'_cmd'} -t $table -v -n -L $chain");
+
+            if ($ipt_obj->{'_ipt_rules_file'}) {
+            }
 
             my $rules_ar = $ipt_obj->chain_rules($table, $chain);
 
@@ -205,7 +301,6 @@ sub chain_rules_tests() {
             }
         }
     }
-
     return;
 }
 
@@ -238,10 +333,74 @@ sub init() {
             "UID 0 account) to effectively test fwknop";
 
     unlink $logfile if -e $logfile;
-    for my $bin ($iptables_bin, $ip6tables_bin) {
-        die "[*] $bin does not exist" unless -e $bin;
-        die "[*] $bin not executable" unless -x $bin;
+    unlink $ipt_rules_file if -e $ipt_rules_file;
+
+    if (-e $fw_cmd_bin and -x $fw_cmd_bin) {
+        $ipt_opts{'firewall-cmd'}  = $fw_cmd_bin;
+        $ipt6_opts{'firewall-cmd'} = $fw_cmd_bin;
+        $ipt6_opts{'use_ipv6'}     = 1;
+        $use_fw_cmd                = 1;
+    } else {
+        for my $bin ($iptables_bin, $ip6tables_bin) {
+            die "[*] $bin does not exist" unless -e $bin;
+            die "[*] $bin not executable" unless -x $bin;
+        }
     }
 
     return;
+}
+
+sub write_rules() {
+    my ($ipt_obj, $cmd) = @_;
+
+    my $rv = 0;
+    my $out_ar = ();
+    my $err_ar = ();
+
+    ### if the original iptables object skipped the iptables exec
+    ### check, then acquire a new object to execute the command
+    if ($ipt_obj->{'_skip_ipt_exec_check'}) {
+        my %opts_cp = %ipt_opts;
+        $opts_cp{'iptables'} = $iptables_bin;
+
+        if ($use_fw_cmd) {
+            $cmd =~ s|^$dummy_path|$fw_cmd_bin|;
+        } else {
+            if ($ipt_obj->{'use_ipv6'}) {
+                %opts_cp = %ipt6_opts;
+                $opts_cp{'iptables'} = $ip6tables_bin;
+                $cmd =~ s|^$dummy_path|$ip6tables_bin|;
+            } else {
+                $cmd =~ s|^$dummy_path|$iptables_bin|;
+            }
+        }
+        if ($use_fw_cmd) {
+            $opts_cp{'firewall-cmd'} = $fw_cmd_bin;
+        } else {
+            $opts_cp{'firewall-cmd'} = '';
+        }
+        $opts_cp{'skip_ipt_exec_check'} = 0;
+
+        my $obj = IPTables::Parse->new(%opts_cp);
+        ($rv, $out_ar, $err_ar) = $obj->exec_iptables($cmd);
+    } else {
+        ($rv, $out_ar, $err_ar) = $ipt_obj->exec_iptables($cmd);
+    }
+
+    &write_rules_file($out_ar);
+
+    return $out_ar;
+}
+
+sub write_rules_file() {
+    my $lines_ar = shift;
+    open F, "> $ipt_rules_file" or die $!;
+    print F $_ for @$lines_ar;
+    close F;
+    return;
+}
+
+sub usage() {
+    print "$0 [--debug] [--verbose] [-h]\n";
+    exit 0;
 }

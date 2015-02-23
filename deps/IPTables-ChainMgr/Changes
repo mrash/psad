@@ -1,5 +1,21 @@
 Revision history for Perl extension IPTables::ChainMgr.
 
+1.3 Mon Feb 23 22:45:44 2015
+    - Added support for systems with 'firewalld' (such as Fedora 21).
+    - For IPTables::Parse versions > 1.1, updated IPTables::ChainMgr to derive
+      extended hash search keys for find_ip_rule() from IPTables::Parse.
+    - For IPTables::Parse versions > 1.1, updated IPTables::ChainMgr to derive
+      iptables 'match' keys to build iptables rules from IPTables::Parse.
+    - Simplified append_ip_rule() to just be a wrapper around add_ip_rule(),
+      which was updated to allow the value "-1" to be passed in as the rule
+      insertion number in order to denote "append" (-A <chain>) mode.
+    - Added "mac_source" tests to t/basic_tests.pl.
+    - Added tests for iptables 'length' match.
+    - Added print_parse_capabilities() so that IPTables::Parse keys/regex's can
+      easily be seen.
+    - Bug fix to ensure that state tracking arguments are properly processed
+      by add_ip_rule().
+
 1.2 Fri Mar 02 21:09:57 2012
     - Added set_chain_policy() function to allow built-in chain policies to be
       set to the specified target.  iptables/ip6tables does not allow the

@@ -1,5 +1,23 @@
 Revision history for Perl extension IPTables::Parse.
 
+1.3 Thu Feb 19 20:09:55 2015
+    - Added support for systems with 'firewalld' via the 'firewall-cmd'
+      command. Such systems include Fedora 21 for example.
+    - Added list_table_chains() to return an array reference of all chains
+      within the specified table. This feature was submitted as a patch by
+      Fabien Mazieres
+    - Added 'use_ipv6' and 'ipt_rules_file' keys to object constructor. These
+      force ip6tables usage and specify a path to a file where
+      'iptables -nL -v' output is included.
+    - Updated perldoc documentation.
+
+1.2 Sun Mar 04 21:21:11 2012
+    - Major update to add a new 'parse_keys' hash to IPTables::Parse objects so
+      that other modules can easily see what portions of iptables rules can be
+      parsed into the data returned by chain_rules().
+    - Added 'mac_source' into extended hash for parsed iptables rules.
+    - Added support for the iptables 'length' match.
+
 1.1 Fri Mar 02 22:31:12 2012
     - Minor update to print the iptables binary name in 'croak' error
       conditions.  The binary name is either 'iptables' or 'ip6tables'.

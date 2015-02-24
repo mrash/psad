@@ -27,8 +27,12 @@ sub new() {
     my $class = shift;
     my %args  = @_;
 
+    my $ipt_bin  = '/sbin/iptables';
+    my $ipt6_bin = '/sbin/ip6tables';
+    my $fwc_bin  = '/usr/bin/firewall-cmd';
+
     my $self = {
-        _iptables        => $args{'iptables'} || $args{'ip6tables'} || '/sbin/iptables',
+        _iptables        => $args{'iptables'} || $args{'ip6tables'} || '',
         _firewall_cmd    => $args{'firewall-cmd'} || '',
         _fwd_args        => $args{'fwd_args'}     || '--direct --passthrough ipv4',
         _ipv6            => $args{'use_ipv6'}     || 0,
@@ -44,20 +48,45 @@ sub new() {
         _skip_ipt_exec_check => $args{'skip_ipt_exec_check'} || 0
     };
 
-    unless ($self->{'_skip_ipt_exec_check'}) {
+    if ($self->{'_skip_ipt_exec_check'}) {
+        unless ($self->{'_firewall_cmd'} or $self->{'_iptables'}) {
+            ### default
+            $self->{'_iptables'} = $ipt_bin;
+        }
+    } else {
         if ($self->{'_firewall_cmd'}) {
             croak "[*] $self->{'_firewall_cmd'} incorrect path.\n"
                 unless -e $self->{'_firewall_cmd'};
             croak "[*] $self->{'_firewall_cmd'} not executable.\n"
                 unless -x $self->{'_firewall_cmd'};
-        } else {
-            if ($self->{'_ipv6'} and $self->{'_iptables'} eq '/sbin/iptables') {
-                $self->{'_iptables'} = '/sbin/ip6tables';
-            }
+        } elsif ($self->{'_iptables'}) {
             croak "[*] $self->{'_iptables'} incorrect path.\n"
                 unless -e $self->{'_iptables'};
             croak "[*] $self->{'_iptables'} not executable.\n"
                 unless -x $self->{'_iptables'};
+        } else {
+            ### check for firewall-cmd first since systems with it
+            ### will have iptables installed as well (but firewall-cmd
+            ### should be used instead if it exists)
+            if (-e $fwc_bin and -x $fwc_bin) {
+                $self->{'_firewall_cmd'} = $fwc_bin;
+            } elsif (-e $ipt_bin and -x $ipt_bin) {
+                $self->{'_iptables'} = $ipt_bin;
+            } elsif (-e $ipt6_bin and -x $ipt6_bin) {
+                $self->{'_iptables'} = $ipt6_bin;
+            } else {
+                croak "[*] Could not find/execute iptables, " .
+                    "specify path via _iptables\n";
+            }
+        }
+    }
+
+    if ($self->{'_ipv6'} and $self->{'_iptables'} eq $ipt_bin) {
+        if (-e $ipt6_bin and -x $ipt6_bin) {
+            $self->{'_iptables'} = $ipt6_bin;
+        } else {
+            croak "[*] Could not find/execute ip6tables, " .
+                "specify path via _iptables\n";
         }
     }
 

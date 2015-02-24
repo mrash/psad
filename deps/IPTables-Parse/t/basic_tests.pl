@@ -31,17 +31,12 @@ die "[*] See '$0 -h' for usage information" unless (GetOptions(
 &usage() if $help;
 
 my %ipt_opts = (
-    'iptables' => $iptables_bin,
-    'iptout'   => '/tmp/iptables.out',
-    'ipterr'   => '/tmp/iptables.err',
     'debug'    => $debug,
     'verbose'  => $verbose
 );
 
 my %ipt6_opts = (
-    'iptables' => $ip6tables_bin,
-    'iptout'   => '/tmp/iptables.out',
-    'ipterr'   => '/tmp/iptables.err',
+    'use_ipv6' => 1,
     'debug'    => $debug,
     'verbose'  => $verbose
 );
@@ -99,8 +94,6 @@ sub iptables_tests() {
         }
         $ipt_opts{'ipt_rules_file'} = $rules_file;
         if ($skip_ipt_exec_check == $SKIP_IPT_EXEC_CHECK) {
-            $ipt_opts{'iptables'}     = $dummy_path;
-            $ipt_opts{'firewall-cmd'} = $dummy_path if $use_fw_cmd;
             $ipt_opts{'skip_ipt_exec_check'} = $skip_ipt_exec_check;
         }
     } else {
@@ -336,10 +329,7 @@ sub init() {
     unlink $ipt_rules_file if -e $ipt_rules_file;
 
     if (-e $fw_cmd_bin and -x $fw_cmd_bin) {
-        $ipt_opts{'firewall-cmd'}  = $fw_cmd_bin;
-        $ipt6_opts{'firewall-cmd'} = $fw_cmd_bin;
-        $ipt6_opts{'use_ipv6'}     = 1;
-        $use_fw_cmd                = 1;
+        $use_fw_cmd = 1;
     } else {
         for my $bin ($iptables_bin, $ip6tables_bin) {
             die "[*] $bin does not exist" unless -e $bin;
@@ -361,23 +351,16 @@ sub write_rules() {
     ### check, then acquire a new object to execute the command
     if ($ipt_obj->{'_skip_ipt_exec_check'}) {
         my %opts_cp = %ipt_opts;
-        $opts_cp{'iptables'} = $iptables_bin;
 
         if ($use_fw_cmd) {
             $cmd =~ s|^$dummy_path|$fw_cmd_bin|;
         } else {
             if ($ipt_obj->{'use_ipv6'}) {
                 %opts_cp = %ipt6_opts;
-                $opts_cp{'iptables'} = $ip6tables_bin;
                 $cmd =~ s|^$dummy_path|$ip6tables_bin|;
             } else {
                 $cmd =~ s|^$dummy_path|$iptables_bin|;
             }
-        }
-        if ($use_fw_cmd) {
-            $opts_cp{'firewall-cmd'} = $fw_cmd_bin;
-        } else {
-            $opts_cp{'firewall-cmd'} = '';
         }
         $opts_cp{'skip_ipt_exec_check'} = 0;
 

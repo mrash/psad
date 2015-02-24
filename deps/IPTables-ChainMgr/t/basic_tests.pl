@@ -47,17 +47,12 @@ die "[*] See '$0 -h' for usage information" unless (GetOptions(
 &usage() if $help;
 
 my %ipt_opts = (
-    'iptables' => $iptables_bin,
-    'iptout'   => '/tmp/iptables.out',
-    'ipterr'   => '/tmp/iptables.err',
     'debug'    => $debug,
     'verbose'  => $verbose
 );
 
 my %ipt6_opts = (
-    'iptables' => $ip6tables_bin,
-    'iptout'   => '/tmp/iptables.out',
-    'ipterr'   => '/tmp/iptables.err',
+    'use_ipv6' => 1,
     'debug'    => $debug,
     'verbose'  => $verbose
 );
@@ -498,15 +493,9 @@ sub init() {
 
     unlink $logfile if -e $logfile;
 
-    if (-e $fw_cmd_bin and -x $fw_cmd_bin) {
-        $ipt_opts{'firewall-cmd'}  = $fw_cmd_bin;
-        $ipt6_opts{'firewall-cmd'} = $fw_cmd_bin;
-        $ipt6_opts{'use_ipv6'}     = 1;
-    } else {
-        for my $bin ($iptables_bin, $ip6tables_bin) {
-            die "[*] $bin does not exist" unless -e $bin;
-            die "[*] $bin not executable" unless -x $bin;
-        }
+    for my $bin ($iptables_bin, $ip6tables_bin) {
+        die "[*] $bin does not exist" unless -e $bin;
+        die "[*] $bin not executable" unless -x $bin;
     }
 
     return;

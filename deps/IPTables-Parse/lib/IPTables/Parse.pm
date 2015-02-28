@@ -7,7 +7,7 @@
 #
 # Author: Michael Rash (mbr@cipherdyne.org)
 #
-# Version: 1.3
+# Version: 1.3.1
 #
 ##################################################################
 #
@@ -21,7 +21,7 @@ use strict;
 use warnings;
 use vars qw($VERSION);
 
-$VERSION = '1.3';
+$VERSION = '1.3.1';
 
 sub new() {
     my $class = shift;
@@ -912,10 +912,7 @@ IPTables::Parse - Perl extension for parsing iptables and ip6tables policies
 
   use IPTables::Parse;
 
-  my $ipt_bin = '/sbin/iptables'; # can set this to /sbin/ip6tables
-
   my %opts = (
-      'iptables' => $ipt_bin,
       'use_ipv6' => 0,         # can set to 1 to force ip6tables usage
       'ipt_rules_file' => '',  # optional file path from
                                # which to read iptables rules
@@ -984,6 +981,8 @@ ip6tables rules on Linux systems through the direct execution of
 iptables/ip6tables commands, or from parsing a file that contains an
 iptables/ip6tables policy listing. Note that the 'firewalld' infrastructure on
 Fedora21 is also supported through execution of the 'firewall-cmd' binary.
+By default, the path to iptables is assumed to be '/sbin/iptables', but if the
+firewall is 'firewalld', then the '/usr/bin/firewall-cmd' is used.
 
 With this module, you can get the current policy applied to a
 table/chain, look for a specific user-defined chain, check for a default DROP
@@ -999,6 +998,13 @@ running on a system without iptables installed, but you have an iptables policy
 written to the ipt.rules file, then you can pass in 'skip_ipt_exec_check=>1'
 in order to analyze the file without having IPTables::Parse check for the
 iptables binary.
+
+In summary, in addition to the hash keys mentioned above, optional keys that
+can be passed to new() include '_iptables' (set path to iptables binary),
+'_firewall_cmd' (set path to 'firewall-cmd' binary for systems with
+'firewalld'), '_fwd_args' (set 'firewall-cmd' usage args; defaults to
+'--direct --passthrough ipv4'), '_ipv6' (set IPv6 mode for ip6tables),
+'_debug' and '_verbose'.
 
 =head1 FUNCTIONS
 
@@ -1118,7 +1124,7 @@ this address if there are any questions, comments, or bug reports.
 
 =head1 VERSION
 
-Version 1.3 (February, 2015)
+Version 1.3.1 (February, 2015)
 
 =head1 COPYRIGHT AND LICENSE
 

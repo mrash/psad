@@ -338,6 +338,9 @@ my %protocol_strings = ();
 ### pid file hash
 my %pidfiles = ();
 
+### for the IPTables::ChainMgr module
+my %ipt_opts = ();
+
 ### initialize and scope some default variables (command
 ### line args can override some default values)
 my $sigs_file        = '';
@@ -3364,6 +3367,17 @@ sub psad_init() {
     ### set some config variables based on command line input
     &handle_cmdline();
 
+    ### set IPTables::ChainMgr options, allow firewall-cmd to take
+    ### over unless disabled
+    if ($config{'ENABLE_FIREWALLD'} eq 'N') {
+        $ipt_opts{'iptables'} = $cmds{'iptables'};
+    }
+    $ipt_opts{'iptout'} = $config{'IPT_OUTPUT_FILE'};
+    $ipt_opts{'ipterr'} = $config{'IPT_ERROR_FILE'};
+
+    $ipt_opts{'debug'}   = 1 if $debug;
+    $ipt_opts{'verbose'} = 1 if $verbose;
+
     ### build iptables block config hash out of IPT_AUTO_CHAIN keywords
     ### (we don't check ENABLE_AUTO_IDS here since someone may have turned
     ### it off but still want to run --Status checks or use --Flush).
@@ -6206,14 +6220,6 @@ sub sockwrite_flush_auto_rules() {
 
 sub flush_auto_blocked_ips() {
 
-    my %ipt_opts = (
-        'iptables' => $cmds{'iptables'},
-        'iptout'   => $config{'IPT_OUTPUT_FILE'},
-        'ipterr'   => $config{'IPT_ERROR_FILE'}
-    );
-    $ipt_opts{'debug'}   = 1 if $debug;
-    $ipt_opts{'verbose'} = 1 if $verbose;
-
     my $ipt = new IPTables::ChainMgr(%ipt_opts)
         or die '[*] Could not acquire IPTables::ChainMgr object.';
 
@@ -6332,14 +6338,6 @@ sub ipt_block() {
     }
 
     print STDERR "[+] ipt_block($ip)\n" if $debug;
-
-    my %ipt_opts = (
-        'iptables' => $cmds{'iptables'},
-        'iptout'   => $config{'IPT_OUTPUT_FILE'},
-        'ipterr'   => $config{'IPT_ERROR_FILE'}
-    );
-    $ipt_opts{'debug'}   = 1 if $debug;
-    $ipt_opts{'verbose'} = 1 if $verbose;
 
     my $ipt = new IPTables::ChainMgr(%ipt_opts)
         or die '[*] Could not acquire IPTables::ChainMgr object.';
@@ -6512,14 +6510,6 @@ sub ipt_block() {
 sub ipt_rm_block() {
     my $ip = shift;
 
-    my %ipt_opts = (
-        'iptables' => $cmds{'iptables'},
-        'iptout'   => $config{'IPT_OUTPUT_FILE'},
-        'ipterr'   => $config{'IPT_ERROR_FILE'}
-    );
-    $ipt_opts{'debug'}   = 1 if $debug;
-    $ipt_opts{'verbose'} = 1 if $verbose;
-
     my $ipt = new IPTables::ChainMgr(%ipt_opts)
         or die '[*] Could not acquire IPTables::ChainMgr object.';
 
@@ -6605,14 +6595,6 @@ sub ipt_rm_block() {
 
 sub ipt_list_auto_chains() {
 
-    my %ipt_opts = (
-        'iptables' => $cmds{'iptables'},
-        'iptout'   => $config{'IPT_OUTPUT_FILE'},
-        'ipterr'   => $config{'IPT_ERROR_FILE'}
-    );
-    $ipt_opts{'debug'}   = 1 if $debug;
-    $ipt_opts{'verbose'} = 1 if $verbose;
-
     my $ipt = new IPTables::ChainMgr(%ipt_opts)
         or die '[*] Could not acquire IPTables::ChainMgr object.';
 
@@ -6631,7 +6613,7 @@ sub ipt_list_auto_chains() {
 
         if ($rv) {
             ($rv, $out_ar, $err_ar) =
-                $ipt->run_ipt_cmd("$cmds{'iptables'} -t " .
+                $ipt->run_ipt_cmd("$ipt->{'_cmd'} -t " .
                     "$table -n -L $to_chain -v");
             if ($rv and $out_ar) {
                 print for @$out_ar;
@@ -7016,14 +6998,6 @@ sub build_ipt_config() {
     @ipt_config = ();
 
     &make_psad_dirs() unless -d $config{'PSAD_DIR'};
-
-    my %ipt_opts = (
-        'iptables' => $cmds{'iptables'},
-        'iptout'   => $config{'IPT_OUTPUT_FILE'},
-        'ipterr'   => $config{'IPT_ERROR_FILE'}
-    );
-    $ipt_opts{'debug'}   = 1 if $debug;
-    $ipt_opts{'verbose'} = 1 if $verbose;
 
     my $ipt = new IPTables::ChainMgr(%ipt_opts)
         or die '[*] Could not acquire IPTables::ChainMgr object.';
@@ -9015,14 +8989,6 @@ sub print_blocked_ip_status() {
     } else {
         push @print_lines,  "    iptables auto-blocked IPs:\n";
     }
-
-    my %ipt_opts = (
-        'iptables' => $cmds{'iptables'},
-        'iptout'   => $config{'IPT_OUTPUT_FILE'},
-        'ipterr'   => $config{'IPT_ERROR_FILE'}
-    );
-    $ipt_opts{'debug'}   = 1 if $debug;
-    $ipt_opts{'verbose'} = 1 if $verbose;
 
     my $ipt = new IPTables::ChainMgr(%ipt_opts)
         or die '[*] Could not acquire IPTables::ChainMgr object.';
@@ -11063,6 +11029,7 @@ sub required_vars() {
         AUTO_BLOCK_DL3_TIMEOUT AUTO_BLOCK_DL4_TIMEOUT
         AUTO_BLOCK_DL5_TIMEOUT EMAIL_THROTTLE EXPECT_TCP_OPTIONS
         ENABLE_PSADWATCHD ENABLE_EXT_BLOCK_SCRIPT_EXEC EXTERNAL_BLOCK_SCRIPT
+        ENABLE_FIREWALLD
     ));
     &defined_vars(\@required_vars);
     return;

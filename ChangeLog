@@ -1,3 +1,9 @@
+psad-2.2.6 (03//2015):
+    - Added support for systems with 'firewalld' by leveraging the
+      'firewall-cmd' binary. This is done via the IPTables::Parse and
+      IPTables::ChainMgr modules.
+    - Updated all module dependencies in the deps/ directory.
+
 psad-2.2.5 (02/09/2015):
     - Added signature to detect fwknop Single Packet Authorization (SPA)
       packets that are destined to the default UDP port 62201. More

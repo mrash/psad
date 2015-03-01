@@ -190,7 +190,8 @@ sub fw_check() {
         print "[+] Results in $config{'FW_CHECK_FILE'}\n",
             "[+] Exiting.\n";
     }
-    return $forward_chain_rv and $input_chain_rv;
+    return 1 if ($forward_chain_rv and $input_chain_rv);
+    return 0;
 }
 
 sub print_fw_help() {

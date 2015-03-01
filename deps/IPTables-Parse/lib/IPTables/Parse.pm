@@ -7,7 +7,7 @@
 #
 # Author: Michael Rash (mbr@cipherdyne.org)
 #
-# Version: 1.3.1
+# Version: 1.4
 #
 ##################################################################
 #
@@ -21,7 +21,7 @@ use strict;
 use warnings;
 use vars qw($VERSION);
 
-$VERSION = '1.3.1';
+$VERSION = '1.4';
 
 sub new() {
     my $class = shift;
@@ -1124,7 +1124,7 @@ this address if there are any questions, comments, or bug reports.
 
 =head1 VERSION
 
-Version 1.3.1 (February, 2015)
+Version 1.4 (February, 2015)
 
 =head1 COPYRIGHT AND LICENSE
 

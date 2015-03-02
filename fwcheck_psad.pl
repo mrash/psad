@@ -13,7 +13,7 @@
 #
 # Credits: (see the CREDITS file bundled with the psad sources.)
 #
-# Copyright (C) 1999-2012 Michael Rash (mbr@cipherdyne.org)
+# Copyright (C) 1999-2015 Michael Rash (mbr@cipherdyne.org)
 #
 # License (GNU Public License):
 #
@@ -55,6 +55,9 @@ my $no_fw_search_all = 0;
 my $log_and_drop_table = 'filter';
 my $enable_ipv6 = 0;
 my $psad_lib_dir = '';
+
+my $USE_IPV6 = 1;
+my $NO_IPV6  = 0;
 
 &usage(1) unless (GetOptions(
     'config=s'    => \$config_file, # Specify path to configuration file.
@@ -130,15 +133,23 @@ sub fw_check() {
     ### only send a firewall config alert if we really need to.
     my $send_alert = 0;
 
+    my $ipt_bin  = '';
+    my $ipt6_bin = '';
+
+    if ($config{'ENABLE_FIREWALLD'} eq 'N') {
+        $ipt_bin  = $cmds{'iptables'};
+        $ipt6_bin = $cmds{'ip6tables'};
+    }
+
     my $forward_chain_rv = 1;
-    my $input_chain_rv = &ipt_chk_chain('INPUT', $cmds{'iptables'});
+    my $input_chain_rv = &ipt_chk_chain('INPUT', $ipt_bin, $NO_IPV6);
     unless ($input_chain_rv) {
         &print_fw_help('INPUT', $cmds{'iptables'});
         $send_alert = 1;
     }
 
     if ($enable_ipv6) {
-        my $tmp_rv = &ipt_chk_chain('INPUT', $cmds{'ip6tables'});
+        my $tmp_rv = &ipt_chk_chain('INPUT', $ipt6_bin, $USE_IPV6);
         unless ($tmp_rv) {
             &print_fw_help('INPUT', $cmds{'ip6tables'});
             $send_alert = 1;
@@ -272,11 +283,19 @@ sub check_forwarding() {
 }
 
 sub ipt_chk_chain() {
-    my ($chain, $ipt_bin) = @_;
+    my ($chain, $ipt_bin, $use_ipv6) = @_;
     my $rv = 1;
 
-    my $ipt = new IPTables::Parse 'iptables' => $ipt_bin
-        or die "[*] Could not acquire IPTables::Parse object: $!";
+    my $ipt;
+
+    if ($ipt_bin) {
+        $ipt = IPTables::Parse->new('iptables' => $ipt_bin,
+                'use_ipv6' => $use_ipv6)
+            or die "[*] Could not acquire IPTables::Parse object: $!";
+    } else {
+        $ipt = IPTables::Parse->new('use_ipv6' => $use_ipv6)
+            or die "[*] Could not acquire IPTables::Parse object: $!";
+    }
 
     if ($fw_analyze) {
         print "[+] Parsing $ipt_bin $chain chain rules.\n";

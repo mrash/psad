@@ -11,7 +11,7 @@
 #
 # Credits:  (see the CREDITS file)
 #
-# Copyright (C) 1999-2012 Michael Rash (mbr@cipherdyne.org)
+# Copyright (C) 1999-2015 Michael Rash (mbr@cipherdyne.org)
 #
 # License (GNU Public License):
 #

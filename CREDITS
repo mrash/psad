@@ -529,3 +529,7 @@ Rinck Sonnenberg
     - Developed UFW and Logstash integration capabilities for psad:
         Logstash:  https://gist.github.com/netson/cc6ffa751aa4610c13c0
         UFW:       https://gist.github.com/netson/c45b2dc4e835761fbccc
+
+Brad Rubenstein
+    - Reported a bug where the exit status returned by 'psad --HUP' indicated
+      an error condition even for no error. Fixed as Github issue 11.

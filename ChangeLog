@@ -1,8 +1,12 @@
 psad-2.2.6 (03//2015):
     - Added support for systems with 'firewalld' by leveraging the
-      'firewall-cmd' binary. This is done via the IPTables::Parse and
+      'firewall-cmd' binary. This is done via the updated IPTables::Parse and
       IPTables::ChainMgr modules.
     - Updated all module dependencies in the deps/ directory.
+    - Bug fix reported by Brad Rubenstein to ensure exiting with a proper exit
+      status in 'psad --HUP' mode. This was also extended to ensure better
+      exit status returns in other modes as well such as --Status, and --USR1.
+      Fixes issue #11 on github.
 
 psad-2.2.5 (02/09/2015):
     - Added signature to detect fwknop Single Packet Authorization (SPA)

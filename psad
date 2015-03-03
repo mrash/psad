@@ -612,6 +612,9 @@ my %gnuplot_non_digit_map = ();
 my %ip2int_cache   = ();
 my %gnuplot_ip2int = ();
 
+my $EXIT_SUCCESS = 0;
+my $EXIT_FAILURE = 1;
+
 ### packet parsing return values
 my $PKT_ERROR   = 0;
 my $PKT_SUCCESS = 1;
@@ -6203,7 +6206,7 @@ sub sockwrite_flush_auto_rules() {
                 print $sock "flush\n";
             }
             close $sock;
-            return 0;
+            return $EXIT_SUCCESS;
         }
     }
 
@@ -6215,7 +6218,7 @@ sub sockwrite_flush_auto_rules() {
         print "[+] Flushing psad chains.\n";
     }
     &flush_auto_blocked_ips();
-    return 0;
+    return $EXIT_SUCCESS;
 }
 
 sub flush_auto_blocked_ips() {
@@ -6623,7 +6626,7 @@ sub ipt_list_auto_chains() {
             print "[-] Table: $table, chain: $to_chain, does not exist\n";
         }
     }
-    return 0;
+    return $EXIT_SUCCESS;
 }
 
 sub check_ipt_cmd() {
@@ -6733,7 +6736,7 @@ sub sockwrite_add_ipt_block_ip() {
     } else {
         print "[-] There is no running psad process. Exiting.\n";
     }
-    return 0;
+    return $EXIT_SUCCESS;
 }
 
 sub sockwrite_rm_ipt_block_ip() {
@@ -6782,10 +6785,10 @@ sub sockwrite_rm_ipt_block_ip() {
                 "socket: $!";
             print $sock "del $fw_rm_block_ip\n";
             close $sock;
-            return 0;
+            return $EXIT_SUCCESS;
         }
     }
-    return 0;
+    return $EXIT_SUCCESS;
 }
 
 sub tcpwr_test_block() {
@@ -7324,7 +7327,7 @@ sub get_whois_info() {
 }
 
 sub stop_psad() {
-    my $rv = 0;
+    my $rv = $EXIT_SUCCESS;
 
     &sys_log('shutting down psad daemons');
     ### must kill psadwatchd first since if not, it might try to restart
@@ -7336,9 +7339,11 @@ sub stop_psad() {
             if ($pid) {
                 print "[+] Stopping $pidname, pid: $pid\n";
                 unless (kill 15, $pid) {
-                    kill 9, $pid or print "[*] psad: Could not kill ",
-                        "$pidname, pid: $pid $!\n";
-                    $rv = 1;
+                    unless (kill 9, $pid) {
+                        print "[*] psad: Could not kill ",
+                            "$pidname, pid: $pid $!\n";
+                        $rv = $EXIT_FAILURE;
+                    }
                 } else {
                     unlink $pidfile;
                 }
@@ -7351,7 +7356,6 @@ sub stop_psad() {
                 }
                 print "[-] psad: $pidname is not running on ",
                     "$config{'HOSTNAME'}\n" if $print;
-                $rv = 1;
             }
         } else {
             my $print = 1;
@@ -7362,7 +7366,6 @@ sub stop_psad() {
             }
             print "[-] psad: pid file $pidfile does not exist for ",
                 "$pidname on $config{'HOSTNAME'}\n" if $print;
-            $rv = 1;
         }
     }
     return $rv;
@@ -7387,7 +7390,7 @@ sub restart() {
     } else {
         system $cmds{'psad'};
     }
-    return 0;
+    return $EXIT_SUCCESS;
 }
 
 sub analysis_mode() {
@@ -7484,7 +7487,7 @@ sub analysis_mode() {
 
     print "\n[+] Finished --Analyze cycle.\n";
 
-    return 0;
+    return $EXIT_SUCCESS;
 }
 
 sub ipt_match_criteria() {
@@ -7695,7 +7698,7 @@ sub csv_mode() {
     } elsif ($csv_print_uniq) {
         print "$_\n" for keys %csv_uniq_lines;
     }
-    return 0;
+    return $EXIT_SUCCESS;
 }
 
 sub gnuplot_header() {
@@ -8564,7 +8567,7 @@ sub benchmark_mode() {
     print scalar localtime(), " [+] Packet creation and processing time: ",
         time() - $b_time, " sec.\n";
     print scalar localtime(), " [+] Exiting benchmark mode.\n";
-    return 0;
+    return $EXIT_SUCCESS;
 }
 
 sub fw_analyze_mode() {
@@ -8582,7 +8585,7 @@ sub fw_analyze_mode() {
         }
     }
 
-    my $exit_status = 0;
+    my $exit_status = $EXIT_SUCCESS;
     if ($run_fw_check) {
         my $opts = "-c $config_file ";
         $opts .= " --fw-analyze" if $fw_analyze;
@@ -8599,7 +8602,8 @@ sub fw_analyze_mode() {
 ### display the status of all four psad daemons
 sub status() {
 
-    my $rv = 0;   ### assume psad is not running and test...
+    my $rv = $EXIT_SUCCESS;
+
     for my $pidname (qw(psadwatchd kmsgsd psad)) {
         my $pidfile = $pidfiles{$pidname};
         if (-e $pidfile) {
@@ -8620,7 +8624,6 @@ sub status() {
                     }
                 }
                 print "\n";
-                $rv = 1;
             } else {
                 my $print = 1;
                 if ($pidname eq 'kmsgsd'
@@ -8630,6 +8633,7 @@ sub status() {
                 }
                 print "[-] psad: $pidname is not running on ",
                     "$config{'HOSTNAME'}\n" if $print;
+                $rv = $EXIT_FAILURE;
             }
         } else {
             my $print = 1;
@@ -8640,6 +8644,9 @@ sub status() {
             }
             print "[-] psad: pid file $pidfile does not exist for ",
                 "$pidname on $config{'HOSTNAME'}\n" if $print;
+            if ($rv  eq 'psad') {
+                $rv = $EXIT_FAILURE;
+            }
         }
     }
     return $rv;
@@ -9643,13 +9650,12 @@ sub remove_old_scans() {
 }
 
 sub usr1() {
-    my $rv = 0;
+    my $rv = $EXIT_SUCCESS;
     my $psad_pidfile = $pidfiles{'psad'};
     if (-e $psad_pidfile) {
         my $pid = &is_running($psad_pidfile);
         if ($pid) {  ### make sure psad is actually running
             if (kill 'USR1', $pid) {
-                $rv = 1;
                 print "[+] USR1 signal sent to pid: $pid\n";
                 for (my $try=0; $try<=20; $try++) {  ### limit attempts to 20
                     sleep 1;
@@ -9671,6 +9677,7 @@ sub usr1() {
             } else {
                 print "[*] Could not send psad the USR1 signal on ",
                     "$config{'HOSTNAME'}\n";
+                $rv = $EXIT_FAILURE;
             }
         } else {
             print "[-] psad is not running on $config{'HOSTNAME'}\n";
@@ -9685,7 +9692,7 @@ sub usr1_handler() {
 }
 
 sub hup() {
-    my $rv = 0;
+    my $rv = $EXIT_SUCCESS;
     for my $pidname (qw(psadwatchd psad kmsgsd)) {
         my $pidfile = $pidfiles{$pidname};
         my $pid = &is_running($pidfile);
@@ -9695,7 +9702,7 @@ sub hup() {
             } else {
                 print "[*] Could not send $pidname ",
                     "(pid: $pid) a HUP signal.\n";
-                $rv = 1;
+                $rv = $EXIT_FAILURE;
             }
         } else {
             my $print = 1;
@@ -9705,7 +9712,6 @@ sub hup() {
                 $print = 0;
             }
             print "[-] $pidname daemon not running.\n" if $print;
-            $rv = 1;
         }
     }
     return $rv;
@@ -10316,11 +10322,13 @@ sub dump_conf() {
         printf $fh "%-30s %s\n", "[+] $var", $cmds{$var};
     }
 
-    return 0;
+    ### sometimes we exit after calling this function, and if not
+    ### the return value is ignored
+    return $EXIT_SUCCESS;
 }
 
 sub dump_ipt_policy() {
-    my $rv = 0;
+    my $rv = $EXIT_SUCCESS;
 
     my $fh = *STDOUT;
     $fh = *STDERR if $debug;
@@ -10345,7 +10353,7 @@ sub dump_ipt_policy() {
             }
         } else {
             print $fh "[*] Could not find ip6tables command.\n";
-            $rv = 1;
+            $rv = $EXIT_FAILURE;
         }
     }
 
@@ -10371,7 +10379,7 @@ sub dump_ipt_policy() {
         }
     } else {
         print $fh "[*] Could not find iptables command.\n";
-        $rv = 1;
+        $rv = $EXIT_FAILURE;
     }
 
     return $rv;
@@ -10478,7 +10486,7 @@ sub download_signatures() {
 
     chdir $curr_pwd or die $!;
 
-    return 0;
+    return $EXIT_SUCCESS;
 }
 
 sub date_time() {

@@ -298,7 +298,7 @@ sub ipt_chk_chain() {
     }
 
     if ($fw_analyze) {
-        print "[+] Parsing $ipt_bin $chain chain rules.\n";
+        print "[+] Parsing $chain chain rules.\n";
     }
 
     if ($fw_search_all) {

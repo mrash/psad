@@ -792,56 +792,9 @@ MAIN: for (;;) {
     ### for --fw-block <ip>
     my @add_ipt_addrs = ();
 
-    if ($hup_flag) {
+    &hup_re_init() if $hup_flag;
 
-        &sys_log('received HUP signal, re-importing psad.conf');
-
-        print STDERR "[+] Received HUP signal, re-importing config...\n"
-            if $debug;
-
-        my $orig_fwdata = $fw_data_file;
-        my $orig_ipt_sockfile = '';
-
-        $orig_ipt_sockfile = $config{'AUTO_IPT_SOCK'}
-            if $config{'ENABLE_AUTO_IDS'} eq 'Y';
-
-        ### Re-import all used config files (psad.conf, auto_dl,
-        ### posf, signatures) if we received a HUP signal.
-        &psad_init();
-
-        if ($orig_fwdata ne $fw_data_file) {
-            close FWDATA;
-
-            ### re-open the fwdata file
-            open FWDATA, $fw_data_file or die
-                "[*] Could not open $fw_data_file: $!";
-
-            $skip_first_loop = 1;
-        }
-
-        if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
-            if ($orig_ipt_sockfile ne $config{'AUTO_IPT_SOCK'}) {
-                close $ipt_sock;
-
-                &get_auto_response_domain_sock();
-
-                $skip_first_loop = 1;
-            }
-        }
-        $hup_flag = 0;  ### clear the HUP flag
-    }
-
-    ### See if we need to print out the %scan datastructure
-    ### (we received a USR1 signal)
-    if ($usr1_flag) {
-        $usr1_flag = 0;  ### clear the USR1 flag
-
-        &sys_log('received USR1 signal, printing scan ' .
-            "hashes to $config{'PSAD_DIR'}/scan_hash.$$");
-
-        ### dump scan hash to filesystem
-        &print_scan();
-    }
+    &usr1_print_scan() if $usr1_flag;
 
     ### allow the contents of the fwdata file to be processed only after
     ### the first loop has been executed.
@@ -9691,6 +9644,18 @@ sub usr1_handler() {
     return;
 }
 
+sub usr1_print_scan() {
+    $usr1_flag = 0;  ### clear the USR1 flag
+
+    &sys_log('received USR1 signal, printing scan ' .
+        "hashes to $config{'PSAD_DIR'}/scan_hash.$$");
+
+    ### dump scan hash to filesystem
+    &print_scan();
+
+    return;
+}
+
 sub hup() {
     my $rv = $EXIT_SUCCESS;
     for my $pidname (qw(psadwatchd psad kmsgsd)) {
@@ -9719,6 +9684,47 @@ sub hup() {
 
 sub hup_handler() {
     $hup_flag = 1;
+    return;
+}
+
+sub hup_re_init() {
+
+    &sys_log('received HUP signal, re-importing psad.conf');
+
+    print STDERR "[+] Received HUP signal, re-importing config...\n"
+        if $debug;
+
+    my $orig_fwdata = $fw_data_file;
+    my $orig_ipt_sockfile = '';
+
+    $orig_ipt_sockfile = $config{'AUTO_IPT_SOCK'}
+        if $config{'ENABLE_AUTO_IDS'} eq 'Y';
+
+    ### Re-import all used config files (psad.conf, auto_dl,
+    ### posf, signatures) if we received a HUP signal.
+    &psad_init();
+
+    if ($orig_fwdata ne $fw_data_file) {
+        close FWDATA;
+
+        ### re-open the fwdata file
+        open FWDATA, $fw_data_file or die
+        "[*] Could not open $fw_data_file: $!";
+
+        $skip_first_loop = 1;
+    }
+
+    if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
+        if ($orig_ipt_sockfile ne $config{'AUTO_IPT_SOCK'}) {
+            close $ipt_sock;
+
+            &get_auto_response_domain_sock();
+
+            $skip_first_loop = 1;
+        }
+    }
+    $hup_flag = 0;  ### clear the HUP flag
+
     return;
 }
 

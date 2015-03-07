@@ -775,7 +775,7 @@ my $fw_data_file_check_ctr = 0;
 ### All firewall drop/reject log messages are written to FW_DATA_FILE
 ### by kmsgsd (or by ulogd directly).
 print STDERR "[+] Opening iptables data file: $fw_data_file\n" if $debug;
-open FWDATA, $fw_data_file or die '[*] Could not open ',
+open my $fwdata_fh, $fw_data_file or die '[*] Could not open ',
     "$fw_data_file: $!";
 
 &get_auto_response_domain_sock()
@@ -792,7 +792,7 @@ MAIN: for (;;) {
     ### for --fw-block <ip>
     my @add_ipt_addrs = ();
 
-    &hup_re_init() if $hup_flag;
+    $fwdata_fh = &hup_re_init($fwdata_fh) if $hup_flag;
 
     &usr1_print_scan() if $usr1_flag;
 
@@ -801,14 +801,14 @@ MAIN: for (;;) {
     if ($skip_first_loop) {
 
         $skip_first_loop = 0;
-        seek FWDATA,0,2;  ### seek to the end of the file
+        seek $fwdata_fh,0,2;  ### seek to the end of the file
         next MAIN;
 
     } else {
 
         ### Get any new packets have been written to
         ### FW_DATA_FILE by kmsgsd for psad analysis.
-        @fw_packets = <FWDATA>;
+        @fw_packets = <$fwdata_fh>;
 
         if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
 
@@ -820,57 +820,9 @@ MAIN: for (;;) {
         }
     }
 
-    if ($fw_data_file_check_ctr == 10) {
-        if (-e $fw_data_file) {
-            my $size_tmp  = -s $fw_data_file;
-            my $inode_tmp = (stat($fw_data_file))[1];
-            if ($inode_tmp != $fw_data_file_inode
-                    or $size_tmp < $fw_data_file_size) {
-
-                close FWDATA;
-
-                &sys_log('[+]', "iptables syslog file $fw_data_file " .
-                    "shrank or was rotated, so re-opening");
-
-                ### re-open the fwdata file
-                open FWDATA, $fw_data_file or die
-                    "[*] Could not open $fw_data_file: $!";
-
-                $skip_first_loop = 1;
-
-                ### set file size and inode
-                $fw_data_file_size  = $size_tmp;
-                $fw_data_file_inode = $inode_tmp;
-            }
-        }
-        $fw_data_file_check_ctr = 0;
-    }
+    $fwdata_fh = &fw_data_file_check($fwdata_fh);
 
     if (@fw_packets) {
-
-        if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
-            ### calculate the timezone offset
-            $timezone = sprintf("%.2d", (Timezone())[3]) . ':00';
-            $year     = This_Year();
-        }
-
-        unless ($no_netstat) {
-            ### we don't expect the list of ports the machine is listening
-            ### on to change very often.
-            if ($netstat_lkup_ctr == 10) {
-                &get_listening_ports();
-                $netstat_lkup_ctr = 0;
-            }
-            $netstat_lkup_ctr++;
-        }
-        ### the local machine ip addresses could change (dhcp, etc.)
-        ### but not that often.
-        if ($local_ips_lkup_ctr == 30) {
-            &get_local_ips();
-            $local_ips_lkup_ctr = 0;
-        }
-        $local_ips_lkup_ctr++;
-
         ### Extract data and summarize scan packets, assign danger level,
         ### send email/syslog alerts.
         &check_scan(\@fw_packets);
@@ -885,7 +837,6 @@ MAIN: for (;;) {
     }
 
     if ($do_log) {
-
         ### log the top port and signature matches
         &log_top_scans();
     }
@@ -917,19 +868,8 @@ MAIN: for (;;) {
     ### setting DISK_MAX_PERCENTAGE = 0.
     if ($config{'DISK_MAX_PERCENTAGE'} > 0
             and (time() - $last_disk_check) > $config{'DISK_CHECK_INTERVAL'}) {
-        ### See how we are doing on disk space, and remove data
-        ### if necessary.
-        if (&disk_space_exceeded() and $config{'ENABLE_SYSLOG_FILE'} ne 'Y') {
-            close FWDATA;
 
-            ### truncate fwdata file
-            &truncate_file($fw_data_file);
-
-            ### re-open the fwdata file
-            open FWDATA, $fw_data_file or die
-                "[*] Could not open $fw_data_file: $!";
-        }
-        $last_disk_check = time();
+        $fwdata_fh = &disk_check($fwdata_fh);
     }
 
     &check_auto_response_sock()
@@ -953,31 +893,21 @@ MAIN: for (;;) {
     }
 
     ### see if we need to timeout any old scans
-    if ($config{'ENABLE_PERSISTENCE'} eq 'N') {
-
-        my $do_timeout = 0;
-        if ($config{'PERSISTENCE_CTR_THRESHOLD'} == 0) {
-            $do_timeout = 1;
-        } elsif ($check_interval_ctr % $config{'PERSISTENCE_CTR_THRESHOLD'} == 0) {
-            $do_timeout = 1;
-        }
-
-        &delete_old_scans() if $do_timeout;
-    }
+    &scan_timeouts() if $config{'ENABLE_PERSISTENCE'} eq 'N';
 
     $check_interval_ctr++;
 
     $fw_data_file_check_ctr++;
 
-    ### clearerr() on the FWDATA filehandle to be ready for new packets
-    FWDATA->clearerr();
+    ### clearerr() on the $fwdata_fh filehandle to be ready for new packets
+    $fwdata_fh->clearerr();
 
     ### sleep for the check interval seconds
     sleep $config{'CHECK_INTERVAL'};
 }
 
 ### for completeness
-close FWDATA;
+close $fwdata_fh;
 exit 0;
 ###=========================================================###
 ######                    END MAIN                       ######
@@ -990,6 +920,29 @@ exit 0;
 ### values in iptables packets (if fwsnort is being used).
 sub check_scan() {
     my $fw_packets_ar = shift;
+
+    if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
+        ### calculate the timezone offset
+        $timezone = sprintf("%.2d", (Timezone())[3]) . ':00';
+        $year     = This_Year();
+    }
+
+    unless ($no_netstat) {
+        ### we don't expect the list of ports the machine is listening
+        ### on to change very often.
+        if ($netstat_lkup_ctr == 10) {
+            &get_listening_ports();
+            $netstat_lkup_ctr = 0;
+        }
+        $netstat_lkup_ctr++;
+    }
+    ### the local machine ip addresses could change (dhcp, etc.)
+    ### but not that often.
+    if ($local_ips_lkup_ctr == 30) {
+        &get_local_ips();
+        $local_ips_lkup_ctr = 0;
+    }
+    $local_ips_lkup_ctr++;
 
     my %curr_scan = ();
     my %curr_sigs_dl = ();
@@ -5718,6 +5671,18 @@ sub scan_logr() {
     return;
 }
 
+sub scan_timeouts() {
+    my $do_timeout = 0;
+    if ($config{'PERSISTENCE_CTR_THRESHOLD'} == 0) {
+        $do_timeout = 1;
+    } elsif ($check_interval_ctr % $config{'PERSISTENCE_CTR_THRESHOLD'} == 0) {
+        $do_timeout = 1;
+    }
+
+    &delete_old_scans() if $do_timeout;
+    return;
+}
+
 sub scan_logr_signatures() {
     my ($src, $dst, $email_fh, $log_sigs_file) = @_;
 
@@ -9602,6 +9567,57 @@ sub remove_old_scans() {
     return;
 }
 
+sub disk_check() {
+    my $fwdata_fh = shift;
+
+    ### See how we are doing on disk space, and remove data
+    ### if necessary.
+    if (&disk_space_exceeded() and $config{'ENABLE_SYSLOG_FILE'} ne 'Y') {
+        close $fwdata_fh;
+
+        ### truncate fwdata file
+        &truncate_file($fw_data_file);
+
+        ### re-open the fwdata file
+        open $fwdata_fh, $fw_data_file or die
+            "[*] Could not open $fw_data_file: $!";
+    }
+    $last_disk_check = time();
+
+    return $fwdata_fh;
+}
+
+sub fw_data_file_check() {
+    my $fwdata_fh = shift;
+
+    if ($fw_data_file_check_ctr == 10) {
+        if (-e $fw_data_file) {
+            my $size_tmp  = -s $fw_data_file;
+            my $inode_tmp = (stat($fw_data_file))[1];
+            if ($inode_tmp != $fw_data_file_inode
+                    or $size_tmp < $fw_data_file_size) {
+
+                close $fwdata_fh;
+
+                &sys_log('[+]', "iptables syslog file $fw_data_file " .
+                    "shrank or was rotated, so re-opening");
+
+                ### re-open the fwdata file
+                open $fwdata_fh, $fw_data_file or die
+                    "[*] Could not open $fw_data_file: $!";
+
+                $skip_first_loop = 1;
+
+                ### set file size and inode
+                $fw_data_file_size  = $size_tmp;
+                $fw_data_file_inode = $inode_tmp;
+            }
+        }
+        $fw_data_file_check_ctr = 0;
+    }
+    return $fwdata_fh;
+}
+
 sub usr1() {
     my $rv = $EXIT_SUCCESS;
     my $psad_pidfile = $pidfiles{'psad'};
@@ -9688,6 +9704,7 @@ sub hup_handler() {
 }
 
 sub hup_re_init() {
+    my $fwdata_fh = shift;
 
     &sys_log('received HUP signal, re-importing psad.conf');
 
@@ -9705,11 +9722,11 @@ sub hup_re_init() {
     &psad_init();
 
     if ($orig_fwdata ne $fw_data_file) {
-        close FWDATA;
+        close $fwdata_fh;
 
         ### re-open the fwdata file
-        open FWDATA, $fw_data_file or die
-        "[*] Could not open $fw_data_file: $!";
+        open $fwdata_fh, $fw_data_file or die
+            "[*] Could not open $fw_data_file: $!";
 
         $skip_first_loop = 1;
     }
@@ -9725,7 +9742,7 @@ sub hup_re_init() {
     }
     $hup_flag = 0;  ### clear the HUP flag
 
-    return;
+    return $fwdata_fh;
 }
 
 sub die_handler() {

@@ -868,29 +868,13 @@ MAIN: for (;;) {
     ### setting DISK_MAX_PERCENTAGE = 0.
     if ($config{'DISK_MAX_PERCENTAGE'} > 0
             and (time() - $last_disk_check) > $config{'DISK_CHECK_INTERVAL'}) {
-
         $fwdata_fh = &disk_check($fwdata_fh);
     }
 
     &check_auto_response_sock()
         if $config{'ENABLE_AUTO_IDS'} eq 'Y';
 
-    ### Print the number of new packets we saw in FW_DATA_FILE if we are
-    ### running in debug mode
-    if ($debug) {
-        print STDERR "[+] MAIN: number of new packets: " .
-            ($#fw_packets+1) . "\n";
-    }
-
-    if ($die_msg) {
-        &print_sys_msg($die_msg, "$config{'PSAD_ERR_DIR'}/psad.die");
-        $die_msg = '';
-    }
-
-    if ($warn_msg) {
-        &print_sys_msg($warn_msg, "$config{'PSAD_ERR_DIR'}/psad.warn");
-        $warn_msg = '';
-    }
+    &notifications($#fw_packets+1);
 
     ### see if we need to timeout any old scans
     &scan_timeouts() if $config{'ENABLE_PERSISTENCE'} eq 'N';
@@ -9616,6 +9600,28 @@ sub fw_data_file_check() {
         $fw_data_file_check_ctr = 0;
     }
     return $fwdata_fh;
+}
+
+sub notifications() {
+   my $num_packets = shift;
+
+    ### Print the number of new packets we saw in FW_DATA_FILE if we are
+    ### running in debug mode
+    if ($debug) {
+        print STDERR "[+] MAIN: number of new packets: " .
+            ($num_packets+1) . "\n";
+    }
+
+    if ($die_msg) {
+        &print_sys_msg($die_msg, "$config{'PSAD_ERR_DIR'}/psad.die");
+        $die_msg = '';
+    }
+
+    if ($warn_msg) {
+        &print_sys_msg($warn_msg, "$config{'PSAD_ERR_DIR'}/psad.warn");
+        $warn_msg = '';
+    }
+    return;
 }
 
 sub usr1() {

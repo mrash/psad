@@ -3502,6 +3502,18 @@ sub validate_config() {
     if ($config{'ENABLE_FW_MSG_READ_CMD'} eq 'Y') {
         die "[*] Could not find/execute FW_MSG_READ_CMD: $config{'FW_MSG_READ_CMD'}"
             unless -e $config{'FW_MSG_READ_CMD'} and -x $config{'FW_MSG_READ_CMD'};
+        ### make sure systemd-journald is running and warn if not
+        if (&look_for_process(qr/systemd\-journald\b/)) {
+            &sys_log('warning: it looks like systemd-journald is not running, ' .
+                'but ENABLE_FW_MSG_READ_CMD is enabled.');
+        }
+    } else {
+        ### warn if systemd-journald is running since we likely won't see any
+        ### firewall logs
+        if (&look_for_process(qr/systemd\-journald\b/)) {
+            &sys_log('warning: it looks like systemd-journald is running, ' .
+                'but ENABLE_FW_MSG_READ_CMD is not enabled.');
+        }
     }
 
     return;
@@ -10838,6 +10850,14 @@ sub is_running() {
     close PIDFILE;
     chomp $pid;
     return $pid if (kill 0, $pid);  ### pid is running
+    return 0;
+}
+
+sub look_for_process() {
+    my $process_re = shift;
+    for (@{&run_command($cmds{'ps'}, 'auxww')}) {
+        return 1 if /$process_re/;
+    }
     return 0;
 }
 

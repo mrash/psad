@@ -135,6 +135,7 @@
 use File::Copy;
 use File::Path;
 use IO::Socket;
+use IO::Select;
 use Socket;
 use POSIX;
 use IO::Handle;
@@ -435,11 +436,16 @@ my $kmsgsd_started   = 0;
 my $warn_msg         = '';
 my $die_msg          = '';
 my $skip_first_loop  = 1;
+my $fw_msg_read_continue = 1;
+my $fw_msg_read_do_sleep = 1;
 my $cmdl_interface   = '';
 my $analyze_write_data = 0;
 my $local_ips_lkup_ctr = 0;
 my $num_hash_marks = 76;  ### for gnuplot output
 my $imported_syslog_module = 0;
+my $TRUNCATE    = 1;
+my $NO_TRUNCATE = 0;
+my $s = ''; ### for IO::Select
 
 ### these flags are used to disable several features
 ### in psad if specified from the command line
@@ -775,8 +781,8 @@ my $fw_data_file_check_ctr = 0;
 ### All firewall drop/reject log messages are written to FW_DATA_FILE
 ### by kmsgsd (or by ulogd directly).
 print STDERR "[+] Opening iptables data file: $fw_data_file\n" if $debug;
-open my $fwdata_fh, $fw_data_file or die '[*] Could not open ',
-    "$fw_data_file: $!";
+
+my $fwdata_fh = &open_fw_data();
 
 &get_auto_response_domain_sock()
     if $config{'ENABLE_AUTO_IDS'} eq 'Y';
@@ -801,14 +807,27 @@ MAIN: for (;;) {
     if ($skip_first_loop) {
 
         $skip_first_loop = 0;
-        seek $fwdata_fh,0,2;  ### seek to the end of the file
+        seek $fwdata_fh,0,SEEK_END;  ### seek to the end of the file
+
         next MAIN;
 
     } else {
 
-        ### Get any new packets have been written to
-        ### FW_DATA_FILE by kmsgsd for psad analysis.
-        @fw_packets = <$fwdata_fh>;
+        ### Get any new packets have been written to syslog
+        if ($config{'ENABLE_FW_MSG_READ_CMD'} eq 'Y') {
+            if ($s->can_read(1)) {
+                my $syslog_line = <$fwdata_fh>;
+                $fwdata_fh->flush();
+                push @fw_packets, $syslog_line unless $fw_msg_read_continue;
+                $fw_msg_read_do_sleep = 0;
+            } else {
+                $fw_msg_read_continue = 0;
+                $fw_msg_read_do_sleep = 1;
+            }
+
+        } else {
+            @fw_packets = <$fwdata_fh>;
+        }
 
         if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
 
@@ -820,7 +839,9 @@ MAIN: for (;;) {
         }
     }
 
-    $fwdata_fh = &fw_data_file_check($fwdata_fh);
+    unless ($config{'ENABLE_FW_MSG_READ_CMD'} eq 'Y') {
+        $fwdata_fh = &fw_data_file_check($fwdata_fh);
+    }
 
     if (@fw_packets) {
         ### Extract data and summarize scan packets, assign danger level,
@@ -884,10 +905,14 @@ MAIN: for (;;) {
     $fw_data_file_check_ctr++;
 
     ### clearerr() on the $fwdata_fh filehandle to be ready for new packets
-    $fwdata_fh->clearerr();
+    #$fwdata_fh->clearerr();
 
     ### sleep for the check interval seconds
-    sleep $config{'CHECK_INTERVAL'};
+    if ($config{'ENABLE_FW_MSG_READ_CMD'} eq 'Y') {
+        sleep $config{'CHECK_INTERVAL'} if $fw_msg_read_do_sleep;
+    } else {
+        sleep $config{'CHECK_INTERVAL'};
+    }
 }
 
 ### for completeness
@@ -3474,7 +3499,68 @@ sub validate_config() {
             "--CSV-fields argument."
     }
 
+    if ($config{'ENABLE_FW_MSG_READ_CMD'} eq 'Y') {
+        die "[*] Could not find/execute FW_MSG_READ_CMD: $config{'FW_MSG_READ_CMD'}"
+            unless -e $config{'FW_MSG_READ_CMD'} and -x $config{'FW_MSG_READ_CMD'};
+    }
+
     return;
+}
+
+sub open_fw_data() {
+
+    if ($config{'ENABLE_FW_MSG_READ_CMD'} eq 'Y') {
+
+        my $fwdata_fh = &fork_fw_read_cmd();
+
+        $s = IO::Select->new();
+        $s->add($fwdata_fh);
+
+        $fwdata_fh->flush();
+
+        return $fwdata_fh;
+
+    } else {
+        open my $fwdata_fh, $fw_data_file or die '[*] Could not open ',
+            "$fw_data_file: $!";
+        return $fwdata_fh;
+    }
+
+    die "[*] Did not open a source of firewall log data";
+}
+
+sub reopen_fw_data() {
+    my ($fwdata_fh, $truncate_flag) = @_;
+
+    close $fwdata_fh;
+
+    ### truncate fwdata file
+    &truncate_file($fw_data_file) if $truncate_flag;
+
+    open $fwdata_fh, $fw_data_file or die
+        "[*] Could not open $fw_data_file: $!";
+
+    return $fwdata_fh;
+}
+
+sub fork_fw_read_cmd() {
+
+    my $cmd = $config{'FW_MSG_READ_CMD'};
+    $cmd .= " $config{'FW_MSG_READ_CMD_ARGS'} "
+        if $config{'USE_FW_MSG_READ_CMD_ARGS'} eq 'Y';
+
+    ### Credit: stackoverflow FIXME
+    socketpair CMDA,CMDB,AF_UNIX,SOCK_STREAM,PF_UNSPEC;
+    if (fork() == 0) {
+        open my $fh, '-|', $cmd;
+        while (<$fh>) {
+            print CMDB;
+            CMDB->flush();
+        }
+        close $fh;
+        exit $? >> 8;
+    }
+    return *CMDA;
 }
 
 sub check_enable_vars_value() {
@@ -9557,14 +9643,7 @@ sub disk_check() {
     ### See how we are doing on disk space, and remove data
     ### if necessary.
     if (&disk_space_exceeded() and $config{'ENABLE_SYSLOG_FILE'} ne 'Y') {
-        close $fwdata_fh;
-
-        ### truncate fwdata file
-        &truncate_file($fw_data_file);
-
-        ### re-open the fwdata file
-        open $fwdata_fh, $fw_data_file or die
-            "[*] Could not open $fw_data_file: $!";
+        $fwdata_fh = &reopen_fw_data($fwdata_fh, $TRUNCATE);
     }
     $last_disk_check = time();
 
@@ -9581,14 +9660,10 @@ sub fw_data_file_check() {
             if ($inode_tmp != $fw_data_file_inode
                     or $size_tmp < $fw_data_file_size) {
 
-                close $fwdata_fh;
-
                 &sys_log('[+]', "iptables syslog file $fw_data_file " .
                     "shrank or was rotated, so re-opening");
 
-                ### re-open the fwdata file
-                open $fwdata_fh, $fw_data_file or die
-                    "[*] Could not open $fw_data_file: $!";
+                $fwdata_fh = &reopen_fw_data($fwdata_fh, $NO_TRUNCATE);
 
                 $skip_first_loop = 1;
 
@@ -9608,8 +9683,7 @@ sub notifications() {
     ### Print the number of new packets we saw in FW_DATA_FILE if we are
     ### running in debug mode
     if ($debug) {
-        print STDERR "[+] MAIN: number of new packets: " .
-            ($num_packets+1) . "\n";
+        print STDERR "[+] MAIN: number of new packets: $num_packets\n";
     }
 
     if ($die_msg) {
@@ -9728,11 +9802,7 @@ sub hup_re_init() {
     &psad_init();
 
     if ($orig_fwdata ne $fw_data_file) {
-        close $fwdata_fh;
-
-        ### re-open the fwdata file
-        open $fwdata_fh, $fw_data_file or die
-            "[*] Could not open $fw_data_file: $!";
+        $fwdata_fh = &reopen_fw_data($fwdata_fh, $NO_TRUNCATE);
 
         $skip_first_loop = 1;
     }
@@ -11066,7 +11136,8 @@ sub required_vars() {
         AUTO_BLOCK_DL3_TIMEOUT AUTO_BLOCK_DL4_TIMEOUT
         AUTO_BLOCK_DL5_TIMEOUT EMAIL_THROTTLE EXPECT_TCP_OPTIONS
         ENABLE_PSADWATCHD ENABLE_EXT_BLOCK_SCRIPT_EXEC EXTERNAL_BLOCK_SCRIPT
-        ENABLE_FIREWALLD
+        ENABLE_FIREWALLD ENABLE_FW_MSG_READ_CMD FW_MSG_READ_CMD
+        FW_MSG_READ_CMD_ARGS USE_FW_MSG_READ_CMD_ARGS
     ));
     &defined_vars(\@required_vars);
     return;

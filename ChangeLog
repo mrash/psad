@@ -1,4 +1,13 @@
 psad-2.2.6 (03//2015):
+    - Added support for reading syslog messages from journalctl on systems
+      where syslog data is tied into systemd. Although this functionality is
+      not enabled by default for now, it may be at a later time as more Linux
+      systems appear move to systemd. To enable reading from journaltcl, then
+      set the ENABLE_FW_MSG_READ_CMD variable in /etc/psad/psad.conf to Y.
+      When enabled, by default the command executed by psad to acquire syslog
+      data is '/bin/journalctl -f -k', but both the command path and the
+      command args can be altered with the FW_MSG_READ_CMD and
+      FW_MSG_READ_CMD_ARGS variables respectively.
     - Added support for systems with 'firewalld' by leveraging the
       'firewall-cmd' binary. This is done via the updated IPTables::Parse and
       IPTables::ChainMgr modules.
@@ -16,7 +25,7 @@ psad-2.2.5 (02/09/2015):
         https://www.cipherdyne.org/fwknop/
 
     - (Rinck Sonnenberg): Spotted install.pl exit code bug when uninstalling
-      psad. Gettting this fixed will enable a proper Puppet module to be
+      psad. Getting this fixed will enable a proper Puppet module to be
       developed which Rinck is working on.
     - (Rinck Sonnenberg) UFW and Logstash integration capabilities for psad
       are now available:

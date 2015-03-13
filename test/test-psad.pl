@@ -23,6 +23,7 @@ my $ack_scan_file  = 'ack_scan_1000_1150';
 my $udp_scan_file  = 'udp_scan_1000_1150';
 my $proto_scan_file = 'proto_scan';
 my $fwknop_pkt_file = 'fwknop_spa_pkt';
+my $syslog_time_fmt1 = 'syslog_time_fmt1.log';
 my $ms_sql_server_sig_match_file  = 'ms_sql_server_sig_match';
 my $ipv6_ms_sql_server_sig_match_file  = 'ipv6_ms_sql_server_sig_match';
 my $no_ms_sql_server_sig_match_file = "$conf_dir/signatures_no_ms_sql_server_sig";
@@ -415,6 +416,19 @@ my @tests = (
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
                 &fw_type() . "/$fwknop_pkt_file -c $default_conf $normal_root_override_str",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'syslog time format (1)',
+        'err_msg'   => 'did not parse syslog time format',
+        'positive_output_matches' => [qr/syslog\shostname\:\sservername/,
+                qr/timestamp\:\s2015\-03\-08T/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
+                &fw_type() . "/$syslog_time_fmt1 -c $default_conf $normal_root_override_str",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },

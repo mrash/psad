@@ -11,6 +11,8 @@ psad-2.2.6 (03//2015):
     - Added support for systems with 'firewalld' by leveraging the
       'firewall-cmd' binary. This is done via the updated IPTables::Parse and
       IPTables::ChainMgr modules.
+    - Bug fix reported by Shlomit Afgin to handle the syslog time format that
+      looks like this: '2015-03-08T02:25:11.444012+02:00 servername kernel: ..'
     - Updated all module dependencies in the deps/ directory.
     - Bug fix reported by Brad Rubenstein to ensure exiting with a proper exit
       status in 'psad --HUP' mode. This was also extended to ensure better

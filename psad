@@ -438,6 +438,7 @@ my $die_msg          = '';
 my $skip_first_loop  = 1;
 my $fw_msg_read_continue = 1;
 my $fw_msg_read_do_sleep = 1;
+my $clear_fw_packet_array = 0;
 my $cmdl_interface   = '';
 my $analyze_write_data = 0;
 my $local_ips_lkup_ctr = 0;
@@ -777,6 +778,9 @@ my $fw_data_file_inode = (stat($fw_data_file))[1];
 
 my $fw_data_file_check_ctr = 0;
 
+### main firewall packets array
+my @fw_packets = ();
+
 ### Get an open filehandle for the main firewall data file FW_DATA_FILE.
 ### All firewall drop/reject log messages are written to FW_DATA_FILE
 ### by kmsgsd (or by ulogd directly).
@@ -792,9 +796,6 @@ my $fwdata_fh = &open_fw_data();
 ###=========================================================###
 MAIN: for (;;) {
 
-    ### scope and clear the firewall data array
-    my @fw_packets = ();
-
     ### for --fw-block <ip>
     my @add_ipt_addrs = ();
 
@@ -807,8 +808,9 @@ MAIN: for (;;) {
     if ($skip_first_loop) {
 
         $skip_first_loop = 0;
-        seek $fwdata_fh,0,SEEK_END;  ### seek to the end of the file
-
+        unless ($config{'ENABLE_FW_MSG_READ_CMD'} eq 'Y') {
+            seek $fwdata_fh,0,SEEK_END;  ### seek to the end of the file
+        }
         next MAIN;
 
     } else {
@@ -839,15 +841,62 @@ MAIN: for (;;) {
         }
     }
 
-    unless ($config{'ENABLE_FW_MSG_READ_CMD'} eq 'Y') {
-        $fwdata_fh = &fw_data_file_check($fwdata_fh);
+    $fwdata_fh = &fw_data_file_check($fwdata_fh)
+        unless $config{'ENABLE_FW_MSG_READ_CMD'} eq 'Y';
+
+    ### sleep for the check interval seconds
+    if ($config{'ENABLE_FW_MSG_READ_CMD'} eq 'Y') {
+
+        if ($fw_msg_read_do_sleep
+                or (($#fw_packets+1) % $config{'FW_MSG_READ_MIN_PKTS'} == 0)) {
+
+            if (@fw_packets) {
+                ### Extract data and summarize scan packets, assign danger
+                ### level, send email/syslog alerts.
+                &check_scan(\@fw_packets);
+            }
+
+            &post_scan_processing($#fw_packets+1, \@add_ipt_addrs);
+            @fw_packets = ();
+        }
+
+        sleep $config{'CHECK_INTERVAL'} if $fw_msg_read_do_sleep;
+
+    } else {
+
+        if (@fw_packets) {
+            ### Extract data and summarize scan packets, assign danger
+            ### level, send email/syslog alerts.
+            &check_scan(\@fw_packets);
+        }
+
+        &post_scan_processing($#fw_packets+1, \@add_ipt_addrs);
+
+        @fw_packets = ();
+
+        ### clearerr() on the $fwdata_fh file handle to be ready
+        ### for new packets
+        $fwdata_fh->clearerr();
+
+        sleep $config{'CHECK_INTERVAL'};
     }
 
-    if (@fw_packets) {
-        ### Extract data and summarize scan packets, assign danger level,
-        ### send email/syslog alerts.
-        &check_scan(\@fw_packets);
-    }
+    $check_interval_ctr++;
+    $fw_data_file_check_ctr++;
+
+} ### MAIN
+
+### for completeness
+close $fwdata_fh;
+exit 0;
+###=========================================================###
+######                    END MAIN                       ######
+###=========================================================###
+
+#=================== BEGIN SUBROUTINES ========================
+
+sub post_scan_processing() {
+    my ($num_packets, $add_ipt_addrs_ar) = @_;
 
     ### log top scans data
     my $do_log = 0;
@@ -875,15 +924,13 @@ MAIN: for (;;) {
         ### even if new packets are not found).
         &timeout_auto_blocked_ips();
 
-        ### see if we need to add any IP address from the domain
+        ### see if we need to add any IP addresses from the domain
         ### socket
-        &check_ipt_cmd(\@add_ipt_addrs) if @add_ipt_addrs;
+        &check_ipt_cmd($add_ipt_addrs_ar) if $#$add_ipt_addrs_ar > -1;
     }
 
     ### Send logs to dshield in dshield format
-    if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y') {
-        &dshield_email_log();
-    }
+    &dshield_email_log() if $config{'ENABLE_DSHIELD_ALERTS'} eq 'Y';
 
     ### Allow disk space utilization checks to be disabled by
     ### setting DISK_MAX_PERCENTAGE = 0.
@@ -895,34 +942,13 @@ MAIN: for (;;) {
     &check_auto_response_sock()
         if $config{'ENABLE_AUTO_IDS'} eq 'Y';
 
-    &notifications($#fw_packets+1);
+    &notifications($num_packets);
 
     ### see if we need to timeout any old scans
     &scan_timeouts() if $config{'ENABLE_PERSISTENCE'} eq 'N';
 
-    $check_interval_ctr++;
-
-    $fw_data_file_check_ctr++;
-
-    ### clearerr() on the $fwdata_fh filehandle to be ready for new packets
-    #$fwdata_fh->clearerr();
-
-    ### sleep for the check interval seconds
-    if ($config{'ENABLE_FW_MSG_READ_CMD'} eq 'Y') {
-        sleep $config{'CHECK_INTERVAL'} if $fw_msg_read_do_sleep;
-    } else {
-        sleep $config{'CHECK_INTERVAL'};
-    }
+    return;
 }
-
-### for completeness
-close $fwdata_fh;
-exit 0;
-###=========================================================###
-######                    END MAIN                       ######
-###=========================================================###
-
-#=================== BEGIN SUBROUTINES ========================
 
 ### Keeps track of scanning ip's, increments packet counters,
 ### keeps track of tcp flags for each scan, test for snort sid
@@ -11188,7 +11214,7 @@ sub required_vars() {
         ENABLE_PSADWATCHD ENABLE_EXT_BLOCK_SCRIPT_EXEC EXTERNAL_BLOCK_SCRIPT
         ENABLE_FIREWALLD ENABLE_FW_MSG_READ_CMD FW_MSG_READ_CMD
         FW_MSG_READ_CMD_ARGS USE_FW_MSG_READ_CMD_ARGS CUSTOM_SYSLOG_TS_RE
-        ENABLE_CUSTOM_SYSLOG_TS_RE
+        ENABLE_CUSTOM_SYSLOG_TS_RE FW_MSG_READ_MIN_PKTS
     ));
     &defined_vars(\@required_vars);
     return;

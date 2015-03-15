@@ -817,7 +817,7 @@ MAIN: for (;;) {
 
         ### Get any new packets have been written to syslog
         if ($config{'ENABLE_FW_MSG_READ_CMD'} eq 'Y') {
-            if ($s->can_read(1)) {
+            if ($s->can_read(.5)) {
                 my $syslog_line = <$fwdata_fh>;
                 $fwdata_fh->flush();
                 push @fw_packets, $syslog_line unless $fw_msg_read_continue;

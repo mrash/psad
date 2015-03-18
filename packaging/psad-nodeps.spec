@@ -1,5 +1,5 @@
 %define name psad
-%define version 2.2.5
+%define version 2.4.0
 %define release 1
 %define psadlogdir /var/log/psad
 %define psadrundir /var/run/psad
@@ -155,6 +155,9 @@ fi
 %config(noreplace) %_sysconfdir/%name/icmp6_types
 
 %changelog
+* Wed Mar 18 2015 Michael Rash <mbr@cipherdyne.org>
+- psad-2.4.0 release
+
 * Mon Feb 09 2015 Michael Rash <mbr@cipherdyne.org>
 - psad-2.2.5 release
 
@@ -183,8 +186,8 @@ fi
 * Fri Feb 20 2009 Michael Rash <mbr@cipherdyne.org>
 - psad-2.1.5 release
 
-* Sun Aug 21 2008 Michael Rash <mbr@cipherdyne.org>
-- This spec file omits installing any perl modules that psad depends upon.
+* Thu Aug 21 2008 Michael Rash <mbr@cipherdyne.org>
+- Updated to use the deps/ directory for all perl module sources.
 - psad-2.1.4 release
 
 * Sat Jun 07 2008 Michael Rash <mbr@cipherdyne.org>
@@ -199,13 +202,13 @@ fi
 * Fri Oct 19 2007 Michael Rash <mbr@cipherdyne.org>
 - psad-2.1 release
 
-* Mon Jul 27 2007 Michael Rash <mbr@cipherdyne.org>
+* Mon Jul 23 2007 Michael Rash <mbr@cipherdyne.org>
 - psad-2.0.8 release
 
 * Mon May 28 2007 Michael Rash <mbr@cipherdyne.org>
 - psad-2.0.7 release
 
-* Fri Mar 24 2007 Michael Rash <mbr@cipherdyne.org>
+* Fri Mar 23 2007 Michael Rash <mbr@cipherdyne.org>
 - psad-2.0.6 release
 
 * Thu Mar 01 2007 Michael Rash <mbr@cipherdyne.org>
@@ -229,7 +232,7 @@ fi
 * Sat Dec 23 2006 Michael Rash <mbr@cipherdyne.org>
 - psad-2.0.2 release
 
-* Mon Dec 12 2006 Michael Rash <mbr@cipherdyne.org>
+* Tue Dec 12 2006 Michael Rash <mbr@cipherdyne.org>
 - psad-2.0.1 release
 
 * Sun Dec 10 2006 Michael Rash <mbr@cipherdyne.org>
@@ -290,12 +293,12 @@ fi
 - Updated to psad-1.3.2 (added fwcheck_psad.pl and fw_search.conf
   installation).
 
-* Mon Oct 14 2003 Michael Rash <mbr@cipherdyne.org>
+* Tue Oct 14 2003 Michael Rash <mbr@cipherdyne.org>
 - Removed ipchains text from description.
 - Added test and config warning message for HOME_NET variable.
 - Updated to version 1.3
 
-* Mon Oct 14 2003 Michael Rash <mbr@cipherdyne.org>
+* Tue Oct 14 2003 Michael Rash <mbr@cipherdyne.org>
 - Removed diskmond since psad handles disk space thresholds
   directly.
 

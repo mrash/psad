@@ -6684,6 +6684,9 @@ sub ipt_list_auto_chains() {
     my $ipt = new IPTables::ChainMgr(%ipt_opts)
         or die '[*] Could not acquire IPTables::ChainMgr object.';
 
+    my $ipt_bin = $cmds{'iptables'};
+    $ipt_bin = $ipt->{'_cmd'} if defined $ipt->{'_cmd'};
+
     print "[+] Listing chains from IPT_AUTO_CHAIN keywords...\n";
     if ($config{'ENABLE_AUTO_IDS'} eq 'N') {
         print '[-] NOTE: ENABLE_AUTO_IDS is currently disabled ',
@@ -6699,7 +6702,7 @@ sub ipt_list_auto_chains() {
 
         if ($rv) {
             ($rv, $out_ar, $err_ar) =
-                $ipt->run_ipt_cmd("$ipt->{'_cmd'} -t " .
+                $ipt->run_ipt_cmd("$ipt_bin -t " .
                     "$table -n -L $to_chain -v");
             if ($rv and $out_ar) {
                 print for @$out_ar;

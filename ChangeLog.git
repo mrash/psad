@@ -1,73 +1,83 @@
-commit 94beee46092129e80c8cd8e3ed6b8b5910b47198 (HEAD, refs/heads/master)
-Merge: a34431b ed20606
+commit dd4f5c0df8b9e117eba0496badefbb9cd42d2bc9 (HEAD, refs/remotes/origin/master, refs/remotes/origin/HEAD, refs/heads/master)
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Mon Feb 9 20:01:50 2015 -0500
+Date:   Tue May 12 22:45:12 2015 -0400
 
-    Merge branch 'master' of https://github.com/mrash/psad
-    
-    Conflicts:
-    	ChangeLog
-    	packaging/psad-nodeps.spec
-    	packaging/psad-require-makemaker.spec
-    	packaging/psad.spec
+    extend IGNORE_PROTOCOLS to match on both numeric protocol and text string regardless of what iptables reports
 
-commit a34431b825d450f196924427e28d3efdf6d87b07
+ ChangeLog |  4 ++++
+ psad      | 10 ++++++++++
+ 2 files changed, 14 insertions(+)
+
+commit 7534df2f52cf057ee0f901e0f69347a01864baac
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Mon Feb 9 19:48:41 2015 -0500
+Date:   Tue May 12 22:32:40 2015 -0400
 
-    added fwknop SPA packet for fwknop detection test
+    bumped version to 2.4.1
 
- test/scans/iptables/fwknop_spa_pkt | 1 +
- 1 file changed, 1 insertion(+)
-
-commit b601e30c0e442293a99e6a291e3b59c653ff34c6
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Mon Feb 9 19:47:50 2015 -0500
-
-    updated ChangeLog for 2.2.5 and bumped version
-
- ChangeLog                             | 16 ++++++++++++++++
+ ChangeLog                             | 10 ++++++++++
  VERSION                               |  2 +-
  nf2csv                                |  2 +-
  packaging/psad-nodeps.spec            |  5 ++++-
  packaging/psad-require-makemaker.spec |  5 ++++-
  packaging/psad.spec                   |  5 ++++-
  psad                                  |  4 ++--
- test/test-psad.pl                     | 16 ++++++++++++++++
- 8 files changed, 48 insertions(+), 7 deletions(-)
+ 7 files changed, 26 insertions(+), 7 deletions(-)
 
-commit 257174e8d85b21fbd73212026ab4d6614fbdb4a5
+commit e596a507dc30b64977c8d4565946698fdf7ee04b
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Mon Feb 9 19:47:21 2015 -0500
+Date:   Tue May 12 22:22:40 2015 -0400
 
-    add Rinck Sonnenberg
+    added config vars to enable/disable whois and reverse DNS lookups
 
- CREDITS | 7 +++++++
- 1 file changed, 7 insertions(+)
+ psad                                             | 19 ++++++++++---------
+ psad.conf                                        |  6 ++++++
+ test/conf/auto_blocking.conf                     |  2 ++
+ test/conf/auto_min_dl5_blocking.conf             |  2 ++
+ test/conf/default_psad.conf                      |  2 ++
+ test/conf/disable_ipv6_detection.conf            |  2 ++
+ test/conf/enable_ack_detection.conf              |  2 ++
+ test/conf/ignore_igmp.conf                       |  2 ++
+ test/conf/ignore_intf.conf                       |  2 ++
+ test/conf/ignore_tcp.conf                        |  2 ++
+ test/conf/ignore_udp.conf                        |  2 ++
+ test/conf/require_DROP_syslog_prefix_str.conf    |  2 ++
+ test/conf/require_missing_syslog_prefix_str.conf |  2 ++
+ 13 files changed, 38 insertions(+), 9 deletions(-)
 
-commit 17e0da10b6a52d1fccc53c097841f0e61953ddb6
+commit c157a3bfd82f1ae22437834106c496eae368772b
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Mon Feb 9 19:46:56 2015 -0500
+Date:   Tue May 12 21:54:48 2015 -0400
 
-    exit status bug fix in --uninstall mode spotted by Rinck Sonnenberg
+    Bug fix to honor IGNORE_PROTOCOLS for non-tcp/udp/icmp protocols
+    
+    This bug was reported by Paul Versloot.
 
- install.pl | 11 +++--------
- 1 file changed, 3 insertions(+), 8 deletions(-)
+ CREDITS                       |   7 +-
+ psad                          |  40 +++++----
+ test/conf/ignore_igmp.conf    | 199 ++++++++++++++++++++++++++++++++++++++++++
+ test/scans/iptables/ipv4_igmp |   4 +
+ test/test-psad.pl             |  14 +++
+ 5 files changed, 244 insertions(+), 20 deletions(-)
 
-commit 0e59ac0c123586fba231104bc59f77e4fa06b6ef
+commit 907230bb59d2d03d32d730fc3f29e8dc18d16ad4
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Mon Feb 9 19:46:23 2015 -0500
+Date:   Sun May 10 16:31:50 2015 -0400
 
-    added a signature for fwknop SPA traffic to the default port of UDP 62201
+    Account for older versions of IPTables::ChainMgr that don't export _cmd
+    
+    Github user itoffshore reported an issue #19 on Alpine Linux where the
+    following error was produced in 'psad -L' mode:
+    
+    [+] Listing chains from IPT_AUTO_CHAIN keywords...
+    
+    Use of uninitialized value in concatenation (.) or string at
+    /usr/sbin/psad line 6701.
+    [*]  -t filter -n -L PSAD_BLOCK_INPUT -v does not look like an iptables
+    command. at /usr/sbin/psad line 6701.
+    
+    This error was produced because a pre-1.3 version of IPTables::ChainMgr
+    is installed on the system, and it doesn't export the _cmd hash key
+    (which is actually exported first by the IPTables::Parse module).
 
- signatures | 1 +
- 1 file changed, 1 insertion(+)
-
-commit ed20606bd2e2334ea9cc9d98fe89ecbfd7a177c6 (refs/remotes/origin/master, refs/remotes/origin/HEAD)
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Fri Jan 16 22:24:49 2015 -0500
-
-    minor ChangeLog typo fix
-
- ChangeLog | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ psad | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)

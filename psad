@@ -1431,8 +1431,9 @@ sub parse_NF_pkt_str() {
     my $is_udplite = 0;
     my $is_icmp    = 0;
     my $is_icmp6   = 0;
+    my $proto_num  = -1;
+    my $proto_str  = '';
     my $is_proto_num = 0;
-    my $proto_num = -1;
 
     ### with ENABLE_SYSLOG_FILE enabled, psad sees all sorts of syslog
     ### messages that aren't just from iptables (kmsgsd is not running
@@ -1611,7 +1612,8 @@ sub parse_NF_pkt_str() {
         ### DST=0000:0000:0000:0000:0000:0000:0000:0001 LEN=59 TC=0
         ### HOPLIMIT=64 FLOWLBL=0 PROTO=UDP SPT=35186 DPT=12345 LEN=19 ]
 
-        $is_icmp6 = 1;
+        $is_icmp6  = 1;
+        $proto_str = 'icmp6'
     } elsif ($pkt_str =~ /PROTO=ICMP\s/) {
         ### test for ICMP before TCP or UDP because ICMP destination
         ### unreachable messages can contain embedded TCP/UDP specifics like
@@ -1624,13 +1626,17 @@ sub parse_NF_pkt_str() {
         ### DST=10.0.0.138 LEN=68 TOS=0x00 PREC=0x00 TTL=0 ID=22458 PROTO=UDP
         ### SPT=35080 DPT=33434 LEN=48 ]
 
-        $is_icmp = 1;
+        $is_icmp   = 1;
+        $proto_str = 'icmp';
     } elsif ($pkt_str =~ /PROTO=TCP\s/) {
-        $is_tcp = 1;
+        $is_tcp    = 1;
+        $proto_str = 'tcp';
     } elsif ($pkt_str =~ /PROTO=UDPLITE\s/) {
         $is_udplite = 1;
+        $proto_str  = 'udplite';
     } elsif ($pkt_str =~ /PROTO=UDP\s/) {
         $is_udp = 1;
+        $proto_str  = 'udp';
     } elsif ($pkt_str =~ /PROTO=(\d+)\s/) {
         $proto_num = $1;
         $is_proto_num = 1;
@@ -1638,6 +1644,11 @@ sub parse_NF_pkt_str() {
         print STDERR "[-] err packet: unrecognized protocol\n" if $debug;
         return $PKT_ERROR;
     }
+
+    ### see if we need to ignore this packet based on the
+    ### IGNORE_PROTOCOLS config keyword.
+    return $PKT_IGNORE if &check_ignore_proto($proto_str,
+            $proto_num, $is_proto_num);
 
     if ($is_tcp) {
         if ($is_ipv6) {
@@ -1779,10 +1790,6 @@ sub parse_NF_pkt_str() {
         }
 
         ### see if we need to ignore this packet based on the
-        ### IGNORE_PROTOCOLS config keyword.
-        return $PKT_IGNORE if &check_ignore_proto($pkt_hr->{'proto'});
-
-        ### see if we need to ignore this packet based on the
         ### IGNORE_PORTS config keyword
         return $PKT_IGNORE if &check_ignore_port($pkt_hr->{'dp'},
                 $pkt_hr->{'proto'});
@@ -1861,10 +1868,6 @@ sub parse_NF_pkt_str() {
                 return $PKT_ERROR;
             }
         }
-
-        ### see if we need to ignore this packet based on the
-        ### IGNORE_PROTOCOLS config keyword.
-        return $PKT_IGNORE if &check_ignore_proto($pkt_hr->{'proto'});
 
         ### see if we need to ignore this packet based on the
         ### IGNORE_PORTS config keyword
@@ -1953,10 +1956,6 @@ sub parse_NF_pkt_str() {
             }
         }
 
-        ### see if we need to ignore this packet based on the
-        ### IGNORE_PROTOCOLS config keyword.
-        return $PKT_IGNORE if &check_ignore_proto($pkt_hr->{'proto'});
-
         if ($config{'ENABLE_DSHIELD_ALERTS'} eq 'Y'
                 and not $benchmark
                 and not $analyze_mode) {
@@ -2020,11 +2019,16 @@ sub parse_NF_pkt_str() {
 }
 
 sub check_ignore_proto() {
-    my $pkt_proto = shift;
+    my ($proto_str, $proto_num, $is_proto_num) = @_;
 
     return 0 unless %ignore_protocols;
 
-    return 1 if defined $ignore_protocols{$pkt_proto};
+    if ($is_proto_num) {
+        return 1 if defined $ignore_protocols{$proto_num};
+    } else {
+        return 1 if defined $ignore_protocols{$proto_str};
+    }
+
     return 0;
 }
 

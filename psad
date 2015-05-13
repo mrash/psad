@@ -5271,7 +5271,7 @@ sub scan_logr() {
         print "    This may take a while...\n" if ((keys %$curr_scan_hr) > 1000);
         if ($analysis_emails) {
             print "[+] Generating email alerts...\n";
-            unless ($no_whois) {
+            unless ($no_whois or $config{'ENABLE_WHOIS_LOOKUPS'} eq 'N') {
                 print "[+] Issuing whois lookups (may take several seconds).\n";
             }
         }
@@ -5497,7 +5497,7 @@ sub scan_logr() {
             ### get reverse dns info
             $src_subj = $src;
             $dst_subj = $dst;
-            unless ($no_rdns) {
+            unless ($no_rdns or $config{'ENABLE_DNS_LOOKUPS'} eq 'N') {
                 $src_dns_str = &get_dns_info($src);
                 if ($src_dns_str) {
                     $src_subj = $src_dns_str;
@@ -5514,7 +5514,7 @@ sub scan_logr() {
 
             ### get whois info
             my $whois_which_ip_str = 'source IP';
-            unless ($no_whois) {
+            unless ($no_whois or $config{'ENABLE_WHOIS_LOOKUPS'} eq 'N') {
                 my $lookup_ip = $src;  ### default
 
                 ### we're most likely interested in the whois information for
@@ -5666,7 +5666,7 @@ sub scan_logr() {
             $scan_style_str =~ s/\,$//;
             printf $fh "\n%${log_len}s%s\n", 'Source: ', $src;
             printf $fh "%${log_len}s%s\n", 'DNS: ', $src_dns_str
-                unless $no_rdns;
+                unless $no_rdns or $config{'ENABLE_DNS_LOOKUPS'} eq 'N';
             if ($config{'ENABLE_MAC_ADDR_REPORTING'} eq 'Y') {
                 printf $fh "%${log_len}s%s\n", 'MAC: ', $src_mac
                     if $src_mac;
@@ -5702,7 +5702,7 @@ sub scan_logr() {
             }
             printf $fh "\n%${log_len}s%s\n", 'Destination: ', $dst;
             printf $fh "%${log_len}s%s\n", 'DNS: ', $dst_dns_str
-                unless $no_rdns;
+                unless $no_rdns or $config{'ENABLE_DNS_LOOKUPS'} eq 'N';
             if ($config{'ENABLE_MAC_ADDR_REPORTING'} eq 'Y') {
                 printf $fh "%${log_len}s%s\n", 'MAC: ', $dst_mac
                     if $dst_mac;
@@ -5781,7 +5781,7 @@ sub scan_logr() {
 
             &sys_log($syslog_str);
 
-            unless ($no_whois) {
+            unless ($no_whois or $config{'ENABLE_WHOIS_LOOKUPS'} eq 'N') {
                 print $fh "\n[+] Whois Information ($whois_which_ip_str):\n";
                 for my $line (@$whois_info_ar) {
                     print $fh $line;
@@ -10856,7 +10856,7 @@ sub defined_vars() {
 sub check_commands() {
     my $exceptions_hr = shift;
 
-    if ($no_whois) {
+    if ($no_whois or $config{'ENABLE_WHOIS_LOOKUPS'} eq 'N') {
         $exceptions_hr->{'whois'} = '';
     } else {
         unless (defined $cmds{'whois'}
@@ -10918,7 +10918,7 @@ sub check_commands() {
         }
     }
 
-    unless ($no_whois) {
+    unless ($no_whois or $config{'ENABLE_WHOIS_LOOKUPS'} eq 'N') {
         ### disable whois lookups if a suitable whois client could not
         ### be found.
         unless (defined $cmds{'whois'}
@@ -11248,7 +11248,8 @@ sub required_vars() {
         ENABLE_PSADWATCHD ENABLE_EXT_BLOCK_SCRIPT_EXEC EXTERNAL_BLOCK_SCRIPT
         ENABLE_FIREWALLD ENABLE_FW_MSG_READ_CMD FW_MSG_READ_CMD
         FW_MSG_READ_CMD_ARGS USE_FW_MSG_READ_CMD_ARGS CUSTOM_SYSLOG_TS_RE
-        ENABLE_CUSTOM_SYSLOG_TS_RE FW_MSG_READ_MIN_PKTS
+        ENABLE_CUSTOM_SYSLOG_TS_RE FW_MSG_READ_MIN_PKTS ENABLE_DNS_LOOKUPS
+        ENABLE_WHOIS_LOOKUPS
     ));
     &defined_vars(\@required_vars);
     return;

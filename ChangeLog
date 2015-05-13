@@ -1,6 +1,10 @@
 psad-2.4.1 (05/13/2015):
     - Bug fix to honor the IGNORE_PROTOCOLS configuration variable for
       non-tcp/udp/icmp protocols. This bug was reported by Paul Versloot.
+      Also extended the IGNORE_PROTOCOLS feature to match on both protocol
+      name and number as well regardless of what iptables reports within log
+      messages. This is so the user does not have to know what iptables will
+      report (which can be inconsistent, e.g. 'TCP' vs. '2' for IGMP).
     - Added two configuration variables ENABLE_WHOIS_LOOKUPS and
       ENABLE_DNS_LOOKUPS (set to 'Y' by default) to allow whois and reverse
       DNS lookups to be controlled from the command line.

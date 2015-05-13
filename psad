@@ -3936,8 +3936,18 @@ sub parse_ignore_protocols() {
             if ($proto =~ /^\d+$/) {
                 ### IP protocol number
                 $ignore_protocols{$proto} = '';
+                ### add the string as well
+                $ignore_protocols{lc($protocol_strings{$proto}{'name'})} = ''
+                    if defined $protocol_strings{$proto};
             } else {
                 $ignore_protocols{lc($proto)} = '';
+                ### try to add the number as well
+                for my $proto_num (keys %protocol_strings) {
+                    if ($proto eq lc($protocol_strings{$proto_num}{'name'})) {
+                        $ignore_protocols{$proto_num} = '';
+                        last;
+                    }
+                }
             }
         }
     }

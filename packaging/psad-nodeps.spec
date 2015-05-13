@@ -1,5 +1,5 @@
 %define name psad
-%define version 2.4.0
+%define version 2.4.1
 %define release 1
 %define psadlogdir /var/log/psad
 %define psadrundir /var/run/psad
@@ -155,6 +155,9 @@ fi
 %config(noreplace) %_sysconfdir/%name/icmp6_types
 
 %changelog
+* Wed May 13 2015 Michael Rash <mbr@cipherdyne.org>
+- psad-2.4.1 release
+
 * Wed Mar 18 2015 Michael Rash <mbr@cipherdyne.org>
 - psad-2.4.0 release
 

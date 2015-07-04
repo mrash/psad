@@ -6241,7 +6241,9 @@ sub renew_auto_blocked_ips() {
                         &sys_log("renewing tcpwrappers auto-block " .
                             "against $ip $timeout_str");
                         &tcpwr_block($ip);
-                        if ($config{'ENABLE_RENEW_BLOCK_EMAILS'} eq 'Y') {
+                        if ($config{'ENABLE_RENEW_BLOCK_EMAILS'} eq 'Y'
+                                and defined $scan_dl{$ip}
+                                and $scan_dl{$ip} >= $config{'EMAIL_ALERT_DANGER_LEVEL'}) {
                             &send_mail("$config{'MAIL_STATUS_PREFIX'} RENEWED " .
                                 "tcpwrappers BLOCK against $ip $timeout_str", '',
                                 $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
@@ -6269,7 +6271,9 @@ sub renew_auto_blocked_ips() {
                             &sys_log("renewing tcpwrappers auto-block " .
                                 "against $ip $timeout_str");
                             &tcpwr_block($ip);
-                            if ($config{'ENABLE_RENEW_BLOCK_EMAILS'} eq 'Y') {
+                            if ($config{'ENABLE_RENEW_BLOCK_EMAILS'} eq 'Y'
+                                    and defined $scan_dl{$ip}
+                                    and $scan_dl{$ip} >= $config{'EMAIL_ALERT_DANGER_LEVEL'}) {
                                 &send_mail("$config{'MAIL_STATUS_PREFIX'} RENEWED " .
                                     "tcpwrappers BLOCK against $ip $timeout_str", '',
                                     $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
@@ -6577,13 +6581,18 @@ sub ipt_block() {
 
         if ($config{'ENABLE_AUTO_IDS_EMAILS'} eq 'Y') {
             if ($renewed_status) {
-                if ($config{'ENABLE_RENEW_BLOCK_EMAILS'} eq 'Y') {
+                if ($config{'ENABLE_RENEW_BLOCK_EMAILS'} eq 'Y'
+                        and defined $scan_dl{$ip}
+                        and $scan_dl{$ip} >= $config{'EMAIL_ALERT_DANGER_LEVEL'}) {
                     &send_mail("$config{'MAIL_STATUS_PREFIX'} $mail_msg",
                         '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
                 }
             } else {
-                &send_mail("$config{'MAIL_STATUS_PREFIX'} $mail_msg", '',
-                    $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+                if (defined $scan_dl{$ip}
+                        and $scan_dl{$ip} >= $config{'EMAIL_ALERT_DANGER_LEVEL'}) {
+                    &send_mail("$config{'MAIL_STATUS_PREFIX'} $mail_msg", '',
+                        $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+                }
             }
         }
         &sys_log($mail_msg);
@@ -6674,7 +6683,9 @@ sub ipt_rm_block() {
             ### don't send timeout email if we are manually flushing
             ### the auto-block rules from the command line with --Flush.
             &sys_log("removed iptables auto-block against $ip");
-            if ($config{'ENABLE_AUTO_IDS_EMAILS'} eq 'Y') {
+            if ($config{'ENABLE_AUTO_IDS_EMAILS'} eq 'Y'
+                    and defined $scan_dl{$ip}
+                    and $scan_dl{$ip} >= $config{'EMAIL_ALERT_DANGER_LEVEL'}) {
                 &send_mail("$config{'MAIL_STATUS_PREFIX'} removed " .
                     "iptables block against $ip", '',
                     $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
@@ -6929,7 +6940,9 @@ sub tcpwr_rm_block() {
         chomp $line;
         if ($line =~ /ALL:\s+$ip$/) {
             &diskwrite_rm_blocked_ip($ip, $config{'AUTO_BLOCK_TCPWR_FILE'});
-            if ($config{'ENABLE_AUTO_IDS_EMAILS'} eq 'Y') {
+            if ($config{'ENABLE_AUTO_IDS_EMAILS'} eq 'Y'
+                    and defined $scan_dl{$ip}
+                    and $scan_dl{$ip} >= $config{'EMAIL_ALERT_DANGER_LEVEL'}) {
                 &send_mail("$config{'MAIL_STATUS_PREFIX'} removed " .
                     "tcpwrappers block against $ip (timeout expired).", '',
                     $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
@@ -6998,7 +7011,9 @@ sub auto_psad_response() {
             if ($config{'TCPWRAPPERS_BLOCK_METHOD'} eq 'Y') {
                 &sys_log('initiating tcpwrappers auto-block ' .
                     "against $src $timeout_str");
-                if ($config{'ENABLE_AUTO_IDS_EMAILS'} eq 'Y') {
+                if ($config{'ENABLE_AUTO_IDS_EMAILS'} eq 'Y'
+                        and defined $scan_dl{$src}
+                        and $scan_dl{$src} >= $config{'EMAIL_ALERT_DANGER_LEVEL'}) {
                     &send_mail("$config{'MAIL_STATUS_PREFIX'} " .
                         "tcpwrappers AUTO-BLOCK against $src $timeout_str",
                         '', $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});

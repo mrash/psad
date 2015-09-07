@@ -117,7 +117,7 @@ sub ip6tables_tests() {
 
     if ($rules_file) {
         if ($skip_ipt_exec_check) {
-            &logr("\n[+] Running $iptables_bin $rules_file " .
+            &logr("\n[+] Running $ip6tables_bin $rules_file " .
                 "(skip ipt exec check) tests...\n");
         } else {
             &logr("\n[+] Running $ip6tables_bin $rules_file tests...\n");

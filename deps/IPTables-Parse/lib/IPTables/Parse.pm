@@ -7,7 +7,7 @@
 #
 # Author: Michael Rash (mbr@cipherdyne.org)
 #
-# Version: 1.4
+# Version: 1.5
 #
 ##################################################################
 #
@@ -21,7 +21,7 @@ use strict;
 use warnings;
 use vars qw($VERSION);
 
-$VERSION = '1.4';
+$VERSION = '1.5';
 
 sub new() {
     my $class = shift;
@@ -36,8 +36,8 @@ sub new() {
         _firewall_cmd    => $args{'firewall-cmd'} || '',
         _fwd_args        => $args{'fwd_args'}     || '--direct --passthrough ipv4',
         _ipv6            => $args{'use_ipv6'}     || 0,
-        _iptout          => $args{'iptout'}       || '/tmp/ipt.out',
-        _ipterr          => $args{'ipterr'}       || '/tmp/ipt.err',
+        _iptout          => $args{'iptout'}       || '/tmp/ipt.out' . $$,
+        _ipterr          => $args{'ipterr'}       || '/tmp/ipt.err' . $$,
         _ipt_alarm       => $args{'ipt_alarm'}    || 30,
         _debug           => $args{'debug'}        || 0,
         _verbose         => $args{'verbose'}      || 0,
@@ -129,6 +129,18 @@ sub new() {
     $self->{'parse_keys'} = &parse_keys();
 
     bless $self, $class;
+}
+
+sub DESTROY {
+    my $self = shift;
+
+    ### clean up tmp files
+    unless ($self->{'_debug'}) {
+        unlink $self->{'_iptout'};
+        unlink $self->{'_ipterr'};
+    }
+
+    return;
 }
 
 sub parse_keys() {
@@ -228,6 +240,7 @@ sub parse_keys() {
                 'ipt_match'  => '-m length --length',
             },
         },
+        'rule_num' => '',
         'raw' => ''
     );
 
@@ -259,7 +272,7 @@ sub list_table_chains() {
     }
 
     for (@ipt_lines) {
-        if (/^\s*Chain\s+(\w+)/) {
+        if (/^\s*Chain\s(.*?)\s\(/) {
             push @chains, $1;
         }
     }
@@ -335,7 +348,7 @@ sub chain_rules() {
         close F;
     } else {
         my ($rv, $out_ar, $err_ar) = $self->exec_iptables(
-                "$self->{'_cmd'} -t $table -v -n -L $chain");
+                "$self->{'_cmd'} -t $table -v -n -L $chain --line-numbers");
         @ipt_lines = @$out_ar;
     }
 
@@ -343,39 +356,82 @@ sub chain_rules() {
     ### policy data came from a file then -v might not have been used)
     my $ipt_verbose = 0;
     for my $line (@ipt_lines) {
-        if ($line =~ /^\s*pkts\s+bytes\s+target/) {
+        if ($line =~ /\spkts\s+bytes\s+target/) {
             $ipt_verbose = 1;
             last;
         }
     }
+    my $has_line_numbers = 0;
+    for my $line (@ipt_lines) {
+        if ($line =~ /^num\s+pkts\s+bytes\s+target/) {
+            $has_line_numbers = 1;
+            last;
+        }
+    }
+
+    my $rule_num = 0;
 
     LINE: for my $line (@ipt_lines) {
         chomp $line;
 
         last LINE if ($found_chain and $line =~ /^\s*Chain\s+/);
 
-        if ($line =~ /^\s*Chain\s+$chain\s+\(/i) {
+        if ($line =~ /^\s*Chain\s\Q$chain\E\s\(/i) {
             $found_chain = 1;
             next LINE;
         }
-        if ($ipt_verbose) {
-            next LINE if $line =~ /^\s*pkts\s+bytes\s+target\s/i;
-        } else {
-            next LINE if $line =~ /^\s*target\s+prot/i;
-        }
+        next LINE if $line =~ /\starget\s{2,}prot/i;
         next LINE unless $found_chain;
         next LINE unless $line;
+
+        ### track the rule number independently of --line-numbers,
+        ### but the values should always match
+        $rule_num++;
 
         ### initialize hash
         my %rule = (
             'extended' => '',
-            'raw'      => $line
+            'raw'      => $line,
+            'rule_num' => $rule_num
         );
         for my $key (keys %{$self->{'parse_keys'}->{'regular'}}) {
             $rule{$key} = '';
         }
         for my $key (keys %{$self->{'parse_keys'}->{'extended'}}) {
             $rule{$key} = '';
+        }
+
+        my $rule_body = '';
+        my $packets   = '';
+        my $bytes     = '';
+        my $rnum      = '';
+
+        if ($ipt_verbose) {
+            if ($has_line_numbers) {
+                if ($line =~ /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(.*)/) {
+                    $rnum      = $1;
+                    $packets   = $2;
+                    $bytes     = $3;
+                    $rule_body = $4;
+                }
+            } else {
+                if ($line =~ /^\s*(\d+)\s+(\d+)\s+(.*)/) {
+                    $packets   = $1;
+                    $bytes     = $2;
+                    $rule_body = $3;
+                }
+            }
+        } else {
+            if ($has_line_numbers) {
+                if ($line =~ /^\s*(\d+)\s+(\d+)\s+(.*)/) {
+                    $rnum      = $1;
+                    $rule_body = $2;
+                }
+            }
+        }
+
+        if ($rnum and $rnum ne $rule_num) {
+            croak "[*] Rule number mis-match.";
         }
 
         if ($ipt_verbose) {
@@ -391,26 +447,28 @@ sub chain_rules() {
             ### 0     0 ACCEPT  tcp   *   *   ::/0     fe80::aa:0:1/128    tcp dpt:12345
             ### 0     0 LOG     all   *   *   ::/0     ::/0                LOG flags 0 level 4
 
-            my $match_re = qr/^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+\-\-\s+
+            my $match_re = qr/^(\S+)\s+(\S+)\s+\-\-\s+
                                 (\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*(.*)/x;
 
             if ($self->{'_ipt_bin_name'} eq 'ip6tables'
                     or ($self->{'_ipt_bin_name'} eq 'firewall-cmd'
                     and $self->{'_fwd_args'} =~ /\sipv6/)) {
-                $match_re = qr/^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+
+                $match_re = qr/^(\S+)\s+(\S+)\s+
                                 (\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*(.*)/x;
             }
 
-            if ($line =~ $match_re) {
-                $rule{'packets'}  = $1;
-                $rule{'bytes'}    = $2;
-                $rule{'target'}   = $3;
-                $rule{'protocol'} = $rule{'proto'} = lc($4);
-                $rule{'intf_in'}  = $5;
-                $rule{'intf_out'} = $6;
-                $rule{'src'}      = $7;
-                $rule{'dst'}      = $8;
-                $rule{'extended'} = $9 || '';
+            if ($rule_body =~ $match_re) {
+                $rule{'packets'}  = $packets;
+                $rule{'bytes'}    = $bytes;
+                $rule{'target'}   = $1;
+                my $proto = $2;
+                $proto = 'all' if $proto eq '0';
+                $rule{'protocol'} = $rule{'proto'} = lc($proto);
+                $rule{'intf_in'}  = $3;
+                $rule{'intf_out'} = $4;
+                $rule{'src'}      = $5;
+                $rule{'dst'}      = $6;
+                $rule{'extended'} = $7 || '';
 
                 &parse_rule_extended(\%rule, $self->{'parse_keys'}->{'extended'});
             }
@@ -433,19 +491,19 @@ sub chain_rules() {
             ### ACCEPT     tcp   ::/0     fe80::aa:0:1/128    tcp dpt:12345
             ### LOG        all   ::/0     ::/0                LOG flags 0 level 4
 
-            my $match_re = qr/^\s*(\S+)\s+(\S+)\s+\-\-\s+(\S+)\s+(\S+)\s*(.*)/;
+            my $match_re = qr/^(\S+)\s+(\S+)\s+\-\-\s+(\S+)\s+(\S+)\s*(.*)/;
 
             if ($self->{'_ipt_bin_name'} eq 'ip6tables'
                     or ($self->{'_ipt_bin_name'} eq 'firewall-cmd'
                     and $self->{'_fwd_args'} =~ /\sipv6/)) {
-                $match_re = qr/^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*(.*)/;
+                $match_re = qr/^(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*(.*)/;
             }
 
-            if ($line =~ $match_re) {
+            if ($rule_body =~ $match_re) {
                 $rule{'target'}   = $1;
                 my $proto = $2;
                 $proto = 'all' if $proto eq '0';
-                $rule{'protocol'} = $rule{'proto'} = $proto;
+                $rule{'protocol'} = $rule{'proto'} = lc($proto);
                 $rule{'src'}      = $3;
                 $rule{'dst'}      = $4;
                 $rule{'extended'} = $5 || '';
@@ -722,7 +780,7 @@ sub sub_chains() {
         chomp $line;
         ### Chain INPUT (policy DROP)
         ### Chain fwsnort_INPUT_eth1 (1 references)
-        if ($line =~ /^\s*Chain\s+$start_chain\s+\(/ and
+        if ($line =~ /^\s*Chain\s+\Q$start_chain\E\s+\(/ and
                 $line !~ /0\s+references/) {
             $found = 1;
             next;
@@ -770,6 +828,12 @@ sub exec_iptables() {
         unless $cmd =~ m|^\s*iptables| or $cmd =~ m|^\S+/iptables|
             or $cmd =~ m|^\s*ip6tables| or $cmd =~ m|^\S+/ip6tables|
             or $cmd =~ m|^\s*firewall-cmd| or $cmd =~ m|^\S+/firewall-cmd|;
+
+    ### sanitize $cmd - this is not bullet proof, but better than
+    ### nothing (especially for strange iptables chain names). Further,
+    ### quotemeta() is too aggressive since things like IPv6 addresses
+    ### contain ":" chars, etc.
+    $cmd =~ s/([;<>\$\|`\@&\(\)\[\]\{\}])/\\$1/g;
 
     my $rv = 1;
     my @stdout = ();
@@ -1113,6 +1177,7 @@ Source control is provided by git:
 Thanks to the following people:
 
   Franck Joncourt <franck.mail@dthconnex.com>
+  Stuart Schneider
   Grant Ferley
   Fabien Mazieres
 
@@ -1124,7 +1189,7 @@ this address if there are any questions, comments, or bug reports.
 
 =head1 VERSION
 
-Version 1.4 (February, 2015)
+Version 1.5 (Septebmer, 2015)
 
 =head1 COPYRIGHT AND LICENSE
 

@@ -16,6 +16,8 @@ my $test_install_dir = 'psad-install';
 my $syn_scan_file  = 'syn_scan_1000_1500';
 my $topera_syn_scan_file = 'topera_ipv6_syn_scan_no_ip_opts';
 my $topera_syn_scan_with_opts_file = 'topera_ipv6_syn_scan_with_ip_opts';
+my $syn_scan_localhost_file = 'syn_scan_1000_1500_localhost';
+my $syn_scan_zeroip_file = 'syn_scan_1000_1500_zeroip';
 my $fin_scan_file  = 'fin_scan_1000_1150';
 my $xmas_scan_file = 'xmas_scan_1000_1150';
 my $null_scan_file = 'null_scan_1000_1150';
@@ -546,6 +548,37 @@ my @tests = (
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv4 <BLOCK> skipping 127.0.0.1',
+        'err_msg'   => 'blocked localhost',
+        'positive_output_matches' => [qr/Skipping\sIP.*from\sauto/i,
+         ],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_auto_dl_file " .
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_localhost_file -c $auto_dl5_blocking_conf " .
+                "$normal_root_override_str --analysis-auto-block",
+        'auto_block_test' => $YES,
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv4 <BLOCK> skipping 0.0.0.0',
+        'err_msg'   => 'blocked localhost',
+        'positive_output_matches' => [qr/Skipping\sIP.*from\sauto/i,
+         ],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_auto_dl_file " .
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_zeroip_file -c $auto_dl5_blocking_conf " .
+                "$normal_root_override_str --analysis-auto-block",
+        'auto_block_test' => $YES,
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+
     {
         'category'  => 'operations',
         'detail'    => 'IPv4 <BLOCK> SYN scan',

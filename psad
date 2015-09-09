@@ -7056,7 +7056,7 @@ sub auto_block_ignore_ip() {
     ### matching the following two addresses is less likely (assuming
     ### iptables is not logging traffic from localhost) than matching
     ### a legitimate interface address
-    if ($ip eq '127.0.0.1' or $ip eq '0.0.0.0') {
+    if ($ip eq '127.0.0.1' or $ip eq '0.0.0.0' or $ip eq '0.0.0.0/0') {
         print STDERR "[+] Skipping IP $ip from auto-block.\n"
             if $debug;
         return 1;

@@ -15,6 +15,7 @@ my $dummy_path      = '/bin/invalidpath';
 
 my $logfile        = 'test.log';
 my $ipt_rules_file = 'ipt_rules.tmp';
+my $basic_ipv4_rules_file = 'basic_ipv4.rules';
 my $PRINT_LEN = 68;
 #================== end config ===================
 
@@ -63,7 +64,7 @@ my %ip6tables_chains = (
 
 my $passed = 0;
 my $failed = 0;
-my $executed = 0;
+my $executed = 1;
 
 my $SKIP_IPT_EXEC_CHECK = 1;
 my $IPT_EXEC_CHECK = 0;
@@ -71,6 +72,7 @@ my $IPT_EXEC_CHECK = 0;
 &init();
 
 ### main testing routines
+&parse_basic_ipv4_policy();
 &iptables_tests('', $IPT_EXEC_CHECK);
 &iptables_tests($ipt_rules_file, $IPT_EXEC_CHECK);
 &iptables_tests($ipt_rules_file, $SKIP_IPT_EXEC_CHECK);
@@ -218,6 +220,32 @@ sub chain_policy_tests() {
             }
         }
     }
+
+    return;
+}
+
+sub parse_basic_ipv4_policy() {
+
+    $ipt_opts{'ipt_rules_file'} = $basic_ipv4_rules_file;
+
+    &logr("\n[+] Running basic IPv4 chain_rules() parse test...\n");
+    &dots_print("parse $basic_ipv4_rules_file via chain_rules()");
+
+    my $ipt_obj = IPTables::Parse->new(%ipt_opts)
+        or die "[*] Could not acquire IPTables::Parse object";
+
+    my $rules_ar = $ipt_obj->chain_rules('filter', 'INPUT');
+
+    if ($#$rules_ar > -1) {
+        &logr("pass ($executed)\n");
+        $passed++;
+    } else {
+        &logr("fail ($executed)\n");
+        $failed++;
+    }
+    $executed++;
+
+    $ipt_opts{'ipt_rules_file'} = '';
 
     return;
 }

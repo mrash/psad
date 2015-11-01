@@ -1,5 +1,17 @@
 Revision history for Perl extension IPTables::Parse.
 
+1.6 Sat Nov 07 08:45:15 2015
+    - (Miloslav Trmač) Fixed a vulnerability to not use predictable names for
+      temporary files. This vulnerability would allow an attacker on a multi-
+      user system to set up symlinks to overwrite any file the current user has
+      write access to. If a user manually overrides the temporary file
+      locations with the 'iptout' and 'ipterr' hash keys, it is recommended to
+      not use predictable names either.
+    - Updated to use the '-w' argument on the iptables command line (a test is
+      performed to see if it is supported). This acquires an exclusive lock on
+      iptables command execution. This can be disable by the user if necessary
+      by setting the new lockless_ipt_exec hash key.
+
 1.5 Mon Sep 07 20:18:16 2015
     - Bug fix to support additional characters in iptables chain names such as
       dashes and special characters. Stuart Schneider reported this bug and

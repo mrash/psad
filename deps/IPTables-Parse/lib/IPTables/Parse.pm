@@ -7,7 +7,7 @@
 #
 # Author: Michael Rash (mbr@cipherdyne.org)
 #
-# Version: 1.5
+# Version: 1.6
 #
 ##################################################################
 #
@@ -17,11 +17,12 @@ package IPTables::Parse;
 use 5.006;
 use POSIX ":sys_wait_h";
 use Carp;
+use File::Temp;
 use strict;
 use warnings;
 use vars qw($VERSION);
 
-$VERSION = '1.5';
+$VERSION = '1.6';
 
 sub new() {
     my $class = shift;
@@ -36,8 +37,8 @@ sub new() {
         _firewall_cmd    => $args{'firewall-cmd'} || '',
         _fwd_args        => $args{'fwd_args'}     || '--direct --passthrough ipv4',
         _ipv6            => $args{'use_ipv6'}     || 0,
-        _iptout          => $args{'iptout'}       || '/tmp/ipt.out' . $$,
-        _ipterr          => $args{'ipterr'}       || '/tmp/ipt.err' . $$,
+        _iptout          => $args{'iptout'}       || mktemp('/tmp/ipt.out.XXXXXX'),
+        _ipterr          => $args{'ipterr'}       || mktemp('/tmp/ipt.err.XXXXXX'),
         _ipt_alarm       => $args{'ipt_alarm'}    || 30,
         _debug           => $args{'debug'}        || 0,
         _verbose         => $args{'verbose'}      || 0,
@@ -45,7 +46,8 @@ sub new() {
         _ipt_exec_style  => $args{'ipt_exec_style'}  || 'waitpid',
         _ipt_exec_sleep  => $args{'ipt_exec_sleep'}  || 0,
         _sigchld_handler => $args{'sigchld_handler'} || \&REAPER,
-        _skip_ipt_exec_check => $args{'skip_ipt_exec_check'} || 0
+        _skip_ipt_exec_check => $args{'skip_ipt_exec_check'} || 0,
+        _lockless_ipt_exec   => $args{'lockless_ipt_exec'}   || 0,
     };
 
     if ($self->{'_skip_ipt_exec_check'}) {
@@ -124,6 +126,16 @@ sub new() {
     $self->{'_cmd'} = $self->{'_iptables'};
     if ($self->{'_firewall_cmd'}) {
         $self->{'_cmd'} = "$self->{'_firewall_cmd'} $self->{'_fwd_args'}";
+    }
+
+    unless ($self->{'_skip_ipt_exec_check'}) {
+        unless ($self->{'_lockless_ipt_exec'}) {
+            ### now that we have the iptables command defined, see whether
+            ### it supports -w to acquire an exclusive lock
+            my ($rv, $out_ar, $err_ar) = &exec_iptables($self,
+                "$self->{'_cmd'} -w -t filter -n -L INPUT");
+            $self->{'_cmd'} .= ' -w' if $rv;
+        }
     }
 
     $self->{'parse_keys'} = &parse_keys();
@@ -329,6 +341,9 @@ sub chain_rules() {
     my $found_chain  = 0;
     my @ipt_lines = ();
 
+    my $fh = *STDERR;
+    $fh = *STDOUT if $self->{'_verbose'};
+
     ### only used for IPv4 + NAT
     my $ip_re = qr|(?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2}|;
 
@@ -408,14 +423,14 @@ sub chain_rules() {
 
         if ($ipt_verbose) {
             if ($has_line_numbers) {
-                if ($line =~ /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(.*)/) {
+                if ($line =~ /^\s*(\d+)\s+(\S+)\s+(\S+)\s+(.*)/) {
                     $rnum      = $1;
                     $packets   = $2;
                     $bytes     = $3;
                     $rule_body = $4;
                 }
             } else {
-                if ($line =~ /^\s*(\d+)\s+(\d+)\s+(.*)/) {
+                if ($line =~ /^\s*(\S+)\s+(\S+)\s+(.*)/) {
                     $packets   = $1;
                     $bytes     = $2;
                     $rule_body = $3;
@@ -423,10 +438,14 @@ sub chain_rules() {
             }
         } else {
             if ($has_line_numbers) {
-                if ($line =~ /^\s*(\d+)\s+(\d+)\s+(.*)/) {
+                if ($line =~ /^\s*(\d+)\s+(.*)/) {
                     $rnum      = $1;
                     $rule_body = $2;
                 }
+            } else {
+                $rule_body = $line;
+                $rnum      = $rule_num;
+                $rnum      = $rule_num;
             }
         }
 
@@ -471,6 +490,10 @@ sub chain_rules() {
                 $rule{'extended'} = $7 || '';
 
                 &parse_rule_extended(\%rule, $self->{'parse_keys'}->{'extended'});
+            } else {
+                if ($self->{'_debug'}) {
+                    print $fh localtime() . "     -v Did not match parse regex: $line\n";
+                }
             }
         } else {
 
@@ -509,6 +532,10 @@ sub chain_rules() {
                 $rule{'extended'} = $5 || '';
 
                 &parse_rule_extended(\%rule, $self->{'parse_keys'}->{'extended'});
+            } else {
+                if ($self->{'_debug'}) {
+                    print $fh localtime() . "     Did not match parse regex: $line\n";
+                }
             }
         }
         push @chain, \%rule;
@@ -980,8 +1007,6 @@ IPTables::Parse - Perl extension for parsing iptables and ip6tables policies
       'use_ipv6' => 0,         # can set to 1 to force ip6tables usage
       'ipt_rules_file' => '',  # optional file path from
                                # which to read iptables rules
-      'iptout'   => '/tmp/iptables.out',
-      'ipterr'   => '/tmp/iptables.err',
       'debug'    => 0,
       'verbose'  => 0
   );
@@ -1057,18 +1082,19 @@ Note that if you initialize the IPTables::Parse object with the 'ipt_rules_file'
 key, then all parsing routines will open the specified file for iptables rules
 data. So, you can create this file with a command like
 'iptables -t filter -nL -v > ipt.rules', and then initialize the object with
-IPTables::Parse->new({'ipt_rules_file'=>'ipt.rules'}). Further, if you are
+IPTables::Parse->new('ipt_rules_file' => 'ipt.rules'). Further, if you are
 running on a system without iptables installed, but you have an iptables policy
 written to the ipt.rules file, then you can pass in 'skip_ipt_exec_check=>1'
 in order to analyze the file without having IPTables::Parse check for the
 iptables binary.
 
 In summary, in addition to the hash keys mentioned above, optional keys that
-can be passed to new() include '_iptables' (set path to iptables binary),
-'_firewall_cmd' (set path to 'firewall-cmd' binary for systems with
-'firewalld'), '_fwd_args' (set 'firewall-cmd' usage args; defaults to
-'--direct --passthrough ipv4'), '_ipv6' (set IPv6 mode for ip6tables),
-'_debug' and '_verbose'.
+can be passed to new() include 'iptables' (set path to iptables binary),
+'firewall_cmd' (set path to 'firewall-cmd' binary for systems with
+'firewalld'), 'fwd_args' (set 'firewall-cmd' usage args; defaults to
+'--direct --passthrough ipv4'), 'ipv6' (set IPv6 mode for ip6tables),
+'debug', 'verbose', and 'lockless_ipt_exec' (disable usage of the iptables
+'-w' argument that acquires an exclusive lock on command execution).
 
 =head1 FUNCTIONS
 
@@ -1180,6 +1206,7 @@ Thanks to the following people:
   Stuart Schneider
   Grant Ferley
   Fabien Mazieres
+  Miloslav Trmač
 
 =head1 AUTHOR
 
@@ -1189,7 +1216,7 @@ this address if there are any questions, comments, or bug reports.
 
 =head1 VERSION
 
-Version 1.5 (Septebmer, 2015)
+Version 1.6 (November, 2015)
 
 =head1 COPYRIGHT AND LICENSE
 

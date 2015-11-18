@@ -3352,8 +3352,9 @@ sub psad_init() {
     if ($config{'ENABLE_FIREWALLD'} eq 'N') {
         $ipt_opts{'iptables'} = $cmds{'iptables'};
     }
-    $ipt_opts{'iptout'} = $config{'IPT_OUTPUT_FILE'};
-    $ipt_opts{'ipterr'} = $config{'IPT_ERROR_FILE'};
+    $ipt_opts{'tmpdir'}     = $config{'PSAD_DIR'};
+    $ipt_opts{'iptout_pat'} = $config{'IPT_OUTPUT_PATTERN'};
+    $ipt_opts{'ipterr_pat'} = $config{'IPT_ERROR_PATTERN'};
 
     $ipt_opts{'debug'}   = 1 if $debug;
     $ipt_opts{'verbose'} = 1 if $verbose;
@@ -11248,7 +11249,7 @@ sub required_vars() {
         PSAD_DIR PSAD_RUN_DIR PSAD_FIFO_DIR ENABLE_FW_LOGGING_CHECK
         ENABLE_RENEW_BLOCK_EMAILS DSHIELD_EMAIL_FILE AUTO_BLOCK_REGEX
         ENABLE_AUTO_IDS_REGEX IPTABLES_PREREQ_CHECK SNORT_RULE_DL_FILE
-        IPT_OUTPUT_FILE IPT_ERROR_FILE PROC_FORWARD_FILE PSAD_CONF_DIR
+        IPT_OUTPUT_PATTERN IPT_ERROR_PATTERN PROC_FORWARD_FILE PSAD_CONF_DIR
         EXTERNAL_NET HTTP_SERVERS SMTP_SERVERS DNS_SERVERS SQL_SERVERS
         TELNET_SERVERS AIM_SERVERS HTTP_PORTS SHELLCODE_PORTS
         ORACLE_PORTS ENABLE_INTF_LOCAL_NETS ENABLE_SNORT_SIG_STRICT

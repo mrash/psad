@@ -1,12 +1,16 @@
 Revision history for Perl extension IPTables::Parse.
 
-1.6.1 Sat Nov 21 10:45:15 2015
+1.6.1 Fri Nov 27 20:26:46 2015
     - Add 'tmpdir', 'iptout_pat', and 'ipterr_pat' optional hash keys when
       acquiring an IPTables::Parse object. These keys allow a temporary
       directory to be specified for iptables stdout/stderr, and the default
       paths are '/some/tmp/dir/iptout.XXXXXX' and '/some/tmp/dir/ipterr.XXXXXX'
       respectively. The 'iptout_pat' and 'ipterr_pat' keys allow the file paths
       to be changed.
+    - If the path to firewall-cmd/iptables/ip6tables was not specified when
+      acquiring an IPTables::Parse object, then an attempt will be made to find
+      the appropriate path in the filesystem. The directories '/sbin',
+      '/usr/sbin', '/bin', and '/usr/bin' are searched in that order.
 
 1.6 Sat Nov 07 08:45:15 2015
     - (Miloslav Trmač) Fixed a vulnerability to not use predictable names for

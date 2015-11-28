@@ -28,9 +28,11 @@ sub new() {
     my $class = shift;
     my %args  = @_;
 
+    ### default iptables/ip6tables/firewall-cmd paths
     my $ipt_bin    = '/sbin/iptables';
     my $ipt6_bin   = '/sbin/ip6tables';
     my $fwc_bin    = '/usr/bin/firewall-cmd';
+
     my $iptout_pat = 'ipt.out.XXXXXX';
     my $ipterr_pat = 'ipt.err.XXXXXX';
 
@@ -55,7 +57,7 @@ sub new() {
         _lockless_ipt_exec   => $args{'lockless_ipt_exec'}   || 0,
     };
 
-    if ($self->{'_skip_ipt_exec_check'}) {
+    if ($self->{'_skip_ipt_exec_check'}) {  ### useful for file-only parsing
         unless ($self->{'_firewall_cmd'} or $self->{'_iptables'}) {
             ### default
             $self->{'_iptables'} = $ipt_bin;
@@ -75,25 +77,38 @@ sub new() {
             ### check for firewall-cmd first since systems with it
             ### will have iptables installed as well (but firewall-cmd
             ### should be used instead if it exists)
-            if (-e $fwc_bin and -x $fwc_bin) {
-                $self->{'_firewall_cmd'} = $fwc_bin;
-            } elsif (-e $ipt_bin and -x $ipt_bin) {
-                $self->{'_iptables'} = $ipt_bin;
-            } elsif (-e $ipt6_bin and -x $ipt6_bin) {
-                $self->{'_iptables'} = $ipt6_bin;
-            } else {
+            my $found = 0;
+            for my $cmd ('firewall-cmd', 'iptables', 'ip6tables') {
+                next if $self->{'_ipv6'} and $cmd eq 'iptables';
+                my $path = &check_cmd($cmd);
+                if ($path) {
+                    if ($cmd eq 'firewall-cmd') {
+                        $self->{'_firewall_cmd'} = $path;
+                    } else {
+                        $self->{'_iptables'} = $path;
+                    }
+                    $found = 1;
+                    last;
+                }
+            }
+            unless ($found) {
                 croak "[*] Could not find/execute iptables, " .
                     "specify path via 'iptables' key.\n";
             }
         }
     }
 
-    if ($self->{'_ipv6'} and $self->{'_iptables'} eq $ipt_bin) {
+    if ($self->{'_ipv6'} and $self->{'_iptables'} !~ /ip6tables/) {
         if (-e $ipt6_bin and -x $ipt6_bin) {
             $self->{'_iptables'} = $ipt6_bin;
         } else {
-            croak "[*] Could not find/execute ip6tables, " .
-                "specify path via 'ip6tables' key.\n";
+            my $path = &check_cmd('ip6tables');
+            if ($path) {
+                $self->{'_iptables'} = $path;
+            } else {
+                croak "[*] Could not find/execute ip6tables, " .
+                    "specify path via 'ip6tables' hash key.\n";
+            }
         }
     }
 
@@ -144,7 +159,7 @@ sub new() {
             if ($self->{'_ipt_bin_name'} eq 'iptables') {
                 unless ($self->{'_skip_ipt_exec_check'}) {
                     croak "[*] use_ipv6 is true, " .
-                        "but $self->{'_iptables'} not ip6tables.\n";
+                        "but $self->{'_iptables'} is not ip6tables.\n";
                 }
             }
         }
@@ -291,6 +306,22 @@ sub parse_keys() {
     );
 
     return \%keys;
+}
+
+sub check_cmd() {
+    my $cmd_name = shift;
+
+    my $path = '';
+
+    for my $search_path ('/sbin', '/usr/sbin', '/bin', '/usr/bin') {
+        my $test_path = "$search_path/$cmd_name";
+        if (-e $test_path and -x $test_path) {
+            $path = $test_path;
+            last;
+        }
+    }
+
+    return $path;
 }
 
 sub list_table_chains() {

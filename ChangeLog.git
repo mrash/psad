@@ -1,83 +1,186 @@
-commit dd4f5c0df8b9e117eba0496badefbb9cd42d2bc9 (HEAD, refs/remotes/origin/master, refs/remotes/origin/HEAD, refs/heads/master)
+commit a76ee06a4998b2c08b11e8763a687cec417d4fbd (HEAD, refs/heads/master)
 Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Tue May 12 22:45:12 2015 -0400
+Date:   Sun Nov 29 04:40:38 2015 -0800
 
-    extend IGNORE_PROTOCOLS to match on both numeric protocol and text string regardless of what iptables reports
+    psad-2.4.2 release
 
+ ChangeLog                             | 5 ++++-
+ VERSION                               | 2 +-
+ nf2csv                                | 2 +-
+ packaging/psad-nodeps.spec            | 5 ++++-
+ packaging/psad-require-makemaker.spec | 5 ++++-
+ packaging/psad.spec                   | 5 ++++-
+ 6 files changed, 18 insertions(+), 6 deletions(-)
+
+commit 5072ba882c72d6e52f3da607d476074ec26b0a7f (refs/remotes/moria/master)
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sun Nov 29 01:10:57 2015 -0800
+
+    remove firewalld config var from test suite (it isn't necessary now that #13 is closed)
+
+ test/conf/auto_blocking.conf                     | 1 -
+ test/conf/auto_min_dl5_blocking.conf             | 1 -
+ test/conf/default_psad.conf                      | 1 -
+ test/conf/disable_ipv6_detection.conf            | 1 -
+ test/conf/enable_ack_detection.conf              | 1 -
+ test/conf/ignore_igmp.conf                       | 1 -
+ test/conf/ignore_intf.conf                       | 1 -
+ test/conf/ignore_tcp.conf                        | 1 -
+ test/conf/ignore_udp.conf                        | 1 -
+ test/conf/require_DROP_syslog_prefix_str.conf    | 1 -
+ test/conf/require_missing_syslog_prefix_str.conf | 1 -
+ 11 files changed, 11 deletions(-)
+
+commit 4187bf1851d8273d9af6a7f53037df7b8859a22c
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sun Nov 29 01:07:29 2015 -0800
+
+    let IPTables::Parse work out which firewall binary to use
+
+ psad      | 14 +++-----------
+ psad.conf |  5 -----
+ 2 files changed, 3 insertions(+), 16 deletions(-)
+
+commit fd76938db17b1e2ccc40c87497f44c8b475eed5c
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sun Nov 29 00:55:53 2015 -0800
+
+    don't require existence of ifconfig command when /usr/sbin/ip is used instead
+
+ psad | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
+
+commit 35bef64a2a405a672c102b982cfdc4bbe5e4175c
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Nov 28 15:36:15 2015 -0800
+
+    update to IPTables::Parse 1.6.1
+
+ deps/IPTables-Parse/Changes               |   6 +-
+ deps/IPTables-Parse/lib/IPTables/Parse.pm |  55 +++++++++++---
+ deps/IPTables-Parse/t/basic_tests.pl      | 119 ++++++++++++++++++++++--------
+ 3 files changed, 135 insertions(+), 45 deletions(-)
+
+commit 6d327e3078a7348be37abb45e9a67f8581f17956
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Wed Nov 18 00:00:30 2015 -0800
+
+    add IPT_OUTPUT_PATTERN and IPT_ERROR_PATTERN to take advantage of IPTables::Parse 1.6.1 functionality
+
+ psad                                             | 7 ++++---
+ psad.conf                                        | 4 ++--
+ test/conf/auto_blocking.conf                     | 4 ++--
+ test/conf/auto_min_dl5_blocking.conf             | 4 ++--
+ test/conf/default_psad.conf                      | 4 ++--
+ test/conf/disable_ipv6_detection.conf            | 4 ++--
+ test/conf/enable_ack_detection.conf              | 4 ++--
+ test/conf/ignore_igmp.conf                       | 4 ++--
+ test/conf/ignore_intf.conf                       | 4 ++--
+ test/conf/ignore_tcp.conf                        | 4 ++--
+ test/conf/ignore_udp.conf                        | 4 ++--
+ test/conf/require_DROP_syslog_prefix_str.conf    | 4 ++--
+ test/conf/require_missing_syslog_prefix_str.conf | 4 ++--
+ 13 files changed, 28 insertions(+), 27 deletions(-)
+
+commit e93aaf9f6d1dffb97199d98770dae7530a262ff5
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Nov 17 23:48:24 2015 -0800
+
+    update to IPTables::Parse 1.6.1
+
+ ChangeLog                                 |  2 +-
+ deps/IPTables-Parse/Changes               |  8 ++++
+ deps/IPTables-Parse/META.json             |  2 +-
+ deps/IPTables-Parse/META.yml              |  2 +-
+ deps/IPTables-Parse/README                |  2 +-
+ deps/IPTables-Parse/VERSION               |  2 +-
+ deps/IPTables-Parse/lib/IPTables/Parse.pm | 66 +++++++++++++++++++++++++------
+ 7 files changed, 67 insertions(+), 17 deletions(-)
+
+commit ced3f85a7eaa167ef9e796a35f21eaea4bb44825
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sun Nov 1 14:38:58 2015 -0800
+
+    update IPTables::Parse to 1.6
+
+ ChangeLog                                 |  8 +++-
+ deps/IPTables-Parse/Changes               | 12 ++++++
+ deps/IPTables-Parse/MANIFEST              |  1 +
+ deps/IPTables-Parse/META.json             |  2 +-
+ deps/IPTables-Parse/META.yml              |  2 +-
+ deps/IPTables-Parse/README                |  2 +-
+ deps/IPTables-Parse/VERSION               |  2 +-
+ deps/IPTables-Parse/lib/IPTables/Parse.pm | 61 ++++++++++++++++++++++---------
+ deps/IPTables-Parse/t/basic_tests.pl      | 30 ++++++++++++++-
+ 9 files changed, 96 insertions(+), 24 deletions(-)
+
+commit 55ba5b1ca2ac63a8e9f53210e4814da35e0dbfb3 (refs/remotes/origin/master, refs/remotes/origin/HEAD)
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Tue Oct 13 22:39:33 2015 -0400
+
+    add META.yml file for the Unix::Syslog module, closes issue #26
+
+ ChangeLog                 |  4 +++-
+ deps/Unix-Syslog/META.yml | 10 ++++++++++
+ 2 files changed, 13 insertions(+), 1 deletion(-)
+
+commit 08032b891ef9f2ca13213f063724a5f01a67d4e5
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Wed Sep 9 19:13:56 2015 -0400
+
+    added tests to make sure 127.0.0.1 and 0.0.0.0 are excluded from auto-blocking
+
+ ChangeLog                                        |    4 +-
+ psad                                             |    2 +-
+ test/scans/iptables/syn_scan_1000_1500_localhost | 1002 ++++++++++++++++++++++
+ test/scans/iptables/syn_scan_1000_1500_zeroip    | 1002 ++++++++++++++++++++++
+ test/test-psad.pl                                |   33 +
+ 5 files changed, 2041 insertions(+), 2 deletions(-)
+
+commit 9d55f5fbff45350b7b04479e5eaa292c8c1dcb8e
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Mon Sep 7 18:10:28 2015 -0400
+
+    update IPTables::Parse and IPTables::ChainMgr modules
+
+ deps/IPTables-ChainMgr/Changes                  |   5 +
+ deps/IPTables-ChainMgr/META.json                |   2 +-
+ deps/IPTables-ChainMgr/META.yml                 |   2 +-
+ deps/IPTables-ChainMgr/README                   |   4 +-
+ deps/IPTables-ChainMgr/VERSION                  |   2 +-
+ deps/IPTables-ChainMgr/lib/IPTables/ChainMgr.pm |   4 +-
+ deps/IPTables-ChainMgr/t/basic_tests.pl         | 304 ++++++++++++++----------
+ deps/IPTables-Parse/Changes                     |  11 +
+ deps/IPTables-Parse/META.json                   |   2 +-
+ deps/IPTables-Parse/META.yml                    |   2 +-
+ deps/IPTables-Parse/VERSION                     |   2 +-
+ deps/IPTables-Parse/lib/IPTables/Parse.pm       | 129 +++++++---
+ deps/IPTables-Parse/t/basic_tests.pl            |   2 +-
+ 13 files changed, 302 insertions(+), 169 deletions(-)
+
+commit 3f716796f6501e9df51925b6c455105a12cf3fe0
+Merge: 04cf9d2 6e80b05
+Author: Michael Rash <michael.rash@gmail.com>
+Date:   Tue Jul 7 06:17:28 2015 -0400
+
+    Merge pull request #24 from radarhere/patch-1
+
+commit 6e80b05d1d6aaea34ce0ad92fb97b1c77dd46dde
+Author: Andrew Murray <radarhere@gmail.com>
+Date:   Tue Jul 7 20:13:30 2015 +1000
+
+    Fixed typo
+
+ ChangeLog | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit 04cf9d2be02fad857f693f5f4b36779dcf0bb834
+Author: Michael Rash <mbr@cipherdyne.org>
+Date:   Sat Jul 4 11:37:47 2015 -0400
+
+    Bug fix to apply EMAIL_ALERT_DANGER_LEVEL threshold to auto-blocking emails
+
+ CREDITS   |  5 +++++
  ChangeLog |  4 ++++
- psad      | 10 ++++++++++
- 2 files changed, 14 insertions(+)
-
-commit 7534df2f52cf057ee0f901e0f69347a01864baac
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Tue May 12 22:32:40 2015 -0400
-
-    bumped version to 2.4.1
-
- ChangeLog                             | 10 ++++++++++
- VERSION                               |  2 +-
- nf2csv                                |  2 +-
- packaging/psad-nodeps.spec            |  5 ++++-
- packaging/psad-require-makemaker.spec |  5 ++++-
- packaging/psad.spec                   |  5 ++++-
- psad                                  |  4 ++--
- 7 files changed, 26 insertions(+), 7 deletions(-)
-
-commit e596a507dc30b64977c8d4565946698fdf7ee04b
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Tue May 12 22:22:40 2015 -0400
-
-    added config vars to enable/disable whois and reverse DNS lookups
-
- psad                                             | 19 ++++++++++---------
- psad.conf                                        |  6 ++++++
- test/conf/auto_blocking.conf                     |  2 ++
- test/conf/auto_min_dl5_blocking.conf             |  2 ++
- test/conf/default_psad.conf                      |  2 ++
- test/conf/disable_ipv6_detection.conf            |  2 ++
- test/conf/enable_ack_detection.conf              |  2 ++
- test/conf/ignore_igmp.conf                       |  2 ++
- test/conf/ignore_intf.conf                       |  2 ++
- test/conf/ignore_tcp.conf                        |  2 ++
- test/conf/ignore_udp.conf                        |  2 ++
- test/conf/require_DROP_syslog_prefix_str.conf    |  2 ++
- test/conf/require_missing_syslog_prefix_str.conf |  2 ++
- 13 files changed, 38 insertions(+), 9 deletions(-)
-
-commit c157a3bfd82f1ae22437834106c496eae368772b
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Tue May 12 21:54:48 2015 -0400
-
-    Bug fix to honor IGNORE_PROTOCOLS for non-tcp/udp/icmp protocols
-    
-    This bug was reported by Paul Versloot.
-
- CREDITS                       |   7 +-
- psad                          |  40 +++++----
- test/conf/ignore_igmp.conf    | 199 ++++++++++++++++++++++++++++++++++++++++++
- test/scans/iptables/ipv4_igmp |   4 +
- test/test-psad.pl             |  14 +++
- 5 files changed, 244 insertions(+), 20 deletions(-)
-
-commit 907230bb59d2d03d32d730fc3f29e8dc18d16ad4
-Author: Michael Rash <mbr@cipherdyne.org>
-Date:   Sun May 10 16:31:50 2015 -0400
-
-    Account for older versions of IPTables::ChainMgr that don't export _cmd
-    
-    Github user itoffshore reported an issue #19 on Alpine Linux where the
-    following error was produced in 'psad -L' mode:
-    
-    [+] Listing chains from IPT_AUTO_CHAIN keywords...
-    
-    Use of uninitialized value in concatenation (.) or string at
-    /usr/sbin/psad line 6701.
-    [*]  -t filter -n -L PSAD_BLOCK_INPUT -v does not look like an iptables
-    command. at /usr/sbin/psad line 6701.
-    
-    This error was produced because a pre-1.3 version of IPTables::ChainMgr
-    is installed on the system, and it doesn't export the _cmd hash key
-    (which is actually exported first by the IPTables::Parse module).
-
- psad | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ psad      | 31 +++++++++++++++++++++++--------
+ 3 files changed, 32 insertions(+), 8 deletions(-)

@@ -3335,7 +3335,9 @@ sub psad_init() {
     ### check to make sure the commands specified in the config section
     ### are in the right place, and attempt to correct automatically if not.
     ### (wget is only needed in --sig-update mode)
-    &check_commands({'wget' => ''});
+    my %cmd_exceptions = ('wget' => '');
+    $cmd_exceptions{'ifconfig'} = '' if $config{'IFCFGTYPE'} =~ /iproute2/i;
+    &check_commands(\%cmd_exceptions);
 
     ### import psad perl modules
     &import_perl_modules();
@@ -10500,11 +10502,11 @@ sub dump_conf() {
     }
     print $fh "\n";
 
-    if (defined $config{'IFCFGTYPE'} and $config{'IFCFGTYPE'} =~ /iproute2/i) {
+    if ($config{'IFCFGTYPE'} =~ /iproute2/i) {
         print $fh "[+] ip addr output:\n";
-        my @ifconfig_out = @{&run_command($cmds{'ip'}, 'addr')};
-        if (@ifconfig_out) {
-            for (@ifconfig_out) {
+        my @ip_out = @{&run_command($cmds{'ip'}, 'addr')};
+        if (@ip_out) {
+            for (@ip_out) {
                 s/$ipv4_re/x.x.x.x/g;
                 s/inet6\s+\S+/inet6 (removed)/;
                 print $fh $_;

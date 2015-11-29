@@ -1,4 +1,4 @@
-psad-2.4.2 (10//2015):
+psad-2.4.2 (11/29/2015):
     - Bug fix to apply the EMAIL_ALERT_DANGER_LEVEL threshold to auto-blocking
       emails (reported by itoffshore@github).
     - Bug fix to include the META.yml file for the Unix::Syslog module. This
@@ -9,6 +9,9 @@ psad-2.4.2 (10//2015):
       an issue where temporary files used predictable names, and this could be
       leveraged by a local attacker to overwrite any files to which the
       attacker has write permissions.
+    - With the update to IPTables::Parse 1.6.1, the path to the
+      iptables/ip6tables/firewall-cmd binary is worked out by the module
+      directly instead of by psad.
 
 psad-2.4.1 (05/13/2015):
     - Bug fix to honor the IGNORE_PROTOCOLS configuration variable for

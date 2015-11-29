@@ -3349,11 +3349,6 @@ sub psad_init() {
     ### set some config variables based on command line input
     &handle_cmdline();
 
-    ### set IPTables::ChainMgr options, allow firewall-cmd to take
-    ### over unless disabled
-    if ($config{'ENABLE_FIREWALLD'} eq 'N') {
-        $ipt_opts{'iptables'} = $cmds{'iptables'};
-    }
     $ipt_opts{'tmpdir'}     = $config{'PSAD_DIR'};
     $ipt_opts{'iptout_pat'} = $config{'IPT_OUTPUT_PATTERN'};
     $ipt_opts{'ipterr_pat'} = $config{'IPT_ERROR_PATTERN'};
@@ -6712,9 +6707,6 @@ sub ipt_list_auto_chains() {
     my $ipt = new IPTables::ChainMgr(%ipt_opts)
         or die '[*] Could not acquire IPTables::ChainMgr object.';
 
-    my $ipt_bin = $cmds{'iptables'};
-    $ipt_bin = $ipt->{'_cmd'} if defined $ipt->{'_cmd'};
-
     print "[+] Listing chains from IPT_AUTO_CHAIN keywords...\n";
     if ($config{'ENABLE_AUTO_IDS'} eq 'N') {
         print '[-] NOTE: ENABLE_AUTO_IDS is currently disabled ',
@@ -6730,7 +6722,7 @@ sub ipt_list_auto_chains() {
 
         if ($rv) {
             ($rv, $out_ar, $err_ar) =
-                $ipt->run_ipt_cmd("$ipt_bin -t " .
+                $ipt->run_ipt_cmd("$ipt->{'_cmd'} -t " .
                     "$table -n -L $to_chain -v");
             if ($rv and $out_ar) {
                 print for @$out_ar;
@@ -11274,8 +11266,8 @@ sub required_vars() {
         AUTO_BLOCK_DL3_TIMEOUT AUTO_BLOCK_DL4_TIMEOUT
         AUTO_BLOCK_DL5_TIMEOUT EMAIL_THROTTLE EXPECT_TCP_OPTIONS
         ENABLE_PSADWATCHD ENABLE_EXT_BLOCK_SCRIPT_EXEC EXTERNAL_BLOCK_SCRIPT
-        ENABLE_FIREWALLD ENABLE_FW_MSG_READ_CMD FW_MSG_READ_CMD
-        FW_MSG_READ_CMD_ARGS USE_FW_MSG_READ_CMD_ARGS CUSTOM_SYSLOG_TS_RE
+        ENABLE_FW_MSG_READ_CMD FW_MSG_READ_CMD FW_MSG_READ_CMD_ARGS
+        USE_FW_MSG_READ_CMD_ARGS CUSTOM_SYSLOG_TS_RE
         ENABLE_CUSTOM_SYSLOG_TS_RE FW_MSG_READ_MIN_PKTS ENABLE_DNS_LOOKUPS
         ENABLE_WHOIS_LOOKUPS
     ));

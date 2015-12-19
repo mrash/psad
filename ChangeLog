@@ -1,6 +1,9 @@
 psad-2.4.3 (12/19/2015):
     - Bug fix in fwcheck_psad related to an uninitialized variable related to
       firewalld deployments.
+    - Bug fix to add psad process into -K, -S, and -R handling if psad is
+      reading iptables logs via journalctl. This is necessary because psad
+      fork()'s an extra copy of itself when reading via journalctl.
     - Updated to IPTables::ChainMgr 1.5.
 
 psad-2.4.2 (11/29/2015):

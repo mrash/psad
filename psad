@@ -3288,9 +3288,10 @@ sub psad_init() {
 
     ### pid file hash
     %pidfiles = (
-        'psadwatchd' => $config{'PSADWATCHD_PID_FILE'},
-        'psad'       => $config{'PSAD_PID_FILE'},
-        'kmsgsd'     => $config{'KMSGSD_PID_FILE'},
+        'psadwatchd'   => $config{'PSADWATCHD_PID_FILE'},
+        'psad'         => $config{'PSAD_PID_FILE'},
+        'psad_fw_read' => $config{'PSAD_FW_READ_PID_FILE'},
+        'kmsgsd'       => $config{'KMSGSD_PID_FILE'},
     );
 
     ### dump configuration to STDOUT
@@ -3652,6 +3653,7 @@ sub fork_fw_read_cmd() {
     ###   running-programs-stdout-from-a-perl-program-that-called-it
     socketpair CMDA,CMDB,AF_UNIX,SOCK_STREAM,PF_UNSPEC;
     if (fork() == 0) {
+        &write_pid($config{'PSAD_FW_READ_PID_FILE'});
         open my $fh, '-|', $fw_read_cmd;
         while (<$fh>) {
             print CMDB;
@@ -7445,7 +7447,7 @@ sub stop_psad() {
     &sys_log('shutting down psad daemons');
     ### must kill psadwatchd first since if not, it might try to restart
     ### any of the other two daemons.
-    for my $pidname (qw(psadwatchd kmsgsd psad)) {
+    for my $pidname (qw(psadwatchd kmsgsd psad psad_fw_read)) {
         my $pidfile = $pidfiles{$pidname};
         if (-e $pidfile) {
             my $pid = &is_running($pidfile);
@@ -8717,7 +8719,7 @@ sub status() {
 
     my $rv = $EXIT_SUCCESS;
 
-    for my $pidname (qw(psadwatchd kmsgsd psad)) {
+    for my $pidname (qw(psadwatchd kmsgsd psad_fw_read psad)) {
         my $pidfile = $pidfiles{$pidname};
         if (-e $pidfile) {
             my $pid = &is_running($pidfile);
@@ -11272,7 +11274,7 @@ sub required_vars() {
         ENABLE_FW_MSG_READ_CMD FW_MSG_READ_CMD FW_MSG_READ_CMD_ARGS
         USE_FW_MSG_READ_CMD_ARGS CUSTOM_SYSLOG_TS_RE
         ENABLE_CUSTOM_SYSLOG_TS_RE FW_MSG_READ_MIN_PKTS ENABLE_DNS_LOOKUPS
-        ENABLE_WHOIS_LOOKUPS
+        ENABLE_WHOIS_LOOKUPS PSAD_FW_READ_PID_FILE
     ));
     &defined_vars(\@required_vars);
     return;

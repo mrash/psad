@@ -10,7 +10,7 @@
 #
 # Author: Michael Rash (mbr@cipherdyne.org)
 #
-# Version: 1.4
+# Version: 1.5
 #
 ##############################################################################
 #
@@ -26,7 +26,7 @@ use strict;
 use warnings;
 use vars qw($VERSION);
 
-$VERSION = '1.4';
+$VERSION = '1.5';
 
 sub new() {
     my $class = shift;
@@ -411,7 +411,7 @@ sub find_ip_rule() {
     my @parse_keys = (qw(protocol s_port d_port to_ip
             to_port mac_source state ctstate));
 
-    if ($IPTables::Parse::VERSION > 1.1) {
+    if ($IPTables::Parse::VERSION gt '1.1') {
 
         @parse_keys = ();
 

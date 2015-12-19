@@ -154,6 +154,15 @@ my @tests = (
     },
     {
         'category' => 'operations',
+        'detail'   => '--Version',
+        'err_msg'  => '--Version mismatch',
+        'function' => \&version_check,
+        'cmdline'  => "$psadCmd -V -c $default_conf $normal_root_override_str",
+        'exec_err' => $NO,
+        'fatal'    => $NO
+    },
+    {
+        'category' => 'operations',
         'detail'   => 'config dump+validate',
         'err_msg'  => 'could not dump+validate config',
         'function' => \&validate_config,
@@ -1186,6 +1195,45 @@ sub install_test_dir() {
     }
 
     chdir $curr_pwd or die $!;
+
+    return $rv;
+}
+
+sub version_check() {
+    my $test_hr = shift;
+
+    my $version_file = '../VERSION';
+
+    my $version = '';
+    if (-e $version_file) {
+        open V, "< $version_file" or die $!;
+        $version = <V>;
+        close $version;
+        chomp $version;
+    } else {
+        die "[*] version file: $version_file does not exist";
+    }
+
+    my $rv = &generic_exec($test_hr);
+
+    if ($rv) {
+        my $output_version = '';
+        open C, "< $current_test_file" or die $!;
+        while (<C>) {
+            if (/psad\sv(\S+)/) {
+                $output_version = $1;
+                last;
+            }
+        }
+        close C;
+        if ($output_version) {
+            unless ($version eq $output_version) {
+                $rv = 0;
+            }
+        } else {
+            $rv = 0;
+        }
+    }
 
     return $rv;
 }

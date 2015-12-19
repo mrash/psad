@@ -782,10 +782,6 @@ my $fw_data_file_check_ctr = 0;
 my @fw_packets = ();
 
 ### Get an open filehandle for the main firewall data file FW_DATA_FILE.
-### All firewall drop/reject log messages are written to FW_DATA_FILE
-### by kmsgsd (or by ulogd directly).
-print STDERR "[+] Opening iptables data file: $fw_data_file\n" if $debug;
-
 my $fwdata_fh = &open_fw_data();
 
 &get_auto_response_domain_sock()
@@ -3615,6 +3611,10 @@ sub open_fw_data() {
         return $fwdata_fh;
 
     } else {
+
+        print STDERR "[+] Opening iptables data file: $fw_data_file\n"
+            if $debug;
+
         open my $fwdata_fh, $fw_data_file or die '[*] Could not open ',
             "$fw_data_file: $!";
         return $fwdata_fh;
@@ -3643,6 +3643,9 @@ sub fork_fw_read_cmd() {
     $fw_read_cmd .= " $config{'FW_MSG_READ_CMD_ARGS'} "
         if $config{'USE_FW_MSG_READ_CMD_ARGS'} eq 'Y';
     $fw_read_cmd =~ s/\s$//;
+
+    print STDERR "[+] Reading iptables logs via: '$fw_read_cmd'\n"
+        if $debug;
 
     ### Credit:
     ###   http://stackoverflow.com/questions/9214964/how-do-i-watch-a- \

@@ -1,9 +1,15 @@
 # server name		charset		optional parameters
-whois.corenic.net	utf-8		-C UTF-8
 whois.cat		utf-8		-C UTF-8
+whois.conac.cn		utf-8
+whois.corenic.net	utf-8		-C UTF-8
+whois.online.rs.corenic.net	utf-8	-C UTF-8
+whois.site.rs.corenic.net	utf-8	-C UTF-8
+whois.lacnic.net	iso-8859-1
 whois.museum		utf-8		-C UTF-8
 
-whois.nic.br		iso-8859-1
+whois.aeda.net.ae	utf-8
+whois.ax		iso-8859-1
+whois.registro.br	iso-8859-1
 whois.cira.ca		iso-8859-1
 whois.nic.ch		utf-8
 whois.nic.cl		iso-8859-1
@@ -13,26 +19,51 @@ whois.nic.cz		utf-8
 whois.denic.de		utf-8
 whois.enum.denic.de	utf-8
 whois.dk-hostmaster.dk	utf-8		--charset=utf-8
-whois.eenet.ee		iso-8859-1
+whois.tld.ee		utf-8
 whois.eu		utf-8
-whois.ficora.fi		iso-8859-1
-whois.nic.fr		iso-8859-1
-whois.hkdnr.net.hk	utf-8
+whois.fi		iso-8859-1
+whois.nic.fo		utf-8
+whois.nic.fr		utf-8
+whois.hkirc.hk		utf-8
+whois.nic.hr		utf-8
 whois.nic.hu		iso-8859-1
+whois.nic.ir		utf-8
 whois.isnic.is		iso-8859-1
+whois.nic.it		utf-8
 whois.jprs.jp		iso-2022-jp
 whois.nic.ad.jp		iso-2022-jp
-whois.nic.or.kr		euc-kr
+whois.domain.kg		cp1251
+whois.nic.or.kr		utf-8
+whois.kr		utf-8
+# XXX I had to guess: the server is unable to fully transcode U+49b in the
+# answer for xn--e1aybc.xn--80ao21a. Maybe it is cp1251 instead?
+whois.nic.kz		rk1048
 whois.nic.li		utf-8
 whois.domreg.lt		utf-8
 whois.dns.lu		iso-8859-1
+whois.marnet.mk		utf-8
 whois.nic.mu		utf-8
 whois.norid.no		iso-8859-1
-whois.nic.nu		utf-8
+whois.iis.nu		utf-8
+whois.registry.om	utf-8
+whois.registry.pf	utf-8
 whois.dns.pt		iso-8859-1
-whois.nic-se.se		utf-8
-whois.nic.tr		utf-8
-whois.twnic.net		utf-8
-whois.net.ua		koi8-u
+whois.registry.qa	utf-8
+whois.nic.re		utf-8
+whois.rnids.rs		utf-8
+whois.nic.net.sa	utf-8
+whois.iis.se		utf-8
+whois.sgnic.sg		utf-8
+whois.tld.sy		utf-8
+whois.thnic.co.th	utf-8
+whois.ati.tn		windows-1252
+whois.nic.tr		iso-8859-9
+whois.twnic.net.tw	utf-8
+whois.biz.ua		utf-8
+whois.co.ua		utf-8
+whois.pp.ua		utf-8
+whois.ua		utf-8
 whois.nic.org.uy	utf-8
+whois.nic.wf		utf-8
+whois.nic.yt		utf-8
 

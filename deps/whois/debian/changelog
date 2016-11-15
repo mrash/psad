@@ -1,3 +1,412 @@
+whois (5.2.13) unstable; urgency=medium
+
+  * Use "domain" instead of "=" for default verisign-grs queries,
+    to ignore the name server names spam.
+  * Fixed make_ip_del_recovered.pl, which generated non-functioning data.
+  * Added the .xn--90ae (бг, Bulgaria) TLD server.
+  * Updated the .bd, .jobs and .mobi TLD servers.
+  * Added new ASN allocations.
+  * Added new recovered IPv4 allocations.
+  * Updated the crsnic.net hiding string to fix hiding for .bi.
+  * Updated the list of new gTLDs.
+
+ -- Marco d'Itri <md@linux.it>  Sun, 30 Oct 2016 17:08:07 +0100
+
+whois (5.2.12) unstable; urgency=medium
+
+  * Implemented support for fuzzing with the awesome american fuzzy lop.
+  * Added the .xn--e1a4c (ею, European Union) and .xn--mix891f (澳門,
+    Macao) TLD servers.
+  * Updated the .jobs, .kn and .pro TLD servers.
+  * Updated the .gi, .lc, .sc and .vc TLD servers, because the precedent
+    data caused the program to return an error status.
+  * Updated the list of new gTLDs.
+  * Fixed the code which queries whois.iana.org for TLDs to recognize IDN
+    TLDs too.
+
+ -- Marco d'Itri <md@linux.it>  Tue, 29 Mar 2016 05:33:10 +0200
+
+whois (5.2.11) unstable; urgency=medium
+
+  * Fixed the --select-types and --sources long options.
+  * Updated the list of new gTLDs.
+  * Removed the .an TLD.
+  * Removed the .xn--l1acc (.МОН, Mongolia) TLD server.
+  * Added the .xn--mgbtx2b (عراق, Iraq) and .xn--qxam (.ΕΛ, Greece) TLD
+    servers.
+
+ -- Marco d'Itri <md@linux.it>  Tue, 08 Dec 2015 07:43:48 +0100
+
+whois (5.2.10) unstable; urgency=medium
+
+  * Updated the list of new gTLDs.
+  * Updated the .ki and .vg TLD servers.
+
+ -- Marco d'Itri <md@linux.it>  Thu, 30 Jul 2015 03:26:56 +0200
+
+whois (5.2.9) unstable; urgency=medium
+
+  * Updated the list of new gTLDs.
+  * Updated the .bn and .cr TLD servers.
+  * Updated IDSTRING to 5.2.
+
+ -- Marco d'Itri <md@linux.it>  Mon, 08 Jun 2015 02:18:47 +0200
+
+whois (5.2.8) unstable; urgency=medium
+
+  * Updated the list of new gTLDs.
+  * Added new ASN allocations.
+  * Added the .xn--y9a3aq (.հայ, Armenia) TLD server.
+
+ -- Marco d'Itri <md@linux.it>  Mon, 18 May 2015 00:37:32 +0200
+
+whois (5.2.7) unstable; urgency=medium
+
+  * Removed a bogus disclaimer detection string.
+  * Updated the list of new gTLDs
+
+ -- Marco d'Itri <md@linux.it>  Wed, 25 Mar 2015 23:04:44 +0100
+
+whois (5.2.6) unstable; urgency=medium
+
+  * Added the .edu.ph TLD server.
+  * Removed the .gov.py TLD server. (Closes: #780562)
+  * Updated the list of new gTLDs.
+  * Implemented hiding multiple disclaimers blocks to improve detection.
+  * Updated the disclaimer detection strings.
+
+ -- Marco d'Itri <md@linux.it>  Mon, 23 Mar 2015 04:28:39 +0100
+
+whois (5.2.5) unstable; urgency=medium
+
+  * Added the .xn--90ais (.бел, Belarus) TLD server.
+  * Updated the .ky TLD server.
+  * Updated the list of new gTLDs.
+  * Added new recovered IPv4 allocations.
+
+ -- Marco d'Itri <md@linux.it>  Tue, 03 Mar 2015 02:15:57 +0100
+
+whois (5.2.4) unstable; urgency=medium
+
+  * Fixed referrals handling for the .cc, .tv a .jobs TLDs.
+  * Updated the list of new gTLDs.
+
+ -- Marco d'Itri <md@linux.it>  Sun, 25 Jan 2015 04:07:20 +0100
+
+whois (5.2.3) unstable; urgency=medium
+
+  * Added the .gw TLD server.
+  * Updated the .bm, .gr, .gt, .md, .np, .py, .tc, .tg, .vi, .net.za,
+    .org.za and .web.za TLD servers. (Closes: #773489)
+  * Removed the .cg TLD server.
+  * Updated the list of new gTLDs.
+  * mkpasswd: use arc4random_buf(3) where available.
+  * mkpasswd: support OpenBSD's new hash 2b.
+  * Updated some IPv4 allocations.
+  * Remove the new_gtlds.h generated file from the Debian source package.
+
+ -- Marco d'Itri <md@linux.it>  Fri, 26 Dec 2014 20:12:24 +0100
+
+whois (5.2.2) unstable; urgency=medium
+
+  * Fixed the code that removes trailing dots. (Closes: #763834)
+  * Added the .xn--d1alf (.мкд, Macedonia) and .xn--node (.გე, Georgia)
+    TLD servers.
+  * Updated the list of new gTLDs.
+
+ -- Marco d'Itri <md@linux.it>  Thu, 06 Nov 2014 03:47:43 +0100
+
+whois (5.2.1) unstable; urgency=medium
+
+  * Added the .aw and .zm TLD servers.
+  * Added the charset for whois.domain.kg.
+  * Updated the list of new gTLDs.
+  * Queries for bare TLDs will be directed to whois.iana.org.
+    (Closes: #763833)
+
+ -- Marco d'Itri <md@linux.it>  Thu, 16 Oct 2014 02:01:20 +0200
+
+whois (5.2.0) unstable; urgency=medium
+
+  * Implemented support for the long RIPE flags.
+  * "Fixed" some harmless bugs discovered with a Coverity scan.
+  * Default to whois.ripe.net when using long flags.
+  * Updated the list of new gTLDs.
+  * Added a new ASN allocation.
+  * Added new recovered IPv4 allocations.
+  * Updated make_version_h.pl to support Debian binNMUs. (Closes: #761318)
+
+ -- Marco d'Itri <md@linux.it>  Sat, 13 Sep 2014 05:05:16 +0200
+
+whois (5.1.5) unstable; urgency=medium
+
+  * Updated the list of new gTLDs.
+  * Added some disclaimer suppression strings for the new gTLDs' servers.
+  * Updated one or more translations. (Closes: #756231)
+
+ -- Marco d'Itri <md@linux.it>  Sat, 02 Aug 2014 03:41:44 +0200
+
+whois (5.1.4) unstable; urgency=medium
+
+  * Added the charset for whois.lacnic.net.
+  * Updated the list of new gTLDs.
+  * Updated one or more translations.
+
+ -- Marco d'Itri <md@linux.it>  Mon, 30 Jun 2014 04:22:21 +0200
+
+whois (5.1.3) unstable; urgency=medium
+
+  * Use the IANA recovered address space list.
+  * Updated the list of new gTLDs.
+  * Support hiding disclaimers until the end of the output.
+  * Fix a disclaimer hiding string. (Closes: #748363)
+
+ -- Marco d'Itri <md@linux.it>  Mon, 26 May 2014 04:19:41 +0200
+
+whois (5.1.2) unstable; urgency=medium
+
+  * Always query whois.nic.$TLD for the "new" gTLDs, because the ICANN
+    contract requires that it works.
+  * Added the .aw and .zm TLD servers.
+  * Updated the .mk, .tc and .vu TLD servers.
+  * Added more ASN entries for Japan and Korea.
+  * Fixed some invalid ASN and networks entries which would never be
+    matched, reported by Henry Stern.
+  * mkpasswd ported to Solaris/Dyson, patch courtesy of Igor Pashev.
+
+ -- Marco d'Itri <md@linux.it>  Fri, 02 May 2014 04:15:08 +0200
+
+whois (5.1.1) unstable; urgency=medium
+
+  * Added the servers for 29 "new" gTLDs.
+
+ -- Marco d'Itri <md@linux.it>  Sat, 11 Jan 2014 00:51:05 +0100
+
+whois (5.1.0) unstable; urgency=low
+
+  * Added the .ga, .ml, .pf, .xn--l1acc (.МОН, Mongolia) and
+    .xn--mgba3a4f16a (.ﺍیﺭﺎﻧ, Iran) TLD servers.
+  * Added the servers for 54 "new" gTLDs.
+  * Updated the .bw, .gd, .hn, .sb, .xn--j1amh and .xn--mgberp4a5d4ar
+    TLD servers.
+  * Added new RIPE and APNIC ASN allocations.
+  * Removed the .ck TLD server.
+  * Updated one or more translations.
+  * Applied multiple small fixes contributed by Petr Písař of Red Hat.
+  * Correctly hide the disclaimers for .be and .sx. (Closes: #729366)
+  * Direct queries for private ASN blocks to RIPE. (Closes: #724661)
+
+ -- Marco d'Itri <md@linux.it>  Thu, 26 Dec 2013 10:05:43 +0100
+
+whois (5.0.26) unstable; urgency=low
+
+  * Added the .cf TLD server.
+  * Updated the .bi TLD server.
+  * Added a new ASN allocation.
+
+ -- Marco d'Itri <md@linux.it>  Wed, 17 Jul 2013 00:48:12 +0200
+
+whois (5.0.25) unstable; urgency=low
+
+  * Added the .ax, .bn, .iq, .pw and .rw TLD servers.
+  * Updated one or more translations.
+
+ -- Marco d'Itri <md@linux.it>  Fri, 10 May 2013 05:13:47 +0200
+
+whois (5.0.24) unstable; urgency=low
+
+  * Merged documentation fixes and the whois.conf(5) man page, courtesy of
+    Petr Písař of Red Hat.
+  * Added a new ASN allocation.
+  * Updated one or more translations. (Closes: #705163)
+
+ -- Marco d'Itri <md@linux.it>  Thu, 18 Apr 2013 03:36:17 +0200
+
+whois (5.0.23) unstable; urgency=medium
+
+  * whois.nic.or.kr switched from EUC-KR to UTF-8. (LP#1132526)
+
+ -- Marco d'Itri <md@linux.it>  Mon, 08 Apr 2013 06:14:14 +0200
+
+whois (5.0.22) unstable; urgency=low
+
+  * Fixed cross-compiling, this time for real. (See #695442.)
+
+ -- Marco d'Itri <md@linux.it>  Sun, 31 Mar 2013 22:17:29 +0200
+
+whois (5.0.21) unstable; urgency=low
+
+  * Fixed parsing of 6to4 addresses: the last two bytes of the IPv4 address
+    in 6to4 addresses were not parsed correctly since version 5.0.19.
+    (Closes: #699928)
+  * Added the .xn--j1amh (.укр, Ukraine) TLD server.
+  * Updated the .bi, .se and .vn TLD servers. (Closes: #697753)
+  * Removed whois.pandi.or.id from the list of servers which support the 
+    RIPE extensions, since it does not anymore and queries are broken.
+    (Closes: #704115)
+  * Updated some disclaimer suppression strings.
+  * Respect DEB_HOST_GNU_TYPE when selecting CC for cross-compiling.
+    (Closes: #695442)
+
+ -- Marco d'Itri <md@linux.it>  Sun, 31 Mar 2013 19:46:02 +0200
+
+whois (5.0.20) unstable; urgency=low
+
+  * Updated the .by, .ng, .om, .sm, .tn, .ug and .vn TLD servers.
+    (Closes: #689486)
+  * Added the .bw, .td, .xn--mgb9awbf (عمان., Oman), .xn--mgberp4a5d4ar 
+    (.السعودية, Saudi Arabia) and .xn--mgbx4cd0ab (ﻢﻠﻴﺴﻳﺍ., Malaysia)
+    TLD servers.
+  * Removed the .kp, .mc, .rw and .xn--mgba3a4f16a (ایران., Iran) TLD servers.
+
+ -- Marco d'Itri <md@linux.it>  Sun, 07 Oct 2012 01:25:05 +0200
+
+whois (5.0.19) unstable; urgency=low
+
+  * Added the .post TLD server.
+  * Updated the .co.za SLD servers. (Closes: #687094)
+  * Added the .alt.za, .net.za and .web.za SLD servers.
+  * whois.ua changed (?) the encoding to utf-8. (Closes: #686715)
+  * Fixed the parsing of 6to4 addresses like whois 2002:xxxx::. (LP#967311)
+  * Modified the package version check in debian/rules to help Ubuntu
+    maintainers. (Closes: #684526)
+
+ -- Marco d'Itri <md@linux.it>  Mon, 17 Sep 2012 21:41:29 +0200
+
+whois (5.0.18) unstable; urgency=low
+
+  * Updated the .ae and .xn--mgbaam7a8h (.امارات, United Arabs Emirates)
+    TLDs.
+  * Updated the server charset table for .fr and .it.
+
+ -- Marco d'Itri <md@linux.it>  Sun, 22 Jul 2012 20:35:18 +0200
+
+whois (5.0.17) unstable; urgency=medium
+
+  * Updated the .bi, .fo, .gr and .gt TLD servers.
+  * Changed the version check in debian/rules to support Ubuntu backports.
+    (Closes: #671097)
+  * Removed support for recursion of .org queries, it has been a thick
+    registry since 2005. (Closes: #678734)
+
+ -- Marco d'Itri <md@linux.it>  Mon, 25 Jun 2012 03:34:36 +0200
+
+whois (5.0.16) unstable; urgency=medium
+
+  * Added the .xn--80ao21a (.ҚАЗ, Kazakhstan) TLD server.
+  * Updated the .ec and .ee TLD servers.
+  * Removed the .xn--mgbc0a9azcg (.المغرب, Morocco) and .xn--mgberp4a5d4ar 
+    (.السعودية, Saudi Arabia) TLD servers.
+  * Added a new ASN allocation.
+  * Updated one or more translations.
+
+ -- Marco d'Itri <md@linux.it>  Mon, 30 Apr 2012 05:44:07 +0200
+
+whois (5.0.15) unstable; urgency=medium
+
+  * Added the .xn--mgba3a4f16a (ایران., Iran) TLD server.
+  * Updated the .pe TLD server, this time for real. (Closes: #653105)
+  * Updated one or more translations. (Closes: #654175)
+
+ -- Marco d'Itri <md@linux.it>  Mon, 05 Mar 2012 22:56:19 +0100
+
+whois (5.0.14) unstable; urgency=medium
+
+  * Added the .sx TLD server.
+  * Updated the .pe TLD server. (Closes: #653105)
+
+ -- Marco d'Itri <md@linux.it>  Fri, 23 Dec 2011 23:55:47 +0100
+
+whois (5.0.13) unstable; urgency=medium
+
+  * Updated the .hr TLD server. (Closes: #646572)
+  * Improved the package description, thanks to debian-l10n-english@.
+    (Closes: #650111)
+  * Updated the FSF address in licenses.
+
+ -- Marco d'Itri <md@linux.it>  Sun, 27 Nov 2011 21:19:28 +0100
+
+whois (5.0.12) unstable; urgency=low
+
+  * Recursion disabled when the query string contains spaces, because
+    probably the query format will not be compatible with the referral
+    server (e.g. whois to rwhois or ARIN to RIPE).
+  * Add the "+" flag by default to queries to whois.arin.net if the
+    argument looks like an IP address. Also add the "a" and "n" flags.
+    No thanks to ARIN for breaking every whois client.
+  * Added the .cv, .lk, .mq, .sy, .so, .biz.ua, .co.ua, .pp.ua, .qa,
+    .xn--3e0b707e (.한국, Korea), .xn--45brj9c (.ভারত, India, Bengali),
+    .xn--90a3ac (.СРБ, Serbia), .xn--clchc0ea0b2g2a9gcd (.சிங்கப்பூர்,
+    Singapore, Tamil), .xn--fpcrj9c3d (.భారత్, India, Telugu), .xn--fzc2c9e2c
+    (.ලංකා, Sri Lanka, Sinhala), .xn--gecrj9c (.ભારત, India, Gujarati),
+    .xn--h2brj9c (.भारत, India, Hindi), .xn--lgbbat1ad8j (.الجزائر, Algeria),
+    .xn--mgbayh7gpa (.الاردن, Jordan), .xn--mgbbh1a71e (.بھارت, India, Urdu),
+    .xn--mgbc0a9azcg (.المغرب, Morocco), .xn--ogbpf8fl (.سورية, Syria),
+    .xn--s9brj9c (.ਭਾਰਤ, India, Punjabi), .xn--xkc2al3hye2a (.இலங்கை, Sri
+    Lanka, Tamil), .xn--wgbl6a (.قطر, Qatar), .xn--xkc2dl3a5ee0h
+    (.இந்தியா, India, Tamil), .xn--yfro4i67o (.新加坡, Singapore, Chinese) and
+    .xxx TLD servers. (Closes: #642424),
+  * Added the .priv.at pseudo-SLD server.
+  * Updated the .co, .gf, .gp, .kr, .li, .rs, .ru, .su, .sv, .ua and
+    .xn--p1ai TLD servers. (Closes: #590425, #634830, #627478)
+  * Added a new ASN allocation.
+  * Fixed a typo and -t syntax in whois(1). (Closes: #614973, #632588)
+  * Made whois return an error in some cases, code contributed by
+    David Souther.
+  * Split HAVE_LINUX_CRYPT_GENSALT from HAVE_XCRYPT to support SuSE,
+    which has it builtin in the libc. Added untested support for Solaris'
+    crypt_gensalt(3). This and the following changes have been contributed
+    by Ludwig Nussel of SuSE.
+  * mkpasswd: stop rejecting non-ASCII characters.
+  * mkpasswd: added support for the 2y algorithm, which fixes CVE-2011-2483.
+  * mkpasswd: raised the number of rounds for 2a/2y from 4 to 5, which is
+    the current default.
+  * mkpasswd: removed support for 2 and {SHA}, which actually are not
+    supported by FreeBSD and libxcrypt.
+
+ -- Marco d'Itri <md@linux.it>  Mon, 10 Oct 2011 02:04:32 +0200
+
+whois (5.0.11) unstable; urgency=medium
+
+  * Added the remaining IPv4 allocations.
+  * Added new ASN allocations.
+  * Updated the .co and .gm TLD servers.
+
+ -- Marco d'Itri <md@linux.it>  Sun, 23 Jan 2011 18:08:55 +0100
+
+whois (5.0.10) unstable; urgency=medium
+
+  * Added new IPv4 allocations.
+
+ -- Marco d'Itri <md@linux.it>  Tue, 30 Nov 2010 23:51:59 +0100
+
+whois (5.0.9) unstable; urgency=low
+
+  * Added new IPv4 allocations.
+
+ -- Marco d'Itri <md@linux.it>  Sun, 12 Nov 2010 22:24:42 +0100
+
+whois (5.0.8) unstable; urgency=medium
+
+  * Added the .xn--fzc2c9e2c (.ලංකා, Sri Lanka, Sinhala), .xn--mgbayh7gpa
+    (.الاردن, Jordan) and .xn--pgbs0dh (.تونس, Tunisia) domains.
+  * Added the .xn--o3cw4h (.ไทย, Thailand) and .xn--ygbi2ammx (.فلسطين,
+    Palestinian Territory) TLD servers.
+  * Updated the .bd and .ps TLD servers.
+  * Removed the .lk TLD server.
+
+ -- Marco d'Itri <md@linux.it>  Wed, 06 Oct 2010 17:57:40 +0200
+
+whois (5.0.7) unstable; urgency=medium
+
+  * Added new IPv4 allocations.
+  * Added the .xn--j6w193g (.香港, Hong Kong), .xn--kprw13d (.台湾, Taiwan)
+    and .xn--kpry57d (.台灣, Taiwan) TLD servers.
+  * Updated the .bd, .bo, .cm, .co, .cu, .dz, .gr, .hk, .lb, .ni, .rw, .tw
+    and .tz TLD servers.
+
+ -- Marco d'Itri <md@linux.it>  Mon, 09 Aug 2010 00:58:21 +0200
+
 whois (5.0.6) unstable; urgency=medium
 
   * Added new IPv4 allocations.

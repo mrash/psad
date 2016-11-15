@@ -1,20 +1,21 @@
 # Traduzione di whois.pot.
-# Copyright (C) 1999-2009 Marco d'Itri
+# Copyright (C) 1999-2013 Marco d'Itri
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: whois 4.7.14\n"
+"Project-Id-Version: whois 5.0.24\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2010-01-27 13:38+0100\n"
-"PO-Revision-Date: 2009-04-12 06:04+0200\n"
+"POT-Creation-Date: 2013-04-10 04:23+0200\n"
+"PO-Revision-Date: 2013-04-10 04:19+0200\n"
 "Last-Translator: Marco d'Itri <md@linux.it>\n"
 "Language-Team: Italian <tp@lists.linux.it>\n"
+"Language: it\n"
 "MIME-Version: 1.0\n"
-"Content-Type: text/plain; charset=iso-8859-1\n"
+"Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
 
-#: ../whois.c:136
+#: ../whois.c:148
 #, c-format
 msgid ""
 "Version %s.\n"
@@ -25,30 +26,30 @@ msgstr ""
 "\n"
 "Segnalare i bug a %s.\n"
 
-#: ../whois.c:190 ../whois.c:243 ../whois.c:249 ../whois.c:256 ../whois.c:286
+#: ../whois.c:202 ../whois.c:255 ../whois.c:261 ../whois.c:291
 #, c-format
 msgid "Using server %s.\n"
 msgstr "Uso il server %s.\n"
 
-#: ../whois.c:228
+#: ../whois.c:240
 msgid "This TLD has no whois server, but you can access the whois database at"
 msgstr ""
-"Questo TLD non ha un server whois, ma si può accedere al database tramite"
+"Questo TLD non ha un server whois, ma si puÃ² accedere al database tramite"
 
-#: ../whois.c:233
+#: ../whois.c:245
 msgid "This TLD has no whois server."
-msgstr "Per questo TLD non esiste un server whois."
+msgstr "Non esiste un server whois per questo TLD."
 
-#: ../whois.c:236
+#: ../whois.c:248
 msgid "No whois server is known for this kind of object."
-msgstr "Non è noto alcun server whois per questo tipo di oggetto."
+msgstr "Non Ã¨ noto alcun server whois per questo tipo di oggetto."
 
-#: ../whois.c:239
+#: ../whois.c:251
 msgid "Unknown AS number or IP network. Please upgrade this program."
 msgstr ""
 "Numero dell'AS o della rete IP sconosciuto. Per favore aggiorna il programma."
 
-#: ../whois.c:262
+#: ../whois.c:267
 #, c-format
 msgid ""
 "\n"
@@ -59,7 +60,7 @@ msgstr ""
 "Cerco l'endpoint IPv4 %s di un indirizzo IPv6 6to4.\n"
 "\n"
 
-#: ../whois.c:268
+#: ../whois.c:273
 #, c-format
 msgid ""
 "\n"
@@ -70,7 +71,7 @@ msgstr ""
 "Cerco l'endpoint IPv4 %s di un indirizzo IPv6 Teredo.\n"
 "\n"
 
-#: ../whois.c:287
+#: ../whois.c:292
 #, c-format
 msgid ""
 "Query string: \"%s\"\n"
@@ -79,7 +80,7 @@ msgstr ""
 "Richiesta: \"%s\"\n"
 "\n"
 
-#: ../whois.c:297
+#: ../whois.c:302
 #, c-format
 msgid ""
 "\n"
@@ -92,165 +93,162 @@ msgstr ""
 "Trovato un riferimento a %s.\n"
 "\n"
 
-#: ../whois.c:339 ../whois.c:342
+#: ../whois.c:344 ../whois.c:347
 #, c-format
 msgid "Cannot parse this line: %s"
 msgstr "Impossibile interpretare questa riga: %s"
 
-#: ../whois.c:506
+#: ../whois.c:516
 msgid "Warning: RIPE flags used with a traditional server."
 msgstr "Attenzione: sono stati usati dei flag RIPE con un server tradizionale."
 
-#: ../whois.c:657 ../whois.c:806
+#: ../whois.c:675 ../whois.c:773
 msgid ""
 "Catastrophic error: disclaimer text has been changed.\n"
 "Please upgrade this program.\n"
 msgstr ""
-"Errore catastrofico: il testo di avvertenze è cambiato.\n"
+"Errore catastrofico: il testo di avvertenze Ã¨ cambiato.\n"
 "Aggiorna questo programma.\n"
 
-#: ../whois.c:858
+#: ../whois.c:828
 #, c-format
 msgid "Host %s not found."
 msgstr "Host %s non trovato."
 
-#: ../whois.c:868
+#: ../whois.c:838
 #, c-format
 msgid "%s/tcp: unknown service"
 msgstr "%s/tcp: servizio sconosciuto"
 
-#: ../whois.c:943
+#: ../whois.c:913
 msgid "Timeout."
 msgstr "Tempo scaduto."
 
-#: ../whois.c:949
+#: ../whois.c:919
 #, c-format
 msgid "Interrupted by signal %d..."
 msgstr "Interrotto dal segnale %d..."
 
-#: ../whois.c:1175
+#: ../whois.c:1189
 #, c-format
 msgid ""
 "Usage: whois [OPTION]... OBJECT...\n"
 "\n"
-"-l                     one level less specific lookup [RPSL only]\n"
-"-L                     find all Less specific matches\n"
-"-m                     find first level more specific matches\n"
-"-M                     find all More specific matches\n"
-"-c                     find the smallest match containing a mnt-irt "
-"attribute\n"
-"-x                     exact match [RPSL only]\n"
-"-d                     return DNS reverse delegation objects too [RPSL "
-"only]\n"
-"-i ATTR[,ATTR]...      do an inverse lookup for specified ATTRibutes\n"
-"-T TYPE[,TYPE]...      only look for objects of TYPE\n"
-"-K                     only primary keys are returned [RPSL only]\n"
-"-r                     turn off recursive lookups for contact information\n"
-"-R                     force to show local copy of the domain object even\n"
-"                       if it contains referral\n"
-"-a                     search all databases\n"
-"-s SOURCE[,SOURCE]...  search the database from SOURCE\n"
-"-g SOURCE:FIRST-LAST   find updates from SOURCE from serial FIRST to LAST\n"
-"-t TYPE                request template for object of TYPE ('all' for a "
-"list)\n"
-"-v TYPE                request verbose template for object of TYPE\n"
-"-q [version|sources|types]  query specified server info [RPSL only]\n"
-"-F                     fast raw output (implies -r)\n"
-"-h HOST                connect to server HOST\n"
-"-p PORT                connect to PORT\n"
+"-h HOST, --host HOST   connect to server HOST\n"
+"-p PORT, --port PORT   connect to PORT\n"
 "-H                     hide legal disclaimers\n"
 "      --verbose        explain what is being done\n"
 "      --help           display this help and exit\n"
 "      --version        output version information and exit\n"
+"\n"
+"These flags are supported by whois.ripe.net and some RIPE-like servers:\n"
+"-l                     find the one level less specific match\n"
+"-L                     find all levels less specific matches\n"
+"-m                     find all one level more specific matches\n"
+"-M                     find all levels of more specific matches\n"
+"-c                     find the smallest match containing a mnt-irt "
+"attribute\n"
+"-x                     exact match\n"
+"-b                     return brief IP address ranges with abuse contact\n"
+"-B                     turn off object filtering (show email addresses)\n"
+"-G                     turn off grouping of associated objects\n"
+"-d                     return DNS reverse delegation objects too\n"
+"-i ATTR[,ATTR]...      do an inverse look-up for specified ATTRibutes\n"
+"-T TYPE[,TYPE]...      only look for objects of TYPE\n"
+"-K                     only primary keys are returned\n"
+"-r                     turn off recursive look-ups for contact information\n"
+"-R                     force to show local copy of the domain object even\n"
+"                       if it contains referral\n"
+"-a                     also search all the mirrored databases\n"
+"-s SOURCE[,SOURCE]...  search the database mirrored from SOURCE\n"
+"-g SOURCE:FIRST-LAST   find updates from SOURCE from serial FIRST to LAST\n"
+"-t TYPE                request template for object of TYPE\n"
+"-v TYPE                request verbose template for object of TYPE\n"
+"-q [version|sources|types]  query specified server info\n"
 msgstr ""
 "Uso: whois [OPZIONE]... OGGETTO...\n"
 "\n"
-"-l                 trova le corrispondenze un livello meno specifiche "
-"[RPSL]\n"
-"-L                 trova le corrispondenze meno specifiche\n"
-"-m                 trova le corrispondenze di primo livello più specifiche\n"
-"-M                 trova le corrispondenze più specifiche\n"
-"-c                 trova le corrispondenze più specifica contenente un\n"
-"                   attributo mnt-irt [solo RPSL]\n"
-"-x                 trova solo la corrispondenza esatta [solo RPSL]\n"
-"-d                 restituisce anche gli oggetti della delega del DNS "
-"[RPSL]\n"
-"-i ATTR[,ATTR]...  fa una ricerca inversa per l'ATTRibuto specificato\n"
-"-T TIPO[,TIPO]...  cerca solo oggetti del TIPO\n"
-"-K                 restituisce solo le chiavi primarie [solo RPSL]\n"
-"-r                 disabilita le ricerche ricorsive\n"
-"-R                 mostra la copia locale dell'oggetto domain anche se\n"
-"                   contiene un riferimento\n"
-"-a                 cerca in tutti i database\n"
-"-s SOURCE[,SOURCE]...  cerca il database da SOURCE\n"
-"-g SOURCE:FIRST-LAST  trova gli aggiornamenti di SOURCE dal seriale F a L\n"
-"-t TIPO        chiede il template per un oggetto del TIPO ('all' per una "
-"lista)\n"
-"-v TIPO            chiede il template prolisso per un oggetto del TIPO\n"
-"-q [version|sources|types]  chiede al server le informazioni indicate "
-"[RPSL]\n"
-"-F                 output grezzo veloce (implica -r)\n"
-"-h HOST            si connette al server HOST\n"
-"-p PORTA           si connette alla PORTA\n"
+"-h HOST, --host HOST    si connette al server HOST\n"
+"-p PORTA, --port PORTA  si connette alla PORTA\n"
 "-H                 nasconde le avvertenze legali\n"
 "      --verbose    spiega cosa sta facendo\n"
 "      --help       mostra questo aiuto ed esce\n"
 "      --version    stampa le informazioni sulla versione ed esce\n"
+"\n"
+"Le seguenti opzioni sono gestite da whois.ripe.net e alcuni server simili:\n"
+"-l                 trova la corrispondenza un livello meno specifica\n"
+"-L                 trova le corrispondenze meno specifiche a tutti i livelli\n"
+"-m                 trova le corrispondenze di primo livello piÃ¹ specifiche\n"
+"-M                 trova le corrispondenze piÃ¹ specifiche a tutti i livelli\n"
+"-c                 trova la corrispondenza piÃ¹ specifica contenente un\n"
+"                   attributo mnt-irt\n"
+"-x                 trova solo la corrispondenza esatta\n"
+"-b                 mostra solo la rete IP con il contatto per gli abusi\n"
+"-B                 non filtra gli oggetti (mostra gli indirizzi di e-mail)\n"
+"-B                 non raggruppa gli oggetti associati\n"
+"-d                 restituisce anche gli oggetti della delega del DNS\n"
+"-i ATTR[,ATTR]...  fa una ricerca inversa per l'ATTRibuto specificato\n"
+"-T TIPO[,TIPO]...  cerca solo oggetti del TIPO\n"
+"-K                 restituisce solo le chiavi primarie\n"
+"-r                 disabilita le ricerche ricorsive per i contatti\n"
+"-R                 mostra la copia locale dell'oggetto domain anche se\n"
+"                   contiene un riferimento\n"
+"-a                 cerca anche in tutti i database replicati\n"
+"-s SOURCE[,SOURCE]...  cerca il database replicato da SOURCE\n"
+"-g SOURCE:FIRST-LAST  trova gli aggiornamenti di SOURCE dal seriale F a L\n"
+"-t TIPO            chiede il template per un oggetto del TIPO\n"
+"-v TIPO            chiede il template prolisso per un oggetto del TIPO\n"
+"-q [version|sources|types]  chiede al server le informazioni indicate\n"
 
-#: ../mkpasswd.c:80
+#: ../mkpasswd.c:84
 msgid "standard 56 bit DES-based crypt(3)"
 msgstr "crypt(3) standard a 56 bit basata su DES"
 
-#: ../mkpasswd.c:162
+#: ../mkpasswd.c:165
 #, c-format
 msgid "Invalid method '%s'.\n"
-msgstr "Il metodo '%s' non è valido.\n"
+msgstr "Il metodo '%s' non Ã¨ valido.\n"
 
-#: ../mkpasswd.c:171 ../mkpasswd.c:181
+#: ../mkpasswd.c:174 ../mkpasswd.c:184
 #, c-format
 msgid "Invalid number '%s'.\n"
-msgstr "Il numero '%s' non è valido.\n"
+msgstr "Il numero '%s' non Ã¨ valido.\n"
 
-#: ../mkpasswd.c:199
+#: ../mkpasswd.c:201
 #, c-format
 msgid "Try '%s --help' for more information.\n"
 msgstr "Per maggior informazioni prova '%s --help'.\n"
 
-#: ../mkpasswd.c:240
+#: ../mkpasswd.c:242
 #, c-format
 msgid "Wrong salt length: %d byte when %d expected.\n"
 msgid_plural "Wrong salt length: %d bytes when %d expected.\n"
 msgstr[0] "Lunghezza del sale sbagliata: %d byte invece di %d.\n"
 msgstr[1] "Lunghezza del sale sbagliata: %d byte invece di %d.\n"
 
-#: ../mkpasswd.c:245
+#: ../mkpasswd.c:247
 #, c-format
 msgid "Wrong salt length: %d byte when %d <= n <= %d expected.\n"
 msgid_plural "Wrong salt length: %d bytes when %d <= n <= %d expected.\n"
 msgstr[0] "Lunghezza del sale sbagliata: %d byte invece di %d <= n <= %d.\n"
 msgstr[1] "Lunghezza del sale sbagliata: %d byte invece di %d <= n <= %d.\n"
 
-#: ../mkpasswd.c:254
+#: ../mkpasswd.c:256
 #, c-format
 msgid "Illegal salt character '%c'.\n"
-msgstr "Il carattere '%c' non è valido in un sale.\n"
+msgstr "Il carattere '%c' non Ã¨ valido in un sale.\n"
 
-#: ../mkpasswd.c:299 ../mkpasswd.c:326
+#: ../mkpasswd.c:306 ../mkpasswd.c:322
 #, c-format
 msgid "Password: "
 msgstr "Password: "
 
-#: ../mkpasswd.c:320
-#, c-format
-msgid "Illegal password character '0x%hhx'.\n"
-msgstr "Il carattere '0x%hhx' non è valido in una password.\n"
-
-#: ../mkpasswd.c:342
+#: ../mkpasswd.c:340
 #, c-format
 msgid "Method not supported by crypt(3).\n"
 msgstr "Metodo non gestito da crypt(3).\n"
 
-#: ../mkpasswd.c:420
+#: ../mkpasswd.c:419
 #, c-format
 msgid ""
 "Usage: mkpasswd [OPTIONS]... [PASSWORD [SALT]]\n"
@@ -261,7 +259,7 @@ msgstr ""
 "Cifra la PASSWORD usando crypt(3).\n"
 "\n"
 
-#: ../mkpasswd.c:423
+#: ../mkpasswd.c:422
 #, c-format
 msgid ""
 "      -m, --method=TYPE     select method TYPE\n"
@@ -290,9 +288,9 @@ msgstr ""
 "      -h, --help            mostra questo aiuto ed esce\n"
 "      -v, --version         mostra le informazioni sulla versione ed esce\n"
 "\n"
-"Se la PASSWORD non è specificata viene chiesta interattivamente.\n"
-"Se il SALE non è specificato ne viene generato uno casuale.\n"
-"Se il TIPO è 'help' viene stampata la lista degli algoritmi disponibili.\n"
+"Se la PASSWORD non Ã¨ specificata viene chiesta interattivamente.\n"
+"Se il SALE non Ã¨ specificato ne viene generato uno casuale.\n"
+"Se il TIPO Ã¨ 'help' viene stampata la lista degli algoritmi disponibili.\n"
 "\n"
 "Segnalare i bug a %s.\n"
 

@@ -17,8 +17,10 @@
  */
 
 /* for crypt, snprintf and strcasecmp */
-#define _XOPEN_SOURCE
-#define _BSD_SOURCE
+#define _XOPEN_SOURCE 500
+#define _BSD_SOURCE 1
+#define _DEFAULT_SOURCE 1
+#define __EXTENSIONS__ 1
 
 /* System library */
 #include <stdio.h>
@@ -36,11 +38,16 @@
 #include <xcrypt.h>
 #include <sys/stat.h>
 #endif
+#ifdef HAVE_LINUX_CRYPT_GENSALT
+#define _OW_SOURCE
+#include <crypt.h>
+#endif
 #ifdef HAVE_GETTIMEOFDAY
 #include <sys/time.h>
 #endif
 
 /* Application-specific */
+#include "version.h"
 #include "utils.h"
 
 /* Global variables */
@@ -79,11 +86,19 @@ static const struct crypt_method methods[] = {
     { "des",		"",	2,	2,	0,
 	N_("standard 56 bit DES-based crypt(3)") },
     { "md5",		"$1$",	8,	8,	0, "MD5" },
-#if defined FreeBSD
-    { "bf",		"$2$",  22,	22,	0, "Blowfish (FreeBSD)" },
-#endif
-#if defined OpenBSD || (defined __SVR4 && defined __sun) || defined HAVE_XCRYPT
+#if defined OpenBSD || defined FreeBSD || (defined __SVR4 && defined __sun)
+# if (defined OpenBSD && OpenBSD >= 201405)
+    /* http://marc.info/?l=openbsd-misc&m=139320023202696 */
+    { "bf",		"$2b$", 22,	22,	1, "Blowfish" },
+    { "bfa",		"$2a$", 22,	22,	1, "Blowfish (obsolete $2a$ version)" },
+# else
     { "bf",		"$2a$", 22,	22,	1, "Blowfish" },
+# endif
+#endif
+#if defined HAVE_LINUX_CRYPT_GENSALT
+    { "bf",		"$2a$", 22,	22,	1, "Blowfish, system-specific on 8-bit chars" },
+    /* algorithm 2y fixes CVE-2011-2483 */
+    { "bfy",		"$2y$", 22,	22,	1, "Blowfish, correct handling of 8-bit chars" },
 #endif
 #if defined FreeBSD
     { "nt",		"$3$",  0,	0,	0, "NT-Hash" },
@@ -103,15 +118,12 @@ static const struct crypt_method methods[] = {
 #if defined __SVR4 && defined __sun
     { "sunmd5",		"$md5$", 8,	8,	1, "SunMD5" },
 #endif
-#if defined HAVE_XCRYPT
-    { "sha",		"{SHA}", 0,	0,	0, "SHA-1" },
-#endif
     { NULL,		NULL,	0,	0,	0, NULL }
 };
 
 void generate_salt(char *const buf, const unsigned int len);
-void *get_random_bytes(const int len);
-void display_help(void);
+void *get_random_bytes(const unsigned int len);
+void display_help(int error);
 void display_version(void);
 void display_methods(void);
 
@@ -176,11 +188,14 @@ int main(int argc, char *argv[])
 	case 'R':
 	    {
 		char *p;
-		rounds = strtol(optarg, &p, 10);
-		if (p == NULL || *p != '\0' || rounds < 0) {
+		long r;
+
+		r = strtol(optarg, &p, 10);
+		if (p == NULL || *p != '\0' || r < 0) {
 		    fprintf(stderr, _("Invalid number '%s'.\n"), optarg);
 		    exit(1);
 		}
+		rounds = r;
 	    }
 	    break;
 	case 's':
@@ -193,8 +208,7 @@ int main(int argc, char *argv[])
 	    display_version();
 	    exit(0);
 	case 'h':
-	    display_help();
-	    exit(0);
+	    display_help(EXIT_SUCCESS);
 	default:
 	    fprintf(stderr, _("Try '%s --help' for more information.\n"),
 		    argv[0]);
@@ -211,8 +225,7 @@ int main(int argc, char *argv[])
 	password = argv[0];
     } else if (argc == 0) {
     } else {
-	display_help();
-	exit(1);
+	display_help(EXIT_FAILURE);
     }
 
     /* default: DES password */
@@ -222,10 +235,11 @@ int main(int argc, char *argv[])
 	salt_prefix = methods[0].prefix;
     }
 
-    if (streq(salt_prefix, "$2a$")) {		/* OpenBSD Blowfish  */
-	if (rounds <= 4)
-	    rounds = 4;
-	/* actually for 2a it is the logarithm of the number of rounds */
+    if (streq(salt_prefix, "$2a$") || streq(salt_prefix, "$2y$")) {
+	/* OpenBSD Blowfish and derivatives */
+	if (rounds <= 5)
+	    rounds = 5;
+	/* actually for 2a/2y it is the logarithm of the number of rounds */
 	snprintf(rounds_str, sizeof(rounds_str), "%02u$", rounds);
     } else if (rounds_support && rounds)
 	snprintf(rounds_str, sizeof(rounds_str), "rounds=%u$", rounds);
@@ -264,7 +278,13 @@ int main(int argc, char *argv[])
 	strcat(salt, rounds_str);
 	strcat(salt, salt_arg);
     } else {
-#ifdef HAVE_XCRYPT
+#ifdef HAVE_SOLARIS_CRYPT_GENSALT
+	salt = crypt_gensalt(salt_prefix, NULL);
+	if (!salt) {
+		perror("crypt_gensalt");
+		exit(2);
+	}
+#elif defined HAVE_LINUX_CRYPT_GENSALT
 	void *entropy = get_random_bytes(64);
 
 	salt = crypt_gensalt(salt_prefix, rounds, entropy, 64);
@@ -293,7 +313,7 @@ int main(int argc, char *argv[])
     if (password) {
     } else if (password_fd != -1) {
 	FILE *fp;
-	unsigned char *p;
+	char *p;
 
 	if (isatty(password_fd))
 	    fprintf(stderr, _("Password: "));
@@ -308,20 +328,9 @@ int main(int argc, char *argv[])
 	    exit(2);
 	}
 
-	p = (unsigned char *)password;
-	while (*p) {
-	    if (*p == '\n' || *p == '\r') {
-		*p = '\0';
-		break;
-	    }
-	    /* which characters are valid? */
-	    if (*p > 0x7f) {
-		fprintf(stderr,
-			_("Illegal password character '0x%hhx'.\n"), *p);
-		exit(1);
-	    }
-	    p++;
-	}
+	p = strpbrk(password, "\n\r");
+	if (p)
+	    *p = '\0';
     } else {
 	password = getpass(_("Password: "));
 	if (!password) {
@@ -338,7 +347,9 @@ int main(int argc, char *argv[])
 	    fprintf(stderr, "crypt failed.\n");
 	    exit(2);
 	}
-	if (!strneq(result, salt_prefix, strlen(salt_prefix))) {
+	/* yes, using strlen(salt_prefix) on salt. It's not
+	 * documented whether crypt_gensalt may change the prefix */
+	if (!strneq(result, salt, strlen(salt_prefix))) {
 	    fprintf(stderr, _("Method not supported by crypt(3).\n"));
 	    exit(2);
 	}
@@ -349,10 +360,10 @@ int main(int argc, char *argv[])
 }
 
 #ifdef RANDOM_DEVICE
-void* get_random_bytes(const int count)
+void* get_random_bytes(const unsigned int count)
 {
     char *buf;
-    int fd;
+    int fd, bytes_read;
 
     buf = NOFAIL(malloc(count));
     fd = open(RANDOM_DEVICE, O_RDONLY);
@@ -360,11 +371,13 @@ void* get_random_bytes(const int count)
 	perror("open(" RANDOM_DEVICE ")");
 	exit(2);
     }
-    if (read(fd, buf, count) != count) {
-	if (count < 0)
-	    perror("read(" RANDOM_DEVICE ")");
-	else
-	    fprintf(stderr, "Short read of %s.\n", RANDOM_DEVICE);
+    bytes_read = read(fd, buf, count);
+    if (bytes_read < 0) {
+	perror("read(" RANDOM_DEVICE ")");
+	exit(2);
+    }
+    if (bytes_read != count) {
+	fprintf(stderr, "Short read of %s.\n", RANDOM_DEVICE);
 	exit(2);
     }
     close(fd);
@@ -373,19 +386,27 @@ void* get_random_bytes(const int count)
 }
 #endif
 
-#ifdef RANDOM_DEVICE
+#if defined RANDOM_DEVICE || defined HAVE_ARC4RANDOM_BUF
 
 void generate_salt(char *const buf, const unsigned int len)
 {
     unsigned int i;
+    unsigned char *entropy;
 
-    unsigned char *entropy = get_random_bytes(len * sizeof(unsigned char));
+#if defined HAVE_ARC4RANDOM_BUF
+    void *entropy = NOFAIL(malloc(len));
+    arc4random_buf(entropy, len);
+#else
+    entropy = get_random_bytes(len);
+#endif
+
     for (i = 0; i < len; i++)
 	buf[i] = valid_salts[entropy[i] % (sizeof valid_salts - 1)];
     buf[i] = '\0';
+    free(entropy);
 }
 
-#else /* RANDOM_DEVICE */
+#else /* RANDOM_DEVICE || HAVE_ARC4RANDOM_BUF */
 
 void generate_salt(char *const buf, const unsigned int len)
 {
@@ -413,11 +434,12 @@ void generate_salt(char *const buf, const unsigned int len)
     buf[i] = '\0';
 }
 
-#endif /* RANDOM_DEVICE */
+#endif /* RANDOM_DEVICE || HAVE_ARC4RANDOM_BUF */
 
-void display_help(void)
+void display_help(int error)
 {
-    fprintf(stderr, _("Usage: mkpasswd [OPTIONS]... [PASSWORD [SALT]]\n"
+    fprintf((EXIT_SUCCESS == error) ? stdout : stderr,
+	    _("Usage: mkpasswd [OPTIONS]... [PASSWORD [SALT]]\n"
 	    "Crypts the PASSWORD using crypt(3).\n\n"));
     fprintf(stderr, _(
 "      -m, --method=TYPE     select method TYPE\n"
@@ -435,6 +457,7 @@ void display_help(void)
 "If TYPE is 'help', available methods are printed.\n"
 "\n"
 "Report bugs to %s.\n"), "<md+whois@linux.it>");
+    exit(error);
 }
 
 void display_version(void)

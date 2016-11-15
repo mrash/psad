@@ -1,6 +1,3 @@
-/* Program version */
-#define VERSION "5.0.6"
-
 /* Configurable features */
 
 /* Always hide legal disclaimers */
@@ -54,6 +51,7 @@
 /* Unknown versions of Solaris */
 #if defined __SVR4 && defined __sun
 # define HAVE_SHA_CRYPT
+# define HAVE_SOLARIS_CRYPT_GENSALT
 #endif
 
 /* FIXME: which systems lack this? */
@@ -81,6 +79,15 @@
 	/* Tru64 UNIX >= 5.1B? */ \
 	|| defined __osf
 # define RANDOM_DEVICE "/dev/urandom"
+#endif
+
+/* use arc4random_buf instead if it is available */
+#if (defined __FreeBSD__ && __FreeBSD__ >= 9) || \
+    (defined __NetBSD__  && __NetBSD_Version__ >= 600000000) || \
+    (defined OpenBSD && OpenBSD >= 200805) || \
+    (defined __APPLE__ && defined __MACH__)
+# define HAVE_ARC4RANDOM_BUF
+# undef RANDOM_DEVICE
 #endif
 
 #ifdef ENABLE_NLS

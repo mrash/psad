@@ -1,21 +1,19 @@
-# ja.po for whois
-# Copyright (C) 2005 Marco d'Itri <md@linux.it>
-# This file is distributed under the same license as the whois package.
-# Satoru SATOH <ss@gnome.gr.jp>, 2005.
+# Oversatt fra whois.pot.
+# Egil Kvaleberg <egil@kvaleberg.no>, 1999.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: whois 4.7.2\n"
+"Project-Id-Version: whois 4.4.5\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2013-04-10 04:23+0200\n"
-"PO-Revision-Date: 2005-04-26 00:20+0900\n"
-"Last-Translator: Satoru SATOH <ss@gnome.gr.jp>\n"
-"Language-Team: Japanese <gnome-translation@gnome.gr.jp>\n"
-"Language: ja\n"
+"PO-Revision-Date: 1999-12-18 14:00:00\n"
+"Last-Translator: Egil Kvaleberg <egil@kvaleberg.no>\n"
+"Language-Team: Norwegian <no@li.org>\n"
+"Language: nb\n"
 "MIME-Version: 1.0\n"
-"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Type: text/plain; charset=iso-8859-1\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=1; plural=0;\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
 
 #: ../whois.c:148
 #, c-format
@@ -24,32 +22,28 @@ msgid ""
 "\n"
 "Report bugs to %s.\n"
 msgstr ""
-"バージョン %s.\n"
-"\n"
-"バグ報告は %s へ.\n"
 
 #: ../whois.c:202 ../whois.c:255 ../whois.c:261 ../whois.c:291
 #, c-format
 msgid "Using server %s.\n"
-msgstr "サーバー %s を使用\n"
+msgstr "Bruker tjener %s.\n"
 
 #: ../whois.c:240
 msgid "This TLD has no whois server, but you can access the whois database at"
 msgstr ""
-"この TLD には whois サーバーがありませんが、次のサーバーで whois データベース"
-"にアクセスできます"
 
 #: ../whois.c:245
 msgid "This TLD has no whois server."
-msgstr "この TLD には whois サーバーがありません"
+msgstr ""
 
 #: ../whois.c:248
 msgid "No whois server is known for this kind of object."
-msgstr "この種のオブジェクトに対する既知の whois サーバーはありません"
+msgstr ""
 
 #: ../whois.c:251
+#, fuzzy
 msgid "Unknown AS number or IP network. Please upgrade this program."
-msgstr "不明な AS 番号または IP ネットワーク. アップグレードして下さい"
+msgstr "Ukjent AS-nummer. Vennligst oppdater programmet."
 
 #: ../whois.c:267
 #, c-format
@@ -58,20 +52,14 @@ msgid ""
 "Querying for the IPv4 endpoint %s of a 6to4 IPv6 address.\n"
 "\n"
 msgstr ""
-"\n"
-"6to4 IPv6 アドレスの IPv4 終端 %s を問い合わせ中\n"
-"\n"
 
 #: ../whois.c:273
-#, fuzzy, c-format
+#, c-format
 msgid ""
 "\n"
 "Querying for the IPv4 endpoint %s of a Teredo IPv6 address.\n"
 "\n"
 msgstr ""
-"\n"
-"6to4 IPv6 アドレスの IPv4 終端 %s を問い合わせ中\n"
-"\n"
 
 #: ../whois.c:292
 #, c-format
@@ -79,11 +67,11 @@ msgid ""
 "Query string: \"%s\"\n"
 "\n"
 msgstr ""
-"問い合わせ文字列: \"%s\"\n"
+"Foresp�rsel: \"%s\"\n"
 "\n"
 
 #: ../whois.c:302
-#, c-format
+#, fuzzy, c-format
 msgid ""
 "\n"
 "\n"
@@ -91,45 +79,46 @@ msgid ""
 "\n"
 msgstr ""
 "\n"
-"\n"
-"%s への照会をみつけました\n"
+"Fant InterNIC-referanse til %s.\n"
 "\n"
 
 #: ../whois.c:344 ../whois.c:347
 #, c-format
 msgid "Cannot parse this line: %s"
-msgstr "この行を解析できません: %s"
+msgstr ""
 
 #: ../whois.c:516
+#, fuzzy
 msgid "Warning: RIPE flags used with a traditional server."
-msgstr "警告: 旧来のサーバーについて RIPE フラグが使用されています"
+msgstr "Merk: RIPE-flaggene ignoreres for en tradisjonell tjener."
 
 #: ../whois.c:675 ../whois.c:773
+#, fuzzy
 msgid ""
 "Catastrophic error: disclaimer text has been changed.\n"
 "Please upgrade this program.\n"
 msgstr ""
-"破滅的なエラー: 免責条項テキストが変更されました\n"
-"このプログラムをアップグレードして下さい\n"
+"Alvorlig feil: INTERNIC har endret standardtekst.\n"
+"Vennligst oppdater programmet.\n"
 
 #: ../whois.c:828
 #, c-format
 msgid "Host %s not found."
-msgstr "ホスト %s はみつかりませんでした"
+msgstr "Finner ikke verten %s."
 
 #: ../whois.c:838
 #, c-format
 msgid "%s/tcp: unknown service"
-msgstr "%s/tcp: 不明なサービス"
+msgstr "%s/tcp: ukjent port"
 
 #: ../whois.c:913
 msgid "Timeout."
-msgstr "時間切れ"
+msgstr ""
 
 #: ../whois.c:919
 #, c-format
 msgid "Interrupted by signal %d..."
-msgstr "シグナル %d が割込み..."
+msgstr "Avbrudt av signal %d..."
 
 #: ../whois.c:1189
 #, c-format
@@ -170,48 +159,47 @@ msgid ""
 msgstr ""
 
 #: ../mkpasswd.c:84
-#, fuzzy
 msgid "standard 56 bit DES-based crypt(3)"
-msgstr "\t標準 56 ビット DES ベース暗号(3)"
+msgstr ""
 
 #: ../mkpasswd.c:165
-#, fuzzy, c-format
+#, c-format
 msgid "Invalid method '%s'.\n"
-msgstr "不正な数字 '%s'\n"
+msgstr ""
 
 #: ../mkpasswd.c:174 ../mkpasswd.c:184
 #, c-format
 msgid "Invalid number '%s'.\n"
-msgstr "不正な数字 '%s'\n"
+msgstr ""
 
 #: ../mkpasswd.c:201
 #, c-format
 msgid "Try '%s --help' for more information.\n"
-msgstr "さらなる詳細については '%s --help' を実行\n"
+msgstr ""
 
 #: ../mkpasswd.c:242
-#, fuzzy, c-format
+#, c-format
 msgid "Wrong salt length: %d byte when %d expected.\n"
 msgid_plural "Wrong salt length: %d bytes when %d expected.\n"
-msgstr[0] "間違ったソルト長: %d バイト(s) (%d を期待)\n"
-msgstr[1] "間違ったソルト長: %d バイト(s) (%d を期待)\n"
+msgstr[0] ""
+msgstr[1] ""
 
 #: ../mkpasswd.c:247
-#, fuzzy, c-format
+#, c-format
 msgid "Wrong salt length: %d byte when %d <= n <= %d expected.\n"
 msgid_plural "Wrong salt length: %d bytes when %d <= n <= %d expected.\n"
-msgstr[0] "間違ったソルト長: %d バイト(s) (%d を期待)\n"
-msgstr[1] "間違ったソルト長: %d バイト(s) (%d を期待)\n"
+msgstr[0] ""
+msgstr[1] ""
 
 #: ../mkpasswd.c:256
 #, c-format
 msgid "Illegal salt character '%c'.\n"
-msgstr "不正なソルト文字 '%c'\n"
+msgstr ""
 
 #: ../mkpasswd.c:306 ../mkpasswd.c:322
 #, c-format
 msgid "Password: "
-msgstr "パスワード: "
+msgstr ""
 
 #: ../mkpasswd.c:340
 #, c-format
@@ -225,12 +213,9 @@ msgid ""
 "Crypts the PASSWORD using crypt(3).\n"
 "\n"
 msgstr ""
-"使い方: mkpasswd [OPTIONS]... [PASSWORD [SALT]]\n"
-"PASSWORD を crypt(3) で暗号化\n"
-"\n"
 
 #: ../mkpasswd.c:422
-#, fuzzy, c-format
+#, c-format
 msgid ""
 "      -m, --method=TYPE     select method TYPE\n"
 "      -5                    like --method=md5\n"
@@ -248,24 +233,11 @@ msgid ""
 "\n"
 "Report bugs to %s.\n"
 msgstr ""
-"      -H, --hash=TYPE       ハッシュ TYPE を選択\n"
-"      -S, --salt=SALT       指定の SALT を選択\n"
-"      -P, --password-fd=NUM /dev/tty の代わりにファイルディスクリプタ\n"
-"                            NUM からパスワードを読み込む\n"
-"      -s, --stdin           --password-fd=0 と同様\n"
-"      -h, --help            このヘルプを表示して終了\n"
-"      -V, --version         バージョン情報を出力して終了\n"
-"\n"
-"PASSWORD が未指定なら対話的に尋ねられます.\n"
-"SALT が未指定ならランダムに生成されたものが用いられます.\n"
-"TYPE が 'help' なら利用可能なアルゴリズムを表示します.\n"
-"\n"
-"バグ報告は %s へ.\n"
 
 #: ../mkpasswd.c:452
-#, fuzzy, c-format
+#, c-format
 msgid "Available methods:\n"
-msgstr "利用可能なアルゴリズム:\n"
+msgstr ""
 
 #, fuzzy
 #~ msgid ""
@@ -303,41 +275,56 @@ msgstr "利用可能なアルゴリズム:\n"
 #~ "      --help           display this help and exit\n"
 #~ "      --version        output version information and exit\n"
 #~ msgstr ""
-#~ ": whois [OPTION]... OBJECT...\n"
+#~ "Bruk: whois [OPSJONER]... OBJEKTER...\n"
 #~ "\n"
-#~ "-l                     one level less specific lookup [RPSL のみ]\n"
-#~ "-L                     find all Less specific matches\n"
-#~ "-m                     find first level more specific matches\n"
-#~ "-M                     find all More specific matches\n"
-#~ "-c                     find the smallest match containing a mnt-irt "
-#~ "attribute\n"
-#~ "-x                     厳密にマッチ [RPSL のみ]\n"
-#~ "-d                     DNS 逆向き移譲オブジェクトも返す [RPSL のみ]\n"
-#~ "-i ATTR[,ATTR]...      指定属性 ATTR について逆引き\n"
-#~ "-T TYPE[,TYPE]...      TYPE オブジェクトのみについて検索\n"
-#~ "-K                     主キーのみ返す [RPSL のみ]\n"
-#~ "-r                     コンタクト情報について再帰検索しない\n"
-#~ "-R                     照会が含まれていても強制的にドメインオブジェクト"
-#~ "の\n"
-#~ "                       ローカルコピーを表示\n"
-#~ "-a                     すべてのデータベースを検索\n"
-#~ "-s SOURCE[,SOURCE]...  SOURCE からデータベースを検索\n"
-#~ "-g SOURCE:FIRST-LAST   SOURCE (シリアル FIRST から LAST まで)から更新を検"
-#~ "索\n"
-#~ "-t TYPE                TYPE オブジェクトについてテンプレートを要求 (リスト"
-#~ "は 'all')\n"
-#~ "-v TYPE                TYPE オブジェクトについて冗長なテンプレートを要求\n"
-#~ "-q [version|sources|types]  指定サーバー情報を問い合わせ [RPSL のみ]\n"
-#~ "-F                     高速直接(ロー)出力 (-r を暗示)\n"
-#~ "-h HOST                サーバー HOST に接続\n"
-#~ "-p PORT                PORT に接続\n"
-#~ "-H                     法的責任棄却声明を表示しない\n"
-#~ "      --verbose        進捗について詳細に説明\n"
-#~ "      --help           このヘルプを表示して終了\n"
-#~ "      --version        バージョン情報を表示して終了\n"
+#~ "-a                     s�k i alle databaser\n"
+#~ "-F                     full utskrift (impliserer -r)\n"
+#~ "-g KILDE:F�RSTE-SISTE  finn oppdateringer fra KILDE fra serie F�RSTE til "
+#~ "SISTE\n"
+#~ "-h VERT                koble til tjener VERT\n"
+#~ "-i ATTR[,ATTR]...      gj�r reversoppslag for attributtene ATTR\n"
+#~ "-L                     finn alle mindre spesifike treff\n"
+#~ "-M                     finn alle mer spesifike treff\n"
+#~ "-m                     finn f�rste niv� av mer spesifike treff\n"
+#~ "-r                     ikke foreta rekursive oppslag\n"
+#~ "-p PORT                koble til PORT\n"
+#~ "-R                     vis lokal kopi av objektet selv om det inneholder\n"
+#~ "                       en referanse\n"
+#~ "-S                     be tjeneren utelate syntaktisk \"sukker\"\n"
+#~ "-s KILDE[,KILDE]...    s�k i databasen fra KILDE\n"
+#~ "-T TYPE[,TYPE]...      se bare p� objekttype TYPE\n"
+#~ "-t TYPE                be om mal for objekttype TYPE ('all' gir en "
+#~ "liste)\n"
+#~ "-v TYPE                be om utf�rlig mal for objekttype TYPE\n"
+#~ "-V                     forklarer hva som skjer\n"
+#~ "\n"
+#~ "Versjon %s. Rapporter feil til %s.\n"
 
-#~ msgid "Illegal password character '0x%hhx'.\n"
-#~ msgstr "不正なパスワード文字 '0x%hhx'\n"
+#~ msgid "Using default server %s.\n"
+#~ msgstr "Bruker standardtjener %s.\n"
 
-#~ msgid "Invalid hash type '%s'.\n"
-#~ msgstr "不正なハッシュタイプ '%s'\n"
+#, fuzzy
+#~ msgid ""
+#~ "\n"
+#~ "Found referral to %s.\n"
+#~ "\n"
+#~ msgstr ""
+#~ "\n"
+#~ "Fant InterNIC-referanse til %s.\n"
+#~ "\n"
+
+#~ msgid "Detected referral to %s on %s.\n"
+#~ msgstr "Referanse til %s vedr�rende %s.\n"
+
+#~ msgid ""
+#~ "I don't know where this IP has been delegated.\n"
+#~ "I'll try ARIN and hope for the best..."
+#~ msgstr ""
+#~ "Vet ikke hvor denne IP-adressen har blitt delegert.\n"
+#~ "Pr�ver ARIN og h�per det beste..."
+
+#~ msgid "I guess it's a netblock name but I don't know where to look it up."
+#~ msgstr "Gjetter at det er et netblock-navn, men vet ikke hvor det finnes."
+
+#~ msgid "I guess it's a domain but I don't know where to look it up."
+#~ msgstr "Gjetter at det er er domene, men vet ikke hvor det finnes."

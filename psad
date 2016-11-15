@@ -3294,18 +3294,6 @@ sub psad_init() {
         'kmsgsd'       => $config{'KMSGSD_PID_FILE'},
     );
 
-    ### dump configuration to STDOUT
-    if ($dump_conf or $dump_ipt_policy) {
-        my $rv = 0;
-        my $rv_tmp = 0;
-        $rv = &dump_conf() if $dump_conf;
-        $rv_tmp = &dump_ipt_policy() if $dump_ipt_policy;
-        $rv += $rv_tmp if $rv_tmp != 0;
-        exit $rv;
-    }
-
-    &dump_conf() if $test_mode;
-
     ### make sure all necessary configuration variables
     ### are defined
     &required_vars();
@@ -3335,6 +3323,18 @@ sub psad_init() {
     my %cmd_exceptions = ('wget' => '');
     $cmd_exceptions{'ifconfig'} = '' if $config{'IFCFGTYPE'} =~ /iproute2/i;
     &check_commands(\%cmd_exceptions);
+
+    ### dump configuration to STDOUT
+    if ($dump_conf or $dump_ipt_policy) {
+        my $rv = 0;
+        my $rv_tmp = 0;
+        $rv = &dump_conf() if $dump_conf;
+        $rv_tmp = &dump_ipt_policy() if $dump_ipt_policy;
+        $rv += $rv_tmp if $rv_tmp != 0;
+        exit $rv;
+    }
+
+    &dump_conf() if $test_mode;
 
     ### import psad perl modules
     &import_perl_modules();
@@ -10860,7 +10860,7 @@ sub is_root() {
 
     $< == 0 and $> == 0 or
         die '[*] psad: You must be root (or equivalent ',
-            "UID 0 account) to execute psad!  Exiting.";
+            "UID 0 account) to execute psad! Exiting.";
 }
 
 ### check to make sure all required varables are defined in the config
@@ -10871,7 +10871,7 @@ sub defined_vars() {
     for my $var (@$varnames_ar) {
         unless (defined $config{$var}) {  ### missing var
             die "[*] The config file \"$config_file\" does not " .
-                  "contain the\nvariable: \"$var\".  Exiting!";
+                  "contain the\nvariable: \"$var\". Exiting!";
         }
     }
     return;

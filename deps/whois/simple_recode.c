@@ -14,9 +14,9 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
 #include <stdlib.h>
@@ -94,6 +94,7 @@ char *simple_recode(const iconv_t handle, const char *str)
 	    {
 		size_t used = outp - result;
 		size_t newsize;
+		char *new_result;
 
 		if (outbuf_size < SIMPLE_RECODE_BUFFER_SIZE_2)
 		    newsize = SIMPLE_RECODE_BUFFER_SIZE_2;
@@ -103,13 +104,17 @@ char *simple_recode(const iconv_t handle, const char *str)
 
 		/* check if the newsize variable has overflowed */
 		if (newsize <= outbuf_size) {
+		    free(result);
 		    errno = ENOMEM;
 		    return NULL;
 		}
 		outbuf_size = newsize;
-		result = realloc(result, outbuf_size);
-		if (!result)
+		new_result = realloc(result, outbuf_size);
+		if (!new_result) {
+		    free(result);
 		    return NULL;
+		}
+		result = new_result;
 
 		/* update the position in the new output stream */
 		outp = result + used;
@@ -119,6 +124,7 @@ char *simple_recode(const iconv_t handle, const char *str)
 	    }
 
 	default:
+	    free(result);
 	    return NULL;
 	}
     } while (inbytes_remaining > 0);

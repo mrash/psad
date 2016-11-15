@@ -1,8 +1,6 @@
 /*
  * RIPE-like servers.
  * All of them do not understand -V2.0Md with the exception of RA and RIPN.
- * 6bone-derived servers will accept the flag with a warning (the flag must
- * match /^V [a-zA-Z]{1,4}\d+[\d\.]{0,5}$/).
  */
 
 /* servers which accept the new syntax (-V XXn.n) */
@@ -11,62 +9,79 @@ const char *ripe_servers[] = {
     "whois.apnic.net",
     "whois.afrinic.net",
     "rr.arin.net",		/* does not accept the old syntax */
-    "whois.6bone.net",		/* 3.0.0b1 */
     "whois.connect.com.au",	/* 3.0.0b1 */
     "whois.nic.fr",
-    "whois.telstra.net",
     "whois.restena.lu",
     "rr.level3.net",		/* 3.0.0a13 */
     "whois.ripn.net",
     "whois.arnes.si",
-    "www.registry.co.ug",
     "whois.nic.ir",
-    "whois.pandi.or.id",
-    "whois.nic.ck",
     "whois.ra.net",
     "whois.bgpmon.net",
     NULL
 };
 
 const char *hide_strings[] = {
-    "NOTICE AND TERMS OF USE: You", "",				/* NetSol */
-    "TERMS OF USE: You are not", "",				/* crsnic */
-    "NOTICE: Access to .ORG WHOIS", "",
-    "NOTICE: Access to the .aero", "",
-    "This Registry database contains ONLY .EDU", "type: help",	/* edu */
-    "% .eu Whois Server", "% of the database",
-    "The data in Register", "",				    /* Register.Com */
-    "The Data in the Tucows", "RECORD DOES NOT",
-    " The data contained in the WHOIS", "",			/* DOTSTER */
-    "This whois service currently only", "top-level domains.",
-    "Signature Domains' Whois Service", "agree to abide by the above",
-    "Access to ASNIC", "by this policy.",			/* as */
-    "The Data in Gabia", "you agree to abide",
-    "The data contained in Go Daddy", "is not the registrant",
-    "Disclaimer: The Global Name Registry", "for any commercial",
-    "Access to America Online", "time. By accessing",		/* AOL */
-    "% Access and use restricted", "",				/* GANDI */
-    "% The data in the WHOIS database of Schlund", "",
-    "NeuStar, Inc., the Registry", "OF THE AVAILABILITY",	/* us */
-    "The data in this whois database is", "",			/* enom */
-    "By submitting a WHOIS query, you agree you will", "LACK OF A DOMAIN",		/* directNIC */
-    "The Data in Moniker.Com", "",
-    "The Data in OnlineNIC", "    By starting this query",
-    "The data in Bulkregister", "",
-    "Interdomain's WHOIS", "DOES NOT SIGNIFY",
-    "The Data provided by Stargate Holdings", "(2) enable any",
-    "; This data is provided by domaindiscount24.com", "",
-    "%% BookMyName Whois", "%% this policy",
-    "The .coop registry WHOIS", "VERIFICATION, NOR DO",
-    "Tralliance, Inc., the Registry", "",			/* .travel */
-    "NOTICE: Access to the domains information", "",		/* CORE */
-    "%% puntCAT Whois Server", "%% any time.",
-    "Access to INFO WHOIS information is provided", "",		/* Afilias */
-    "Access to CCTLD WHOIS information is provided", "",	/* Afilias */
+    "The data in Networksolutions.com's WHOIS database", NULL,
+    /* Some registrars like .wang copied the first paragraph of this
+     * disclaimer, so the detection here needs to be split in two parts. */
+    "TERMS OF USE: You are not authorized", NULL,	/* crsnic */
+    "The data in Register.com's WHOIS database", NULL,
+    "The Data in the Tucows Registrar WHOIS database", NULL,
+    "The data in NameSecure.com's WHOIS database", NULL,
+    "The Data in Gabia's WHOIS database", NULL,
+    "The data contained in GoDaddy.com", NULL,
+    "Personal data access and use are governed by French", NULL, /* GANDI */
+    "The data in this whois database is provided to you", NULL,	/* enom */
+    "; Please register your domains at; http://www.", NULL, /* key-systems.net */
+    "%% NOTICE: Access to this information is provided", NULL, /* bookmyname.com */
+    "% NOTICE: Access to the domains information", NULL, /* CORE */
+    "The Data in MarkMonitor.com's", NULL, /* MarkMonitor */
+    "Corporation Service Company(c) (CSC)  The Trusted Partner", "Register your domain name at", /* CSC */
+    "The data in Networksolutions.com's", NULL,		/* Networksolutions */
+    "# Welcome to the OVH WHOIS Server", "", /* ovh */
+    "TERMS OF USE OF MELBOURNE IT WHOIS DATABASE", NULL,
+    "The data contained in this Registrar's Whois", NULL, /* wildwestdomains.com */
+    "The data in the FastDomain Inc. WHOIS database", NULL,
+
+    /* gTLDs */
+    "Access to .AERO WHOIS information", "",
     "DotAsia WHOIS LEGAL STATEMENT", "integrity of the database.",
+    "The .coop registry WHOIS", "VERIFICATION, NOR DO",
+    "%% puntCAT Whois Server", "%% any time.",
+    "This Registry database contains ONLY .EDU", "type: help",	/* edu */
+    "Access to AFILIAS WHOIS information is provided", NULL,	/* .info */
     "mTLD WHOIS LEGAL STATEMENT", "integrity of the database.",	/* .mobi */
-    "Access to RegistryPro's Whois", "All rights",		/* .pro */
-    "Telnic, Ltd., the Registry Operator", "(b) harass any person;", /* .tel */
+    "Access to Public Interest Registry WHOIS information", NULL, /* .org */
+    "Access to .PRO REGISTRY WHOIS information", "",
+    "Telnic, Ltd., the Registry Operator for .TEL", NULL,
+    "Tralliance, Inc., the Registry Operator for .travel", NULL,
+    "Access to .XXX ICM REGISTRY WHOIS", NULL,			/* .xxx */
+
+    /* new gTLDs */
+    "Terms of Use: Users accessing the Donuts WHOIS", NULL,
+    "Terms of Use: Users accessing the United TLD WHOIS", NULL,
+    "Access to WHOIS information is provided", "",		/* Afilias */
+    "The  WHOIS information provided on this page", NULL, /* uniregistry.net */
+    "The whois information provided on this site", "",	/* mm-registry.com */
+    "; This data is provided by ", NULL,		/* ksregistry.net */
+    "This whois service is provided by CentralNic Ltd", "",
+    ".Club Domains, LLC, the Registry Operator", NULL,
+    "% Except for agreed Internet operational purposes", NULL,	/* .berlin */
+    "TERMS OF USE: The information in the Whois database", NULL, /* .wang */
+    "The WHOIS service offered by Neustar, Inc, on behalf", NULL,
+    "The WHOIS service offered by the Registry Operator", NULL, /* .science */
+
+    /* ccTLDs */
+    "Access to CCTLD WHOIS information is provided", "",	/* Afilias */
+    "This WHOIS information is provided", NULL,			/* as */
+    "% The WHOIS service offered by DNS Belgium", "",		/* be */
+    "%   (c) 2015 NIC Costa Rica", "",				/* cr */
+    "% The WHOIS service offered by EURid", "% of the database", /* eu */
+    "% WHOIS LEGAL STATEMENT AND TERMS & CONDITIONS", NULL,	/* sx */
+    "; The data in the WHOIS database of KSregistry GmbH", "",	/* vg */
+    "NeuStar, Inc., the Registry Administrator for .US", NULL,
+
     NULL, NULL
 };
 
@@ -93,6 +108,7 @@ struct ip_del {
 };
 
 const struct ip_del ip_assign[] = {
+#include "ip_del_recovered.h"
 #include "ip_del.h"
     { 0, 0, NULL }
 };
@@ -130,8 +146,18 @@ const struct as32_del as32_assign[] = {
     { 0, 0, NULL }
 };
 
+const char *new_gtlds[] = {
+#include "new_gtlds.h"
+    NULL
+};
+
 const char *tld_serv[] = {
 #include "tld_serv.h"
+    NULL,	NULL
+};
+
+const char *nic_handles_post[] = {
+#include "nic_handles.h"
     NULL,	NULL
 };
 

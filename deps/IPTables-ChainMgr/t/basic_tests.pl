@@ -19,8 +19,20 @@ my $fw_cmd_bin    = '/bin/firewall-cmd';
 my %test_chains = (
     'filter' => [
         {'chain' => 'CHAINMGR', 'jump_from' => 'INPUT'},
+        {'chain' => 'CHAINMGR', 'jump_from' => 'FORWARD'},
         ### iptables allows odd chain names
         {'chain' => 'SC~!@#^%&$*-[]+={}-test', 'jump_from' => 'INPUT'}
+    ],
+    'mangle' => [
+        {'chain' => 'CHAINMGR', 'jump_from' => 'INPUT'},
+        {'chain' => 'CHAINMGR', 'jump_from' => 'FORWARD'},
+        {'chain' => 'SC~!@#^%&$*-[]+={}-test', 'jump_from' => 'INPUT'}
+    ],
+    'raw' => [
+        {'chain' => 'CHAINMGR', 'jump_from' => 'PREROUTING'},
+    ],
+    'nat' => [
+        {'chain' => 'CHAINMGR', 'jump_from' => 'PREROUTING'},
     ],
 );
 
@@ -209,7 +221,6 @@ sub set_chain_policy_test() {
     return;
 }
 
-
 sub add_jump_rule_test() {
     my ($ipt_obj, $table, $chain, $jump_from_chain) = @_;
 
@@ -277,6 +288,10 @@ sub add_rules_tests() {
 sub add_extended_rules_tests() {
     my ($ipt_obj, $table, $chain) = @_;
 
+    ### for any -> any testing
+    my $ip_any_net = '0.0.0.0/0';
+    $ip_any_net = '::/0' if $ipt_obj->{'_ipv6'};
+
     my $src_ip = $ipt_obj->normalize_net($ipv4_src);
     my $dst_ip = $ipt_obj->normalize_net($ipv4_dst);
 
@@ -338,6 +353,23 @@ sub add_extended_rules_tests() {
                 'd_port' => 80, 'ctstate' => 'ESTABLISHED,RELATED'});
         &pass_fail($rule_position, "   Could not find TCP $src_ip(0) -> " .
             "$dst_ip(80) ctstate ESTABLISHED,RELATED $target rule");
+
+        ### all protocols and IP's, MAC source
+        &dots_print("add_ext_ip_rules(): $table $chain $ip_any_net " .
+            "-> $ip_any_net $target mac_source $mac_source ");
+        ($rv, $out_ar, $err_ar) = $ipt_obj->add_ip_rule($ip_any_net,
+                $ip_any_net, $chain_past_end, $table, $chain, $target,
+                {'mac_source' => $mac_source});
+        &pass_fail($rv, "   Could not add $ip_any_net -> $ip_any_net " .
+            "$target mac_source $mac_source");
+
+        &dots_print("find ext rule: $table $chain $ip_any_net " .
+            "-> $ip_any_net $target mac_source $mac_source ");
+        ($rule_position, $num_chain_rules) = $ipt_obj->find_ip_rule($ip_any_net,
+                $ip_any_net, $table, $chain, $target,
+                {'mac_source' => $mac_source});
+        &pass_fail($rule_position, "   Could not find $ip_any_net " .
+                "-> $ip_any_net $target mac_source $mac_source");
 
         ### TCP + mac source
         &dots_print("add_ext_ip_rules(): $table $chain TCP " .
@@ -541,7 +573,7 @@ sub init() {
 
     $< == 0 && $> == 0 or
         die "[*] $0: You must be root (or equivalent ",
-            "UID 0 account) to effectively test fwknop";
+            "UID 0 account) to effectively test IPTables::ChainMgr";
 
     unlink $logfile if -e $logfile;
 

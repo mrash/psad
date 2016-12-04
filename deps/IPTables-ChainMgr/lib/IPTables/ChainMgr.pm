@@ -10,7 +10,7 @@
 #
 # Author: Michael Rash (mbr@cipherdyne.org)
 #
-# Version: 1.5
+# Version: 1.6
 #
 ##############################################################################
 #
@@ -26,7 +26,7 @@ use strict;
 use warnings;
 use vars qw($VERSION);
 
-$VERSION = '1.5';
+$VERSION = '1.6';
 
 sub new() {
     my $class = shift;
@@ -169,6 +169,7 @@ sub add_ip_rule() {
     my $target  = shift ||
         croak qq|[-] Must specify $self->{'_ipt_bin_name'} | .
             qq|target, e.g. "DROP"|;
+
     ### optionally add port numbers and protocols, etc.
     my $extended_hr = shift || {};
 
@@ -256,7 +257,7 @@ sub build_ipt_matches() {
     my $ipt_matches = '';
     my $msg = '';
 
-    if ($IPTables::Parse::VERSION > 1.1) {
+    if ($IPTables::Parse::VERSION gt 1.1) {
 
         ### src and dst
         if ($normalized_src ne '') {
@@ -512,7 +513,7 @@ sub find_ip_rule() {
 sub print_parse_capabilities() {
     my $self = shift;
 
-    if ($IPTables::Parse::VERSION > 1.1) {
+    if ($IPTables::Parse::VERSION gt 1.1) {
 
         print "[+] IPTables::Parse regular options:\n";
         for my $key (keys %{$self->{'parse_obj'}->{'parse_keys'}->{'regular'}}) {
@@ -685,8 +686,6 @@ IPTables::ChainMgr - Perl extension for manipulating iptables and ip6tables poli
       'use_ipv6' => 0,         # can set to 1 to force ip6tables usage
       'ipt_rules_file' => '',  # optional file path from
                                # which to read iptables rules
-      'iptout'   => '/tmp/iptables.out',
-      'ipterr'   => '/tmp/iptables.err',
       'debug'    => 0,
       'verbose'  => 0
 

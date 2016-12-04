@@ -1,5 +1,13 @@
 Revision history for Perl extension IPTables::ChainMgr.
 
+1.6 Sat Dec 04 15:42:45 2016
+    - Additional t/basic_tests.pl tests for 'mangle', 'nat', and 'raw' tables.
+    - Minor additional bug fix for IPTables::Parse version comparison (reported
+      by github user 'meZee').
+    - Minor documentation update to ensure to not recommend using predictable
+      temporary file paths for iptables output. The default paths are
+      provided via the File::Temp module in IPTables::Parse.
+
 1.5 Sat Dec 19 10:55:12 2015
     - Minor bug fix for IPTables::Parse version comparison (reported by github
       user 'HellUnit').

@@ -8759,7 +8759,7 @@ sub status() {
             }
             print "[-] psad: pid file $pidfile does not exist for ",
                 "$pidname on $config{'HOSTNAME'}\n" if $print;
-            if ($rv  eq 'psad') {
+            if ($pidname eq 'psad') {
                 $rv = $EXIT_FAILURE;
             }
         }

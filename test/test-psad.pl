@@ -210,7 +210,7 @@ my @tests = (
         'err_msg'   => 'could not get psad status',
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -S -c $default_conf $normal_root_override_str",
-        'exec_err'  => $NO,
+#        'exec_err'  => $NO,
         'fatal'     => $NO
     },
     {
@@ -219,7 +219,7 @@ my @tests = (
         'err_msg'   => 'could not get psad status summary',
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -S --status-summary -c $default_conf $normal_root_override_str",
-        'exec_err'  => $NO,
+#        'exec_err'  => $NO,
         'fatal'     => $NO
     },
     {

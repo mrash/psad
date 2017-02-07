@@ -3358,6 +3358,9 @@ sub psad_init() {
     ### it off but still want to run --Status checks or use --Flush).
     &build_ipt_config() unless $syslog_server;
 
+    ### the --Status command line switch was given
+    exit &status() if $status_mode;
+
     ### The --Kill command line switch was given.
     exit &stop_psad() if $kill;
 
@@ -3420,9 +3423,6 @@ sub psad_init() {
     ### adapted from the Snort IDS and contain several keywords that
     ### were added by the psad project).
     &import_signatures() unless $no_signatures;
-
-    ### the --Status command line switch was given
-    exit &status() if $status_mode;
 
     ### there is a set of ports that should be ignored
     &parse_ignore_ports();
@@ -6832,8 +6832,8 @@ sub sockwrite_add_ipt_block_ip() {
             die "[*] ENABLE_AUTO_IDS is not set to 'Y', exiting.";
         }
         if (&is_running($config{'PSAD_PID_FILE'})) {
-            print "[+] Writing $fw_block_ip to socket; psad will add the IP\n",
-                "    within $config{'CHECK_INTERVAL'} seconds.\n";
+            print "[+] Writing $fw_block_ip to socket; psad will add the IP ",
+                "within $config{'CHECK_INTERVAL'} seconds.\n";
 
             ### open domain socket with running psad process
             my $sock = IO::Socket::UNIX->new($config{'AUTO_IPT_SOCK'})
@@ -6847,6 +6847,7 @@ sub sockwrite_add_ipt_block_ip() {
     } else {
         print "[-] There is no running psad process. Exiting.\n";
     }
+    $fw_block_ip = '';
     return $EXIT_SUCCESS;
 }
 
@@ -6896,9 +6897,11 @@ sub sockwrite_rm_ipt_block_ip() {
                 "socket: $!";
             print $sock "del $fw_rm_block_ip\n";
             close $sock;
+            $fw_rm_block_ip = '';
             return $EXIT_SUCCESS;
         }
     }
+    $fw_rm_block_ip = '';
     return $EXIT_SUCCESS;
 }
 
@@ -7075,7 +7078,7 @@ sub get_block_timeout() {
     } elsif ($dl == 4) {
         $timeout = $config{'AUTO_BLOCK_DL4_TIMEOUT'};
     } elsif ($dl == 5) {
-        $timeout = $config{'AUTO_BLOCK_DL5_TIMEOUT'};
+        $timeout = $config{'AUTO_BLOCK_DL5_TIMEOUT'}; ### permanent
     }
 
     my $timeout_str = "for $timeout seconds";
@@ -9124,6 +9127,7 @@ sub print_blocked_ip_status() {
             if ($specific_ip) {
                 next unless $ip eq $specific_ip;
             }
+
             my $timestamp = '';
             my $time_remain = 0;
             ### older versions do not have the timestamp
@@ -9146,6 +9150,7 @@ sub print_blocked_ip_status() {
             } else {
                 push @print_lines,  "      $ip\n";
             }
+
             my $blocked = 0;
             for my $hr (@ipt_config) {
                 if ($ipt->find_ip_rule(
@@ -9165,13 +9170,15 @@ sub print_blocked_ip_status() {
                 ### we should see that the IP is still blocked
                 unless ($blocked) {
                     push @print_lines,  '            [not currently blocked, sending ',
-                        "cleanup message]\n";
+                        "cleanup via --fw-rm-block-ip]\n";
                     system "$cmds{'psad'} --fw-rm-block-ip $ip";
                 }
             } else {
-                push @print_lines,  '            [expired timeout, sending ',
-                    "cleanup message]\n";
-                system "$cmds{'psad'} --fw-rm-block-ip $ip";
+                if ($scan_dl{$ip} != 5) {  ### 5 == permanent
+                    push @print_lines,  '            [expired timeout, sending ',
+                        "cleanup via --fw-rm-block-ip]\n";
+                    system "$cmds{'psad'} --fw-rm-block-ip $ip";
+                }
             }
         }
     }

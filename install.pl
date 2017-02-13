@@ -11,7 +11,7 @@
 #
 # Credits:  (see the CREDITS file)
 #
-# Copyright (C) 1999-2015 Michael Rash (mbr@cipherdyne.org)
+# Copyright (C) 1999-2017 Michael Rash (mbr@cipherdyne.org)
 #
 # License (GNU Public License):
 #
@@ -53,6 +53,7 @@ my $makeCmd      = '/usr/bin/make';
 my $perlCmd      = '/usr/bin/perl';
 my $wgetCmd      = '/usr/bin/wget';
 my $runlevelCmd  = '/sbin/runlevel';
+my $systemctlCmd = '/bin/systemctl';
 
 my $install_root = '/';
 
@@ -177,7 +178,9 @@ my $locale = 'C';  ### default LC_ALL env variable
 my $no_locale = 0;
 my $deps_dir = 'deps';
 my $init_dir = '/etc/init.d';
+my $systemd_init_dir = '/lib/systemd/system';
 my $init_name = 'psad';
+my $systemd_init_name = 'psad.service';
 my $install_syslog_fifo = 0;
 my $runlevel = -1;
 my @installation_lines = ();
@@ -201,6 +204,7 @@ Getopt::Long::Configure('no_ignore_case');
     'no-syslog-test'    => \$skip_syslog_test,
     'uninstall'         => \$uninstall,   ### Uninstall psad.
     'init-dir=s'        => \$init_dir,
+    'systemdinit-dir=s' => \$systemd_init_dir,
     'init-name=s'       => \$init_name,
     'install-syslog-fifo' => \$install_syslog_fifo,
     'install-root=s'    => \$install_root,
@@ -242,25 +246,36 @@ $cmds{'runlevel'} = $runlevelCmd;
 
 my $distro = &get_distro();
 
-if ($distro eq 'redhat' or $distro eq 'fedora') {
-    ### add chkconfig only if we are runing on a redhat distro
-    $cmds{'chkconfig'} = $chkconfigCmd;
-} elsif ($distro eq 'gentoo') {
-    ### add rc-update if we are running on a gentoo distro
-    $cmds{'rc-update'} = $rcupdateCmd;
-} elsif ($distro eq 'ubuntu') {
-    ### add update-rc.d if we are running on an ubuntu distro
-    $cmds{'update-rc.d'} = $updatercdCmd;
-}
+### handle systems with systemd
+my $is_systemd = &look_for_process(qr|/systemd|);
 
-unless (-d $init_dir) {
-    if (-d '/etc/rc.d/init.d') {
-        $init_dir = '/etc/rc.d/init.d';
-    } elsif (-d '/etc/rc.d') {  ### for Slackware
-        $init_dir = '/etc/rc.d';
-    } else {
-        die "[*] Cannot find the init script directory, use ",
-            "--init-dir <path>" unless $install_test_dir;
+if ($is_systemd) {
+    $init_dir  = $systemd_init_dir;
+    $init_name = $systemd_init_name;
+    $cmds{'systemctl'} = $systemctlCmd;
+    die "[*] systemd init directory $init_dir does not exist, ",
+        "use --systemd-init-dir <path>" unless -d $init_dir;
+} else {
+    if ($distro eq 'redhat' or $distro eq 'fedora') {
+        ### add chkconfig only if we are runing on a redhat distro
+        $cmds{'chkconfig'} = $chkconfigCmd;
+    } elsif ($distro eq 'gentoo') {
+        ### add rc-update if we are running on a gentoo distro
+        $cmds{'rc-update'} = $rcupdateCmd;
+    } elsif ($distro eq 'ubuntu') {
+        ### add update-rc.d if we are running on an ubuntu distro
+        $cmds{'update-rc.d'} = $updatercdCmd;
+    }
+
+    unless (-d $init_dir) {
+        if (-d '/etc/rc.d/init.d') {
+            $init_dir = '/etc/rc.d/init.d';
+        } elsif (-d '/etc/rc.d') {  ### for Slackware
+            $init_dir = '/etc/rc.d';
+        } else {
+            die "[*] Cannot find the init script directory, use ",
+                "--init-dir <path>" unless $install_test_dir;
+        }
     }
 }
 
@@ -750,21 +765,30 @@ sub install() {
 
     my $init_file = '';
     my $installed_init_script = 0;
-    if ($distro eq 'redhat') {
-        $init_file = 'init-scripts/psad-init.redhat';
-    } elsif ($distro eq 'fedora') {
-        $init_file = 'init-scripts/psad-init.fedora';
-    } elsif ($distro eq 'gentoo') {
-        $init_file = 'init-scripts/psad-init.gentoo';
+
+    if ($is_systemd) {
+        $init_file = 'init-scripts/systemd/psad.service';
     } else {
-        $init_file = 'init-scripts/psad-init.generic';
+        if ($distro eq 'redhat') {
+            $init_file = 'init-scripts/psad-init.redhat';
+        } elsif ($distro eq 'fedora') {
+            $init_file = 'init-scripts/psad-init.fedora';
+        } elsif ($distro eq 'gentoo') {
+            $init_file = 'init-scripts/psad-init.gentoo';
+        } else {
+            $init_file = 'init-scripts/psad-init.generic';
+        }
     }
 
     if ($init_dir and &is_root()) {
         &logr("[+] Copying $init_file -> ${init_dir}/$init_name\n");
         copy $init_file, "${init_dir}/$init_name" or die "[*] Could not copy ",
             "$init_file -> ${init_dir}/$init_name: $!";
-        &perms_ownership("${init_dir}/$init_name", 0744);
+        if ($is_systemd) {
+            &perms_ownership("${init_dir}/$init_name", 0644);
+        } else {
+            &perms_ownership("${init_dir}/$init_name", 0744);
+        }
         &enable_psad_at_boot($distro);
         $installed_init_script = 1;
     }
@@ -781,7 +805,11 @@ sub install() {
     }
     if ($installed_init_script) {
         if ($init_dir) {
-            &logr("\n[+] To start psad, run \"${init_dir}/psad start\"\n");
+            if ($is_systemd) {
+                &logr("\n[+] To start psad, run \"$cmds{'systemctl'} start psad\"\n");
+            } else {
+                &logr("\n[+] To start psad, run \"${init_dir}/psad start\"\n");
+            }
         } else {
             &logr("\n[+] To start psad, run ${USRSBIN_DIR}/psad\"\n");
         }
@@ -933,8 +961,8 @@ sub uninstall() {
             warn "[*] Could not remove ${USRSBIN_DIR}/kmsgsd!!!\n";
     }
     if (-e "${init_dir}/psad") {
-        print "[+] Removing ${init_dir}/psad\n";
-        unlink "${init_dir}/psad";
+        print "[+] Removing ${init_dir}/$init_name\n";
+        unlink "${init_dir}/$init_name";
     }
     if (-d $config{'PSAD_CONF_DIR'}) {
         print "[+] Removing configuration directory: $config{'PSAD_CONF_DIR'}";
@@ -1002,8 +1030,12 @@ sub stop_psad() {
         chomp $pid;
         if (kill 0, $pid) {
             print "[+] Stopping running psad daemons.\n";
-            if (-x "$init_dir/psad") {
-                &run_cmd("$init_dir/psad stop");
+            if (-x "$init_dir/$init_name") {
+                if ($is_systemd) {
+                    &run_cmd("$cmds{'systemctl'} stop psad");
+                } else {
+                    &run_cmd("$init_dir/$init_name stop");
+                }
                 ### if psad is still running then use -K
                 if (kill 0, $pid) {
                     &run_cmd("$USRSBIN_DIR/psad -K");
@@ -1095,6 +1127,25 @@ sub install_perl_module() {
     }
 
     return;
+}
+
+sub run_cmd_get_output() {
+    my ($cmd_path, $args) = @_;
+    my $cmd = $cmd_path;
+    $cmd .= " $args" if $args;
+    open CMD, "$cmd |" or die "[*] Could not ",
+        "execute $cmd: $!";
+    my @lines = <CMD>;
+    close CMD;
+    return \@lines;
+}
+
+sub look_for_process() {
+    my $process_re = shift;
+    for (@{&run_cmd_get_output($cmds{'ps'}, 'auxww')}) {
+        return 1 if /$process_re/;
+    }
+    return 0;
 }
 
 sub run_cmd() {
@@ -2050,8 +2101,14 @@ sub enable_psad_at_boot() {
 
     return unless &is_root();
 
-    if (&query_yes_no("[+] Enable psad at boot time ([y]/n)?  ",
+    unless (&query_yes_no("[+] Enable psad at boot time ([y]/n)?  ",
                 $ACCEPT_YES_DEFAULT)) {
+        return;
+    }
+
+    if ($is_systemd) {
+        &run_cmd("$cmds{'systemctl'} enable psad");
+    } else {
         if ($distro eq 'redhat' or $distro eq 'fedora') {
             &run_cmd("$cmds{'chkconfig'} --add $init_name");
         } elsif ($distro eq 'gentoo') {
@@ -2336,8 +2393,12 @@ Usage: install.pl [options]
                                    derived.
     --init-dir <path>            - Specify path to the init directory (the
                                    default is $init_dir).
+    --systemd-init-dir <path>    - Specify path to the systemd init directory
+                                   (the default is $systemd_init_dir).
     --init-name <name>           - Specify the name for the psad init
                                    script (the default is $init_name).
+    --systemd-init-name <name>   - Specify the name for the systemd psad init
+                                   file (the default is $systemd_init_name).
     --install-syslog-fifo        - Add the installation of the psadfifo
                                    (this is not usually necessary since
                                    the default is to enable

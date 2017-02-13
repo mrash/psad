@@ -1,4 +1,7 @@
 psad-2.4.4 (02//2017):
+    - Added detection for Mirai botnet default credentials scans. These scans
+      follow a well-defined pattern of 10 connections to TCP port 23 (telnet)
+      followed by a connection to TCP port 2323.
     - Added installation support (install.pl and 'psad.service' file) for
       systems running systemd.
     - Bug fix to not remove auto-blocked IP's from a running psad instance

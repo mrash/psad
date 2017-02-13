@@ -16,6 +16,7 @@ my $test_install_dir = 'psad-install';
 my $syn_scan_file  = 'syn_scan_1000_1500';
 my $topera_syn_scan_file = 'topera_ipv6_syn_scan_no_ip_opts';
 my $topera_syn_scan_with_opts_file = 'topera_ipv6_syn_scan_with_ip_opts';
+my $mirai_scan_file = 'mirai_default_credentials_scan';
 my $syn_scan_localhost_file = 'syn_scan_1000_1500_localhost';
 my $syn_scan_zeroip_file = 'syn_scan_1000_1500_zeroip';
 my $fin_scan_file  = 'fin_scan_1000_1150';
@@ -293,7 +294,19 @@ my @tests = (
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
-
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv4 detect Mirai default credentials scans',
+        'err_msg'   => 'did not detect Mirai scan',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/Mirai\sbotnet\sdefault\scredentials\sscan/i],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
+                &fw_type() . "/$mirai_scan_file -c $default_conf $normal_root_override_str",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
     {
         'category'  => 'operations',
         'detail'    => 'IPv4 MS SQL Server communication attempt detection',

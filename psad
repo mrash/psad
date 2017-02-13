@@ -196,6 +196,9 @@ my %scan_email_ctrs = ();
 ### ENABLE_EXT_SCRIPT_EXEC is set to 'Y');
 my %scan_ext_exec = ();
 
+### for Mirai botnet scanning phase detection
+my %mirai_scan = ();
+
 ### cache p0f-based passive os fingerprinting information
 my %p0f = ();
 
@@ -578,6 +581,7 @@ my %pkt_NF_init = (
     'fwsnort_estab' => 0,
     'is_topera'     => 0,  ### Topera IPv6 scanner detection, requires --log-ip-options
     'is_masscan'    => 0,  ### Masscan detection, requires --log-tcp-options
+    'is_mirai'      => 0,  ### Mirai botnet scanning phase detection
     'chain'         => '',
     'log_prefix'    => '',
     'dshield_str'   => '',
@@ -958,7 +962,8 @@ sub post_scan_processing() {
 
 ### Keeps track of scanning ip's, increments packet counters,
 ### keeps track of tcp flags for each scan, test for snort sid
-### values in iptables packets (if fwsnort is being used).
+### values in iptables packets (if fwsnort is being used). This
+### is the main detection function.
 sub check_scan() {
     my $fw_packets_ar = shift;
 
@@ -1038,6 +1043,25 @@ sub check_scan() {
             $top_udp_ports{$pkt{'dp'}}++;
         } elsif ($pkt{'proto'} eq 'udplite') {
             $top_udplite_ports{$pkt{'dp'}}++;
+        }
+
+        ### Mirai scanning phase detection
+        if ($pkt{'proto'} eq 'tcp' and $pkt{'flags'} =~ /SYN/) {
+            if ($pkt{'dp'} == 23) {
+                $mirai_scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'dp'}}++;
+            } elsif ($pkt{'dp'} == 2323) {
+                if (defined $mirai_scan{$pkt{'src'}}
+                        and defined $mirai_scan{$pkt{'src'}}{$pkt{'dst'}}
+                        and defined $mirai_scan{$pkt{'src'}}{$pkt{'dst'}}{'23'}) {
+                    ### if 10 connects to port 23 have also been seen from the
+                    ### same source IP, and now we have a connect to port 2323 then
+                    ### it is most likely a Mirai botnet scan looking for default
+                    ### credentials
+                    if ($mirai_scan{$pkt{'src'}}{$pkt{'dst'}}{'23'} >= 10) {
+                        $pkt{'is_mirai'} = 1;
+                    }
+                }
+            }
         }
 
         ### If we made it here then we correctly matched packets
@@ -1281,6 +1305,7 @@ sub check_scan() {
 
         $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'is_topera'}  = $pkt{'is_topera'};
         $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'is_masscan'} = $pkt{'is_masscan'};
+        $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'is_mirai'}   = $pkt{'is_mirai'};
 
         if ($pkt{'log_prefix'}) {
             ### see if the logging prefix matches the blocking
@@ -5639,6 +5664,16 @@ sub scan_logr() {
                         $scan_style_str = "Masscan $flags scan";
                         printf $fh "%${log_len}s%s\n", $prefix,
                             "[$flags: $n_pkts packets, Masscan $flags scan]";
+                    } elsif ($curr_scan_hr->{$src}->{$dst}->{'is_mirai'}) {
+                        $scan_style_str = "Mirai botnet default credentials scan";
+                        printf $fh "%${log_len}s%s\n", $prefix,
+                            "[$flags: $n_pkts packets, Mirai botnet default credentials scan]";
+                        ### reset Mirai tracking hash scan now that we have logged it
+                        if (defined $mirai_scan{$src}
+                                and defined $mirai_scan{$src}{$dst}
+                                and defined $mirai_scan{$src}{$dst}{'23'}) {
+                            $mirai_scan{$src}{$dst}{'23'} = 0;
+                        }
                     } else {
                         if ($nmap_opts) {
                             printf $fh "%${log_len}s%s\n", $prefix,

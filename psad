@@ -3358,40 +3358,15 @@ sub psad_init() {
     ### it off but still want to run --Status checks or use --Flush).
     &build_ipt_config() unless $syslog_server;
 
-    ### the --Status command line switch was given
-    exit &status() if $status_mode;
-
-    ### The --Kill command line switch was given.
-    exit &stop_psad() if $kill;
-
-    ### The --HUP command line switch was given.
-    exit &hup() if $hup;
-
-    ### The --USR1 command line switch was given.
-    exit &usr1() if $usr1;
-
-    ### The --Flush command line switch was given.
-    exit &sockwrite_flush_auto_rules() if $flush_fw;
-
-    ### the --Restart command line switch was given
-    exit &restart() if $restart;
-
-    ### list any existing iptables IPT_AUTO_CHAIN chains
-    exit &ipt_list_auto_chains() if $fw_list_auto;
-
-    ### add an IP/network to the psad auto blocking chains via the
-    ### domain socket (note that &sockwrite_add_ipt_block_ip() calls
-    ### &import_auto_dl() to make sure we don't add an IP that should
-    ### be ignored).
-    exit &sockwrite_add_ipt_block_ip() if $fw_block_ip;
-
-    ### delete IP/network from psad auto blocking chains
-    exit &sockwrite_rm_ipt_block_ip() if $fw_rm_block_ip;
+    ### run any further terminating options such as --Status or --HUP
+    &terminating_options();
 
     ### send a warning via syslog if the HOME_NET variable definition
     ### appears to include a subnet that is not directly connected to
     ### the local system.
     &validate_home_net();
+
+    &sys_log("starting up psad version $version");
 
     ### import icmp types and codes from psad_icmp_types; icmp "type"
     ### and "code" fields will be validated against the values in this
@@ -3458,6 +3433,38 @@ sub psad_init() {
     }
 
     return;
+}
+
+sub terminating_options() {
+    ### the --Status command line switch was given
+    exit &status() if $status_mode;
+
+    ### The --Kill command line switch was given.
+    exit &stop_psad() if $kill;
+
+    ### The --HUP command line switch was given.
+    exit &hup() if $hup;
+
+    ### The --USR1 command line switch was given.
+    exit &usr1() if $usr1;
+
+    ### The --Flush command line switch was given.
+    exit &sockwrite_flush_auto_rules() if $flush_fw;
+
+    ### the --Restart command line switch was given
+    exit &restart() if $restart;
+
+    ### list any existing iptables IPT_AUTO_CHAIN chains
+    exit &ipt_list_auto_chains() if $fw_list_auto;
+
+    ### add an IP/network to the psad auto blocking chains via the
+    ### domain socket (note that &sockwrite_add_ipt_block_ip() calls
+    ### &import_auto_dl() to make sure we don't add an IP that should
+    ### be ignored).
+    exit &sockwrite_add_ipt_block_ip() if $fw_block_ip;
+
+    ### delete IP/network from psad auto blocking chains
+    exit &sockwrite_rm_ipt_block_ip() if $fw_rm_block_ip;
 }
 
 sub validate_config() {

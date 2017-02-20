@@ -1,0 +1,9 @@
+[Unit]
+Description=Job that runs the psad daemon
+
+[Service]
+Type=forking
+ExecStart=/usr/sbin/psad -c /etc/psad/psad.conf
+
+[Install]
+WantedBy=multi-user.target

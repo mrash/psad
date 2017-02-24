@@ -1,9 +1,13 @@
 [Unit]
-Description=Job that runs the psad daemon
+Description=The Port Scan Attack Detector (psad)
+Documentation=man:psad(8) https://www.cipherdyne.org/psad/
 
 [Service]
 Type=forking
-ExecStart=/usr/sbin/psad -c /etc/psad/psad.conf
+ExecStart=/usr/sbin/psad
+ExecStop=/usr/sbin/psad --Kill
+ExecReload=/usr/sbin/psad --HUP
+PIDFile=/var/run/psad/psad.pid
 
 [Install]
 WantedBy=multi-user.target

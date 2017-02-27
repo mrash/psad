@@ -35,7 +35,7 @@ The second shows Nachi worm traffic on an hourly basis from the Scan30 iptables
 data:
 
 ![alt text][nachi-worm-hourly-graph]
-[nachi-wormhourly-graph]: images/nachi_worm_hourly.png "Nachi Worm Hourly Graph"
+[nachi-worm-hourly-graph]: images/nachi_worm_hourly.png "Nachi Worm Hourly Graph"
 
 ## Configuration Information
 Information on config keywords referenced by psad may be found both in the

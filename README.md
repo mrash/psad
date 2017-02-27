@@ -1,43 +1,50 @@
-psad (Port Scan Attack Detector)
-Version:  2.2.6
-Author:   Michael Rash (mbr@cipherdyne.org)
-Website:  http://www.cipherdyne.org/
+# psad - Intrusion Detection with iptables Logs
 
-Thanks to: (see the CREDITS file).
+## Introduction
+The Port Scan Attack Detector `psad` is lightweight system daemon written in
+is designed to work with Linux iptables/ip6tables/firewalld firewalling code to
+detect suspicious traffic such as port scans and sweeps, backdoors, botnet
+command and control communications, and more. It features a set of highly
+configurable danger thresholds (with sensible defaults provided), verbose alert
+messages that include the source, destination, scanned port range, begin and
+end times, TCP flags and corresponding nmap options, reverse DNS info, email
+and syslog alerting, automatic blocking of offending IP addresses via dynamic
+configuration of iptables rulesets, passive operating system fingerprinting,
+and DShield reporting. In addition, `psad` incorporates many of the TCP, UDP,
+and ICMP signatures included in the Snort intrusion detection system.
+to detect highly suspect scans for various backdoor programs (e.g. EvilFTP,
+GirlFriend, SubSeven), DDoS tools (Mstream, Shaft), and advanced port scans
+(SYN, FIN, XMAS) which are easily leveraged against a machine via nmap. `psad`
+can also alert on Snort signatures that are logged via
+[fwsnort](https://github.com/mrash/fwsnort), which makes use of the iptables
+string match extension to detect traffic that matches application layer
+signatures. As of the 2.4.4 release, `psad` can also detect the IoT default
+credentials scanning phase of the Mirai botnet.
 
-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-DESCRIPTION:
+## Visualizing Malicious Traffic
+`psad` offers integration with `gnuplot` and `afterglow` to produce graphs of
+malicious traffic. The following two graphs are of the Nachi worm from the
+Honeynet [Scan30](http://old.honeynet.org/scans/scan30/) challenge. First, a
+link graph produced by `afterglow` after analysis of the iptables log data by
+`psad`:
 
-    The Port Scan Attack Detector (psad) is a collection of two lightweight
-system daemons written in Perl and in C that are designed to work with Linux
-iptables firewalling code to detect port scans and other suspect traffic.  It
-features a set of highly configurable danger thresholds (with sensible
-defaults provided), verbose alert messages that include the source,
-destination, scanned port range, begin and end times, tcp flags and
-corresponding nmap options, reverse DNS info, email and syslog alerting,
-automatic blocking of offending ip addresses via dynamic configuration of
-iptables rulesets, passive operating system fingerprinting, and DSheild
-reporting.  In addition, psad incorporates many of the tcp, udp, and icmp
-signatures included in the snort intrusion detection system
-(http://www.snort.org) to detect highly suspect scans for various backdoor
-programs (e.g. EvilFTP, GirlFriend, SubSeven), DDoS tools (mstream, shaft),
-and advanced port scans (syn, fin, xmas) which are easily leveraged against a
-machine via nmap.  psad can also alert on snort signatures that are logged
-via fwsnort, which makes use of the iptables string match module to detect
-application layer signatures.
+![alt text][nachi-worm-link-graph]
+[nachi-worm-link-graph]: images/nachi_worm.gif "Nachi Worm Link Graph"
 
-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-CONFIGURATION INFORMATION:
+The second shows Nachi worm traffic on an hourly basis from the Scan30 iptables
+data:
 
-    Information on config keywords referenced by psad may be found both in the
+![alt text][nachi-worm-hourly-graph]
+[nachi-wormhourly-graph]: images/nachi_worm_hourly.png "Nachi Worm Hourly Graph"
+
+## Configuration Information
+Information on config keywords referenced by psad may be found both in the
 psad(8) man page, and also here:
 
 http://www.cipherdyne.org/psad/docs/config.html
 
-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-METHODOLOGY:
-
-    All information psad analyzes is gathered from iptables log messages.
+## Methodology
+All information psad analyzes is gathered from iptables log messages.
 psad by default reads the /var/log/messages file for new iptables messages and
 optionally writes them out to a dedicated file (/var/log/psad/fwdata).
 psad is then responsible for applying the danger threshold and signature logic
@@ -48,7 +55,7 @@ dump the contents of the current scan hash data structure to
 /var/log/psad/scan_hash.$$ where "$$" represents the pid of the running psad
 daemon.
 
-    NOTE:  Since psad relies on iptables to generate appropriate log messages
+NOTE:  Since psad relies on iptables to generate appropriate log messages
 for unauthorized packets, psad is only as good as the logging rules included
 in the iptables ruleset.  Usually the best way setup the firewall is with
 default "drop and log" rules at the end of the ruleset, and include rules
@@ -65,21 +72,38 @@ found here:
 
 http://www.cipherdyne.org/LinuxFirewalls/ch01/
 
-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-INSTALLATION:
+## Installation
+See the INSTALL file in the psad sources directory.
 
-    See the INSTALL file in the psad sources directory.
+## Firewall Setup
+The main requirement for an iptables configuration to be compatible with psad
+is simply that iptables logs packets. This is commonly accomplished by adding
+rules to the INPUT and FORWARD chains like so:
 
-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-FIREWALL SETUP:
+```bash
+iptables -A INPUT -j LOG
+iptables -A FORWARD -j LOG
+```
 
-    See the FW_HELP file in the psad sources directory.  Also, read the
-    README.SYSLOG file.
+The rules above should be added at the end of the INPUT and FORWARD chains
+after all ACCEPT rules for legitimate traffic and just before a corresponding
+DROP rule for traffic that is not to be allowed through the policy. Note that
+iptables policies can be quite complex with protocol, network, port, and
+interface restrictions, user defined chains, connection tracking rules, and
+much more. There are many pieces of software such as Shorewall and Firewall
+Builder, that build iptables policies and take advantage of the advanced
+filtering and logging capabilities offered by iptables. Generally the policies
+built by such pieces of software are compatible with psad since they
+specifically add rules that instruct iptables to log packets that are not part
+of legitimate traffic. Psad can be configured to only analyze those iptables
+messages that contain specific log prefixes (which are added via the
+--log-prefix option), but the default as of version 1.3.2 is for psad to
+analyze all iptables log messages for port scans, probes for backdoor
+programs, and other suspect traffic. See the list of features offered by psad
+for more information (http://www.cipherdyne.org/psad/features.html).
 
-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-PLATFORMS:
-
-    psad has been tested on RedHat 6.2 - 9.0, Fedora Core 1 and 2, and
+## Platforms
+psad has been tested on RedHat 6.2 - 9.0, Fedora Core 1 and 2, and
 Gentoo Linux systems running various kernels.  The only program that
 specifically depends on the RedHat architecture is psad-init, which depends
 on /etc/rc.d/init.d/functions.  For non-RedHat systems a more generic init
@@ -87,25 +111,16 @@ script is included called "psad-init.generic".  The psad init scripts are
 mostly included as a nicety; psad can be run from the command line like any
 other program.
 
-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-COPYRIGHT:
+## License
+`psad` is released as open source software under the terms of
+the **GNU General Public License (GPL v2+)**. The latest release can be found
+at [https://github.com/mrash/psad/releases](https://github.com/mrash/psad/releases)
 
-Copyright (C) 1999-2015 Michael Rash (mbr@cipherdyne.org)
-
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
-
-psad makes use of many of the tcp, udp, and icmp signatures available in
+psad makes use of many of the TCP, UDP, and ICMP signatures available in
 Snort (written by Marty Roesch, see http://www.snort.org).  Snort is a
 registered trademark of Sourcefire, Inc.
+
+## Contact
+All feature requests and bug fixes are managed through github issues tracking.
+However, you can email me (michael.rash_AT_gmail.com), or reach me through
+Twitter ([@michaelrash](https://twitter.com/michaelrash)).

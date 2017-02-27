@@ -1,7 +1,7 @@
 # psad - Intrusion Detection with iptables Logs
 
 ## Introduction
-The Port Scan Attack Detector `psad` is lightweight system daemon written in
+The Port Scan Attack Detector `psad` is a lightweight system daemon written in
 is designed to work with Linux iptables/ip6tables/firewalld firewalling code to
 detect suspicious traffic such as port scans and sweeps, backdoors, botnet
 command and control communications, and more. It features a set of highly

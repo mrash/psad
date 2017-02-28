@@ -2247,7 +2247,7 @@ sub install_manpage() {
     &full_mkdir($mpath, 0755);
     my $mfile = "${mpath}/${manpage}";
     &logr("[+] Installing $manpage man page at $mfile\n");
-    copy $manpage, $mfile or die "[*] Could not copy $manpage to ",
+    copy "doc/$manpage", $mfile or die "[*] Could not copy doc/$manpage to ",
         "$mfile: $!";
     &perms_ownership($mfile, 0644);
     &logr("[+] Compressing manpage $mfile\n");

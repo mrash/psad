@@ -12,13 +12,13 @@
 use strict;
 
 my @files = qw(
-    psad
-    nf2csv
+    ../psad
+    ../nf2csv
 );
 
 my $new_version = $ARGV[0] or die "[*] $0 <new version>";
 
-open F, '< VERSION' or die "[*] Could not open VERSION file: $!";
+open F, '< ../VERSION' or die "[*] Could not open VERSION file: $!";
 my $old_version = <F>;
 close F;
 chomp $old_version;
@@ -42,6 +42,6 @@ for my $file (@files) {
         system qq{perl -p -i -e "s|$search_re|$replace_str|" $file};
     }
 }
-system qq{perl -p -i -e 's|$old_version|$new_version|' VERSION};
+system qq{perl -p -i -e 's|$old_version|$new_version|' ../VERSION};
 
 exit 0;

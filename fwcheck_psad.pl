@@ -207,8 +207,8 @@ sub print_fw_help() {
     my $chain = shift;
     print FWCHECK
 "[-] You may just need to add a default logging rule to the\n",
-"    '$log_and_drop_table' '$chain' chain on $config{'HOSTNAME'}.  For more information,\n",
-"    see the file \"FW_HELP\" in the psad sources directory or visit:\n\n",
+"    '$log_and_drop_table' '$chain' chain on $config{'HOSTNAME'}. For more information,\n",
+"    see the file \"README\" in the psad sources directory or visit:\n\n",
 "    http://www.cipherdyne.org/psad/docs/fwconfig.html\n\n";
     return;
 }

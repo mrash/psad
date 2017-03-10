@@ -3383,24 +3383,6 @@ sub psad_init() {
     ### it off but still want to run --Status checks or use --Flush).
     &build_ipt_config() unless $syslog_server;
 
-    ### run any further terminating options such as --Status or --HUP
-    &terminating_options();
-
-    ### send a warning via syslog if the HOME_NET variable definition
-    ### appears to include a subnet that is not directly connected to
-    ### the local system.
-    &validate_home_net();
-
-    &sys_log("starting up psad version $version");
-
-    ### import icmp types and codes from psad_icmp_types; icmp "type"
-    ### and "code" fields will be validated against the values in this
-    ### file.
-    &import_icmp_types('icmp', \%valid_icmp_types, $config{'ICMP_TYPES_FILE'})
-        unless $no_icmp_types;
-    &import_icmp_types('icmp6', \%valid_icmp6_types,
-        $config{'ICMP6_TYPES_FILE'}) unless $no_icmp6_types;
-
     ### import p0f-based passive OS fingerprinting signatures
     &import_p0f_ipv4_sigs() unless $no_posf;
 
@@ -3432,6 +3414,24 @@ sub psad_init() {
 
     ### there is a set of interfaces that should be ignored
     &parse_ignore_interfaces();
+
+    ### run any further terminating options such as --Status or --HUP
+    &terminating_options();
+
+    ### send a warning via syslog if the HOME_NET variable definition
+    ### appears to include a subnet that is not directly connected to
+    ### the local system.
+    &validate_home_net();
+
+    &sys_log("starting up psad version $version");
+
+    ### import icmp types and codes from psad_icmp_types; icmp "type"
+    ### and "code" fields will be validated against the values in this
+    ### file.
+    &import_icmp_types('icmp', \%valid_icmp_types, $config{'ICMP_TYPES_FILE'})
+        unless $no_icmp_types;
+    &import_icmp_types('icmp6', \%valid_icmp6_types,
+        $config{'ICMP6_TYPES_FILE'}) unless $no_icmp6_types;
 
     ### enter iptables analysis mode.
     exit &analysis_mode() if $analyze_mode;
@@ -5719,6 +5719,7 @@ sub scan_logr() {
                 }
             }
             $scan_style_str =~ s/\,$//;
+            $scan_style_str =~ s/^\s//;
             printf $fh "\n%${log_len}s%s\n", 'Source: ', $src;
             printf $fh "%${log_len}s%s\n", 'DNS: ', $src_dns_str
                 unless $no_rdns or $config{'ENABLE_DNS_LOOKUPS'} eq 'N';

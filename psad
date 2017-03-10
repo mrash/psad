@@ -7508,25 +7508,13 @@ sub stop_psad() {
                 } else {
                     unlink $pidfile;
                 }
-            } else {
-                my $print = 1;
-                if ($pidname eq 'kmsgsd'
-                        and ($config{'SYSLOG_DAEMON'} =~ /ulog/i
-                        or $config{'ENABLE_SYSLOG_FILE'} eq 'Y')) {
-                    $print = 0;
-                }
+            } elsif ($pidname eq 'psad') {
                 print "[-] psad: $pidname is not running on ",
-                    "$config{'HOSTNAME'}\n" if $print;
+                    "$config{'HOSTNAME'}\n";
             }
-        } else {
-            my $print = 1;
-            if ($pidname eq 'kmsgsd'
-                    and ($config{'SYSLOG_DAEMON'} =~ /ulog/i
-                    or $config{'ENABLE_SYSLOG_FILE'} eq 'Y')) {
-                $print = 0;
-            }
+        } elsif ($pidname eq 'psad') {
             print "[-] psad: pid file $pidfile does not exist for ",
-                "$pidname on $config{'HOSTNAME'}\n" if $print;
+                "$pidname on $config{'HOSTNAME'}\n";
         }
     }
     return $rv;
@@ -8785,29 +8773,15 @@ sub status() {
                     }
                 }
                 print "\n";
-            } else {
-                my $print = 1;
-                if ($pidname eq 'kmsgsd'
-                        and ($config{'SYSLOG_DAEMON'} =~ /ulog/i
-                        or $config{'ENABLE_SYSLOG_FILE'} eq 'Y')) {
-                    $print = 0;
-                }
+            } elsif ($pidname eq 'psad') {
                 print "[-] psad: $pidname is not running on ",
-                    "$config{'HOSTNAME'}\n" if $print;
+                    "$config{'HOSTNAME'}\n";
                 $rv = $EXIT_FAILURE;
             }
-        } else {
-            my $print = 1;
-            if ($pidname eq 'kmsgsd'
-                    and ($config{'SYSLOG_DAEMON'} =~ /ulog/i
-                    or $config{'ENABLE_SYSLOG_FILE'} eq 'Y')) {
-                $print = 0;
-            }
+        } elsif ($pidname eq 'psad') {
             print "[-] psad: pid file $pidfile does not exist for ",
-                "$pidname on $config{'HOSTNAME'}\n" if $print;
-            if ($pidname eq 'psad') {
+                "$pidname on $config{'HOSTNAME'}\n";
                 $rv = $EXIT_FAILURE;
-            }
         }
     }
     return $rv;

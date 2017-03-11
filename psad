@@ -3415,16 +3415,6 @@ sub psad_init() {
     ### there is a set of interfaces that should be ignored
     &parse_ignore_interfaces();
 
-    ### run any further terminating options such as --Status or --HUP
-    &terminating_options();
-
-    ### send a warning via syslog if the HOME_NET variable definition
-    ### appears to include a subnet that is not directly connected to
-    ### the local system.
-    &validate_home_net();
-
-    &sys_log("starting up psad version $version");
-
     ### import icmp types and codes from psad_icmp_types; icmp "type"
     ### and "code" fields will be validated against the values in this
     ### file.
@@ -3433,14 +3423,15 @@ sub psad_init() {
     &import_icmp_types('icmp6', \%valid_icmp6_types,
         $config{'ICMP6_TYPES_FILE'}) unless $no_icmp6_types;
 
-    ### enter iptables analysis mode.
-    exit &analysis_mode() if $analyze_mode;
+    ### send a warning via syslog if the HOME_NET variable definition
+    ### appears to include a subnet that is not directly connected to
+    ### the local system.
+    &validate_home_net();
 
-    ### enter CSV output mode.
-    exit &csv_mode() if $csv_mode or $gnuplot_mode;
+    ### run any further terminating options such as --Status or --HUP
+    &terminating_options();
 
-    ### enter benchmarking mode
-    exit &benchmark_mode() if $benchmark;
+    &sys_log("starting up psad version $version");
 
     ### analyze the iptables policy and exit
     my $rv = &fw_analyze_mode();
@@ -3490,6 +3481,15 @@ sub terminating_options() {
 
     ### delete IP/network from psad auto blocking chains
     exit &sockwrite_rm_ipt_block_ip() if $fw_rm_block_ip;
+
+    ### enter iptables analysis mode.
+    exit &analysis_mode() if $analyze_mode;
+
+    ### enter CSV output mode.
+    exit &csv_mode() if $csv_mode or $gnuplot_mode;
+
+    ### enter benchmarking mode
+    exit &benchmark_mode() if $benchmark;
 }
 
 sub validate_config() {

@@ -68,7 +68,7 @@ psad by default reads the /var/log/messages file for new iptables messages and
 optionally writes them out to a dedicated file (/var/log/psad/fwdata).
 psad is then responsible for applying the danger threshold and signature logic
 in order to determine whether or not a port scan has taken place, send
-appropriate alert emails, and (optionally) block offending ip addresses.  psad
+appropriate alert emails, and (optionally) block offending ip addresses. psad
 includes a signal handler such that if a USR1 signal is received, psad will
 dump the contents of the current scan hash data structure to
 /var/log/psad/scan_hash.$$ where "$$" represents the pid of the running psad
@@ -76,13 +76,13 @@ daemon.
 
 NOTE: Since psad relies on iptables to generate appropriate log messages
 for unauthorized packets, psad is only as good as the logging rules included
-in the iptables ruleset.  Usually the best way setup the firewall is with
-default "drop and log" rules at the end of the ruleset, and include rules
-above this last rule that only allow traffic that should be allowed through.
-Upon execution, the psad daemon will attempt to ascertain whether or not such
-a default deny rule exists, and will warn the administrator if it doesn't.
-See the FW_EXAMPLE_RULES file for example firewall rulesets that are
-compatible with psad.
+in the iptables ruleset. Hence if your firewall is not configured to log packets,
+then psad will NOT detect port scans or anything else.  Usually the best way
+setup the firewall is with default "drop and log" rules at the end of the ruleset,
+and include rules above this last rule that only allow traffic that should be
+allowed through. Upon execution, the psad daemon will attempt to ascertain whether
+or not such a default deny rule exists, and will warn the user if not. See the
+FW_EXAMPLE_RULES file for example firewall rulesets that are compatible with psad.
 
 Additionally, extensive coverage of psad is included in the book "Linux
 Firewalls: Attack Detection and Response" published by No Starch Press, and a
@@ -101,7 +101,8 @@ apt-get install psad
 ```
 
 If psad is not available in the package repository, it can be installed with the
-`install.pl` script bundled in the psad sources. `psad` requires several perl modules
+`install.pl` script bundled in the psad sources. The install.pl script also handles
+upgrades if psad is already installed. `psad` requires several perl modules
 that may or may not already be installed on your Linux system. These modules are
 included in the deps/ directory in the psad sources, and are automatically installed
 by the install.pl script. The list of modules is:

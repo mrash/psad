@@ -49,21 +49,6 @@ psad also includes a whois client written by Marco d'Itri (see the deps/whois
 directory).  This client does better than others at collecting the correct
 whois information for a given IP address.
 
-CONNECTION TRACKING:
-    As of kernel version 2.4.13, there is a bug in the connection tracking
-code that can drop packets that are part of legitimate TCP connections that
-have entered into the CLOSE_WAIT state depending on how late they arrive.
-Since these packets are drop whenever the iptables policy is configured in
-a default drop stance, psad interprets them as potentially belonging to a
-scan.  The source of the problem is an inappropriately low timeout value, and
-fortunately this problem is mostly fixed (or at least minimized) by the
-trivial kernel patch "conntrack_patch" included with the psad source code.
-If you start noticing lots of ACK/FIN, ACK, and even RST packets being denied
-by iptables from legtimate sessions, then you may want to apply this patch.
-This will of course require the kernel to be recompiled.  For more information
-on how to do this, see the Kernel-HOWTO available at:
-http://www.digitalhermit.com/linux/Kernel-Build-HOWTO.html
-
 UPGRADES:
     You can install a new version of psad over an existing one; just run
 install.pl.  The installation script will preserve any old configuration

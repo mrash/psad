@@ -30,7 +30,7 @@ The complete feature list is below.
  * Forensics mode iptables/ip6tables logfile analysis (useful as a forensics tool for extracting scan information from old iptables/ip6tables logfiles).
  * Passive operating system fingerprinting via TCP syn packets. Two different fingerprinting strategies are supported; a re-implementation of p0f that strictly uses iptables/ip6tables log messages (requires the --log-tcp-options command line switch), and a TOS-based strategy.
  * Email alerts that contain TCP/UDP/ICMP scan characteristics, reverse dns and whois information, snort rule matches, remote OS guess information, and more.
- * Content-based alerts for buffer overflow attacks, suspicious application commands, and other suspect traffic through the use of the iptables string match extension and fwsnort.
+ * When combined with [fwsnort](https://github.com/mrash/fwsnort) and the iptables string match extension, `psad` can generate alerts for application layer buffer overflow attacks, suspicious application commands, and other suspect layer  7 traffic.
  * Icmp type and code header field validation.
  * Configurable scan thresholds and danger level assignments.
  * Iptables ruleset parsing to verify "default drop" policy stance.
@@ -58,7 +58,7 @@ data:
 
 ## Configuration Information
 Information on config keywords referenced by psad may be found both in the
-psad(8) man page, and also here:
+`psad(8)` man page, and also here:
 
 http://www.cipherdyne.org/psad/docs/config.html
 
@@ -74,7 +74,7 @@ dump the contents of the current scan hash data structure to
 /var/log/psad/scan_hash.$$ where "$$" represents the pid of the running psad
 daemon.
 
-NOTE:  Since psad relies on iptables to generate appropriate log messages
+NOTE: Since psad relies on iptables to generate appropriate log messages
 for unauthorized packets, psad is only as good as the logging rules included
 in the iptables ruleset.  Usually the best way setup the firewall is with
 default "drop and log" rules at the end of the ruleset, and include rules
@@ -92,7 +92,31 @@ found here:
 http://www.cipherdyne.org/LinuxFirewalls/ch01/
 
 ## Installation
-See the INSTALL file in the psad sources directory.
+Depending on the Linux distribution, `psad` may already be available in the
+default package repository. For example, on Debian or Ubuntu systems, installation
+is done with a simple:
+
+```bash
+apt-get install psad
+```
+
+If psad is not available in the package repository, it can be installed with the
+`install.pl` script bundled in the psad sources. `psad` requires several perl modules
+that may or may not already be installed on your Linux system. These modules are
+included in the deps/ directory in the psad sources, and are automatically installed
+by the install.pl script. The list of modules is:
+
+ * Bit::Vector
+ * Date::Calc
+ * IPTables::ChainMgr
+ * IPTables::Parse
+ * NetAddr::IP
+ * Storable
+ * Unix::Syslog
+
+psad also includes a whois client written by Marco d'Itri (see the deps/whois
+directory).  This client does better than others at collecting the correct
+whois information for a given IP address.
 
 ## Firewall Setup
 The main requirement for an iptables configuration to be compatible with psad
@@ -116,19 +140,14 @@ built by such pieces of software are compatible with psad since they
 specifically add rules that instruct iptables to log packets that are not part
 of legitimate traffic. Psad can be configured to only analyze those iptables
 messages that contain specific log prefixes (which are added via the
---log-prefix option), but the default as of version 1.3.2 is for psad to
-analyze all iptables log messages for port scans, probes for backdoor
-programs, and other suspect traffic. See the list of features offered by psad
-for more information (http://www.cipherdyne.org/psad/features.html).
+--log-prefix option), but the default is for psad to analyze all iptables log
+messages for evidence of port scans, probes for backdoor programs, and other
+suspect traffic.
 
 ## Platforms
-psad has been tested on RedHat 6.2 - 9.0, Fedora Core 1 and 2, and
-Gentoo Linux systems running various kernels.  The only program that
-specifically depends on the RedHat architecture is psad-init, which depends
-on /etc/rc.d/init.d/functions.  For non-RedHat systems a more generic init
-script is included called "psad-init.generic".  The psad init scripts are
-mostly included as a nicety; psad can be run from the command line like any
-other program.
+psad generally runs on Linux systems, and is available in the package
+repositories of many major Linux distributions. If there are any operational
+issues with psad, please open an issue on [psad](https://github.com/mrash/psad)
 
 ## License
 `psad` is released as open source software under the terms of

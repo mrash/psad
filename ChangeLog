@@ -1,4 +1,7 @@
 psad-2.4.5 (03//2017):
+    - Bug fix to apply syslog only ALERTING_METHOD properly when an email
+      throttle is also set. This issue was reported by @joshlinx on github as
+      issue #44.
     - Bug fix to include top signature matches in 'psad --Status' output. This
       issue was reported by @joshlinx on github as issue #41.
 

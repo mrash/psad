@@ -5349,7 +5349,8 @@ sub scan_logr() {
             unless ($no_email_alerts) {
                 $scan_email_ctrs{$src}{'email_ctr'}++;
             }
-            if ($config{'EMAIL_THROTTLE'} > 1) {
+            if ($scan_email_ctrs{$src}{'email_ctr'} > 0
+                    and $config{'EMAIL_THROTTLE'} > 1) {
                 next SRC if (($scan_email_ctrs{$src}{'email_ctr'}
                         % $config{'EMAIL_THROTTLE'}) == 0);
             }

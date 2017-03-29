@@ -47,14 +47,12 @@ Honeynet [Scan30](http://old.honeynet.org/scans/scan30/) challenge. First, a
 link graph produced by `afterglow` after analysis of the iptables log data by
 `psad`:
 
-![alt text][nachi-worm-link-graph]
-[nachi-worm-link-graph]: images/nachi_worm.gif "Nachi Worm Link Graph"
+![nachi-worm-link-graph](images/nachi_worm.gif) "Nachi Worm Link Graph"
 
 The second shows Nachi worm traffic on an hourly basis from the Scan30 iptables
 data:
 
-![alt text][nachi-worm-hourly-graph]
-[nachi-worm-hourly-graph]: images/nachi_worm_hourly.png "Nachi Worm Hourly Graph"
+![nachi-worm-hourly-graph](images/nachi_worm_hourly.png) "Nachi Worm Hourly Graph"
 
 ## Configuration Information
 Information on config keywords referenced by psad may be found both in the

@@ -270,7 +270,7 @@ my @tests = (
                 qr/scanned\sports.*?1000\-1500\b/i,
                 qr/Source\sOS/i, qr/BACKDOOR/i,
                 qr/IP\sstatus/i,
-                qr/Scanned\sdestinations\s4/i,
+                qr/Total\sscan\sdestinations\:\s4/i,
                 qr/192\.168\.10\.55/],
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,

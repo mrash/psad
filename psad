@@ -5031,7 +5031,8 @@ sub assign_danger_level() {
             }
 
             ### if PORT_RANGE_SCAN_THRESHOLD is >= 1, then psad will not assign
-            ### a danger level to repeated packets to the same port
+            ### a danger level to repeated packets to the same port except in
+            ### the case of port sweep detection
             if ($absnum < $config{'DANGER_LEVEL1'}) {
                 ### don't have enough packets to even reach danger level 1 yet.
                 next DST;
@@ -5323,6 +5324,7 @@ sub scan_logr() {
     }
 
     SRC: for my $src (keys %$curr_scan_hr) {
+
         print STDERR "[+] scan_logr(): source IP: $src\n" if $debug;
         ### only send alerts for scans that are at least at
         ### danger level 1 or above.
@@ -5355,6 +5357,8 @@ sub scan_logr() {
                         % $config{'EMAIL_THROTTLE'}) == 0);
             }
         }
+
+        my $tot_scan_dsts = keys %{$curr_scan_hr->{$src}};
 
         DST: for my $dst (keys %{$curr_scan_hr->{$src}}) {
 
@@ -5419,7 +5423,8 @@ sub scan_logr() {
             ### unless it already exists
             mkdir "$config{'PSAD_DIR'}/${src}", 0700
                 unless -d "$config{'PSAD_DIR'}/${src}";
-            my $src_dir = "$config{'PSAD_DIR'}/${src}";
+
+            my $src_dir      = "$config{'PSAD_DIR'}/${src}";
             my $dl_file      = "${src_dir}/danger_level";
             my $posf_file    = "${src_dir}/os_guess";
             my $p0f_file     = "${src_dir}/p0f_guess";
@@ -5622,6 +5627,9 @@ sub scan_logr() {
                 delete $auto_assigned_msg{$src};
             }
             print $fh "\n\n";
+
+            printf $fh "%${log_len}s%s", 'Scanned destinations: ',
+                "$tot_scan_dsts\n";
 
             if ($curr_scan_hr->{$src}->{$dst}->{'tot_protocols'}
                     >= $config{'PROTOCOL_SCAN_THRESHOLD'}) {
@@ -5835,6 +5843,7 @@ sub scan_logr() {
             $syslog_str .= " other proto pkts: $other_proto_newpkts"
                 if $other_proto_newpkts;
             $syslog_str .= " DL: $curr_dl";
+            $syslog_str .= " total scan dsts: $tot_scan_dsts";
 
             &sys_log($syslog_str);
 
@@ -11299,7 +11308,8 @@ sub required_vars() {
         ENABLE_FW_MSG_READ_CMD FW_MSG_READ_CMD FW_MSG_READ_CMD_ARGS
         USE_FW_MSG_READ_CMD_ARGS CUSTOM_SYSLOG_TS_RE
         ENABLE_CUSTOM_SYSLOG_TS_RE FW_MSG_READ_MIN_PKTS ENABLE_DNS_LOOKUPS
-        ENABLE_WHOIS_LOOKUPS PSAD_FW_READ_PID_FILE
+        ENABLE_WHOIS_LOOKUPS PSAD_FW_READ_PID_FILE DL1_UNIQUE_HOSTS
+        DL2_UNIQUE_HOSTS DL3_UNIQUE_HOSTS DL4_UNIQUE_HOSTS DL5_UNIQUE_HOSTS
     ));
     &defined_vars(\@required_vars);
     return;

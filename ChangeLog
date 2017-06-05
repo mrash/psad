@@ -1,4 +1,15 @@
 psad-2.4.5 (03//2017):
+    - Added proper port sweep detection based on a single port being probed
+      across a configurable number of destination hosts. The number of
+      destinations is controlled by the following new configuration variables
+      (and associated defaults) in the psad.conf file:
+
+          DL1_UNIQUE_HOSTS            10;
+          DL2_UNIQUE_HOSTS            20;
+          DL3_UNIQUE_HOSTS            50;
+          DL4_UNIQUE_HOSTS            100;
+          DL5_UNIQUE_HOSTS            500;
+
     - Bug fix to apply syslog only ALERTING_METHOD properly when an email
       throttle is also set. This issue was reported by @joshlinx on github as
       issue #44.

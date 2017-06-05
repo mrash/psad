@@ -582,6 +582,7 @@ my %pkt_NF_init = (
     'is_topera'     => 0,  ### Topera IPv6 scanner detection, requires --log-ip-options
     'is_masscan'    => 0,  ### Masscan detection, requires --log-tcp-options
     'is_mirai'      => 0,  ### Mirai botnet scanning phase detection
+    'is_port_sweep' => 0,
     'chain'         => '',
     'log_prefix'    => '',
     'dshield_str'   => '',
@@ -5001,6 +5002,8 @@ sub assign_danger_level() {
             }
         }
 
+        my $tot_dsts = keys %{$curr_scan_hr->{$src}};
+
         DST: for my $dst (keys %{$curr_scan_hr->{$src}}) {
             my $absnum        = $scan{$src}{$dst}{'absnum'};
             my $tot_protocols = $scan{$src}{$dst}{'tot_protocols'};
@@ -5033,40 +5036,53 @@ sub assign_danger_level() {
             ### if PORT_RANGE_SCAN_THRESHOLD is >= 1, then psad will not assign
             ### a danger level to repeated packets to the same port except in
             ### the case of port sweep detection
-            if ($absnum < $config{'DANGER_LEVEL1'}) {
+            if ($absnum < $config{'DANGER_LEVEL1'}
+                        and $tot_dsts < $config{'DL1_UNIQUE_HOSTS'}) {
                 ### don't have enough packets to even reach danger level 1 yet.
                 next DST;
             }
             if ($range >= $config{'PORT_RANGE_SCAN_THRESHOLD'}
-                    or $tot_protocols >= $config{'PROTOCOL_SCAN_THRESHOLD'}) {
-                if ($absnum < $config{'DANGER_LEVEL2'}) {
+                    or $tot_protocols >= $config{'PROTOCOL_SCAN_THRESHOLD'}
+                    or $tot_dsts >= $config{'DL1_UNIQUE_HOSTS'}) {
+                my $changed_dl = 0;
+                if ($absnum < $config{'DANGER_LEVEL2'}
+                        or $tot_dsts < $config{'DL2_UNIQUE_HOSTS'}) {
                     if ($scan_dl{$src} < 1) {
-                        $scan{$src}{$dst}{'alerted'} = 0
-                            if $config{'ALERT_ALL'} eq 'N';
                         $scan_dl{$src} = 1;
+                        $changed_dl = 1;
                     }
-                } elsif ($absnum < $config{'DANGER_LEVEL3'}) {
+                } elsif ($absnum < $config{'DANGER_LEVEL3'}
+                        or $tot_dsts < $config{'DL3_UNIQUE_HOSTS'}) {
                     if ($scan_dl{$src} < 2) {
-                        $scan{$src}{$dst}{'alerted'} = 0
-                            if $config{'ALERT_ALL'} eq 'N';
                         $scan_dl{$src} = 2;
+                        $changed_dl = 1;
                     }
-                } elsif ($absnum < $config{'DANGER_LEVEL4'}) {
+                } elsif ($absnum < $config{'DANGER_LEVEL4'}
+                        or $tot_dsts < $config{'DL4_UNIQUE_HOSTS'}) {
                     if ($scan_dl{$src} < 3) {
-                        $scan{$src}{$dst}{'alerted'} = 0
-                            if $config{'ALERT_ALL'} eq 'N';
                         $scan_dl{$src} = 3;
+                        $changed_dl = 1;
                     }
-                } elsif ($absnum < $config{'DANGER_LEVEL5'}) {
+                } elsif ($absnum < $config{'DANGER_LEVEL5'}
+                        or $tot_dsts < $config{'DL5_UNIQUE_HOSTS'}) {
                     if ($scan_dl{$src} < 4) {
-                        $scan{$src}{$dst}{'alerted'} = 0
-                            if $config{'ALERT_ALL'} eq 'N';
                         $scan_dl{$src} = 4;
+                        $changed_dl = 1;
                     }
                 } elsif ($scan_dl{$src} < 5) {
-                    $scan{$src}{$dst}{'alerted'} = 0
-                            if $config{'ALERT_ALL'} eq 'N';
                     $scan_dl{$src} = 5;
+                    $changed_dl = 1;
+                }
+
+                if ($changed_dl) {
+                    $scan{$src}{$dst}{'alerted'} = 0
+                        if $config{'ALERT_ALL'} eq 'N';
+                    if ($e_port and $range == 0 ### one port
+                            and $tot_dsts >= $config{'DL1_UNIQUE_HOSTS'}) {
+                        $scan{$src}{$dst}{'is_port_sweep'} = 1;
+                        print "    Port sweep $src -> $dst port $e_port\n"
+                            if $debug;
+                    }
                 }
             }
         }
@@ -5665,7 +5681,11 @@ sub scan_logr() {
                         $nmap_opts = '-O';
                     }
 
-                    if ($curr_scan_hr->{$src}->{$dst}->{'is_topera'}) {
+                    if ($curr_scan_hr->{$src}->{$dst}->{'is_port_sweep'}) {
+                        $scan_style_str = "Port sweep $flags scan";
+                        printf $fh "%${log_len}s%s\n", $prefix,
+                            "[$flags: $n_pkts packets, port sweep $flags scan]";
+                    } elsif ($curr_scan_hr->{$src}->{$dst}->{'is_topera'}) {
                         $scan_style_str = "Topera $flags scan";
                         printf $fh "%${log_len}s%s\n", $prefix,
                             "[$flags: $n_pkts packets, Topera $flags scan]";
@@ -8912,14 +8932,15 @@ sub print_scan_status() {
             my $uniq_sigs  = 0;
             my $tot_protocols = 0;
             for my $dst (keys %{$scan{$src}}) {
-                if (defined $scan{$src}{$dst}{'tot_protocols'}) {
-                    $tot_protocols += $scan{$src}{$dst}{'tot_protocols'};
-                }
                 next unless defined $scan{$src}{$dst}{'absnum'};
                 $tot_pkts += $scan{$src}{$dst}{'absnum'};
             }
+            my %tot_protocols = ();
             for my $proto (keys %protocols) {
                 for my $dst (keys %{$scan{$src}}) {
+                    if (defined $scan{$src}{$dst}{$proto}) {
+                        $tot_protocols{$proto} = '';
+                    }
                     next unless defined $scan{$src}{$dst}{$proto}
                             and defined $scan{$src}{$dst}{$proto}{'sid'};
                     for my $sid (keys %{$scan{$src}{$dst}{$proto}{'sid'}}) {
@@ -8927,6 +8948,7 @@ sub print_scan_status() {
                     }
                 }
             }
+            $tot_protocols = keys %tot_protocols;
 
             ### source IP line
             my $src_str = "\nSRC:  $src, DL: $dl, Dsts: $total_dsts" .

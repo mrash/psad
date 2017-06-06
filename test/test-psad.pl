@@ -14,6 +14,8 @@ my $run_dir        = 'run';
 my $scans_dir      = 'scans';
 my $test_install_dir = 'psad-install';
 my $syn_scan_file  = 'syn_scan_1000_1500';
+my $syn_sweep_file = 'syn_sweep';
+my $syn_scan_multi_dst_file  = 'syn_scan_1000_1500_multi_dst';
 my $topera_syn_scan_file = 'topera_ipv6_syn_scan_no_ip_opts';
 my $topera_syn_scan_with_opts_file = 'topera_ipv6_syn_scan_with_ip_opts';
 my $mirai_scan_file = 'mirai_default_credentials_scan';
@@ -261,6 +263,37 @@ my @tests = (
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv4 SYN scan multi-dst detection',
+        'err_msg'   => 'did not detect SYN scan',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/scanned\sports.*?1000\-1500\b/i,
+                qr/Source\sOS/i, qr/BACKDOOR/i,
+                qr/IP\sstatus/i,
+                qr/Total\sscan\sdestinations\:\s4/i,
+                qr/192\.168\.10\.55/],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
+                &fw_type() . "/$syn_scan_multi_dst_file -c $default_conf $normal_root_override_str",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+    {
+        'category'  => 'operations',
+        'detail'    => 'IPv4 SYN sweep detection',
+        'err_msg'   => 'did not detect SYN scan',
+        'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
+                qr/port sweep.*port\s1083\b/i],
+        'match_all' => $MATCH_ALL_RE,
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
+                &fw_type() . "/$syn_sweep_file -c $default_conf $normal_root_override_str",
+        'exec_err'  => $NO,
+        'fatal'     => $NO
+    },
+
     {
         'category'  => 'operations',
         'detail'    => 'IPv6 Topera SYN scan detection',

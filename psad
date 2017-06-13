@@ -5077,7 +5077,7 @@ sub assign_danger_level() {
                 if ($changed_dl) {
                     $scan{$src}{$dst}{'alerted'} = 0
                         if $config{'ALERT_ALL'} eq 'N';
-                    if ($e_port and $range == 0 ### one port
+                    if ($e_port and $range == $config{'PORT_RANGE_SWEEP_THRESHOLD'}
                             and $tot_dsts >= $config{'DL1_UNIQUE_HOSTS'}) {
                         $scan{$src}{$dst}{'is_port_sweep'} = 1;
                         print "    Port sweep $src -> $dst port $e_port\n"
@@ -11332,6 +11332,7 @@ sub required_vars() {
         ENABLE_CUSTOM_SYSLOG_TS_RE FW_MSG_READ_MIN_PKTS ENABLE_DNS_LOOKUPS
         ENABLE_WHOIS_LOOKUPS PSAD_FW_READ_PID_FILE DL1_UNIQUE_HOSTS
         DL2_UNIQUE_HOSTS DL3_UNIQUE_HOSTS DL4_UNIQUE_HOSTS DL5_UNIQUE_HOSTS
+        PORT_RANGE_SWEEP_THRESHOLD
     ));
     &defined_vars(\@required_vars);
     return;

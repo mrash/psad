@@ -1,4 +1,4 @@
-psad-2.4.5 (03//2017):
+psad-2.4.5 (06//2017):
     - Added proper port sweep detection based on a single port being probed
       across a configurable number of destination hosts. The number of
       destinations is controlled by the following new configuration variables
@@ -9,6 +9,14 @@ psad-2.4.5 (03//2017):
           DL3_UNIQUE_HOSTS            50;
           DL4_UNIQUE_HOSTS            100;
           DL5_UNIQUE_HOSTS            500;
+          PORT_RANGE_SWEEP_THRESHOLD  0;
+
+      The PORT_RANGE_SWEEP_THRESHOLD variable is set to zero by default to
+      denote a sweep for a single port. The comparison is made as an "equals"
+      test against this variable. So a scan that trips the
+      PORT_RANGE_SCAN_THRESHOLD can be changed to a sweep if
+      PORT_RANGE_SWEEP_THRESHOLD is changed to a value greater than
+      PORT_RANGE_SCAN_THRESHOLD and if at least DL1_UNIQUE_HOSTS are hit.
 
     - Bug fix to apply syslog only ALERTING_METHOD properly when an email
       throttle is also set. This issue was reported by @joshlinx on github as

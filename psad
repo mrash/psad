@@ -5041,30 +5041,54 @@ sub assign_danger_level() {
                 ### don't have enough packets to even reach danger level 1 yet.
                 next DST;
             }
+
             if ($range >= $config{'PORT_RANGE_SCAN_THRESHOLD'}
                     or $tot_protocols >= $config{'PROTOCOL_SCAN_THRESHOLD'}
                     or $tot_dsts >= $config{'DL1_UNIQUE_HOSTS'}) {
+
                 my $changed_dl = 0;
-                if ($absnum < $config{'DANGER_LEVEL2'}
-                        or $tot_dsts < $config{'DL2_UNIQUE_HOSTS'}) {
+                if ($absnum < $config{'DANGER_LEVEL2'}) {
                     if ($scan_dl{$src} < 1) {
                         $scan_dl{$src} = 1;
                         $changed_dl = 1;
                     }
-                } elsif ($absnum < $config{'DANGER_LEVEL3'}
-                        or $tot_dsts < $config{'DL3_UNIQUE_HOSTS'}) {
+                } elsif ($absnum < $config{'DANGER_LEVEL3'}) {
                     if ($scan_dl{$src} < 2) {
                         $scan_dl{$src} = 2;
                         $changed_dl = 1;
                     }
-                } elsif ($absnum < $config{'DANGER_LEVEL4'}
-                        or $tot_dsts < $config{'DL4_UNIQUE_HOSTS'}) {
+                } elsif ($absnum < $config{'DANGER_LEVEL4'}) {
                     if ($scan_dl{$src} < 3) {
                         $scan_dl{$src} = 3;
                         $changed_dl = 1;
                     }
-                } elsif ($absnum < $config{'DANGER_LEVEL5'}
-                        or $tot_dsts < $config{'DL5_UNIQUE_HOSTS'}) {
+                } elsif ($absnum < $config{'DANGER_LEVEL5'}) {
+                    if ($scan_dl{$src} < 4) {
+                        $scan_dl{$src} = 4;
+                        $changed_dl = 1;
+                    }
+                } elsif ($scan_dl{$src} < 5) {
+                    $scan_dl{$src} = 5;
+                    $changed_dl = 1;
+                }
+
+                ### sweep detection
+                if ($tot_dsts < $config{'DL2_UNIQUE_HOSTS'}) {
+                    if ($scan_dl{$src} < 1) {
+                        $scan_dl{$src} = 1;
+                        $changed_dl = 1;
+                    }
+                } elsif ($tot_dsts < $config{'DL3_UNIQUE_HOSTS'}) {
+                    if ($scan_dl{$src} < 2) {
+                        $scan_dl{$src} = 2;
+                        $changed_dl = 1;
+                    }
+                } elsif ($tot_dsts < $config{'DL4_UNIQUE_HOSTS'}) {
+                    if ($scan_dl{$src} < 3) {
+                        $scan_dl{$src} = 3;
+                        $changed_dl = 1;
+                    }
+                } elsif ($tot_dsts < $config{'DL5_UNIQUE_HOSTS'}) {
                     if ($scan_dl{$src} < 4) {
                         $scan_dl{$src} = 4;
                         $changed_dl = 1;

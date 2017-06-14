@@ -114,6 +114,9 @@ $ipt_opts{'tmpdir'}     = $config{'PSAD_DIR'};
 $ipt_opts{'iptout_pat'} = $config{'IPT_OUTPUT_PATTERN'};
 $ipt_opts{'ipterr_pat'} = $config{'IPT_ERROR_PATTERN'};
 
+$ipt_opts{'firewall-cmd'} = $config{'FW_CMD'}
+    if $config{'ENABLE_OVERRIDE_FW_CMD'} eq 'Y';
+
 open FWCHECK, "> $config{'FW_CHECK_FILE'}" or die "[*] Could not ",
     "open $config{'FW_CHECK_FILE'}: $!";
 
@@ -525,6 +528,12 @@ sub import_config() {
                 $config{$varname} = $val unless defined $config{$varname};
             }
         }
+    }
+
+    if ($config{'ENABLE_OVERRIDE_FW_CMD'} eq 'Y') {
+        die "[*] Must set a path to a firewall binary with FW_CMD"
+            if $config{'FW_CMD'} eq 'NONE';
+        $cmds{'iptables'} = $config{'ENABLE_OVERRIDE_FW_CMD'};
     }
 
     return;

@@ -28,6 +28,9 @@ psad-2.4.5 (06/13/2017):
       that really "low and slow" scans may be missed in exchange for a better
       operational model. Note the MAX_SCAN_IP_PAIRS variable can also be used
       to control memory consumption if ENABLE_PERSISTENCE is enabled.
+    - Added new variables ENABLE_OVERRIDE_FW_CMD and FW_CMD to force a path to
+      a firewall binary to be set instead of having psad search for standard
+      installation paths.
 
 psad-2.4.4 (02/20/2017):
     - Added detection for Mirai botnet default credentials scans. These scans

@@ -204,7 +204,7 @@ Getopt::Long::Configure('no_ignore_case');
     'no-syslog-test'    => \$skip_syslog_test,
     'uninstall'         => \$uninstall,   ### Uninstall psad.
     'init-dir=s'        => \$init_dir,
-    'systemdinit-dir=s' => \$systemd_init_dir,
+    'systemd-init-dir=s' => \$systemd_init_dir,
     'init-name=s'       => \$init_name,
     'install-syslog-fifo' => \$install_syslog_fifo,
     'install-root=s'    => \$install_root,

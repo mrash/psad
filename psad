@@ -20,7 +20,7 @@
 #
 # Credits: (see the CREDITS file bundled with the psad sources.)
 #
-# Version: 2.4.4
+# Version: 2.4.5
 #
 # Copyright (C) 1999-2017 Michael Rash (mbr@cipherdyne.org)
 #
@@ -146,7 +146,7 @@ use strict;
 ### ========================== main =================================
 
 ### set the current version
-my $version = '2.4.4';
+my $version = '2.4.5';
 
 ### default config file for psad (can be changed with
 ### --config switch)
@@ -5041,30 +5041,54 @@ sub assign_danger_level() {
                 ### don't have enough packets to even reach danger level 1 yet.
                 next DST;
             }
+
             if ($range >= $config{'PORT_RANGE_SCAN_THRESHOLD'}
                     or $tot_protocols >= $config{'PROTOCOL_SCAN_THRESHOLD'}
                     or $tot_dsts >= $config{'DL1_UNIQUE_HOSTS'}) {
+
                 my $changed_dl = 0;
-                if ($absnum < $config{'DANGER_LEVEL2'}
-                        or $tot_dsts < $config{'DL2_UNIQUE_HOSTS'}) {
+                if ($absnum < $config{'DANGER_LEVEL2'}) {
                     if ($scan_dl{$src} < 1) {
                         $scan_dl{$src} = 1;
                         $changed_dl = 1;
                     }
-                } elsif ($absnum < $config{'DANGER_LEVEL3'}
-                        or $tot_dsts < $config{'DL3_UNIQUE_HOSTS'}) {
+                } elsif ($absnum < $config{'DANGER_LEVEL3'}) {
                     if ($scan_dl{$src} < 2) {
                         $scan_dl{$src} = 2;
                         $changed_dl = 1;
                     }
-                } elsif ($absnum < $config{'DANGER_LEVEL4'}
-                        or $tot_dsts < $config{'DL4_UNIQUE_HOSTS'}) {
+                } elsif ($absnum < $config{'DANGER_LEVEL4'}) {
                     if ($scan_dl{$src} < 3) {
                         $scan_dl{$src} = 3;
                         $changed_dl = 1;
                     }
-                } elsif ($absnum < $config{'DANGER_LEVEL5'}
-                        or $tot_dsts < $config{'DL5_UNIQUE_HOSTS'}) {
+                } elsif ($absnum < $config{'DANGER_LEVEL5'}) {
+                    if ($scan_dl{$src} < 4) {
+                        $scan_dl{$src} = 4;
+                        $changed_dl = 1;
+                    }
+                } elsif ($scan_dl{$src} < 5) {
+                    $scan_dl{$src} = 5;
+                    $changed_dl = 1;
+                }
+
+                ### sweep detection
+                if ($tot_dsts < $config{'DL2_UNIQUE_HOSTS'}) {
+                    if ($scan_dl{$src} < 1) {
+                        $scan_dl{$src} = 1;
+                        $changed_dl = 1;
+                    }
+                } elsif ($tot_dsts < $config{'DL3_UNIQUE_HOSTS'}) {
+                    if ($scan_dl{$src} < 2) {
+                        $scan_dl{$src} = 2;
+                        $changed_dl = 1;
+                    }
+                } elsif ($tot_dsts < $config{'DL4_UNIQUE_HOSTS'}) {
+                    if ($scan_dl{$src} < 3) {
+                        $scan_dl{$src} = 3;
+                        $changed_dl = 1;
+                    }
+                } elsif ($tot_dsts < $config{'DL5_UNIQUE_HOSTS'}) {
                     if ($scan_dl{$src} < 4) {
                         $scan_dl{$src} = 4;
                         $changed_dl = 1;
@@ -5077,7 +5101,7 @@ sub assign_danger_level() {
                 if ($changed_dl) {
                     $scan{$src}{$dst}{'alerted'} = 0
                         if $config{'ALERT_ALL'} eq 'N';
-                    if ($e_port and $range == 0 ### one port
+                    if ($e_port and $range == $config{'PORT_RANGE_SWEEP_THRESHOLD'}
                             and $tot_dsts >= $config{'DL1_UNIQUE_HOSTS'}) {
                         $scan{$src}{$dst}{'is_port_sweep'} = 1;
                         print "    Port sweep $src -> $dst port $e_port\n"
@@ -11332,6 +11356,7 @@ sub required_vars() {
         ENABLE_CUSTOM_SYSLOG_TS_RE FW_MSG_READ_MIN_PKTS ENABLE_DNS_LOOKUPS
         ENABLE_WHOIS_LOOKUPS PSAD_FW_READ_PID_FILE DL1_UNIQUE_HOSTS
         DL2_UNIQUE_HOSTS DL3_UNIQUE_HOSTS DL4_UNIQUE_HOSTS DL5_UNIQUE_HOSTS
+        PORT_RANGE_SWEEP_THRESHOLD
     ));
     &defined_vars(\@required_vars);
     return;

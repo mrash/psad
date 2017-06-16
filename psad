@@ -3379,8 +3379,14 @@ sub psad_init() {
     $ipt_opts{'debug'}   = 1 if $debug;
     $ipt_opts{'verbose'} = 1 if $verbose;
 
-    $ipt_opts{'firewall-cmd'} = $config{'FW_CMD'}
-        if $config{'ENABLE_OVERRIDE_FW_CMD'} eq 'Y';
+    if ($config{'ENABLE_OVERRIDE_FW_CMD'} eq 'Y') {
+        if ($config{'FW_CMD_ARGS'} ne 'NONE') {
+            $ipt_opts{'firewall-cmd'} = $config{'FW_CMD'};
+            $ipt_opts{'fwd_args'}     = $config{'FW_CMD_ARGS'};
+        } else {
+            $ipt_opts{'iptables'} = $config{'FW_CMD'};
+        }
+    }
 
     ### build iptables block config hash out of IPT_AUTO_CHAIN keywords
     ### (we don't check ENABLE_AUTO_IDS here since someone may have turned
@@ -3634,7 +3640,7 @@ sub validate_config() {
     if ($config{'ENABLE_OVERRIDE_FW_CMD'} eq 'Y') {
         die "[*] Must set a path to a firewall binary with FW_CMD"
             if $config{'FW_CMD'} eq 'NONE';
-        $cmds{'iptables'} = $config{'ENABLE_OVERRIDE_FW_CMD'};
+        $cmds{'iptables'} = $config{'FW_CMD'};
     }
 
     return;
@@ -11365,7 +11371,7 @@ sub required_vars() {
         ENABLE_CUSTOM_SYSLOG_TS_RE FW_MSG_READ_MIN_PKTS ENABLE_DNS_LOOKUPS
         ENABLE_WHOIS_LOOKUPS PSAD_FW_READ_PID_FILE DL1_UNIQUE_HOSTS
         DL2_UNIQUE_HOSTS DL3_UNIQUE_HOSTS DL4_UNIQUE_HOSTS DL5_UNIQUE_HOSTS
-        PORT_RANGE_SWEEP_THRESHOLD ENABLE_OVERRIDE_FW_CMD FW_CMD
+        PORT_RANGE_SWEEP_THRESHOLD ENABLE_OVERRIDE_FW_CMD FW_CMD FW_CMD_ARGS
     ));
     &defined_vars(\@required_vars);
     return;

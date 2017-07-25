@@ -818,14 +818,12 @@ MAIN: for (;;) {
 
         ### Get any new packets have been written to syslog
         if ($config{'ENABLE_FW_MSG_READ_CMD'} eq 'Y') {
-            if ($s->can_read(.5)) {
-                my $syslog_line = <$fwdata_fh>;
-                $fwdata_fh->flush();
-                push @fw_packets, $syslog_line unless $fw_msg_read_continue;
-                $fw_msg_read_do_sleep = 0;
-            } else {
+            if ($s->can_read(120)) {
+                while ($s->can_read(.5) && @fw_packets < 10) {
+                    my $syslog_line = <$fwdata_fh>;
+                    push @fw_packets, $syslog_line unless $fw_msg_read_continue;
+                }
                 $fw_msg_read_continue = 0;
-                $fw_msg_read_do_sleep = 1;
             }
 
         } else {
@@ -848,18 +846,14 @@ MAIN: for (;;) {
     ### sleep for the check interval seconds
     if ($config{'ENABLE_FW_MSG_READ_CMD'} eq 'Y') {
 
-        if ($fw_msg_read_do_sleep
-                or (($#fw_packets+1) % $config{'FW_MSG_READ_MIN_PKTS'} == 0)) {
-
-            if (@fw_packets) {
-                ### Extract data and summarize scan packets, assign danger
-                ### level, send email/syslog alerts.
-                &check_scan(\@fw_packets);
-            }
-
-            &post_scan_processing($#fw_packets+1, \@add_ipt_addrs);
-            @fw_packets = ();
+        if (@fw_packets) {
+            ### Extract data and summarize scan packets, assign danger
+            ### level, send email/syslog alerts.
+            &check_scan( \@fw_packets );
         }
+
+        &post_scan_processing( $#fw_packets + 1, \@add_ipt_addrs );
+        @fw_packets = ();
 
         unless (&look_for_process(quotemeta($fw_read_cmd))) {
             &sys_log("firewall logs read command '$fw_read_cmd' " .
@@ -871,7 +865,6 @@ MAIN: for (;;) {
             $fw_msg_read_continue = 1;
         }
 
-        sleep $config{'CHECK_INTERVAL'} if $fw_msg_read_do_sleep;
 
     } else {
 

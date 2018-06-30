@@ -389,8 +389,8 @@ static void exec_binary(const char *binary, const char *cmdlinefile)
 
         while (*index != '\n' && *index != '\0') {
             non_ws = 0;
-            while (*index != ' ' && *index != '\t'
-                    && index != '\0' && *index != '\n') {
+            while (*index != ' '  && *index != '\t'
+                && *index != '\0' && *index != '\n') {
                 index++;
                 non_ws++;
             }

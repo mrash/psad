@@ -1700,9 +1700,9 @@ sub parse_NF_pkt_str() {
                     $pkt_hr->{'win'}, $pkt_hr->{'flags'})
                         = ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
 
-                $pkt_hr->{'s_obj'} = new6 NetAddr::IP($pkt_hr->{'src'})
+                $pkt_hr->{'s_obj'} = NetAddr::IP->new6($pkt_hr->{'src'})
                     or return $PKT_ERROR;
-                $pkt_hr->{'d_obj'} = new6 NetAddr::IP($pkt_hr->{'dst'})
+                $pkt_hr->{'d_obj'} = NetAddr::IP->new6($pkt_hr->{'dst'})
                     or return $PKT_ERROR;
 
                 if ($pkt_str =~ /(?:OPT\s+\(\s+\)\s+){7,}/) {
@@ -1735,9 +1735,9 @@ sub parse_NF_pkt_str() {
                     $pkt_hr->{'flags'})
                         = ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
 
-                $pkt_hr->{'s_obj'} = new NetAddr::IP($pkt_hr->{'src'})
+                $pkt_hr->{'s_obj'} = NetAddr::IP->new($pkt_hr->{'src'})
                     or return $PKT_ERROR;
-                $pkt_hr->{'d_obj'} = new NetAddr::IP($pkt_hr->{'dst'})
+                $pkt_hr->{'d_obj'} = NetAddr::IP->new($pkt_hr->{'dst'})
                     or return $PKT_ERROR;
 
             } else {
@@ -1852,9 +1852,9 @@ sub parse_NF_pkt_str() {
                     $pkt_hr->{'flow_label'}, $pkt_hr->{'sp'}, $pkt_hr->{'dp'},
                     $pkt_hr->{'udp_len'}) = ($1,$2,$3,$4,$5,$6,$7,$8,$9);
 
-                $pkt_hr->{'s_obj'} = new6 NetAddr::IP($pkt_hr->{'src'})
+                $pkt_hr->{'s_obj'} = NetAddr::IP->new6($pkt_hr->{'src'})
                     or return $PKT_ERROR;
-                $pkt_hr->{'d_obj'} = new6 NetAddr::IP($pkt_hr->{'dst'})
+                $pkt_hr->{'d_obj'} = NetAddr::IP->new6($pkt_hr->{'dst'})
                     or return $PKT_ERROR;
 
             } else {
@@ -1879,9 +1879,9 @@ sub parse_NF_pkt_str() {
                     $pkt_hr->{'sp'}, $pkt_hr->{'dp'}, $pkt_hr->{'udp_len'})
                         = ($1,$2,$3,$4,$5,$6,$7,$8,$9);
 
-                $pkt_hr->{'s_obj'} = new NetAddr::IP($pkt_hr->{'src'})
+                $pkt_hr->{'s_obj'} = NetAddr::IP->new($pkt_hr->{'src'})
                     or return $PKT_ERROR;
-                $pkt_hr->{'d_obj'} = new NetAddr::IP($pkt_hr->{'dst'})
+                $pkt_hr->{'d_obj'} = NetAddr::IP->new($pkt_hr->{'dst'})
                     or return $PKT_ERROR;
 
             } else {
@@ -1925,9 +1925,9 @@ sub parse_NF_pkt_str() {
                     $pkt_hr->{'flow_label'}, $pkt_hr->{'itype'},
                     $pkt_hr->{'icode'}) = ($1,$2,$3,$4,$5,$6,$7,$8);
 
-                $pkt_hr->{'s_obj'} = new6 NetAddr::IP($pkt_hr->{'src'})
+                $pkt_hr->{'s_obj'} = NetAddr::IP->new6($pkt_hr->{'src'})
                     or return $PKT_ERROR;
-                $pkt_hr->{'d_obj'} = new6 NetAddr::IP($pkt_hr->{'dst'})
+                $pkt_hr->{'d_obj'} = NetAddr::IP->new6($pkt_hr->{'dst'})
                     or return $PKT_ERROR;
 
             } else {
@@ -1952,9 +1952,9 @@ sub parse_NF_pkt_str() {
                     $pkt_hr->{'ttl'}, $pkt_hr->{'ip_id'}, $pkt_hr->{'itype'},
                     $pkt_hr->{'icode'}) = ($1,$2,$3,$4,$5,$6,$7);
 
-                $pkt_hr->{'s_obj'} = new NetAddr::IP($pkt_hr->{'src'})
+                $pkt_hr->{'s_obj'} = NetAddr::IP->new($pkt_hr->{'src'})
                     or return $PKT_ERROR;
-                $pkt_hr->{'d_obj'} = new NetAddr::IP($pkt_hr->{'dst'})
+                $pkt_hr->{'d_obj'} = NetAddr::IP->new($pkt_hr->{'dst'})
                     or return $PKT_ERROR;
 
             } else {
@@ -1990,7 +1990,22 @@ sub parse_NF_pkt_str() {
 
         if ($is_ipv6) {
 
-            ### FIXME future
+            if ($pkt_str =~ /SRC=($ipv6_re)\s+DST=($ipv6_re)\s+/) {
+
+                ($pkt_hr->{'src'}, $pkt_hr->{'dst'}) = ($1,$2);
+
+                $pkt_hr->{'s_obj'} = NetAddr::IP->new6($pkt_hr->{'src'})
+                    or return $PKT_ERROR;
+                $pkt_hr->{'d_obj'} = NetAddr::IP->new6($pkt_hr->{'dst'})
+                    or return $PKT_ERROR;
+
+                $pkt_hr->{'proto'} = $proto_num;
+
+            } else {
+                print STDERR "[-] err packet: strange IPv6 format\n"
+                    if $debug;
+                return $PKT_ERROR;
+            }
 
         } else {
 
@@ -2004,19 +2019,33 @@ sub parse_NF_pkt_str() {
                 ($pkt_hr->{'src'}, $pkt_hr->{'dst'}, $pkt_hr->{'ip_len'},
                     $pkt_hr->{'ttl'}, $pkt_hr->{'ip_id'}) = ($1,$2,$3,$4,$5);
 
-                $pkt_hr->{'s_obj'} = new NetAddr::IP($pkt_hr->{'src'})
+                $pkt_hr->{'s_obj'} = NetAddr::IP->new($pkt_hr->{'src'})
                     or return $PKT_ERROR;
-                $pkt_hr->{'d_obj'} = new NetAddr::IP($pkt_hr->{'dst'})
+                $pkt_hr->{'d_obj'} = NetAddr::IP->new($pkt_hr->{'dst'})
                     or return $PKT_ERROR;
-            }
 
-            $pkt_hr->{'proto'} = $proto_num;
+                $pkt_hr->{'proto'} = $proto_num;
+
+            } else {
+                print STDERR "[-] err packet: strange IPv4 format\n"
+                    if $debug;
+                return $PKT_ERROR;
+            }
         }
 
     } else {
         ### Sometimes the iptables log entry gets messed up due to
         ### buffering issues so we write it to the error log.
         print STDERR "[-] err packet: no regex match.\n" if $debug;
+        return $PKT_ERROR;
+    }
+
+    unless ($pkt_hr->{'s_obj'}) {
+        print STDERR "[-] No s_obj object\n" if $debug;
+        return $PKT_ERROR;
+    }
+    unless ($pkt_hr->{'d_obj'}) {
+        print STDERR "[-] No d_obj object\n" if $debug;
         return $PKT_ERROR;
     }
 
@@ -3454,7 +3483,7 @@ sub psad_init() {
     &dump_conf() if $debug;
 
     if ($restrict_ip_cmdline) {
-        $restrict_ip = new NetAddr::IP $restrict_ip_cmdline
+        $restrict_ip = NetAddr::IP->new($restrict_ip_cmdline)
             or die "[*] Could not acquire NetAddr::IP object for $restrict_ip";
     }
 
@@ -3751,9 +3780,9 @@ sub get_connected_subnets() {
             next if $intf_name eq 'lo';
             next if $intf_name =~ /dummy/i;
             if ($line =~ /^\s+inet.*?($ipv4_re)\/(\d+)/i) {
-                push @connected_subnets, new NetAddr::IP($1, $2);
+                push @connected_subnets, NetAddr::IP->new($1, $2);
             } elsif ($line =~ /inet6\s(\S+)/) {
-                push @connected_subnets, new6 NetAddr::IP($1);
+                push @connected_subnets, NetAddr::IP->new6($1);
             }
         }
     } else {
@@ -3768,9 +3797,9 @@ sub get_connected_subnets() {
             next if $intf_name eq 'lo';
             next if $intf_name =~ /dummy/i;
             if ($line =~ /^\s+inet.*?:($ipv4_re).*:($ipv4_re)/i) {
-                push @connected_subnets, new NetAddr::IP($1, $2);
+                push @connected_subnets, NetAddr::IP->new($1, $2);
             } elsif ($line =~ /^\s+inet6\saddr:\s+(\S+)/) {
-                push @connected_subnets, new6 NetAddr::IP($1);
+                push @connected_subnets, NetAddr::IP->new6($1);
             }
         }
     }
@@ -3812,15 +3841,15 @@ sub validate_home_net() {
         for my $net (@home_nets) {
             my $home_net = '';
             if ($net =~ m|($ipv4_re/$ipv4_re)|) {
-                $home_net = new NetAddr::IP $1;
+                $home_net = NetAddr::IP->new($1);
             } elsif ($net =~ m|($ipv4_re/\d+)|) {
-                $home_net = new NetAddr::IP $1;
+                $home_net = NetAddr::IP->new($1);
             } elsif ($net =~ m|($ipv4_re)|) {
-                $home_net = new NetAddr::IP $1;
+                $home_net = NetAddr::IP->new($1);
             } else {
                 next;
             }
-            push @local_nets, new NetAddr::IP $net;
+            push @local_nets, NetAddr::IP->new($net);
             my $found = 0;
             for my $net (@$connected_subnets_ar) {
                 $found = $found_one_net = 1
@@ -4649,10 +4678,10 @@ sub expand_sig_ips() {
                     or $ip =~ m|($ipv4_re/\d+)|
                     or $ip =~ m|($ipv4_re)|) {
                 push @arr, $1;
-                $sig_ip_objs{$1} = new NetAddr::IP($1);
+                $sig_ip_objs{$1} = NetAddr::IP->new($1);
             } elsif ($ip =~ m|\:|) {
                 push @arr, $ip;
-                $sig_ip_objs{$ip} = new NetAddr::IP($ip)
+                $sig_ip_objs{$ip} = NetAddr::IP->new($ip)
                     or die "[*] NetAddr::IP error for $ip";
             }
         }
@@ -4661,13 +4690,13 @@ sub expand_sig_ips() {
             or $ip_str =~ m|($ipv4_re/\d+)|
             or $ip_str =~ m|($ipv4_re)|) {
         push @arr, $1;
-        $sig_ip_objs{$1} = new NetAddr::IP($1)
+        $sig_ip_objs{$1} = NetAddr::IP->new($1)
             or die "[*] NetAddr::IP error for $1";
 
     } elsif ($ip_str =~ m|\:|) {
 
         push @arr, $ip_str;
-        $sig_ip_objs{$ip_str} = new NetAddr::IP($ip_str)
+        $sig_ip_objs{$ip_str} = NetAddr::IP->new($ip_str)
             or die "[*] NetAddr::IP error for $ip_str";
 
     } elsif ($ip_str eq 'any' or $ip_str =~ m|NOT_?USED|i) {
@@ -4676,7 +4705,7 @@ sub expand_sig_ips() {
 
         ### this will match any IPv4 or IPv6 address
         $sig_ip_objs{'any'}
-            = new6 NetAddr::IP('0000:0000:0000:0000:0000:0000:0000:0000/0');
+            = NetAddr::IP->new6('0000:0000:0000:0000:0000:0000:0000:0000/0');
 
     } else {
         die "[*] import_signatures(): Unrecognized src/dst: $ip_str ",
@@ -4808,7 +4837,7 @@ sub import_auto_dl() {
             next;
         }
 
-        $auto_dl_ip_objs{$ip} = new NetAddr::IP($ip, $mask);
+        $auto_dl_ip_objs{$ip} = NetAddr::IP->new($ip, $mask);
         unless (defined $auto_dl_ip_objs{$ip} and $auto_dl_ip_objs{$ip}) {
             &sys_log("auto_dl could not acquire NetAddr::IP object at line $i");
             next;
@@ -5626,8 +5655,8 @@ sub scan_logr() {
                 ### we're most likely interested in the whois information for
                 ### a non local IP address
                 if ($config{'ENABLE_WHOIS_FORCE_SRC_IP'} eq 'N'
-                        and &is_local($src, new NetAddr::IP($src))
-                        and not &is_local($dst, new NetAddr::IP($dst))) {
+                        and &is_local($src, NetAddr::IP->new($src))
+                        and not &is_local($dst, NetAddr::IP->new($dst))) {
                     $whois_which_ip_str = 'destination IP';
                     $lookup_ip = $dst;
                 }
@@ -6439,7 +6468,7 @@ sub sockwrite_flush_auto_rules() {
 
 sub flush_auto_blocked_ips() {
 
-    my $ipt = new IPTables::ChainMgr(%ipt_opts)
+    my $ipt = IPTables::ChainMgr->new(%ipt_opts)
         or die '[*] Could not acquire IPTables::ChainMgr object.';
 
     &sys_log('flushing existing psad iptables ' .
@@ -6558,7 +6587,7 @@ sub ipt_block() {
 
     print STDERR "[+] ipt_block($ip)\n" if $debug;
 
-    my $ipt = new IPTables::ChainMgr(%ipt_opts)
+    my $ipt = IPTables::ChainMgr->new(%ipt_opts)
         or die '[*] Could not acquire IPTables::ChainMgr object.';
 
     my $block_success   = 0;
@@ -6734,7 +6763,7 @@ sub ipt_block() {
 sub ipt_rm_block() {
     my $ip = shift;
 
-    my $ipt = new IPTables::ChainMgr(%ipt_opts)
+    my $ipt = IPTables::ChainMgr->new(%ipt_opts)
         or die '[*] Could not acquire IPTables::ChainMgr object.';
 
     print STDERR "[+] ipt_rm_block($ip)\n" if $debug;
@@ -6821,7 +6850,7 @@ sub ipt_rm_block() {
 
 sub ipt_list_auto_chains() {
 
-    my $ipt = new IPTables::ChainMgr(%ipt_opts)
+    my $ipt = IPTables::ChainMgr->new(%ipt_opts)
         or die '[*] Could not acquire IPTables::ChainMgr object.';
 
     print "[+] Listing chains from IPT_AUTO_CHAIN keywords...\n";
@@ -6903,15 +6932,15 @@ sub sockwrite_add_ipt_block_ip() {
     if ($fw_block_ip =~ m|^\s*($ipv4_re)\s*$|) {
         $block_ip   = $1;
         $block_mask = '32';
-        $block_net = new NetAddr::IP($1);
+        $block_net = NetAddr::IP->new($1);
     } elsif ($fw_block_ip =~ m|^\s*($ipv4_re)/($ipv4_re)\s*$|) {
         $block_ip   = $1;
         $block_mask = $2;
-        $block_net = new NetAddr::IP($1, $2);
+        $block_net = NetAddr::IP->new($1, $2);
     } elsif ($fw_block_ip =~ m|^\s*($ipv4_re)/(\d+)\s*$|) {
         $block_ip   = $1;
         $block_mask = $2;
-        $block_net = new NetAddr::IP($1, $2);
+        $block_net = NetAddr::IP->new($1, $2);
     } else {
         die "[*] Badly formatted block IP: $fw_block_ip";
     }
@@ -6975,15 +7004,15 @@ sub sockwrite_rm_ipt_block_ip() {
     if ($fw_rm_block_ip =~ m|^\s*($ipv4_re)\s*$|) {
         $rm_block_ip   = $1;
         $rm_block_mask = '32';
-        $rm_block_net = new NetAddr::IP($1);
+        $rm_block_net = NetAddr::IP->new($1);
     } elsif ($fw_rm_block_ip =~ m|^\s*($ipv4_re)/($ipv4_re)\s*$|) {
         $rm_block_ip   = $1;
         $rm_block_mask = $2;
-        $rm_block_net = new NetAddr::IP($1, $2);
+        $rm_block_net = NetAddr::IP->new($1, $2);
     } elsif ($fw_rm_block_ip =~ m|^\s*($ipv4_re)/(\d+)\s*$|) {
         $rm_block_ip   = $1;
         $rm_block_mask = $2;
-        $rm_block_net = new NetAddr::IP($1, $2);
+        $rm_block_net = NetAddr::IP->new($1, $2);
     } else {
         die "[*] Badly formatted rm block IP: $fw_rm_block_ip";
     }
@@ -7232,7 +7261,7 @@ sub build_ipt_config() {
 
     &make_psad_dirs() unless -d $config{'PSAD_DIR'};
 
-    my $ipt = new IPTables::ChainMgr(%ipt_opts)
+    my $ipt = IPTables::ChainMgr->new(%ipt_opts)
         or die '[*] Could not acquire IPTables::ChainMgr object.';
 
     my $ctr = 1;
@@ -8671,25 +8700,25 @@ sub csv_tokens() {
                     $search_hsh{'str'} = $1;
                 } elsif ($search =~ m|^$ipv4_re/$ipv4_re$|) {
                     $search_hsh{'net'} = $search;
-                    $search_hsh{'net_obj'} = new NetAddr::IP($search)
+                    $search_hsh{'net_obj'} = NetAddr::IP->new($search)
                         or die "[*] NetAddr::IP($search) error";
                 } elsif ($search =~ m|^$ipv4_re/\d+$|) {
                     $search_hsh{'net'} = $search;
-                    $search_hsh{'net_obj'} = new NetAddr::IP($search)
+                    $search_hsh{'net_obj'} = NetAddr::IP->new($search)
                         or die "[*] NetAddr::IP($search) error";
                 } elsif ($search =~ m|^$ipv4_re$|) {
                     $search_hsh{'ip'} = $search;
-                    $search_hsh{'ip_obj'} = new NetAddr::IP($search)
+                    $search_hsh{'ip_obj'} = NetAddr::IP->new($search)
                         or die "[*] NetAddr::IP($search) error";
                 } elsif ($search =~ m|\:|) {
                     ### see if this is an IPv6 address
                     if ($search =~ m|\/|) {
                         $search_hsh{'net'} = $search;
-                        $search_hsh{'net_obj'} = new6 NetAddr::IP($search)
+                        $search_hsh{'net_obj'} = NetAddr::IP->new6($search)
                             or die "[*] NetAddr::IP($search) error";
                     } else {
                         $search_hsh{'net'} = $search;
-                        $search_hsh{'net_obj'} = new6 NetAddr::IP($search)
+                        $search_hsh{'net_obj'} = NetAddr::IP->new6($search)
                             or die "[*] NetAddr::IP($search) error";
                     }
                 } else {
@@ -8994,7 +9023,7 @@ sub print_scan_status() {
                 ", Pkts: $tot_pkts, Total protocols: $tot_protocols, " .
                 "Unique sigs: $uniq_sigs";
 
-            my $src_obj = new NetAddr::IP($src) or die "[*] NetAddr::IP($src) error";
+            my $src_obj = NetAddr::IP->new($src) or die "[*] NetAddr::IP($src) error";
             if ($src_obj->version() == 6) {
                 $src_str = "\nSRC:  $src (" . $src_obj->short() .
                     "), DL: $dl, Dsts: $total_dsts" .
@@ -9032,7 +9061,7 @@ sub print_scan_status() {
 
             DST: for my $dst (keys %{$scan{$src}}) {
                 my $dst_str = "    DST: $dst";
-                my $dst_obj = new NetAddr::IP($dst)
+                my $dst_obj = NetAddr::IP->new($dst)
                     or die "[*] NetAddr::IP($dst) error";
                 if ($dst_obj->version() == 6) {
                     $dst_str = "    DST: $dst (" . $dst_obj->short() . ')';
@@ -9203,7 +9232,7 @@ sub print_blocked_ip_status() {
         push @print_lines,  "    iptables auto-blocked IPs:\n";
     }
 
-    my $ipt = new IPTables::ChainMgr(%ipt_opts)
+    my $ipt = IPTables::ChainMgr->new(%ipt_opts)
         or die '[*] Could not acquire IPTables::ChainMgr object.';
 
     my $found_line = 0;
@@ -9791,7 +9820,7 @@ sub print_top_attackers() {
             next unless defined $top_packet_counts{$src}
                     or defined $top_sig_counts{$src};
 
-            my $ip_obj = new NetAddr::IP($src)
+            my $ip_obj = NetAddr::IP->new($src)
                 or die "[*] NetAddr::IP $src error";
 
             $ip_objs{$src} = $ip_obj;

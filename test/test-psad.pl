@@ -7,12 +7,12 @@ use Getopt::Long 'GetOptions';
 use strict;
 
 #==================== config =====================
-my $logfile        = 'test.log';
-my $output_dir     = 'output';
-my $conf_dir       = 'conf';
-my $run_dir        = 'run';
-my $scans_dir      = 'scans';
-my $test_install_dir = 'psad-install';
+my $logfile        = './test.log';
+my $output_dir     = './output';
+my $conf_dir       = './conf';
+my $run_dir        = './run';
+my $scans_dir      = './scans';
+my $test_install_dir = './psad-install';
 my $syn_scan_file  = 'syn_scan_1000_1500';
 my $syn_sweep_file = 'syn_sweep';
 my $syn_scan_multi_dst_file  = 'syn_scan_1000_1500_multi_dst';

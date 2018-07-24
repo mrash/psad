@@ -1,3 +1,9 @@
+psad-2.4.6 (07//2018):
+    - Add EMAIL_APPEND_HEADER to allow psad alerts to have custom email headers
+      appended to outbound emails. This uses the '-a' command line argument
+      offered by the 'mail' command. An example usage would be to set the
+      'From' email header.
+
 psad-2.4.5 (06/13/2017):
     - Added proper port sweep detection based on a single port being probed
       across a configurable number of destination hosts. The number of

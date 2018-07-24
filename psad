@@ -11147,8 +11147,13 @@ sub send_mail() {
         close F;
     }
 
-    open MAIL, qq{| $mailCmd -s "$subject" $addr_str > /dev/null 2>&1} or die
-        qq{[*] Could not send mail: $mailCmd -s "$subject" $addr_str: $!};
+    my $mail_str = $mailCmd;
+    $mail_str .= " $config{'EMAIL_APPEND_HEADER'}"
+        if $config{'EMAIL_APPEND_HEADER'} ne 'NONE';
+    $mail_str .= qq{ -s "$subject" $addr_str > /dev/null 2>&1};
+
+    open MAIL, qq{| $mail_str} or die
+        qq{[*] Could not send mail: $mail_str: $!};
     if ($body_file and @mail_body_lines) {
         print MAIL for @mail_body_lines;
     }
@@ -11401,6 +11406,7 @@ sub required_vars() {
         ENABLE_WHOIS_LOOKUPS PSAD_FW_READ_PID_FILE DL1_UNIQUE_HOSTS
         DL2_UNIQUE_HOSTS DL3_UNIQUE_HOSTS DL4_UNIQUE_HOSTS DL5_UNIQUE_HOSTS
         PORT_RANGE_SWEEP_THRESHOLD ENABLE_OVERRIDE_FW_CMD FW_CMD FW_CMD_ARGS
+        EMAIL_APPEND_HEADER
     ));
     &defined_vars(\@required_vars);
     return;

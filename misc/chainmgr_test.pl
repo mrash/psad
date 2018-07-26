@@ -8,7 +8,7 @@ my $psad_lib_dir = '/usr/lib/psad';
 ### import psad perl modules
 &import_psad_perl_modules();
 
-my $ipt = new IPTables::ChainMgr(
+my $ipt = IPTables::ChainMgr->new(
     'iptables' => '/sbin/iptables',
     'verbose'  => 1
 );

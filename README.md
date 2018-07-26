@@ -146,7 +146,7 @@ suspect traffic.
 ## Platforms
 psad generally runs on Linux systems, and is available in the package
 repositories of many major Linux distributions. If there are any operational
-issues with psad, please open an issue on [psad](https://github.com/mrash/psad)
+issues with psad, please open an issue on [github](https://github.com/mrash/psad)
 
 ## License
 `psad` is released as open source software under the terms of

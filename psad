@@ -3276,6 +3276,12 @@ sub import_perl_modules() {
     Unix::Syslog->import(qw(:subs :macros));
     Storable->import(qw(retrieve store)) if $store_file;
 
+    if ($debug) {
+        print STDERR "[+] IPTables::ChainMgr::VERSION: $IPTables::ChainMgr::VERSION\n";
+        require IPTables::Parse; ### debug mode only, IPTables::ChainMgr imports it
+        print STDERR "[+] IPTables::Parse::VERSION $IPTables::Parse::VERSION\n";
+    }
+
     $imported_syslog_module = 1;
 
     return;

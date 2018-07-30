@@ -3,6 +3,13 @@ psad-2.4.6 (07//2018):
       appended to outbound emails. This uses the '-a' command line argument
       offered by the 'mail' command. An example usage would be to set the
       'From' email header.
+    - Bug fix for ENABLE_OVERRIDE_FW_CMD feature to allow global option
+      settings to the underlying firewall command to be controlled via a new
+      variable FW_CMD_ARGS. This variable is only used when
+      ENABLE_OVERRIDE_FW_CMD is enabled, and is set to NONE by default.
+      Normally, on systems running firewalld, the command line arguments
+      '--direct --passthrough ipv4' are set provided, but FW_CMD_ARGS can be
+      used to control this.
 
 psad-2.4.5 (06/13/2017):
     - Added proper port sweep detection based on a single port being probed

@@ -4104,6 +4104,12 @@ sub import_snort_rules() {
                     $fwsnort_sigs{$sid}{'classtype'} = '';
                 }
 
+                if (/[\s;]metadata:\s*(.*?)\s*;/) {
+                    $fwsnort_sigs{$sid}{'metadata'} = [split '\s*,\s*', $1];
+                } else {
+                    $fwsnort_sigs{$sid}{'metadata'} = '';
+                }
+
                 $fwsnort_sigs{$sid}{'priority'} = &convert_snort_priority($1)
                     if /[\s;]priority:\s*(\d+)\s*;/;
 
@@ -4884,7 +4890,6 @@ sub import_auto_dl() {
     close F;
 
     if (%auto_dl) {
-
         ### don't write syslog message if we are running in --fw-block-ip
         ### mode
         unless ($fw_block_ip) {
@@ -6179,6 +6184,13 @@ sub scan_logr_signatures() {
                             print $email_fh "       reference: ($reftype) ",
                                   "${baseurl}$ref\n";
                         }
+                    }
+                }
+
+                ### Snort metadata
+                if ($sig_hr->{'metadata'}) {
+                    for my $metadata_field (@{$sig_hr->{'metadata]'}}) {
+                        print $email_fh "       $metadata_field\n";
                     }
                 }
                 print $email_fh "\n";

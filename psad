@@ -6189,7 +6189,7 @@ sub scan_logr_signatures() {
 
                 ### Snort metadata
                 if ($sig_hr->{'metadata'}) {
-                    for my $metadata_field (@{$sig_hr->{'metadata]'}}) {
+                    for my $metadata_field (@{$sig_hr->{'metadata'}}) {
                         print $email_fh "       $metadata_field\n";
                     }
                 }

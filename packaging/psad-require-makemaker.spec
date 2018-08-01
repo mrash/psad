@@ -1,5 +1,5 @@
 %define name psad
-%define version 2.4.5
+%define version 2.4.6
 %define release 1
 %define psadlibdir %_libdir/%name
 %define psadlogdir /var/log/psad
@@ -302,6 +302,9 @@ fi
 %_libdir/%name
 
 %changelog
+* Tue Jul 31 2018 Michael Rash <mbr@cipherdyne.org>
+- psad-2.4.6 release
+
 * Tue Jun 13 2017 Michael Rash <mbr@cipherdyne.org>
 - psad-2.4.5 release
 

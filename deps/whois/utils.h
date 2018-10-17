@@ -49,12 +49,15 @@
 # define ngettext(a, b, c) ((c==1) ? (a) : (b))
 #endif
 
+#if defined IDN2_VERSION_NUMBER && IDN2_VERSION_NUMBER < 0x00140000
+# define IDN2_NONTRANSITIONAL IDN2_NFC_INPUT
+#endif
 
 /* Prototypes */
 void *do_nofail(void *ptr, const char *file, const int line);
 char **merge_args(char *args, char *argv[], int *argc);
 
-void err_quit(const char *fmt, ...) NORETURN;
-void err_sys(const char *fmt, ...) NORETURN;
+void NORETURN err_quit(const char *fmt, ...);
+void NORETURN err_sys(const char *fmt, ...);
 
 #endif

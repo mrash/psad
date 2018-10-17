@@ -1,5 +1,5 @@
 /*
- * Copyright 1999-2010 by Marco d'Itri <md@linux.it>.
+ * Copyright (C) 1999-2018 Marco d'Itri <md@linux.it>.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 #include "config.h"
 #include <string.h>
 #include <ctype.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -31,11 +32,10 @@
 #ifdef HAVE_REGEXEC
 #include <regex.h>
 #endif
-#ifdef HAVE_LIBIDN
+#ifdef HAVE_LIBIDN2
+#include <idn2.h>
+#elif defined HAVE_LIBIDN
 #include <idna.h>
-#endif
-#ifdef HAVE_INET_PTON
-#include <arpa/inet.h>
 #endif
 
 /* Application-specific */
@@ -126,7 +126,8 @@ int main(int argc, char *argv[])
     int longindex;
 #endif
 
-    int ch, nopar = 0, fstringlen = 64;
+    int ch, nopar = 0;
+    size_t fstringlen = 64;
     const char *server = NULL, *port = NULL;
     char *qstring, *fstring;
     int ret;
@@ -368,6 +369,12 @@ int handle_query(const char *hserver, const char *hport,
 	    server = guess_server(p);
 	    free(p);
 	    goto retry;
+	case 0x0D:
+	    p = convert_in6arpa(query);
+	    free(server);
+	    server = guess_server(p);
+	    free(p);
+	    goto retry;
 	default:
 	    break;
     }
@@ -538,12 +545,7 @@ char *guess_server(const char *s)
 	return strdup(whereas32(as32));
 
     /* smells like an IP? */
-#ifdef HAVE_INET_PTON
-    if (inet_pton(AF_INET, s, &ip) > 0) {
-	ip = ntohl(ip);
-#else
     if ((ip = myinet_aton(s))) {
-#endif
 	for (i = 0; ip_assign[i].serv; i++)
 	    if ((ip & ip_assign[i].mask) == ip_assign[i].net)
 		return strdup(ip_assign[i].serv);
@@ -560,7 +562,7 @@ char *guess_server(const char *s)
 	char *server = malloc(strlen("whois.nic.") + strlen(tld) + 1);
 	strcpy(server, "whois.nic.");
 	strcat(server, tld);
-	return(server);
+	return server;
     }
 
     /* no dot but hyphen */
@@ -653,7 +655,7 @@ char *queryformat(const char *server, const char *flags, const char *query)
 	simple_recode_input_charset = "utf-8";	/* then try UTF-8 */
 #endif
 
-#ifdef HAVE_LIBIDN
+#if defined HAVE_LIBIDN || defined HAVE_LIBIDN2
 # define DENIC_PARAM_ACE ",ace"
 #else
 # define DENIC_PARAM_ACE ""
@@ -813,10 +815,17 @@ char *query_crsnic(const int sock, const char *query)
     int hide = hide_discl;
     char *referral_server = NULL;
     int state = 0;
+    int dotscount = 0;
 
     temp = malloc(strlen("domain ") + strlen(query) + 2 + 1);
+    *temp = '\0';
 
-    if (!strpbrk(query, "=~ "))
+    /* if this has more than one dot then it is a name server */
+    for (p = (char *) query; *p != '\0'; p++)
+	if (*p == '.')
+	    dotscount++;
+
+    if (dotscount == 1 && !strpbrk(query, "=~ "))
 	strcpy(temp, "domain ");
     strcat(temp, query);
     strcat(temp, "\r\n");
@@ -831,8 +840,11 @@ char *query_crsnic(const int sock, const char *query)
 	   is queried */
 	if (state == 0 && strneq(buf, "   Domain Name:", 15))
 	    state = 1;
-	if (state == 1 && (strneq(buf, "   Whois Server:", 16)
-		    || strneq(buf, "   WHOIS Server:", 16))) {
+	if (state == 0 && strneq(buf, "   Server Name:", 15)) {
+	    referral_server = strdup("");
+	    state = 2;
+	}
+	if (state == 1 && strneq(buf, "   Registrar WHOIS Server:", 26)) {
 	    for (p = buf; *p != ':'; p++);	/* skip until the colon */
 	    for (p++; *p == ' '; p++);		/* skip the spaces */
 	    referral_server = strdup(p);
@@ -881,7 +893,7 @@ char *query_afilias(const int sock, const char *query)
 	   This is not supposed to happen. */
 	if (state == 0 && strneq(buf, "Domain Name:", 12))
 	    state = 1;
-	if (state == 1 && strneq(buf, "Whois Server:", 13)) {
+	if (state == 1 && strneq(buf, "Registrar WHOIS Server:", 23)) {
 	    for (p = buf; *p != ':'; p++);	/* skip until colon */
 	    for (p++; *p == ' '; p++);		/* skip colon and spaces */
 	    referral_server = strdup(p);
@@ -930,7 +942,7 @@ int openconn(const char *server, const char *port)
      * instead of connecting to the actual whois server.
      */
     if (AFL_MODE)
-	return (dup(0));
+	return dup(0);
 
     alarm(60);
 
@@ -939,9 +951,7 @@ int openconn(const char *server, const char *port)
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_ADDRCONFIG;
-#ifdef HAVE_LIBIDN
     hints.ai_flags |= AI_IDN;
-#endif
 
     if ((err = getaddrinfo(server, port ? port : "nicname", &hints, &res))
 	    != 0) {
@@ -998,7 +1008,7 @@ int connect_with_timeout(int fd, const struct sockaddr *addr,
     struct timeval tv;
 
     if (timeout <= 0)
-	return (connect(fd, addr, addrlen));
+	return connect(fd, addr, addrlen);
 
     if ((savedflags = fcntl(fd, F_GETFL, 0)) < 0)
 	return -1;
@@ -1050,19 +1060,20 @@ int connect_with_timeout(int fd, const struct sockaddr *addr,
     return 0;
 }
 
-void alarm_handler(int signum)
+void NORETURN alarm_handler(int signum)
 {
     close(sockfd);
     err_quit(_("Timeout."));
 }
 
-void sighandler(int signum)
+void NORETURN sighandler(int signum)
 {
     close(sockfd);
     err_quit(_("Interrupted by signal %d..."), signum);
 }
 
-int japanese_locale(void) {
+int japanese_locale(void)
+{
     char *lang;
 
     lang = getenv("LC_MESSAGE");
@@ -1133,7 +1144,7 @@ const char *is_new_gtld(const char *s)
 	if (in_domain(s, new_gtlds[i]))
 	    return new_gtlds[i];
 
-    return 0;
+    return NULL;
 }
 
 /*
@@ -1145,7 +1156,7 @@ const char *is_new_gtld(const char *s)
 char *normalize_domain(const char *dom)
 {
     char *p, *ret;
-#ifdef HAVE_LIBIDN
+#if defined HAVE_LIBIDN || defined HAVE_LIBIDN2
     char *domain_start = NULL;
 #endif
 
@@ -1160,7 +1171,7 @@ char *normalize_domain(const char *dom)
 	p--;
     }
 
-#ifdef HAVE_LIBIDN
+#if defined HAVE_LIBIDN || defined HAVE_LIBIDN2
     /* find the start of the last word if there are spaces in the query */
     for (p = ret; *p; p++)
 	if (*p == ' ')
@@ -1170,8 +1181,13 @@ char *normalize_domain(const char *dom)
 	char *q, *r;
 	int prefix_len;
 
+#ifdef HAVE_LIBIDN2
+	if (idn2_lookup_ul(domain_start, &q, IDN2_NONTRANSITIONAL) != IDN2_OK)
+	    return ret;
+#else
 	if (idna_to_ascii_lz(domain_start, &q, 0) != IDNA_SUCCESS)
 	    return ret;
+#endif
 
 	/* reassemble the original query in a new buffer */
 	prefix_len = domain_start - ret;
@@ -1186,8 +1202,13 @@ char *normalize_domain(const char *dom)
     } else {
 	char *q;
 
+#ifdef HAVE_LIBIDN2
+	if (idn2_lookup_ul(ret, &q, IDN2_NONTRANSITIONAL) != IDN2_OK)
+	    return ret;
+#else
 	if (idna_to_ascii_lz(ret, &q, 0) != IDNA_SUCCESS)
 	    return ret;
+#endif
 
 	free(ret);
 	return q;
@@ -1199,7 +1220,8 @@ char *normalize_domain(const char *dom)
 
 /* server and port have to be freed by the caller */
 void split_server_port(const char *const input,
-	char **server, char **port) {
+	char **server, char **port)
+{
     char *p;
 
     if (*input == '[' && (p = strchr(input, ']'))) {	/* IPv6 */
@@ -1232,25 +1254,13 @@ void split_server_port(const char *const input,
     }
 
     /* change the server name to lower case */
-    for (p = (char *) *server; *p && *p != '\0'; p++)
+    for (p = (char *) *server; *p; p++)
 	*p = tolower(*p);
 }
 
 char *convert_6to4(const char *s)
 {
     char *new;
-
-#ifdef HAVE_INET_PTON
-    struct in6_addr ipaddr;
-    unsigned char *ip;
-
-    if (inet_pton(AF_INET6, s, &ipaddr) <= 0)
-	return strdup("0.0.0.0");
-
-    ip = (unsigned char *)&ipaddr;
-    new = malloc(sizeof("255.255.255.255"));
-    sprintf(new, "%d.%d.%d.%d", *(ip + 2), *(ip + 3), *(ip + 4), *(ip + 5));
-#else
     int items;
     unsigned int a, b;
     char c;
@@ -1268,8 +1278,7 @@ char *convert_6to4(const char *s)
     }
 
     new = malloc(sizeof("255.255.255.255"));
-    sprintf(new, "%d.%d.%d.%d", a >> 8, a & 0xff, b >> 8, b & 0xff);
-#endif
+    sprintf(new, "%u.%u.%u.%u", a >> 8, a & 0xff, b >> 8, b & 0xff);
 
     return new;
 }
@@ -1277,19 +1286,6 @@ char *convert_6to4(const char *s)
 char *convert_teredo(const char *s)
 {
     char *new;
-
-#ifdef HAVE_INET_PTON
-    struct in6_addr ipaddr;
-    unsigned char *ip;
-
-    if (inet_pton(AF_INET6, s, &ipaddr) <= 0)
-	return strdup("0.0.0.0");
-
-    ip = (unsigned char *)&ipaddr;
-    new = malloc(sizeof("255.255.255.255"));
-    sprintf(new, "%d.%d.%d.%d", *(ip + 12) ^ 0xff, *(ip + 13) ^ 0xff,
-	    *(ip + 14) ^ 0xff, *(ip + 15) ^ 0xff);
-#else
     unsigned int a, b;
 
     if (sscanf(s, "2001:%*[^:]:%*[^:]:%*[^:]:%*[^:]:%*[^:]:%x:%x", &a, &b) != 2)
@@ -1298,8 +1294,7 @@ char *convert_teredo(const char *s)
     a ^= 0xffff;
     b ^= 0xffff;
     new = malloc(sizeof("255.255.255.255"));
-    sprintf(new, "%d.%d.%d.%d", a >> 8, a & 0xff, b >> 8, b & 0xff);
-#endif
+    sprintf(new, "%u.%u.%u.%u", a >> 8, a & 0xff, b >> 8, b & 0xff);
 
     return new;
 }
@@ -1340,7 +1335,68 @@ char *convert_inaddr(const char *s)
     return new;
 }
 
-#ifndef HAVE_INET_PTON
+char *convert_in6arpa(const char *s)
+{
+    char *ip, *p;
+    int character = 0;
+    int digits = 1;
+
+    ip = malloc(40);
+
+    p = strstr(s, ".ip6.arpa");
+    if (!p || p == s) {
+	ip[character] = '\0';
+	return ip;
+    }
+
+    /* start from the first character before ".ip6.arpa" */
+    p--;
+
+    while (1) {
+	/* check that this is a valid digit for an IPv6 address */
+	if (!((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f') ||
+	      (*p >= 'A' && *p <= 'F'))) {
+	    ip[character] = '\0';
+	    return ip;
+	}
+
+	/* copy the digit to the IP address */
+	ip[character++] = *p;
+
+	/* stop if we have reached the beginning of the string */
+	if (p == s)
+	    break;
+
+	/* stop if we have parsed a complete address */
+	if (character == 39)
+	    break;
+
+	/* add the colon separator every four digits */
+	if ((digits++ % 4) == 0)
+	    ip[character++] = ':';
+
+	/* go to the precedent character and abort if it is not a dot */
+	p--;
+	if (*p != '.') {
+	    ip[character] = '\0';
+	    return ip;
+	}
+
+	/* abort if the string starts with the dot */
+	if (p == s) {
+	    ip[character] = '\0';
+	    return ip;
+	}
+
+	/* go to the precedent character and continue */
+	p--;
+    }
+
+    /* terminate the string */
+    ip[character] = '\0';
+    return ip;
+}
+
 unsigned long myinet_aton(const char *s)
 {
     unsigned long a, b, c, d;
@@ -1356,7 +1412,6 @@ unsigned long myinet_aton(const char *s)
 	return 0;
     return (a << 24) + (b << 16) + (c << 8) + d;
 }
-#endif
 
 unsigned long asn32_to_long(const char *s)
 {
@@ -1372,13 +1427,14 @@ unsigned long asn32_to_long(const char *s)
     return (a << 16) + b;
 }
 
-int isasciidigit(const char c) {
+int isasciidigit(const char c)
+{
     return (c >= '0' && c <= '9') ? 1 : 0;
 }
 
 /* http://www.ripe.net/ripe/docs/databaseref-manual.html */
 
-void usage(int error)
+void NORETURN usage(int error)
 {
     fprintf((EXIT_SUCCESS == error) ? stdout : stderr, _(
 "Usage: whois [OPTION]... OBJECT...\n\n"

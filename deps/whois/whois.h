@@ -1,3 +1,5 @@
+#include "utils.h"
+
 /* 6bone referto: extension */
 #define REFERTO_FORMAT	"%% referto: whois -h %255s -p %15s %1021[^\n\r]"
 
@@ -21,9 +23,9 @@ char *query_crsnic(const int, const char *);
 char *query_afilias(const int, const char *);
 int openconn(const char *, const char *);
 int connect_with_timeout(int, const struct sockaddr *, socklen_t, int);
-void usage(int error);
-void alarm_handler(int);
-void sighandler(int);
+void NORETURN usage(int error);
+void NORETURN alarm_handler(int);
+void NORETURN sighandler(int);
 int japanese_locale(void);
 unsigned long myinet_aton(const char *);
 unsigned long asn32_to_long(const char *);
@@ -36,6 +38,7 @@ char *normalize_domain(const char *);
 char *convert_6to4(const char *);
 char *convert_teredo(const char *);
 char *convert_inaddr(const char *);
+char *convert_in6arpa(const char *);
 int handle_query(const char *server, const char *port,
 		   const char *qstring, const char *fstring);
 void split_server_port(const char *const input, char **server, char **port);

@@ -61,7 +61,7 @@ const char *hide_strings[] = {
     /* new gTLDs */
     "Terms of Use: Users accessing the Donuts WHOIS", NULL,
     "Terms of Use: Users accessing the United TLD WHOIS", NULL,
-    "Access to WHOIS information is provided", "",		/* Afilias */
+    "Access to WHOIS information is provided", NULL,		/* Afilias */
     "The  WHOIS information provided on this page", NULL, /* uniregistry.net */
     "The whois information provided on this site", "",	/* mm-registry.com */
     "; This data is provided by ", NULL,		/* ksregistry.net */
@@ -78,6 +78,7 @@ const char *hide_strings[] = {
     "% The WHOIS service offered by DNS Belgium", "",		/* be */
     "%   (c) 2015 NIC Costa Rica", "",				/* cr */
     "% The WHOIS service offered by EURid", "% of the database", /* eu */
+    "Access to .IN WHOIS information", "",			/* in */
     "% WHOIS LEGAL STATEMENT AND TERMS & CONDITIONS", NULL,	/* sx */
     "; The data in the WHOIS database of KSregistry GmbH", "",	/* vg */
     "NeuStar, Inc., the Registry Administrator for .US", NULL,

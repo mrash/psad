@@ -77,9 +77,6 @@ Return the smallest IP address range with a reference to an irt object.
 .TP 8
 .B \-d
 Return the reverse DNS delegation object too.
-.\" .TP 8
-.\" .B \-F
-.\" Return attribute names in short format. Implies \fI-r\fP option.
 .TP 8
 .B \-g SOURCE:FIRST\-LAST
 Search updates from \fISOURCE\fP database between \fIFIRST\fP and \fILAST\fP
@@ -136,19 +133,15 @@ a comma.
 .TP 8
 .B -v TYPE
 Return the verbose template for a object of \fITYPE\fP.
-.\" .TP 8
-.\" .B \-V AGENT
-.\" Change user agent identifier. Typical format is \fIXXn.n\fP like \fIMd5.0\fP.
-.\" RIPE uses the value to identify a client behind a registered proxy (in that
-.\" case a comma followed by a client IP address should be appended).
 .TP 8
 .B -x
 Search for only exact match on network address prefix.
 .SH "NOTES"
-Please remember that \fIwhois.networksolutions.com\fP by default will
-only search in the domains database. If you want to search for NIC handles
-you have to prepend a \fI!\fP character. When you do this, the default
-server becomes \fIwhois.networksolutions.com\fP.
+When querying the Verisign gTLDs (e.g. .com, .net...) thin registry servers
+for a domain the program will automatically prepend the \fIdomain\fP
+keyword to only show domain records.
+The \fInameserver\fP or \fIregistrar\fP keywords must be used to show
+other kinds of records.
 .P
 When querying \fIwhois.arin.net\fP for IPv4 or IPv6 networks, the CIDR
 netmask length will be automatically removed from the query string.
@@ -209,13 +202,11 @@ of objects are located. If the variable does not exist then
 .SH "BUGS"
 The program may have buffer overflows in the command line parser:
 be sure to not pass untrusted data to it.
-It should be rewritten to use a dynamics strings library.
+It should be rewritten to use a dynamic strings library.
 .SH "HISTORY"
 This program closely tracks the user interface of the whois client
 developed at RIPE by Ambrose Magee and others on the base of the
 original BSD client.
-I also added support for the protocol extensions developed by David
-Kessens of QWest for the 6bone server.
 .SH "AUTHOR"
 .B Whois
 and this man page were written by Marco d'Itri <\fImd@linux.it\fP>

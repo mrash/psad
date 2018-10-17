@@ -13,6 +13,10 @@
 
 
 /* autoconf in cpp macros */
+#if defined __NetBSD__ || __OpenBSD__
+# include <sys/param.h>
+#endif
+
 #ifdef linux
 # define ENABLE_NLS
 #endif
@@ -56,10 +60,6 @@
 
 /* FIXME: which systems lack this? */
 #define HAVE_GETTIMEOFDAY
-/* FIXME: disabled because it does not parse addresses with a netmask length.
- * The code using it needs to be either fixed or removed.
-#define HAVE_INET_PTON
-*/
 
 /*
  * Please send patches to correctly ignore old releases which lack a RNG
@@ -85,9 +85,14 @@
 #if (defined __FreeBSD__ && __FreeBSD__ >= 9) || \
     (defined __NetBSD__  && __NetBSD_Version__ >= 600000000) || \
     (defined OpenBSD && OpenBSD >= 200805) || \
-    (defined __APPLE__ && defined __MACH__)
+    (defined __APPLE__ && defined __MACH__ && MAC_OS_X_VERSION_MIN_REQUIRED >= 1070)
 # define HAVE_ARC4RANDOM_BUF
 # undef RANDOM_DEVICE
+#endif
+
+/* or else getentropy(2) on Linux */
+#if defined __GLIBC__ && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 25
+# define HAVE_GETENTROPY
 #endif
 
 #ifdef ENABLE_NLS

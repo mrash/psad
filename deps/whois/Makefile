@@ -2,8 +2,9 @@ prefix = /usr
 
 CFLAGS ?= -g -O2
 
-PERL = perl
-INSTALL = install
+PKG_CONFIG ?= pkg-config
+PERL ?= perl
+INSTALL ?= install
 
 whois_OBJECTS := whois.o utils.o
 mkpasswd_OBJECTS := mkpasswd.o utils.o
@@ -15,7 +16,7 @@ mkpasswd_OBJECTS := mkpasswd.o utils.o
 # FreeBSD
 #whois_LDADD += -liconv
 #LIBS += -L/usr/local/lib -lintl
-#INCLUDES += -I/usr/local/include
+#DEFS += -I/usr/local/include
 
 # OS/2 EMX
 #whois_LDADD += -lsocket
@@ -32,9 +33,17 @@ ifdef LOCALEDIR
 DEFS += -DLOCALEDIR=\"$(BASEDIR)$(prefix)/share/locale\"
 endif
 
+# libidn support has been autodetected since 5.2.18
 ifdef HAVE_LIBIDN
-whois_LDADD += -lidn
-DEFS += -DHAVE_LIBIDN
+$(error Please fix your build system to stop defining HAVE_LIBIDN!)
+endif
+
+ifeq ($(shell $(PKG_CONFIG) --exists 'libidn2 >= 2.0.3' || echo NO),)
+whois_LDADD += $(shell $(PKG_CONFIG) --libs libidn2)
+DEFS += -DHAVE_LIBIDN2 $(shell $(PKG_CONFIG) --cflags libidn2)
+else ifeq ($(shell $(PKG_CONFIG) --exists 'libidn' || echo NO),)
+whois_LDADD += $(shell $(PKG_CONFIG) --libs libidn)
+DEFS += -DHAVE_LIBIDN $(shell $(PKG_CONFIG) --cflags libidn)
 endif
 
 ifdef HAVE_ICONV
@@ -98,13 +107,8 @@ servers_charset.h: servers_charset_list make_servers_charset.pl
 
 ##############################################################################
 afl:
-	$(MAKE) whois \
-		CC=afl-gcc AFL_HARDEN=1 \
-		HAVE_LIBIDN=1 HAVE_ICONV=1 DEFS=-DAFL_MODE=1
-
-afl2:
-	$(MAKE) whois \
-		HAVE_LIBIDN=1 HAVE_ICONV=1 DEFS=-DAFL_MODE=1
+	-rm -f Makefile.depend
+	DEFS=-DAFL_MODE=1 AFL_HARDEN=1 $(MAKE) whois CC=afl-gcc HAVE_ICONV=1
 
 afl-run:
 	nice afl-fuzz -i ../afl_in -o ../afl_out -- ./whois

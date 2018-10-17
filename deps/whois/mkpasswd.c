@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2001-2008  Marco d'Itri
+ * Copyright (C) 2001-2018 Marco d'Itri <md@linux.it>.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -11,9 +11,9 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
 /* for crypt, snprintf and strcasecmp */
@@ -32,6 +32,7 @@
 #endif
 #include <fcntl.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 #include <sys/types.h>
 #ifdef HAVE_XCRYPT
@@ -123,9 +124,10 @@ static const struct crypt_method methods[] = {
 
 void generate_salt(char *const buf, const unsigned int len);
 void *get_random_bytes(const unsigned int len);
-void display_help(int error);
+void NORETURN display_help(int error);
 void display_version(void);
 void display_methods(void);
+char *read_line(FILE *fp);
 
 int main(int argc, char *argv[])
 {
@@ -150,7 +152,7 @@ int main(int argc, char *argv[])
     /* prepend options from environment */
     argv = merge_args(getenv("MKPASSWD_OPTIONS"), argv, &argc);
 
-    while ((ch = GETOPT_LONGISH(argc, argv, "hH:m:5P:R:sS:V", longopts, 0))
+    while ((ch = GETOPT_LONGISH(argc, argv, "hH:m:5P:R:sS:V", longopts, NULL))
 	    > 0) {
 	switch (ch) {
 	case '5':
@@ -313,24 +315,20 @@ int main(int argc, char *argv[])
     if (password) {
     } else if (password_fd != -1) {
 	FILE *fp;
-	char *p;
 
 	if (isatty(password_fd))
 	    fprintf(stderr, _("Password: "));
-	password = NOFAIL(malloc(128));
 	fp = fdopen(password_fd, "r");
 	if (!fp) {
 	    perror("fdopen");
 	    exit(2);
 	}
-	if (!fgets(password, 128, fp)) {
-	    perror("fgets");
+
+	password = read_line(fp);
+	if (!password) {
+	    perror("fgetc");
 	    exit(2);
 	}
-
-	p = strpbrk(password, "\n\r");
-	if (p)
-	    *p = '\0';
     } else {
 	password = getpass(_("Password: "));
 	if (!password) {
@@ -359,13 +357,21 @@ int main(int argc, char *argv[])
     exit(0);
 }
 
-#ifdef RANDOM_DEVICE
+#if defined RANDOM_DEVICE || defined HAVE_ARC4RANDOM_BUF || defined HAVE_GETENTROPY
+
 void* get_random_bytes(const unsigned int count)
 {
-    char *buf;
-    int fd, bytes_read;
+    char *buf = NOFAIL(malloc(count));
 
-    buf = NOFAIL(malloc(count));
+#if defined HAVE_ARC4RANDOM_BUF
+    arc4random_buf(buf, count);
+#elif defined HAVE_GETENTROPY
+    if (getentropy(buf, count) < 0)
+	perror("getentropy");
+#else
+    int fd;
+    ssize_t bytes_read;
+
     fd = open(RANDOM_DEVICE, O_RDONLY);
     if (fd < 0) {
 	perror("open(" RANDOM_DEVICE ")");
@@ -381,24 +387,17 @@ void* get_random_bytes(const unsigned int count)
 	exit(2);
     }
     close(fd);
+#endif
 
     return buf;
 }
-#endif
-
-#if defined RANDOM_DEVICE || defined HAVE_ARC4RANDOM_BUF
 
 void generate_salt(char *const buf, const unsigned int len)
 {
     unsigned int i;
     unsigned char *entropy;
 
-#if defined HAVE_ARC4RANDOM_BUF
-    void *entropy = NOFAIL(malloc(len));
-    arc4random_buf(entropy, len);
-#else
     entropy = get_random_bytes(len);
-#endif
 
     for (i = 0; i < len; i++)
 	buf[i] = valid_salts[entropy[i] % (sizeof valid_salts - 1)];
@@ -406,7 +405,7 @@ void generate_salt(char *const buf, const unsigned int len)
     free(entropy);
 }
 
-#else /* RANDOM_DEVICE || HAVE_ARC4RANDOM_BUF */
+#else /* RANDOM_DEVICE || HAVE_ARC4RANDOM_BUF || HAVE_GETENTROPY */
 
 void generate_salt(char *const buf, const unsigned int len)
 {
@@ -434,9 +433,9 @@ void generate_salt(char *const buf, const unsigned int len)
     buf[i] = '\0';
 }
 
-#endif /* RANDOM_DEVICE || HAVE_ARC4RANDOM_BUF */
+#endif /* RANDOM_DEVICE || HAVE_ARC4RANDOM_BUF || HAVE_GETENTROPY*/
 
-void display_help(int error)
+void NORETURN display_help(int error)
 {
     fprintf((EXIT_SUCCESS == error) ? stdout : stderr,
 	    _("Usage: mkpasswd [OPTIONS]... [PASSWORD [SALT]]\n"
@@ -463,7 +462,7 @@ void display_help(int error)
 void display_version(void)
 {
     printf("mkpasswd %s\n\n", VERSION);
-    puts("Copyright (C) 2001-2008 Marco d'Itri\n"
+    puts("Copyright (C) 2001-2018 Marco d'Itri\n"
 "This is free software; see the source for copying conditions.  There is NO\n"
 "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.");
 }
@@ -475,5 +474,31 @@ void display_methods(void)
     printf(_("Available methods:\n"));
     for (i = 0; methods[i].method != NULL; i++)
 	printf("%s\t%s\n", methods[i].method, methods[i].desc);
+}
+
+char *read_line(FILE *fp) {
+    int size = 128;
+    int ch;
+    size_t pos = 0;
+    char *password;
+
+    password = NOFAIL(malloc(size));
+
+    while ((ch = fgetc(fp)) != EOF) {
+	if (ch == '\n' || ch == '\r')
+	    break;
+	password[pos++] = ch;
+	if (pos == size) {
+	    size += 128;
+	    password = NOFAIL(realloc(password, size));
+	}
+    }
+    password[pos] = '\0';
+
+    if (ferror(fp)) {
+	free(password);
+	return NULL;
+    }
+    return password;
 }
 

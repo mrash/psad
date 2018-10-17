@@ -1,3 +1,98 @@
+whois (5.3.2) unstable; urgency=medium
+
+  * Added the .ge TLD server.
+  * Updated the charset for whois.nic.cl. (Closes: #900047)
+  * Updated the list of new gTLDs.
+
+ -- Marco d'Itri <md@linux.it>  Sun, 15 Jul 2018 12:38:42 +0200
+
+whois (5.3.1) unstable; urgency=medium
+
+  * mkpasswd: support passwords of arbitrary length. (Closes: #899254)
+  * Added the .ls TLD server. (Closes: #896452)
+  * Added support for -bzh and -uanic NIC handles.
+  * Updated the list of new gTLDs.
+
+ -- Marco d'Itri <md@linux.it>  Tue, 22 May 2018 15:32:28 +0200
+
+whois (5.3.0) unstable; urgency=medium
+
+  * Implemented querying for ip6.arpa domains.
+  * Updated the .pr TLD servers.
+  * Updated the list of new gTLDs.
+
+ -- Marco d'Itri <md@linux.it>  Sun, 21 Jan 2018 01:23:45 +0100
+
+whois (5.2.20) unstable; urgency=medium
+
+  * Added the .mr TLD server.
+  * Removed the .bs TLD server.
+  * Updated the .ai, .gh, .gr, .kw, .ls, .ph, .sb, .com.uy and .vn TLD
+    servers.
+
+ -- Marco d'Itri <md@linux.it>  Wed, 27 Dec 2017 03:15:27 +0100
+
+whois (5.2.19) unstable; urgency=medium
+
+  * Switched do libidn2.
+  * Adopted getentropy(2) for mkpasswd on recent Linux.
+  * Updated the .id and .museum TLD servers.
+  * Removed the .dj TLD server.
+
+ -- Marco d'Itri <md@linux.it>  Sun, 10 Dec 2017 17:16:58 +0100
+
+whois (5.2.18) unstable; urgency=medium
+
+  * Fixed an unitialised variable which used to break querying the
+    Verisign registry servers with parameters.
+  * Do not request domains only when querying the Verisign registry
+    servers for a hostname.
+  * Fixed the program return code for queries like
+    "nameserver name.example.com".
+
+ -- Marco d'Itri <md@linux.it>  Tue, 22 Aug 2017 16:45:02 +0200
+
+whois (5.2.17) unstable; urgency=high
+
+  * Fixed whois referrals for .com, .net, .jobs, .bz, .cc and .tv, broken
+    by an ICANN-mandated output change:
+    https://www.icann.org/resources/pages/rdds-labeling-policy-2017-02-01-en
+  * Added the .xn--2scrj9c (ಭಾರತ, India), .xn--3hcrj9c (ଭାରତ, India),
+    .xn--45br5cyl (ভাৰত, India), .xn--h2breg3eve (भारतम्, India),
+    .xn--h2brj9c8c (भारोत, India), .xn--mgbbh1a (ﺏﺍﺮﺗ, India),
+    .xn--mgbgu82a (ڀﺍﺮﺗ, India) and .xn--rvc1e0am3e (ഭാരതം, India)
+    TLD servers.
+  * Updated the list of new gTLDs.
+  * whois.1: fixed a typo. (Closes: #866742)
+
+ -- Marco d'Itri <md@linux.it>  Thu, 27 Jul 2017 17:08:47 +0200
+
+whois (5.2.16) unstable; urgency=medium
+
+  * Fixed parsing of 6to4 addresses broken in 5.2.15.
+  * Updated the .do TLD server.
+  * Updated the list of new gTLDs.
+
+ -- Marco d'Itri <md@linux.it>  Mon, 13 Mar 2017 01:40:38 +0100
+
+whois (5.2.15) unstable; urgency=medium
+
+  * Updated the .gf and .mq TLD servers.
+  * Updated the list of new gTLDs.
+  * Updated the charset for whois.nic.kz.
+  * Fixed multiple portability issues on non-Linux platforms.
+  * Fixed a lot of minor compiler warnings with no practical effects.
+  * Added support for libidn2, not enabled yet.
+
+ -- Marco d'Itri <md@linux.it>  Mon, 27 Feb 2017 00:37:41 +0100
+
+whois (5.2.14) unstable; urgency=medium
+
+  * Updated the .ar, .bm and .fm TLD servers.
+  * Updated the Afilias hiding string to fix hiding for the new .bm server.
+
+ -- Marco d'Itri <md@linux.it>  Thu, 29 Dec 2016 23:12:19 +0100
+
 whois (5.2.13) unstable; urgency=medium
 
   * Use "domain" instead of "=" for default verisign-grs queries,

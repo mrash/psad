@@ -22,7 +22,7 @@
 #
 # Version: 2.4.5
 #
-# Copyright (C) 1999-2017 Michael Rash (mbr@cipherdyne.org)
+# Copyright (C) 1999-2018 Michael Rash (mbr@cipherdyne.org)
 #
 # Reference: SNORT is a registered trademark of Sourcefire, Inc.
 #
@@ -434,7 +434,7 @@ my $rm_data_ctr      = 0;
 my $analysis_emails  = 0;
 my $analysis_whois   = 0;
 my $enable_analysis_dns = 0;
-my $netstat_lkup_ctr = 0;
+my $port_lkup_ctr    = 0;
 my $kmsgsd_started   = 0;
 my $warn_msg         = '';
 my $die_msg          = '';
@@ -457,13 +457,13 @@ my $no_snort_sids = 0;
 my $no_signatures = 0;
 my $no_icmp_types = 0;
 my $no_icmp6_types = 0;
+my $no_port_lookup = 0;
 my $no_auto_dl    = 0;
 my $no_posf       = 0;
 my $no_daemon     = 0;
 my $no_ipt_errors = 0;
 my $no_rdns       = 0;
 my $no_whois      = 0;
-my $no_netstat    = 0;
 my $no_fwcheck    = 0;
 my $no_kmsgsd     = 0;
 my $no_email_alerts  = 0;
@@ -669,7 +669,7 @@ my @args_cp = @ARGV;
 &get_local_ips();
 
 ### get the current services running on this machine
-&get_listening_ports() unless $no_netstat;
+&get_listening_ports() unless $no_port_lookup;
 
 ### daemonize psad unless running with --no-daemon or an
 ### analysis mode
@@ -976,14 +976,14 @@ sub check_scan() {
         $year     = This_Year();
     }
 
-    unless ($no_netstat) {
+    unless ($no_port_lookup) {
         ### we don't expect the list of ports the machine is listening
         ### on to change very often.
-        if ($netstat_lkup_ctr == 10) {
+        if ($port_lkup_ctr == 10) {
             &get_listening_ports();
-            $netstat_lkup_ctr = 0;
+            $port_lkup_ctr = 0;
         }
-        $netstat_lkup_ctr++;
+        $port_lkup_ctr++;
     }
     ### the local machine ip addresses could change (dhcp, etc.)
     ### but not that often.
@@ -7566,7 +7566,7 @@ sub get_whois_info() {
         };
 
         if ($@) {
-            system "$cmds{'killall'} $cmds{'whois'}";
+            system "$cmds{'pkill'} $cmds{'whois'}";
             kill 9, $pid unless kill 15, $pid;
             print STDERR "[-] whois alarm on pid: $pid\n" if $debug;
             warn $@;
@@ -10345,7 +10345,7 @@ sub setup() {
                 close SYSLOG;
                 &sys_log('reconfiguring syslogd to write ' .
                     "kern.info messages to $config{'PSAD_FIFO_FILE'}");
-                system "$cmds{'killall'} -HUP syslogd";
+                system "$cmds{'pkill'} --signal HUP syslogd";
             }
         } else {
             &send_mail("$config{'MAIL_ERROR_PREFIX'} " .
@@ -10390,7 +10390,7 @@ sub setup() {
 
                 &sys_log('reconfiguring syslog-ng to write ' .
                     "kern.info messages to $config{'PSAD_FIFO_FILE'}");
-                system "$cmds{'killall'} -HUP syslog-ng";
+                system "$cmds{'pkill'} --signal HUP syslog-ng";
             }
         } else {
             &send_mail("$config{'MAIL_ERROR_PREFIX'} " .
@@ -11088,10 +11088,14 @@ sub check_commands() {
     unless (defined $cmds{'ss'} and -x $cmds{'ss'}) {
         if (defined $cmds{'netstat'}) {
             unless (-x $cmds{'netstat'}) {
-                die "[*] Neither 'ss' nor 'netstat' commands are available.";
+                $no_port_lookup = 1;
+                warn "[*] Neither 'ss' nor 'netstat' commands are available, ",
+                    "setting --no-port-lookup.";
             }
         } else {
-            die "[*] Neither 'ss' nor 'netstat' commands are available.";
+            $no_port_lookup = 1;
+            warn "[*] Neither 'ss' nor 'netstat' commands are available, ",
+                "setting --no-port-lookup.";
         }
     }
     return;
@@ -11336,7 +11340,7 @@ sub getopt_wrapper() {
         'no-fwcheck'        => \$no_fwcheck,      # Do not check firewall rules.
         'no-rdns'           => \$no_rdns,         # Do not issue dns lookups against
                                                   #   scanning IP address.
-        'no-netstat'        => \$no_netstat,      # Do not check to see if the
+        'no-port-lookup'    => \$no_port_lookup,  # Do not check to see if the
                                                   #   firewall is listening on
                                                   #   localport that has been scanned.
         'no-ipt-errors'     => \$no_ipt_errors,   # Do not write malformed packet.
@@ -11598,8 +11602,9 @@ Options:
     --no-kmsgsd                   - Disable startup of kmsgsd (useful for
                                     debugging with an existing file of
                                     iptables log messages).
-    --no-netstat                  - Disable local port lookups for scan
+    --no-port-lookup              - Disable local port lookups for scan
                                     signatures.
+    --no-netstat                  - Synonym for --no-port-lookup.
     -h   --help                   - Display usage on STDOUT and exit.
 
 _HELP_

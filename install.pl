@@ -424,7 +424,8 @@ sub install() {
         }
     }
 
-    if (-d 'deps' and -d 'deps/snort_rules') {
+    my $snort_dir = 'deps/snort_rules';
+    if (-d 'deps' and -d $snort_dir) {
 
         &logr("[+] Installing Snort-2.3.3 signatures in " .
             "$config{'SNORT_RULES_DIR'}\n");
@@ -432,34 +433,42 @@ sub install() {
             &full_mkdir($config{'SNORT_RULES_DIR'}, 0700);
         }
 
-        opendir D, 'deps/snort_rules' or die "[*] Could not open ",
-            "the deps/snort_rules directory: $!";
+        opendir D, $snort_dir or die "[*] Could not open ",
+            "the $snort_dir/ directory: $!";
         my @files = readdir D;
         closedir D;
 
         for my $file (@files) {
             next unless $file =~ /\.rules$/ or $file =~ /\.config$/;
-            &logr("[+] Installing deps/snort_rules/${file}\n");
-            copy "deps/snort_rules/${file}",
+            &logr("[+] Installing ${snort_dir}/${file}\n");
+            copy "${snort_dir}/${file}",
                  "$config{'SNORT_RULES_DIR'}/${file}" or
-                die "[*] Could not copy deps/snort_rules/${file} -> ",
+                die "[*] Could not copy ${snort_dir}/${file} -> ",
                     "$config{'SNORT_RULES_DIR'}/${file}: $!";
             &perms_ownership("$config{'SNORT_RULES_DIR'}/${file}", 0600);
         }
     }
 
     ### reputation feed data
-    if (-d 'deps' and -d 'deps/reputation_feeds') {
-        opendir D, 'deps/reputation_feeds' or die "[*] Could not open ",
-            "the deps/reputation_feeds directory: $!";
+    my $repu_dir = 'deps/reputation_feeds';
+    if (-d 'deps' and -d $repu_dir) {
+
+        &logr("[+] Installing reputation feed data in " .
+            "$config{'REPUTATION_FEEDS_DIR'}\n");
+        unless (-d $config{'REPUTATION_FEEDS_DIR'}) {
+            &full_mkdir($config{'REPUTATION_FEEDS_DIR'}, 0700);
+        }
+
+        opendir D, $repu_dir or die "[*] Could not open ",
+            "the $repu_dir directory: $!";
         my @files = readdir D;
         closedir D;
         for my $file (@files) {
             next if $file eq '.' or $file eq '..';
-            &logr("[+] Installing deps/reputation_feeds/${file}\n");
-            copy "deps/reputation_feeds/${file}",
+            &logr("[+] Installing ${repu_dir}/${file}\n");
+            copy "${repu_dir}/${file}",
                  "$config{'REPUTATION_FEEDS_DIR'}/${file}" or
-                die "[*] Could not copy deps/reputation_feeds/${file} -> ",
+                die "[*] Could not copy ${repu_dir}/${file} -> ",
                     "$config{'REPUTATION_FEEDS_DIR'}/${file}: $!";
             &perms_ownership("$config{'REPUTATION_FEEDS_DIR'}/${file}", 0600);
         }

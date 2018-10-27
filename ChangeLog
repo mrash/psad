@@ -1,5 +1,13 @@
 psad-2.4.7 (11//2018):
-    - Switch to the 'ss' command instead of 'netstat' to detect local servers.
+    - Switch to use the 'pkill' command by default instead of the 'killall'
+      command to stop processes.
+    - Switch to use the 'ss' command by default instead of 'netstat' to detect
+      local servers.
+    - Switch to use the 'ip' command by default instead of 'ifconfig' to get
+      local IP/network information. This is configurable via the 'IFCFGTYPE'
+      variable in psad.conf.
+    - Remove syslog testing code from install.pl.
+    - Update the whois client to whois-5.3.2.
 
 psad-2.4.6 (07/31/2018):
     - Add EMAIL_APPEND_HEADER to allow psad alerts to have custom email headers

@@ -314,7 +314,7 @@ sub install() {
     ### make sure install.pl is being called from the source directory
     unless (-e 'psad') {
         die "[*] install.pl can only be executed from the directory\n",
-            "    that contains the psad sources!  Exiting.";
+            "    that contains the psad sources! Exiting.";
     }
     &logr('[+] ' . localtime() . " Installing psad on hostname: $HOSTNAME\n");
 
@@ -447,6 +447,24 @@ sub install() {
             &perms_ownership("$config{'SNORT_RULES_DIR'}/${file}", 0600);
         }
     }
+
+    ### reputation feed data
+    if (-d 'deps' and -d 'deps/reputation_feeds') {
+        opendir D, 'deps/reputation_feeds' or die "[*] Could not open ",
+            "the deps/reputation_feeds directory: $!";
+        my @files = readdir D;
+        closedir D;
+        for my $file (@files) {
+            next if $file eq '.' or $file eq '..';
+            &logr("[+] Installing deps/reputation_feeds/${file}\n");
+            copy "deps/reputation_feeds/${file}",
+                 "$config{'REPUTATION_FEEDS_DIR'}/${file}" or
+                die "[*] Could not copy deps/reputation_feeds/${file} -> ",
+                    "$config{'REPUTATION_FEEDS_DIR'}/${file}: $!";
+            &perms_ownership("$config{'REPUTATION_FEEDS_DIR'}/${file}", 0600);
+        }
+    }
+
     print "\n\n";
 
     &logr("[+] Compiling kmsgsd, and psadwatchd:\n");

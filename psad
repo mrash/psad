@@ -4127,25 +4127,94 @@ sub import_reputation_feeds() {
 
         ### copy the newly imported feed data into place
         unless ($reputation_feeds_list) {
+            &reputation_feeds_report_diffs($feed, \%new_feed_data)
+                if $feed->{'enable_diffs'};
         }
     }
 
     return;
 }
 
-sub parse_reputation_feed_conf_var() {
+sub reputation_feeds_report_diffs() {
+    my ($feed, $new_feed_data) = @_;
+
+    unless (defined $reputation_data{$feed->{'feed_name'}}) {
+        &sys_log("reputation feed: '$feed->{'feed_name'}' is new");
+        return;
+    }
+
+    my $diff_email_file = "$config{'PSAD_DIR'}/reputation_feed_diff";
+    my $time = scalar localtime();
+    my $is_change = 0;
+
+    ### email file handle
+    my $fh;
+
+    ### open the email alert file
+    if ($no_daemon) {
+        $fh = *STDOUT;
+    } else {
+        open E, "> $diff_email_file" or
+            die "[*] Could not open $diff_email_file: $!";
+        $fh = *E;
+    }
+
+    print $fh "=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=",
+        "-=-=-=-=\n\n\n";
+
+    if ($feed->{'data_type'} eq 'IP') {
+        print $fh "Reputation feed: '$feed->{'feed_name'}' IP updates:\n";
+        for my $ip_type ('ipv4', 'ipv6') {
+            ### look for removed IP's
+            for my $ip (keys %{$reputation_data{$feed->{'feed_name'}}{'ipv4'}}) {
+                unless (defined $new_feed_data->{$ip_type}) {
+                    print $fh "- Deleted IP: $ip\n";
+                }
+            }
+            for my $ip (keys %{$new_feed_data->{$ip_type}}) {
+                unless (defined $reputation_data{$feed->{'feed_name'}}{$ip_type}) {
+                    print $fh "+ New IP: $ip\n";
+                }
+            }
+        }
+    }
+
+    print $fh "\n=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=",
+        "-=-=-=-=\n";
+    close $fh unless $no_daemon;
+
+    if ($is_change and not $no_daemon) {
+        &send_mail("$config{'MAIL_STATUS_PREFIX'} Reputation diff: $feed->{'feed_name'}",
+            $diff_email_file, $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
+    }
+    return;
+}
+
+sub reputation_feed_parse_conf_var() {
     my $reputation_var_str = shift;
 
-    ### <feed name>,<data type>,<data format>,<update interval>,<enable diffs>,<local file name>,<update CMD>
-    ### "EmergingThreats Block IPs",IP,newline,1440,Y,ET-Block-IPs,"/usr/bin/curl -o $FILE https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt";
-    my ($feed_name, $data_type, $data_format, $update_interval,
+    ### <feed name>,<danger level>,<data type>,<data format>,<update interval>,<enable diffs>,<local file name>,<update CMD>
+    ### "EmergingThreats Block IPs",4,IP,newline,1440,Y,ET-Block-IPs,"/usr/bin/curl -o $FILE https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt";
+    my ($feed_name, $danger_level, $data_type, $data_format, $update_interval,
         $enable_diffs, $local_file_name, $update_cmd) = split /,/, $reputation_var_str;
     $feed_name  =~ s/\"//g;
     $feed_name  =~ s/\'//g;
     $update_cmd =~ s/\"//g;
     $update_cmd =~ s/\'//g;
 
+    die "[*] REPUTATION_FEED danger level: '$danger_level' must be in the range [1-5]."
+        unless $danger_level =~ m|^\d+$| and $danger_level >= 1 and $danger_level <= 5;
+    die "[*] REPUTATION_FEED data type: '$data_type' not supported, must be 'IP' for now."
+        unless $data_type eq 'IP';
+    die "[*] REPUTATION_FEED data format: '$data_format' not supported, must be 'newline' for now."
+        unless $data_format eq 'newline';
+    die "[*] REPUTATION_FEED update interval: '$update_interval' must be in the range [0-43200]."
+        unless $update_interval =~ m|^\d+$| and $update_interval >= 0 and $update_interval <= 43200;
+    die "[*] REPUTATION_FEED enable diffs: '$enable_diffs' not supported, must be 'Y' or 'N'."
+        unless $enable_diffs eq 'Y' or $enable_diffs eq 'N';
+
     return {
+        'raw_str'         => $reputation_var_str,
         'feed_name'       => $feed_name,
         'data_type'       => $data_type,
         'data_format'     => $data_format,
@@ -11076,7 +11145,7 @@ sub import_config() {
             } else {
                 ### handle variables that can be set multiple times
                 if ($varname eq 'REPUTATION_FEED') {
-                    push @{$config{$varname}}, &parse_reputation_feed_conf_var($val);
+                    push @{$config{$varname}}, &reputation_feed_parse_conf_var($val);
                 } else {
                     $config{$varname} = $val unless defined $config{$varname};
                 }

@@ -425,6 +425,7 @@ my $print_ver        = 0;
 my $help             = 0;
 my $dump_conf        = 0;
 my $download_sigs    = 0;
+my $reputation_feeds_update = 0;
 my $chk_interval     = 0;
 my $log_len          = 23;  ### used in scan_logr()
 my $fw_analyze       = 0;
@@ -468,6 +469,7 @@ my $no_fwcheck    = 0;
 my $no_kmsgsd     = 0;
 my $no_email_alerts  = 0;
 my $no_syslog_alerts = 0;
+my $no_reputation_feeds = 0;
 
 ### tcp option types
 my $tcp_nop_type       = 1;
@@ -3403,7 +3405,11 @@ sub psad_init() {
 
     ### download latest signatures from
     ### http://www.cipherdyne.org/psad/signatures
-    exit &download_signatures() if $download_sigs;
+    if ($download_sigs or $reputation_feeds_update) {
+        &download_signatures() if $download_sigs;
+        &update_reputation_feeds if $reputation_feeds_update;
+        exit $EXIT_SUCCESS; ### die calls made in previous functions
+    }
 
     ### set some config variables based on command line input
     &handle_cmdline();
@@ -3451,6 +3457,9 @@ sub psad_init() {
     ### adapted from the Snort IDS and contain several keywords that
     ### were added by the psad project).
     &import_signatures() unless $no_signatures;
+
+    ### import reputation feed data
+    &import_reputation_feeds() unless $no_reputation_feeds;
 
     ### there is a set of ports that should be ignored
     &parse_ignore_ports();
@@ -4057,6 +4066,9 @@ sub parse_ignore_interfaces() {
         }
     }
     return;
+}
+
+sub import_reputation_feeds() {
 }
 
 sub import_snort_rules() {
@@ -10859,6 +10871,10 @@ sub run_command() {
     return \@lines;
 }
 
+sub update_reputation_feeds() {
+    return;
+}
+
 sub download_signatures() {
 
     &archive_conf($config{'SIGS_FILE'});
@@ -10963,22 +10979,26 @@ sub import_config() {
 
     open C, "< $conf_file" or die "[*] Could not open " .
         "config file $conf_file: $!";
-    my @lines = <C>;
-    close C;
-    for my $line (@lines) {
+    for my $line (<C>) {
         chomp $line;
         next if ($line =~ /^\s*#/);
         if ($line =~ /^\s*(\S+)\s+(.*?)\;/) {
             my $varname = $1;
             my $val     = $2;
-            if ($val =~ m|/.+| && $varname =~ /^\s*(\S+)Cmd$/) {
+            if ($val =~ m|/.+| and $varname =~ /^\s*(\S+)Cmd$/) {
                 ### found a command
                 $cmds{$1} = $val unless defined $cmds{$1};
             } else {
-                $config{$varname} = $val unless defined $config{$varname};
+                ### handle variables that can be set multiple times
+                if ($varname eq 'REPUTATION_FEED') {
+                    push @{$config{$varname}}, $val;
+                } else {
+                    $config{$varname} = $val unless defined $config{$varname};
+                }
             }
         }
     }
+    close C;
     return;
 }
 
@@ -11246,6 +11266,8 @@ sub getopt_wrapper() {
         'signatures=s'      => \$sigs_file,       # Path to psad signatures file.
         'sig-update'        => \$download_sigs,   # Download the latest signatures from
                                                   # http://www.cipherdyne.org/psad/signatures
+        'reputation-feeds-update' => \$reputation_feeds_update,  # Download the latest reputation
+                                                  # feeds data.
         'passive-os-sigs=s' => \$posf_file,       # Path to passive os fingerprinting
                                                   #   signatures.
         'snort-type=s'      => \$srules_type,     # Only process snort rules of
@@ -11379,6 +11401,7 @@ sub getopt_wrapper() {
         'lib-dir=s'         => \$lib_dir,         # Specify path to psad lib directory.
         'no-snort-sids'     => \$no_snort_sids,   # Disable search for snort SID's
                                                   #   in iptables messages.
+        'no-reputation-feeds' => \$no_reputation_feeds, # Disable reputation feed matching.
         'no-whois'          => \$no_whois,        # Do not issue whois lookups against
         'no-passiveos'      => \$no_posf,         # Do not attempt to passively
         'no-passive-os'     => \$no_posf,         # Do not attempt to passively
@@ -11473,7 +11496,8 @@ sub required_vars() {
         ENABLE_WHOIS_LOOKUPS PSAD_FW_READ_PID_FILE DL1_UNIQUE_HOSTS
         DL2_UNIQUE_HOSTS DL3_UNIQUE_HOSTS DL4_UNIQUE_HOSTS DL5_UNIQUE_HOSTS
         PORT_RANGE_SWEEP_THRESHOLD ENABLE_OVERRIDE_FW_CMD FW_CMD FW_CMD_ARGS
-        EMAIL_APPEND_HEADER
+        EMAIL_APPEND_HEADER ENABLE_REPUTATION_FEEDS REPUTATION_FEED
+        REPUTATION_FEEDS_DIR
     ));
     &defined_vars(\@required_vars);
     return;
@@ -11506,6 +11530,9 @@ Options:
     --sig-update                  - Download the latest set of psad
                                     signatures from:
                                     http://www.cipherdyne.org/
+    --reputation-feeds-update     - Download the latest reputation feed data.
+                                    Use --reputation-list to list all
+                                    configured reputation feeds.
     -w,  --whois-analysis         - Enable whois lookups when running in
                                     offline --Analyze-msgs mode.
     --dns-analysis                - Enable reverse DNS lookups in
@@ -11642,6 +11669,7 @@ Options:
     --no-snort-sids               - Disable examination for snort sids
                                     (such as those generated by fwsnort) in
                                     iptables log messages.
+    --no-reputation-feeds         - Disable reputation feed comparisons.
     --no-signatures               - Disable psad signature processing
                                     (independent of snort sid matching).
     --no-icmp-types               - Disable icmp type/code validation.

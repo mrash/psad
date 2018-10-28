@@ -4145,7 +4145,11 @@ sub reputation_feeds_report_diffs() {
 
     my $diff_email_file = "$config{'PSAD_DIR'}/reputation_feed_diff";
     my $time = scalar localtime();
-    my $is_change = 0;
+    my $is_diff = 0;
+    my $new_ipv4_ctr = 0;
+    my $new_ipv6_ctr = 0;
+    my $deleted_ipv4_ctr = 0;
+    my $deleted_ipv6_ctr = 0;
 
     ### email file handle
     my $fh;
@@ -4169,11 +4173,23 @@ sub reputation_feeds_report_diffs() {
             for my $ip (keys %{$reputation_data{$feed->{'feed_name'}}{'ipv4'}}) {
                 unless (defined $new_feed_data->{$ip_type}) {
                     print $fh "- Deleted IP: $ip\n";
+                    $is_diff = 1;
+                    if ($ip_type eq 'ipv4') {
+                        $deleted_ipv4_ctr += 1;
+                    } else {
+                        $deleted_ipv6_ctr += 1;
+                    }
                 }
             }
             for my $ip (keys %{$new_feed_data->{$ip_type}}) {
                 unless (defined $reputation_data{$feed->{'feed_name'}}{$ip_type}) {
                     print $fh "+ New IP: $ip\n";
+                    $is_diff = 1;
+                    if ($ip_type eq 'ipv4') {
+                        $new_ipv4_ctr += 1;
+                    } else {
+                        $new_ipv6_ctr += 1;
+                    }
                 }
             }
         }
@@ -4183,7 +4199,10 @@ sub reputation_feeds_report_diffs() {
         "-=-=-=-=\n";
     close $fh unless $no_daemon;
 
-    if ($is_change and not $no_daemon) {
+    if ($is_diff and not $no_daemon) {
+        &sys_log("reputation feed: '$feed->{'feed_name'}' IPv4 new/deleted addrs: " .
+            "$new_ipv4_ctr/$deleted_ipv4_ctr, IPv6 new/deleted addrs: " .
+            "$new_ipv6_ctr/$deleted_ipv6_ctr");
         &send_mail("$config{'MAIL_STATUS_PREFIX'} Reputation diff: $feed->{'feed_name'}",
             $diff_email_file, $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
     }

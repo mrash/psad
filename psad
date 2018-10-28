@@ -163,8 +163,12 @@ my $debug_sid = 0;  ### debug a specific signature
 my $flush_fw = 0;
 
 ### build the iptables blocking configuration out of the
-### IPT_AUTO_CHAIN variable
+### IPT_AUTO_CHAIN variables
 my @ipt_config = ();
+
+### build the configuration for reputation feed updates
+my @reputation_config = ();
+my %reputation_data   = ();
 
 ### main configuration hash
 my %config = ();
@@ -426,6 +430,7 @@ my $help             = 0;
 my $dump_conf        = 0;
 my $download_sigs    = 0;
 my $reputation_feeds_update = 0;
+my $reputation_feeds_list = 0;
 my $chk_interval     = 0;
 my $log_len          = 23;  ### used in scan_logr()
 my $fw_analyze       = 0;
@@ -3459,7 +3464,10 @@ sub psad_init() {
     &import_signatures() unless $no_signatures;
 
     ### import reputation feed data
-    &import_reputation_feeds() unless $no_reputation_feeds;
+    unless ($no_reputation_feeds) {
+        &import_reputation_feeds();
+        exit $EXIT_SUCCESS if $reputation_feeds_list;
+    }
 
     ### there is a set of ports that should be ignored
     &parse_ignore_ports();
@@ -4069,6 +4077,91 @@ sub parse_ignore_interfaces() {
 }
 
 sub import_reputation_feeds() {
+
+    &build_reputation_config();
+
+    ### now import the data from the filesystem for each feed
+    RFEED: for my $feed (@reputation_config) {
+
+        my $msg = "importing reputation feed: '$feed->{'feed_name'}'";
+        if ($reputation_feeds_list) {
+            print "[+] $msg\n";
+        } else {
+            &sys_log($msg);
+        }
+
+        ### check for the feed data file
+        my $feed_data_file = "$config{'REPUTATION_FEEDS_DIR'}/$feed->{'local_file_name'}";
+
+        unless (-e $feed_data_file) {
+            my $msg = "reputation feed '$feed->{'feed_name'}' data " .
+                "file: '$feed_data_file' does not exist.";
+            if ($reputation_feeds_list) {
+                print "[-] $msg\n";
+            } else {
+                &sys_log($msg);
+            }
+            next RFEED;
+        }
+
+        my %new_feed_data = ('ipv4'=>{}, 'ipv6'=>{});
+
+        open F, "< $feed_data_file" or die "[*] Could not open: $feed_data_file: $!";
+        if ($feed->{'data_format'} eq 'newline') {
+            while (<F>) {
+                if ($feed->{'data_type'} eq 'IP') {
+                    if (/($ipv4_re)/) {
+                        $new_feed_data{'ipv4'}{$1} = '';
+                    } elsif (/($ipv6_re)/) {
+                        $new_feed_data{'ipv6'}{$1} = '';
+                    }
+                }
+            }
+        }
+        close F;
+
+        $msg = "feed '$feed->{'feed_name'}', imported " . (keys (%{$new_feed_data{'ipv4'}})) .
+            " IPv4 addresses, and " . (keys (%{$new_feed_data{'ipv6'}})) . " IPv6 addresses";
+        if ($reputation_feeds_list) {
+            print "[+] $msg\n";
+        } else {
+            &sys_log($msg);
+        }
+
+        ### copy the newly imported feed data into place
+        unless ($reputation_feeds_list) {
+        }
+    }
+
+    return;
+}
+
+sub build_reputation_config() {
+
+    @reputation_config = ();
+
+    for my $feed_str (@{$config{'REPUTATION_FEED'}}) {
+        ### <feed name>,<data type>,<data format>,<update interval>,<enable diffs>,<local file name>,<update CMD>
+        ### "EmergingThreats Block IPs",IP,newline,1440,Y,ET-Block-IPs,"/usr/bin/curl -o $FILE https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt";
+        my ($feed_name, $data_type, $data_format, $update_interval,
+            $enable_diffs, $local_file_name, $update_cmd) = split /,/, $feed_str;
+        $feed_name  =~ s/\"//g;
+        $feed_name  =~ s/\'//g;
+        $update_cmd =~ s/\"//g;
+        $update_cmd =~ s/\'//g;
+
+        push @reputation_config, {
+            'feed_name'       => $feed_name,
+            'data_type'       => $data_type,
+            'data_format'     => $data_format,
+            'update_interval' => $update_interval,
+            'enable_diffs'    => $enable_diffs,
+            'local_file_name' => $local_file_name,
+            'update_cmd'      => $update_cmd
+        }
+    }
+
+    return;
 }
 
 sub import_snort_rules() {
@@ -10872,6 +10965,9 @@ sub run_command() {
 }
 
 sub update_reputation_feeds() {
+
+    &build_reputation_config();
+
     return;
 }
 
@@ -11268,6 +11364,7 @@ sub getopt_wrapper() {
                                                   # http://www.cipherdyne.org/psad/signatures
         'reputation-feeds-update' => \$reputation_feeds_update,  # Download the latest reputation
                                                   # feeds data.
+        'reputation-feeds-list' => \$reputation_feeds_list, # List all reputation feeds.
         'passive-os-sigs=s' => \$posf_file,       # Path to passive os fingerprinting
                                                   #   signatures.
         'snort-type=s'      => \$srules_type,     # Only process snort rules of
@@ -11533,6 +11630,7 @@ Options:
     --reputation-feeds-update     - Download the latest reputation feed data.
                                     Use --reputation-list to list all
                                     configured reputation feeds.
+    --reputation-feeds-list       - List all configured reputation feeds.
     -w,  --whois-analysis         - Enable whois lookups when running in
                                     offline --Analyze-msgs mode.
     --dns-analysis                - Enable reverse DNS lookups in

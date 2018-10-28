@@ -167,8 +167,7 @@ my $flush_fw = 0;
 my @ipt_config = ();
 
 ### build the configuration for reputation feed updates
-my @reputation_config = ();
-my %reputation_data   = ();
+my %reputation_data = ();
 
 ### main configuration hash
 my %config = ();
@@ -4078,10 +4077,8 @@ sub parse_ignore_interfaces() {
 
 sub import_reputation_feeds() {
 
-    &build_reputation_config();
-
     ### now import the data from the filesystem for each feed
-    RFEED: for my $feed (@reputation_config) {
+    RFEED: for my $feed (@{$config{'REPUTATION_FEED'}}) {
 
         my $msg = "importing reputation feed: '$feed->{'feed_name'}'";
         if ($reputation_feeds_list) {
@@ -4136,32 +4133,27 @@ sub import_reputation_feeds() {
     return;
 }
 
-sub build_reputation_config() {
+sub parse_reputation_feed_conf_var() {
+    my $reputation_var_str = shift;
 
-    @reputation_config = ();
+    ### <feed name>,<data type>,<data format>,<update interval>,<enable diffs>,<local file name>,<update CMD>
+    ### "EmergingThreats Block IPs",IP,newline,1440,Y,ET-Block-IPs,"/usr/bin/curl -o $FILE https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt";
+    my ($feed_name, $data_type, $data_format, $update_interval,
+        $enable_diffs, $local_file_name, $update_cmd) = split /,/, $reputation_var_str;
+    $feed_name  =~ s/\"//g;
+    $feed_name  =~ s/\'//g;
+    $update_cmd =~ s/\"//g;
+    $update_cmd =~ s/\'//g;
 
-    for my $feed_str (@{$config{'REPUTATION_FEED'}}) {
-        ### <feed name>,<data type>,<data format>,<update interval>,<enable diffs>,<local file name>,<update CMD>
-        ### "EmergingThreats Block IPs",IP,newline,1440,Y,ET-Block-IPs,"/usr/bin/curl -o $FILE https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt";
-        my ($feed_name, $data_type, $data_format, $update_interval,
-            $enable_diffs, $local_file_name, $update_cmd) = split /,/, $feed_str;
-        $feed_name  =~ s/\"//g;
-        $feed_name  =~ s/\'//g;
-        $update_cmd =~ s/\"//g;
-        $update_cmd =~ s/\'//g;
-
-        push @reputation_config, {
-            'feed_name'       => $feed_name,
-            'data_type'       => $data_type,
-            'data_format'     => $data_format,
-            'update_interval' => $update_interval,
-            'enable_diffs'    => $enable_diffs,
-            'local_file_name' => $local_file_name,
-            'update_cmd'      => $update_cmd
-        }
+    return {
+        'feed_name'       => $feed_name,
+        'data_type'       => $data_type,
+        'data_format'     => $data_format,
+        'update_interval' => $update_interval,
+        'enable_diffs'    => $enable_diffs,
+        'local_file_name' => $local_file_name,
+        'update_cmd'      => $update_cmd
     }
-
-    return;
 }
 
 sub import_snort_rules() {
@@ -10965,9 +10957,6 @@ sub run_command() {
 }
 
 sub update_reputation_feeds() {
-
-    &build_reputation_config();
-
     return;
 }
 
@@ -11087,7 +11076,7 @@ sub import_config() {
             } else {
                 ### handle variables that can be set multiple times
                 if ($varname eq 'REPUTATION_FEED') {
-                    push @{$config{$varname}}, $val;
+                    push @{$config{$varname}}, &parse_reputation_feed_conf_var($val);
                 } else {
                     $config{$varname} = $val unless defined $config{$varname};
                 }

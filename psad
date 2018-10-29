@@ -9,7 +9,7 @@
 # Purpose: psad makes use of iptables logs to detect port scans,
 #          probes for backdoors and DDoS tools, and other suspect traffic
 #          (many signatures were adapted from the SNORT intrusion
-#          detection system).  Data is provided by parsing syslog
+#          detection system). Data is provided by parsing syslog
 #          firewall messages out of /var/log/messages (or wherever syslog
 #          is configured to write iptables logs to).
 #
@@ -30,7 +30,7 @@
 #
 #    This program is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 #    GNU General Public License for more details.
 #
 #    You should have received a copy of the GNU General Public License
@@ -40,7 +40,7 @@
 #
 # TODO: (see the TODO file bundled with the psad sources.)
 #
-# Default behavior is as follows.  Each of these features can be disabled
+# Default behavior is as follows. Each of these features can be disabled
 # with command line arguments:
 #
 #       - passive OS fingerprinting                   = yes
@@ -53,11 +53,11 @@
 #       - parse netstat output for local server ports = yes
 #
 # Coding Style:  All configuration variables from psad.conf are stored in
-#   the %config hash by keys that are in capital letters.  This is
+#   the %config hash by keys that are in capital letters. This is
 #   the only place in the code where capital letters will be used in
-#   variables names.  There are several variables with file-scope, and
+#   variables names. There are several variables with file-scope, and
 #   these variables are clearly commented near the top of each of the
-#   psad daemons.  Lines are generally limited to 80 characters for easy
+#   psad daemons. Lines are generally limited to 80 characters for easy
 #   reading.
 #
 # Scan hash key explanation:
@@ -113,7 +113,7 @@
 # Files specification for /var/log/psad/<srcip> directories:
 #
 #   psad creates a new directory "/var/log/psad/<src>" for each new <src>
-#   from which a scan is detected.  Under this directory several files are
+#   from which a scan is detected. Under this directory several files are
 #   created:
 #
 #       danger_level       - Overall danger level aggregated for all scans.
@@ -220,8 +220,8 @@ my %valid_icmp_types  = ();
 my %valid_icmp6_types = ();
 
 ### Cache snort rule messages unless --no-snort-sids switch was
-### given.  This is only useful if iptables includes rules
-### that log things like "SID123".  "fwsnort"
+### given. This is only useful if iptables includes rules
+### that log things like "SID123". "fwsnort"
 ### (http://www.cipherdyne.org/fwsnort/) will automatically
 ### build such a ruleset from snort signatures.
 my %fwsnort_sigs = ();
@@ -325,7 +325,7 @@ my $ipv4_re = qr|(?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2}|;  ### IPv4
 my $ipv6_re = qr|(?:[a-f0-9]{4}:){7}(?:[a-f0-9]{4})|i;
 
 ### ttl values are decremented depending on the number of hops
-### the packet has taken before it hits the firewall.  We will
+### the packet has taken before it hits the firewall. We will
 ### assume packets will not jump through more than 20 hops on
 ### average.
 my $max_hops = 20;
@@ -697,8 +697,8 @@ unless ($no_daemon or $debug) {
 ### SYSLOG_DAEMON is set to ulogd or psad is configured to acquire data
 ### from a normal file via IPT_SYSLOG_FILE), so let's start it here for good
 ### measure (as of 0.9.2 it makes use of the pid files and unique_pid(),
-### so we don't have to worry about starting a duplicate copy).  While
-### we're at it, start psadwatchd as well.  Note that this is the best
+### so we don't have to worry about starting a duplicate copy). While
+### we're at it, start psadwatchd as well. Note that this is the best
 ### place to start the other daemons since we just wrote the psad pid
 ### to PID_FILE above.
 my $cmd = '';
@@ -740,9 +740,9 @@ if ($config{'ENABLE_AUTO_IDS'} eq 'Y') {
     &flush_auto_blocked_ips() if $config{'FLUSH_IPT_AT_INIT'} eq 'Y';
 
     ### Check to see if psad automatically blocked some IPs from
-    ### a previous run.  This feature is most useful for preserving
+    ### a previous run. This feature is most useful for preserving
     ### auto-block rules for IPs after a reboot or after restarting
-    ### psad.  (Note that ENABLE_AUTO_IDS is disabled by psad_init()
+    ### psad. (Note that ENABLE_AUTO_IDS is disabled by psad_init()
     ### if we are running on a syslog server or if we are running
     ### in -A mode).
     &renew_auto_blocked_ips();
@@ -1012,7 +1012,6 @@ sub check_scan() {
 
     ### loop through all of the packet log messages we have just acquired
     ### from iptables
-
     PKT: for my $pkt_str (@$fw_packets_ar) {
 
         ### main packet data structure
@@ -1120,7 +1119,7 @@ sub check_scan() {
         }
 
         ### see if we need to assign a danger level according to the auto_dl
-        ### file.  The return value is the auto-assigned danger level (or
+        ### file. The return value is the auto-assigned danger level (or
         ### -1 if there is no auto-assigned danger level.
         unless ($no_auto_dl) {
             my $rv = &assign_auto_danger_level(\%pkt);
@@ -1137,7 +1136,7 @@ sub check_scan() {
         if ($pkt{'proto'} eq 'icmp') {
 
             ### validate icmp type and code fields against the official values
-            ### in RFC 792.  See %inval_type_code for corresponding signature
+            ### in RFC 792. See %inval_type_code for corresponding signature
             ### message text and danger levels.
             my $type_code_rv = &check_icmp_type(
                     'icmp', \%valid_icmp_types,
@@ -1174,7 +1173,7 @@ sub check_scan() {
         } elsif ($pkt{'proto'} eq 'icmp6') {
 
             ### validate icmp6 type and code fields against the official values
-            ### defined by IANA.  See %inval_type_code for corresponding signature
+            ### defined by IANA. See %inval_type_code for corresponding signature
             ### message text and danger levels.
             my $type_code_rv = &check_icmp_type(
                     'icmp6', \%valid_icmp6_types,
@@ -1347,7 +1346,7 @@ sub check_scan() {
             unless (defined $scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}
                     and defined $scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}{'abs_sp'}) {
                 ### This is the absolute starting port since the
-                ### first packet was detected.  Make sure the initial
+                ### first packet was detected. Make sure the initial
                 ### start port is not too low
                 $scan{$pkt{'src'}}{$pkt{'dst'}}{$pkt{'proto'}}{'abs_sp'} = 65535;
                 ### make sure the initial end port is not too high
@@ -1378,7 +1377,7 @@ sub check_scan() {
         ### system based on the ttl, id, len, window, and tos
         ### fields in tcp syn packets (this technique is based
         ### on the paper "Passive OS Fingerprinting: Details
-        ### and Techniques" by Toby Miller).  Also attempt to
+        ### and Techniques" by Toby Miller). Also attempt to
         ### fingerprint with a re-implementation of Michal Zalewski's
         ### p0f that only requires iptables log messages
         unless ($no_posf) {
@@ -1475,7 +1474,7 @@ sub parse_NF_pkt_str() {
     $pkt_hr->{'raw'} = $pkt_str if $csv_mode or $gnuplot_mode;
 
     ### see if there is a logging prefix (used for scan email alert even
-    ### if we are running with FW_SEARCH_ALL = Y).  Note that sometimes
+    ### if we are running with FW_SEARCH_ALL = Y). Note that sometimes
     ### there is a buffering issue in the kernel ring buffer that is used
     ### to hold the iptables log message, so we want to get only the
     ### very last possible candidate for the log prefix (this is why the
@@ -1771,7 +1770,7 @@ sub parse_NF_pkt_str() {
             ### FIXME: ignore TCP packets that have the ACK or RST
             ### bits set (unless we matched a snort sid) since
             ### _usually_ we see these packets as a result of the
-            ### iptables connection tracking bug.  Also, note that
+            ### iptables connection tracking bug. Also, note that
             ### no signatures make use of the RST flag.
 
             print STDERR "[-] err packet: matched ACK or RST flag.\n"
@@ -2669,7 +2668,7 @@ sub p0f_ipv4() {
     #
     # wwww:ttt:D:ss:OOO...:OS:Version:Subtype:Details
     #
-    # wwww     - window size (can be *, %nnn, Snn or Tnn).  The special values
+    # wwww     - window size (can be *, %nnn, Snn or Tnn). The special values
     #            "S" and "T" which are a multiple of MSS or a multiple of MTU
     #            respectively.
     # ttt      - initial TTL
@@ -2750,7 +2749,7 @@ sub p0f_ipv4() {
                             {$test_frag_bit}{$sig_ttl}{$sig_win_size}}) {
                         my @sig_opts = split /\,/, $sig_opts;
                         for (my $i=0; $i<=$#sig_opts; $i++) {
-                            ### tcp option order is important.  Check to see if
+                            ### tcp option order is important. Check to see if
                             ### the option order in the packet matches the order we
                             ### expect to see in the signature
                             if ($sig_opts[$i] =~ /^([NMWST])/) {
@@ -3152,7 +3151,7 @@ sub delete_old_scans() {
 }
 
 sub dshield_email_log() {
-    ### dshield alert interval is in hours.  Check to see if there are more
+    ### dshield alert interval is in hours. Check to see if there are more
     ### than 10,000 lines of log data (and if the last alert was sent more than
     ### two hours later than the previous alert), and if yes send the alert
     ### email.
@@ -4349,9 +4348,9 @@ sub import_snort_class_priorities() {
         ### config classification: rpc-portmap-decode,Decode of an RPC Query,2
         if (/config\s+classification:\s+(\S+),.*(\d+)/) {
             ### the snort priority value can go from 1 to 10, with 1 being the
-            ### worst offense and 10 being the least.  Most priorities are
-            ### from 1 to 4.  We need to map these into the psad danger levels
-            ### (reversed).  NOTE: the Snort engine does not enforce the 1-10
+            ### worst offense and 10 being the least. Most priorities are
+            ### from 1 to 4. We need to map these into the psad danger levels
+            ### (reversed). NOTE: the Snort engine does not enforce the 1-10
             ### range.
             $snort_class_dl{$1} = &convert_snort_priority($2);
         }
@@ -6763,7 +6762,7 @@ sub get_auto_response_domain_sock() {
 sub check_auto_response_sock() {
 
     ### we expect that the AUTO_IPT_SOCK file should exist
-    ### in the filesystem.  If not, then something deleted it
+    ### in the filesystem. If not, then something deleted it
     ### and we can recover by reopening it.
     return if -e $config{'AUTO_IPT_SOCK'};
 
@@ -6913,7 +6912,7 @@ sub ipt_block() {
 
         ### make sure the ip is in the auto_blocked_ips cache (the ip
         ### may have come from the command line with --fw-block-ip
-        ### instead of through the iptables log).  Also, don't re-define
+        ### instead of through the iptables log). Also, don't re-define
         ### the block time if it has already been defined (note that we
         ### may instantiated multiple block actions in the for loop
         ### above).
@@ -7341,7 +7340,7 @@ sub auto_psad_response() {
 
         my $dl = $scan_dl{$src};
 
-        ### We only want to block the IP once.  Currently this will block
+        ### We only want to block the IP once. Currently this will block
         ### all traffic from the host to _all_ destinations that are
         ### protected by the firewall if the IP trips the $auto_psad_level
         ### threshold for _any_ destination.
@@ -7925,10 +7924,10 @@ sub analysis_mode() {
 
     my $fh = '';
     if ($pkts_from_stdin) {
-        print "[+] Entering analysis mode.  Parsing STDIN\n";
+        print "[+] Entering analysis mode. Parsing STDIN\n";
         $fh = *STDIN;
     } else {
-        print "[+] Entering analysis mode.  Parsing $fw_data_file\n";
+        print "[+] Entering analysis mode. Parsing $fw_data_file\n";
         open MSGS, "< $fw_data_file" or die "[*] Could not open ",
             "$fw_data_file: $!";
         $fh = *MSGS;
@@ -9062,7 +9061,7 @@ sub fw_analyze_mode() {
         $run_fw_check = 1;
     } else {
         ### if psad is running on a syslog server, do not check the firewall
-        ### rules since they may not be local.  Also, do not check the
+        ### rules since they may not be local. Also, do not check the
         ### firewall if psad is configured to parse all iptables messages.
         unless ($no_fwcheck or $syslog_server
                 or $config{'ENABLE_FW_LOGGING_CHECK'} eq 'N') {
@@ -10791,7 +10790,7 @@ sub disk_space_exceeded() {
         }
         if ($rm_data_ctr > $config{'DISK_MAX_RM_RETRIES'}) {
             &sys_log("could not sufficiently reduce disk " .
-                "utilization in $config{'PSAD_DIR'} partition.  " .
+                "utilization in $config{'PSAD_DIR'} partition. " .
                 "Stopping psad!");
             &send_mail("$config{'MAIL_ERROR_PREFIX'} Could not " .
                 "reduce disk utilization on " .
@@ -11536,7 +11535,7 @@ sub getopt_wrapper() {
                                                   #   psad in auto blocking code.
         'List'              => \$fw_list_auto,    # Synonym for --fw-list-auto
         'fw-block-ip=s'     => \$fw_block_ip,     # Add an IP/net to the psad auto-
-                                                  #   blocking chains.  Then psad can
+                                                  #   blocking chains. Then psad can
                                                   #   manage timeouts, etc.
         'fw-rm-block-ip=s'  => \$fw_rm_block_ip,  # Delete any block rule against an IP
         'fw-del-chains'     => \$fw_del_chains,   # Delete psad chains in addition to

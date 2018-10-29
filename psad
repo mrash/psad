@@ -1122,9 +1122,24 @@ sub check_scan() {
         ### file. The return value is the auto-assigned danger level (or
         ### -1 if there is no auto-assigned danger level.
         unless ($no_auto_dl) {
+
             my $rv = &assign_auto_danger_level(\%pkt);
 
             print STDERR "[+] assign_auto_danger_level() returned: $rv\n"
+                if $debug;
+            if ($rv == 0) {
+                print STDERR "[+] ignoring $pkt{'src'} $pkt{'proto'} ",
+                    "$pkt{'dp'} scan.\n" if $debug;
+                next PKT;
+            }
+        }
+
+        ### reputation feed comparisons may influence danger level
+        if ($config{'ENABLE_REPUTATION_FEEDS'} eq 'Y') {
+
+            my $rv = &reputation_feeds_check(\%pkt);
+
+            print STDERR "[+] reputation_feeds_check() returned: $rv\n"
                 if $debug;
             if ($rv == 0) {
                 print STDERR "[+] ignoring $pkt{'src'} $pkt{'proto'} ",
@@ -4087,7 +4102,7 @@ sub import_reputation_feeds() {
         }
 
         ### check for the feed data file
-        my $feed_data_file = "$config{'REPUTATION_FEEDS_DIR'}/$feed->{'local_file_name'}";
+        my $feed_data_file = "$config{'REPUTATION_FEEDS_DIR'}/$feed->{'local_file'}";
 
         unless (-e $feed_data_file) {
             my $msg = "reputation feed '$feed->{'feed_name'}' data " .
@@ -4124,10 +4139,23 @@ sub import_reputation_feeds() {
             &sys_log($msg);
         }
 
-        ### copy the newly imported feed data into place
         unless ($reputation_feeds_list) {
             &reputation_feeds_report_diffs($feed, \%new_feed_data)
                 if $feed->{'enable_diffs'};
+
+            if ($feed->{'data_type'} eq 'IP') {
+
+                for my $ip_type (qw(ipv4 ipv6)) {
+
+                    ### zero out the old reputation feed data
+                    $reputation_data{$feed->{'feed_name'}}{$ip_type} = {};
+
+                    ### copy the newly imported feed data into place
+                    for my $ip (keys %{$new_feed_data{$ip_type}}) {
+                        $reputation_data{$feed->{'feed_name'}}{$ip_type}{$ip} = '';
+                    }
+                }
+            }
         }
     }
 
@@ -4211,10 +4239,11 @@ sub reputation_feeds_report_diffs() {
 sub reputation_feed_parse_conf_var() {
     my $reputation_var_str = shift;
 
-    ### <feed name>,<danger level>,<data type>,<data format>,<update interval>,<enable diffs>,<local file name>,<update CMD>
+    ### <feed name>,<danger level>,<data type>,<data format>,<update interval>,<enable diffs>,<local file>,<update CMD>
     ### "EmergingThreats Block IPs",4,IP,newline,1440,Y,ET-Block-IPs,"/usr/bin/curl -o $FILE https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt";
     my ($feed_name, $danger_level, $data_type, $data_format, $update_interval,
-        $enable_diffs, $local_file_name, $update_cmd) = split /,/, $reputation_var_str;
+        $enable_diffs, $local_file, $update_cmd) = split /,/, $reputation_var_str;
+
     $feed_name  =~ s/\"//g;
     $feed_name  =~ s/\'//g;
     $update_cmd =~ s/\"//g;
@@ -4231,6 +4260,9 @@ sub reputation_feed_parse_conf_var() {
     die "[*] REPUTATION_FEED enable diffs: '$enable_diffs' not supported, must be 'Y' or 'N'."
         unless $enable_diffs eq 'Y' or $enable_diffs eq 'N';
 
+    ### expand any existing $LOCAL_FILE variable in the update command
+    $update_cmd =~ s/\$LOCAL_FILE/$local_file/;
+
     return {
         'raw_str'         => $reputation_var_str,
         'feed_name'       => $feed_name,
@@ -4238,7 +4270,7 @@ sub reputation_feed_parse_conf_var() {
         'data_format'     => $data_format,
         'update_interval' => $update_interval,
         'enable_diffs'    => $enable_diffs,
-        'local_file_name' => $local_file_name,
+        'local_file'      => $local_file,
         'update_cmd'      => $update_cmd
     }
 }
@@ -5354,6 +5386,41 @@ sub assign_danger_level() {
             "$scan_dl{$src}\n" if $debug;
     }
     return;
+}
+
+sub reputation_feeds_check() {
+    my $pkt_hr = shift;
+
+    my $rv = -1;
+
+    for my $feed (@{$config{'REPUTATION_FEED'}}) {
+        next unless $feed->{'data_type'} eq 'IP';
+
+        my $feed_dl = $feed->{'danger_level'};
+        my $do_update_dl = 0; 
+        my $src = $pkt_hr->{'src'};
+        if ($pkt_hr->{'is_ipv6'}) {
+            if (defined $reputation_data{$feed->{'feed_name'}}{'ipv6'}{$src}) {
+                if ($scan_dl{$src} < $feed_dl) {
+                    $do_update_dl = 1;
+                }
+            }
+        } else {
+            if (defined $reputation_data{$feed->{'feed_name'}}{'ipv4'}{$src}) {
+                if ($scan_dl{$src} < $feed_dl) {
+                    $do_update_dl = 1;
+                }
+            }
+        }
+
+        if ($do_update_dl) {
+            &sys_log("reputation feed: '$feed->{'feed_name'}' " .
+                "assigned DL: $feed_dl for IP: $src");
+            $scan_dl{$src} = $feed_dl;
+            $rv = $feed_dl;
+        }
+    }
+    return $rv;
 }
 
 sub assign_auto_danger_level() {

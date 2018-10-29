@@ -855,6 +855,7 @@ sub expand_vars() {
         }
         for my $hr (\%config, \%cmds) {
             for my $var (keys %$hr) {
+                next if $var eq 'REPUTATION_FEED';
                 my $val = $hr->{$var};
                 if ($val =~ m|\$(\w+)|) {
                     my $sub_var = $1;

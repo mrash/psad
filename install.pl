@@ -732,7 +732,7 @@ sub install() {
     }
 
     ### download signatures?
-    &download_signatures() if &query_signatures();
+    &run_cmd("${USRSBIN_DIR}/psad --sig-update") if &query_signatures();
 
     &install_manpage('psad.8');
     &install_manpage('psadwatchd.8');
@@ -1278,31 +1278,7 @@ sub query_signatures() {
 
 sub download_signatures() {
 
-    my $curr_pwd = cwd() or die $!;
-    chdir '/tmp' or die $!;
-
-    print "[+] Downloading latest signatures from:\n",
-        "        $config{'SIG_UPDATE_URL'}\n";
-
-    unlink 'signatures' if -e 'signatures';
-
-    ### download the file
-    unless (-x $wgetCmd) {
-        &logr("[-] The $wgetCmd var is not a valid path for wget, " .
-            "skipping sig install.\n");
-    }
-    &run_cmd("$wgetCmd $config{'SIG_UPDATE_URL'}");
-
-    unless (-e 'signatures') {
-        &logr("[-] Could not download signatures, continuing with install.\n");
-    }
-
-    unlink "$config{'PSAD_CONF_DIR'}/signatures"
-        if -e "$config{'PSAD_CONF_DIR'}/signatures";
-    move 'signatures', "$config{'PSAD_CONF_DIR'}/signatures";
-    chdir $curr_pwd or die $!;
-
-    return;
+    &run_cmd("${USRSBIN_DIR}/psad --sig-update");
 }
 
 sub query_use_home_net_default() {

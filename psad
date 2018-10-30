@@ -132,12 +132,13 @@
 #
 
 ### modules used by psad
+use POSIX;
 use File::Copy;
+use File::Temp;
 use File::Path;
 use IO::Socket;
 use IO::Select;
 use Socket;
-use POSIX;
 use IO::Handle;
 use Data::Dumper;
 use Getopt::Long 'GetOptions';
@@ -11122,20 +11123,21 @@ sub download_signatures() {
     &check_commands({'sendmail'=>'', 'mail'=>'', 'netstat'=>''});
 
     my $curr_pwd = getcwd();
-    chdir '/tmp' or die $!;
+
+    chdir $config{'PSAD_DIR'} or die $!;
 
     print "[+] Downloading latest signatures from:\n",
         "        $config{'SIG_UPDATE_URL'}\n";
 
-    unlink 'signatures' if -e 'signatures';
+    my $download_file = mktemp('signatures.XXXXXX');
 
     ### download the file
-    system "$cmds{'wget'} $config{'SIG_UPDATE_URL'}";
+    system "$cmds{'wget'} -O $download_file $config{'SIG_UPDATE_URL'}";
 
-    die "[*] Could not download signature file" unless -e 'signatures';
+    die "[*] Could not download signature file" unless -e $download_file;
 
     unlink $config{'SIGS_FILE'} if -e $config{'SIGS_FILE'};
-    move 'signatures', $config{'SIGS_FILE'};
+    move $download_file, $config{'SIGS_FILE'};
 
     print
 "[+] New signature file $config{'SIGS_FILE'} has been put in\n",
@@ -11180,6 +11182,12 @@ sub archive_conf() {
 
     my $curr_pwd = getcwd();
     chdir $config{'CONF_ARCHIVE_DIR'} or die $!;
+
+    unless (-e $file) {
+        print "[-] file '$file' does not exist.";
+        return;
+    }
+
     my ($filename) = ($file =~ m|.*/(.*)|);
     my $base = "${filename}.old";
     for (my $i = 5; $i > 1; $i--) {  ### keep five copies of old config files

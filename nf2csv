@@ -5,7 +5,7 @@
 # File: nf2csv
 #
 # Purpose: nf2csv parses iptables log messages and prints them on stdout
-#          in comma separated value format.  This is most useful for
+#          in comma separated value format. This is most useful for
 #          generating data for the AfterGlow project
 #          (http://afterglow.sourceforge.net) to visualize iptables log
 #          data.
@@ -22,7 +22,7 @@
 #
 #    This program is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 #    GNU General Public License for more details.
 #
 #    You should have received a copy of the GNU General Public License
@@ -36,7 +36,7 @@
 use Getopt::Long 'GetOptions';
 use strict;
 
-my $version = '2.4.6';
+my $version = '3.0';
 
 ### regex to match an ip address
 my $ip_re = qr|(?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2}|;

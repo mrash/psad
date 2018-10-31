@@ -116,7 +116,7 @@ C.Holman
 
 Mike McCandless
     - Asked whether or not there is documentation for the various psad
-      configuration variables in psad.conf.  The "PSAD CONFIGURATION
+      configuration variables in psad.conf. The "PSAD CONFIGURATION
       VARIABLES" section of the man page was the result.
 
 Jason Czerak
@@ -140,7 +140,7 @@ Ugo Viti
 
 Leif Westlye
     - Discovered a bug where psad would not allow commands to be different
-      than the <cmd>Cmd name.  The bugfix allows someone to specify
+      than the <cmd>Cmd name. The bugfix allows someone to specify
       "/usr/bin/mailto" for the mailCmd for example.
 
 Daniel Gubser
@@ -209,11 +209,11 @@ Kenneth Grande
     - Suggested protocol-specific thresholds for email alerts.
 
 Lenny Cartier
-    - Wrote a spec file for Mandrake Linux.  An rpm built from this spec
+    - Wrote a spec file for Mandrake Linux. An rpm built from this spec
       file is in the user contribs section of the Mandrake site now.
 
 Bryan Stine
-    - Wrote a psad ebuild script for inclusion in Gentoo Linux.  As of the
+    - Wrote a psad ebuild script for inclusion in Gentoo Linux. As of the
       1.2.4 release psad is included in the portage tree.
     - Wrote a much-improved init script for Gentoo systems.
 
@@ -282,7 +282,7 @@ Michael S. Zick
       auto-blocking code.
 
 Nerijus Baliuna
-    - Suggested ability to ignore entire protocols.  The IGNORE_PROTOCOLS
+    - Suggested ability to ignore entire protocols. The IGNORE_PROTOCOLS
       keyword was the result.
     - Suggested adding various psad docs (CREDITS, ChangeLog, INSTALL,
       etc.) to be installed by the psad rpm
@@ -298,17 +298,17 @@ Blair Zajac
       installed in the system perl lib tree (this was originally submitted
       as a patch for fwknop).
     - Found bug with perl module file paths and naming convention (this bug
-      resulted in some modules being needlessly installed).  This find was
+      resulted in some modules being needlessly installed). This find was
       originally for fwknop.
     - Suggested the -O optimization in Makefile (originally suggested for the
       fwknop project).
 
 Troy Swaine
-    - Suggested a command line interface to block IP addresses.  The result
+    - Suggested a command line interface to block IP addresses. The result
       is the --fw-block-ip argument.
 
 Najib Bakari
-    - Pointed out that sendmail is not usually required to run psad.  The
+    - Pointed out that sendmail is not usually required to run psad. The
       result is the alert.conf file with the ALERTING_METHODS keyword,
       which also gets referenced by psadwatchd.
 
@@ -327,7 +327,7 @@ Alex Luna
 
 Torkel Hasle
     - Suggested the ability to assign danger levels based on ports in
-      addition to the protocol in auto_dl.  Suggested better sweep detection
+      addition to the protocol in auto_dl. Suggested better sweep detection
       by calculating scan danger levels over all destinations (i.e. 5 packets
       to different destinations should trigger danger level 1).
 
@@ -341,7 +341,7 @@ Jeroen Vermeulen
       iptables commands.
     - Found bug where IPTABLES_AUTO_RULENUM misled the user into thinking that
       it governed where the jump rule into a custom chain is added within the
-      calling chain.  This resulted in the IPT_AUTO_CHAIN{n} variables being
+      calling chain. This resulted in the IPT_AUTO_CHAIN{n} variables being
       updated to support the rule position for both the jump rule and any new
       rules within the chain.
 
@@ -354,7 +354,7 @@ Richard B\351neyt
       /proc/kmsg to be defined for the psadfifo file.
 
 Philip Lawrence
-    - Contributed patch to fix module path import bug.  This resulted in the
+    - Contributed patch to fix module path import bug. This resulted in the
       psad-2.0.1 release.
 
 Stefano Harding
@@ -371,8 +371,8 @@ pyllyukko
     - Suggested that the psad.spec file respect the %_initrddir RPM macro.
     - Suggested configurable syslog facility and priority settings.
     - Contributed a suspicious iptables log message that contained a broken
-      set of TCP options.  This exposed a bug where psad would consume all
-      available memory on the system and would have to be killed.  The result
+      set of TCP options. This exposed a bug where psad would consume all
+      available memory on the system and would have to be killed. The result
       is an additional check to ensure that the length fields parsed from TCP
       options are greater than one byte; otherwise, the TLV encoding doesn't
       work out properly.
@@ -427,23 +427,23 @@ Steve B
       failed to start" to be generated.
 
 Miroslav Grepl
-    - Contributed policy files to make psad compatible with SELinux.  The
+    - Contributed policy files to make psad compatible with SELinux. The
       files are located in a new "selinux" directory in the
       psad sources.
 
 Stephen Nims
     - Reported 'Date::Calc::Decode_Month(): argument is not a string at
-      /usr/sbin/psad line 1103' bug.  This affected DShield processing and a
+      /usr/sbin/psad line 1103' bug. This affected DShield processing and a
       few other areas.
 
 Dan A. Dickey
     - Submitted a patch to allow psad to use the "ip" command from the iproute2
-      tools to acquire IP addresses from local interfaces.  Dan's description
+      tools to acquire IP addresses from local interfaces. Dan's description
       is as follows: "...A main reason for doing this is in the case of multi-
       homed hosts. ifconfig sets these up on an interface using aliases,
-      iproute2 does not.  So, for a multi-homed interface (eth0 with multiple
+      iproute2 does not. So, for a multi-homed interface (eth0 with multiple
       addresses), ifconfig -a only shows the first one configured and not the
-      rest.  ip addr shows all of the configured addresses...".
+      rest. ip addr shows all of the configured addresses...".
     - Valuable input around whois process handling w.r.t. zombie processes.
       This helped to lead to a solution using fork() and exec(), and was
       tracked by Github issue #15.
@@ -462,7 +462,7 @@ Dean Takemori
     - Reported a condition where whois lookups were being calculated always on
       the source IP of suspicious traffic even if the source IP's were on
       internal directly connected networks (frequently on RFC 1918 address
-      space).  This report led to a change where whois lookups are now done
+      space). This report led to a change where whois lookups are now done
       against non-local IP addresses by default (see the ENABLE_WHOIS_LOCAL
       variable).
 
@@ -488,17 +488,17 @@ Gregorio Narvaez
 
 Pui Edylie
     - Reported a problem where psad could not map an fwsnort log message back
-      to the corresponding Snort 'msg' field.  Added the FWSNORT_RULES_DIR
+      to the corresponding Snort 'msg' field. Added the FWSNORT_RULES_DIR
       variable to have psad read Snort rules from any installed fwsnort
       instance.
 
 Oscar Marley
     - Suggested configurable auto-blocking timeout values depending on the
-      danger level that a scan or attack achieves.  This resulted in the
+      danger level that a scan or attack achieves. This resulted in the
       implementation of the AUTO_BLOCK_DL*_TIMEOUT variables.
 
 Naji Mouawad
-    - Suggested the ability to throttle email alerts that psad sends.  The
+    - Suggested the ability to throttle email alerts that psad sends. The
       This resulted in the implementation of the EMAIL_THROTTLE variable.
 
 Nicholas Ritter
@@ -512,11 +512,11 @@ Gusta-BH
 
 Tim Kramer
     - Provided guidance on getting psad to be compatible with the upstart init
-      daemon on RHEL systems.  This effort was tracked via issue #12 on github.
+      daemon on RHEL systems. This effort was tracked via issue #12 on github.
 
 Wolfgang Breyha
     - Submitted a patch to allow VLAN interfaces and interface aliases in
-      IGNORE_INTERFACES.  This fixes issue #8 on github.
+      IGNORE_INTERFACES. This fixes issue #8 on github.
 
 Steve Murphy
     - Contributed a patch to exec a script upon only blocking events. Two new

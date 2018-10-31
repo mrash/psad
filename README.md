@@ -75,7 +75,7 @@ daemon.
 NOTE: Since psad relies on iptables to generate appropriate log messages
 for unauthorized packets, psad is only as good as the logging rules included
 in the iptables ruleset. Hence if your firewall is not configured to log packets,
-then psad will NOT detect port scans or anything else.  Usually the best way
+then psad will NOT detect port scans or anything else. Usually the best way
 setup the firewall is with default "drop and log" rules at the end of the ruleset,
 and include rules above this last rule that only allow traffic that should be
 allowed through. Upon execution, the psad daemon will attempt to ascertain whether
@@ -84,7 +84,7 @@ FW_EXAMPLE_RULES file for example firewall rulesets that are compatible with psa
 
 Additionally, extensive coverage of psad is included in the book "Linux
 Firewalls: Attack Detection and Response" published by No Starch Press, and a
-supporting script in this book is compatible with psad.  This script can be
+supporting script in this book is compatible with psad. This script can be
 found here:
 
 http://www.cipherdyne.org/LinuxFirewalls/ch01/
@@ -114,7 +114,7 @@ by the install.pl script. The list of modules is:
  * Unix::Syslog
 
 psad also includes a whois client written by Marco d'Itri (see the deps/whois
-directory).  This client does better than others at collecting the correct
+directory). This client does better than others at collecting the correct
 whois information for a given IP address.
 
 ## Firewall Setup
@@ -154,7 +154,7 @@ the **GNU General Public License (GPL v2+)**. The latest release can be found
 at [https://github.com/mrash/psad/releases](https://github.com/mrash/psad/releases)
 
 psad makes use of many of the TCP, UDP, and ICMP signatures available in
-Snort (written by Marty Roesch, see http://www.snort.org).  Snort is a
+Snort (written by Marty Roesch, see http://www.snort.org). Snort is a
 registered trademark of Sourcefire, Inc.
 
 ## Contact

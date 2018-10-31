@@ -6,7 +6,7 @@
 #
 # Purpose: To parse the iptables ruleset on the underlying system to see if
 #          iptables has been configured to log and block unwanted packets by
-#          default.  This program is called by psad, but can also be executed
+#          default. This program is called by psad, but can also be executed
 #          manually from the command line.
 #
 # Author: Michael Rash (mbr@cipherdyne.org)
@@ -19,7 +19,7 @@
 #
 #    This program is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 #    GNU General Public License for more details.
 #
 #    You should have received a copy of the GNU General Public License
@@ -197,7 +197,7 @@ sub fw_check() {
     } else {
         print FWCHECK
 "[+] The iptables ruleset on $config{'HOSTNAME'} will log and block unwanted\n",
-"    packets in both the INPUT and FORWARD chains.  Firewall config success!\n";
+"    packets in both the INPUT and FORWARD chains. Firewall config success!\n";
 
         if ($fw_analyze) {
             print "[+] Firewall config looks good.\n",
@@ -226,7 +226,7 @@ sub check_forwarding() {
     ### check to see if there are multiple interfaces on the
     ### machine and return false if not since the machine will
     ### not be able to forward packets anyway (e.g. desktop
-    ### machines).  Also return false if forwarding is turned
+    ### machines). Also return false if forwarding is turned
     ### off (we have to trust the machine config is as the
     ### admin wants it).
     my $forwarding;
@@ -370,7 +370,7 @@ sub ipt_chk_chain() {
                     }
                     print FWCHECK
 "[-] The $chain chain in the ruleset on $config{'HOSTNAME'} does not\n",
-"    appear to include a default LOG rule $str1.  psad will not be able to\n",
+"    appear to include a default LOG rule $str1. psad will not be able to\n",
 "    detect $str2 without such a rule.\n\n";
 
                     $rv = 0;

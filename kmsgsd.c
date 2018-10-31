@@ -20,7 +20,7 @@
 *
 *     This program is distributed in the hope that it will be useful,
 *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-*     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 *     GNU General Public License for more details.
 *
 *     You should have received a copy of the GNU General Public License
@@ -145,7 +145,7 @@ int main(int argc, char *argv[]) {
     /* start doing the real work now that the daemon is running and
      * the config file has been processed */
 
-    /* open the psadfifo named pipe.  Note that we are opening the pipe
+    /* open the psadfifo named pipe. Note that we are opening the pipe
      * _without_ the O_NONBLOCK flag since we want the read on the file
      * descriptor to block until there is something new in the pipe.
      * Also, note that we are opening with O_RDWR, since this seems to
@@ -474,7 +474,7 @@ static void check_config(void)
         expand_config_vars();
 
         /* there are no FW_MSG_SEARCH vars in fw_search.conf; default
-         * to "DROP".  Psad will generate a syslog warning.  */
+         * to "DROP". Psad will generate a syslog warning.  */
         if (! fw_search_all_flag && num_fw_search_strings == 0) {
             fw_msg_search[num_fw_search_strings]
                 = (char *) safe_malloc(strlen("DROP")+1);

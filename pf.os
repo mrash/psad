@@ -21,7 +21,7 @@
 #
 #
 # This fingerprint database is adapted from Michal Zalewski's p0f passive
-# operating system package.  The last database sync was from a Nov 3 2003
+# operating system package. The last database sync was from a Nov 3 2003
 # p0f.fp.
 #
 #
@@ -78,7 +78,7 @@
 #   NEW SIGNATURE: Always wildcard this value, except for rare cases when
 #   you have an appliance with a fixed value, know the system supports only
 #   a very limited number of network interface types, or know the system
-#   is using a value it pulled out of nowhere.  Specific unique MSS
+#   is using a value it pulled out of nowhere. Specific unique MSS
 #   can be used to tell Google crawlbots from the rest of the population.
 #
 # - Window scaling (WSCALE) - this feature is used to scale WSS.
@@ -111,7 +111,7 @@
 #
 # wwww:ttt:D:ss:OOO...:OS:Version:Subtype:Details
 #
-# wwww     - window size (can be *, %nnn, Snn or Tnn).  The special values
+# wwww     - window size (can be *, %nnn, Snn or Tnn). The special values
 #            "S" and "T" which are a multiple of MSS or a multiple of MTU
 #            respectively.
 # ttt      - initial TTL

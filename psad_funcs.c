@@ -17,7 +17,7 @@
 *
 *     This program is distributed in the hope that it will be useful,
 *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-*     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 *     GNU General Public License for more details.
 *
 *     You should have received a copy of the GNU General Public License
@@ -159,7 +159,7 @@ int find_char_var(const char *search_str, char *charvar, char *line)
 
     if (char_ctr > MAX_GEN_LEN-1) {
         fprintf(stderr,
-                "[*] find_char_var(): the config line for %s is too long.  Exiting.\n",
+                "[*] find_char_var(): the config line for %s is too long. Exiting.\n",
                 search_str);
         exit(EXIT_FAILURE);
     }

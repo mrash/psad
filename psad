@@ -4,7 +4,9 @@
 #
 # File: psad (/usr/sbin/psad)
 #
-# URL: http://www.cipherdyne.org/psad/
+# URL: https://www.cipherdyne.org/psad/
+#
+# Github: https://github.com/mrash/psad
 #
 # Purpose: psad makes use of iptables logs to detect port scans,
 #          probes for backdoors and DDoS tools, and other suspect traffic
@@ -14,13 +16,13 @@
 #          is configured to write iptables logs to).
 #
 #          For more information read the psad man page or view the
-#          documentation provided at: http://www.cipherdyne.org/psad/
+#          documentation provided at: https://www.cipherdyne.org/psad/
 #
 # Author: Michael Rash (mbr@cipherdyne.org)
 #
 # Credits: (see the CREDITS file bundled with the psad sources.)
 #
-# Version: 2.4.6
+# Version: 3.0
 #
 # Copyright (C) 1999-2018 Michael Rash (mbr@cipherdyne.org)
 #
@@ -147,7 +149,7 @@ use strict;
 ### ========================== main =================================
 
 ### set the current version
-my $version = '2.4.6';
+my $version = '3.0';
 
 ### default config file for psad (can be changed with
 ### --config switch)
@@ -3426,14 +3428,14 @@ sub psad_init() {
     ### http://www.cipherdyne.org/psad/signatures
     if ($download_sigs or $reputation_feeds_update) {
         &download_signatures() if $download_sigs;
-        &update_reputation_feeds if $reputation_feeds_update;
+        &download_reputation_feeds() if $reputation_feeds_update;
         exit $EXIT_SUCCESS; ### die calls made in previous functions
     }
 
     ### set some config variables based on command line input
     &handle_cmdline();
 
-    $ipt_opts{'tmpdir'}     = $config{'PSAD_DIR'};
+    $ipt_opts{'tmpdir'}     = $config{'PSAD_TMP_DIR'};
     $ipt_opts{'iptout_pat'} = $config{'IPT_OUTPUT_PATTERN'};
     $ipt_opts{'ipterr_pat'} = $config{'IPT_ERROR_PATTERN'};
 
@@ -4262,7 +4264,7 @@ sub reputation_feed_parse_conf_var() {
         unless $enable_diffs eq 'Y' or $enable_diffs eq 'N';
 
     ### expand any existing $LOCAL_FILE variable in the update command
-    $update_cmd =~ s/\$LOCAL_FILE/$local_file/;
+#    $update_cmd =~ s/\$LOCAL_FILE/$local_file/;
 
     return {
         'raw_str'         => $reputation_var_str,
@@ -11111,7 +11113,88 @@ sub run_command() {
     return \@lines;
 }
 
-sub update_reputation_feeds() {
+sub download_reputation_feeds() {
+
+    my $curr_pwd = getcwd();
+
+    chdir $config{'PSAD_TMP_DIR'} or die $!;
+
+    print getcwd(), "\n";
+
+    my $msg = 'updating reputation feed data';
+    if ($reputation_feeds_update) {
+        print "[+] $msg\n";
+    } else {
+        &sys_log($msg);
+    }
+
+    RFEED: for my $feed (@{$config{'REPUTATION_FEED'}}) {
+
+        my $msg = "downloading reputation feed data for: '$feed->{'feed_name'}'";
+        if ($reputation_feeds_update) {
+            print "[+] $msg\n";
+        } else {
+            &sys_log($msg);
+        }
+
+        my $feed_full_path = "$config{'REPUTATION_FEEDS_DIR'}/$feed->{'local_file'}";
+
+        &archive_conf($feed_full_path);
+
+        my $download_file = mktemp($feed->{'local_file'} . '.XXXXXX');
+        my $download_cmd  = $feed->{'update_cmd'};
+
+        if ($download_cmd =~ m|\$LOCAL_FILE|) {
+            $download_cmd =~ s|\$LOCAL_FILE|$download_file|;
+        } else {
+            $download_file = $feed->{'local_file'};
+        }
+
+        if ($download_cmd =~ m|^(/\S+)\s+(.*)|) {
+            my $cmd  = $1;
+            #my $args = "$2 2> /dev/null";
+            my $args = $2;
+            &run_command($cmd, $args);
+        } else {
+            system $download_cmd;
+        }
+
+        unless (-e $download_file) {
+            ### skip this one since we couldn't download it
+            my $msg = "could not download/acquire feed " .
+                "data for: '$feed->{'feed_name'}'";
+            if ($reputation_feeds_update) {
+                print "[+] $msg\n";
+            } else {
+                &sys_log($msg);
+            }
+            next RFEED;
+        }
+
+        unlink $feed_full_path if -e $feed_full_path;
+        move $download_file, $feed_full_path;
+
+        if (-e $feed_full_path) {
+            my $msg = "successfully updated feed " .
+                "data for: '$feed->{'feed_name'}'";
+            if ($reputation_feeds_update) {
+                print "[+] $msg\n";
+            } else {
+                &sys_log($msg);
+            }
+        } else {
+            my $msg = "could not download/acquire feed " .
+                "data for: '$feed->{'feed_name'}'";
+            if ($reputation_feeds_update) {
+                print "[+] $msg\n";
+            } else {
+                &sys_log($msg);
+            }
+        }
+    }
+
+    chdir $curr_pwd or die $!;
+
     return;
 }
 
@@ -11124,7 +11207,7 @@ sub download_signatures() {
 
     my $curr_pwd = getcwd();
 
-    chdir $config{'PSAD_DIR'} or die $!;
+    chdir $config{'PSAD_TMP_DIR'} or die $!;
 
     print "[+] Downloading latest signatures from:\n",
         "        $config{'SIG_UPDATE_URL'}\n";
@@ -11146,7 +11229,7 @@ sub download_signatures() {
 
     chdir $curr_pwd or die $!;
 
-    return $EXIT_SUCCESS;
+    return;
 }
 
 sub date_time() {
@@ -11181,10 +11264,18 @@ sub archive_conf() {
     my $file = shift;
 
     my $curr_pwd = getcwd();
-    chdir $config{'CONF_ARCHIVE_DIR'} or die $!;
+
+    chdir $config{'CONF_ARCHIVE_DIR'} or die "[*] Could not " .
+        "chdir($config{'CONF_ARCHIVE_DIR'}): $!";
 
     unless (-e $file) {
-        print "[-] file '$file' does not exist.";
+        my $msg = "archive_conf(): file '$file' does not exist.";
+        if ($download_sigs or $reputation_feeds_update) {
+            print "[-] $msg\n";
+        } else {
+            &sys_log($msg);
+        }
+        chdir $curr_pwd or die $!;
         return;
     }
 
@@ -11198,10 +11289,15 @@ sub archive_conf() {
                 "move ${base}${j}.gz -> ${base}${i}.gz: $!";
         }
     }
-    print "[+] Archiving original $file -> ${base}1\n";
+    my $msg = "Archiving original $file -> ${base}1";
+    if ($download_sigs or $reputation_feeds_update) {
+        print "[+] $msg\n";
+    } else {
+        &sys_log($msg);
+    }
 
     unlink "${base}1.gz" if -e "${base}1.gz";
-    ### move $file into the archive directory
+    ### copy $file into the archive directory
     copy $file, "${base}1" or die "[*] Could not copy ",
         "$file -> ${base}1: $!";
 
@@ -11745,7 +11841,7 @@ sub required_vars() {
         DL2_UNIQUE_HOSTS DL3_UNIQUE_HOSTS DL4_UNIQUE_HOSTS DL5_UNIQUE_HOSTS
         PORT_RANGE_SWEEP_THRESHOLD ENABLE_OVERRIDE_FW_CMD FW_CMD FW_CMD_ARGS
         EMAIL_APPEND_HEADER ENABLE_REPUTATION_FEEDS REPUTATION_FEED
-        REPUTATION_FEEDS_DIR
+        REPUTATION_FEEDS_DIR PSAD_TMP_DIR
     ));
     &defined_vars(\@required_vars);
     return;

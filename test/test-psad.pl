@@ -61,6 +61,7 @@ my $require_prefix_conf = "$conf_dir/require_DROP_syslog_prefix_str.conf";
 my $require_missing_prefix_conf = "$conf_dir/require_missing_syslog_prefix_str.conf";
 my $enable_ack_detection_conf = "$conf_dir/enable_ack_detection.conf";
 my $disable_ipv6_conf = "$conf_dir/disable_ipv6_detection.conf";
+my $reputation_conf = "$conf_dir/reputation.conf";
 #================== end config ===================
 
 my $YES = 1;
@@ -79,7 +80,7 @@ my $diff_mode = 0;
 my $test_limit = 0;
 my $saved_last_results = 0;
 my $test_system_install = 0;
-my $normal_root_override_str = '';
+my $install_override = '';
 my $PRINT_LEN = 68;
 my $REQUIRED = 1;
 my $OPTIONAL = 0;
@@ -121,8 +122,14 @@ exit 1 unless GetOptions(
 &usage() if $help;
 
 if ($test_system_install) {
-    $normal_root_override_str = "-O $conf_dir/normal_root_override.conf";
+    $install_override = "-O $conf_dir/normal_root_override.conf";
     $psadCmd = '/usr/sbin/psad';
+} else {
+    ### provide absolute path to override INSTALL_DIR
+    open F, "> $conf_dir/install_override.conf" or die $!;
+    print F "INSTALL_ROOT              " . getcwd() . "/psad-install;\n";
+    close F;
+    $install_override = "-O $conf_dir/install_override.conf";
 }
 
 ### define all tests
@@ -151,7 +158,7 @@ my @tests = (
         'detail'   => '--help',
         'err_msg'  => 'could not get --help output',
         'function' => \&generic_exec,
-        'cmdline'  => "$psadCmd -h -c $default_conf $normal_root_override_str",
+        'cmdline'  => "$psadCmd -h -c $default_conf $install_override",
         'exec_err' => $NO,
         'fatal'    => $NO
     },
@@ -160,7 +167,7 @@ my @tests = (
         'detail'   => '--Version',
         'err_msg'  => '--Version mismatch',
         'function' => \&version_check,
-        'cmdline'  => "$psadCmd -V -c $default_conf $normal_root_override_str",
+        'cmdline'  => "$psadCmd -V -c $default_conf $install_override",
         'exec_err' => $NO,
         'fatal'    => $NO
     },
@@ -169,7 +176,7 @@ my @tests = (
         'detail'   => 'config dump+validate',
         'err_msg'  => 'could not dump+validate config',
         'function' => \&validate_config,
-        'cmdline'  => "$psadCmd --test-mode -D -c $default_conf $normal_root_override_str",
+        'cmdline'  => "$psadCmd --test-mode -D -c $default_conf $install_override",
         'exec_err' => $NO,
         'fatal'    => $NO
     },
@@ -181,7 +188,7 @@ my @tests = (
                 qr/\biptables\b/, qr/\bip6tables\b/],
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
-        'cmdline'   => "$psadCmd --test-mode --fw-dump -c $default_conf $normal_root_override_str",
+        'cmdline'   => "$psadCmd --test-mode --fw-dump -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -192,7 +199,7 @@ my @tests = (
         'positive_output_matches' => [qr/Listing\schains\sfrom\sIPT_AUTO_CHAIN/],
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
-        'cmdline'   => "$psadCmd --test-mode --fw-list-auto -c $default_conf $normal_root_override_str",
+        'cmdline'   => "$psadCmd --test-mode --fw-list-auto -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -203,7 +210,7 @@ my @tests = (
         'positive_output_matches' => [qr/Parsing.*rules/, qr/Parsing.*rules/],
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
-        'cmdline'   => "$psadCmd --test-mode --fw-analyze -c $default_conf $normal_root_override_str",
+        'cmdline'   => "$psadCmd --test-mode --fw-analyze -c $default_conf $install_override",
         'exec_err'  => $IGNORE,
         'fatal'     => $NO
     },
@@ -212,7 +219,7 @@ my @tests = (
         'detail'    => '--Status',
         'err_msg'   => 'could not get psad status',
         'function'  => \&generic_exec,
-        'cmdline'   => "$psadCmd --test-mode -S -c $default_conf $normal_root_override_str",
+        'cmdline'   => "$psadCmd --test-mode -S -c $default_conf $install_override",
 #        'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -221,7 +228,7 @@ my @tests = (
         'detail'    => '--Status --status-summary',
         'err_msg'   => 'could not get psad status summary',
         'function'  => \&generic_exec,
-        'cmdline'   => "$psadCmd --test-mode -S --status-summary -c $default_conf $normal_root_override_str",
+        'cmdline'   => "$psadCmd --test-mode -S --status-summary -c $default_conf $install_override",
 #        'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -232,7 +239,7 @@ my @tests = (
         'positive_output_matches' => [qr/Next\savailable.*\s\d+/i],
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
-        'cmdline'   => "$psadCmd --test-mode --get-next-rule-id -c $default_conf $normal_root_override_str",
+        'cmdline'   => "$psadCmd --test-mode --get-next-rule-id -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -243,10 +250,21 @@ my @tests = (
         'positive_output_matches' => [qr/Entering\sbenchmark\smode/, qr/processing\stime\:\s\d+/],
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
-        'cmdline'   => "$psadCmd --test-mode --Benchmark --packets 1000 -c $default_conf $normal_root_override_str",
+        'cmdline'   => "$psadCmd --test-mode --Benchmark --packets 1000 -c $default_conf $install_override",
         'exec_err'  => $IGNORE,
         'fatal'     => $NO
     },
+
+    ### reputation feed tests
+    {
+        'category'  => 'operations',
+        'detail'    => '--reputation-feeds-update',
+        'err_msg'   => 'could not update reputation feeds',
+        'function'  => \&generic_exec,
+        'cmdline'   => "$psadCmd --reputation-feeds-update -c $reputation_conf $install_override",
+        'fatal'     => $NO
+    },
+
     {
         'category'  => 'operations',
         'detail'    => 'IPv4 SYN scan detection',
@@ -259,7 +277,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$syn_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -276,7 +294,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$syn_scan_multi_dst_file -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$syn_scan_multi_dst_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -289,7 +307,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$syn_sweep_file -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$syn_sweep_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -306,7 +324,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$topera_syn_scan_file -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$topera_syn_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -323,7 +341,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$topera_syn_scan_with_opts_file -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$topera_syn_scan_with_opts_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -336,7 +354,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$mirai_scan_file -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$mirai_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -352,7 +370,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$ms_sql_server_sig_match_file -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$ms_sql_server_sig_match_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -368,7 +386,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$ipv6_ms_sql_server_sig_match_file -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$ipv6_ms_sql_server_sig_match_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -382,7 +400,7 @@ my @tests = (
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
                 &fw_type() . "/$ms_sql_server_sig_match_file " .
-                "--signatures $no_ms_sql_server_sig_match_file -c $default_conf $normal_root_override_str",
+                "--signatures $no_ms_sql_server_sig_match_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -396,7 +414,7 @@ my @tests = (
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
                 &fw_type() . "/$ipv6_ms_sql_server_sig_match_file " .
-                "--signatures $no_ms_sql_server_sig_match_file -c $default_conf $normal_root_override_str",
+                "--signatures $no_ms_sql_server_sig_match_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -413,7 +431,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$fin_scan_file -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$fin_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -429,7 +447,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$xmas_scan_file -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$xmas_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -444,7 +462,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$null_scan_file -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$null_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -459,7 +477,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$proto_scan_file -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$proto_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -474,7 +492,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$fwknop_pkt_file -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$fwknop_pkt_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -487,7 +505,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$syslog_time_fmt1 -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$syslog_time_fmt1 -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -503,7 +521,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$ack_scan_file -c $enable_ack_detection_conf $normal_root_override_str",
+                &fw_type() . "/$ack_scan_file -c $enable_ack_detection_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -518,7 +536,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$udp_scan_file -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$udp_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -534,7 +552,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_auto_dl_file " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -549,7 +567,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_subnet_auto_dl_file " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -564,7 +582,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_subnet_auto_dl_file_tcp " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -576,7 +594,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_subnet_auto_dl_file_udp " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -598,7 +616,7 @@ my @tests = (
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_auto_dl_file " .
                 "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $auto_dl5_blocking_conf " .
-                "$normal_root_override_str --analysis-auto-block",
+                "$install_override --analysis-auto-block",
         'auto_block_test' => $YES,
         'exec_err'  => $NO,
         'fatal'     => $NO
@@ -613,7 +631,7 @@ my @tests = (
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_auto_dl_file " .
                 "-m $scans_dir/" .  &fw_type() . "/$syn_scan_localhost_file -c $auto_dl5_blocking_conf " .
-                "$normal_root_override_str --analysis-auto-block",
+                "$install_override --analysis-auto-block",
         'auto_block_test' => $YES,
         'exec_err'  => $NO,
         'fatal'     => $NO
@@ -628,7 +646,7 @@ my @tests = (
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_auto_dl_file " .
                 "-m $scans_dir/" .  &fw_type() . "/$syn_scan_zeroip_file -c $auto_dl5_blocking_conf " .
-                "$normal_root_override_str --analysis-auto-block",
+                "$install_override --analysis-auto-block",
         'auto_block_test' => $YES,
         'exec_err'  => $NO,
         'fatal'     => $NO
@@ -651,7 +669,7 @@ my @tests = (
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data " .
                 "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $auto_blocking_conf " .
-                "$normal_root_override_str --analysis-auto-block",
+                "$install_override --analysis-auto-block",
         'auto_block_test' => $YES,
         'exec_err'  => $NO,
         'fatal'     => $NO
@@ -671,7 +689,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-fields SRC:1.2.3.4 " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -689,7 +707,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-fields SRC:192.168.10.55 " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -707,7 +725,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-fields DST:1.2.3.4 " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -725,7 +743,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-fields DST:192.168.10.1 " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -743,7 +761,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => qq|$psadCmd --test-mode -A --analysis-fields "SRC:192.168.10.55, DST:192.168.10.1" | .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -761,7 +779,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-fields LEN:15 " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -779,7 +797,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-fields LEN:44 " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -793,7 +811,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-fields BOGUS:44 " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $install_override",
         'exec_err'  => $YES,
         'fatal'     => $NO
     },
@@ -809,7 +827,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_auto_dl_file " .
-                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -824,7 +842,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_subnet_auto_dl_file " .
-                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -839,7 +857,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_subnet_auto_dl_file_udp " .
-                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -851,7 +869,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_subnet_auto_dl_file_tcp " .
-                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -864,7 +882,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $ignore_ipv4_auto_dl_file " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -876,7 +894,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $ignore_ipv4_subnet_auto_dl_file " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -888,7 +906,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_auto_dl_file " .  ### psad.conf IGNORE_PROTOCOLS trumps auto_dl
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $ignore_tcp_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $ignore_tcp_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -900,7 +918,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_auto_dl_file " .  ### psad.conf IGNORE_PROTOCOLS trumps auto_dl
-                "-m $scans_dir/" .  &fw_type() . "/$igmp_traffic_file -c $ignore_igmp_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$igmp_traffic_file -c $ignore_igmp_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -912,7 +930,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_auto_dl_file " .
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $ignore_intf_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $ignore_intf_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -924,7 +942,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_auto_dl_file " .  ### psad.conf FW_MSG_SEARCH trumps auto_dl
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $require_prefix_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $require_prefix_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -936,7 +954,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_auto_dl_file " .  ### psad.conf FW_MSG_SEARCH trumps auto_dl
-                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $require_missing_prefix_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$syn_scan_file -c $require_missing_prefix_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -950,7 +968,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $ignore_ipv4_auto_dl_file " .
-                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -962,7 +980,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $ignore_ipv4_subnet_auto_dl_file " .
-                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -974,7 +992,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $dl5_ipv4_auto_dl_file " .  ### psad.conf IGNORE_PROTOCOLS trumps auto_dl
-                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $ignore_udp_conf $normal_root_override_str",
+                "-m $scans_dir/" .  &fw_type() . "/$udp_scan_file -c $ignore_udp_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -990,7 +1008,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$ipv6_connect_scan_file -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$ipv6_connect_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -1003,7 +1021,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$ipv6_ping_scan_file -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$ipv6_ping_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -1017,7 +1035,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$ipv6_invalid_icmp6_type_code_file -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$ipv6_invalid_icmp6_type_code_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -1031,7 +1049,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$ipv4_valid_ping -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$ipv4_valid_ping -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -1046,7 +1064,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$ipv4_invalid_icmp6_type_code_file -c $default_conf $normal_root_override_str",
+                &fw_type() . "/$ipv4_invalid_icmp6_type_code_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -1060,7 +1078,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
-                &fw_type() . "/$ipv6_connect_scan_file -c $disable_ipv6_conf $normal_root_override_str",
+                &fw_type() . "/$ipv6_connect_scan_file -c $disable_ipv6_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -1073,7 +1091,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $ignore_ipv6_addr_auto_dl_file " .
-                "-m $scans_dir/" . &fw_type() . "/$ipv6_connect_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" . &fw_type() . "/$ipv6_connect_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },
@@ -1086,7 +1104,7 @@ my @tests = (
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data --auto-dl $ignore_ipv6_addr_auto_dl_file_abbrev " .
-                "-m $scans_dir/" . &fw_type() . "/$ipv6_connect_scan_file -c $default_conf $normal_root_override_str",
+                "-m $scans_dir/" . &fw_type() . "/$ipv6_connect_scan_file -c $default_conf $install_override",
         'exec_err'  => $NO,
         'fatal'     => $NO
     },

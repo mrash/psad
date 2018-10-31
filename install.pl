@@ -4,7 +4,7 @@
 #
 # File: install.pl
 #
-# Purpose:  install.pl is the installation script for psad.  It is safe
+# Purpose:  install.pl is the installation script for psad. It is safe
 #           to execute install.pl even if psad has already been installed
 #           on a system since install.pl will preserve the existing
 #           config section.
@@ -17,7 +17,7 @@
 #
 #    This program is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 #    GNU General Public License for more details.
 #
 #    You should have received a copy of the GNU General Public License
@@ -380,6 +380,10 @@ sub install() {
         &logr("[+] Creating $config{'PSAD_DIR'}\n");
         &full_mkdir($config{'PSAD_DIR'}, 0700);
     }
+    unless (-d $config{'PSAD_TMP_DIR'}) {
+        &logr("[+] Creating $config{'PSAD_TMP_DIR'}\n");
+        &full_mkdir($config{'PSAD_TMP_DIR'}, 0700);
+    }
     unless (-d $config{'PSAD_LIBS_DIR'}) {
         &logr("[+] Creating $config{'PSAD_LIBS_DIR'}\n");
         &full_mkdir($config{'PSAD_LIBS_DIR'}, 0755);
@@ -493,16 +497,16 @@ sub install() {
     print "\n\n";
     &logr("[+] Verifying compilation of fwcheck_psad.pl script:\n");
     unless (&run_cmd("$cmds{'perl'} -c fwcheck_psad.pl") == 0) {
-        die "[*] fwcheck_psad.pl does not compile with \"perl -c\".  Download ",
+        die "[*] fwcheck_psad.pl does not compile with \"perl -c\". Download ",
             "the latest sources from:\n\nhttp://www.cipherdyne.org/"
             unless $skip_module_install;
     }
 
-    ### make sure the psad (perl) daemon compiles.  The other three
+    ### make sure the psad (perl) daemon compiles. The other three
     ### daemons have all been re-written in C.
     &logr("[+] Verifying compilation of psad perl daemon:\n");
     unless (&run_cmd("$cmds{'perl'} -c psad") == 0) {
-        die "[*] psad does not compile with \"perl -c\".  Download the",
+        die "[*] psad does not compile with \"perl -c\". Download the",
             " latest sources from:\n\nhttp://www.cipherdyne.org/"
             unless $skip_module_install;
     }
@@ -510,7 +514,7 @@ sub install() {
     ### install nf2csv
     &logr("[+] Verifying compilation of nf2csv script:\n");
     unless (&run_cmd("$cmds{'perl'} -c nf2csv") == 0) {
-        die "[*] nf2csv does not compile with \"perl -c\".  Download ",
+        die "[*] nf2csv does not compile with \"perl -c\". Download ",
             "the latest sources from:\n\nhttp://www.cipherdyne.org/"
             unless $skip_module_install;
     }
@@ -636,7 +640,7 @@ sub install() {
         }
 
         ### Give the admin the opportunity to set the strings that are
-        ### parsed out of iptables messages.  This is useful since the
+        ### parsed out of iptables messages. This is useful since the
         ### admin may have configured the firewall to use a logging prefix
         ### of "Audit" or something else other than the default string
         ### "DROP".
@@ -718,7 +722,7 @@ sub install() {
             } elsif ($syslog_str eq 'metalog') {
                 if (-e $syslog_conf) {
                     &config_metalog($syslog_conf);
-                    &logr("[-] Metalog support is shaky in psad.  " .
+                    &logr("[-] Metalog support is shaky in psad. " .
                         "Use at your own risk.\n");
                     ### don't send warning about not restarting metalog daemon
                     $restarted_syslog = 1;
@@ -905,7 +909,7 @@ sub uninstall() {
         exit 0;
     }
     ### after this point, psad will really be uninstalled so stop writing stuff
-    ### to the install.log file.  Just print everything to STDOUT
+    ### to the install.log file. Just print everything to STDOUT
     if (-e $config{'PSAD_PID_FILE'}) {
         open PID, "$config{'PSAD_PID_FILE'}" or die "[*] Could not open ",
             "$config{'PSAD_PID_FILE'}: $!";
@@ -1232,11 +1236,11 @@ sub set_home_net() {
     }
     my $ans_file_str = 'Specify HOME_NET subnets:';
     my $str =
-"\n    Specify which subnets are part of your internal network.  Note that\n" .
+"\n    Specify which subnets are part of your internal network. Note that\n" .
 "    you can correct anything you enter here by editing the \"HOME_NET\"\n" .
 "    variable in: $file.\n\n" .
 "    Enter each of the subnets (except for the external subnet) on a line by\n" .
-"    itself.  Each of the subnets should be in the form <net>/<mask>.  E.g.\n" .
+"    itself. Each of the subnets should be in the form <net>/<mask>. E.g.\n" .
 "    in CIDR notation: 192.168.10.0/24 (preferrable), or regular notation:\n" .
 "    192.168.10.0/255.255.255.0\n\n    End with a \".\" on a line by itself.\n\n";
     &logr($str);
@@ -1285,7 +1289,7 @@ sub query_use_home_net_default() {
     my $str =
 "\n[+] By default, psad matches Snort rules against any IP addresses, but\n" .
 "    psad offers the ability to restrict signature matches to specific\n" .
-"    networks with the HOME_NET variable (similar to Snort).  However, psad\n" .
+"    networks with the HOME_NET variable (similar to Snort). However, psad\n" .
 "    also offers the ability to acquire all local subnets on the local system\n" .
 "    by parsing the output of \"ifconfig\", or the subnets can be restricted\n" .
 "    to a limited set of networks.\n\n";
@@ -1338,7 +1342,7 @@ sub check_hostname() {
             ### only the HOSTNAME variable is set to _CHANGEME_ by
             ### default as of psad-1.6.0
             if ($var eq 'HOSTNAME') {
-                &logr("[-] set_hostname() failed.  Edit the HOSTNAME " .
+                &logr("[-] set_hostname() failed. Edit the HOSTNAME " .
                     " variable in $file\n");
             } else {
                 &logr("[-] Var $var is set to _CHANGEME_ in " .
@@ -1686,11 +1690,11 @@ sub get_fw_search_strings() {
     my $str =
 "\n    psad checks the firewall configuration on the underlying machine\n" .
 "    to see if packets will be logged and dropped that have not\n" .
-"    explicitly allowed through.  By default, psad looks for the string\n" .
+"    explicitly allowed through. By default, psad looks for the string\n" .
 "    \"DROP\". However, if your particular firewall configuration logs\n" .
 "    blocked packets with the string \"Audit\" for example, psad can be\n" .
-"    configured here to look for this string.  In addition, psad can also\n" .
-"    be configured here to look for multiple strings if needed.  Remember,\n" .
+"    configured here to look for this string. In addition, psad can also\n" .
+"    be configured here to look for multiple strings if needed. Remember,\n" .
 "    whatever string you configure psad to look for must be logged via the\n" .
 "    --log-prefix option in iptables.\n\n";
         &logr($str);
@@ -1733,10 +1737,10 @@ sub get_fw_search_strings() {
 sub query_dshield() {
     my $str =
 "\n[+] psad has the capability of sending scan data via email alerts to the\n" .
-"    DShield distributed intrusion detection system (www.dshield.org).  By\n" .
+"    DShield distributed intrusion detection system (www.dshield.org). By\n" .
 "    default this feature is not enabled since firewall log data is sensitive,\n" .
 "    but submitting logs to DShield provides a valuable service and assists\n" .
-"    in generally enhancing internet security.  As an optional step, if you\n" .
+"    in generally enhancing internet security. As an optional step, if you\n" .
 "    have a DShield user id you can edit the \"DSHIELD_USER_ID\" variable\n" .
 "    in $config{'PSAD_CONF_DIR'}/psad.conf\n\n";
     &logr($str);
@@ -1799,7 +1803,7 @@ sub query_email() {
 
 sub query_syslog() {
     &logr("\n[+] psad supports the syslogd, rsyslogd, syslog-ng, ulogd, and\n" .
-        "    metalog logging daemons.  Which system logger is running?\n\n");
+        "    metalog logging daemons. Which system logger is running?\n\n");
 
     my $ans = '';
     my $ans_file_str = 'System logger:';
@@ -1906,6 +1910,12 @@ sub archive() {
     my $file = shift;
     my $curr_pwd = cwd() or die $!;
     chdir $config{'CONF_ARCHIVE_DIR'} or die $!;
+
+    unless (-e $file) {
+        &logr("[-] File '$file' does not exist in $config{'CONF_ARCHIVE_DIR'}\n");
+        return;
+    }
+
     my ($filename) = ($file =~ m|.*/(.*)|);
     my $base = "${filename}.old";
     for (my $i = 5; $i > 1; $i--) {  ### keep five copies of old config files

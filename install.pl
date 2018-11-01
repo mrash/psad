@@ -738,6 +738,10 @@ sub install() {
     ### download signatures?
     &run_cmd("${USRSBIN_DIR}/psad --sig-update") if &query_signatures();
 
+    ### update reputation feeds?
+    &run_cmd("${USRSBIN_DIR}/psad --reputation-feeds-update")
+        if &query_reputation_feeds();
+
     &install_manpage('psad.8');
     &install_manpage('psadwatchd.8');
     &install_manpage('kmsgsd.8');
@@ -1272,7 +1276,7 @@ sub set_home_net() {
 
 sub query_signatures() {
     &logr("[+] The latest psad signatures can be installed with " .
-        qq|"psad --sig-update"\n    or installed now with install.pl.\n\n|);
+        qq|"psad --sig-update"\n\n|);
     &logr("    If you decide to answer 'y' to the next question, install.pl\n" .
         "    will require DNS and network access now.\n\n");
     return &query_yes_no("    Would you like to install the latest " .
@@ -1280,9 +1284,13 @@ sub query_signatures() {
             "(y/n)?  ", $NO_ANS_DEFAULT);
 }
 
-sub download_signatures() {
-
-    &run_cmd("${USRSBIN_DIR}/psad --sig-update");
+sub query_reputation_feeds() {
+    &logr("[+] The latest reputation feed data can be installed with " .
+        qq|"psad --reputation-feeds-update"\n\n|);
+    &logr("    If you decide to answer 'y' to the next question, install.pl\n" .
+        "    will require DNS and network access now.\n\n");
+    return &query_yes_no("    Would you like to install the latest " .
+            "reputation feed data (y/n)?  ", $NO_ANS_DEFAULT);
 }
 
 sub query_use_home_net_default() {

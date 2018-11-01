@@ -591,12 +591,21 @@ my %pkt_NF_init = (
     'is_topera'     => 0,  ### Topera IPv6 scanner detection, requires --log-ip-options
     'is_masscan'    => 0,  ### Masscan detection, requires --log-tcp-options
     'is_mirai'      => 0,  ### Mirai botnet scanning phase detection
+    'reputation_feed_matches' => {}, ### for reputation feed matches
     'is_port_sweep' => 0,
     'chain'         => '',
     'log_prefix'    => '',
     'dshield_str'   => '',
     'syslog_host'   => '',
     'timestamp'     => ''
+);
+
+my %nmap_flags_to_opts = (
+    'SYN'             => '-sT or -sS',
+    'FIN'             => '-sF',
+    'NULL'            => '-sN',
+    'URG PSH FIN'     => '-sX',
+    'URG PSH SYN FIN' => '-O',
 );
 
 my %gnuplot_non_digit_packet_fields = (
@@ -1120,6 +1129,8 @@ sub check_scan() {
             $scan{$pkt{'src'}}{$pkt{'dst'}}{'alerted'} = 0
                 if $config{'ALERT_ALL'} eq 'N';
         }
+
+        print STDERR "    current DL: $scan_dl{$pkt{'src'}}\n" if $debug;
 
         ### see if we need to assign a danger level according to the auto_dl
         ### file. The return value is the auto-assigned danger level (or
@@ -4269,6 +4280,7 @@ sub reputation_feed_parse_conf_var() {
     return {
         'raw_str'         => $reputation_var_str,
         'feed_name'       => $feed_name,
+        'danger_level'    => $danger_level,
         'data_type'       => $data_type,
         'data_format'     => $data_format,
         'update_interval' => $update_interval,
@@ -5420,6 +5432,7 @@ sub reputation_feeds_check() {
             &sys_log("reputation feed: '$feed->{'feed_name'}' " .
                 "assigned DL: $feed_dl for IP: $src");
             $scan_dl{$src} = $feed_dl;
+            $pkt_hr->{'reputation_feed_matches'}{$feed->{'feed_name'}} = '';
             $rv = $feed_dl;
         }
     }
@@ -5997,23 +6010,13 @@ sub scan_logr() {
                 for my $flags (keys %{$curr_scan_hr->{$src}->
                         {$dst}->{'tcp'}->{'flags'}}) {
 
-                    my $nmap_opts = '';
                     $syslog_flags .= "$flags ";
                     my $n_pkts = $curr_scan_hr->{$src}->{$dst}->
                         {'tcp'}->{'flags'}->{$flags};
 
-                    ### FUTURE: replace this with a simple hash lookup
-                    if ($flags eq 'SYN') {
-                        $nmap_opts = '-sT or -sS';
-                    } elsif ($flags eq 'FIN') {
-                        $nmap_opts = '-sF';
-                    } elsif ($flags eq 'URG PSH FIN') {
-                        $nmap_opts = '-sX';
-                    } elsif ($flags eq 'NULL') {
-                        $nmap_opts = '-sN';
-                    } elsif ($flags eq 'URG PSH SYN FIN') {
-                        $nmap_opts = '-O';
-                    }
+                    my $nmap_opts = '';
+                    $nmap_opts    = $nmap_flags_to_opts{$flags}
+                        if defined $nmap_flags_to_opts{$flags};
 
                     if ($curr_scan_hr->{$src}->{$dst}->{'is_port_sweep'}) {
                         $scan_style_str = "Port sweep $flags scan";

@@ -35,13 +35,13 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 705 (msg:"SNMP AgentX/tcp request"; fla
 ### info.rules
 
 ### ddos.rules
-alert udp $EXTERNAL_NET any -> $HOME_NET 31335 (msg:"DDOS Trin00 Daemon to Master"; reference:arachnids,187; reference:url,www.sans.org/resources/idfaq/trinoo.php; classtype:attempted-recon; psad_dsize:>2; psad_id:100002; psad_dl:2; psad_derived_sids:223,231,232;)
-alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"DDOS TFN client command BE"; icmp_id:456; icmp_seq:0; itype:0; reference:arachnids,184; classtype:attempted-dos; sid:228; psad_id:100003; psad_dl:2;)
-alert tcp $HOME_NET 20432 -> $EXTERNAL_NET any (msg:"DDOS shaft client login to handler connection attempt"; flags:S; reference:arachnids,254; reference:url,security.royans.net/info/posts/bugtraq_ddos3.shtml; classtype:attempted-dos; sid:230; psad_id:100004; psad_dl:2;)
-alert udp $EXTERNAL_NET any -> $HOME_NET 18753 (msg:"DDOS shaft handler to agent"; reference:arachnids,255; classtype:attempted-dos; psad_dsize:>10; sid:239; psad_id:100005; psad_dl:2;)
-alert udp $EXTERNAL_NET any -> $HOME_NET 20433 (msg:"DDOS shaft agent to handler"; reference:arachnids,256; classtype:attempted-dos; psad_dsize:>4; sid:240; psad_id:100006; psad_dl:2;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 27665 (msg:"DDOS Trin00 Attacker to Master connection attempt"; flags:S; reference:arachnids,197; classtype:attempted-dos; psad_id:100007; psad_dl:2; psad_derived_sids:233,234,235;)
-alert udp $EXTERNAL_NET any -> $HOME_NET 27444 (msg:"DDOS Trin00 Master to Daemon default password attempt"; reference:arachnids,197; classtype:attempted-dos; psad_dsize:>6; sid:237; psad_id:100008; psad_dl:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 31335 (msg:"DDOS Trin00 Daemon to Master"; reference:url,en.wikipedia.org/wiki/Trinoo; classtype:attempted-recon; psad_dsize:>2; psad_id:100002; psad_dl:2; psad_derived_sids:223,231,232;)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"DDOS TFN client command BE"; icmp_id:456; icmp_seq:0; itype:0; reference:url,en.wikipedia.org/wiki/Tribe_Flood_Network; classtype:attempted-dos; sid:228; psad_id:100003; psad_dl:2;)
+alert tcp $HOME_NET 20432 -> $EXTERNAL_NET any (msg:"DDOS shaft client login to handler connection attempt"; flags:S; reference:url,https://www.usenix.org/legacy/publications/library/proceedings/lisa2000/full_papers/dietrich/dietrich_html/index.html; classtype:attempted-dos; sid:230; psad_id:100004; psad_dl:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 18753 (msg:"DDOS shaft handler to agent"; reference:url,www.usenix.org/legacy/publications/library/proceedings/lisa2000/full_papers/dietrich/dietrich_html/index.html; classtype:attempted-dos; psad_dsize:>10; sid:239; psad_id:100005; psad_dl:2;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 20433 (msg:"DDOS shaft agent to handler"; reference:url,www.usenix.org/legacy/publications/library/proceedings/lisa2000/full_papers/dietrich/dietrich_html/index.html; classtype:attempted-dos; psad_dsize:>4; sid:240; psad_id:100006; psad_dl:2;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 27665 (msg:"DDOS Trin00 Attacker to Master connection attempt"; flags:S; reference:url,en.wikipedia.org/wiki/Trinoo; classtype:attempted-dos; psad_id:100007; psad_dl:2; psad_derived_sids:233,234,235;)
+alert udp $EXTERNAL_NET any -> $HOME_NET 27444 (msg:"DDOS Trin00 Master to Daemon default password attempt"; reference:url,en.wikipedia.org/wiki/Trinoo; classtype:attempted-dos; psad_dsize:>6; sid:237; psad_id:100008; psad_dl:2;)
 alert udp $EXTERNAL_NET any -> $HOME_NET 6838 (msg:"DDOS mstream agent to handler"; classtype:attempted-dos; psad_dsize:>8; sid:243; psad_id:100009; psad_dl:2;)
 alert udp $EXTERNAL_NET any -> $HOME_NET 10498 (msg:"DDOS mstream handler to agent"; reference:cve,2000-0138; classtype:attempted-dos; psad_dsize:>3; psad_id:100010; psad_dl:2; psad_derived_sids:244,245,246;)
 alert tcp $EXTERNAL_NET any -> $HOME_NET 12754 (msg:"DDOS mstream client to handler"; flags:S; reference:cve,2000-0138; classtype:attempted-dos; sid:247; psad_id:100011; psad_dl:2;)

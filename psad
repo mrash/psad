@@ -170,6 +170,7 @@ my $flush_fw = 0;
 my @ipt_config = ();
 
 ### build the configuration for reputation feed updates
+my %reputation_feeds_lookup = (); ### fast feed lookups
 my %reputation_data = ();
 
 ### main configuration hash
@@ -1149,18 +1150,7 @@ sub check_scan() {
         }
 
         ### reputation feed comparisons may influence danger level
-        if ($config{'ENABLE_REPUTATION_FEEDS'} eq 'Y') {
-
-            my $rv = &reputation_feeds_check(\%pkt);
-
-            print STDERR "[+] reputation_feeds_check() returned: $rv\n"
-                if $debug;
-            if ($rv == 0) {
-                print STDERR "[+] ignoring $pkt{'src'} $pkt{'proto'} ",
-                    "$pkt{'dp'} scan.\n" if $debug;
-                next PKT;
-            }
-        }
+        &reputation_feeds_check(\%pkt) if $config{'ENABLE_REPUTATION_FEEDS'} eq 'Y';
 
         if ($pkt{'proto'} eq 'icmp') {
 
@@ -1341,6 +1331,14 @@ sub check_scan() {
         $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'is_topera'}  = $pkt{'is_topera'};
         $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'is_masscan'} = $pkt{'is_masscan'};
         $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'is_mirai'}   = $pkt{'is_mirai'};
+
+        ### track reputation matches
+        if (scalar keys %{$pkt{'reputation_feed_matches'}}) {
+            for my $feed (keys %{$pkt{'reputation_feed_matches'}}) {
+                $curr_scan{$pkt{'src'}}{$pkt{'dst'}}{'reputation_feed_matches'}{$feed}
+                    = $pkt{'reputation_feed_matches'}{$feed};
+            }
+        }
 
         if ($pkt{'log_prefix'}) {
             ### see if the logging prefix matches the blocking
@@ -4115,6 +4113,9 @@ sub import_reputation_feeds() {
             &sys_log($msg);
         }
 
+        ### for fast feed name lookups
+        $reputation_feeds_lookup{$feed->{'feed_name'}} = $feed;
+
         ### check for the feed data file
         my $feed_data_file = "$config{'REPUTATION_FEEDS_DIR'}/$feed->{'local_file'}";
 
@@ -4145,8 +4146,10 @@ sub import_reputation_feeds() {
         }
         close F;
 
-        $msg = "feed '$feed->{'feed_name'}', imported " . (keys (%{$new_feed_data{'ipv4'}})) .
-            " IPv4 addresses, and " . (keys (%{$new_feed_data{'ipv6'}})) . " IPv6 addresses";
+        $msg = "reputation feed '$feed->{'feed_name'}', imported "
+                . (keys (%{$new_feed_data{'ipv4'}})) .
+            " IPv4 addresses, and " . (keys (%{$new_feed_data{'ipv6'}}))
+                . " IPv6 addresses";
         if ($reputation_feeds_list) {
             print "[+] $msg\n";
         } else {
@@ -4172,7 +4175,6 @@ sub import_reputation_feeds() {
             }
         }
     }
-
     return;
 }
 
@@ -4273,9 +4275,6 @@ sub reputation_feed_parse_conf_var() {
         unless $update_interval =~ m|^\d+$| and $update_interval >= 0 and $update_interval <= 43200;
     die "[*] REPUTATION_FEED enable diffs: '$enable_diffs' not supported, must be 'Y' or 'N'."
         unless $enable_diffs eq 'Y' or $enable_diffs eq 'N';
-
-    ### expand any existing $LOCAL_FILE variable in the update command
-#    $update_cmd =~ s/\$LOCAL_FILE/$local_file/;
 
     return {
         'raw_str'         => $reputation_var_str,
@@ -5406,9 +5405,8 @@ sub assign_danger_level() {
 sub reputation_feeds_check() {
     my $pkt_hr = shift;
 
-    my $rv = -1;
-
     for my $feed (@{$config{'REPUTATION_FEED'}}) {
+
         next unless $feed->{'data_type'} eq 'IP';
 
         my $feed_dl = $feed->{'danger_level'};
@@ -5416,15 +5414,18 @@ sub reputation_feeds_check() {
         my $src = $pkt_hr->{'src'};
         if ($pkt_hr->{'is_ipv6'}) {
             if (defined $reputation_data{$feed->{'feed_name'}}{'ipv6'}{$src}) {
-                if ($scan_dl{$src} < $feed_dl) {
-                    $do_update_dl = 1;
-                }
+                $pkt_hr->{'reputation_feed_matches'}{$feed->{'feed_name'}} += 1;
+                &sys_log("reputation feed: '$feed->{'feed_name'}' match for IP: $src, " .
+                    "packets: $pkt_hr->{'reputation_feed_matches'}{$feed->{'feed_name'}}");
+
+                $do_update_dl = 1 if $scan_dl{$src} < $feed_dl;
             }
         } else {
             if (defined $reputation_data{$feed->{'feed_name'}}{'ipv4'}{$src}) {
-                if ($scan_dl{$src} < $feed_dl) {
-                    $do_update_dl = 1;
-                }
+                $pkt_hr->{'reputation_feed_matches'}{$feed->{'feed_name'}} += 1;
+                &sys_log("reputation feed: '$feed->{'feed_name'}' match for IP: $src, " .
+                    "packets: $pkt_hr->{'reputation_feed_matches'}{$feed->{'feed_name'}}");
+                $do_update_dl = 1 if $scan_dl{$src} < $feed_dl;
             }
         }
 
@@ -5432,11 +5433,9 @@ sub reputation_feeds_check() {
             &sys_log("reputation feed: '$feed->{'feed_name'}' " .
                 "assigned DL: $feed_dl for IP: $src");
             $scan_dl{$src} = $feed_dl;
-            $pkt_hr->{'reputation_feed_matches'}{$feed->{'feed_name'}} = '';
-            $rv = $feed_dl;
         }
     }
-    return $rv;
+    return;
 }
 
 sub assign_auto_danger_level() {
@@ -6093,6 +6092,19 @@ sub scan_logr() {
                 printf $fh "%${log_len}s%s\n", 'MAC: ', $src_mac
                     if $src_mac;
             }
+
+            ### reputation matches
+            if (scalar keys %{$curr_scan_hr->{$src}->{$dst}->{'reputation_feed_matches'}}) {
+                for my $feed (keys %{$curr_scan_hr->{$src}->{$dst}->{'reputation_feed_matches'}}) {
+                    my $pkts = $curr_scan_hr->{$src}->{$dst}->{'reputation_feed_matches'}->{$feed};
+                    my $update_cmd = $reputation_feeds_lookup{$feed}{'update_cmd'};
+                    if ($update_cmd =~ m|\$LOCAL_FILE|) {
+                        $update_cmd =~ s|\$LOCAL_FILE|$reputation_feeds_lookup{$feed}{'local_file'}|;
+                    }
+                    printf $fh "%${log_len}s%s\n", 'Reputation feed: ', "'$feed', matches: $pkts, update cmd: '$update_cmd'";
+                }
+            }
+
             unless ($no_posf) {
                 if (defined $p0f{$src}) {  ### prefer p0f-based fingerprinting
                     ### any p0f fingerprint that contains a "@" is an
@@ -6112,8 +6124,7 @@ sub scan_logr() {
                         if ($printed_guess_line) {
                             printf $fh "%${log_len}s%s\n", ' ', $os;
                         } else {
-                            printf $fh "%${log_len}s%s\n", 'OS guess: ',
-                                $os;
+                            printf $fh "%${log_len}s%s\n", 'OS guess: ', $os;
                         }
                         $printed_guess_line = 1;
                     }

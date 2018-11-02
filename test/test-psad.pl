@@ -487,9 +487,9 @@ my @tests = (
         'detail'    => 'reputation feed scan detection',
         'err_msg'   => 'did not detect reputation feed IPs',
         'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
-                qr/IP\sprotocols\:\s251\,/i,
                 qr/IP\sstatus/i,
-                qr/192\.168\.10\.55/],
+                qr/reputation\s.*Test\sBlock\sIPs/,
+                qr/reputation\s.*Test\sBlock\sIPs\s2/],
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .
@@ -1326,6 +1326,13 @@ sub generic_exec() {
     my $exec_rv = &run_cmd($test_hr->{'cmdline'},
                 $cmd_out_tmp, $current_test_file);
 
+    ### move any ipt_analysis directory into place in the
+    ### output directory
+    if (-e "$test_install_dir/var/log/psad/ipt_analysis") {
+        move "$test_install_dir/var/log/psad/ipt_analysis",
+            "$output_dir/${executed}_ipt_analysis" or die $!;
+    }
+
     if ($test_hr->{'exec_err'} eq $YES) {
         $rv = 0 if $exec_rv;
     } elsif ($test_hr->{'exec_err'} eq $NO) {
@@ -1476,11 +1483,21 @@ sub init() {
         }
         mkdir "${output_dir}.last"
             or die "[*] ${output_dir}.last: $!";
+
+        ### *.test files
         for my $file (glob("$output_dir/*.test")) {
             if ($file =~ m|.*/(.*)|) {
                 copy $file, "${output_dir}.last/$1" or die $!;
             }
         }
+
+        ### *_ipt_analysis directories
+        for my $dir (glob("$output_dir/*_ipt_analysis")) {
+            if ($dir =~ m|.*/(.*)|) {
+                move $dir, "${output_dir}.last/$1" or die $!;
+            }
+        }
+
         if (-e "$output_dir/init") {
             copy "$output_dir/init", "${output_dir}.last/init";
         }
@@ -1501,6 +1518,10 @@ sub init() {
     for my $file (glob("$output_dir/*.test")) {
         unlink $file or die "[*] Could not unlink($file)";
     }
+    for my $dir (glob("$output_dir/*_ipt_analysis")) {
+        rmtree $dir or die "[*] Could not rmtree($dir)";
+    }
+
     if (-e "$output_dir/init") {
         unlink "$output_dir/init" or die $!;
     }

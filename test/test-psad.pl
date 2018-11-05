@@ -488,8 +488,10 @@ my @tests = (
         'err_msg'   => 'did not detect reputation feed IPs',
         'positive_output_matches' => [qr/Top\s\d+\sattackers/i,
                 qr/IP\sstatus/i,
-                qr/reputation\s.*Test\sBlock\sIPs/,
-                qr/reputation\s.*Test\sBlock\sIPs\s2/],
+                qr/reputation\s.*Test\sBlock\sIPs.*assigned\sDL/,
+                qr/reputation\s.*Test\sBlock\sIPs.*network\smatch/,
+                qr/reputation\s.*Test\sBlock\sIPs\s2.*assigned\sDL/,
+                qr/reputation\s.*Test\sBlock\sIPs\s2.*network\smatch/],
         'match_all' => $MATCH_ALL_RE,
         'function'  => \&generic_exec,
         'cmdline'   => "$psadCmd --test-mode -A --analysis-write-data -m $scans_dir/" .

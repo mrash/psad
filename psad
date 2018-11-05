@@ -178,7 +178,8 @@ my %config = ();
 my $override_config_str = '';
 
 ### local subnets
-my @local_nets = ();
+my @local_nets  = ();
+my %is_local_ip = (); ### cache of IP's that are local
 
 ### fw search string array
 my @fw_search = ();
@@ -320,7 +321,7 @@ my %top_sigs    = ();
 my %sig_sources = ();
 my %top_sig_counts = ();
 my %top_packet_counts = ();
-my %local_src = ();
+my %local_ip = ();
 
 ### regex to match IP addresses
 my $ipv4_re = qr|(?:[0-2]?\d{1,2}\.){3}[0-2]?\d{1,2}|;  ### IPv4
@@ -433,7 +434,7 @@ my $help             = 0;
 my $dump_conf        = 0;
 my $download_sigs    = 0;
 my $reputation_feeds_update = 0;
-my $reputation_feeds_list = 0;
+my $reputation_feeds_list   = 0;
 my $chk_interval     = 0;
 my $log_len          = 23;  ### used in scan_logr()
 my $fw_analyze       = 0;
@@ -1112,11 +1113,11 @@ sub check_scan() {
 
         if ($config{'HOME_NET'} ne 'any') {
             if ($pkt{'chain'} eq 'INPUT') {
-                $local_src{$pkt{'dst'}} = '';
+                $is_local_ip{$pkt{'dst'}} = '';
             } elsif ($pkt{'chain'} eq 'OUTPUT') {
-                $local_src{$pkt{'src'}} = '';
+                $is_local_ip{$pkt{'src'}} = '';
             } elsif ($pkt{'chain'} eq 'FORWARD') {
-                $local_src{$pkt{'src'}} = ''
+                $is_local_ip{$pkt{'src'}} = ''
                     if &is_local($pkt{'src'}, $pkt{'s_obj'});
             }
         }
@@ -3533,7 +3534,7 @@ sub psad_init() {
 
     if ($restrict_ip_cmdline) {
         $restrict_ip = NetAddr::IP->new($restrict_ip_cmdline)
-            or die "[*] Could not acquire NetAddr::IP object for $restrict_ip";
+            or die "[*] Could not acquire NetAddr::IP object for $restrict_ip: $!";
     }
 
     return;
@@ -3829,9 +3830,11 @@ sub get_connected_subnets() {
             next if $intf_name eq 'lo';
             next if $intf_name =~ /dummy/i;
             if ($line =~ /^\s+inet.*?($ipv4_re)\/(\d+)/i) {
-                push @connected_subnets, NetAddr::IP->new($1, $2);
+                push @connected_subnets, NetAddr::IP->new($1, $2)
+                    or die "[*] NetAddr::IP->new($1, $2) error: $!";
             } elsif ($line =~ /inet6\s(\S+)/) {
-                push @connected_subnets, NetAddr::IP->new6($1);
+                push @connected_subnets, NetAddr::IP->new6($1)
+                    or die "[*] NetAddr::IP->new6($1) error: $!";
             }
         }
     } else {
@@ -3846,9 +3849,11 @@ sub get_connected_subnets() {
             next if $intf_name eq 'lo';
             next if $intf_name =~ /dummy/i;
             if ($line =~ /^\s+inet.*?:($ipv4_re).*:($ipv4_re)/i) {
-                push @connected_subnets, NetAddr::IP->new($1, $2);
+                push @connected_subnets, NetAddr::IP->new($1, $2)
+                    or die "[*] NetAddr::IP->new($1, $2) error: $!";
             } elsif ($line =~ /^\s+inet6\saddr:\s+(\S+)/) {
-                push @connected_subnets, NetAddr::IP->new6($1);
+                push @connected_subnets, NetAddr::IP->new6($1)
+                    or die "[*] NetAddr::IP->new6($1) error: $!";
             }
         }
     }
@@ -3890,15 +3895,19 @@ sub validate_home_net() {
         for my $net (@home_nets) {
             my $home_net = '';
             if ($net =~ m|($ipv4_re/$ipv4_re)|) {
-                $home_net = NetAddr::IP->new($1);
+                $home_net = NetAddr::IP->new($1)
+                    or die "[*] NetAddr::IP->new($1) error: $!";
             } elsif ($net =~ m|($ipv4_re/\d+)|) {
-                $home_net = NetAddr::IP->new($1);
+                $home_net = NetAddr::IP->new($1)
+                    or die "[*] NetAddr::IP->new($1) error: $!"
             } elsif ($net =~ m|($ipv4_re)|) {
-                $home_net = NetAddr::IP->new($1);
+                $home_net = NetAddr::IP->new($1)
+                    or die "[*] NetAddr::IP->new($1) error: $!";
             } else {
                 next;
             }
-            push @local_nets, NetAddr::IP->new($net);
+            push @local_nets, NetAddr::IP->new($net)
+                    or die "[*] NetAddr::IP->new($net) error: $!";
             my $found = 0;
             for my $net (@$connected_subnets_ar) {
                 $found = $found_one_net = 1
@@ -4106,6 +4115,9 @@ sub import_reputation_feeds() {
     ### now import the data from the filesystem for each feed
     RFEED: for my $feed (@{$config{'REPUTATION_FEED'}}) {
 
+        ### only support IP feeds for now
+        next RFEED unless $feed->{'data_type'} eq 'IP';
+
         my $msg = "importing reputation feed: '$feed->{'feed_name'}'";
         if ($reputation_feeds_list) {
             print "[+] $msg\n";
@@ -4130,15 +4142,25 @@ sub import_reputation_feeds() {
             next RFEED;
         }
 
-        my %new_feed_data = ('ipv4'=>{}, 'ipv6'=>{});
+        my %new_feed_data = (
+            'ipv4'     => {},
+            'ipv4_net' => {},
+            'ipv6'     => {},
+            'ipv6_net' => {}
+        );
 
         open F, "< $feed_data_file" or die "[*] Could not open: $feed_data_file: $!";
         if ($feed->{'data_format'} eq 'newline') {
             while (<F>) {
                 if ($feed->{'data_type'} eq 'IP') {
-                    if (/($ipv4_re)/) {
+                    if (m|($ipv4_re)/(\d{1,2})|) {
+                        $new_feed_data{'ipv4_net'}{"$1/$2"} = NetAddr::IP->new($1, $2)
+                            or die "[*] NetAddr::IP($1, $2) error: $!";
+                    } elsif (m|($ipv4_re)|) {
                         $new_feed_data{'ipv4'}{$1} = '';
-                    } elsif (/($ipv6_re)/) {
+                    } elsif (m|($ipv6_re)/(\d{1,3})|) {
+                        $new_feed_data{'ipv6_net'}{"$1/$2"} = NetAddr::IP->new6($1, $2);
+                    } elsif (m|($ipv6_re)|) {
                         $new_feed_data{'ipv6'}{$1} = '';
                     }
                 }
@@ -4147,9 +4169,15 @@ sub import_reputation_feeds() {
         close F;
 
         $msg = "reputation feed '$feed->{'feed_name'}', imported "
-                . (keys (%{$new_feed_data{'ipv4'}})) .
-            " IPv4 addresses, and " . (keys (%{$new_feed_data{'ipv6'}}))
-                . " IPv6 addresses";
+            . (keys (%{$new_feed_data{'ipv4'}}))
+            . " IPv4 addresses, "
+            . (keys (%{$new_feed_data{'ipv4_net'}}))
+            . " IPv4 networks, "
+            . (keys (%{$new_feed_data{'ipv6'}}))
+            . " IPv6 addresses, "
+            . (keys (%{$new_feed_data{'ipv6_net'}}))
+            . " and IPv6 networks";
+
         if ($reputation_feeds_list) {
             print "[+] $msg\n";
         } else {
@@ -4162,14 +4190,16 @@ sub import_reputation_feeds() {
 
             if ($feed->{'data_type'} eq 'IP') {
 
-                for my $ip_type (qw(ipv4 ipv6)) {
+                for my $ip_type (qw(ipv4 ipv4_net ipv6 ipv6_net)) {
 
                     ### zero out the old reputation feed data
                     $reputation_data{$feed->{'feed_name'}}{$ip_type} = {};
 
                     ### copy the newly imported feed data into place
-                    for my $ip (keys %{$new_feed_data{$ip_type}}) {
-                        $reputation_data{$feed->{'feed_name'}}{$ip_type}{$ip} = '';
+                    for my $ip_net (keys %{$new_feed_data{$ip_type}}) {
+                        my $ip_net_val = $new_feed_data{$ip_type}{$ip_net};
+                        $reputation_data{$feed->{'feed_name'}}{$ip_type}{$ip_net}
+                                = $ip_net_val;
                     }
                 }
             }
@@ -4190,9 +4220,13 @@ sub reputation_feeds_report_diffs() {
     my $time = scalar localtime();
     my $is_diff = 0;
     my $new_ipv4_ctr = 0;
+    my $new_ipv4_net_ctr = 0;
     my $new_ipv6_ctr = 0;
+    my $new_ipv6_net_ctr = 0;
     my $deleted_ipv4_ctr = 0;
+    my $deleted_ipv4_net_ctr = 0;
     my $deleted_ipv6_ctr = 0;
+    my $deleted_ipv6_net_ctr = 0;
 
     ### email file handle
     my $fh;
@@ -4211,16 +4245,20 @@ sub reputation_feeds_report_diffs() {
 
     if ($feed->{'data_type'} eq 'IP') {
         print $fh "Reputation feed: '$feed->{'feed_name'}' IP updates:\n";
-        for my $ip_type ('ipv4', 'ipv6') {
+        for my $ip_type (qw/ipv4 ipv4_net ipv6 ipv6_net/) {
             ### look for removed IP's
-            for my $ip (keys %{$reputation_data{$feed->{'feed_name'}}{'ipv4'}}) {
+            for my $ip (keys %{$reputation_data{$feed->{'feed_name'}}{$ip_type}}) {
                 unless (defined $new_feed_data->{$ip_type}) {
                     print $fh "- Deleted IP: $ip\n";
                     $is_diff = 1;
                     if ($ip_type eq 'ipv4') {
                         $deleted_ipv4_ctr += 1;
-                    } else {
+                    } elsif ($ip_type eq 'ipv4_net') {
+                        $deleted_ipv4_net_ctr += 1;
+                    } elsif ($ip_type eq 'ipv6') {
                         $deleted_ipv6_ctr += 1;
+                    } elsif ($ip_type eq 'ipv6_net') {
+                        $deleted_ipv6_net_ctr += 1;
                     }
                 }
             }
@@ -4230,8 +4268,12 @@ sub reputation_feeds_report_diffs() {
                     $is_diff = 1;
                     if ($ip_type eq 'ipv4') {
                         $new_ipv4_ctr += 1;
-                    } else {
+                    } elsif ($ip_type eq 'ipv4_net') {
+                        $new_ipv4_net_ctr += 1;
+                    } elsif ($ip_type eq 'ipv6') {
                         $new_ipv6_ctr += 1;
+                    } elsif ($ip_type eq 'ipv6_net') {
+                        $new_ipv6_net_ctr += 1;
                     }
                 }
             }
@@ -4243,9 +4285,15 @@ sub reputation_feeds_report_diffs() {
     close $fh unless $no_daemon;
 
     if ($is_diff and not $no_daemon) {
-        &sys_log("reputation feed: '$feed->{'feed_name'}' IPv4 new/deleted addrs: " .
-            "$new_ipv4_ctr/$deleted_ipv4_ctr, IPv6 new/deleted addrs: " .
-            "$new_ipv6_ctr/$deleted_ipv6_ctr");
+        &sys_log("reputation feed: '$feed->{'feed_name'}' IPv4 new/deleted addrs: "
+            . "$new_ipv4_ctr/$deleted_ipv4_ctr, "
+            . "IPv4 new/deleted networks: "
+            . "$new_ipv4_net_ctr/$deleted_ipv4_net_ctr, "
+            . "IPv6 new/deleted addrs: "
+            . "$new_ipv6_ctr/$deleted_ipv6_ctr"
+            . "IPv6 new/deleted networks: "
+            . "$new_ipv6_net_ctr/$deleted_ipv6_net_ctr"
+        );
         &send_mail("$config{'MAIL_STATUS_PREFIX'} Reputation diff: $feed->{'feed_name'}",
             $diff_email_file, $config{'EMAIL_ADDRESSES'}, $cmds{'mail'});
     }
@@ -5410,29 +5458,56 @@ sub reputation_feeds_check() {
         next unless $feed->{'data_type'} eq 'IP';
 
         my $feed_dl = $feed->{'danger_level'};
-        my $do_update_dl = 0; 
-        my $src = $pkt_hr->{'src'};
-        if ($pkt_hr->{'is_ipv6'}) {
-            if (defined $reputation_data{$feed->{'feed_name'}}{'ipv6'}{$src}) {
-                $pkt_hr->{'reputation_feed_matches'}{$feed->{'feed_name'}} += 1;
-                &sys_log("reputation feed: '$feed->{'feed_name'}' match for IP: $src, " .
-                    "packets: $pkt_hr->{'reputation_feed_matches'}{$feed->{'feed_name'}}");
 
-                $do_update_dl = 1 if $scan_dl{$src} < $feed_dl;
+        my $do_update_dl = 0;
+        my $matched = 0;
+
+        ### default to the source IP, but switch if it is local
+        my $ip = $pkt_hr->{'src'};
+        my $ip_obj_key = 's_obj';
+        if (defined $is_local_ip{$ip}) {
+            if (not defined $is_local_ip{$pkt_hr->{'dst'}}) {
+            } else {
+                ### both IP's are local
+                return;
             }
-        } else {
-            if (defined $reputation_data{$feed->{'feed_name'}}{'ipv4'}{$src}) {
+        }
+
+        my $ip_type  = 'ipv4';
+        my $net_type = 'ipv4_net';
+        if ($pkt_hr->{'is_ipv6'}) {
+            $ip_type  = 'ipv6';
+            $net_type = 'ipv6_net';
+        }
+
+        ### IP equals test
+        if (defined $reputation_data{$feed->{'feed_name'}}{$ip_type}{$ip}) {
+            $pkt_hr->{'reputation_feed_matches'}{$feed->{'feed_name'}} += 1;
+            &sys_log("reputation feed: '$feed->{'feed_name'}' match for IP: $ip, " .
+                "packets: $pkt_hr->{'reputation_feed_matches'}{$feed->{'feed_name'}}");
+            $matched = 1;
+        }
+
+        ### network tests
+        for my $rnet (keys %{$reputation_data{$feed->{'feed_name'}}{$net_type}}) {
+            my $rnet_obj = $reputation_data{$feed->{'feed_name'}}{$net_type}{$rnet};
+            if ($pkt_hr->{$ip_obj_key}->within($rnet_obj)) {
                 $pkt_hr->{'reputation_feed_matches'}{$feed->{'feed_name'}} += 1;
-                &sys_log("reputation feed: '$feed->{'feed_name'}' match for IP: $src, " .
-                    "packets: $pkt_hr->{'reputation_feed_matches'}{$feed->{'feed_name'}}");
-                $do_update_dl = 1 if $scan_dl{$src} < $feed_dl;
+                &sys_log("reputation feed: '$feed->{'feed_name'}' network "
+                    . "match for IP: $ip within $rnet, "
+                    . "packets: $pkt_hr->{'reputation_feed_matches'}{$feed->{'feed_name'}}");
+                $matched = 1;
             }
+        }
+
+        if ($matched) {
+            $do_update_dl = 1 if $scan_dl{$ip} < $feed_dl;
         }
 
         if ($do_update_dl) {
             &sys_log("reputation feed: '$feed->{'feed_name'}' " .
-                "assigned DL: $feed_dl for IP: $src");
-            $scan_dl{$src} = $feed_dl;
+                "assigned DL: $feed_dl for IP: $ip");
+            $scan_dl{$ip} = $feed_dl;
         }
     }
     return;
@@ -5651,7 +5726,7 @@ sub log_top_scans() {
         } else {
             $str .= ' 0';
         }
-        if (defined $local_src{$src}) {
+        if (defined $is_local_ip{$src}) {
             $str .= ' 1';
         } else {
             $str .= ' 0';
@@ -5933,8 +6008,8 @@ sub scan_logr() {
                 ### we're most likely interested in the whois information for
                 ### a non local IP address
                 if ($config{'ENABLE_WHOIS_FORCE_SRC_IP'} eq 'N'
-                        and &is_local($src, NetAddr::IP->new($src))
-                        and not &is_local($dst, NetAddr::IP->new($dst))) {
+                        and defined $is_local_ip{$src}
+                        and not defined $is_local_ip{$dst}) {
                     $whois_which_ip_str = 'destination IP';
                     $lookup_ip = $dst;
                 }
@@ -5976,8 +6051,10 @@ sub scan_logr() {
             }
 
             print $fh "=-=-=-=-=-=-=-=-=-=-=-= $time =-=-=-=-=-=-=-=",
-                "-=-=-=-=\n\n\n";
+                "-=-=-=-=\n\n";
 
+            printf $fh "%${log_len}s%s\n", 'psad Alert: ',
+                "version $version ($cmds{'psad'})";
             printf $fh "%${log_len}s%s", 'Danger level: ',
                 "[$scan_dl{$src}] (out of 5)";
 
@@ -9022,25 +9099,25 @@ sub csv_tokens() {
                 } elsif ($search =~ m|^$ipv4_re/$ipv4_re$|) {
                     $search_hsh{'net'} = $search;
                     $search_hsh{'net_obj'} = NetAddr::IP->new($search)
-                        or die "[*] NetAddr::IP($search) error";
+                        or die "[*] NetAddr::IP($search) error: $!";
                 } elsif ($search =~ m|^$ipv4_re/\d+$|) {
                     $search_hsh{'net'} = $search;
                     $search_hsh{'net_obj'} = NetAddr::IP->new($search)
-                        or die "[*] NetAddr::IP($search) error";
+                        or die "[*] NetAddr::IP($search) error: $!";
                 } elsif ($search =~ m|^$ipv4_re$|) {
                     $search_hsh{'ip'} = $search;
                     $search_hsh{'ip_obj'} = NetAddr::IP->new($search)
-                        or die "[*] NetAddr::IP($search) error";
+                        or die "[*] NetAddr::IP($search) error: $!";
                 } elsif ($search =~ m|\:|) {
                     ### see if this is an IPv6 address
                     if ($search =~ m|\/|) {
                         $search_hsh{'net'} = $search;
                         $search_hsh{'net_obj'} = NetAddr::IP->new6($search)
-                            or die "[*] NetAddr::IP($search) error";
+                            or die "[*] NetAddr::IP($search) error: $!";
                     } else {
                         $search_hsh{'net'} = $search;
                         $search_hsh{'net_obj'} = NetAddr::IP->new6($search)
-                            or die "[*] NetAddr::IP($search) error";
+                            or die "[*] NetAddr::IP($search) error: $!";
                     }
                 } else {
                     die "[*] Unrecognized value for $token";
@@ -9344,7 +9421,8 @@ sub print_scan_status() {
                 ", Pkts: $tot_pkts, Total protocols: $tot_protocols, " .
                 "Unique sigs: $uniq_sigs";
 
-            my $src_obj = NetAddr::IP->new($src) or die "[*] NetAddr::IP($src) error";
+            my $src_obj = NetAddr::IP->new($src)
+                    or die "[*] NetAddr::IP($src) error: $!";
             if ($src_obj->version() == 6) {
                 $src_str = "\nSRC:  $src (" . $src_obj->short() .
                     "), DL: $dl, Dsts: $total_dsts" .
@@ -9363,7 +9441,7 @@ sub print_scan_status() {
                 }
                 $src_str .= ", Email alerts: $tot_alerts";
             }
-            if (&is_local($src, $src_obj)) {
+            if (defined $is_local_ip{$src}) {
                 $src_str .= ', Local IP';
             }
             $printed = 1;
@@ -9383,11 +9461,11 @@ sub print_scan_status() {
             DST: for my $dst (keys %{$scan{$src}}) {
                 my $dst_str = "    DST: $dst";
                 my $dst_obj = NetAddr::IP->new($dst)
-                    or die "[*] NetAddr::IP($dst) error";
+                    or die "[*] NetAddr::IP($dst) error: $!";
                 if ($dst_obj->version() == 6) {
                     $dst_str = "    DST: $dst (" . $dst_obj->short() . ')';
                 }
-                if (&is_local($dst, $dst_obj)) {
+                if (defined $is_local_ip{$dst}) {
                     $dst_str .= ', Local IP';
                 }
                 push @lines, "$dst_str\n";
@@ -10102,7 +10180,7 @@ sub import_top_attackers() {
             } else {
                 $scan_dl{$ip} = $dl;
             }
-            $local_src{$ip} = '' if $is_local;
+            $is_local_ip{$ip} = '' if $is_local;
             $top_packet_counts{$ip} = $tot_pkts;
             $top_sig_counts{$ip}    = $sig_matches;
         }
@@ -10142,7 +10220,7 @@ sub print_top_attackers() {
                     or defined $top_sig_counts{$src};
 
             my $ip_obj = NetAddr::IP->new($src)
-                or die "[*] NetAddr::IP $src error";
+                or die "[*] NetAddr::IP $src error: $!";
 
             $ip_objs{$src} = $ip_obj;
             if ($ip_obj->version() == 6) {
@@ -10174,7 +10252,7 @@ sub print_top_attackers() {
             } else {
                 $str .= ', Sig count: 0';
             }
-            if (defined $local_src{$src}) {
+            if (defined $is_local_ip{$src}) {
                 $str .= ', (local IP)';
             }
             $ctr++;
@@ -11373,6 +11451,7 @@ sub expand_vars() {
         for my $hr (\%config, \%cmds) {
             for my $var (keys %$hr) {
                 my $val = $hr->{$var};
+                next if $var eq 'IP_INFO';
                 if ($val =~ m|\$(\w+)|) {
                     my $sub_var = $1;
                     die "[*] sub-ver $sub_var not allowed within same ",
@@ -11855,7 +11934,8 @@ sub required_vars() {
         DL2_UNIQUE_HOSTS DL3_UNIQUE_HOSTS DL4_UNIQUE_HOSTS DL5_UNIQUE_HOSTS
         PORT_RANGE_SWEEP_THRESHOLD ENABLE_OVERRIDE_FW_CMD FW_CMD FW_CMD_ARGS
         EMAIL_APPEND_HEADER ENABLE_REPUTATION_FEEDS REPUTATION_FEED
-        REPUTATION_FEEDS_DIR PSAD_TMP_DIR
+        REPUTATION_FEEDS_DIR PSAD_TMP_DIR ENABLE_IP_INFO_URL
+        IP_INFO
     ));
     &defined_vars(\@required_vars);
     return;

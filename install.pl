@@ -810,6 +810,7 @@ sub import_config() {
         if (/^\s*(\S+)\s+(.*?)\;/) {
             my $varname = $1;
             my $val     = $2;
+            next if $varname eq 'IP_INFO';
             if ($val =~ m|/.+| and $varname =~ /^\s*(\S+)Cmd$/) {
                 ### found a command
                 $cmds{$1} = $val;

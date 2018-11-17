@@ -6182,6 +6182,13 @@ sub scan_logr() {
                 }
             }
 
+            ### IP information URL
+            if ($config{'ENABLE_IP_INFO_URL'} eq 'Y') {
+                my $url = $config{'IP_INFO_URL'};
+                $url =~ s/\$SRC/$src/;
+                printf $fh "%${log_len}s%s\n", 'IP Info: ', "'$config{'IP_INFO_LABEL'}' - '$url'";
+            }
+
             unless ($no_posf) {
                 if (defined $p0f{$src}) {  ### prefer p0f-based fingerprinting
                     ### any p0f fingerprint that contains a "@" is an
@@ -11427,6 +11434,14 @@ sub import_config() {
                 ### handle variables that can be set multiple times
                 if ($varname eq 'REPUTATION_FEED') {
                     push @{$config{$varname}}, &reputation_feed_parse_conf_var($val);
+                } elsif ($varname eq 'IP_INFO') {
+                    $config{$varname} = $val unless defined $config{$varname};
+                    if ($val =~ m|\"(.*?)\"\,(.*)|) {
+                        $config{'IP_INFO_LABEL'} = $1;
+                        $config{'IP_INFO_URL'}   = $2;
+                    } else {
+                        die qq/[*] Need format "<label>",<url> for $varname/;
+                    }
                 } else {
                     $config{$varname} = $val unless defined $config{$varname};
                 }
@@ -11451,7 +11466,7 @@ sub expand_vars() {
         for my $hr (\%config, \%cmds) {
             for my $var (keys %$hr) {
                 my $val = $hr->{$var};
-                next if $var eq 'IP_INFO';
+                next if $var eq 'IP_INFO' or $var eq 'IP_INFO_URL';
                 if ($val =~ m|\$(\w+)|) {
                     my $sub_var = $1;
                     die "[*] sub-ver $sub_var not allowed within same ",

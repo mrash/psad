@@ -7208,7 +7208,10 @@ sub ipt_rm_block() {
         }
         print STDERR "[+] ipt_rm_block(): removed iptables block ",
             "against $ip\n" if $debug;
-
+            
+        if ($config{'ENABLE_EXT_UNBLOCK_SCRIPT_EXEC'} eq 'Y') {
+            &exec_external_script($ip, $config{'EXTERNAL_UNBLOCK_SCRIPT'});
+        }
         return 1;
     }
 
